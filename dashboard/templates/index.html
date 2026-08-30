@@ -382,68 +382,69 @@
         </a>
     </div>
 
-    <!-- Clean Header -->
-    <header class="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-slate-200 px-4 sm:px-8 py-3 transition-all">
-        <div class="max-w-[1680px] mx-auto flex items-center justify-between">
+    <!-- Clean Modern Glass Header -->
+    <header class="sticky top-0 z-40 bg-[#0B0E14]/90 backdrop-blur-xl border-b border-white/10 px-4 sm:px-6 lg:px-8 py-2.5 transition-all">
+        <div class="max-w-[1720px] mx-auto flex items-center justify-between gap-3 sm:gap-4">
             <!-- Brand & Status -->
-            <div class="flex items-center space-x-3">
-                <div class="w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center text-white">
-                    <i data-lucide="activity" class="w-4 h-4"></i>
+            <div class="flex items-center space-x-3 shrink-0">
+                <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 to-indigo-400 flex items-center justify-center text-white shadow-md shadow-indigo-500/20">
+                    <i data-lucide="activity" class="w-4 h-4 text-white"></i>
                 </div>
-                <div class="flex items-center space-x-2">
-                    <h1 class="text-base font-bold tracking-tight text-slate-900">R20 自进化交易</h1>
+                <div class="flex items-baseline space-x-2">
+                    <h1 class="text-base font-extrabold tracking-tight text-white">R20</h1>
+                    <span class="text-xs font-semibold text-slate-400 hidden lg:inline font-mono tracking-normal">自进化交易</span>
                 </div>
             </div>
 
-            <!-- Desktop Nav Tabs -->
-            <div class="hidden md:flex items-center space-x-1">
-                <button onclick="switchMainTab('trading')" id="top-nav-btn-trading" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition nav-pill-active flex items-center space-x-1.5">
+            <!-- Desktop Nav Tabs (Segmented Capsule) -->
+            <div class="hidden md:flex items-center space-x-1 bg-slate-950/60 p-1 rounded-xl border border-white/8 backdrop-blur-md">
+                <button onclick="switchMainTab('trading')" id="top-nav-btn-trading" class="px-3 py-1.5 rounded-lg text-xs font-bold transition nav-pill-active flex items-center space-x-1.5">
                     <i data-lucide="layout-grid" class="w-3.5 h-3.5"></i>
                     <span>实盘矩阵</span>
                 </button>
-                <button onclick="switchMainTab('factors')" id="top-nav-btn-factors" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition flex items-center space-x-1.5">
+                <button onclick="switchMainTab('factors')" id="top-nav-btn-factors" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white hover:bg-white/5 transition flex items-center space-x-1.5">
                     <i data-lucide="brain" class="w-3.5 h-3.5"></i>
-                    <span>AI大脑决策</span>
+                    <span>AI决策</span>
                 </button>
-                <button onclick="switchMainTab('news')" id="top-nav-btn-news" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition flex items-center space-x-1.5">
+                <button onclick="switchMainTab('news')" id="top-nav-btn-news" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white hover:bg-white/5 transition flex items-center space-x-1.5">
                     <i data-lucide="newspaper" class="w-3.5 h-3.5"></i>
                     <span>全网舆情</span>
                 </button>
-                <button onclick="switchMainTab('lab')" id="top-nav-btn-lab" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition flex items-center space-x-1.5">
+                <button onclick="switchMainTab('lab')" id="top-nav-btn-lab" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white hover:bg-white/5 transition flex items-center space-x-1.5">
                     <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
                     <span>自进化</span>
                 </button>
-                <button onclick="switchMainTab('history')" id="top-nav-btn-history" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition flex items-center space-x-1.5">
+                <button onclick="switchMainTab('history')" id="top-nav-btn-history" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white hover:bg-white/5 transition flex items-center space-x-1.5">
                     <i data-lucide="receipt" class="w-3.5 h-3.5"></i>
                     <span>交易台账</span>
                 </button>
             </div>
 
-            <!-- Right: Status & Sync -->
-            <div class="flex items-center space-x-2 sm:space-x-2.5">
+            <!-- Right: Actions Group -->
+            <div class="flex items-center space-x-2 sm:space-x-2.5 shrink-0">
                 <!-- GitHub Repository Link in Top Nav -->
-                <a href="https://github.com/555cute/r20-quantum-trader" target="_blank" rel="noopener noreferrer" class="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700/80 hover:border-slate-500 hover:bg-slate-800 text-white hover:text-white text-xs font-bold flex items-center space-x-2 transition shadow-sm group" title="访问 GitHub 开源项目仓库">
+                <a href="https://github.com/555cute/r20-quantum-trader" target="_blank" rel="noopener noreferrer" class="px-2.5 py-1.5 rounded-xl bg-slate-900/90 border border-slate-700/80 hover:border-slate-500 hover:bg-slate-800 text-white text-xs font-bold flex items-center space-x-1.5 transition shadow-sm group" title="访问 GitHub 开源项目仓库">
                     <svg class="w-4 h-4 text-white group-hover:scale-110 transition-transform fill-current shrink-0" viewBox="0 0 24 24" aria-hidden="true">
                         <path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/>
                     </svg>
                     <span class="text-xs font-bold text-white tracking-wide">GitHub</span>
-                    <span class="px-1.5 py-0.5 rounded text-[10px] font-mono font-extrabold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">MIT</span>
+                    <span class="px-1.5 py-0.2 rounded text-[9px] font-mono font-extrabold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">MIT</span>
                 </a>
 
                 <!-- Realtime Prompt Quick Trigger Button in Top Nav -->
-                <button onclick="openPromptModal()" class="px-2.5 py-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 hover:bg-indigo-500/20 hover:border-indigo-500/50 text-xs font-semibold flex items-center space-x-1.5 transition shadow-xs" title="实时查看当前 AI 大脑完整提示词">
+                <button onclick="openPromptModal()" class="px-2.5 py-1.5 rounded-xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 hover:bg-indigo-500/20 hover:border-indigo-500/50 text-xs font-bold flex items-center space-x-1.5 transition shadow-xs" title="实时查看当前 AI 大脑完整提示词">
                     <i data-lucide="terminal" class="w-3.5 h-3.5 text-indigo-400"></i>
                     <span class="hidden sm:inline font-bold text-slate-200">大脑提示词</span>
                     <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
                 </button>
 
-                <div class="hidden sm:flex items-center space-x-2 px-2.5 py-1 rounded-md bg-slate-900/80 border border-slate-800 text-xs font-mono">
-                    <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-                    <span class="text-slate-200 font-bold">LIVE</span>
-                    <span class="text-slate-600">|</span>
-                    <span id="last-updated" class="text-slate-300 font-mono text-[11px]">同步中...</span>
+                <div class="hidden lg:flex items-center space-x-1.5 px-2.5 py-1 rounded-xl bg-slate-950/60 border border-white/5 text-xs font-mono">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span class="text-slate-200 font-bold text-[11px]">LIVE</span>
+                    <span class="text-slate-700">|</span>
+                    <span id="last-updated" class="text-slate-400 font-mono text-[11px]">同步中...</span>
                 </div>
-                <button onclick="loadAllData()" class="w-8 h-8 rounded-md bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:border-slate-700 shadow-sm flex items-center justify-center transition active:scale-95" title="刷新数据">
+                <button onclick="loadAllData()" class="w-8 h-8 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:border-slate-700 shadow-sm flex items-center justify-center transition active:scale-95 shrink-0" title="刷新数据">
                     <i data-lucide="refresh-cw" id="refresh-icon" class="w-3.5 h-3.5"></i>
                 </button>
             </div>
@@ -1243,9 +1244,9 @@
                 const topBtn = document.getElementById(`top-nav-btn-${t}`);
                 if (topBtn) {
                     if (t === tabName) {
-                        topBtn.className = "px-3.5 py-1.5 rounded-lg text-xs font-semibold transition nav-pill-active flex items-center space-x-1.5";
+                        topBtn.className = "px-3 py-1.5 rounded-lg text-xs font-bold transition nav-pill-active flex items-center space-x-1.5";
                     } else {
-                        topBtn.className = "px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition flex items-center space-x-1.5";
+                        topBtn.className = "px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white hover:bg-white/5 transition flex items-center space-x-1.5";
                     }
                 }
 
