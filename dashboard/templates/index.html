@@ -1648,11 +1648,27 @@
             let html = '';
             factors.forEach(f => {
                 const action = f.action || 'WAIT';
-                let actionBadge = '<span class="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-slate-800/80 text-slate-300 border border-slate-700">🤖 观望 WAIT</span>';
-                if (action === 'BUY_LONG') {
-                    actionBadge = '<span class="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-emerald-950/80 text-emerald-400 border border-emerald-500/50 shadow-sm">🟢 批准做多 BUY</span>';
-                } else if (action === 'SELL_SHORT') {
-                    actionBadge = '<span class="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-rose-950/80 text-rose-400 border border-rose-500/50 shadow-sm">🔴 批准做空 SELL</span>';
+                const pos = f.position;
+                const isHolding = !!pos;
+                const isLong = pos && String(pos.side || '').includes('多');
+
+                let actionBadge = '<span class="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-slate-800/80 text-slate-400 border border-slate-700">🤖 空仓观望 WAIT</span>';
+
+                if (isHolding) {
+                    if (action === 'BUY_LONG') {
+                        actionBadge = '<span class="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-indigo-950/80 text-indigo-300 border border-indigo-500/50 shadow-sm animate-pulse">🚀 顺势加多 SCALE-IN</span>';
+                    } else if (action === 'SELL_SHORT') {
+                        actionBadge = '<span class="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-indigo-950/80 text-indigo-300 border border-indigo-500/50 shadow-sm animate-pulse">🌪️ 顺势加空 SCALE-IN</span>';
+                    } else {
+                        const sideColor = isLong ? 'text-emerald-300 border-emerald-500/40 bg-emerald-950/50' : 'text-rose-300 border-rose-500/40 bg-rose-950/50';
+                        actionBadge = `<span class="px-2 py-0.5 rounded-lg text-[10px] font-bold border ${sideColor} shadow-sm">📌 持仓盯盘 (${isLong ? '多' : '空'}单)</span>`;
+                    }
+                } else {
+                    if (action === 'BUY_LONG') {
+                        actionBadge = '<span class="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-emerald-950/80 text-emerald-400 border border-emerald-500/50 shadow-sm">🟢 批准做多 BUY</span>';
+                    } else if (action === 'SELL_SHORT') {
+                        actionBadge = '<span class="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-rose-950/80 text-rose-400 border border-rose-500/50 shadow-sm">🔴 批准做空 SELL</span>';
+                    }
                 }
 
                 const chg = Number(f.change24h || f.chg24h || 0);

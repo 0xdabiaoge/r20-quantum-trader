@@ -442,6 +442,7 @@ def update_cache_cycle():
             pass
 
     factors_list = []
+    pos_map = {p.get("instId"): p for p in positions} if isinstance(positions, list) else {}
     if os.path.exists(STATE_JSON_FILE):
         try:
             with open(STATE_JSON_FILE, "r", encoding="utf-8") as f:
@@ -474,6 +475,7 @@ def update_cache_cycle():
                     factors_list.append({
                         "name": ins.get("name"),
                         "instId": inst_id,
+                        "position": pos_map.get(inst_id),
                         "type": ins.get("type", "crypto"),
                         "price": ins.get("price", "--"),
                         "score": score_val,
