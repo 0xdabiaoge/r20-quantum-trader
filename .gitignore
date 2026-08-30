@@ -1,0 +1,68 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environments
+.venv/
+venv/
+ENV/
+
+# Sensitive & Secret Credentials (CRITICAL)
+.env
+.env.local
+.okx/
+.bypy/
+*.pem
+*.key
+*.secret
+id_rsa
+id_rsa.pub
+token.json
+credentials.json
+
+# Live Real-Money Ledger & Private DBs (CRITICAL)
+data/*.json
+data/*.db
+data/*.sqlite
+data/*.xlsx
+data/*.csv
+data/*.lock
+data/*.tmp
+!data/.gitkeep
+
+# Live Logs & Backups & PIDs
+logs/
+backups/
+*.log
+*.tar.gz
+*.zip
+*.pid
+
+# OS & Editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo

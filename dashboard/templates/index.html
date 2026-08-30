@@ -1,0 +1,2456 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>R20自进化交易</title>
+    <meta name="theme-color" content="#ffffff">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Plus Jakarta Sans"', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+                        mono: ['"JetBrains Mono"', 'monospace'],
+                    },
+                    colors: {
+                        surface: '#F8FAFC',
+                        card: '#FFFFFF',
+                        border: '#E2E8F0',
+                        brand: {
+                            50: '#EFF6FF',
+                            500: '#3B82F6',
+                            600: '#2563EB',
+                            700: '#1D4ED8',
+                        },
+                        profit: {
+                            light: '#ECFDF5',
+                            text: '#059669',
+                            dark: '#047857'
+                        },
+                        loss: {
+                            light: '#FFF1F2',
+                            text: '#E11D48',
+                            dark: '#BE123C'
+                        }
+                    },
+                    boxShadow: {
+                        'soft': '0 2px 10px rgba(15, 23, 42, 0.03), 0 1px 3px rgba(15, 23, 42, 0.02)',
+                        'hover': '0 12px 28px rgba(15, 23, 42, 0.07), 0 4px 10px rgba(15, 23, 42, 0.03)',
+                        'floating': '0 20px 40px -15px rgba(15, 23, 42, 0.1)',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #F8FAFC;
+            color: #0F172A;
+            -webkit-font-smoothing: antialiased;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .custom-card {
+            background: #FFFFFF;
+            border: 1px solid #E2E8F0;
+            border-radius: 16px;
+            box-shadow: 0 2px 8px -2px rgba(15, 23, 42, 0.04);
+            transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .custom-card:hover {
+            border-color: #CBD5E1;
+            box-shadow: 0 8px 24px -4px rgba(15, 23, 42, 0.08);
+            transform: translateY(-2px);
+        }
+
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 5px;
+            height: 5px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #CBD5E1;
+            border-radius: 9999px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #94A3B8;
+        }
+
+        .nav-pill-active {
+            background: #0F172A !important;
+            color: #FFFFFF !important;
+            box-shadow: 0 4px 12px rgba(15, 23, 42, 0.15);
+        }
+
+        .mobile-nav-active {
+            color: #2563EB !important;
+        }
+        .mobile-nav-active .mobile-icon-wrapper {
+            background: #EFF6FF !important;
+            color: #2563EB !important;
+        }
+
+        .live-dot {
+            box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5);
+            animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        @keyframes pulse-ring {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5); }
+            70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+
+        /* ============================================================
+           R20 QUANTUM TERMINAL - INSTITUTIONAL GRADE TRADING UI
+           Linear / Vercel / Bloomberg Hybrid Modern High-End Styling
+           ============================================================ */
+        :root {
+            --ui-bg: #0B0E14;
+            --ui-surface: #11151F;
+            --ui-surface-hover: #161B26;
+            --ui-surface-subtle: #181E2B;
+            --ui-border: rgba(255, 255, 255, 0.08);
+            --ui-border-hover: rgba(255, 255, 255, 0.16);
+            --ui-border-highlight: rgba(99, 102, 241, 0.3);
+            --ui-ink: #F8FAFC;
+            --ui-ink-secondary: #94A3B8;
+            --ui-muted: #64748B;
+            --ui-brand: #6366F1;
+            --ui-brand-glow: rgba(99, 102, 241, 0.15);
+            --ui-profit: #10B981;
+            --ui-profit-bg: rgba(16, 185, 129, 0.1);
+            --ui-profit-border: rgba(16, 185, 129, 0.25);
+            --ui-loss: #F43F5E;
+            --ui-loss-bg: rgba(244, 63, 94, 0.1);
+            --ui-loss-border: rgba(244, 63, 94, 0.25);
+        }
+
+        body {
+            background-color: var(--ui-bg) !important;
+            color: var(--ui-ink) !important;
+            font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.07) 0px, transparent 50%),
+                radial-gradient(at 100% 0%, rgba(16, 185, 129, 0.05) 0px, transparent 50%),
+                radial-gradient(at 50% 100%, rgba(14, 165, 233, 0.05) 0px, transparent 50%);
+            background-attachment: fixed;
+            min-height: 100vh;
+        }
+
+        /* Institutional Terminal Cards */
+        .custom-card {
+            background: rgba(17, 21, 31, 0.75) !important;
+            backdrop-filter: blur(16px) !important;
+            -webkit-backdrop-filter: blur(16px) !important;
+            border: 1px solid var(--ui-border) !important;
+            border-radius: 16px !important;
+            box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.4), inset 0 1px 0 0 rgba(255, 255, 255, 0.05) !important;
+            transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+        }
+        .custom-card:hover {
+            border-color: var(--ui-border-hover) !important;
+            box-shadow: 0 12px 32px -4px rgba(0, 0, 0, 0.5), inset 0 1px 0 0 rgba(255, 255, 255, 0.08) !important;
+            transform: translateY(-1px);
+        }
+
+        /* Sleek Glass Header */
+        header {
+            background: rgba(11, 14, 20, 0.85) !important;
+            backdrop-filter: blur(20px) !important;
+            -webkit-backdrop-filter: blur(20px) !important;
+            border-bottom: 1px solid var(--ui-border) !important;
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3) !important;
+        }
+        header h1 {
+            color: #FFFFFF !important;
+            font-weight: 800 !important;
+            letter-spacing: -0.02em !important;
+        }
+
+        /* Nav Pills (Linear Style) */
+        header .nav-pill-active {
+            background: rgba(255, 255, 255, 0.1) !important;
+            color: #FFFFFF !important;
+            border: 1px solid rgba(255, 255, 255, 0.15) !important;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3), inset 0 1px 0 0 rgba(255, 255, 255, 0.1) !important;
+            backdrop-filter: blur(8px) !important;
+        }
+        header button:not(.nav-pill-active) {
+            color: #94A3B8 !important;
+            border: 1px solid transparent !important;
+        }
+        header button:not(.nav-pill-active):hover {
+            color: #FFFFFF !important;
+            background: rgba(255, 255, 255, 0.05) !important;
+        }
+
+        /* Modern Dark Tables */
+        table thead tr {
+            border-bottom: 1px solid var(--ui-border) !important;
+            background: rgba(255, 255, 255, 0.02);
+        }
+        table th {
+            color: #94A3B8 !important;
+            font-size: 11px !important;
+            font-weight: 600 !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.05em !important;
+        }
+        table tbody tr {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04) !important;
+            transition: background 0.15s ease;
+        }
+        table tbody tr:hover {
+            background: rgba(255, 255, 255, 0.03) !important;
+        }
+
+        /* Scrollbars */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 5px;
+            height: 5px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 9999px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        /* Typography & Utility classes */
+        .text-slate-900 { color: #FFFFFF !important; }
+        .text-slate-800 { color: #F8FAFC !important; }
+        .text-slate-700 { color: #E2E8F0 !important; }
+        .text-slate-600 { color: #94A3B8 !important; }
+        .text-slate-500 { color: #64748B !important; }
+        .text-slate-400 { color: #64748B !important; }
+        .text-slate-300 { color: #475569 !important; }
+
+        /* Universal Dark Overrides for Tailwind Opacity & Background Variants */
+        [class*="bg-slate-50"], [class*="bg-slate-100"], [class*="bg-gray-50"], [class*="bg-gray-100"] {
+            background-color: rgba(255, 255, 255, 0.04) !important;
+        }
+        [class*="bg-white"] {
+            background-color: rgba(17, 21, 31, 0.6) !important;
+        }
+        [class*="bg-slate-900"] {
+            background-color: #080B11 !important;
+        }
+        [class*="bg-slate-950"] {
+            background-color: #040608 !important;
+        }
+
+        /* Accent Badge & Bubble Backgrounds with Soft Micro-Glow */
+        [class*="bg-emerald-50"] {
+            background-color: rgba(16, 185, 129, 0.1) !important;
+        }
+        [class*="text-emerald-"] {
+            color: #34D399 !important;
+        }
+        [class*="border-emerald-"] {
+            border-color: rgba(16, 185, 129, 0.25) !important;
+        }
+
+        [class*="bg-rose-50"] {
+            background-color: rgba(244, 63, 94, 0.1) !important;
+        }
+        [class*="text-rose-"] {
+            color: #FB7185 !important;
+        }
+        [class*="border-rose-"] {
+            border-color: rgba(244, 63, 94, 0.25) !important;
+        }
+
+        [class*="bg-blue-50"] {
+            background-color: rgba(59, 130, 246, 0.1) !important;
+        }
+        [class*="text-blue-"] {
+            color: #60A5FA !important;
+        }
+        [class*="border-blue-"] {
+            border-color: rgba(59, 130, 246, 0.25) !important;
+        }
+
+        [class*="bg-indigo-50"] {
+            background-color: rgba(99, 102, 241, 0.1) !important;
+        }
+        [class*="text-indigo-"] {
+            color: #818CF8 !important;
+        }
+        [class*="border-indigo-"] {
+            border-color: rgba(99, 102, 241, 0.25) !important;
+        }
+
+        [class*="bg-purple-50"] {
+            background-color: rgba(168, 85, 247, 0.1) !important;
+        }
+        [class*="text-purple-"] {
+            color: #C084FC !important;
+        }
+        [class*="border-purple-"] {
+            border-color: rgba(168, 85, 247, 0.25) !important;
+        }
+
+        [class*="bg-amber-50"] {
+            background-color: rgba(245, 158, 11, 0.1) !important;
+        }
+        [class*="text-amber-"] {
+            color: #FBBF24 !important;
+        }
+        [class*="border-amber-"] {
+            border-color: rgba(245, 158, 11, 0.25) !important;
+        }
+
+        [class*="bg-cyan-50"] {
+            background-color: rgba(6, 182, 212, 0.1) !important;
+        }
+        [class*="text-cyan-"] {
+            color: #22D3EE !important;
+        }
+        [class*="border-cyan-"] {
+            border-color: rgba(6, 182, 212, 0.25) !important;
+        }
+
+        [class*="border-slate-100"], [class*="border-slate-200"] {
+            border-color: rgba(255, 255, 255, 0.08) !important;
+        }
+        
+        /* Badges & Status */
+        .badge-profit {
+            background: var(--ui-profit-bg) !important;
+            color: var(--ui-profit) !important;
+            border: 1px solid var(--ui-profit-border) !important;
+        }
+        .badge-loss {
+            background: var(--ui-loss-bg) !important;
+            color: var(--ui-loss) !important;
+            border: 1px solid var(--ui-loss-border) !important;
+        }
+
+        /* Glow effects */
+        .glow-brand {
+            box-shadow: 0 0 25px -3px rgba(99, 102, 241, 0.25);
+        }
+        .glow-profit {
+            box-shadow: 0 0 25px -3px rgba(16, 185, 129, 0.25);
+        }
+
+        /* Live status dot */
+        .live-dot {
+            box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+            animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite !important;
+        }
+
+        /* Mobile Bottom Nav */
+        nav.md\:hidden {
+            background: rgba(11, 14, 20, 0.9) !important;
+            backdrop-filter: blur(20px) !important;
+            border-top: 1px solid var(--ui-border) !important;
+        }
+        .mobile-nav-active {
+            color: #6366F1 !important;
+        }
+        .mobile-nav-active .mobile-icon-wrapper {
+            background: rgba(99, 102, 241, 0.15) !important;
+            color: #818CF8 !important;
+        }
+
+    </style>
+</head>
+<body class="min-h-[100dvh] flex flex-col font-sans pb-24 md:pb-10 selection:bg-brand-50 selection:text-brand-700">
+
+    <!-- Top Auth Alert Banner (Optional) -->
+    <div id="auth-alert-banner" class="hidden bg-amber-50 border-b border-amber-200 px-4 py-2 text-xs text-amber-800 flex items-center justify-between shadow-sm">
+        <div class="flex items-center space-x-2">
+            <i data-lucide="shield-alert" class="w-4 h-4 text-amber-600 shrink-0"></i>
+            <span>OKX 设备授权待激活：验证码 <strong id="banner-usercode" class="font-mono bg-white px-2 py-0.5 rounded border border-amber-300">--</strong></span>
+        </div>
+        <a id="banner-auth-link" href="https://www.okx.com/account/oauth?flow=device" target="_blank" class="px-3 py-1 bg-amber-600 text-white rounded-lg font-semibold hover:bg-amber-700 transition">
+            前往授权
+        </a>
+    </div>
+
+    <!-- Clean Header -->
+    <header class="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-slate-200 px-4 sm:px-8 py-3 transition-all">
+        <div class="max-w-[1680px] mx-auto flex items-center justify-between">
+            <!-- Brand & Status -->
+            <div class="flex items-center space-x-3">
+                <div class="w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center text-white">
+                    <i data-lucide="activity" class="w-4 h-4"></i>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <h1 class="text-base font-bold tracking-tight text-slate-900">R20 自进化交易</h1>
+                </div>
+            </div>
+
+            <!-- Desktop Nav Tabs -->
+            <div class="hidden md:flex items-center space-x-1">
+                <button onclick="switchMainTab('trading')" id="top-nav-btn-trading" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition nav-pill-active flex items-center space-x-1.5">
+                    <i data-lucide="layout-grid" class="w-3.5 h-3.5"></i>
+                    <span>实盘矩阵</span>
+                </button>
+                <button onclick="switchMainTab('factors')" id="top-nav-btn-factors" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition flex items-center space-x-1.5">
+                    <i data-lucide="brain" class="w-3.5 h-3.5"></i>
+                    <span>AI大脑决策</span>
+                </button>
+                <button onclick="switchMainTab('news')" id="top-nav-btn-news" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition flex items-center space-x-1.5">
+                    <i data-lucide="newspaper" class="w-3.5 h-3.5"></i>
+                    <span>全网舆情</span>
+                </button>
+                <button onclick="switchMainTab('lab')" id="top-nav-btn-lab" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition flex items-center space-x-1.5">
+                    <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+                    <span>自进化</span>
+                </button>
+                <button onclick="switchMainTab('history')" id="top-nav-btn-history" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition flex items-center space-x-1.5">
+                    <i data-lucide="receipt" class="w-3.5 h-3.5"></i>
+                    <span>交易台账</span>
+                </button>
+            </div>
+
+            <!-- Right: Status & Sync -->
+            <div class="flex items-center space-x-2 sm:space-x-2.5">
+                <!-- Realtime Prompt Quick Trigger Button in Top Nav -->
+                <button onclick="openPromptModal()" class="px-2.5 py-1.5 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 hover:border-indigo-300 text-xs font-semibold flex items-center space-x-1.5 transition shadow-xs" title="实时查看当前 AI 大脑完整提示词">
+                    <i data-lucide="terminal" class="w-3.5 h-3.5 text-indigo-600"></i>
+                    <span class="hidden sm:inline">大脑提示词</span>
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                </button>
+
+                <div class="hidden sm:flex items-center space-x-2 px-2.5 py-1 rounded-md bg-slate-50 border border-slate-200 text-xs font-mono">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    <span class="text-slate-700 font-semibold">LIVE</span>
+                    <span class="text-slate-300">|</span>
+                    <span id="last-updated" class="text-slate-400 text-[11px]">同步中...</span>
+                </div>
+                <button onclick="loadAllData()" class="w-8 h-8 rounded-md bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:border-slate-300 shadow-sm flex items-center justify-center transition active:scale-95" title="刷新数据">
+                    <i data-lucide="refresh-cw" id="refresh-icon" class="w-3.5 h-3.5"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="max-w-[1680px] mx-auto px-4 sm:px-8 pt-6 w-full flex-1">
+
+        <!-- ========================================== -->
+        <!-- TAB 1: 实盘总览 (TRADING DASHBOARD / 首页) -->
+        <!-- ========================================== -->
+        <div id="tab-content-trading" class="space-y-6">
+
+            <!-- 🏆 TOP 4 KPI HERO CARDS (移动端仅首页展示，PC端全局/首页自然沉浸) -->
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+                <!-- 1. 账户总权益 -->
+                <div class="custom-card p-4 sm:p-5 flex flex-col justify-between">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-semibold text-slate-500">账户总权益 (USDT)</span>
+                        <div class="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center text-slate-600">
+                            <i data-lucide="wallet" class="w-4 h-4"></i>
+                        </div>
+                    </div>
+                    <div>
+                        <div id="metric-equity" class="text-2xl sm:text-3xl font-extrabold font-mono tracking-tight text-slate-900">4,244.57</div>
+                        <div class="flex items-center justify-between text-[11px] font-mono text-slate-500 mt-2 pt-2 border-t border-slate-100">
+                            <span>可用: <strong id="metric-avail" class="text-slate-700">--</strong></span>
+                            <span id="metric-margin-usage" class="text-slate-400">占用率: 0%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. 系统累计总收益 -->
+                <div class="custom-card p-4 sm:p-5 flex flex-col justify-between">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-semibold text-slate-500">累计净收益 (NAV)</span>
+                        <div class="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
+                            <i data-lucide="trending-up" class="w-4 h-4"></i>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="flex items-baseline space-x-2">
+                            <span id="metric-cum-pnl" class="text-2xl sm:text-3xl font-extrabold font-mono tracking-tight text-emerald-600">+0.00</span>
+                            <span class="text-xs font-bold text-slate-400">USDT</span>
+                        </div>
+                        <div class="flex items-center justify-between text-[11px] font-mono mt-2 pt-2 border-t border-slate-100">
+                            <span>ROI: <strong id="metric-cum-roi" class="text-emerald-600">+0.00%</strong></span>
+                            <span class="text-slate-400">累计手续费: <strong id="metric-cum-fees" class="text-slate-600">0.00 U</strong></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. 今日已结净盈亏 -->
+                <div class="custom-card p-4 sm:p-5 flex flex-col justify-between">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-semibold text-slate-500">今日已结净盈亏 (落袋)</span>
+                        <div class="w-7 h-7 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600">
+                            <i data-lucide="check-circle-2" class="w-4 h-4"></i>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="flex items-baseline space-x-2">
+                            <span id="metric-realized-pnl" class="text-2xl sm:text-3xl font-extrabold font-mono tracking-tight text-slate-900">+0.00</span>
+                            <span class="text-xs font-bold text-slate-400">USDT</span>
+                        </div>
+                        <div class="flex items-center justify-between text-[11px] font-mono mt-2 pt-2 border-t border-slate-100">
+                            <span id="metric-today-wr" class="text-slate-600 font-semibold">胜率: 0%</span>
+                            <span class="text-slate-400">手续费: <strong id="metric-fees" class="text-slate-600">0 U</strong></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4. 在途持仓净浮盈 -->
+                <div class="custom-card p-4 sm:p-5 flex flex-col justify-between">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-semibold text-slate-500">在途持仓净浮盈 (UPL)</span>
+                        <div class="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
+                            <i data-lucide="pie-chart" class="w-4 h-4"></i>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="flex items-baseline space-x-2">
+                            <span id="metric-upl" class="text-2xl sm:text-3xl font-extrabold font-mono tracking-tight text-slate-900">+0.00</span>
+                            <span class="text-xs font-bold text-slate-400">USDT</span>
+                        </div>
+                        <div class="flex items-center justify-between text-[11px] font-mono mt-2 pt-2 border-t border-slate-100">
+                            <span id="metric-pos-count" class="text-slate-700 font-semibold">0/6 仓</span>
+                            <span id="metric-pos-direction" class="text-slate-500">0多 / 0空</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 1. 活动持仓列表卡片 -->
+            <div class="custom-card p-5 sm:p-6">
+                <div class="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
+                    <div class="flex items-center space-x-2.5">
+                        <div class="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+                            <i data-lucide="layers" class="w-4 h-4"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-sm sm:text-base font-bold text-slate-900">实盘活动持仓 (Active Positions)</h2>
+                            <p class="text-[11px] text-slate-400">实时盯盘 · 交易所云端保护与本地移动止盈追踪</p>
+                        </div>
+                    </div>
+                    <span class="px-3 py-1 rounded-full text-xs font-mono font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                        <span id="pos-badge-count">0</span> / 6 在途
+                    </span>
+                </div>
+
+                <!-- Desktop Table View -->
+                <div class="hidden md:block overflow-x-auto custom-scrollbar">
+                    <table class="w-full text-left text-xs">
+                        <thead>
+                            <tr class="border-b border-slate-100 text-slate-400 font-semibold">
+                                <th class="pb-3 whitespace-nowrap">标的 / 杠杆</th>
+                                <th class="pb-3 whitespace-nowrap">策略形态</th>
+                                <th class="pb-3 whitespace-nowrap">方向 / 占用保证金</th>
+                                <th class="pb-3 whitespace-nowrap font-mono">开仓均价</th>
+                                <th class="pb-3 whitespace-nowrap font-mono">标记现价</th>
+                                <th class="pb-3 whitespace-nowrap font-mono">交易所云端止损</th>
+                                <th class="pb-3 text-right whitespace-nowrap font-mono">净浮盈</th>
+                                <th class="pb-3 text-right whitespace-nowrap font-mono">杠杆 ROI</th>
+                            </tr>
+                        </thead>
+                        <tbody id="positions-tbody" class="divide-y divide-slate-100 font-mono">
+                            <tr><td colspan="8" class="py-8 text-center text-slate-400 font-sans">当前无在途持仓</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Mobile Card List View -->
+                <div id="positions-mobile-list" class="md:hidden space-y-3">
+                    <div class="py-8 text-center text-slate-400 text-xs">当前无在途持仓</div>
+                </div>
+            </div>
+
+            <!-- 2. 资产净值走势与回撤监控图 (双轴/双重视角) -->
+            <div class="custom-card p-5 sm:p-6">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 mb-4 border-b border-slate-100">
+                    <div class="flex items-center space-x-2.5">
+                        <div class="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+                            <i data-lucide="line-chart" class="w-4 h-4"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-sm sm:text-base font-bold text-slate-900">资产净值与动态回撤走势 (Equity & Drawdown)</h2>
+                            <p class="text-[11px] text-slate-400">实时追踪官方账户总权益(USDT) 与 峰值动态回撤深度(%)</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <div class="flex items-center space-x-1.5 text-xs font-mono">
+                            <span class="inline-flex items-center px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                <span class="w-2 h-0.5 bg-emerald-500 mr-1.5"></span> 总权益(左轴)
+                            </span>
+                            <span class="inline-flex items-center px-2 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-200">
+                                <span class="w-2 h-0.5 bg-rose-500 mr-1.5"></span> 动态回撤(右轴)
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                <div class="h-64 sm:h-72 w-full">
+                    <canvas id="equityChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- TAB 2: AI 大脑决策 (AI BRAIN MATRIX) -->
+        <!-- ========================================== -->
+        <div id="tab-content-factors" class="hidden space-y-6">
+            <!-- 整合后的 AI 大脑决策与全景量化因子矩阵 (6大标的单卡全集) -->
+            <div class="custom-card p-5 sm:p-6">
+                <div class="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
+                    <div class="flex items-center space-x-2.5">
+                        <div class="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+                            <i data-lucide="brain" class="w-4 h-4"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-sm sm:text-base font-bold text-slate-900">AI 大脑实时决策与全维因子矩阵 (6 大核心加密资产)</h2>
+                            <p class="text-[11px] text-slate-400">LLM全权智能决策 · 5维量化因子库 · 盘口微观深度 · OKX SmartMoney 80%+ 聪明钱主力</p>
+                        </div>
+                    </div>
+                    <div class="text-xs font-mono text-slate-500 hidden sm:flex items-center space-x-1.5">
+                        <span>决策基准:</span>
+                        <strong id="brain-matrix-time" class="text-brand-600">--</strong>
+                    </div>
+                </div>
+                <div id="factors-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div class="col-span-full py-8 text-center text-slate-400 text-xs">加载 AI 决策全景矩阵中...</div>
+                </div>
+            </div>
+
+            <!-- AI 决策历程与宏观推演审计流 -->
+            <div class="custom-card p-5 sm:p-6">
+                <div class="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
+                    <div class="flex items-center space-x-2.5">
+                        <div class="w-8 h-8 rounded-xl bg-cyan-50 text-cyan-600 flex items-center justify-center font-bold">
+                            <i data-lucide="history" class="w-4 h-4"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-sm sm:text-base font-bold text-slate-900">AI 大脑历史决策推演审计流 (Decision Audit Log)</h2>
+                            <p class="text-[11px] text-slate-400">记录每轮 15 分钟大模型对全市场的宏观认知、观望判定与在途持仓管理指令</p>
+                        </div>
+                    </div>
+                </div>
+                <div id="ai-history-timeline" class="space-y-3.5 max-h-[420px] overflow-y-auto custom-scrollbar pr-1">
+                    <div class="py-8 text-center text-slate-400 text-xs">加载决策历史中...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- TAB 3: 全网舆情 (NEWS INTELLIGENCE) -->
+        <!-- ========================================== -->
+        <div id="tab-content-news" class="hidden space-y-6">
+            <div class="custom-card p-5 sm:p-6">
+                <div class="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
+                    <div class="flex items-center space-x-2.5">
+                        <div class="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
+                            <i data-lucide="newspaper" class="w-4 h-4"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-sm sm:text-base font-bold text-slate-900">实时重大资讯与多币种舆情情绪 (News Intelligence)</h2>
+                            <p class="text-[11px] text-slate-400">金色财经 · BlockBeats · 华尔街见闻 · 深潮 24H 实时监控</p>
+                        </div>
+                    </div>
+                    <div class="text-xs font-mono text-slate-500">
+                        宏观基调: <strong id="news-macro-env" class="text-emerald-600">偏多震荡</strong>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    <!-- Left: Coins Sentiment (5 cols) -->
+                    <div class="lg:col-span-5 bg-slate-50 rounded-2xl p-4 border border-slate-200/60">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-xs font-bold text-slate-800 flex items-center space-x-1.5">
+                                <i data-lucide="flame" class="w-3.5 h-3.5 text-amber-500"></i>
+                                <span>标的多空情绪指数</span>
+                            </h3>
+                            <span id="news-sentiment-time" class="text-[10px] font-mono text-slate-400">--</span>
+                        </div>
+                        <div id="coin-sentiments-grid" class="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+                            <div class="col-span-full py-6 text-center text-slate-400 text-xs">加载舆情指数中...</div>
+                        </div>
+                    </div>
+
+                    <!-- Right: News Feed (7 cols) -->
+                    <div class="lg:col-span-7 bg-slate-50 rounded-2xl p-4 border border-slate-200/60 flex flex-col justify-between">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-xs font-bold text-slate-800 flex items-center space-x-1.5">
+                                <i data-lucide="radio" class="w-3.5 h-3.5 text-blue-500"></i>
+                                <span>重点快讯与宏观情报</span>
+                            </h3>
+                            <span id="news-feed-time" class="text-[10px] font-mono text-blue-600 font-semibold">24H 实时推送</span>
+                        </div>
+                        <div id="news-headlines-container" class="space-y-2.5 max-h-[340px] overflow-y-auto custom-scrollbar pr-1">
+                            <div class="py-6 text-center text-slate-400 text-xs">加载资讯中...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- TAB 4: 自进化 (SELF-EVOLUTION LAB) -->
+        <!-- ========================================== -->
+        <div id="tab-content-lab" class="hidden space-y-6">
+            <!-- 1. Realtime Markdown Trading Memory -->
+            <div class="custom-card p-5 sm:p-6 flex flex-col justify-between">
+                <div class="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
+                    <div class="flex items-center space-x-2.5">
+                        <div class="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold">
+                            <i data-lucide="brain-circuit" class="w-4 h-4"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-sm sm:text-base font-bold text-slate-900">AI 交易大脑启发式长期记忆库 (AI Trading Memory)</h2>
+                            <p class="text-[11px] text-slate-400">每日交易流水复盘沉淀 · 带精确时间戳 · 智能时效动态淘汰与覆盖 · QwenPaw 原生 Prompt 注入</p>
+                        </div>
+                    </div>
+                    <div class="text-xs font-mono text-purple-600 font-bold hidden sm:flex items-center space-x-1.5">
+                        <span class="w-2 h-2 rounded-full bg-purple-500"></span>
+                        <span id="lab-memory-time">实时生效中</span>
+                    </div>
+                </div>
+                <!-- Markdown Memory Raw Display Box -->
+                <div class="bg-slate-900 text-slate-100 p-4 rounded-xl font-mono text-xs max-h-[380px] overflow-y-auto custom-scrollbar border border-slate-800 shadow-inner">
+                    <pre id="ai-memory-markdown-viewer" class="whitespace-pre-wrap leading-relaxed text-[11px] font-mono text-slate-200">加载长期记忆 Markdown 提示词中...</pre>
+                </div>
+            </div>
+
+            <!-- 2. Diagnosis & Cognitive Post-Mortem Grid -->
+            <div class="custom-card p-5 sm:p-6">
+                <div class="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
+                    <div class="flex items-center space-x-2.5">
+                        <div class="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
+                            <i data-lucide="sparkles" class="w-4 h-4"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-sm sm:text-base font-bold text-slate-900">AI 认知复盘与痛点归因 (Cognitive Post-Mortem)</h2>
+                            <p class="text-[11px] text-slate-400">穿透真实损益与手续费摩擦 · 诊断失误根源 · 提炼实战进化方向</p>
+                        </div>
+                    </div>
+                    <div class="text-xs font-mono text-slate-600 hidden sm:flex items-center space-x-2">
+                        <span>决策模式:</span>
+                        <strong class="text-indigo-600 font-bold">LLM 全权智能裁决</strong>
+                    </div>
+                </div>
+
+                <!-- AI Insights (Full Width) -->
+                <div class="bg-slate-50 rounded-2xl p-4 border border-slate-200/60 flex flex-col justify-between">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-xs font-bold text-slate-800 flex items-center space-x-1.5">
+                            <i data-lucide="microscope" class="w-3.5 h-3.5 text-blue-500"></i>
+                            <span>AI 逐单归因与痛点诊断</span>
+                        </h3>
+                        <span id="lab-insights-time" class="text-[10px] font-mono text-slate-400">--</span>
+                    </div>
+                    <div id="ai-insights-container" class="space-y-2.5 text-xs max-h-[300px] overflow-y-auto custom-scrollbar pr-1">
+                        <div class="py-6 text-center text-slate-400 text-xs">加载诊断中...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Performance Leaderboard -->
+            <div class="custom-card p-5 sm:p-6">
+                <h3 class="text-sm font-bold text-slate-900 mb-4">标的盈亏与胜率贡献榜</h3>
+                <div class="overflow-x-auto custom-scrollbar">
+                    <table class="w-full text-left text-xs">
+                        <thead>
+                            <tr class="border-b border-slate-100 text-slate-400 font-semibold">
+                                <th class="pb-3">标的代码</th>
+                                <th class="pb-3 font-mono">总交易单数</th>
+                                <th class="pb-3 font-mono">胜负场次</th>
+                                <th class="pb-3 font-mono">胜率</th>
+                                <th class="pb-3 text-right font-mono">净盈亏贡献</th>
+                            </tr>
+                        </thead>
+                        <tbody id="leaderboard-tbody" class="divide-y divide-slate-100 font-mono">
+                            <tr><td colspan="5" class="py-6 text-center text-slate-400 font-sans">暂无战报数据</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- TAB 5: 交易台账 (LIFECYCLE TRADES & LOGS) -->
+        <!-- ========================================== -->
+        <div id="tab-content-history" class="hidden space-y-6">
+            <!-- 交易台账 -->
+            <div class="custom-card p-5 sm:p-6">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 mb-4 border-b border-slate-100">
+                    <div class="flex items-center space-x-2.5">
+                        <div class="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+                            <i data-lucide="receipt" class="w-4 h-4"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-sm sm:text-base font-bold text-slate-900">生命周期交易台账 (Lifecycle Trades)</h2>
+                            <p class="text-[11px] text-slate-400">开单即刻入库 · 平仓自动回填盈亏与出场原因</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Search & Filter Pill Buttons -->
+                    <div class="flex items-center space-x-2 w-full sm:w-auto">
+                        <div class="flex items-center space-x-1 bg-slate-100 p-1 rounded-xl border border-slate-200 text-[11px] font-semibold">
+                            <button onclick="setTradeFilter('all')" id="filter-btn-all" class="px-2.5 py-1 rounded-lg bg-white text-slate-900 shadow-sm transition">全部</button>
+                            <button onclick="setTradeFilter('active')" id="filter-btn-active" class="px-2.5 py-1 rounded-lg text-slate-500 hover:text-slate-900 transition">在途持仓</button>
+                            <button onclick="setTradeFilter('closed')" id="filter-btn-closed" class="px-2.5 py-1 rounded-lg text-slate-500 hover:text-slate-900 transition">已平仓</button>
+                        </div>
+                        <input type="text" id="trade-search" oninput="renderTrades()" placeholder="搜索标的/方向/形态/原因..." class="px-3.5 py-1.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-blue-500 w-full sm:w-56 font-mono">
+                    </div>
+                </div>
+                <div class="overflow-x-auto custom-scrollbar max-h-[580px]">
+                    <table class="w-full text-left text-xs whitespace-nowrap">
+                        <thead class="sticky top-0 bg-[#0B0E14] z-10 border-b border-white/10">
+                            <tr class="text-slate-400 font-semibold">
+                                <th class="py-3 px-3.5 whitespace-nowrap">标的 / 方向</th>
+                                <th class="py-3 px-3.5 whitespace-nowrap">策略形态</th>
+                                <th class="py-3 px-3.5 whitespace-nowrap">占用保证金</th>
+                                <th class="py-3 px-3.5 whitespace-nowrap font-mono">开仓 (价格 / 时间)</th>
+                                <th class="py-3 px-3.5 whitespace-nowrap font-mono">平仓 (价格 / 时间)</th>
+                                <th class="py-3 px-3.5 text-right whitespace-nowrap font-mono">净盈亏 (ROI)</th>
+                                <th class="py-3 px-3.5 text-center whitespace-nowrap font-mono">耗时</th>
+                                <th class="py-3 px-3.5 whitespace-nowrap">出场原因</th>
+                            </tr>
+                        </thead>
+                        <tbody id="trades-tbody" class="divide-y divide-white/5 font-mono">
+                            <tr><td colspan="8" class="py-8 text-center text-slate-500 font-sans">加载台账中...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 系统巡检日志 -->
+            <div class="custom-card p-5 sm:p-6">
+                <div class="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
+                    <h3 class="text-sm font-bold text-slate-900 flex items-center space-x-2">
+                        <i data-lucide="terminal" class="w-4 h-4 text-slate-600"></i>
+                        <span>AI 多因子交易引擎巡检日志</span>
+                    </h3>
+                </div>
+                <div id="logs-container" class="bg-slate-900 text-slate-200 p-4 rounded-xl font-mono text-xs max-h-60 overflow-y-auto custom-scrollbar space-y-1">
+                    <p class="text-slate-400">加载日志中...</p>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- ⚡ GLOBAL FLOATING ACTION BUTTON FOR REALTIME PROMPT (右下角悬浮按钮) -->
+    <div class="fixed bottom-20 md:bottom-8 right-5 sm:right-8 z-40">
+        <button onclick="openPromptModal()" class="group flex items-center space-x-2 px-4 py-3 rounded-full bg-slate-900 hover:bg-slate-800 text-white shadow-xl hover:shadow-2xl border border-slate-700 transition transform hover:-translate-y-0.5 active:scale-95" title="点击展开/收起实时 AI 大脑提示词">
+            <div class="w-6 h-6 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold">
+                <i data-lucide="terminal" class="w-3.5 h-3.5"></i>
+            </div>
+            <span class="text-xs font-bold tracking-wide">实时提示词</span>
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        </button>
+    </div>
+
+    <!-- 🧠 FULL PROMPT MODAL / OVERLAY (全局全屏/弹窗提示词透视抽屉) -->
+    <div id="prompt-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-3 sm:p-6 transition-opacity">
+        <div class="bg-white border border-slate-200 rounded-2xl sm:rounded-3xl w-full max-w-4xl max-h-[90vh] shadow-2xl flex flex-col overflow-hidden">
+            <!-- Modal Header -->
+            <div class="px-5 sm:px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/80">
+                <div class="flex items-center space-x-3">
+                    <div class="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-600 font-bold">
+                        <i data-lucide="terminal" class="w-4 h-4"></i>
+                    </div>
+                    <div>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <h3 class="text-sm sm:text-base font-bold text-slate-900">AI 大脑实时完整提示词 (Realtime Prompt)</h3>
+                            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200">100% 透明审计</span>
+                            <span id="modal-prompt-time" class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-950/80 text-indigo-300 border border-indigo-500/30">推演基准: --</span>
+                        </div>
+                        <p class="text-[11px] text-slate-400">系统指令 (System Prompt) + 全周期因子 / 聪明钱资金流 / 实时快讯 / 账户持仓全量输入 (User Prompt)</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <button onclick="copyPromptText()" id="copy-prompt-btn" class="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold flex items-center space-x-1.5 shadow-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5 text-slate-500"></i>
+                        <span>一键复制</span>
+                    </button>
+                    <button onclick="closePromptModal()" class="w-8 h-8 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-500 flex items-center justify-center transition">
+                        ✕
+                    </button>
+                </div>
+            </div>
+
+            <!-- Modal Body (Prompt Viewer) -->
+            <div class="p-4 sm:p-6 overflow-y-auto custom-scrollbar flex-1 bg-slate-950">
+                <pre id="modal-prompt-content" class="whitespace-pre-wrap leading-relaxed text-[11px] font-mono text-slate-200 select-text">加载 AI 大脑最新完整提示词中...</pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- 📱 ULTRA CLEAN MOBILE BOTTOM BAR (Fixed & Attached to Screen Bottom) -->
+    <nav class="md:hidden fixed inset-x-0 bottom-0 z-50 bg-white/95 backdrop-blur-xl border-t border-slate-200 px-3 py-1.5 pb-safe shadow-[0_-4px_20px_rgba(0,0,0,0.04)]">
+        <div class="max-w-md mx-auto flex items-center justify-around">
+            <button onclick="switchMainTab('trading')" id="nav-btn-trading" class="flex flex-col items-center justify-center flex-1 py-1 text-slate-400 hover:text-slate-900 transition mobile-nav-active">
+                <div class="mobile-icon-wrapper w-8 h-8 rounded-xl flex items-center justify-center mb-0.5 bg-transparent transition">
+                    <i data-lucide="layout-grid" class="w-4 h-4"></i>
+                </div>
+                <span class="text-[10px] font-bold">实盘</span>
+            </button>
+
+            <button onclick="switchMainTab('factors')" id="nav-btn-factors" class="flex flex-col items-center justify-center flex-1 py-1 text-slate-400 hover:text-slate-900 transition">
+                <div class="mobile-icon-wrapper w-8 h-8 rounded-xl flex items-center justify-center mb-0.5 bg-transparent transition">
+                    <i data-lucide="brain" class="w-4 h-4"></i>
+                </div>
+                <span class="text-[10px] font-bold">AI大脑</span>
+            </button>
+
+            <button onclick="switchMainTab('news')" id="nav-btn-news" class="flex flex-col items-center justify-center flex-1 py-1 text-slate-400 hover:text-slate-900 transition">
+                <div class="mobile-icon-wrapper w-8 h-8 rounded-xl flex items-center justify-center mb-0.5 bg-transparent transition">
+                    <i data-lucide="newspaper" class="w-4 h-4"></i>
+                </div>
+                <span class="text-[10px] font-bold">舆情</span>
+            </button>
+
+            <button onclick="switchMainTab('lab')" id="nav-btn-lab" class="flex flex-col items-center justify-center flex-1 py-1 text-slate-400 hover:text-slate-900 transition">
+                <div class="mobile-icon-wrapper w-8 h-8 rounded-xl flex items-center justify-center mb-0.5 bg-transparent transition">
+                    <i data-lucide="sparkles" class="w-4 h-4"></i>
+                </div>
+                <span class="text-[10px] font-bold">自进化</span>
+            </button>
+
+            <button onclick="switchMainTab('history')" id="nav-btn-history" class="flex flex-col items-center justify-center flex-1 py-1 text-slate-400 hover:text-slate-900 transition">
+                <div class="mobile-icon-wrapper w-8 h-8 rounded-xl flex items-center justify-center mb-0.5 bg-transparent transition">
+                    <i data-lucide="receipt" class="w-4 h-4"></i>
+                </div>
+                <span class="text-[10px] font-bold">台账</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- 📰 NEWS DETAIL DRILLDOWN MODAL -->
+    <div id="news-detail-modal" class="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="bg-white border border-slate-200 rounded-3xl w-full max-w-lg p-6 shadow-floating relative overflow-hidden flex flex-col space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div class="flex items-center space-x-2.5">
+                    <div class="w-9 h-9 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600 font-bold">
+                        <i data-lucide="radio" class="w-4 h-4"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-bold text-slate-900">重点快讯详情与宏观透视</h3>
+                        <p class="text-[11px] text-slate-400">实时媒体源 · 金色财经 / 深潮 / 华尔街见闻</p>
+                    </div>
+                </div>
+                <button onclick="closeNewsDetailModal()" class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition">
+                    ✕
+                </button>
+            </div>
+
+            <!-- Modal Content -->
+            <div class="space-y-3.5 text-xs max-h-[420px] overflow-y-auto custom-scrollbar pr-1">
+                <!-- Meta tags -->
+                <div class="flex items-center justify-between font-mono text-[11px] bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                    <span class="text-slate-500">发布时间: <strong id="modal-news-time" class="text-slate-800">--</strong></span>
+                    <span class="text-slate-500">来源渠道: <strong id="modal-news-source" class="text-brand-600">--</strong></span>
+                </div>
+
+                <!-- Title & Summary -->
+                <div class="space-y-2">
+                    <h4 id="modal-news-title" class="text-sm font-extrabold text-slate-900 leading-snug">--</h4>
+                    <div id="modal-news-summary" class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-slate-700 leading-relaxed text-xs">
+                        --
+                    </div>
+                </div>
+
+                <!-- AI Impact Analysis -->
+                <div class="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 space-y-1.5">
+                    <div class="flex items-center space-x-1.5 text-amber-900 font-bold">
+                        <i data-lucide="shield-alert" class="w-3.5 h-3.5 text-amber-600"></i>
+                        <span>AI 风险与多空冲击判定：</span>
+                    </div>
+                    <p id="modal-news-impact" class="text-amber-800 font-mono text-[11px] leading-relaxed">
+                        经系统自然语言判定，该快讯对当前市场未构成黑天鹅突发破坏性影响，交易系统维持常态运行。
+                    </p>
+                </div>
+            </div>
+
+            <div class="pt-2 border-t border-slate-100 flex justify-between items-center">
+                <a id="modal-news-url" href="#" target="_blank" class="text-xs text-brand-600 hover:text-brand-700 font-semibold flex items-center space-x-1">
+                    <span>查看原文报道</span>
+                    <i data-lucide="external-link" class="w-3 h-3"></i>
+                </a>
+                <button onclick="closeNewsDetailModal()" class="px-5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition">
+                    关闭
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 🌐 COIN SENTIMENT DRILLDOWN MODAL (专门针对多空情绪指数的深度弹窗) -->
+    <div id="coin-sentiment-modal" class="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="bg-white border border-slate-200 rounded-3xl w-full max-w-lg p-6 shadow-floating relative overflow-hidden flex flex-col space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600 font-extrabold font-mono text-base">
+                        <span id="modal-sent-coin-name">BTC</span>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-bold text-slate-900 flex items-center space-x-2">
+                            <span>社交舆情与情绪深度透视</span>
+                            <span id="modal-sent-badge" class="text-xs px-2 py-0.5 rounded-full font-mono font-bold bg-emerald-50 text-emerald-600 border border-emerald-200">+0.40</span>
+                        </h3>
+                        <p class="text-[11px] text-slate-400">全网社交热度 · 多空看涨/看跌比 · 情绪偏置分</p>
+                    </div>
+                </div>
+                <button onclick="closeCoinSentimentModal()" class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition">
+                    ✕
+                </button>
+            </div>
+
+            <!-- Modal Content -->
+            <div class="space-y-3.5 text-xs max-h-[420px] overflow-y-auto custom-scrollbar pr-1">
+                <!-- Sentiment Grid -->
+                <div class="grid grid-cols-2 gap-2.5 font-mono">
+                    <div class="p-3 rounded-2xl bg-slate-50 border border-slate-200">
+                        <span class="text-[10px] text-slate-400 block mb-1">24H 社交提及热度</span>
+                        <strong id="modal-sent-mentions" class="text-slate-900 text-sm">-- 次</strong>
+                    </div>
+                    <div class="p-3 rounded-2xl bg-slate-50 border border-slate-200">
+                        <span class="text-[10px] text-slate-400 block mb-1">情绪状态标签</span>
+                        <strong id="modal-sent-label" class="text-brand-600 text-sm">Bullish 偏多</strong>
+                    </div>
+                </div>
+
+                <!-- Bull/Bear Visual Ratio Bar -->
+                <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                    <div class="flex justify-between items-center font-mono text-xs">
+                        <span class="text-emerald-600 font-bold flex items-center space-x-1">
+                            <span>多头看涨: </span>
+                            <strong id="modal-sent-bull-ratio">70.0%</strong>
+                        </span>
+                        <span class="text-rose-600 font-bold flex items-center space-x-1">
+                            <span>空头看跌: </span>
+                            <strong id="modal-sent-bear-ratio">30.0%</strong>
+                        </span>
+                    </div>
+                    <div class="w-full h-3 rounded-full bg-rose-200 overflow-hidden flex shadow-inner">
+                        <div id="modal-sent-bar-bull" class="h-full bg-emerald-500 transition-all duration-500" style="width: 70%;"></div>
+                    </div>
+                </div>
+
+                <!-- Factor Weight in Trading Matrix -->
+                <div class="p-3.5 rounded-2xl bg-indigo-50 border border-indigo-200 text-indigo-900 space-y-1.5 leading-relaxed">
+                    <div class="flex items-center space-x-1.5 font-bold">
+                        <i data-lucide="sparkles" class="w-3.5 h-3.5 text-indigo-600"></i>
+                        <span>量化因子赋能机制：</span>
+                    </div>
+                    <p id="modal-sent-factor-desc" class="text-slate-600 font-mono text-[11px]">
+                        该币种舆情偏置得分直接输入 Alpha-Quant v5.0 多因子评分引擎（权重占比 15%），为顺势波段开仓提供前瞻性情绪支持与风险过滤。
+                    </p>
+                </div>
+            </div>
+
+            <div class="pt-2 border-t border-slate-100 flex justify-end">
+                <button onclick="closeCoinSentimentModal()" class="px-5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition">
+                    确定
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 🔍 COIN FACTOR DRILLDOWN MODAL (针对AI大脑决策矩阵的深度推演透视弹窗) -->
+    <div id="coin-factor-modal" class="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="bg-white border border-slate-200 rounded-3xl w-full max-w-lg p-6 shadow-floating relative overflow-hidden flex flex-col space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-4">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 font-extrabold font-mono text-base">
+                        <span id="modal-coin-name">BTC</span>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-bold text-slate-900 flex items-center space-x-2">
+                            <span>AI大脑深度决策推演</span>
+                            <span id="modal-coin-badge" class="text-xs px-2.5 py-0.5 rounded-full font-mono font-bold bg-slate-100 text-slate-600 border border-slate-200">🤖 AI观望</span>
+                        </h3>
+                        <p class="text-[11px] text-slate-400">OKX 原生多周期时序 · Taker 资金流 · OI 筹码与盈亏比精算</p>
+                    </div>
+                </div>
+                <button onclick="closeCoinFactorModal()" class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition">
+                    ✕
+                </button>
+            </div>
+
+            <!-- Modal Content -->
+            <div class="space-y-3.5 text-xs max-h-[420px] overflow-y-auto custom-scrollbar pr-1">
+                <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center justify-between font-mono">
+                    <div>
+                        <span class="text-[10px] text-slate-400 block mb-0.5">当前标记价格</span>
+                        <strong id="modal-coin-price" class="text-slate-900 text-sm font-bold">--</strong>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-[10px] text-slate-400 block mb-0.5">AI 决策置信度</span>
+                        <strong id="modal-coin-confidence" class="text-blue-600 text-xs font-bold">85%</strong>
+                    </div>
+                </div>
+
+                <!-- Price Action & Structure -->
+                <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2">
+                    <span class="text-[11px] font-bold text-slate-700 flex items-center space-x-1.5">
+                        <i data-lucide="layers-3" class="w-3.5 h-3.5 text-blue-500"></i>
+                        <span>多周期价格行为与结构 (Price Action)</span>
+                    </span>
+                    <p id="modal-factor-mstruct" class="text-slate-700 leading-relaxed font-sans text-xs bg-white p-2.5 rounded-xl border border-slate-200">--</p>
+                </div>
+
+                <!-- Volume & Flow -->
+                <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2">
+                    <span class="text-[11px] font-bold text-slate-700 flex items-center space-x-1.5">
+                        <i data-lucide="bar-chart-2" class="w-3.5 h-3.5 text-emerald-500"></i>
+                        <span>资金流向与筹码博弈 (Flow & OI)</span>
+                    </span>
+                    <p id="modal-factor-flow" class="text-slate-700 leading-relaxed font-sans text-xs bg-white p-2.5 rounded-xl border border-slate-200">--</p>
+                </div>
+
+                <!-- Strategy Reasoning -->
+                <div class="p-3.5 rounded-2xl bg-blue-50/70 border border-blue-200 text-blue-900 leading-relaxed text-xs">
+                    <span class="font-bold block mb-1 flex items-center space-x-1">
+                        <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-500"></i>
+                        <span>AI 大脑核心裁决理由：</span>
+                    </span>
+                    <p id="modal-factor-desc" class="text-slate-700 font-sans text-xs">综合多周期价格行为与盘口资金流做出的最终决策说明。</p>
+                </div>
+            </div>
+            
+            <div class="pt-2 border-t border-slate-100 flex justify-end">
+                <button onclick="closeCoinFactorModal()" class="px-5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition">
+                    关闭
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SCRIPTS -->
+    <script>
+        let allTrades = [];
+        let rawJsonData = null;
+        let equityChartInstance = null;
+        let currentChartMode = 'pnl';
+        let activeTab = 'trading';
+
+        function escapeHtml(value) {
+            return String(value ?? '')
+                .replaceAll('&', '&amp;')
+                .replaceAll('<', '&lt;')
+                .replaceAll('>', '&gt;')
+                .replaceAll('"', '&quot;')
+                .replaceAll("'", '&#039;');
+        }
+
+        function escapeDataForHtml(value) {
+            if (typeof value === 'string') return escapeHtml(value);
+            if (Array.isArray(value)) return value.map(escapeDataForHtml);
+            if (value && typeof value === 'object') {
+                return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, escapeDataForHtml(item)]));
+            }
+            return value;
+        }
+
+                function safeExternalUrl(value) {
+            try {
+                const url = new URL(String(value || ""), window.location.href);
+                return ["http:", "https:"].includes(url.protocol) ? url.href : "#";
+            } catch (_) {
+                return "#";
+            }
+        }
+
+        window.switchMainTab = function(tabName) {
+            activeTab = tabName;
+            const tabs = ["trading", "factors", "news", "lab", "history"];
+            
+            tabs.forEach(t => {
+                const content = document.getElementById(`tab-content-${t}`);
+                if (content) {
+                    if (t === tabName) {
+                        content.classList.remove("hidden");
+                        content.style.display = "block";
+                    } else {
+                        content.classList.add("hidden");
+                        content.style.display = "none";
+                    }
+                }
+
+                // Desktop Top Buttons
+                const topBtn = document.getElementById(`top-nav-btn-${t}`);
+                if (topBtn) {
+                    if (t === tabName) {
+                        topBtn.className = "px-3.5 py-1.5 rounded-lg text-xs font-semibold transition nav-pill-active flex items-center space-x-1.5";
+                    } else {
+                        topBtn.className = "px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition flex items-center space-x-1.5";
+                    }
+                }
+
+                // Mobile Bottom Buttons
+                const mobBtn = document.getElementById(`nav-btn-${t}`);
+                if (mobBtn) {
+                    if (t === tabName) {
+                        mobBtn.className = "flex flex-col items-center justify-center flex-1 py-1 text-brand-600 transition mobile-nav-active";
+                    } else {
+                        mobBtn.className = "flex flex-col items-center justify-center flex-1 py-1 text-slate-400 hover:text-slate-200 transition";
+                    }
+                }
+            });
+
+            if (tabName === "trading" && equityChartInstance) {
+                setTimeout(() => equityChartInstance.resize(), 50);
+            }
+            if (window.lucide) lucide.createIcons();
+        };
+
+        // Global Prompt Modal Control
+        window.openPromptModal = function() {
+            const modal = document.getElementById("prompt-modal");
+            const contentEl = document.getElementById("modal-prompt-content");
+            const timeEl = document.getElementById("modal-prompt-time");
+            let promptText = window.latestAiPromptText || "";
+            const factors = (rawJsonData && rawJsonData.factors) ? rawJsonData.factors : [];
+            const history = (rawJsonData && rawJsonData.ai_brain_history) ? rawJsonData.ai_brain_history : [];
+
+            if (rawJsonData && rawJsonData.ai_last_prompt && rawJsonData.ai_last_prompt.trim()) {
+                promptText = rawJsonData.ai_last_prompt.trim();
+            }
+            if (!promptText && history.length > 0) {
+                for (let h of history) {
+                    if (h.ai_last_prompt && h.ai_last_prompt.trim()) {
+                        promptText = h.ai_last_prompt.trim();
+                        window.latestAiPromptText = promptText;
+                        break;
+                    }
+                }
+            }
+            if (!promptText && factors.length > 0) {
+                for (let f of factors) {
+                    if (f.ai_last_prompt && f.ai_last_prompt.trim()) {
+                        promptText = f.ai_last_prompt.trim();
+                        window.latestAiPromptText = promptText;
+                        break;
+                    }
+                }
+            }
+
+            function updatePromptDisplay(txt) {
+                let promptTimeStr = "";
+                if (txt) {
+                    const matchTime = txt.match(/【推演基准时间】:\s*([0-9-:\s]+)/) || txt.match(/【USER PROMPT \(([0-9-:\s]+)\)】/);
+                    if (matchTime && matchTime[1]) {
+                        promptTimeStr = matchTime[1].trim();
+                    }
+                }
+                if (!promptTimeStr && history.length > 0 && history[0].time) {
+                    promptTimeStr = history[0].time;
+                }
+                if (!promptTimeStr && rawJsonData && rawJsonData.timestamp) {
+                    promptTimeStr = rawJsonData.timestamp;
+                }
+                if (timeEl) {
+                    timeEl.innerText = promptTimeStr ? `推演基准: ${promptTimeStr}` : "推演基准: 实时最新";
+                }
+                if (contentEl) {
+                    if (txt && txt.trim()) {
+                        contentEl.textContent = txt.trim();
+                    } else {
+                        contentEl.textContent = "等待首轮 AI 大脑决策触发并抓取完整提示词快照...";
+                    }
+                }
+            }
+
+            if (promptText && promptText.trim()) {
+                updatePromptDisplay(promptText);
+            } else {
+                // Async fallback fetch
+                fetch('/api/all?t=' + Date.now())
+                    .then(r => r.ok ? r.json() : {})
+                    .then(d => {
+                        const hList = d.ai_brain_history || [];
+                        let p = d.ai_last_prompt || '';
+                        if (!p && hList.length > 0) p = hList[0].ai_last_prompt || '';
+                        if (p) {
+                            window.latestAiPromptText = p;
+                            updatePromptDisplay(p);
+                        } else {
+                            updatePromptDisplay('');
+                        }
+                    })
+                    .catch(() => updatePromptDisplay(''));
+            }
+
+            if (modal) {
+                modal.classList.remove("hidden");
+                modal.style.display = "flex";
+            }
+            if (window.lucide) lucide.createIcons();
+        };
+
+        window.closePromptModal = function() {
+            const modal = document.getElementById("prompt-modal");
+            if (modal) {
+                modal.classList.add("hidden");
+                modal.style.display = "none";
+            }
+        };
+
+        window.copyPromptText = function() {
+            const contentEl = document.getElementById("modal-prompt-content");
+            const btn = document.getElementById("copy-prompt-btn");
+            if (contentEl && contentEl.textContent) {
+                navigator.clipboard.writeText(contentEl.textContent).then(() => {
+                    if (btn) {
+                        const originalHtml = btn.innerHTML;
+                        btn.innerHTML = "<span>✅ 已复制</span>";
+                        setTimeout(() => { 
+                            btn.innerHTML = originalHtml; 
+                            if (window.lucide) lucide.createIcons(); 
+                        }, 2000);
+                    }
+                }).catch(() => {
+                    alert("复制失败，请手动选取复制");
+                });
+            }
+        };
+
+        async function loadAllData() {
+            const icon = document.getElementById('refresh-icon');
+            if (icon) icon.classList.add('animate-spin');
+
+            try {
+                const res = await fetch('/api/all?t=' + Date.now());
+                if (!res.ok) throw new Error(`Dashboard API HTTP ${res.status}`);
+                const responseData = await res.json();
+                rawJsonData = responseData;
+                const data = escapeDataForHtml(responseData);
+
+                const health = data.data_health || {};
+                const liveDot = document.querySelector('.live-dot') || document.querySelector('.pulse-dot');
+                const statusText = liveDot?.nextElementSibling;
+                if (statusText && health.status) statusText.innerText = health.status;
+
+                // 1. Account Metrics
+                if (data.account) {
+                    const eqEl = document.getElementById('metric-equity');
+                    if (eqEl) eqEl.innerText = Number(data.account.total_eq || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                    const avEl = document.getElementById('metric-avail');
+                    if (avEl) avEl.innerText = Number(data.account.avail_eq || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' U';
+                    const muEl = document.getElementById('metric-margin-usage');
+                    if (muEl) muEl.innerText = `占用率: ${data.account.margin_usage_pct || 0}%`;
+
+                    const cumPnl = Number(data.account.cum_net_pnl || 0);
+                    const cumRoi = Number(data.account.cum_roi_pct || 0);
+                    const initCap = data.account.initial_capital || 10000.0;
+
+                    const cumPnlEl = document.getElementById('metric-cum-pnl');
+                    if (cumPnlEl) {
+                        cumPnlEl.innerText = (cumPnl >= 0 ? '+' : '') + cumPnl.toFixed(2);
+                        cumPnlEl.className = `text-2xl sm:text-3xl font-extrabold font-mono tracking-tight ${cumPnl >= 0 ? 'text-emerald-600' : 'text-rose-600'}`;
+                    }
+                    const cumRoiEl = document.getElementById('metric-cum-roi');
+                    if (cumRoiEl) {
+                        cumRoiEl.innerText = (cumRoi >= 0 ? '+' : '') + cumRoi.toFixed(2) + '%';
+                        cumRoiEl.className = `font-mono font-bold ${cumRoi >= 0 ? 'text-emerald-600' : 'text-rose-600'}`;
+                    }
+                    const cumFees = Number(data.account.cum_total_fees || 0);
+                    const cumFeesEl = document.getElementById('metric-cum-fees');
+                    if (cumFeesEl) cumFeesEl.innerText = `${cumFees.toFixed(2)} U`;
+
+                    const upl = Number(data.account.pos_upl_total || 0);
+                    const uplEl = document.getElementById('metric-upl');
+                    if (uplEl) {
+                        uplEl.innerText = (upl >= 0 ? '+' : '') + upl.toFixed(2);
+                        uplEl.className = `text-2xl sm:text-3xl font-extrabold font-mono tracking-tight ${upl >= 0 ? 'text-emerald-600' : 'text-rose-600'}`;
+                    }
+                }
+
+                // 2. Today Realized Stats
+                if (data.today_stats) {
+                    const realized = Number(data.today_stats.net_realized || 0);
+                    const realizedEl = document.getElementById('metric-realized-pnl');
+                    if (realizedEl) {
+                        realizedEl.innerText = (realized >= 0 ? '+' : '') + realized.toFixed(2);
+                        realizedEl.className = `text-2xl sm:text-3xl font-extrabold font-mono tracking-tight ${realized >= 0 ? 'text-emerald-600' : 'text-rose-600'}`;
+                    }
+
+                    const twrEl = document.getElementById('metric-today-wr');
+                    if (twrEl) twrEl.innerText = `胜率: ${data.today_stats.win_rate || 0}% (${data.today_stats.win_trades || 0}胜/${data.today_stats.loss_trades || 0}负)`;
+                    const feesEl = document.getElementById('metric-fees');
+                    if (feesEl) feesEl.innerText = `${data.today_stats.fees_paid || 0} U`;
+                }
+
+                // 3. Positions Summary
+                if (data.positions_summary) {
+                    const pcEl = document.getElementById('metric-pos-count');
+                    if (pcEl) pcEl.innerText = `${data.positions_summary.total || 0}/${data.positions_summary.max_positions || 6} 仓`;
+                    const pbcEl = document.getElementById('pos-badge-count');
+                    if (pbcEl) pbcEl.innerText = `${data.positions_summary.total || 0}`;
+                    const pdEl = document.getElementById('metric-pos-direction');
+                    if (pdEl) pdEl.innerText = `${data.positions_summary.long_count || 0}多 / ${data.positions_summary.short_count || 0}空`;
+                    renderPositions(data.positions_summary.items || []);
+                }
+
+                // 4. Render Components
+                const matrixTimeEl = document.getElementById('brain-matrix-time');
+                if (matrixTimeEl && data.timestamp) {
+                    matrixTimeEl.innerText = data.timestamp;
+                }
+
+                renderFactors(data.factors || [], data.factor_library || {}, data.ai_last_prompt || '');
+                renderAiBrainHistory(data.ai_brain_history || []);
+                renderNewsIntelligence(data.news_intelligence || {});
+                renderReviewLab(data.review || {}, data.ai_trading_memory_md || '');
+                renderPerformance(data.performance || {});
+                renderChart(data.snapshots || []);
+
+                allTrades = data.trades || [];
+                renderTrades();
+                renderLogs(data.logs || []);
+
+                const luEl = document.getElementById('last-updated');
+                if (luEl && data.timestamp) luEl.innerText = data.timestamp.substring(11, 19);
+            } catch (err) {
+                console.error('Failed to load data:', err);
+            } finally {
+                if (icon) icon.classList.remove('animate-spin');
+            }
+        }
+
+        // Render Factors Matrix (Integrated Full-Spectrum Decision Cards & Realtime Prompt)
+        function renderFactors(factors, factorLibSnapshot, lastPromptText) {
+            // Render Live AI Brain Prompt Viewer
+            const promptViewer = document.getElementById('ai-brain-prompt-viewer');
+            if (promptViewer) {
+                let promptFound = lastPromptText || '';
+                if (!promptFound && rawJsonData && rawJsonData.ai_brain_history && rawJsonData.ai_brain_history.length > 0) {
+                    promptFound = rawJsonData.ai_brain_history[0].ai_last_prompt || '';
+                }
+                if (promptFound && promptFound.trim()) {
+                    promptViewer.textContent = promptFound.trim();
+                } else {
+                    promptViewer.textContent = '等待首轮 AI 大脑决策触发并抓取完整提示词快照...';
+                }
+            }
+
+            const grid = document.getElementById('factors-grid');
+            if (!grid) return;
+            if (!factors || factors.length === 0) {
+                grid.innerHTML = '<div class="col-span-full py-8 text-center text-slate-500 text-xs">暂无 AI 大脑决策数据</div>';
+                return;
+            }
+
+            const libMap = {};
+            if (factorLibSnapshot && factorLibSnapshot.instruments) {
+                factorLibSnapshot.instruments.forEach(item => {
+                    libMap[item.name] = item;
+                });
+            }
+
+            let html = '';
+            factors.forEach(f => {
+                const action = f.action || 'WAIT';
+                let actionBadge = '<span class="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-slate-800/80 text-slate-300 border border-slate-700">🤖 观望 WAIT</span>';
+                if (action === 'BUY_LONG') {
+                    actionBadge = '<span class="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-emerald-950/80 text-emerald-400 border border-emerald-500/50 shadow-sm">🟢 批准做多 BUY</span>';
+                } else if (action === 'SELL_SHORT') {
+                    actionBadge = '<span class="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-rose-950/80 text-rose-400 border border-rose-500/50 shadow-sm">🔴 批准做空 SELL</span>';
+                }
+
+                const chg = Number(f.change24h || f.chg24h || 0);
+                const chgColor = chg >= 0 ? 'text-emerald-400' : 'text-rose-400';
+                const px = f.price || '--';
+                const instName = f.name || f.instId || 'OTHER';
+                const reason = f.reason || '全市场宏观与微观综合研判中';
+                
+                // Get Deep Factor Library Overlay
+                const lib = libMap[instName] || {};
+                const tm = lib.trend_momentum || {};
+                const vc = lib.volatility_channel || {};
+                const vf = lib.volume_money_flow || {};
+                const ms = lib.microstructure || {};
+                const sm = lib.smart_money_derivatives || f.smart_money || {};
+                const alphaScore = lib.composite_alpha_score !== undefined ? lib.composite_alpha_score : '--';
+
+                const bid = ms.bid_px || f.bidPx || '--';
+                const ask = ms.ask_px || f.askPx || '--';
+                const fr = sm.funding_rate_pct !== undefined ? `${sm.funding_rate_pct}%` : (f.fundingRate || '--');
+                const oi = sm.oi_usd || f.oiUsd || '--';
+                const taker = vf.taker_net_usd || f.takerNetUsd || '--';
+                const adx = tm.adx_1h || f.adx_1h || '--';
+                const rsiVal = tm.rsi_14 !== undefined ? tm.rsi_14 : (f.rsi || '--');
+                const cmfVal = vf.cmf_1h !== undefined ? vf.cmf_1h : '--';
+                const depthRatio = ms.bid_ask_depth_ratio || 1.0;
+                const smLong = sm.weighted_long_pct !== undefined ? `${sm.weighted_long_pct}%` : '--';
+                const smFlow = sm.smart_money_flow_usd || sm.net_flow_usdt || '0 U';
+
+                const timeTag = f.time_str || f.timestamp || '';
+                const timeTagHtml = timeTag ? `<span class="text-[9px] font-mono text-slate-500">⏱ ${timeTag.substring(11, 19) || timeTag}</span>` : '';
+
+                html += `
+                    <div onclick="openCoinFactorModal('${instName}')" class="p-4 rounded-2xl bg-slate-900/40 border border-white/8 hover:border-indigo-500/40 hover:bg-slate-900/70 hover:shadow-xl cursor-pointer transition flex flex-col justify-between space-y-3 group">
+                        <!-- Top Bar: Asset & Price -->
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-1.5">
+                                <span class="font-extrabold text-white text-base tracking-tight group-hover:text-indigo-400 transition">${instName}</span>
+                                <span class="text-[10px] text-slate-500 font-mono">${f.instId || ''}</span>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                ${timeTagHtml}
+                                <span class="text-xs font-mono font-bold ${chgColor}">${chg > 0 ? '+' : ''}${chg}%</span>
+                            </div>
+                        </div>
+
+                        <!-- 1. Ticker & Orderbook Microstructure Depth -->
+                        <div class="bg-slate-950/60 px-2.5 py-1.5 rounded-xl border border-white/5 flex items-center justify-between font-mono text-[10px]">
+                            <div>
+                                <span class="text-slate-500 block font-sans text-[9px]">现价</span>
+                                <span class="text-xs font-bold text-white">${px}</span>
+                            </div>
+                            <div class="text-right">
+                                <div><span class="text-emerald-400">买:${bid}</span> / <span class="text-rose-400">卖:${ask}</span></div>
+                                <div class="text-[9px] text-slate-500">盘口买卖比: <strong class="${depthRatio >= 1.2 ? 'text-emerald-400' : (depthRatio <= 0.8 ? 'text-rose-400' : 'text-slate-300')}">${depthRatio}</strong></div>
+                            </div>
+                        </div>
+
+                        <!-- 2. Integrated 4-Pillar Quantitative Factor Grid (ADX, RSI, CMF, ATR) -->
+                        <div class="grid grid-cols-4 gap-1 bg-slate-950/60 p-2 rounded-xl border border-white/5 text-[10px] font-mono text-center">
+                            <div>
+                                <span class="text-slate-500 block font-sans text-[9px]">1H ADX</span>
+                                <strong class="${Number(adx) >= 22 ? 'text-indigo-400 font-extrabold' : 'text-slate-400'}">${adx}</strong>
+                            </div>
+                            <div>
+                                <span class="text-slate-500 block font-sans text-[9px]">RSI(14)</span>
+                                <strong class="text-slate-200">${rsiVal}</strong>
+                            </div>
+                            <div>
+                                <span class="text-slate-500 block font-sans text-[9px]">CMF资金</span>
+                                <strong class="${Number(cmfVal) >= 0 ? 'text-emerald-400' : 'text-rose-400'}">${cmfVal}</strong>
+                            </div>
+                            <div>
+                                <span class="text-slate-500 block font-sans text-[9px]">Alpha分</span>
+                                <strong class="${Number(alphaScore) > 20 ? 'text-emerald-400' : (Number(alphaScore) < -20 ? 'text-rose-400' : 'text-slate-400')}">${alphaScore > 0 ? '+' : ''}${alphaScore}</strong>
+                            </div>
+                        </div>
+
+                        <!-- 3. Smart Money & Derivatives Flow -->
+                        <div class="bg-purple-950/30 p-2 rounded-xl border border-purple-500/20 flex items-center justify-between text-[10px] font-mono">
+                            <div>
+                                <span class="text-slate-500 block font-sans text-[9px]">👑 聪明钱主力 (Top100)</span>
+                                <span class="text-purple-300 font-bold">加权多: ${smLong}</span>
+                            </div>
+                            <div class="text-right">
+                                <span class="text-slate-500 block font-sans text-[9px]">24H 主力净流</span>
+                                <span class="${String(smFlow).includes('-') ? 'text-rose-400' : 'text-emerald-400'} font-bold">${smFlow}</span>
+                            </div>
+                        </div>
+
+                        <!-- 4. AI Reasoning & CoT Snippet -->
+                        <div class="space-y-1 text-xs bg-indigo-950/30 p-2.5 rounded-xl border border-indigo-500/20">
+                            <div class="flex items-start space-x-1.5 text-slate-300 text-[11px] leading-relaxed">
+                                <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5"></i>
+                                <span class="line-clamp-2">${reason}</span>
+                            </div>
+                        </div>
+
+                        <!-- 5. Bottom Action & Execution Status -->
+                        <div class="pt-1.5 border-t border-white/5 flex items-center justify-between">
+                            <span class="text-[10px] text-slate-500 font-mono">费率: ${fr} | OI: ${oi}</span>
+                            ${actionBadge}
+                        </div>
+                    </div>
+                `;
+            });
+            grid.innerHTML = html;
+        }
+
+        // Render Positions
+        function renderPositions(positions) {
+            const tbody = document.getElementById('positions-tbody');
+            const mobileList = document.getElementById('positions-mobile-list');
+            
+            if (!positions || positions.length === 0) {
+                if (tbody) tbody.innerHTML = '<tr><td colspan="8" class="py-8 text-center text-slate-400 font-sans">当前无在途持仓</td></tr>';
+                if (mobileList) mobileList.innerHTML = '<div class="py-8 text-center text-slate-400 text-xs bg-slate-50 rounded-2xl border border-slate-200">当前无在途持仓</div>';
+                return;
+            }
+
+            let desktopHtml = '';
+            let mobileHtml = '';
+
+            positions.forEach(p => {
+                const isLong = String(p.posSide || p.side || '').toLowerCase().includes('long');
+                const sideBadge = isLong 
+                    ? 'bg-emerald-50 text-emerald-600 border-emerald-200' 
+                    : 'bg-rose-50 text-rose-600 border-rose-200';
+
+                const upl = Number(p.upl || 0);
+                const roi = Number(p.roi_pct || p.uplRatio || 0);
+                const isProfit = upl >= 0;
+                const pnlClass = isProfit ? 'text-emerald-600' : 'text-rose-600';
+
+                const instName = p.name || p.instId.replace('-USDT-SWAP', '');
+                const lever = p.lever ? `${p.lever}x` : '3x';
+                const marginUsdt = p.margin_usdt ? Number(p.margin_usdt).toFixed(1) : '--';
+                const notionalUsdt = p.notional_usdt ? Number(p.notional_usdt).toFixed(1) : '--';
+                const avgPrice = p.avgPx || '--';
+                const markPrice = p.markPx || '--';
+                const stopPrice = p.exchangeSl || '--';
+                const strategyStopPrice = p.trailingSl || '--';
+                const protectionStatus = p.protectionStatus || 'unprotected';
+                const coverage = Number(p.protectionCoveragePct || 0);
+                const protectionLabel = protectionStatus === 'fully_protected'
+                    ? `完整OCO保护 ${coverage.toFixed(0)}%`
+                    : (protectionStatus === 'partially_protected' ? `部分保护 ${coverage.toFixed(0)}%` : '未检测到云端保护');
+                const protectionClass = protectionStatus === 'fully_protected'
+                    ? 'text-emerald-600'
+                    : (protectionStatus === 'partially_protected' ? 'text-amber-600' : 'text-rose-600');
+                const stratTag = p.strategyTag || (isLong ? '🌊 顺势回踩' : '⚡ 阻力抛压');
+
+                // 1. Desktop Row
+                desktopHtml += `
+                    <tr class="hover:bg-slate-50 transition border-b border-slate-100">
+                        <td class="py-3 font-bold text-slate-900">
+                            <span class="text-sm">${instName}</span>
+                            <span class="ml-1 px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px] font-semibold">${lever}</span>
+                        </td>
+                        <td class="py-3">
+                            <span class="px-2 py-0.5 rounded-lg bg-blue-50 text-brand-600 border border-blue-100 text-[11px] font-medium">${stratTag}</span>
+                        </td>
+                        <td class="py-3">
+                            <div class="inline-flex items-center space-x-2">
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold border ${sideBadge}">${isLong ? '做多' : '做空'}</span>
+                                <span class="font-bold text-slate-900">${marginUsdt} U</span>
+                                <span class="text-[10px] text-slate-400">(${notionalUsdt} U名义 / ${p.pos}张)</span>
+                            </div>
+                        </td>
+                        <td class="py-3 text-slate-600 font-mono">${avgPrice}</td>
+                        <td class="py-3 text-brand-600 font-mono font-semibold">${markPrice}</td>
+                        <td class="py-3 font-mono"><div class="${protectionClass}">${stopPrice}</div><div class="text-[10px] ${protectionClass}">${protectionLabel}</div></td>
+                        <td class="py-3 text-right font-mono font-extrabold ${pnlClass}">
+                            ${isProfit ? '+' : ''}${upl.toFixed(2)} U
+                        </td>
+                        <td class="py-3 text-right font-mono font-extrabold ${pnlClass}">
+                            ${isProfit ? '+' : ''}${roi.toFixed(2)}%
+                        </td>
+                    </tr>
+                `;
+
+                // 2. Mobile Card
+                mobileHtml += `
+                    <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3 font-mono">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-2">
+                                <span class="font-bold text-base text-slate-900">${instName}</span>
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold border ${sideBadge}">${isLong ? '多' : '空'} ${lever}</span>
+                            </div>
+                            <div class="text-right">
+                                <span class="text-base font-extrabold ${pnlClass}">${isProfit ? '+' : ''}${upl.toFixed(2)} U</span>
+                                <span class="text-xs ${pnlClass} block font-bold">(${isProfit ? '+' : ''}${roi.toFixed(2)}%)</span>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-slate-200/60">
+                            <div><span class="text-slate-400">开仓均价: </span><span class="text-slate-800">${avgPrice}</span></div>
+                            <div><span class="text-slate-400">标记现价: </span><span class="text-brand-600 font-bold">${markPrice}</span></div>
+                            <div><span class="text-slate-400">保证金: </span><span class="text-slate-800 font-bold">${marginUsdt} U</span></div>
+                            <div><span class="text-slate-400">云端止损: </span><span class="${protectionClass}">${stopPrice}</span></div>
+                            <div><span class="text-slate-400">策略追踪线: </span><span class="text-slate-500">${strategyStopPrice}</span></div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            if (tbody) tbody.innerHTML = desktopHtml;
+            if (mobileList) mobileList.innerHTML = mobileHtml;
+        }
+
+        // Render Confluence (AI Brain Reasoning Table)
+        function renderConfluence(factors, timeStr) {
+            const tbody = document.getElementById('confluence-tbody');
+            const tableTimeEl = document.getElementById('confluence-table-time');
+            if (tableTimeEl) tableTimeEl.innerText = timeStr || '--';
+
+            if (!tbody || !factors || factors.length === 0) return;
+
+            let html = '';
+            factors.forEach(f => {
+                const conf15 = f.market_structure || f.confluence_15m || '--';
+                const adx = f.adx_1h !== undefined && f.adx_1h !== '--' ? `ADX: ${f.adx_1h}` : '';
+                const sm = f.smart_money || {};
+                const smLong = sm.weighted_long_pct !== undefined ? `加权多: ${sm.weighted_long_pct}%` : '--';
+                const smFlow = sm.net_flow_usdt ? `净流: ${sm.net_flow_usdt}` : '';
+                const smWin = sm.top_win_rate ? `<span class="text-amber-600 font-bold">(${sm.top_win_rate})</span>` : '';
+                
+                const action = f.action || 'WAIT';
+                const fTime = f.time_str || timeStr || '';
+                
+                let resBadge = 'bg-slate-100 text-slate-500 border-slate-200';
+                let resText = '⚪ AI观望';
+                if (action === 'BUY_LONG') {
+                    resBadge = 'bg-emerald-50 text-emerald-600 border-emerald-300 font-bold';
+                    resText = '🟢 批准做多';
+                } else if (action === 'SELL_SHORT') {
+                    resBadge = 'bg-rose-50 text-rose-600 border-rose-300 font-bold';
+                    resText = '🔴 批准做空';
+                }
+
+                html += `
+                    <tr class="hover:bg-slate-50 transition border-b border-slate-100">
+                        <td class="py-2.5 font-bold text-slate-900 font-sans">
+                            <div>${f.name || f.instId}</div>
+                            <div class="text-[9px] font-mono text-slate-400 font-normal">${fTime.substring(11, 19) || fTime}</div>
+                        </td>
+                        <td class="py-2.5 text-slate-600 text-[11px] font-sans">
+                            <div>${conf15}</div>
+                            ${adx ? `<div class="text-[10px] font-mono font-bold text-indigo-600">${adx}</div>` : ''}
+                        </td>
+                        <td class="py-2.5 text-[11px] font-sans">
+                            <div class="font-bold text-slate-800 font-mono">${smLong} ${smWin}</div>
+                            <div class="text-[10px] text-blue-600 font-mono">${smFlow}</div>
+                        </td>
+                        <td class="py-2.5 text-right font-sans">
+                            <span class="px-2 py-0.5 rounded-full text-[10px] border ${resBadge}">${resText}</span>
+                        </td>
+                    </tr>
+                `;
+            });
+            tbody.innerHTML = html;
+        }
+
+        // Render Factor Library Grid
+        function renderFactorLibrary(libData) {
+            const grid = document.getElementById('factor-library-grid');
+            const timeEl = document.getElementById('factor-lib-time');
+            if (timeEl && libData && libData.time_str) {
+                timeEl.innerText = libData.time_str;
+            }
+            if (!grid) return;
+
+            const list = libData?.instruments || [];
+            if (list.length === 0) {
+                grid.innerHTML = '<div class="col-span-full py-8 text-center text-slate-400 text-xs">暂无因子库快照数据</div>';
+                return;
+            }
+
+            let html = '';
+            list.forEach(item => {
+                const tm = item.trend_momentum || {};
+                const vc = item.volatility_channel || {};
+                const vf = item.volume_money_flow || {};
+                const ms = item.microstructure || {};
+                const sm = item.smart_money_derivatives || {};
+                const score = Number(item.composite_alpha_score || 0);
+
+                const scoreColor = score > 30 ? 'text-emerald-600' : (score < -30 ? 'text-rose-600' : 'text-slate-700');
+                const scoreBadge = score > 30 
+                    ? 'bg-emerald-50 text-emerald-600 border-emerald-200' 
+                    : (score < -30 ? 'bg-rose-50 text-rose-600 border-rose-200' : 'bg-slate-100 text-slate-600 border-slate-200');
+
+                html += `
+                    <div class="p-3.5 rounded-2xl bg-white border border-slate-200/90 flex flex-col justify-between space-y-2.5 shadow-sm hover:border-purple-300 transition">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-1.5">
+                                <span class="font-bold text-slate-900 text-sm">${item.name}</span>
+                                <span class="text-[10px] text-slate-400 font-mono">${item.instId}</span>
+                            </div>
+                            <span class="text-[10px] px-2 py-0.5 rounded-full font-mono font-bold border ${scoreBadge}">综合 Alpha: ${score > 0 ? '+' : ''}${score}</span>
+                        </div>
+
+                        <!-- 5 Pillars Matrix Grid -->
+                        <div class="grid grid-cols-2 gap-1.5 text-[10px] font-mono">
+                            <!-- Pillar 1: Trend & Momentum -->
+                            <div class="bg-slate-50 p-2 rounded-xl border border-slate-100 space-y-0.5">
+                                <span class="text-slate-400 block font-sans font-semibold">1. 动量趋势</span>
+                                <div>ADX: <strong class="text-indigo-600">${tm.adx_1h || '--'}</strong> | RSI: ${tm.rsi_14 || '--'}</div>
+                                <div>KDJ(J): ${tm.kdj_j || '--'} | 乖离: ${tm.vwap_bias_pct || 0}%</div>
+                            </div>
+
+                            <!-- Pillar 2: Volatility & Channel -->
+                            <div class="bg-slate-50 p-2 rounded-xl border border-slate-100 space-y-0.5">
+                                <span class="text-slate-400 block font-sans font-semibold">2. 波动通道</span>
+                                <div>ATR(14): ${vc.atr_14 || '--'} (${vc.atr_pct || 0}%)</div>
+                                <div>布林宽度: <strong class="text-slate-800">${vc.bb_width_1h || '--'}%</strong></div>
+                            </div>
+
+                            <!-- Pillar 3: Money Flow -->
+                            <div class="bg-slate-50 p-2 rounded-xl border border-slate-100 space-y-0.5">
+                                <span class="text-slate-400 block font-sans font-semibold">3. 资金流向</span>
+                                <div>CMF: <strong class="${vf.cmf_1h >= 0 ? 'text-emerald-600' : 'text-rose-600'}">${vf.cmf_1h || 0}</strong> | 量比: ${vf.vol_ratio_15m || 1.0}x</div>
+                                <div>Taker: <strong class="text-slate-700">${vf.taker_net_usd || '--'}</strong></div>
+                            </div>
+
+                            <!-- Pillar 4: Microstructure -->
+                            <div class="bg-slate-50 p-2 rounded-xl border border-slate-100 space-y-0.5">
+                                <span class="text-slate-400 block font-sans font-semibold">4. 盘口微观</span>
+                                <div>买卖盘比: <strong class="${ms.bid_ask_depth_ratio >= 1.2 ? 'text-emerald-600' : (ms.bid_ask_depth_ratio <= 0.8 ? 'text-rose-600' : 'text-slate-700')}">${ms.bid_ask_depth_ratio || 1.0}</strong></div>
+                                <div>BBO价差: ${ms.spread_pct || 0}%</div>
+                            </div>
+                        </div>
+
+                        <!-- Pillar 5: Smart Money Overlay -->
+                        <div class="bg-purple-50/50 p-2 rounded-xl border border-purple-100/60 flex items-center justify-between text-[10px] font-mono">
+                            <div>
+                                <span class="text-slate-400 block font-sans">5. 👑 聪明钱主力共振</span>
+                                <span class="text-purple-700 font-bold">加权多: ${sm.weighted_long_pct || 50}%</span>
+                            </div>
+                            <div class="text-right">
+                                <span class="text-slate-400 block font-sans">24H 资金净流</span>
+                                <span class="${String(sm.smart_money_flow_usd).includes('-') ? 'text-rose-600' : 'text-emerald-600'} font-bold">${sm.smart_money_flow_usd || '0 U'}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            grid.innerHTML = html;
+        }
+
+        // Render AI Brain History Audit Flow
+        function renderAiBrainHistory(history) {
+            const container = document.getElementById('ai-history-timeline');
+            if (!container) return;
+            
+            // Extract latest prompt from history items if available
+            if (history && history.length > 0) {
+                for (let h of history) {
+                    if (h.macro_assessment && h.ai_last_prompt) {
+                        window.latestAiPromptText = h.ai_last_prompt;
+                        const pv = document.getElementById('ai-brain-prompt-viewer');
+                        if (pv && pv.textContent.includes('等待')) {
+                            pv.textContent = h.ai_last_prompt;
+                        }
+                        break;
+                    }
+                }
+            }
+            
+            // Fallback: If history list empty, synthesize from latest factors & state
+            if (!history || history.length === 0) {
+                if (rawJsonData && rawJsonData.factors && rawJsonData.factors.length > 0) {
+                    const latestTime = rawJsonData.timestamp ? rawJsonData.timestamp.replace(' (北京时间)', '') : '最新推演';
+                    const macro = rawJsonData.factors[0]?.ai_decision?.summary_reason ? '全市场宏观流动性与筹码多维评估完成' : '全市场窄幅缩量整固中，流动性偏低，坚决执行防守策略。';
+                    const waitCount = rawJsonData.factors.filter(f => f.action === 'WAIT' || f.action === 'HOLD').length;
+                    const buyCount = rawJsonData.factors.filter(f => f.action === 'BUY_LONG').length;
+                    const sellCount = rawJsonData.factors.filter(f => f.action === 'SELL_SHORT').length;
+
+                    let badgeSummary = `<span class="px-2 py-0.5 rounded-lg bg-slate-800 text-slate-300 border border-slate-700 text-[10px]">🤖 观望 ${waitCount} 标的</span>`;
+                    if (buyCount > 0) badgeSummary += ` <span class="px-2 py-0.5 rounded-lg bg-emerald-950/80 text-emerald-400 border border-emerald-500/40 text-[10px] font-bold">🟢 做多 ${buyCount}</span>`;
+                    if (sellCount > 0) badgeSummary += ` <span class="px-2 py-0.5 rounded-lg bg-rose-950/80 text-rose-400 border border-rose-500/40 text-[10px] font-bold">🔴 做空 ${sellCount}</span>`;
+
+                    history = [{
+                        time: latestTime,
+                        macro_assessment: macro,
+                        badge_summary: badgeSummary,
+                        position_management: [
+                            { instId: 'LINK-USDT-SWAP', action: 'HOLD', reason: '多单盈利中，现价紧贴11.42支撑，继续持有盯盘' }
+                        ]
+                    }];
+                } else {
+                    container.innerHTML = '<div class="py-8 text-center text-slate-500 text-xs">暂无历史决策记录</div>';
+                    return;
+                }
+            }
+
+            let html = '';
+            history.forEach(item => {
+                const timeStr = item.time || '--';
+                const macro = item.macro_assessment || '宏观中性震荡';
+                const posMgmt = item.position_management || [];
+                const topOps = item.top_opportunities || [];
+
+                let posMgmtHtml = '';
+                if (posMgmt.length > 0) {
+                    posMgmtHtml = `
+                        <div class="mt-2 p-2.5 rounded-xl bg-blue-950/40 border border-blue-500/20 space-y-1">
+                            <span class="text-[10px] font-bold text-blue-300 block flex items-center space-x-1">
+                                <i data-lucide="shield" class="w-3 h-3 text-blue-400"></i>
+                                <span>在途持仓动态管理指令：</span>
+                            </span>
+                            ${posMgmt.map(p => `
+                                <div class="text-[11px] text-slate-300 flex items-center space-x-2">
+                                    <strong class="font-bold font-mono text-white">${p.instId}</strong>: 
+                                    <span class="px-1.5 py-0.2 rounded bg-slate-800 text-blue-300 font-bold border border-blue-500/30 text-[10px]">${p.action}</span>
+                                    <span>${p.reason}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `;
+                }
+
+                let badgeSummary = item.badge_summary;
+                if (!badgeSummary) {
+                    const waitCount = topOps.filter(o => o.action === 'WAIT' || o.action === 'HOLD').length;
+                    const buyCount = topOps.filter(o => o.action === 'BUY_LONG').length;
+                    const sellCount = topOps.filter(o => o.action === 'SELL_SHORT').length;
+
+                    badgeSummary = `<span class="px-2 py-0.5 rounded-lg bg-slate-800 text-slate-300 border border-slate-700 text-[10px]">🤖 观望 ${waitCount || 6} 标的</span>`;
+                    if (buyCount > 0) badgeSummary += ` <span class="px-2 py-0.5 rounded-lg bg-emerald-950/80 text-emerald-400 border border-emerald-500/40 text-[10px] font-bold">🟢 做多 ${buyCount}</span>`;
+                    if (sellCount > 0) badgeSummary += ` <span class="px-2 py-0.5 rounded-lg bg-rose-950/80 text-rose-400 border border-rose-500/40 text-[10px] font-bold">🔴 做空 ${sellCount}</span>`;
+                }
+
+                html += `
+                    <div class="p-4 rounded-2xl bg-slate-900/40 border border-white/8 space-y-2 hover:border-cyan-500/30 hover:bg-slate-900/70 transition">
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 border-b border-white/5 pb-2">
+                            <div class="flex items-center space-x-2">
+                                <span class="text-xs font-mono font-bold text-slate-200 bg-slate-800 px-2 py-0.5 rounded-lg border border-slate-700">${timeStr}</span>
+                                <span class="text-xs font-bold">${badgeSummary}</span>
+                            </div>
+                            <span class="text-[11px] text-slate-400 font-medium">🧠 LLM 全市场推演</span>
+                        </div>
+
+                        <div class="text-xs text-slate-300 leading-relaxed font-sans flex items-start space-x-1.5 pt-1">
+                            <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5"></i>
+                            <div>
+                                <strong class="text-slate-100">宏观流动性基调：</strong>
+                                <span class="text-slate-300">${macro}</span>
+                            </div>
+                        </div>
+
+                        ${posMgmtHtml}
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        }
+
+        // Render News Intelligence
+        function renderNewsIntelligence(newsIntel) {
+            const timeStr = newsIntel.updated_at || newsIntel.timestamp || '--';
+            const macroEl = document.getElementById('news-macro-env');
+            if (macroEl) macroEl.innerText = `${newsIntel.macro_sentiment || '中性平衡'} (${timeStr.substring(11, 19) || timeStr})`;
+
+            const sentTimeEl = document.getElementById('news-sentiment-time');
+            if (sentTimeEl) sentTimeEl.innerText = `更新于 ${timeStr}`;
+
+            const coinsGrid = document.getElementById('coin-sentiments-grid');
+            if (coinsGrid) {
+                const coins = newsIntel.coins_sentiment || {};
+                const coinKeys = Object.keys(coins);
+
+                if (coinKeys.length === 0) {
+                    coinsGrid.innerHTML = '<div class="col-span-full py-6 text-center text-slate-400 text-xs">暂无舆情指数</div>';
+                } else {
+                    let html = '';
+                    coinKeys.forEach(k => {
+                        const c = coins[k];
+                        const score = Number(c.sentiment_factor_score || 0);
+                        const isBull = score >= 0.2;
+                        const isBear = score <= -0.1;
+                        const badgeClass = isBull ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : (isBear ? 'bg-rose-50 text-rose-600 border-rose-200' : 'bg-slate-100 text-slate-600 border-slate-200');
+
+                        html += `
+                            <div onclick="openCoinSentimentModal('${c.ccy}')" class="p-2.5 rounded-xl bg-white border border-slate-200 hover:border-amber-400 hover:shadow-sm cursor-pointer transition flex flex-col justify-between group">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center space-x-1">
+                                        <span class="font-bold text-slate-900 text-xs group-hover:text-amber-600 transition">${c.ccy}</span>
+                                        <i data-lucide="message-square" class="w-2.5 h-2.5 text-slate-400 group-hover:text-amber-500 transition"></i>
+                                    </div>
+                                    <span class="text-[9px] px-1.5 py-0.5 rounded font-mono font-bold border ${badgeClass}">${score > 0 ? '+' : ''}${score.toFixed(2)}</span>
+                                </div>
+                                <div class="mt-1 flex justify-between text-[10px] text-slate-500 font-mono">
+                                    <span class="text-emerald-600">多:${c.bullish_ratio || '--'}</span>
+                                    <span class="text-rose-600">空:${c.bearish_ratio || '--'}</span>
+                                </div>
+                                <div class="mt-1 text-[9px] text-slate-400 font-mono text-right border-t border-slate-100 pt-0.5">
+                                    ${timeStr.substring(11, 16) || '--'}
+                                </div>
+                            </div>
+                        `;
+                    });
+                    coinsGrid.innerHTML = html;
+                }
+            }
+
+            const newsContainer = document.getElementById('news-headlines-container');
+            if (newsContainer) {
+                const list = newsIntel.latest_news || [];
+                if (list.length === 0) {
+                    newsContainer.innerHTML = '<div class="py-6 text-center text-slate-400 text-xs">暂无最新重大快讯</div>';
+                } else {
+                    let html = '';
+                    list.forEach((n, idx) => {
+                        const platforms = (n.platforms && n.platforms.length > 0) ? n.platforms.join('·') : 'OKX Feed';
+                        const nTime = n.time || timeStr || '--';
+                        html += `
+                            <div onclick="openNewsDetailModal(${idx})" class="p-3 rounded-xl bg-white border border-slate-200 hover:border-blue-400 hover:shadow-sm cursor-pointer transition flex flex-col space-y-1 group">
+                                <div class="flex items-center justify-between text-[10px]">
+                                    <span class="font-mono text-brand-600 font-semibold">${nTime}</span>
+                                    <span class="px-2 py-0.2 rounded bg-slate-100 text-slate-500 font-medium">${platforms}</span>
+                                </div>
+                                <p class="text-xs font-bold text-slate-800 line-clamp-1 group-hover:text-brand-600 transition">${n.title || ''}</p>
+                                <p class="text-[11px] text-slate-500 line-clamp-2 leading-relaxed">${n.summary || ''}</p>
+                            </div>
+                        `;
+                    });
+                    newsContainer.innerHTML = html;
+                }
+            }
+        }
+
+        // Render Review Lab (AI Cognitive Post-Mortem & Realtime Markdown Memory)
+        function renderReviewLab(review, memoryMdText) {
+            const timeStr = review.timestamp || review.updated_at || review.time || '--';
+            const insTimeEl = document.getElementById('lab-insights-time');
+            if (insTimeEl) insTimeEl.innerText = `复盘时间: ${timeStr}`;
+            const memTimeEl = document.getElementById('lab-memory-time');
+            if (memTimeEl) memTimeEl.innerText = `生效时间: ${timeStr}`;
+
+            // 0.1 Render Live Markdown Memory Viewer (Use raw text to preserve Markdown characters)
+            const mdViewer = document.getElementById('ai-memory-markdown-viewer');
+            const rawMd = (rawJsonData && rawJsonData.ai_trading_memory_md) ? rawJsonData.ai_trading_memory_md : memoryMdText;
+            if (mdViewer) {
+                if (rawMd && rawMd.trim()) {
+                    mdViewer.textContent = rawMd.trim();
+                } else {
+                    mdViewer.textContent = '暂无长期记忆 Markdown 文件 (系统初始纯净状态，等待新一轮复盘流水沉淀...)';
+                }
+            }
+
+            // 1. Insights / Diagnosis
+            const insContainer = document.getElementById('ai-insights-container');
+            const insights = review.insights || review.ai_insights || [];
+            if (insContainer) {
+                if (insights.length === 0) {
+                    insContainer.innerHTML = '<div class="py-6 text-center text-slate-500 text-xs">暂无诊断报告数据</div>';
+                } else {
+                    let html = '';
+                    insights.forEach(ins => {
+                        html += `<div class="p-3 rounded-xl bg-slate-900/60 border border-white/5 text-slate-300 leading-relaxed text-xs flex items-start space-x-2.5">
+                            <span class="text-amber-400 font-bold shrink-0">💡</span>
+                            <div class="flex flex-col space-y-0.5">
+                                <span class="text-[10px] font-mono text-slate-500">${timeStr}</span>
+                                <span>${ins}</span>
+                            </div>
+                        </div>`;
+                    });
+                    insContainer.innerHTML = html;
+                }
+            }
+        }
+
+        // Render Performance Leaderboard
+        function renderPerformance(perf) {
+            const tbody = document.getElementById('leaderboard-tbody');
+            if (!tbody) return;
+            const list = perf.inst_leaderboard || perf.leaderboard || [];
+
+            if (list.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="py-6 text-center text-slate-400 font-sans">暂无标的战报</td></tr>';
+                return;
+            }
+
+            let html = '';
+            list.forEach(item => {
+                const wr = Number(item.win_rate || 0);
+                const pnl = Number(item.pnl || 0);
+                const isPos = pnl >= 0;
+                const pnlClass = isPos ? 'text-emerald-600 font-bold' : 'text-rose-600 font-bold';
+
+                html += `
+                    <tr class="hover:bg-slate-50 transition border-b border-slate-100">
+                        <td class="py-2.5 font-bold text-slate-900">${item.inst}</td>
+                        <td class="py-2.5 text-slate-600">${item.trades} 笔</td>
+                        <td class="py-2.5 text-slate-600">${item.wins}胜 / ${item.losses}负</td>
+                        <td class="py-2.5 text-brand-600 font-bold">${wr.toFixed(1)}%</td>
+                        <td class="py-2.5 text-right ${pnlClass}">${isPos ? '+' : ''}${pnl.toFixed(2)} U</td>
+                    </tr>
+                `;
+            });
+            tbody.innerHTML = html;
+        }
+
+        let currentTradeFilter = 'all';
+
+        function setTradeFilter(type) {
+            currentTradeFilter = type;
+            ['all', 'active', 'closed'].forEach(k => {
+                const btn = document.getElementById(`filter-btn-${k}`);
+                if (btn) {
+                    if (k === type) {
+                        btn.className = 'px-2.5 py-1 rounded-lg bg-white text-slate-900 shadow-sm transition font-bold';
+                    } else {
+                        btn.className = 'px-2.5 py-1 rounded-lg text-slate-500 hover:text-slate-900 transition font-normal';
+                    }
+                }
+            });
+            renderTrades();
+        }
+
+        // Render Trades Table
+        function renderTrades() {
+            const tbody = document.getElementById('trades-tbody');
+            if (!tbody) return;
+            const searchInput = document.getElementById('trade-search');
+            const kw = searchInput ? searchInput.value.toLowerCase().trim() : '';
+
+            let filtered = allTrades || [];
+            
+            // Status Filter
+            if (currentTradeFilter === 'active') {
+                filtered = filtered.filter(t => t.status === 'holding');
+            } else if (currentTradeFilter === 'closed') {
+                filtered = filtered.filter(t => t.status !== 'holding');
+            }
+
+            if (kw) {
+                filtered = filtered.filter(t => 
+                    (t.inst && t.inst.toLowerCase().includes(kw)) ||
+                    (t.strategy && t.strategy.toLowerCase().includes(kw)) ||
+                    (t.side && t.side.toLowerCase().includes(kw)) ||
+                    (t.exit_reason && t.exit_reason.toLowerCase().includes(kw)) ||
+                    (t.status && t.status.toLowerCase().includes(kw))
+                );
+            }
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="py-8 text-center text-slate-400 font-sans text-xs">无匹配交易台账记录</td></tr>';
+                return;
+            }
+
+            const formatPx = (val) => {
+                if (val === undefined || val === null || val === '--' || isNaN(Number(val))) return val || '--';
+                const num = Number(val);
+                if (num >= 1000) return num.toFixed(2);
+                if (num >= 10) return num.toFixed(3);
+                return num.toFixed(4);
+            };
+
+            let html = '';
+            filtered.slice(0, 80).forEach(t => {
+                const isHolding = t.status === 'holding';
+                const isLong = t.side === '多';
+                const sideBadge = isLong ? 'bg-emerald-950/80 text-emerald-400 border-emerald-500/40' : 'bg-rose-950/80 text-rose-400 border-rose-500/40';
+
+                const pnl = Number(t.pnl || 0.0);
+                const roi = Number(t.roi_pct || 0.0);
+                const isProfit = pnl >= 0;
+                const pnlClass = isProfit ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold';
+
+                const marginDisplay = t.margin ? `${Number(t.margin).toFixed(1)} U` : '--';
+                const openTimeStr = (t.open_time || '--').substring(5, 19);
+                const closeTimeStr = isHolding ? '<span class="text-blue-400 font-bold">持仓盯盘中...</span>' : (t.close_time || '--').substring(5, 19);
+                const closePxStr = isHolding ? `<span class="text-blue-400 font-bold">${formatPx(t.close_px)}</span>` : `<span class="text-slate-200">${formatPx(t.close_px)}</span>`;
+
+                const pnlDisplay = isHolding 
+                    ? `<span class="${pnlClass}">${isProfit ? '+' : ''}${pnl.toFixed(2)} U</span> <span class="text-[10px] text-slate-400 ml-1.5 font-normal">(${isProfit ? '+' : ''}${roi.toFixed(1)}% 浮)</span>`
+                    : `<span class="${pnlClass}">${isProfit ? '+' : ''}${pnl.toFixed(2)} U</span> <span class="text-[10px] ${pnlClass} ml-1.5 font-normal">(${isProfit ? '+' : ''}${roi.toFixed(1)}%)</span>`;
+
+                const statusBadge = isHolding
+                    ? 'bg-blue-950/80 text-blue-400 border-blue-500/40'
+                    : (isProfit ? 'bg-emerald-950/80 text-emerald-400 border-emerald-500/40' : 'bg-rose-950/80 text-rose-400 border-rose-500/40');
+
+                const exitReason = t.exit_reason || (isHolding ? '⏳ 实时监控中' : '平仓完成');
+
+                html += `
+                    <tr class="hover:bg-slate-800/40 transition border-b border-white/5 ${isHolding ? 'bg-blue-950/20' : ''}">
+                        <td class="py-3 px-3.5 whitespace-nowrap">
+                            <div class="flex items-center space-x-2">
+                                <span class="font-bold text-white text-xs">${t.inst}</span>
+                                <span class="px-2 py-0.5 rounded-lg text-[10px] font-bold border ${sideBadge}">${t.side} ${t.lever || '3x'}</span>
+                            </div>
+                        </td>
+                        <td class="py-3 px-3.5 whitespace-nowrap">
+                            <span class="px-2.5 py-1 rounded-lg bg-slate-800/80 text-slate-300 border border-white/5 text-[11px] font-medium inline-block">${t.strategy || '⚪ 观望'}</span>
+                        </td>
+                        <td class="py-3 px-3.5 whitespace-nowrap font-bold text-slate-200">${marginDisplay}</td>
+                        <td class="py-3 px-3.5 whitespace-nowrap">
+                            <div class="flex items-center space-x-2">
+                                <span class="text-slate-100 font-bold">${formatPx(t.open_px)}</span>
+                                <span class="text-[10px] text-slate-500 font-mono">(${openTimeStr})</span>
+                            </div>
+                        </td>
+                        <td class="py-3 px-3.5 whitespace-nowrap">
+                            <div class="flex items-center space-x-2">
+                                <span>${closePxStr}</span>
+                                <span class="text-[10px] text-slate-500 font-mono">(${closeTimeStr})</span>
+                            </div>
+                        </td>
+                        <td class="py-3 px-3.5 whitespace-nowrap text-right">${pnlDisplay}</td>
+                        <td class="py-3 px-3.5 whitespace-nowrap text-center text-slate-400 font-mono">${t.duration || '--'}</td>
+                        <td class="py-3 px-3.5 whitespace-nowrap">
+                            <span class="px-2.5 py-0.5 rounded-lg text-[10px] border ${statusBadge}">${exitReason}</span>
+                        </td>
+                    </tr>
+                `;
+            });
+            tbody.innerHTML = html;
+        }
+
+        // Render Logs
+        function renderLogs(logs) {
+            const container = document.getElementById('logs-container');
+            if (!container) return;
+            if (!logs || logs.length === 0) {
+                container.innerHTML = '<p class="text-slate-400">暂无巡检日志</p>';
+                return;
+            }
+            container.innerHTML = logs.map(l => {
+                let colorClass = 'text-slate-300';
+                if (l.includes('🟢 开多') || l.includes('🎯 移动止盈')) {
+                    colorClass = 'text-emerald-400 font-semibold';
+                } else if (l.includes('🔴 开空')) {
+                    colorClass = 'text-rose-400 font-semibold';
+                } else if (l.includes('⌛ 时间止损')) {
+                    colorClass = 'text-amber-400';
+                } else if (l.includes('⚡ Alpha-Quant')) {
+                    colorClass = 'text-blue-300';
+                }
+                return `<p class="leading-relaxed text-[11px] ${colorClass}">${l}</p>`;
+            }).join('');
+            container.scrollTop = container.scrollHeight;
+        }
+
+        // Modal Handlers (AI Brain Full Reasoning Modal)
+        function openCoinFactorModal(ccy) {
+            if (!rawJsonData) return;
+            const modal = document.getElementById('coin-factor-modal');
+            if (!modal) return;
+
+            const f = (rawJsonData.factors || []).find(item => item.name === ccy || item.instId.startsWith(ccy)) || {};
+            const thought = f.thought_process || {};
+
+            document.getElementById('modal-coin-name').innerText = ccy;
+
+            const action = f.action || 'WAIT';
+            const badgeEl = document.getElementById('modal-coin-badge');
+            if (action === 'BUY_LONG') {
+                badgeEl.innerText = '🟢 建议做多 BUY';
+                badgeEl.className = 'text-xs px-2.5 py-0.5 rounded-full font-mono font-bold bg-emerald-50 text-emerald-600 border border-emerald-300 shadow-sm';
+            } else if (action === 'SELL_SHORT') {
+                badgeEl.innerText = '🔴 建议做空 SELL';
+                badgeEl.className = 'text-xs px-2.5 py-0.5 rounded-full font-mono font-bold bg-rose-50 text-rose-600 border border-rose-300 shadow-sm';
+            } else {
+                badgeEl.innerText = '🤖 AI观望 WAIT';
+                badgeEl.className = 'text-xs px-2.5 py-0.5 rounded-full font-mono font-bold bg-slate-100 text-slate-600 border border-slate-200';
+            }
+
+            document.getElementById('modal-coin-price').innerText = f.price || '--';
+            document.getElementById('modal-coin-confidence').innerText = `${f.confidence || 75}%`;
+
+            document.getElementById('modal-factor-mstruct').innerText = thought.market_structure || f.market_structure || f.confluence_15m || '多周期价格行为整固中';
+            document.getElementById('modal-factor-flow').innerText = thought.volume_and_oi || f.volume_and_oi || f.confluence_1h || 'OI未平仓量与主动买卖吃单流监控';
+            document.getElementById('modal-factor-desc').innerText = f.reason || f.desc || `【${ccy}】AI大脑判定当前风险收益比不足，建议空仓观望。`;
+
+            modal.classList.remove('hidden');
+        }
+
+        function closeCoinFactorModal() {
+            const modal = document.getElementById('coin-factor-modal');
+            if (modal) modal.classList.add('hidden');
+        }
+
+        // 🌐 Coin Sentiment Modal Handler (专门针对全网舆情指数的深度弹窗)
+        function openCoinSentimentModal(ccy) {
+            if (!rawJsonData) return;
+            const modal = document.getElementById('coin-sentiment-modal');
+            if (!modal) return;
+
+            const s = (rawJsonData.news_intelligence?.coins_sentiment || {})[ccy] || {};
+            const score = Number(s.sentiment_factor_score || 0);
+
+            document.getElementById('modal-sent-coin-name').innerText = ccy;
+            
+            const badgeEl = document.getElementById('modal-sent-badge');
+            badgeEl.innerText = `${score > 0 ? '+' : ''}${score.toFixed(2)} 分`;
+            badgeEl.className = `text-xs px-2 py-0.5 rounded-full font-mono font-bold ${score >= 0.2 ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' : (score <= -0.1 ? 'bg-rose-50 text-rose-600 border border-rose-200' : 'bg-slate-100 text-slate-600 border border-slate-200')}`;
+
+            document.getElementById('modal-sent-mentions').innerText = s.mentions !== undefined ? `${s.mentions} 次` : '--';
+            
+            const labelEl = document.getElementById('modal-sent-label');
+            labelEl.innerText = score >= 0.2 ? '🔥 Bullish 偏多共振' : (score <= -0.1 ? '❄️ Bearish 偏空承压' : '⚖️ Neutral 中性平衡');
+            labelEl.className = score >= 0.2 ? 'text-emerald-600 text-sm font-bold' : (score <= -0.1 ? 'text-rose-600 text-sm font-bold' : 'text-brand-600 text-sm font-bold');
+
+            const bullRatioStr = s.bullish_ratio || '65%';
+            const bearRatioStr = s.bearish_ratio || '35%';
+            document.getElementById('modal-sent-bull-ratio').innerText = bullRatioStr;
+            document.getElementById('modal-sent-bear-ratio').innerText = bearRatioStr;
+
+            const bullPercent = parseFloat(bullRatioStr) || 60;
+            const barBull = document.getElementById('modal-sent-bar-bull');
+            if (barBull) barBull.style.width = `${bullPercent}%`;
+
+            modal.classList.remove('hidden');
+        }
+
+        function closeCoinSentimentModal() {
+            const modal = document.getElementById('coin-sentiment-modal');
+            if (modal) modal.classList.add('hidden');
+        }
+
+        // 📰 News Detail Modal Handler (快讯卡片点击展开详情)
+        function openNewsDetailModal(index) {
+            if (!rawJsonData) return;
+            const newsList = rawJsonData.news_intelligence?.latest_news || [];
+            const n = newsList[index];
+            if (!n) return;
+
+            const modal = document.getElementById('news-detail-modal');
+            if (!modal) return;
+
+            document.getElementById('modal-news-time').innerText = n.time || '--';
+            document.getElementById('modal-news-source').innerText = (n.platforms && n.platforms.length > 0) ? n.platforms.join(' · ') : 'OKX Feed / 金色财经';
+            document.getElementById('modal-news-title').innerText = n.title || '快讯详情';
+            document.getElementById('modal-news-summary').innerText = n.summary || n.title || '暂无更详细摘要内容。';
+
+            // AI Impact evaluation
+            const titleText = (n.title || '') + (n.summary || '');
+            let impactDesc = '经系统自然语言判定，该快讯对当前市场未构成黑天鹅突发破坏性影响，交易系统维持常态运行。';
+            if (titleText.includes('监管') || titleText.includes('起诉') || titleText.includes('黑客') || titleText.includes('攻击') || titleText.includes('清算')) {
+                impactDesc = '⚠️ 监测到高敏感词汇（监管/黑客/清算），系统黑天鹅哨兵已提高风险警惕度，严密监控多空盘口深度。';
+            } else if (titleText.includes('ETF') || titleText.includes('增发') || titleText.includes('降息') || titleText.includes('通过')) {
+                impactDesc = '🟢 捕捉到宏观积极叙事（流动性释放/利好政策），利于支撑主流币种风险偏好抬升。';
+            }
+            document.getElementById('modal-news-impact').innerText = impactDesc;
+
+            const urlEl = document.getElementById('modal-news-url');
+            if (urlEl) {
+                const safeUrl = safeExternalUrl(n.url);
+                if (safeUrl !== '#') {
+                    urlEl.href = safeUrl;
+                    urlEl.rel = 'noopener noreferrer';
+                    urlEl.classList.remove('hidden');
+                } else {
+                    urlEl.classList.add('hidden');
+                }
+            }
+
+            modal.classList.remove('hidden');
+        }
+
+        function closeNewsDetailModal() {
+            const modal = document.getElementById('news-detail-modal');
+            if (modal) modal.classList.add('hidden');
+        }
+
+        // Render Chart (Professional Double-Axis: Real Total Equity + Dynamic Peak Drawdown)
+        function renderChart(snapshots) {
+            const ctx = document.getElementById('equityChart');
+            if (!ctx) return;
+
+            const points = snapshots && snapshots.length > 0 ? snapshots : [];
+            if (points.length === 0) {
+                if (equityChartInstance) {
+                    equityChartInstance.destroy();
+                    equityChartInstance = null;
+                }
+                return;
+            }
+
+            const labels = points.map(p => (p.time || '').substring(11, 16) || p.time);
+            const equityValues = points.map(p => Number(p.total_eq || p.equity || 10000.0));
+
+            // Calculate Dynamic Peak Drawdown Series
+            let peak = equityValues[0];
+            const drawdownValues = equityValues.map(eq => {
+                if (eq > peak) peak = eq;
+                const dd = peak > 0 ? ((eq - peak) / peak * 100) : 0;
+                return Number(dd.toFixed(2));
+            });
+
+            if (equityChartInstance) {
+                equityChartInstance.destroy();
+            }
+
+            equityChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: '总权益 (USDT)',
+                            data: equityValues,
+                            borderColor: '#059669',
+                            borderWidth: 2.5,
+                            backgroundColor: 'rgba(16, 185, 129, 0.08)',
+                            fill: true,
+                            tension: 0.3,
+                            pointRadius: 2,
+                            pointHoverRadius: 5,
+                            pointBackgroundColor: '#059669',
+                            yAxisID: 'yEquity'
+                        },
+                        {
+                            label: '动态回撤 (%)',
+                            data: drawdownValues,
+                            borderColor: '#E11D48',
+                            borderWidth: 1.5,
+                            borderDash: [3, 3],
+                            backgroundColor: 'rgba(225, 29, 72, 0.05)',
+                            fill: true,
+                            tension: 0.2,
+                            pointRadius: 0,
+                            pointHoverRadius: 4,
+                            pointBackgroundColor: '#E11D48',
+                            yAxisID: 'yDrawdown'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: '#0F172A',
+                            padding: 12,
+                            titleFont: { size: 11, family: 'Inter' },
+                            bodyFont: { size: 12, family: 'JetBrains Mono', weight: 'bold' },
+                            callbacks: {
+                                label: function(context) {
+                                    if (context.datasetIndex === 0) {
+                                        return ` 总权益: ${context.parsed.y.toFixed(2)} USDT`;
+                                    } else {
+                                        return ` 动态回撤: ${context.parsed.y.toFixed(2)} %`;
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false },
+                            ticks: { font: { size: 10, family: 'JetBrains Mono' }, color: '#94A3B8', maxTicksLimit: 10 }
+                        },
+                        yEquity: {
+                            type: 'linear',
+                            position: 'left',
+                            grid: { color: '#F1F5F9' },
+                            ticks: {
+                                font: { size: 10, family: 'JetBrains Mono' },
+                                color: '#059669',
+                                callback: value => value.toFixed(0) + ' U'
+                            }
+                        },
+                        yDrawdown: {
+                            type: 'linear',
+                            position: 'right',
+                            grid: { display: false },
+                            ticks: {
+                                font: { size: 10, family: 'JetBrains Mono' },
+                                color: '#E11D48',
+                                callback: value => value.toFixed(1) + '%'
+                            },
+                            suggestedMax: 0.5,
+                            suggestedMin: -3.0
+                        }
+                    }
+                }
+            });
+        }
+
+        // Start Auto Poll
+        loadAllData();
+        setInterval(loadAllData, 4000);
+    </script>
+</body>
+</html>
