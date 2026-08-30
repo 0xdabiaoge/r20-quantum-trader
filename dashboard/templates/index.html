@@ -8,9 +8,9 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="/static/js/tailwindcss.js"></script>
+    <script src="/static/js/chart.min.js"></script>
+    <script src="/static/js/lucide.min.js"></script>
     <script>
         tailwind.config = {
             theme: {
@@ -454,15 +454,15 @@
                 <!-- 1. 账户总权益 -->
                 <div class="custom-card p-4 sm:p-5 flex flex-col justify-between">
                     <div class="flex items-center justify-between mb-2">
-                        <span class="text-xs font-semibold text-slate-500">账户总权益 (USDT)</span>
-                        <div class="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center text-slate-600">
+                        <span class="text-xs font-semibold text-slate-400">账户总权益 (USDT)</span>
+                        <div class="w-7 h-7 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
                             <i data-lucide="wallet" class="w-4 h-4"></i>
                         </div>
                     </div>
                     <div>
-                        <div id="metric-equity" class="text-2xl sm:text-3xl font-extrabold font-mono tracking-tight text-slate-900">4,244.57</div>
-                        <div class="flex items-center justify-between text-[11px] font-mono text-slate-500 mt-2 pt-2 border-t border-slate-100">
-                            <span>可用: <strong id="metric-avail" class="text-slate-700">--</strong></span>
+                        <div id="metric-equity" class="text-2xl sm:text-3xl font-extrabold font-mono tracking-tight text-white">--</div>
+                        <div class="flex items-center justify-between text-[11px] font-mono text-slate-400 mt-2 pt-2 border-t border-white/5">
+                            <span>可用: <strong id="metric-avail" class="text-slate-200">--</strong></span>
                             <span id="metric-margin-usage" class="text-slate-400">占用率: 0%</span>
                         </div>
                     </div>
@@ -471,19 +471,19 @@
                 <!-- 2. 系统累计总收益 -->
                 <div class="custom-card p-4 sm:p-5 flex flex-col justify-between">
                     <div class="flex items-center justify-between mb-2">
-                        <span class="text-xs font-semibold text-slate-500">累计净收益 (NAV)</span>
-                        <div class="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
+                        <span class="text-xs font-semibold text-slate-400">累计净收益 (NAV)</span>
+                        <div class="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
                             <i data-lucide="trending-up" class="w-4 h-4"></i>
                         </div>
                     </div>
                     <div>
                         <div class="flex items-baseline space-x-2">
-                            <span id="metric-cum-pnl" class="text-2xl sm:text-3xl font-extrabold font-mono tracking-tight text-emerald-600">+0.00</span>
-                            <span class="text-xs font-bold text-slate-400">USDT</span>
+                            <span id="metric-cum-pnl" class="text-2xl sm:text-3xl font-extrabold font-mono tracking-tight text-emerald-400">--</span>
+                            <span class="text-xs font-bold text-slate-500">USDT</span>
                         </div>
-                        <div class="flex items-center justify-between text-[11px] font-mono mt-2 pt-2 border-t border-slate-100">
-                            <span>ROI: <strong id="metric-cum-roi" class="text-emerald-600">+0.00%</strong></span>
-                            <span class="text-slate-400">累计手续费: <strong id="metric-cum-fees" class="text-slate-600">0.00 U</strong></span>
+                        <div class="flex items-center justify-between text-[11px] font-mono mt-2 pt-2 border-t border-white/5">
+                            <span>ROI: <strong id="metric-cum-roi" class="text-emerald-400 font-bold">--</strong></span>
+                            <span class="text-slate-400">累计手续费: <strong id="metric-cum-fees" class="text-slate-300">--</strong></span>
                         </div>
                     </div>
                 </div>
@@ -491,19 +491,19 @@
                 <!-- 3. 今日已结净盈亏 -->
                 <div class="custom-card p-4 sm:p-5 flex flex-col justify-between">
                     <div class="flex items-center justify-between mb-2">
-                        <span class="text-xs font-semibold text-slate-500">今日已结净盈亏 (落袋)</span>
-                        <div class="w-7 h-7 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600">
+                        <span class="text-xs font-semibold text-slate-400">今日已结净盈亏 (落袋)</span>
+                        <div class="w-7 h-7 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
                             <i data-lucide="check-circle-2" class="w-4 h-4"></i>
                         </div>
                     </div>
                     <div>
                         <div class="flex items-baseline space-x-2">
-                            <span id="metric-realized-pnl" class="text-2xl sm:text-3xl font-extrabold font-mono tracking-tight text-slate-900">+0.00</span>
-                            <span class="text-xs font-bold text-slate-400">USDT</span>
+                            <span id="metric-realized-pnl" class="text-2xl sm:text-3xl font-extrabold font-mono tracking-tight text-slate-200">--</span>
+                            <span class="text-xs font-bold text-slate-500">USDT</span>
                         </div>
-                        <div class="flex items-center justify-between text-[11px] font-mono mt-2 pt-2 border-t border-slate-100">
-                            <span id="metric-today-wr" class="text-slate-600 font-semibold">胜率: 0%</span>
-                            <span class="text-slate-400">手续费: <strong id="metric-fees" class="text-slate-600">0 U</strong></span>
+                        <div class="flex items-center justify-between text-[11px] font-mono mt-2 pt-2 border-t border-white/5">
+                            <span id="metric-today-wr" class="text-slate-300 font-semibold">胜率: 0%</span>
+                            <span class="text-slate-400">手续费: <strong id="metric-fees" class="text-slate-300">0 U</strong></span>
                         </div>
                     </div>
                 </div>
@@ -511,19 +511,19 @@
                 <!-- 4. 在途持仓净浮盈 -->
                 <div class="custom-card p-4 sm:p-5 flex flex-col justify-between">
                     <div class="flex items-center justify-between mb-2">
-                        <span class="text-xs font-semibold text-slate-500">在途持仓净浮盈 (UPL)</span>
-                        <div class="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
+                        <span class="text-xs font-semibold text-slate-400">在途持仓净浮盈 (UPL)</span>
+                        <div class="w-7 h-7 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
                             <i data-lucide="pie-chart" class="w-4 h-4"></i>
                         </div>
                     </div>
                     <div>
                         <div class="flex items-baseline space-x-2">
-                            <span id="metric-upl" class="text-2xl sm:text-3xl font-extrabold font-mono tracking-tight text-slate-900">+0.00</span>
-                            <span class="text-xs font-bold text-slate-400">USDT</span>
+                            <span id="metric-upl" class="text-2xl sm:text-3xl font-extrabold font-mono tracking-tight text-white">--</span>
+                            <span class="text-xs font-bold text-slate-500">USDT</span>
                         </div>
-                        <div class="flex items-center justify-between text-[11px] font-mono mt-2 pt-2 border-t border-slate-100">
-                            <span id="metric-pos-count" class="text-slate-700 font-semibold">0/6 仓</span>
-                            <span id="metric-pos-direction" class="text-slate-500">0多 / 0空</span>
+                        <div class="flex items-center justify-between text-[11px] font-mono mt-2 pt-2 border-t border-white/5">
+                            <span id="metric-pos-count" class="text-slate-200 font-semibold">0/6 仓</span>
+                            <span id="metric-pos-direction" class="text-slate-400">0多 / 0空</span>
                         </div>
                     </div>
                 </div>
@@ -1415,12 +1415,15 @@
                 renderTrades();
                 renderLogs(data.logs || []);
 
+                if (window.lucide) lucide.createIcons();
+
                 const luEl = document.getElementById('last-updated');
                 if (luEl && data.timestamp) luEl.innerText = data.timestamp.substring(11, 19);
             } catch (err) {
                 console.error('Failed to load data:', err);
             } finally {
                 if (icon) icon.classList.remove('animate-spin');
+                if (window.lucide) lucide.createIcons();
             }
         }
 
