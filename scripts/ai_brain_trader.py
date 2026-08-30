@@ -315,10 +315,11 @@ SYSTEM_PROMPT = """你是一名管理顶级加密量化对冲基金的首席AI�
 5. 任何关键行情缺失、标记为 DATA_INVALID、价格结构不合法或无法计算真实 R:R 时，必须 WAIT；不得猜测缺失数据。
 6. 长期记忆、偏好标的和历史胜率只能作为弱先验，绝不得覆盖本轮原始行情、持仓风险和硬门禁。
 7. 不得为已有持仓输出新的 BUY_LONG/SELL_SHORT；已有持仓只能通过 position_management 管理。
-8. 必须输出严格标准 JSON 对象，包含全市场宏观评估(macro_assessment)、在途持仓管理(position_management)与针对每个标的的决策字典(decisions)。
+8. 必须认真审查在途未成交限价挂单 (pending_orders)：若行情已大幅偏离、市场逻辑反转或挂单已过时，必须在 pending_orders_management 中果断输出 CANCEL 撤单指令，防止挂单成交在不利位置；有效挂单输出 KEEP 维持。
+9. 必须输出严格标准 JSON 对象，包含全市场宏观评估(macro_assessment)、在途持仓管理(position_management)、在途挂单管理(pending_orders_management)与针对每个标的的决策字典(decisions)。
 """
 
-def construct_full_market_prompt(packages: List[Dict[str, Any]], pos_summary: str = "当前总持仓 0/6", active_positions_detail: List[Dict[str, Any]] = None, current_time_str: str = "", usdt_available: float = 0.0) -> str:
+def construct_full_market_prompt(packages: List[Dict[str, Any]], pos_summary: str = "当前总持仓 0/6", active_positions_detail: List[Dict[str, Any]] = None, pending_orders_detail: List[Dict[str, Any]] = None, current_time_str: str = "", usdt_available: float = 0.0) -> str:
     tz_bj = datetime.timezone(datetime.timedelta(hours=8))
     now_bj_str = current_time_str or datetime.datetime.now(tz_bj).strftime("%Y-%m-%d %H:%M:%S (北京时间)")
     market_lines = []
@@ -353,6 +354,34 @@ def construct_full_market_prompt(packages: List[Dict[str, Any]], pos_summary: st
         pos_lines.append("当前无任何在途持仓敞口 (100% 现金空仓状态)")
     
     active_pos_text = "\n".join(pos_lines)
+
+    # Format Pending Limit Orders
+    pending_lines = []
+    if pending_orders_detail and len(pending_orders_detail) > 0:
+        for o in pending_orders_detail:
+            c_ts = int(o.get("cTime", 0) or 0) / 1000.0
+            c_time_str = datetime.datetime.fromtimestamp(c_ts, tz=tz_bj).strftime("%Y-%m-%d %H:%M:%S") if c_ts > 0 else "--"
+            inst_id = o.get("instId", "")
+            side_str = "限价买多" if o.get("side") == "buy" and o.get("posSide") == "long" else ("限价卖空" if o.get("side") == "sell" and o.get("posSide") == "short" else f"{o.get('side')} {o.get('posSide')}")
+            px_val = o.get("px", "--")
+            sz_val = o.get("sz", "--")
+            ord_id = o.get("ordId", "")
+            
+            attach_list = o.get("attachAlgoOrds", [])
+            tp_sl_info = ""
+            if attach_list and len(attach_list) > 0:
+                att = attach_list[0]
+                tp_p = att.get("tpTriggerPx", "--")
+                sl_p = att.get("slTriggerPx", "--")
+                tp_sl_info = f" | 附带云端止盈: {tp_p} / 止损: {sl_p}"
+            
+            pending_lines.append(
+                f"- [挂单ID: {ord_id}] {inst_id} | {side_str} {sz_val}张 @ {px_val} | 挂单时间: {c_time_str}{tp_sl_info}"
+            )
+    else:
+        pending_lines.append("当前无任何在途未成交限价挂单 (挂单池为空)")
+    
+    pending_orders_text = "\n".join(pending_lines)
 
     memory_lessons = ""
     # Priority 1: Read Human/LLM Markdown Memory (QwenPaw-native)
@@ -411,6 +440,10 @@ def construct_full_market_prompt(packages: List[Dict[str, Any]], pos_summary: st
 【当前活动在途持仓明细】:
 {active_pos_text}
 
+======================= 【在途未成交限价挂单 (Pending Maker Orders)】 =======================
+【当前在途挂单列表】:
+{pending_orders_text}
+
 {memory_lessons}
 
 ======================= 【六币种原生行情、技术指标与筹码矩阵】 =======================
@@ -420,12 +453,14 @@ def construct_full_market_prompt(packages: List[Dict[str, Any]], pos_summary: st
 【推演与决策任务】:
 你拥有【最高决策主权】，请不要受任何单一死板指标的束缚，全权由你作为首席交易官根据上述【全网快讯资讯】、【多周期K线形态】、【盘口深度】与【聪明钱资金流向】进行综合直觉与量化推演：
 1. 【在途持仓管理】：对当前已有持仓逐一分析（如 LINK/ETH 等）：当前行情动能如何？是继续持有(HOLD)、提止损保本、止盈平仓(CLOSE)、还是逢高/破位止损平仓？给出持仓调整策略。
-2. 【多空开仓全权裁决】：自主判断未持仓品种是否具备确定性爆发机会：
+2. 【在途限价挂单生命周期审查与裁决 (Pending Orders Management)】：
+   - 仔细审查上述在途未成交挂单：若挂单价格已大幅偏离最新盘口、或者行情动能/突发要闻已转变导致原挂单计划失效，必须在 pending_orders_management 中为该挂单输出 CANCEL 立即撤单指令，防止挂单成交在不利价格；若原计划仍然有效且价格合适，输出 KEEP 维持挂单。
+3. 【多空开仓全权裁决】：自主判断未持仓品种是否具备确定性爆发机会：
    - 充分吸收【最新重大快讯】中潜在的利好/利空催化剂；
    - 结合多周期价格行为与筹码，自主决定多空方向 (action: BUY_LONG / SELL_SHORT / WAIT)；
    - 自主规划拟开仓保证金 (margin_usdt: 建议可用余额的 5%~20%) 与 杠杆倍数 (leverage: 2~5x)；
    - 自主规划挂单入场价 (entry_price)、止盈触发价 (take_profit_price) 与 止损触发价 (stop_loss_price)，必须满足严密的盈亏比 (R:R ≥ 2.0)。
-3. 必须输出严格 JSON，格式如下：
+4. 必须输出严格 JSON，格式如下：
 {{
   "macro_assessment": "30字内全市场宏观流动性与情绪总结",
   "position_management": [
@@ -435,6 +470,14 @@ def construct_full_market_prompt(packages: List[Dict[str, Any]], pos_summary: st
       "suggested_sl_price": float (若调整止损填具体价格，否则0),
       "confidence": 0~100,
       "reason": "30字内持仓调整原因与当前动能分析"
+    }}
+  ],
+  "pending_orders_management": [
+    {{
+      "ordId": "3879092142614409217",
+      "instId": "LINK-USDT-SWAP",
+      "action": "KEEP" | "CANCEL",
+      "reason": "30字内撤单或维持挂单原因"
     }}
   ],
   "decisions": {{
@@ -517,7 +560,19 @@ def execute_batch_ai_brain_cycle(pos_summary: str = "当前总持仓 0/6", activ
     except Exception as e:
         print(f"[AI Brain Batch] Factor Library update warning: {e}")
 
-    prompt = construct_full_market_prompt(packages, pos_summary, active_positions_detail, current_time_str=time_str, usdt_available=usdt_available)
+    # Fetch live pending limit orders from exchange
+    pending_orders_list = []
+    try:
+        ord_cmd = "okx --demo swap orders --json 2>/dev/null"
+        ord_res = subprocess.run(ord_cmd, shell=True, capture_output=True, text=True, timeout=8)
+        if ord_res.stdout:
+            pending_orders_list = json.loads(ord_res.stdout)
+            if not isinstance(pending_orders_list, list):
+                pending_orders_list = []
+    except Exception as e:
+        print(f"[AI Brain Batch] Pending orders fetch warning: {e}")
+
+    prompt = construct_full_market_prompt(packages, pos_summary, active_positions_detail, pending_orders_detail=pending_orders_list, current_time_str=time_str, usdt_available=usdt_available)
     
     # Save Realtime Prompt Snapshot for Web Transparent Inspection
     try:
@@ -603,6 +658,21 @@ def execute_batch_ai_brain_cycle(pos_summary: str = "当前总持仓 0/6", activ
                     "reason": "模型遗漏该持仓，安全降级为 HOLD"
                 })
             pos_mgmt_list = validated_pos_mgmt
+
+            # Execute Pending Orders Cancellation if AI Brain decides CANCEL
+            pending_mgmt_list = brain_output.get("pending_orders_management", [])
+            if isinstance(pending_mgmt_list, list):
+                for p_order in pending_mgmt_list:
+                    if not isinstance(p_order, dict):
+                        continue
+                    p_act = str(p_order.get("action", "")).upper()
+                    p_ord_id = str(p_order.get("ordId", ""))
+                    p_inst_id = str(p_order.get("instId", ""))
+                    p_reason = str(p_order.get("reason", "模型指示撤销该挂单"))
+                    if p_act == "CANCEL" and p_ord_id and p_inst_id:
+                        cxl_cmd = f"okx --demo swap cancel {p_inst_id} --ordId {p_ord_id} --json"
+                        cxl_res = subprocess.run(cxl_cmd, shell=True, capture_output=True, text=True, timeout=10)
+                        print(f"[AI Brain Batch] 🛑 AI自主撤回失效/过时限价单: {p_inst_id} (ordId={p_ord_id}, 原因={p_reason})")
 
             standard_cache = {}
             for p in packages:

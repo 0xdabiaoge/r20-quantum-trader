@@ -220,6 +220,7 @@ def build_lifecycle_ledger():
             "close_fee": round(fee / 2.0, 4),
             "fee": round(fee, 2),
             "pnl": net_pnl,
+            "roi": roi_pct,
             "roi_pct": roi_pct,
             "duration": duration_str,
             "status": "closed",

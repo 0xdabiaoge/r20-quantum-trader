@@ -425,14 +425,14 @@
 
             <!-- Right: Actions Group -->
             <div class="flex items-center space-x-2 sm:space-x-3 shrink-0">
-                <!-- GitHub Repository Link in Top Nav with Version -->
-                <a href="https://github.com/555cute/r20-quantum-trader" target="_blank" rel="noopener noreferrer" class="px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-slate-600 hover:bg-slate-800 text-white text-xs font-bold flex items-center space-x-2 transition shadow-sm group" title="访问 GitHub 开源项目仓库 (v5.2.0)">
+                <!-- GitHub & Community Modal Trigger in Top Nav -->
+                <button onclick="openAboutModal()" class="px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-indigo-500/50 hover:bg-slate-800 text-white text-xs font-bold flex items-center space-x-2 transition shadow-sm group" title="点击查看项目介绍、GitHub开源与社区交流群">
                     <svg class="w-4 h-4 text-white group-hover:scale-110 transition-transform fill-current shrink-0" viewBox="0 0 24 24" aria-hidden="true">
                         <path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/>
                     </svg>
-                    <span class="text-xs font-bold text-white tracking-wide">GitHub</span>
-                    <span class="px-1.5 py-0.5 rounded text-[10px] font-mono font-extrabold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">v5.2.0</span>
-                </a>
+                    <span class="text-xs font-bold text-white tracking-wide">开源与交流</span>
+                    <span class="px-1.5 py-0.5 rounded text-[10px] font-mono font-extrabold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">v5.3.0</span>
+                </button>
 
                 <div class="flex items-center space-x-1.5 px-2.5 py-1 rounded-xl bg-slate-950/60 border border-slate-800 text-xs font-mono">
                     <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -879,30 +879,9 @@
 
     </main>
 
-    <!-- Modern Dark Footer with GitHub Ecosystem -->
-    <footer class="max-w-[1680px] mx-auto px-4 sm:px-8 py-8 mt-12 mb-16 md:mb-0 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-400 gap-4">
-        <div class="flex items-center space-x-3">
-            <div class="w-6 h-6 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 font-mono font-bold text-xs">⚡</div>
-            <span class="font-bold text-white tracking-wide">R20 Quantum Trader</span>
-            <span class="text-slate-600">|</span>
-            <span class="text-slate-300">LLM-Native 启发式自进化量化交易终端</span>
-        </div>
-        <div class="flex items-center space-x-4">
-            <a href="https://github.com/555cute/r20-quantum-trader" target="_blank" rel="noopener noreferrer" class="flex items-center space-x-2 text-white hover:text-indigo-300 transition font-bold group">
-                <svg class="w-4 h-4 text-white fill-current shrink-0" viewBox="0 0 24 24" aria-hidden="true">
-                    <path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/>
-                </svg>
-                <span class="tracking-wide text-white">GitHub 开源仓库</span>
-            </a>
-            <span class="text-slate-600">•</span>
-            <span class="px-2 py-0.5 rounded text-[10px] bg-slate-900 border border-slate-700 font-mono font-bold text-indigo-300">v5.2.0</span>
-            <span class="px-2 py-0.5 rounded text-[10px] bg-slate-900 border border-slate-700 font-mono font-bold text-emerald-400">MIT License</span>
-        </div>
-    </footer>
-
     <!-- ⚡ GLOBAL FLOATING ACTION BUTTON FOR REALTIME PROMPT (右下角悬浮按钮) -->
-    <div class="fixed bottom-20 md:bottom-8 right-5 sm:right-8 z-40">
-        <button onclick="openPromptModal()" class="group flex items-center space-x-2 px-4 py-3 rounded-full bg-slate-900 hover:bg-slate-800 text-white shadow-xl hover:shadow-2xl border border-slate-700 transition transform hover:-translate-y-0.5 active:scale-95" title="点击展开/收起实时 AI 大脑提示词">
+    <div class="fixed bottom-6 right-5 sm:right-8 z-40">
+        <button onclick="openPromptModal()" class="group flex items-center space-x-2 px-4 py-2.5 rounded-full bg-slate-900/90 hover:bg-slate-800 text-white shadow-xl hover:shadow-2xl border border-slate-800 transition transform hover:-translate-y-0.5 active:scale-95" title="点击展开/收起实时 AI 大脑提示词">
             <div class="w-6 h-6 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold">
                 <i data-lucide="terminal" class="w-3.5 h-3.5"></i>
             </div>
@@ -912,29 +891,29 @@
     </div>
 
     <!-- 🧠 FULL PROMPT MODAL / OVERLAY (全局全屏/弹窗提示词透视抽屉) -->
-    <div id="prompt-modal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-3 sm:p-6 transition-opacity">
-        <div class="bg-white border border-slate-200 rounded-2xl sm:rounded-3xl w-full max-w-4xl max-h-[90vh] shadow-2xl flex flex-col overflow-hidden">
+    <div id="prompt-modal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md hidden flex items-center justify-center p-3 sm:p-6 transition-opacity">
+        <div class="bg-[#11151F] border border-slate-800 rounded-2xl sm:rounded-3xl w-full max-w-4xl max-h-[90vh] shadow-2xl flex flex-col overflow-hidden">
             <!-- Modal Header -->
-            <div class="px-5 sm:px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/80">
+            <div class="px-5 sm:px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/60">
                 <div class="flex items-center space-x-3">
-                    <div class="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-600 font-bold">
+                    <div class="w-9 h-9 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 font-bold">
                         <i data-lucide="terminal" class="w-4 h-4"></i>
                     </div>
                     <div>
                         <div class="flex flex-wrap items-center gap-2">
-                            <h3 class="text-sm sm:text-base font-bold text-slate-900">AI 大脑实时完整提示词 (Realtime Prompt)</h3>
-                            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200">100% 透明审计</span>
+                            <h3 class="text-sm sm:text-base font-bold text-white">AI 大脑实时完整提示词 (Realtime Prompt)</h3>
+                            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">100% 透明审计</span>
                             <span id="modal-prompt-time" class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-950/80 text-indigo-300 border border-indigo-500/30">推演基准: --</span>
                         </div>
-                        <p class="text-[11px] text-slate-400">系统指令 (System Prompt) + 全周期因子 / 聪明钱资金流 / 实时快讯 / 账户持仓全量输入 (User Prompt)</p>
+                        <p class="text-[11px] text-slate-400">系统指令 (System Prompt) + 全周期因子 / 聪明钱资金流 / 实时快讯 / 挂单持仓全量输入 (User Prompt)</p>
                     </div>
                 </div>
                 <div class="flex items-center space-x-2">
-                    <button onclick="copyPromptText()" id="copy-prompt-btn" class="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold flex items-center space-x-1.5 shadow-xs transition">
-                        <i data-lucide="copy" class="w-3.5 h-3.5 text-slate-500"></i>
+                    <button onclick="copyPromptText()" id="copy-prompt-btn" class="px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-200 hover:bg-slate-700 text-xs font-semibold flex items-center space-x-1.5 shadow-xs transition">
+                        <i data-lucide="copy" class="w-3.5 h-3.5 text-slate-400"></i>
                         <span>一键复制</span>
                     </button>
-                    <button onclick="closePromptModal()" class="w-8 h-8 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-500 flex items-center justify-center transition">
+                    <button onclick="closePromptModal()" class="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition">
                         ✕
                     </button>
                 </div>
@@ -943,6 +922,88 @@
             <!-- Modal Body (Prompt Viewer) -->
             <div class="p-4 sm:p-6 overflow-y-auto custom-scrollbar flex-1 bg-slate-950">
                 <pre id="modal-prompt-content" class="whitespace-pre-wrap leading-relaxed text-[11px] font-mono text-slate-200 select-text">加载 AI 大脑最新完整提示词中...</pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- 🌐 ABOUT & COMMUNITY MODAL (开源生态、系统介绍与QQ交流群弹窗) -->
+    <div id="about-modal" class="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md hidden flex items-center justify-center p-4 sm:p-6 transition-opacity">
+        <div class="bg-[#11151F] border border-slate-800 rounded-2xl sm:rounded-3xl w-full max-w-xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200">
+            <!-- Modal Header -->
+            <div class="px-5 sm:px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-gradient-to-r from-slate-900 via-slate-900 to-indigo-950/50">
+                <div class="flex items-center space-x-3">
+                    <div class="w-9 h-9 rounded-xl bg-slate-800 border border-slate-700 text-white flex items-center justify-center font-bold">
+                        <svg class="w-5 h-5 text-white fill-current shrink-0" viewBox="0 0 24 24" aria-hidden="true">
+                            <path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <div class="flex items-center space-x-2">
+                            <h3 class="text-base font-extrabold text-white">R20 Quantum Trader</h3>
+                            <span class="px-2 py-0.2 rounded text-[10px] font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">v5.3.0</span>
+                        </div>
+                        <p class="text-xs text-slate-400">LLM-Native 启发式自进化量化交易系统</p>
+                    </div>
+                </div>
+                <button onclick="closeAboutModal()" class="w-8 h-8 rounded-lg bg-slate-800/80 border border-slate-700 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition">
+                    ✕
+                </button>
+            </div>
+
+            <!-- Modal Content -->
+            <div class="p-5 sm:p-6 space-y-5 text-xs leading-relaxed text-slate-300">
+                <!-- System Brief -->
+                <div class="space-y-2 p-3.5 rounded-2xl bg-slate-900/60 border border-slate-800">
+                    <h4 class="text-white font-bold flex items-center space-x-1.5">
+                        <span class="text-indigo-400">⚡</span>
+                        <span>系统核心特性</span>
+                    </h4>
+                    <p class="text-slate-300">本系统基于 <strong class="text-indigo-300">QwenPaw</strong> 智能代理框架与 <strong class="text-white">Gemini 3.7 Flash High</strong> 高强度思考链打造。废除一切老旧机械参数，实现对 <strong class="text-white">BTC/ETH/SOL/DOGE/SUI/LINK</strong> 6 大加密资产的 100% 大模型自主多周期推演、智能限价 Maker 挂单与每日 20:00 启发式复盘自进化。</p>
+                </div>
+
+                <!-- GitHub Open Source Link -->
+                <div class="flex items-center justify-between p-3.5 rounded-2xl bg-indigo-950/30 border border-indigo-500/30">
+                    <div>
+                        <div class="text-white font-bold flex items-center space-x-2">
+                            <span>GitHub 官方开源项目</span>
+                            <span class="px-1.5 py-0.2 rounded text-[9px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono">MIT License</span>
+                        </div>
+                        <span class="text-[11px] text-slate-400 font-mono mt-0.5 block">https://github.com/555cute/r20-quantum-trader</span>
+                    </div>
+                    <a href="https://github.com/555cute/r20-quantum-trader" target="_blank" rel="noopener noreferrer" class="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center space-x-1.5 shadow-md shadow-indigo-600/30 transition shrink-0">
+                        <span>访问仓库</span>
+                        <span>↗</span>
+                    </a>
+                </div>
+
+                <!-- QQ & Community Contact -->
+                <div class="space-y-3 p-4 rounded-2xl bg-slate-900/80 border border-slate-800">
+                    <div class="text-white font-bold flex items-center space-x-1.5">
+                        <span class="text-cyan-400">💬</span>
+                        <span>官方交流与开发者联系</span>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div class="p-3 rounded-xl bg-slate-950/80 border border-slate-800/80 flex items-center justify-between">
+                            <div>
+                                <span class="text-[11px] text-slate-400 block">作者个人 QQ</span>
+                                <strong class="text-sm font-mono text-cyan-300 tracking-wider select-all">1090188816</strong>
+                            </div>
+                            <button onclick="copyToClipboard('1090188816', this)" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-[11px] font-bold text-slate-200 transition">
+                                复制
+                            </button>
+                        </div>
+                        <div class="p-3 rounded-xl bg-slate-950/80 border border-slate-800/80 flex items-center justify-between">
+                            <div>
+                                <span class="text-[11px] text-slate-400 block">量化交流 QQ 群</span>
+                                <strong class="text-sm font-mono text-emerald-300 tracking-wider select-all">655973677</strong>
+                            </div>
+                            <button onclick="copyToClipboard('655973677', this)" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-[11px] font-bold text-slate-200 transition">
+                                复制
+                            </button>
+                        </div>
+                    </div>
+                    <p class="text-[11px] text-slate-400 text-center">欢迎量化交易爱好者、大模型 Agent 开发者进群交流探讨实战心得！</p>
+                </div>
             </div>
         </div>
     </div>
@@ -1373,6 +1434,42 @@
                 }).catch(() => {
                     alert("复制失败，请手动选取复制");
                 });
+            }
+        };
+
+        // Global About & Community Modal Control
+        window.openAboutModal = function() {
+            const modal = document.getElementById("about-modal");
+            if (modal) {
+                modal.classList.remove("hidden");
+                modal.style.display = "flex";
+            }
+            if (window.lucide) lucide.createIcons();
+        };
+
+        window.closeAboutModal = function() {
+            const modal = document.getElementById("about-modal");
+            if (modal) {
+                modal.classList.add("hidden");
+                modal.style.display = "none";
+            }
+        };
+
+        window.copyToClipboard = function(text, btn) {
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(text).then(() => {
+                    const originalText = btn.innerText;
+                    btn.innerText = "已复制";
+                    btn.classList.add("text-emerald-400", "border-emerald-500/50");
+                    setTimeout(() => {
+                        btn.innerText = originalText;
+                        btn.classList.remove("text-emerald-400", "border-emerald-500/50");
+                    }, 2000);
+                }).catch(() => {
+                    prompt("请手动复制：", text);
+                });
+            } else {
+                prompt("请手动复制：", text);
             }
         };
 

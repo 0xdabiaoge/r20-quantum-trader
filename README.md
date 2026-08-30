@@ -7,7 +7,7 @@
 <br/>
 
 [![Live Demo](https://img.shields.io/badge/🌐_Live_Demo-www.r20.cn-6366F1?style=for-the-badge&logo=googlechrome&logoColor=white)](https://www.r20.cn)
-[![Version: v5.2.0](https://img.shields.io/badge/Version-v5.2.0-8B5CF6?style=for-the-badge&logo=github&logoColor=white)](https://github.com/555cute/r20-quantum-trader/releases)
+[![Version: v5.3.0](https://img.shields.io/badge/Version-v5.3.0-8B5CF6?style=for-the-badge&logo=github&logoColor=white)](https://github.com/555cute/r20-quantum-trader/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-10B981?style=for-the-badge&logo=opensourceinitiative&logoColor=white)](https://opensource.org/licenses/MIT)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/Dashboard-FastAPI%20%2B%20Tailwind-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
@@ -205,6 +205,17 @@ r20-quantum-trader/
 - 真实 OKX 交易密钥（`.okx/`）与大模型 API Key 严格采用环境变量与密文存储解耦，**源码中 100% 零硬编码密钥**；
 - 实盘私有账本与资金流水已被 `.gitignore` 彻底物理隔离，绝不上云；
 - 开源代码库已经过自动化敏感特征全量静态穿透审计。
+
+---
+
+## 💬 交流与社区 (Community & Contact)
+
+欢迎量化交易爱好者、大模型 Agent 开发者与开源贡献者加入交流讨论！
+
+- 🐧 **作者个人 QQ**: `1090188816`
+- 👥 **量化实战交流 QQ 群**: `655973677`
+- 🌐 **在线终端**: [https://www.r20.cn](https://www.r20.cn)
+- 🐙 **GitHub 仓库**: [https://github.com/555cute/r20-quantum-trader](https://github.com/555cute/r20-quantum-trader)
 
 ---
 
