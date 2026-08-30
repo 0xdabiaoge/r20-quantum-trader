@@ -425,6 +425,14 @@
 
             <!-- Right: Actions Group -->
             <div class="flex items-center space-x-2 sm:space-x-3 shrink-0">
+                <!-- AI Core Model Badge (当前主脑模型展示) -->
+                <div class="hidden sm:flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl bg-slate-900/80 border border-slate-800 text-slate-300 font-mono text-xs shadow-inner" title="当前交易与自进化主脑大模型：Gemini 3.7 Flash High (启用深度思考链)">
+                    <div class="w-2 h-2 rounded-full bg-indigo-400 animate-pulse"></div>
+                    <span class="text-[10px] text-slate-400 font-sans font-medium">主脑</span>
+                    <span class="text-xs font-bold text-indigo-300">Gemini 3.7 Flash</span>
+                    <span class="px-1.5 py-0.2 rounded text-[9px] font-extrabold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">High CoT</span>
+                </div>
+
                 <!-- GitHub & Community Modal Trigger in Top Nav -->
                 <button onclick="openAboutModal()" class="px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-indigo-500/50 hover:bg-slate-800 text-white text-xs font-bold flex items-center space-x-2 transition shadow-sm group" title="点击查看项目介绍、GitHub开源与社区交流群">
                     <svg class="w-4 h-4 text-white group-hover:scale-110 transition-transform fill-current shrink-0" viewBox="0 0 24 24" aria-hidden="true">
@@ -658,9 +666,15 @@
                             <p class="text-[11px] text-slate-400">LLM全权智能决策 · 5维量化因子库 · 盘口微观深度 · OKX SmartMoney 80%+ 聪明钱主力</p>
                         </div>
                     </div>
-                    <div class="text-xs font-mono text-slate-500 hidden sm:flex items-center space-x-1.5">
-                        <span>决策基准:</span>
-                        <strong id="brain-matrix-time" class="text-brand-600">--</strong>
+                    <div class="flex items-center space-x-2">
+                        <div class="text-xs font-mono text-slate-400 hidden sm:flex items-center space-x-1.5">
+                            <span>主脑:</span>
+                            <span class="px-2 py-0.5 rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 font-bold text-[11px] font-mono">Gemini 3.7 Flash High</span>
+                        </div>
+                        <div class="text-xs font-mono text-slate-500 hidden sm:flex items-center space-x-1.5">
+                            <span>决策基准:</span>
+                            <strong id="brain-matrix-time" class="text-brand-600">--</strong>
+                        </div>
                     </div>
                 </div>
                 <div id="factors-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
