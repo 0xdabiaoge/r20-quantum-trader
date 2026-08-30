@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-R20 AI LLM-Native Self-Improvement & Strategy Evolution Engine v5.1 (self_improvement_engine.py)
+R20 AI LLM-Native Self-Improvement & Strategy Evolution Engine v5.3.1 (self_improvement_engine.py)
 Focuses purely on Crypto Alpha generation & dynamic quantitative risk adaptation.
 Eliminates rigid cooldown bans in favor of dynamic volatility-adjusted thresholds,
 asymmetric Kelly bet-sizing, and LLM cognitive post-mortem lessons.
@@ -253,7 +253,7 @@ def run_self_evolution(force: bool = False):
     tz_bj = datetime.timezone(datetime.timedelta(hours=8))
     now_bj = datetime.datetime.now(tz_bj)
     timestamp_str = now_bj.strftime("%Y-%m-%d %H:%M:%S")
-    log_msg("🧬 启动 R20 AI 大脑自进化认知复盘与实战心法提炼 (v5.2 Crypto Focus)...")
+    log_msg("🧬 启动 R20 AI 大脑自进化认知复盘与实战心法提炼 (v5.3.1 Crypto Focus)...")
 
     closed_trades = load_closed_trades()
     total_trades = len(closed_trades)

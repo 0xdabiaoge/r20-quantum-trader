@@ -831,7 +831,7 @@
                                 </svg>
                             </div>
                             <h2 class="text-base sm:text-lg font-bold text-white tracking-tight">R20 Quantum Trader 官方开源代码库</h2>
-                            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-mono">v5.2.0</span>
+                            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-mono">v5.3.1</span>
                             <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono">MIT License</span>
                         </div>
                         <p class="text-xs text-slate-300">LLM-Native 大模型全权决策 · 多维量化因子矩阵 · 启发式自进化记忆 · Bloomberg 级暗黑磨砂极客监控终端</p>
@@ -855,25 +855,25 @@
         <div id="tab-content-history" class="hidden space-y-6">
             <!-- 交易台账 -->
             <div class="custom-card p-5 sm:p-6">
-                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 mb-4 border-b border-slate-100">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 mb-4 border-b border-slate-800">
                     <div class="flex items-center space-x-2.5">
-                        <div class="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+                        <div class="w-8 h-8 rounded-xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 flex items-center justify-center font-bold">
                             <i data-lucide="receipt" class="w-4 h-4"></i>
                         </div>
                         <div>
-                            <h2 class="text-sm sm:text-base font-bold text-slate-900">生命周期交易台账 (Lifecycle Trades)</h2>
+                            <h2 class="text-sm sm:text-base font-bold text-white">生命周期交易台账 (Lifecycle Trades)</h2>
                             <p class="text-[11px] text-slate-400">开单即刻入库 · 平仓自动回填盈亏与出场原因</p>
                         </div>
                     </div>
                     
                     <!-- Search & Filter Pill Buttons -->
                     <div class="flex items-center space-x-2 w-full sm:w-auto">
-                        <div class="flex items-center space-x-1 bg-slate-100 p-1 rounded-xl border border-slate-200 text-[11px] font-semibold">
-                            <button onclick="setTradeFilter('all')" id="filter-btn-all" class="px-2.5 py-1 rounded-lg bg-white text-slate-900 shadow-sm transition">全部</button>
-                            <button onclick="setTradeFilter('active')" id="filter-btn-active" class="px-2.5 py-1 rounded-lg text-slate-500 hover:text-slate-900 transition">在途持仓</button>
-                            <button onclick="setTradeFilter('closed')" id="filter-btn-closed" class="px-2.5 py-1 rounded-lg text-slate-500 hover:text-slate-900 transition">已平仓</button>
+                        <div class="flex items-center space-x-1 bg-slate-950 p-1 rounded-xl border border-slate-800 text-[11px] font-semibold">
+                            <button onclick="setTradeFilter('all')" id="filter-btn-all" class="px-2.5 py-1 rounded-lg bg-indigo-600 text-white shadow-sm transition">全部</button>
+                            <button onclick="setTradeFilter('active')" id="filter-btn-active" class="px-2.5 py-1 rounded-lg text-slate-400 hover:text-white transition">在途持仓</button>
+                            <button onclick="setTradeFilter('closed')" id="filter-btn-closed" class="px-2.5 py-1 rounded-lg text-slate-400 hover:text-white transition">已平仓</button>
                         </div>
-                        <input type="text" id="trade-search" oninput="renderTrades()" placeholder="搜索标的/方向/形态/原因..." class="px-3.5 py-1.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-blue-500 w-full sm:w-56 font-mono">
+                        <input type="text" id="trade-search" oninput="renderTrades()" placeholder="搜索标的/方向/形态/原因..." class="px-3.5 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 text-xs focus:outline-none focus:border-indigo-500 w-full sm:w-56 font-mono placeholder:text-slate-500">
                     </div>
                 </div>
                 <div class="overflow-x-auto custom-scrollbar max-h-[580px]">
@@ -899,13 +899,13 @@
 
             <!-- 系统巡检日志 -->
             <div class="custom-card p-5 sm:p-6">
-                <div class="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
-                    <h3 class="text-sm font-bold text-slate-900 flex items-center space-x-2">
-                        <i data-lucide="terminal" class="w-4 h-4 text-slate-600"></i>
-                        <span>AI 多因子交易引擎巡检日志</span>
+                <div class="flex items-center justify-between pb-3 mb-3 border-b border-slate-800">
+                    <h3 class="text-sm font-bold text-white flex items-center space-x-2">
+                        <i data-lucide="terminal" class="w-4 h-4 text-indigo-400"></i>
+                        <span>R20 AI 大脑量化引擎巡检日志</span>
                     </h3>
                 </div>
-                <div id="logs-container" class="bg-slate-900 text-slate-200 p-4 rounded-xl font-mono text-xs max-h-60 overflow-y-auto custom-scrollbar space-y-1">
+                <div id="logs-container" class="bg-slate-950/80 border border-slate-800/80 text-slate-200 p-4 rounded-xl font-mono text-xs max-h-60 overflow-y-auto custom-scrollbar space-y-1">
                     <p class="text-slate-400">加载日志中...</p>
                 </div>
             </div>
@@ -1199,7 +1199,7 @@
                         <span>量化因子赋能机制：</span>
                     </div>
                     <p id="modal-sent-factor-desc" class="text-slate-600 font-mono text-[11px]">
-                        该币种舆情偏置得分直接输入 Alpha-Quant v5.0 多因子评分引擎（权重占比 15%），为顺势波段开仓提供前瞻性情绪支持与风险过滤。
+                        该币种舆情偏置得分直接输入 R20 Quantum Trader v5.3.1 评分引擎（权重占比 15%），为顺势波段开仓提供前瞻性情绪支持与风险过滤。
                     </p>
                 </div>
             </div>
@@ -2335,9 +2335,9 @@
                 const btn = document.getElementById(`filter-btn-${k}`);
                 if (btn) {
                     if (k === type) {
-                        btn.className = 'px-2.5 py-1 rounded-lg bg-white text-slate-900 shadow-sm transition font-bold';
+                        btn.className = 'px-2.5 py-1 rounded-lg bg-indigo-600 text-white shadow-sm transition font-bold';
                     } else {
-                        btn.className = 'px-2.5 py-1 rounded-lg text-slate-500 hover:text-slate-900 transition font-normal';
+                        btn.className = 'px-2.5 py-1 rounded-lg text-slate-400 hover:text-white transition font-normal';
                     }
                 }
             });
@@ -2460,8 +2460,8 @@
                     colorClass = 'text-rose-400 font-semibold';
                 } else if (l.includes('⌛ 时间止损')) {
                     colorClass = 'text-amber-400';
-                } else if (l.includes('⚡ Alpha-Quant')) {
-                    colorClass = 'text-blue-300';
+                } else if (l.includes('⚡ R20') || l.includes('⚡ Alpha-Quant')) {
+                    colorClass = 'text-indigo-300 font-semibold';
                 }
                 return `<p class="leading-relaxed text-[11px] ${colorClass}">${l}</p>`;
             }).join('');
