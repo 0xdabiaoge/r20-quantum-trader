@@ -1664,7 +1664,8 @@
                 const action = f.action || 'WAIT';
                 const pos = f.position;
                 const isHolding = !!pos;
-                const isLong = pos && String(pos.side || '').includes('多');
+                const sideStr = String((pos && (pos.posSide || pos.side)) || '').toLowerCase();
+                const isLong = sideStr.includes('long') || sideStr.includes('多') || sideStr.includes('buy');
 
                 let actionBadge = '<span class="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-slate-800/80 text-slate-400 border border-slate-700">🤖 空仓观望 WAIT</span>';
 

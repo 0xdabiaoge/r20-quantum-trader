@@ -161,6 +161,7 @@ def update_cache_cycle():
                 "instId": p.get("instId"),
                 "name": p.get("instId", "").replace("-USDT-SWAP", ""),
                 "posSide": pos_side,
+                "side": pos_side,
                 "pos": p.get("pos"),
                 "pos_sz": pos_sz,
                 "notional_usdt": notional_usdt,
