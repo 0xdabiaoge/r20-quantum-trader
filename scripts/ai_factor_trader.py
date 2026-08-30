@@ -106,6 +106,12 @@ TAKER_FEE_RATE = 0.0005
 MAKER_FEE_RATE = 0.0002 # Limit Order Maker Fee (60% Lower Than Market Taker)
 MAX_DAILY_LOSS_USDT = 150.0
 
+# 🚀 Pyramiding Scale-In Hard Risk Gateways (顺势浮盈金字塔加仓风控硬门禁)
+MAX_SINGLE_ASSET_MARGIN = 600.0   # 单标的最大累计占用保证金上限 (USDT)
+MAX_SCALE_IN_COUNT = 1            # 单标的最大顺势加仓次数 (底仓+最多1次顺势追加)
+MIN_SCALE_IN_PROFIT_RATIO = 0.008 # 允许顺势加仓的最小底仓浮盈率 (+0.8%)
+MIN_SCALE_IN_CONFIDENCE = 75.0    # 顺势加仓必须达到的最低 AI 置信度门槛
+
 def is_tradfi_market_liquid(asset_type: str) -> bool:
     """Strict US Regular Trading Window (BJ 21:30 ~ 次日 04:00)"""
     if asset_type in ["crypto", "commodity"]:
@@ -1410,35 +1416,124 @@ def execute_portfolio():
             if actual_sz <= 0:
                 continue
 
-            # Long Execution (Smart Limit Order at Best Bid / Near Price for Lowest Maker Fee)
-            if action == "BUY_LONG" and not curr_pos and inst_id not in pending_inst_ids and reserved_slot_count < MAX_CONCURRENT_POSITIONS and reserved_long_count < MAX_SAME_DIRECTION_POSITIONS:
-                limit_px = round(ai_decision.get("entry_price") if (ai_decision and ai_decision.get("entry_price", 0) > 0) else (f.get("bidPx") or f["price"]), prec)
-                tp_px = round(ai_decision.get("take_profit_price") if (ai_decision and ai_decision.get("take_profit_price", 0) > 0) else (limit_px + tp_dist), prec)
-                sl_px = round(ai_decision.get("stop_loss_price") if (ai_decision and ai_decision.get("stop_loss_price", 0) > 0) else (limit_px - sl_dist), prec)
+            # Long Execution (Initial Entry or Strict Pyramiding Scale-In)
+            if action == "BUY_LONG":
+                is_scale_in = False
+                allow_entry = False
 
-                accepted, order_ref = submit_protected_limit_order(inst_id, "buy", "long", actual_sz, limit_px, tp_px, sl_px)
-                if accepted:
-                    executed_actions.append(f"[{f['name']}] AI限价多单已提交待成交 {actual_sz}张@{limit_px} (order={order_ref}, TP={tp_px}, SL={sl_px})")
-                    pending_inst_ids.add(inst_id)
-                    reserved_slot_count += 1
-                    reserved_long_count += 1
-                else:
-                    executed_actions.append(f"[{f['name']}] AI限价多单提交失败: {order_ref}")
+                # Case A: Standard Initial Entry (No existing position & slot available)
+                if not curr_pos and inst_id not in pending_inst_ids and reserved_slot_count < MAX_CONCURRENT_POSITIONS and reserved_long_count < MAX_SAME_DIRECTION_POSITIONS:
+                    allow_entry = True
 
-            # Short Execution (Smart Limit Order at Best Ask / Near Price for Lowest Maker Fee)
-            elif action == "SELL_SHORT" and not curr_pos and inst_id not in pending_inst_ids and reserved_slot_count < MAX_CONCURRENT_POSITIONS and reserved_short_count < MAX_SAME_DIRECTION_POSITIONS:
-                limit_px = round(ai_decision.get("entry_price") if (ai_decision and ai_decision.get("entry_price", 0) > 0) else (f.get("askPx") or f["price"]), prec)
-                tp_px = round(ai_decision.get("take_profit_price") if (ai_decision and ai_decision.get("take_profit_price", 0) > 0) else (limit_px - tp_dist), prec)
-                sl_px = round(ai_decision.get("stop_loss_price") if (ai_decision and ai_decision.get("stop_loss_price", 0) > 0) else (limit_px + sl_dist), prec)
+                # Case B: Strict Pyramiding Scale-In (Existing long position in profit/breakeven)
+                elif curr_pos and str(curr_pos.get("side", "")).lower() == "long" and inst_id not in pending_inst_ids:
+                    pos_upl = float(curr_pos.get("upl", 0.0) or 0.0)
+                    pos_upl_ratio = float(curr_pos.get("uplRatio", 0.0) or 0.0)
+                    pos_avg_px = float(curr_pos.get("avgPx", 0.0) or 0.0)
+                    curr_margin = float(curr_pos.get("margin", 0.0) or 0.0)
+                    tracker = trackers.get(f"{inst_id}_long", {})
+                    scale_count = int(tracker.get("scale_count", 0))
+                    trailing_sl = float(tracker.get("trailingStopPx", 0.0) or 0.0)
 
-                accepted, order_ref = submit_protected_limit_order(inst_id, "sell", "short", actual_sz, limit_px, tp_px, sl_px)
-                if accepted:
-                    executed_actions.append(f"[{f['name']}] AI限价空单已提交待成交 {actual_sz}张@{limit_px} (order={order_ref}, TP={tp_px}, SL={sl_px})")
-                    pending_inst_ids.add(inst_id)
-                    reserved_slot_count += 1
-                    reserved_short_count += 1
-                else:
-                    executed_actions.append(f"[{f['name']}] AI限价空单提交失败: {order_ref}")
+                    # Ironclad Pyramiding Rules:
+                    # 1. Base position must be in profit (ROI >= +0.8%) OR stop-loss already moved to/above avg entry px (No-risk trade).
+                    # 2. Maximum 1 scale-in per position to prevent overconcentration.
+                    # 3. Combined margin must not exceed MAX_SINGLE_ASSET_MARGIN.
+                    # 4. AI Confidence must be >= 75%.
+                    is_profit_or_breakeven = (pos_upl > 0 and pos_upl_ratio >= MIN_SCALE_IN_PROFIT_RATIO) or (trailing_sl > 0 and trailing_sl >= pos_avg_px)
+                    planned_margin = ai_margin if ai_margin > 0 else (actual_sz * ct_val * f["price"] / max(1.0, ai_lever))
+                    within_margin_cap = (curr_margin + planned_margin) <= MAX_SINGLE_ASSET_MARGIN
+
+                    if is_profit_or_breakeven and scale_count < MAX_SCALE_IN_COUNT and within_margin_cap and ai_conf >= MIN_SCALE_IN_CONFIDENCE:
+                        allow_entry = True
+                        is_scale_in = True
+                        print(f"[Pyramiding] {f['name']} 满足顺势浮盈加多条件: 底仓浮盈={pos_upl:+.2f}U ({pos_upl_ratio*100:+.1f}%), 已加仓{scale_count}次, 计划加仓{actual_sz}张")
+                    else:
+                        if not is_profit_or_breakeven:
+                            print(f"[Pyramiding 拦截] {f['name']} 底仓未达浮盈保本门禁 (浮盈={pos_upl:+.2f}U ROI={pos_upl_ratio*100:+.1f}%), 严禁逆势加仓")
+                        elif scale_count >= MAX_SCALE_IN_COUNT:
+                            print(f"[Pyramiding 拦截] {f['name']} 已达最大加仓次数 ({scale_count}/{MAX_SCALE_IN_COUNT})")
+                        elif not within_margin_cap:
+                            print(f"[Pyramiding 拦截] {f['name']} 加仓后总保证金将超限 ({curr_margin + planned_margin:.1f} > {MAX_SINGLE_ASSET_MARGIN}U)")
+                        elif ai_conf < MIN_SCALE_IN_CONFIDENCE:
+                            print(f"[Pyramiding 拦截] {f['name']} AI加仓置信度不足 ({ai_conf:.0f}% < {MIN_SCALE_IN_CONFIDENCE}%)")
+
+                if allow_entry:
+                    limit_px = round(ai_decision.get("entry_price") if (ai_decision and ai_decision.get("entry_price", 0) > 0) else (f.get("bidPx") or f["price"]), prec)
+                    tp_px = round(ai_decision.get("take_profit_price") if (ai_decision and ai_decision.get("take_profit_price", 0) > 0) else (limit_px + tp_dist), prec)
+                    sl_px = round(ai_decision.get("stop_loss_price") if (ai_decision and ai_decision.get("stop_loss_price", 0) > 0) else (limit_px - sl_dist), prec)
+
+                    accepted, order_ref = submit_protected_limit_order(inst_id, "buy", "long", actual_sz, limit_px, tp_px, sl_px)
+                    if accepted:
+                        if is_scale_in:
+                            tracker = trackers.get(f"{inst_id}_long", {})
+                            tracker["scale_count"] = tracker.get("scale_count", 0) + 1
+                            save_trackers(trackers)
+                            executed_actions.append(f"[{f['name']}] 🚀 AI顺势浮盈金字塔加多挂单已提交 {actual_sz}张@{limit_px} (order={order_ref}, TP={tp_px}, SL={sl_px})")
+                        else:
+                            executed_actions.append(f"[{f['name']}] AI限价多单已提交待成交 {actual_sz}张@{limit_px} (order={order_ref}, TP={tp_px}, SL={sl_px})")
+                            pending_inst_ids.add(inst_id)
+                            reserved_slot_count += 1
+                            reserved_long_count += 1
+                    else:
+                        executed_actions.append(f"[{f['name']}] AI限价多单提交失败: {order_ref}")
+
+            # Short Execution (Initial Entry or Strict Pyramiding Scale-In)
+            elif action == "SELL_SHORT":
+                is_scale_in = False
+                allow_entry = False
+
+                # Case A: Standard Initial Entry
+                if not curr_pos and inst_id not in pending_inst_ids and reserved_slot_count < MAX_CONCURRENT_POSITIONS and reserved_short_count < MAX_SAME_DIRECTION_POSITIONS:
+                    allow_entry = True
+
+                # Case B: Strict Pyramiding Scale-In (Existing short position in profit/breakeven)
+                elif curr_pos and str(curr_pos.get("side", "")).lower() == "short" and inst_id not in pending_inst_ids:
+                    pos_upl = float(curr_pos.get("upl", 0.0) or 0.0)
+                    pos_upl_ratio = float(curr_pos.get("uplRatio", 0.0) or 0.0)
+                    pos_avg_px = float(curr_pos.get("avgPx", 0.0) or 0.0)
+                    curr_margin = float(curr_pos.get("margin", 0.0) or 0.0)
+                    tracker = trackers.get(f"{inst_id}_short", {})
+                    scale_count = int(tracker.get("scale_count", 0))
+                    trailing_sl = float(tracker.get("trailingStopPx", 0.0) or 0.0)
+
+                    is_profit_or_breakeven = (pos_upl > 0 and pos_upl_ratio >= MIN_SCALE_IN_PROFIT_RATIO) or (trailing_sl > 0 and trailing_sl <= pos_avg_px)
+                    planned_margin = ai_margin if ai_margin > 0 else (actual_sz * ct_val * f["price"] / max(1.0, ai_lever))
+                    within_margin_cap = (curr_margin + planned_margin) <= MAX_SINGLE_ASSET_MARGIN
+
+                    if is_profit_or_breakeven and scale_count < MAX_SCALE_IN_COUNT and within_margin_cap and ai_conf >= MIN_SCALE_IN_CONFIDENCE:
+                        allow_entry = True
+                        is_scale_in = True
+                        print(f"[Pyramiding] {f['name']} 满足顺势浮盈加空条件: 底仓浮盈={pos_upl:+.2f}U ({pos_upl_ratio*100:+.1f}%), 已加仓{scale_count}次, 计划加仓{actual_sz}张")
+                    else:
+                        if not is_profit_or_breakeven:
+                            print(f"[Pyramiding 拦截] {f['name']} 底仓未达浮盈保本门禁 (浮盈={pos_upl:+.2f}U ROI={pos_upl_ratio*100:+.1f}%), 严禁逆势加仓")
+                        elif scale_count >= MAX_SCALE_IN_COUNT:
+                            print(f"[Pyramiding 拦截] {f['name']} 已达最大加仓次数 ({scale_count}/{MAX_SCALE_IN_COUNT})")
+                        elif not within_margin_cap:
+                            print(f"[Pyramiding 拦截] {f['name']} 加仓后总保证金将超限 ({curr_margin + planned_margin:.1f} > {MAX_SINGLE_ASSET_MARGIN}U)")
+                        elif ai_conf < MIN_SCALE_IN_CONFIDENCE:
+                            print(f"[Pyramiding 拦截] {f['name']} AI加仓置信度不足 ({ai_conf:.0f}% < {MIN_SCALE_IN_CONFIDENCE}%)")
+
+                if allow_entry:
+                    limit_px = round(ai_decision.get("entry_price") if (ai_decision and ai_decision.get("entry_price", 0) > 0) else (f.get("askPx") or f["price"]), prec)
+                    tp_px = round(ai_decision.get("take_profit_price") if (ai_decision and ai_decision.get("take_profit_price", 0) > 0) else (limit_px - tp_dist), prec)
+                    sl_px = round(ai_decision.get("stop_loss_price") if (ai_decision and ai_decision.get("stop_loss_price", 0) > 0) else (limit_px + sl_dist), prec)
+
+                    accepted, order_ref = submit_protected_limit_order(inst_id, "sell", "short", actual_sz, limit_px, tp_px, sl_px)
+                    if accepted:
+                        if is_scale_in:
+                            tracker = trackers.get(f"{inst_id}_short", {})
+                            tracker["scale_count"] = tracker.get("scale_count", 0) + 1
+                            save_trackers(trackers)
+                            executed_actions.append(f"[{f['name']}] 🌪️ AI顺势浮盈金字塔加空挂单已提交 {actual_sz}张@{limit_px} (order={order_ref}, TP={tp_px}, SL={sl_px})")
+                        else:
+                            executed_actions.append(f"[{f['name']}] AI限价空单已提交待成交 {actual_sz}张@{limit_px} (order={order_ref}, TP={tp_px}, SL={sl_px})")
+                            pending_inst_ids.add(inst_id)
+                            reserved_slot_count += 1
+                            reserved_short_count += 1
+                    else:
+                        executed_actions.append(f"[{f['name']}] AI限价空单提交失败: {order_ref}")
 
     # 5. Persist Latest State for Web Monitoring Dashboard
     state_payload = {
