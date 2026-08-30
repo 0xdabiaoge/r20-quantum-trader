@@ -1,7 +1,7 @@
 {
   "name": "R20自进化交易系统",
   "short_name": "R20 Quant",
-  "version": "5.3.0",
+  "version": "5.3.1",
   "description": "R20 AI多因子自进化量化交易控制台",
   "start_url": "/",
   "display": "standalone",

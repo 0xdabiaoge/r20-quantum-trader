@@ -181,6 +181,47 @@ def update_cache_cycle():
                 "tp2Hit": t_info.get("tp2_hit", False)
             })
 
+    # 2.5 Fetch OKX Live Pending Maker Orders
+    orders_ok, orders_data, orders_error = run_json_cmd_status("okx --demo swap orders --json")
+    pending_orders_list = []
+    if isinstance(orders_data, list):
+        for o in orders_data:
+            c_ts = int(o.get("cTime", 0) or 0) / 1000.0
+            c_time_str = datetime.datetime.fromtimestamp(c_ts, tz=tz_beijing).strftime("%m-%d %H:%M:%S") if c_ts > 0 else "--"
+            inst_id = o.get("instId", "")
+            inst_clean = inst_id.replace("-USDT-SWAP", "").replace("-SWAP", "")
+            side_raw = str(o.get("side", "")).lower()
+            pos_side = str(o.get("posSide", "")).lower()
+            is_long = (pos_side == "long" or side_raw == "buy")
+            side_label = "限价买多" if is_long else "限价卖空"
+            side_color = "emerald" if is_long else "rose"
+            
+            attach_list = o.get("attachAlgoOrds", [])
+            tp_px = "--"
+            sl_px = "--"
+            if attach_list and len(attach_list) > 0:
+                att = attach_list[0]
+                tp_px = str(att.get("tpTriggerPx") or "--")
+                sl_px = str(att.get("slTriggerPx") or "--")
+
+            pending_orders_list.append({
+                "ordId": str(o.get("ordId", "")),
+                "inst": inst_clean,
+                "instId": inst_id,
+                "side": side_label,
+                "side_raw": side_raw,
+                "posSide": pos_side,
+                "is_long": is_long,
+                "side_color": side_color,
+                "lever": f"{o.get('lever', '3')}x",
+                "px": str(o.get("px", "--")),
+                "sz": str(o.get("sz", "--")),
+                "time": c_time_str,
+                "state": str(o.get("state", "live")),
+                "tp_px": tp_px,
+                "sl_px": sl_px
+            })
+
     # A failed core account query must never overwrite last-known-good data with zeros.
     if not balance_ok or not positions_ok:
         if CACHE_DATA:
@@ -682,6 +723,7 @@ def update_cache_cycle():
             "total_upl": round(total_pos_upl, 2),
             "items": positions
         },
+        "pending_orders": pending_orders_list,
         "factors": factors_list,
         "funding_settlements": {
             "total_funding_pnl": round(today_funding, 4),

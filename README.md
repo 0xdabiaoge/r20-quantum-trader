@@ -7,7 +7,7 @@
 <br/>
 
 [![Live Demo](https://img.shields.io/badge/🌐_Live_Demo-www.r20.cn-6366F1?style=for-the-badge&logo=googlechrome&logoColor=white)](https://www.r20.cn)
-[![Version: v5.3.0](https://img.shields.io/badge/Version-v5.3.0-8B5CF6?style=for-the-badge&logo=github&logoColor=white)](https://github.com/555cute/r20-quantum-trader/releases)
+[![Version: v5.3.1](https://img.shields.io/badge/Version-v5.3.1-8B5CF6?style=for-the-badge&logo=github&logoColor=white)](https://github.com/555cute/r20-quantum-trader/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-10B981?style=for-the-badge&logo=opensourceinitiative&logoColor=white)](https://opensource.org/licenses/MIT)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/Dashboard-FastAPI%20%2B%20Tailwind-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
