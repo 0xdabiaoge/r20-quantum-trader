@@ -425,14 +425,6 @@
 
             <!-- Right: Actions Group -->
             <div class="flex items-center space-x-2 sm:space-x-3 shrink-0">
-                <!-- AI Core Model Badge (当前主脑模型展示) -->
-                <div class="hidden sm:flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl bg-slate-900/80 border border-slate-800 text-slate-300 font-mono text-xs shadow-inner" title="当前交易与自进化主脑大模型：Gemini 3.7 Flash High (启用深度思考链)">
-                    <div class="w-2 h-2 rounded-full bg-indigo-400 animate-pulse"></div>
-                    <span class="text-[10px] text-slate-400 font-sans font-medium">主脑</span>
-                    <span class="text-xs font-bold text-indigo-300">Gemini 3.7 Flash</span>
-                    <span class="px-1.5 py-0.2 rounded text-[9px] font-extrabold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">High CoT</span>
-                </div>
-
                 <!-- GitHub & Community Modal Trigger in Top Nav -->
                 <button onclick="openAboutModal()" class="px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-indigo-500/50 hover:bg-slate-800 text-white text-xs font-bold flex items-center space-x-2 transition shadow-sm group" title="点击查看项目介绍、GitHub开源与社区交流群">
                     <svg class="w-4 h-4 text-white group-hover:scale-110 transition-transform fill-current shrink-0" viewBox="0 0 24 24" aria-hidden="true">
@@ -667,13 +659,15 @@
                         </div>
                     </div>
                     <div class="flex items-center space-x-2">
-                        <div class="text-xs font-mono text-slate-400 hidden sm:flex items-center space-x-1.5">
-                            <span>主脑:</span>
-                            <span class="px-2 py-0.5 rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 font-bold text-[11px] font-mono">Gemini 3.7 Flash High</span>
+                        <div class="hidden sm:flex items-center space-x-1.5 px-2.5 py-1 rounded-xl bg-slate-900/90 border border-slate-800 text-xs font-mono">
+                            <span class="w-2 h-2 rounded-full bg-indigo-400 animate-pulse"></span>
+                            <span class="text-[10px] text-slate-400 font-sans">推演主脑:</span>
+                            <span class="text-indigo-300 font-bold">Gemini 3.7 Flash</span>
+                            <span class="px-1.5 py-0.2 rounded text-[9px] font-extrabold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">High CoT</span>
                         </div>
-                        <div class="text-xs font-mono text-slate-500 hidden sm:flex items-center space-x-1.5">
-                            <span>决策基准:</span>
-                            <strong id="brain-matrix-time" class="text-brand-600">--</strong>
+                        <div class="text-xs font-mono text-slate-400 hidden sm:flex items-center space-x-1.5">
+                            <span class="text-slate-500">决策基准:</span>
+                            <strong id="brain-matrix-time" class="text-indigo-400 font-bold">--</strong>
                         </div>
                     </div>
                 </div>
@@ -769,9 +763,17 @@
                             <p class="text-[11px] text-slate-400">每日交易流水复盘沉淀 · 带精确时间戳 · 智能时效动态淘汰与覆盖 · QwenPaw 原生 Prompt 注入</p>
                         </div>
                     </div>
-                    <div class="text-xs font-mono text-purple-600 font-bold hidden sm:flex items-center space-x-1.5">
-                        <span class="w-2 h-2 rounded-full bg-purple-500"></span>
-                        <span id="lab-memory-time">实时生效中</span>
+                    <div class="flex items-center space-x-2">
+                        <div class="hidden sm:flex items-center space-x-1.5 px-2.5 py-1 rounded-xl bg-slate-900/90 border border-slate-800 text-xs font-mono">
+                            <span class="w-2 h-2 rounded-full bg-purple-400 animate-pulse"></span>
+                            <span class="text-[10px] text-slate-400 font-sans">复盘主脑:</span>
+                            <span class="text-purple-300 font-bold">Gemini 3.7 Flash</span>
+                            <span class="px-1.5 py-0.2 rounded text-[9px] font-extrabold bg-purple-500/20 text-purple-300 border border-purple-500/30">High CoT</span>
+                        </div>
+                        <div class="text-xs font-mono text-purple-400 font-bold hidden sm:flex items-center space-x-1.5">
+                            <span class="w-2 h-2 rounded-full bg-purple-500"></span>
+                            <span id="lab-memory-time">实时生效中</span>
+                        </div>
                     </div>
                 </div>
                 <!-- Markdown Memory Raw Display Box -->
@@ -950,8 +952,12 @@
                     <div>
                         <div class="flex flex-wrap items-center gap-2">
                             <h3 class="text-sm sm:text-base font-bold text-white">AI 大脑实时完整提示词 (Realtime Prompt)</h3>
+                            <div class="flex items-center space-x-1 px-2 py-0.5 rounded text-[10px] font-mono bg-indigo-500/10 text-indigo-300 border border-indigo-500/30">
+                                <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse"></span>
+                                <span>主脑: Gemini 3.7 Flash High CoT</span>
+                            </div>
                             <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">100% 透明审计</span>
-                            <span id="modal-prompt-time" class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-950/80 text-indigo-300 border border-indigo-500/30">推演基准: --</span>
+                            <span id="modal-prompt-time" class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-900 text-slate-300 border border-slate-700">推演基准: --</span>
                         </div>
                         <p class="text-[11px] text-slate-400">系统指令 (System Prompt) + 全周期因子 / 聪明钱资金流 / 实时快讯 / 挂单持仓全量输入 (User Prompt)</p>
                     </div>
