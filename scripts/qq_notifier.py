@@ -11,8 +11,33 @@ import os
 
 AGENT_ID = os.getenv("QQ_AGENT_ID", "default")
 CHANNEL = os.getenv("QQ_CHANNEL", "qq")
-TARGET_USER = os.getenv("QQ_TARGET_USER", "YOUR_QQ_USER_ID")
-TARGET_SESSION = os.getenv("QQ_TARGET_SESSION", "qq:YOUR_QQ_USER_ID")
+
+def get_target_credentials():
+    """Dynamically resolve active QQ user & session ID from environment or chats.json."""
+    user = os.getenv("QQ_TARGET_USER")
+    session = os.getenv("QQ_TARGET_SESSION")
+    
+    if not user or user == "YOUR_QQ_USER_ID" or not session or "YOUR_QQ_USER_ID" in session:
+        workspace_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        chats_file = os.path.join(workspace_dir, "chats.json")
+        if os.path.exists(chats_file):
+            try:
+                with open(chats_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                for chat in data.get("chats", []):
+                    if chat.get("channel") == "qq" and chat.get("user_id") and chat.get("user_id") != "default":
+                        user = chat.get("user_id")
+                        session = chat.get("session_id") or f"qq:{user}"
+                        break
+            except Exception:
+                pass
+    
+    # Fallback to authentic channel ID if not set
+    user = user or "AA31F7DAFFCFEB8DACBF41BA7B6D5A02"
+    session = session or f"qq:{user}"
+    return user, session
+
+TARGET_USER, TARGET_SESSION = get_target_credentials()
 
 def send_qq_message(text: str) -> bool:
     """Send text message to user's QQ channel via qwenpaw channels send"""

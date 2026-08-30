@@ -1470,11 +1470,15 @@ def execute_portfolio():
                             tracker["scale_count"] = tracker.get("scale_count", 0) + 1
                             save_trackers(trackers)
                             executed_actions.append(f"[{f['name']}] 🚀 AI顺势浮盈金字塔加多挂单已提交 {actual_sz}张@{limit_px} (order={order_ref}, TP={tp_px}, SL={sl_px})")
+                            if notify_trade_open:
+                                notify_trade_open(f["name"], "多 (顺势加仓)", actual_sz, limit_px, "🚀 顺势金字塔加多", f"TP={tp_px}, SL={sl_px} | {ai_reason}")
                         else:
                             executed_actions.append(f"[{f['name']}] AI限价多单已提交待成交 {actual_sz}张@{limit_px} (order={order_ref}, TP={tp_px}, SL={sl_px})")
                             pending_inst_ids.add(inst_id)
                             reserved_slot_count += 1
                             reserved_long_count += 1
+                            if notify_trade_open:
+                                notify_trade_open(f["name"], "多", actual_sz, limit_px, strat_tag, f"TP={tp_px}, SL={sl_px} | {ai_reason}")
                     else:
                         executed_actions.append(f"[{f['name']}] AI限价多单提交失败: {order_ref}")
 
@@ -1527,11 +1531,15 @@ def execute_portfolio():
                             tracker["scale_count"] = tracker.get("scale_count", 0) + 1
                             save_trackers(trackers)
                             executed_actions.append(f"[{f['name']}] 🌪️ AI顺势浮盈金字塔加空挂单已提交 {actual_sz}张@{limit_px} (order={order_ref}, TP={tp_px}, SL={sl_px})")
+                            if notify_trade_open:
+                                notify_trade_open(f["name"], "空 (顺势加仓)", actual_sz, limit_px, "🌪️ 顺势金字塔加空", f"TP={tp_px}, SL={sl_px} | {ai_reason}")
                         else:
                             executed_actions.append(f"[{f['name']}] AI限价空单已提交待成交 {actual_sz}张@{limit_px} (order={order_ref}, TP={tp_px}, SL={sl_px})")
                             pending_inst_ids.add(inst_id)
                             reserved_slot_count += 1
                             reserved_short_count += 1
+                            if notify_trade_open:
+                                notify_trade_open(f["name"], "空", actual_sz, limit_px, strat_tag, f"TP={tp_px}, SL={sl_px} | {ai_reason}")
                     else:
                         executed_actions.append(f"[{f['name']}] AI限价空单提交失败: {order_ref}")
 
