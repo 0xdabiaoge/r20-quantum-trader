@@ -234,82 +234,80 @@
     <!-- Main Viewport Container -->
     <main class="max-w-[1720px] mx-auto px-3 sm:px-6 pt-4 w-full flex-1 space-y-4">
 
-        <!-- ============================================================= -->
-        <!-- 📊 TOP QUANTITATIVE HUD RIBBON (High-Density Terminal Ticker) -->
-        <!-- ============================================================= -->
-        <div class="terminal-panel p-3.5 sm:p-4">
-            <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 divide-y lg:divide-y-0 lg:divide-x divide-[#1A2232]">
-                
-                <!-- Tile 1: 账户总权益 (Total Equity) -->
-                <div class="flex flex-col justify-between pt-2 lg:pt-0 lg:px-2 first:pt-0 first:px-0">
-                    <div class="flex items-center justify-between text-[11px] text-[#707E94] font-semibold">
-                        <span>官方账户总权益 (EQUITY)</span>
-                        <span class="font-mono text-[10px] text-[#3875F6]">USDT</span>
-                    </div>
-                    <div class="my-1">
-                        <span id="metric-equity" class="text-xl sm:text-2xl font-extrabold font-mono text-white tracking-tight">--</span>
-                    </div>
-                    <div class="flex items-center justify-between text-[11px] font-mono text-[#707E94] pt-1.5 border-t border-[#161D2B]">
-                        <span>可用: <strong id="metric-avail" class="text-[#EAECEF]">--</strong></span>
-                        <span id="metric-margin-usage" class="text-[#707E94]">占用率: 0%</span>
-                    </div>
-                </div>
-
-                <!-- Tile 2: 累计净收益 (NAV Return) -->
-                <div class="flex flex-col justify-between pt-2 lg:pt-0 lg:px-4">
-                    <div class="flex items-center justify-between text-[11px] text-[#707E94] font-semibold">
-                        <span>累计净收益 (NAV PnL)</span>
-                        <span id="metric-cum-roi" class="font-mono text-[10px] font-bold text-[#0ECB81]">--</span>
-                    </div>
-                    <div class="my-1 flex items-baseline space-x-1.5">
-                        <span id="metric-cum-pnl" class="text-xl sm:text-2xl font-extrabold font-mono text-[#0ECB81] tracking-tight">--</span>
-                        <span class="text-[10px] font-mono text-[#707E94]">USDT</span>
-                    </div>
-                    <div class="flex items-center justify-between text-[11px] font-mono text-[#707E94] pt-1.5 border-t border-[#161D2B]">
-                        <span>ROI: <strong id="metric-cum-roi-label" class="text-[#0ECB81]">--</strong></span>
-                        <span>累计手续费: <strong id="metric-cum-fees" class="text-[#EAECEF]">--</strong></span>
-                    </div>
-                </div>
-
-                <!-- Tile 3: 今日已结盈亏 (Realized PnL) -->
-                <div class="flex flex-col justify-between pt-2 lg:pt-0 lg:px-4">
-                    <div class="flex items-center justify-between text-[11px] text-[#707E94] font-semibold">
-                        <span>今日已结盈亏 (REALIZED)</span>
-                        <span id="metric-today-wr" class="font-mono text-[10px] font-bold text-[#EAECEF]">胜率: 0%</span>
-                    </div>
-                    <div class="my-1 flex items-baseline space-x-1.5">
-                        <span id="metric-realized-pnl" class="text-xl sm:text-2xl font-extrabold font-mono text-[#EAECEF] tracking-tight">--</span>
-                        <span class="text-[10px] font-mono text-[#707E94]">USDT</span>
-                    </div>
-                    <div class="flex items-center justify-between text-[11px] font-mono text-[#707E94] pt-1.5 border-t border-[#161D2B]">
-                        <span class="text-[#707E94]">今日基准: 00:00~24:00</span>
-                        <span>手续费: <strong id="metric-fees" class="text-[#EAECEF]">0 U</strong></span>
-                    </div>
-                </div>
-
-                <!-- Tile 4: 在途持仓浮盈 (Active Positions & UPL) -->
-                <div class="flex flex-col justify-between pt-2 lg:pt-0 lg:px-4">
-                    <div class="flex items-center justify-between text-[11px] text-[#707E94] font-semibold">
-                        <span>在途持仓浮盈 (UNREALIZED)</span>
-                        <span id="metric-pos-count" class="font-mono text-[10px] font-bold text-[#3875F6]">0/6 仓</span>
-                    </div>
-                    <div class="my-1 flex items-baseline space-x-1.5">
-                        <span id="metric-upl" class="text-xl sm:text-2xl font-extrabold font-mono text-white tracking-tight">--</span>
-                        <span class="text-[10px] font-mono text-[#707E94]">USDT</span>
-                    </div>
-                    <div class="flex items-center justify-between text-[11px] font-mono text-[#707E94] pt-1.5 border-t border-[#161D2B]">
-                        <span id="metric-pos-direction">0 多 / 0 空</span>
-                        <span class="text-[#0ECB81] font-semibold">100% 云端OCO保护</span>
-                    </div>
-                </div>
-
-            </div>
-        </div>
-
         <!-- ========================================== -->
         <!-- TAB 1: 实盘总览 (TRADING MONITOR / 首页) -->
         <!-- ========================================== -->
         <div id="tab-content-trading" class="space-y-4">
+
+            <!-- 📊 TOP QUANTITATIVE HUD RIBBON (首页专属核心指标卡) -->
+            <div class="terminal-panel p-3.5 sm:p-4">
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 divide-y lg:divide-y-0 lg:divide-x divide-[#1A2232]">
+                    
+                    <!-- Tile 1: 账户总权益 (Total Equity) -->
+                    <div class="flex flex-col justify-between pt-2 lg:pt-0 lg:px-2 first:pt-0 first:px-0">
+                        <div class="flex items-center justify-between text-[11px] text-[#707E94] font-semibold">
+                            <span>官方账户总权益 (EQUITY)</span>
+                            <span class="font-mono text-[10px] text-[#3875F6]">USDT</span>
+                        </div>
+                        <div class="my-1">
+                            <span id="metric-equity" class="text-xl sm:text-2xl font-extrabold font-mono text-white tracking-tight">--</span>
+                        </div>
+                        <div class="flex items-center justify-between text-[11px] font-mono text-[#707E94] pt-1.5 border-t border-[#161D2B]">
+                            <span>可用: <strong id="metric-avail" class="text-[#EAECEF]">--</strong></span>
+                            <span id="metric-margin-usage" class="text-[#707E94]">占用率: 0%</span>
+                        </div>
+                    </div>
+
+                    <!-- Tile 2: 累计净收益 (NAV Return) -->
+                    <div class="flex flex-col justify-between pt-2 lg:pt-0 lg:px-4">
+                        <div class="flex items-center justify-between text-[11px] text-[#707E94] font-semibold">
+                            <span>累计净收益 (NAV PnL)</span>
+                            <span id="metric-cum-roi" class="font-mono text-[10px] font-bold text-[#0ECB81]">--</span>
+                        </div>
+                        <div class="my-1 flex items-baseline space-x-1.5">
+                            <span id="metric-cum-pnl" class="text-xl sm:text-2xl font-extrabold font-mono text-[#0ECB81] tracking-tight">--</span>
+                            <span class="text-[10px] font-mono text-[#707E94]">USDT</span>
+                        </div>
+                        <div class="flex items-center justify-between text-[11px] font-mono text-[#707E94] pt-1.5 border-t border-[#161D2B]">
+                            <span>ROI: <strong id="metric-cum-roi-label" class="text-[#0ECB81]">--</strong></span>
+                            <span>累计手续费: <strong id="metric-cum-fees" class="text-[#EAECEF]">--</strong></span>
+                        </div>
+                    </div>
+
+                    <!-- Tile 3: 今日已结盈亏 (Realized PnL) -->
+                    <div class="flex flex-col justify-between pt-2 lg:pt-0 lg:px-4">
+                        <div class="flex items-center justify-between text-[11px] text-[#707E94] font-semibold">
+                            <span>今日已结盈亏 (REALIZED)</span>
+                            <span id="metric-today-wr" class="font-mono text-[10px] font-bold text-[#EAECEF]">胜率: 0%</span>
+                        </div>
+                        <div class="my-1 flex items-baseline space-x-1.5">
+                            <span id="metric-realized-pnl" class="text-xl sm:text-2xl font-extrabold font-mono text-[#EAECEF] tracking-tight">--</span>
+                            <span class="text-[10px] font-mono text-[#707E94]">USDT</span>
+                        </div>
+                        <div class="flex items-center justify-between text-[11px] font-mono text-[#707E94] pt-1.5 border-t border-[#161D2B]">
+                            <span class="text-[#707E94]">今日基准: 00:00~24:00</span>
+                            <span>手续费: <strong id="metric-fees" class="text-[#EAECEF]">0 U</strong></span>
+                        </div>
+                    </div>
+
+                    <!-- Tile 4: 在途持仓浮盈 (Active Positions & UPL) -->
+                    <div class="flex flex-col justify-between pt-2 lg:pt-0 lg:px-4">
+                        <div class="flex items-center justify-between text-[11px] text-[#707E94] font-semibold">
+                            <span>在途持仓浮盈 (UNREALIZED)</span>
+                            <span id="metric-pos-count" class="font-mono text-[10px] font-bold text-[#3875F6]">0/6 仓</span>
+                        </div>
+                        <div class="my-1 flex items-baseline space-x-1.5">
+                            <span id="metric-upl" class="text-xl sm:text-2xl font-extrabold font-mono text-white tracking-tight">--</span>
+                            <span class="text-[10px] font-mono text-[#707E94]">USDT</span>
+                        </div>
+                        <div class="flex items-center justify-between text-[11px] font-mono text-[#707E94] pt-1.5 border-t border-[#161D2B]">
+                            <span id="metric-pos-direction">0 多 / 0 空</span>
+                            <span class="text-[#0ECB81] font-semibold">100% 云端OCO保护</span>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
             
             <!-- 1. 实盘活动持仓 (Active Positions) -->
             <div class="terminal-panel p-4 sm:p-5">
@@ -404,7 +402,6 @@
                     <!-- View Mode Switcher -->
                     <div class="flex items-center bg-[#0B0F17] p-0.5 rounded-lg border border-[#1A2232] text-[11px] font-mono">
                         <button onclick="setChartMode('equity')" id="chart-mode-equity" class="px-2.5 py-1 rounded bg-[#1C2436] text-white font-bold transition">总权益 NAV</button>
-                        <button onclick="setChartMode('roi')" id="chart-mode-roi" class="px-2.5 py-1 rounded text-[#707E94] hover:text-white transition">收益率 ROI</button>
                         <button onclick="setChartMode('trades')" id="chart-mode-trades" class="px-2.5 py-1 rounded text-[#707E94] hover:text-white transition">逐单盈亏柱</button>
                     </div>
                 </div>
@@ -934,6 +931,9 @@
                     }
                 }
             });
+            if (tabName === 'trading' && equityChartInstance) {
+                setTimeout(() => equityChartInstance.resize(), 50);
+            }
             if (window.lucide) lucide.createIcons();
         };
 
@@ -1934,7 +1934,7 @@
 
         function setChartMode(mode) {
             currentChartMode = mode;
-            ['equity', 'roi', 'trades'].forEach(m => {
+            ['equity', 'trades'].forEach(m => {
                 const btn = document.getElementById(`chart-mode-${m}`);
                 if (btn) {
                     if (m === mode) {
@@ -1949,7 +1949,7 @@
             }
         }
 
-        // Render Chart (Institutional Quantitative Multi-Mode Engine)
+        // Render Chart (Institutional Quantitative Dual-Mode Engine)
         function renderChart(snapshots) {
             const ctx = document.getElementById('equityChart');
             if (!ctx) return;
@@ -2067,92 +2067,7 @@
                     }
                 });
             }
-            // MODE 2: Cumulative ROI (%)
-            else if (currentChartMode === 'roi') {
-                if (points.length === 0) return;
-
-                const labels = points.map(p => (p.time || '').substring(11, 16) || p.time);
-                const roiValues = points.map(p => {
-                    const eq = Number(p.total_eq || p.equity || initialCapital);
-                    return Number(((eq - initialCapital) / initialCapital * 100).toFixed(2));
-                });
-                const zeroBaseline = points.map(() => 0.0);
-
-                equityChartInstance = new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: labels,
-                        datasets: [
-                            {
-                                label: '累计净值收益率 (%)',
-                                data: roiValues,
-                                borderColor: '#3875F6',
-                                borderWidth: 2,
-                                backgroundColor: 'rgba(56, 117, 246, 0.06)',
-                                fill: true,
-                                tension: 0.25,
-                                pointRadius: 2,
-                                pointHoverRadius: 5,
-                                pointBackgroundColor: '#3875F6',
-                                yAxisID: 'y'
-                            },
-                            {
-                                label: '0% 保本基准',
-                                data: zeroBaseline,
-                                borderColor: '#475569',
-                                borderWidth: 1.5,
-                                borderDash: [4, 4],
-                                fill: false,
-                                pointRadius: 0,
-                                pointHoverRadius: 0,
-                                yAxisID: 'y'
-                            }
-                        ]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        layout: { padding: { left: 10, right: 10, top: 5, bottom: 5 } },
-                        interaction: { mode: 'index', intersect: false },
-                        plugins: {
-                            legend: { display: false },
-                            tooltip: {
-                                backgroundColor: '#0E121B',
-                                borderColor: '#1A2232',
-                                borderWidth: 1,
-                                padding: 10,
-                                titleFont: { size: 11, family: 'JetBrains Mono' },
-                                bodyFont: { size: 12, family: 'JetBrains Mono', weight: 'bold' },
-                                callbacks: {
-                                    label: function(context) {
-                                        if (context.datasetIndex === 0) {
-                                            const val = context.parsed.y;
-                                            return ` 累计收益率: ${val >= 0 ? '+' : ''}${val.toFixed(2)} %`;
-                                        }
-                                        return ` 基准保本线: 0.00 %`;
-                                    }
-                                }
-                            }
-                        },
-                        scales: {
-                            x: {
-                                grid: { color: 'rgba(255, 255, 255, 0.03)' },
-                                ticks: { font: { size: 10, family: 'JetBrains Mono' }, color: '#707E94', maxTicksLimit: 12 }
-                            },
-                            y: {
-                                type: 'linear',
-                                grid: { color: 'rgba(255, 255, 255, 0.03)' },
-                                ticks: {
-                                    font: { size: 10, family: 'JetBrains Mono' },
-                                    color: '#707E94',
-                                    callback: value => (value >= 0 ? '+' : '') + value.toFixed(1) + '%'
-                                }
-                            }
-                        }
-                    }
-                });
-            }
-            // MODE 3: Closed Trades PnL Bar Chart
+            // MODE 2: Closed Trades PnL Bar Chart
             else if (currentChartMode === 'trades') {
                 const closedTrades = (allTrades || []).filter(t => t.status !== 'holding');
                 if (closedTrades.length === 0) {
