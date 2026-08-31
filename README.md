@@ -7,6 +7,7 @@
 <br/>
 
 [![Version](https://img.shields.io/badge/Version-v5.3.1-6366F1.svg)](https://github.com/555cute/r20-quantum-trader/releases)
+[![LINUX DO](https://img.shields.io/badge/Community-LINUX%20DO-EA580C.svg)](https://linux.do/)
 [![License](https://img.shields.io/badge/License-MIT-10B981.svg)](https://opensource.org/licenses/MIT)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
 [![QwenPaw](https://img.shields.io/badge/Agent_Framework-QwenPaw-4F46E5.svg)](https://github.com/agentscope-ai/QwenPaw)
@@ -29,6 +30,7 @@
 | :--- | :--- | :--- |
 | 👥 **官方量化实战交流群** | **QQ 群号: `655973677`** | 实时探讨实盘策略、因子优化与大模型调优 |
 | 🐧 **作者个人 QQ** | **QQ: `1090188816`** | 技术交流、系统定制与开源协作 |
+| 🔥 **LINUX DO 社区** | **[linux.do](https://linux.do/)** | 本项目已链接并认可 LINUX DO 社区，欢迎社区佬友交流探讨 |
 | 🌐 **24H 在线实盘终端** | **[https://www.r20.cn](https://www.r20.cn)** | 纯净域名直连，毫秒级同步 OKX 实盘数据 |
 | 🐙 **GitHub 开源主仓** | **[555cute/r20-quantum-trader](https://github.com/555cute/r20-quantum-trader)** | 欢迎 Star ⭐️ 与提交 PR 协同演进 |
 
@@ -240,5 +242,6 @@ r20-quantum-trader/
 ---
 
 <div align="center">
-Made with ❤️ by R20 Quantum Trader Team • Powered by <a href="https://github.com/agentscope-ai/QwenPaw">QwenPaw Framework</a>
+Made with ❤️ by R20 Quantum Trader Team • Powered by <a href="https://github.com/agentscope-ai/QwenPaw">QwenPaw Framework</a><br/>
+🤝 本项目已链接并认可 <a href="https://linux.do/">LINUX DO</a> 社区
 </div>
