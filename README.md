@@ -6,7 +6,7 @@
 
 <br/>
 
-[![Version](https://img.shields.io/badge/Version-v5.3.1-6366F1.svg)](https://github.com/555cute/r20-quantum-trader/releases)
+[![Version](https://img.shields.io/badge/Version-v5.3.2-6366F1.svg)](https://github.com/555cute/r20-quantum-trader/releases)
 [![LINUX DO](https://img.shields.io/badge/Community-LINUX%20DO-EA580C.svg)](https://linux.do/)
 [![License](https://img.shields.io/badge/License-MIT-10B981.svg)](https://opensource.org/licenses/MIT)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
