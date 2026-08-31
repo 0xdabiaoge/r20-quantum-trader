@@ -1157,7 +1157,7 @@
                 renderPositions(positions);
                 renderPendingOrders(data.pending_orders || []);
                 renderChart(data.snapshots || []);
-                renderFactors(data.factors || [], data.factor_library_snapshot, data.ai_last_prompt);
+                renderFactors(data.factors || [], data.factor_library || data.factor_library_snapshot, data.ai_last_prompt);
                 renderAiBrainHistory(data.ai_brain_history || []);
                 renderNewsIntelligence(data.news_intelligence || {});
                 renderReviewLab(data.review || data.review_lab || {}, data.ai_trading_memory_md);
@@ -1396,6 +1396,7 @@
                 const vf = lib.volume_money_flow || {};
                 const ms = lib.microstructure || {};
                 const sm = lib.smart_money_derivatives || f.smart_money || {};
+                const cd = lib.calculus_dynamics || (f.calculus || {});
                 const alphaScore = lib.composite_alpha_score !== undefined ? lib.composite_alpha_score : '--';
 
                 const bid = ms.bid_px || f.bidPx || '--';
@@ -1408,6 +1409,11 @@
                 const depthRatio = ms.bid_ask_depth_ratio || 1.0;
                 const smLong = sm.weighted_long_pct !== undefined ? `${sm.weighted_long_pct}%` : '--';
                 const smFlow = sm.smart_money_flow_usd || sm.net_flow_usdt || '0 U';
+                
+                const calcRegime = cd.regime || 'RANGE_LOW_VELOCITY';
+                const calcV = cd.velocity !== undefined ? Number(cd.velocity).toFixed(2) : '--';
+                const calcA = cd.acceleration !== undefined ? Number(cd.acceleration).toFixed(2) : '--';
+                const calcI = cd.impulse !== undefined ? Number(cd.impulse).toFixed(2) : '--';
 
                 html += `
                     <div onclick="openCoinFactorModal('${instName}')" class="terminal-panel p-3.5 hover:border-[#3875F6] cursor-pointer transition flex flex-col justify-between space-y-2.5">
@@ -1452,7 +1458,19 @@
                             </div>
                         </div>
 
-                        <!-- 3. Smart Money -->
+                        <!-- 3. Calculus Dynamics (∫ 微积分状态) -->
+                        <div class="terminal-subpanel px-2.5 py-1.5 flex items-center justify-between text-[10px] font-mono">
+                            <div>
+                                <span class="text-[#707E94] block text-[9px]">微积分态: <strong class="text-blue-400">${calcRegime}</strong></span>
+                                <span class="text-[#EAECEF]">速度: ${calcV > 0 ? '+' : ''}${calcV}</span>
+                            </div>
+                            <div class="text-right">
+                                <span class="text-[#707E94] block text-[9px]">冲量: <strong class="${Number(calcI) >= 0 ? 'text-[#0ECB81]' : 'text-[#F6465D]'}">${calcI > 0 ? '+' : ''}${calcI}</strong></span>
+                                <span class="${Number(calcA) >= 0 ? 'text-[#0ECB81]' : 'text-[#F6465D]'}">加速度: ${calcA > 0 ? '+' : ''}${calcA}</span>
+                            </div>
+                        </div>
+
+                        <!-- 4. Smart Money -->
                         <div class="terminal-subpanel px-2.5 py-1.5 flex items-center justify-between text-[10px] font-mono">
                             <div>
                                 <span class="text-[#707E94] block text-[9px]">聪明钱主力 (Top100)</span>
@@ -1464,12 +1482,12 @@
                             </div>
                         </div>
 
-                        <!-- 4. Rationale Snippet -->
+                        <!-- 5. Rationale Snippet -->
                         <div class="text-[11px] text-[#707E94] font-sans leading-relaxed line-clamp-2">
                             ${reason}
                         </div>
 
-                        <!-- 5. Bottom Status -->
+                        <!-- 6. Bottom Status -->
                         <div class="pt-2 border-t border-[#161D2B] flex items-center justify-between">
                             <span class="text-[10px] text-[#707E94] font-mono">费率: ${fr} | OI: ${oi}</span>
                             ${actionBadge}

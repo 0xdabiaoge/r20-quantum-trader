@@ -773,7 +773,19 @@ def fetch_single_instrument_data(item, all_positions, usdt_available):
         except Exception:
             pass
 
-    # 5. Dynamic Equal-Risk Position Sizing with AI Self-Evolution Kelly Multipliers
+    # 5. Causal Multi-Timeframe Calculus Dynamics
+    f["calculus"] = {"valid": False, "regime": "RANGE_LOW_VELOCITY", "velocity": 0.0, "acceleration": 0.0, "impulse": 0.0, "max_abs_jerk": 0.0, "quality": 0.0}
+    try:
+        from calculus_engine import calculate_multi_timeframe
+        f["calculus"] = calculate_multi_timeframe({
+            "15M": raw_15m,
+            "1H": raw_1h,
+            "4H": raw_4h
+        })
+    except Exception:
+        pass
+
+    # 6. Dynamic Equal-Risk Position Sizing with AI Self-Evolution Kelly Multipliers
     adaptive_cfg = load_adaptive_config()
     pos_multipliers = adaptive_cfg.get("position_size_multipliers", {})
     pos_mult = float(pos_multipliers.get(f["name"], 1.0))
@@ -1109,9 +1121,29 @@ def evaluate_asset_signal(f):
     score_sent = max(-0.8, min(0.8, sent_score * 1.5))
 
     # -------------------------------------------------------------------------
+    # 📊 Sub-Factor 5: Causal Calculus Dynamics (-1.2 ~ +1.2)
+    # -------------------------------------------------------------------------
+    score_calc = 0.0
+    c_dyn = f.get("calculus", {})
+    c_v = float(c_dyn.get("velocity", 0.0) or 0.0)
+    c_a = float(c_dyn.get("acceleration", 0.0) or 0.0)
+    c_i = float(c_dyn.get("impulse", 0.0) or 0.0)
+    c_j = abs(float(c_dyn.get("max_abs_jerk", 0.0) or 0.0))
+    c_regime = c_dyn.get("regime", "")
+
+    if c_regime == "BULL_ACCELERATING" or (c_v > 0.2 and c_a > 0.1 and c_i > 0):
+        score_calc += 0.8
+    elif c_regime == "BULL_DECELERATING" or (c_v > 0.2 and c_a < -0.3):
+        score_calc -= 0.6 # Anti-FOMO deceleration penalty
+    elif c_regime == "BEAR_ACCELERATING" or (c_v < -0.2 and c_a < -0.1 and c_i < 0):
+        score_calc -= 0.8
+    elif c_regime == "BEAR_DECELERATING" or (c_v < -0.2 and c_a > 0.3):
+        score_calc += 0.6 # Anti-bottom chasing penalty
+
+    # -------------------------------------------------------------------------
     # 🎯 Continuous Synthesis Multi-Factor Alpha Score
     # -------------------------------------------------------------------------
-    raw_alpha_score = round(score_trend + score_vol + score_mr + score_sent, 2)
+    raw_alpha_score = round(score_trend + score_vol + score_mr + score_sent + score_calc, 2)
     
     # -------------------------------------------------------------------------
     # 🏆 6 Institutional Quant Setups Recognition
@@ -1120,46 +1152,49 @@ def evaluate_asset_signal(f):
     strategy_desc = "因子分布中性，无高置信度共振信号"
     reasons = []
 
+    # High Jerk Shock Filter: Shock market dampens high-risk breakout setups
+    is_high_jerk_shock = (c_j >= 1.8 or c_regime == "SHOCK_HIGH_JERK")
+
     # Setup 1: 🌊 顺势机构回踩 (Institutional Pullback)
-    if regime == "BULL_TREND" and (px <= ema21 * 1.008 and px >= ema55 * 0.994) and (38.0 <= rsi <= 56.0) and (is_bull_c or lower_wick >= 0.20) and not cooldown_long:
+    if regime == "BULL_TREND" and (px <= ema21 * 1.008 and px >= ema55 * 0.994) and (38.0 <= rsi <= 56.0) and (is_bull_c or lower_wick >= 0.20) and not cooldown_long and not is_high_jerk_shock:
         strategy_tag = "🌊 顺势回踩"
         raw_alpha_score = max(raw_alpha_score, 2.4)
-        strategy_desc = f"【1H机构顺势】回踩EMA21/55价值中枢止跌收阳(RSI={rsi:.1f}, OBV={obv_flow})，顺势低吸做多"
-        reasons = ["1H单边主升结构", "EMA价值区放量承接", "OBV多头能量潮支撑"]
+        strategy_desc = f"【1H机构顺势】回踩EMA21/55价值中枢止跌收阳(RSI={rsi:.1f}, 微积分速度={c_v:+.2f})，顺势低吸做多"
+        reasons = ["1H单边主升结构", "EMA价值区放量承接", "微积分动能企稳"]
 
     # Setup 2: ⚡ 阻力抛压做空 (Resistance Exhaustion)
-    elif regime == "BEAR_TREND" and (px >= ema21 * 0.992 and px <= ema55 * 1.006) and (44.0 <= rsi <= 62.0) and (is_bear_c or upper_wick >= 0.20) and not cooldown_short:
+    elif regime == "BEAR_TREND" and (px >= ema21 * 0.992 and px <= ema55 * 1.006) and (44.0 <= rsi <= 62.0) and (is_bear_c or upper_wick >= 0.20) and not cooldown_short and not is_high_jerk_shock:
         strategy_tag = "⚡ 阻力抛压"
         raw_alpha_score = min(raw_alpha_score, -2.4)
-        strategy_desc = f"【1H机构顺势】反弹测试EMA21/55阻力带右侧收阴遇阻(RSI={rsi:.1f}, MACD加速={macd_accel})，顺势做空"
-        reasons = ["1H单边主跌结构", "EMA阻力带量能衰竭遇阻", "MACD柱状动能向下加速"]
+        strategy_desc = f"【1H机构顺势】反弹测试EMA21/55阻力带右侧收阴遇阻(RSI={rsi:.1f}, 微积分速度={c_v:+.2f})，顺势做空"
+        reasons = ["1H单边主跌结构", "EMA阻力带量能衰竭遇阻", "微积分动能向下发散"]
 
     # Setup 3: 🚀 动量挤压突破 (Momentum Squeeze Breakout)
-    elif (px > ema9) and (55.0 <= rsi <= 74.0) and vol_ratio >= 1.3 and macd_accel > 0 and is_bull_c and not cooldown_long:
+    elif (px > ema9) and (55.0 <= rsi <= 74.0) and vol_ratio >= 1.3 and macd_accel > 0 and is_bull_c and not cooldown_long and (c_a >= -0.2) and not is_high_jerk_shock:
         strategy_tag = "🚀 动量突破"
         raw_alpha_score = max(raw_alpha_score, 2.5)
-        strategy_desc = f"【动量爆发】放量突破前高动能发散(量能={vol_ratio}x, MACD发散={macd_hist})，顺势追涨"
-        reasons = ["动量主升放量突破", f"成交量放大 {vol_ratio} 倍", "MACD柱状线快速扩张"]
+        strategy_desc = f"【动量爆发】放量突破前高动能发散(量能={vol_ratio}x, 微积分加速度={c_a:+.2f})，顺势追涨"
+        reasons = ["动量主升放量突破", f"成交量放大 {vol_ratio} 倍", "微积分正加速度扩张"]
 
     # Setup 4: 🌪️ 破位放量追空 (Breakdown Acceleration)
-    elif (px < ema9) and (26.0 <= rsi <= 45.0) and vol_ratio >= 1.3 and macd_accel < 0 and is_bear_c and not cooldown_short:
+    elif (px < ema9) and (26.0 <= rsi <= 45.0) and vol_ratio >= 1.3 and macd_accel < 0 and is_bear_c and not cooldown_short and (c_a <= 0.2) and not is_high_jerk_shock:
         strategy_tag = "🌪️ 破位追空"
         raw_alpha_score = min(raw_alpha_score, -2.5)
-        strategy_desc = f"【空头加速】击穿前低关键支撑放量下泄(量能={vol_ratio}x, OBV流向={obv_flow})，顺势破位做空"
-        reasons = ["空头破位下泄加速", f"放量破位 (量能 {vol_ratio}x)", "OBV资金流向确认净流出"]
+        strategy_desc = f"【空头加速】击穿前低关键支撑放量下泄(量能={vol_ratio}x, 微积分加速度={c_a:+.2f})，顺势破位做空"
+        reasons = ["空头破位下泄加速", f"放量破位 (量能 {vol_ratio}x)", "微积分负加速度下泄"]
 
     # Setup 5: 💎 极值均值回归 (Extreme Mean Reversion)
     elif vwap_bias <= -0.85 and rsi <= 30.0 and (is_bull_c or lower_wick >= 0.28) and not cooldown_long:
         strategy_tag = "💎 极值回归"
         raw_alpha_score = max(raw_alpha_score, 2.3)
-        strategy_desc = f"【VWAP极值偏离】量价严重负乖离({vwap_bias:+.2f}%)且RSI超卖({rsi:.1f})，右侧收阳止跌反弹"
+        strategy_desc = f"【VWAP极值偏离】量价严重负乖离({vwap_bias:+.2f}%)且RSI超卖({rsi:.1f})，微积分减速企稳收阳"
         reasons = [f"VWAP严重负偏离 ({vwap_bias:+.2f}%)", "RSI极值超卖区间", "下引线止跌确认"]
 
     # Setup 6: 🛡️ 流动性猎杀反转 (Liquidity Sweep Reversal)
     elif vwap_bias >= 0.85 and rsi >= 70.0 and (is_bear_c or upper_wick >= 0.28) and not cooldown_short:
         strategy_tag = "🛡️ 冲高反转"
         raw_alpha_score = min(raw_alpha_score, -2.3)
-        strategy_desc = f"【冲高衰竭】刺破正乖离极值区({vwap_bias:+.2f}%)受阻长上影线回落(RSI={rsi:.1f})，反转做空"
+        strategy_desc = f"【冲高衰竭】刺破正乖离极值区({vwap_bias:+.2f}%)受阻长上影线回落(RSI={rsi:.1f})，微积分动能钝化反转"
         reasons = [f"VWAP严重正偏离 ({vwap_bias:+.2f}%)", "RSI严重超买动能钝化", "上引线受阻承压"]
 
     # Adaptive strategy enablement and bounded weighting are applied after classification.
@@ -1440,14 +1475,19 @@ def execute_portfolio():
                     # 2. Maximum 1 scale-in per position to prevent overconcentration.
                     # 3. Combined margin must not exceed MAX_SINGLE_ASSET_MARGIN.
                     # 4. AI Confidence must be >= 75%.
+                    # 5. Calculus Momentum Hard Gateway: Acceleration must not be decelerating sharply (a >= -0.25)
+                    c_dyn = f.get("calculus", {})
+                    c_accel = float(c_dyn.get("acceleration", 0.0) or 0.0)
+                    calculus_accel_ok = (c_accel >= -0.25)
+
                     is_profit_or_breakeven = (pos_upl > 0 and pos_upl_ratio >= MIN_SCALE_IN_PROFIT_RATIO) or (trailing_sl > 0 and trailing_sl >= pos_avg_px)
                     planned_margin = ai_margin if ai_margin > 0 else (actual_sz * ct_val * f["price"] / max(1.0, ai_lever))
                     within_margin_cap = (curr_margin + planned_margin) <= MAX_SINGLE_ASSET_MARGIN
 
-                    if is_profit_or_breakeven and scale_count < MAX_SCALE_IN_COUNT and within_margin_cap and ai_conf >= MIN_SCALE_IN_CONFIDENCE:
+                    if is_profit_or_breakeven and scale_count < MAX_SCALE_IN_COUNT and within_margin_cap and ai_conf >= MIN_SCALE_IN_CONFIDENCE and calculus_accel_ok:
                         allow_entry = True
                         is_scale_in = True
-                        print(f"[Pyramiding] {f['name']} 满足顺势浮盈加多条件: 底仓浮盈={pos_upl:+.2f}U ({pos_upl_ratio*100:+.1f}%), 已加仓{scale_count}次, 计划加仓{actual_sz}张")
+                        print(f"[Pyramiding] {f['name']} 满足顺势浮盈加多条件: 底仓浮盈={pos_upl:+.2f}U ({pos_upl_ratio*100:+.1f}%), 已加仓{scale_count}次, 微积分加速度={c_accel:+.2f}, 计划加仓{actual_sz}张")
                     else:
                         if not is_profit_or_breakeven:
                             print(f"[Pyramiding 拦截] {f['name']} 底仓未达浮盈保本门禁 (浮盈={pos_upl:+.2f}U ROI={pos_upl_ratio*100:+.1f}%), 严禁逆势加仓")
@@ -1457,6 +1497,8 @@ def execute_portfolio():
                             print(f"[Pyramiding 拦截] {f['name']} 加仓后总保证金将超限 ({curr_margin + planned_margin:.1f} > {MAX_SINGLE_ASSET_MARGIN}U)")
                         elif ai_conf < MIN_SCALE_IN_CONFIDENCE:
                             print(f"[Pyramiding 拦截] {f['name']} AI加仓置信度不足 ({ai_conf:.0f}% < {MIN_SCALE_IN_CONFIDENCE}%)")
+                        elif not calculus_accel_ok:
+                            print(f"[Pyramiding 拦截] {f['name']} 微积分动能严重失速衰竭 (加速度={c_accel:+.2f} < -0.25)，禁止追多加仓")
 
                 if allow_entry:
                     limit_px = round(ai_decision.get("entry_price") if (ai_decision and ai_decision.get("entry_price", 0) > 0) else (f.get("bidPx") or f["price"]), prec)
@@ -1505,10 +1547,14 @@ def execute_portfolio():
                     planned_margin = ai_margin if ai_margin > 0 else (actual_sz * ct_val * f["price"] / max(1.0, ai_lever))
                     within_margin_cap = (curr_margin + planned_margin) <= MAX_SINGLE_ASSET_MARGIN
 
-                    if is_profit_or_breakeven and scale_count < MAX_SCALE_IN_COUNT and within_margin_cap and ai_conf >= MIN_SCALE_IN_CONFIDENCE:
+                    c_dyn = f.get("calculus", {})
+                    c_accel = float(c_dyn.get("acceleration", 0.0) or 0.0)
+                    calculus_accel_ok = (c_accel <= 0.25)
+
+                    if is_profit_or_breakeven and scale_count < MAX_SCALE_IN_COUNT and within_margin_cap and ai_conf >= MIN_SCALE_IN_CONFIDENCE and calculus_accel_ok:
                         allow_entry = True
                         is_scale_in = True
-                        print(f"[Pyramiding] {f['name']} 满足顺势浮盈加空条件: 底仓浮盈={pos_upl:+.2f}U ({pos_upl_ratio*100:+.1f}%), 已加仓{scale_count}次, 计划加仓{actual_sz}张")
+                        print(f"[Pyramiding] {f['name']} 满足顺势浮盈加空条件: 底仓浮盈={pos_upl:+.2f}U ({pos_upl_ratio*100:+.1f}%), 已加仓{scale_count}次, 微积分加速度={c_accel:+.2f}, 计划加仓{actual_sz}张")
                     else:
                         if not is_profit_or_breakeven:
                             print(f"[Pyramiding 拦截] {f['name']} 底仓未达浮盈保本门禁 (浮盈={pos_upl:+.2f}U ROI={pos_upl_ratio*100:+.1f}%), 严禁逆势加仓")
@@ -1518,6 +1564,8 @@ def execute_portfolio():
                             print(f"[Pyramiding 拦截] {f['name']} 加仓后总保证金将超限 ({curr_margin + planned_margin:.1f} > {MAX_SINGLE_ASSET_MARGIN}U)")
                         elif ai_conf < MIN_SCALE_IN_CONFIDENCE:
                             print(f"[Pyramiding 拦截] {f['name']} AI加仓置信度不足 ({ai_conf:.0f}% < {MIN_SCALE_IN_CONFIDENCE}%)")
+                        elif not calculus_accel_ok:
+                            print(f"[Pyramiding 拦截] {f['name']} 微积分动能严重失速减速 (加速度={c_accel:+.2f} > 0.25)，禁止追空加仓")
 
                 if allow_entry:
                     limit_px = round(ai_decision.get("entry_price") if (ai_decision and ai_decision.get("entry_price", 0) > 0) else (f.get("askPx") or f["price"]), prec)

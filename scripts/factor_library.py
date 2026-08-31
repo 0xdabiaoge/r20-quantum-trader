@@ -95,6 +95,17 @@ def compute_instrument_factors(item: Dict[str, Any], smart_money_pool: Dict[str,
             "long_short_ratio": "--",
             "signal": "NEUTRAL"
         },
+
+        # Pillar 6: Calculus Dynamics (Velocity, Acceleration, Impulse & Jerk)
+        "calculus_dynamics": {
+            "velocity": 0.0,
+            "acceleration": 0.0,
+            "impulse": 0.0,
+            "jerk": 0.0,
+            "regime": "RANGE_LOW_VELOCITY",
+            "quality": 0.0,
+            "direction": 0
+        },
         
         # Composite Factor Score (-100 to +100)
         "composite_alpha_score": 0.0,
@@ -194,6 +205,22 @@ def compute_instrument_factors(item: Dict[str, Any], smart_money_pool: Dict[str,
                     if closes[i] > closes[i-1]: obv += vols[i]
                     elif closes[i] < closes[i-1]: obv -= vols[i]
                 factors["volume_money_flow"]["obv_flow"] = "BULL_FLOW" if obv > 0 else ("BEAR_FLOW" if obv < 0 else "NEUTRAL")
+
+                # Pillar 6 Calculus Dynamics (15M High-Resolution)
+                try:
+                    sys.path.append(os.path.join(WORKSPACE_DIR, "scripts"))
+                    from calculus_engine import calculate_calculus
+                    c_res = calculate_calculus(closes, highs, lows)
+                    if c_res.get("valid"):
+                        factors["calculus_dynamics"]["velocity"] = c_res.get("velocity", 0.0)
+                        factors["calculus_dynamics"]["acceleration"] = c_res.get("acceleration", 0.0)
+                        factors["calculus_dynamics"]["impulse"] = c_res.get("impulse", 0.0)
+                        factors["calculus_dynamics"]["jerk"] = c_res.get("jerk", 0.0)
+                        factors["calculus_dynamics"]["regime"] = c_res.get("regime", "RANGE_LOW_VELOCITY")
+                        factors["calculus_dynamics"]["quality"] = c_res.get("quality", 0.0)
+                        factors["calculus_dynamics"]["direction"] = c_res.get("direction", 0)
+                except Exception:
+                    pass
     except Exception:
         pass
 
@@ -315,12 +342,34 @@ def compute_instrument_factors(item: Dict[str, Any], smart_money_pool: Dict[str,
     if depth_r >= 1.4: score += 15.0
     elif depth_r <= 0.7: score -= 15.0
 
+    # 6. Calculus Dynamics Modulation (Velocity, Acceleration, Impulse & Jerk Risk)
+    c_dyn = factors["calculus_dynamics"]
+    c_v = c_dyn.get("velocity", 0.0)
+    c_a = c_dyn.get("acceleration", 0.0)
+    c_i = c_dyn.get("impulse", 0.0)
+    c_j = abs(c_dyn.get("jerk", 0.0))
+    c_regime = c_dyn.get("regime", "")
+
+    # Bullish acceleration vs deceleration
+    if c_regime == "BULL_ACCELERATING" or (c_v > 0.2 and c_a > 0.1 and c_i > 0):
+        score += 15.0
+    elif c_regime == "BULL_DECELERATING" or (c_v > 0.2 and c_a < -0.3):
+        score -= 10.0 # Anti-FOMO top chasing penalty
+    elif c_regime == "BEAR_ACCELERATING" or (c_v < -0.2 and c_a < -0.1 and c_i < 0):
+        score -= 15.0
+    elif c_regime == "BEAR_DECELERATING" or (c_v < -0.2 and c_a > 0.3):
+        score += 10.0 # Anti-bottom chasing penalty
+
+    # High Jerk Shock Risk Penalty
+    if c_j >= 1.8 or c_regime == "SHOCK_HIGH_JERK":
+        score *= 0.6 # dampen conviction under high-jerk shock
+
     factors["composite_alpha_score"] = round(score, 1)
 
     # Decision Recommendation
-    if score >= 45.0 and adx >= 20.0:
+    if score >= 45.0 and adx >= 20.0 and c_j < 1.8:
         factors["signal_recommendation"] = "BUY_LONG"
-    elif score <= -45.0 and adx >= 20.0:
+    elif score <= -45.0 and adx >= 20.0 and c_j < 1.8:
         factors["signal_recommendation"] = "SELL_SHORT"
     else:
         factors["signal_recommendation"] = "WAIT"

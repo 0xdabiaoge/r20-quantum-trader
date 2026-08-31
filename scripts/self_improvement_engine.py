@@ -203,7 +203,7 @@ def call_llm_evolution_review(closed_trades: List[Dict[str, Any]], existing_memo
 {json.dumps(closed_trades, indent=2, ensure_ascii=False)}
 
 【复盘与长期记忆进化/动态覆盖任务】:
-请基于上述真实交易流水，对照【已有历史长期记忆库】，审视哪些旧经验已失效需淘汰覆盖，提炼出最新的 3~4 条实战心法，输出标准 JSON：
+请基于上述真实交易流水，对照【已有历史长期记忆库】，审视哪些旧经验已失效需淘汰覆盖（特别关注微积分动能加速度 Calculus Acceleration 衰竭与假突破、顺势加仓时机与止损冷却），提炼出最新的 3~4 条实战心法，输出标准 JSON：
 {{
   "diagnosis_insights": [
     "3~4 条深度痛点与亏损归因诊断 (直击实战要害，严格对齐上方真实数据)"
