@@ -391,18 +391,25 @@
                 </div>
             </div>
 
-            <!-- 3. 资产净值曲线与绩效透视 (Portfolio NAV Performance) -->
+            <!-- 3. 资产总权益与逐单盈亏叠加透视 (Equity & Trade PnL Combo) -->
             <div class="terminal-panel p-4 sm:p-5">
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-3 mb-2.5 border-b border-[#1A2232]">
                     <div class="flex items-center space-x-2">
                         <div class="w-2 h-2 rounded-full bg-[#3875F6]"></div>
-                        <h2 class="text-xs sm:text-sm font-bold text-white font-mono tracking-wide uppercase">资产净值与绩效透视 (Portfolio NAV)</h2>
+                        <h2 class="text-xs sm:text-sm font-bold text-white font-mono tracking-wide uppercase">资产总权益与逐单盈亏叠加透视 (Equity & Trade PnL)</h2>
                     </div>
 
-                    <!-- View Mode Switcher -->
-                    <div class="flex items-center bg-[#0B0F17] p-0.5 rounded-lg border border-[#1A2232] text-[11px] font-mono">
-                        <button onclick="setChartMode('equity')" id="chart-mode-equity" class="px-2.5 py-1 rounded bg-[#1C2436] text-white font-bold transition">总权益 NAV</button>
-                        <button onclick="setChartMode('trades')" id="chart-mode-trades" class="px-2.5 py-1 rounded text-[#707E94] hover:text-white transition">逐单盈亏柱</button>
+                    <!-- Clean Dual-Axis Legend -->
+                    <div class="flex items-center space-x-3 text-[11px] font-mono">
+                        <span class="inline-flex items-center text-[#0ECB81]">
+                            <span class="w-2.5 h-0.5 bg-[#0ECB81] mr-1.5 rounded-full"></span> 账户总权益(左轴)
+                        </span>
+                        <span class="inline-flex items-center text-[#707E94]">
+                            <span class="w-2.5 h-0.5 border-t border-dashed border-[#707E94] mr-1.5"></span> 初始基准(4192.61 U)
+                        </span>
+                        <span class="inline-flex items-center text-[#EAECEF]">
+                            <span class="w-2 h-2 bg-[#0ECB81] mr-0.5 rounded-sm"></span><span class="w-2 h-2 bg-[#F6465D] mr-1.5 rounded-sm"></span> 逐单盈亏柱(右轴)
+                        </span>
                     </div>
                 </div>
 
@@ -414,7 +421,7 @@
                         <span class="hidden sm:inline">峰值 ATH: <strong id="chart-stat-peak" class="text-[#0ECB81]">4,192.61 U</strong></span>
                     </div>
                     <div>
-                        <span>最大动态回撤: <strong id="chart-stat-maxdd" class="text-[#F6465D]">-3.73%</strong></span>
+                        <span>最大动态回撤: <strong id="chart-stat-maxdd" class="text-[#F6465D]">-3.72%</strong></span>
                     </div>
                 </div>
 
@@ -1148,6 +1155,9 @@
                     brainMatrixTimeEl.innerText = data.timestamp.replace(' (北京时间)', '');
                 }
 
+                // Assign data stores first
+                allTrades = data.trades || data.trades_history || [];
+
                 // Render Sub-Views
                 renderPositions(positions);
                 renderPendingOrders(data.pending_orders || []);
@@ -1157,7 +1167,6 @@
                 renderNewsIntelligence(data.news_intelligence || {});
                 renderReviewLab(data.review || data.review_lab || {}, data.ai_trading_memory_md);
                 renderPerformance(perf);
-                allTrades = data.trades || data.trades_history || [];
                 renderTrades();
                 renderLogs(data.logs || []);
 
@@ -1930,214 +1939,211 @@
             }
         }
 
-        let currentChartMode = 'equity';
-
-        function setChartMode(mode) {
-            currentChartMode = mode;
-            ['equity', 'trades'].forEach(m => {
-                const btn = document.getElementById(`chart-mode-${m}`);
-                if (btn) {
-                    if (m === mode) {
-                        btn.className = 'px-2.5 py-1 rounded bg-[#1C2436] text-white font-bold transition';
-                    } else {
-                        btn.className = 'px-2.5 py-1 rounded text-[#707E94] hover:text-white transition';
-                    }
-                }
-            });
-            if (rawJsonData) {
-                renderChart(rawJsonData.snapshots || []);
-            }
-        }
-
-        // Render Chart (Institutional Quantitative Dual-Mode Engine)
+        // Render Chart (Institutional Dual-Axis Overlay: Total Equity Line + Trade PnL Bars)
         function renderChart(snapshots) {
             const ctx = document.getElementById('equityChart');
             if (!ctx) return;
 
-            const points = snapshots && snapshots.length > 0 ? snapshots : [];
             const acc = rawJsonData?.account || {};
             const initialCapital = Number(acc.initial_capital || 4192.61);
+            const closedTrades = (allTrades || []).filter(t => t.status !== 'holding');
+
+            // Build chronological event list
+            const events = [
+                {
+                    label: '起步 (08-30 15:00)',
+                    time: '2026-08-30 15:00:00',
+                    equity: initialCapital,
+                    pnl: null,
+                    inst: '',
+                    side: '',
+                    strategy: '初始本金基准'
+                }
+            ];
+
+            // Closed trades in chronological order (oldest to newest)
+            const sortedTrades = [...closedTrades].reverse();
+            let runningEquity = initialCapital;
+
+            sortedTrades.forEach(t => {
+                const pnl = Number(t.pnl || 0.0);
+                runningEquity += pnl;
+                const tTime = t.close_time || t.open_time || '';
+                const timeSub = tTime.length >= 16 ? tTime.substring(5, 16) : tTime;
+                events.push({
+                    label: `${t.inst} (${timeSub})`,
+                    time: tTime,
+                    equity: Number(runningEquity.toFixed(2)),
+                    pnl: pnl,
+                    roi: Number(t.roi_pct || 0.0),
+                    inst: t.inst || '',
+                    side: t.side || '',
+                    lever: t.lever || '3x',
+                    strategy: t.strategy || '--'
+                });
+            });
+
+            // Current Live point
+            const currentLiveEquity = Number(acc.total_eq !== undefined ? acc.total_eq : (acc.equity !== undefined ? acc.equity : runningEquity));
+            events.push({
+                label: '实时最新 (LIVE)',
+                time: '实时',
+                equity: Number(currentLiveEquity.toFixed(2)),
+                pnl: null,
+                inst: 'LIVE',
+                side: '',
+                strategy: '实时在途持仓与盘口'
+            });
 
             // Calculate peak and max drawdown for HUD stats
-            if (points.length > 0) {
-                const eqList = points.map(p => Number(p.total_eq || p.equity || initialCapital));
-                let peakVal = eqList[0];
-                let maxDdPct = 0;
-                eqList.forEach(eq => {
-                    if (eq > peakVal) peakVal = eq;
-                    const dd = peakVal > 0 ? ((peakVal - eq) / peakVal * 100) : 0;
-                    if (dd > maxDdPct) maxDdPct = dd;
-                });
+            let peakVal = initialCapital;
+            let maxDdPct = 0;
+            events.forEach(e => {
+                if (e.equity > peakVal) peakVal = e.equity;
+                const dd = peakVal > 0 ? ((peakVal - e.equity) / peakVal * 100) : 0;
+                if (dd > maxDdPct) maxDdPct = dd;
+            });
 
-                const statPeakEl = document.getElementById('chart-stat-peak');
-                if (statPeakEl) statPeakEl.innerText = `${peakVal.toFixed(2)} U`;
-                const statBaseEl = document.getElementById('chart-stat-base');
-                if (statBaseEl) statBaseEl.innerText = `${initialCapital.toFixed(2)} U`;
-                const statMaxDdEl = document.getElementById('chart-stat-maxdd');
-                if (statMaxDdEl) statMaxDdEl.innerText = `-${maxDdPct.toFixed(2)}%`;
-            }
+            const statPeakEl = document.getElementById('chart-stat-peak');
+            if (statPeakEl) statPeakEl.innerText = `${peakVal.toFixed(2)} U`;
+            const statBaseEl = document.getElementById('chart-stat-base');
+            if (statBaseEl) statBaseEl.innerText = `${initialCapital.toFixed(2)} U`;
+            const statMaxDdEl = document.getElementById('chart-stat-maxdd');
+            if (statMaxDdEl) statMaxDdEl.innerText = `-${maxDdPct.toFixed(2)}%`;
 
             if (equityChartInstance) {
                 equityChartInstance.destroy();
                 equityChartInstance = null;
             }
 
-            // MODE 1: Total Equity NAV (with Baseline Reference Line)
-            if (currentChartMode === 'equity') {
-                if (points.length === 0) return;
+            const labels = events.map(e => e.label);
+            const equityValues = events.map(e => e.equity);
+            const baselineValues = events.map(() => initialCapital);
+            const pnlValues = events.map(e => e.pnl);
+            const pnlColors = events.map(e => (e.pnl === null ? 'transparent' : (e.pnl >= 0 ? '#0ECB81' : '#F6465D')));
+            const pnlBorders = events.map(e => (e.pnl === null ? 'transparent' : (e.pnl >= 0 ? '#059669' : '#BE123C')));
 
-                const labels = points.map(p => (p.time || '').substring(11, 16) || p.time);
-                const equityValues = points.map(p => Number(p.total_eq || p.equity || initialCapital));
-                const baselineValues = points.map(() => initialCapital);
+            // Calculate min/max equity for tight, professional charting scale
+            const validEquities = equityValues.filter(v => typeof v === 'number' && !isNaN(v));
+            const minEq = validEquities.length > 0 ? Math.min(...validEquities, initialCapital) : 3800;
+            const maxEq = validEquities.length > 0 ? Math.max(...validEquities, initialCapital) : 4300;
+            const yEquityMin = Math.max(0, Math.floor((minEq - 80) / 50) * 50);
+            const yEquityMax = Math.ceil((maxEq + 50) / 50) * 50;
 
-                equityChartInstance = new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: labels,
-                        datasets: [
-                            {
-                                label: '账户总权益 (USDT)',
-                                data: equityValues,
-                                borderColor: '#0ECB81',
-                                borderWidth: 2.2,
-                                backgroundColor: 'rgba(14, 203, 129, 0.06)',
-                                fill: true,
-                                tension: 0.25,
-                                pointRadius: 2,
-                                pointHoverRadius: 5,
-                                pointBackgroundColor: '#0ECB81',
-                                yAxisID: 'y'
-                            },
-                            {
-                                label: '初始本金基准 (4,192.61 U)',
-                                data: baselineValues,
-                                borderColor: '#475569',
-                                borderWidth: 1.5,
-                                borderDash: [4, 4],
-                                fill: false,
-                                pointRadius: 0,
-                                pointHoverRadius: 0,
-                                yAxisID: 'y'
-                            }
-                        ]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        layout: { padding: { left: 10, right: 10, top: 5, bottom: 5 } },
-                        interaction: { mode: 'index', intersect: false },
-                        plugins: {
-                            legend: { display: false },
-                            tooltip: {
-                                backgroundColor: '#0E121B',
-                                borderColor: '#1A2232',
-                                borderWidth: 1,
-                                padding: 10,
-                                titleFont: { size: 11, family: 'JetBrains Mono' },
-                                bodyFont: { size: 12, family: 'JetBrains Mono', weight: 'bold' },
-                                callbacks: {
-                                    label: function(context) {
-                                        if (context.datasetIndex === 0) {
-                                            const val = context.parsed.y;
-                                            const diff = val - initialCapital;
-                                            const diffPct = (diff / initialCapital) * 100;
-                                            return ` 账户总权益: ${val.toFixed(2)} USDT (${diff >= 0 ? '+' : ''}${diff.toFixed(2)} U / ${diffPct.toFixed(2)}%)`;
-                                        } else {
-                                            return ` 初始本金基准: ${context.parsed.y.toFixed(2)} USDT`;
-                                        }
-                                    }
-                                }
-                            }
+            equityChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            type: 'line',
+                            label: '账户总权益 (USDT)',
+                            data: equityValues,
+                            borderColor: '#0ECB81',
+                            borderWidth: 2.2,
+                            backgroundColor: 'rgba(14, 203, 129, 0.05)',
+                            fill: true,
+                            tension: 0.25,
+                            pointRadius: 3,
+                            pointHoverRadius: 6,
+                            pointBackgroundColor: '#0ECB81',
+                            yAxisID: 'yEquity',
+                            order: 1
                         },
-                        scales: {
-                            x: {
-                                grid: { color: 'rgba(255, 255, 255, 0.03)' },
-                                ticks: { font: { size: 10, family: 'JetBrains Mono' }, color: '#707E94', maxTicksLimit: 12 }
-                            },
-                            y: {
-                                type: 'linear',
-                                grid: { color: 'rgba(255, 255, 255, 0.03)' },
-                                ticks: {
-                                    font: { size: 10, family: 'JetBrains Mono' },
-                                    color: '#707E94',
-                                    callback: value => value.toFixed(0) + ' U'
+                        {
+                            type: 'line',
+                            label: '初始本金基准',
+                            data: baselineValues,
+                            borderColor: '#707E94',
+                            borderWidth: 1.5,
+                            borderDash: [4, 4],
+                            fill: false,
+                            pointRadius: 0,
+                            pointHoverRadius: 0,
+                            yAxisID: 'yEquity',
+                            order: 2
+                        },
+                        {
+                            type: 'bar',
+                            label: '逐单净盈亏 (USDT)',
+                            data: pnlValues,
+                            backgroundColor: pnlColors,
+                            borderColor: pnlBorders,
+                            borderWidth: 1,
+                            borderRadius: 4,
+                            barPercentage: 0.55,
+                            yAxisID: 'yPnL',
+                            order: 3
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    layout: { padding: { left: 10, right: 10, top: 5, bottom: 5 } },
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: '#0E121B',
+                            borderColor: '#1A2232',
+                            borderWidth: 1,
+                            padding: 10,
+                            titleFont: { size: 11, family: 'JetBrains Mono' },
+                            bodyFont: { size: 11, family: 'JetBrains Mono' },
+                            callbacks: {
+                                label: function(context) {
+                                    const idx = context.dataIndex;
+                                    const ev = events[idx];
+                                    if (context.datasetIndex === 0) {
+                                        const eq = context.parsed.y;
+                                        const diff = eq - initialCapital;
+                                        const diffPct = (diff / initialCapital) * 100;
+                                        return ` 💰 账户总权益: ${eq.toFixed(2)} USDT (${diff >= 0 ? '+' : ''}${diff.toFixed(2)} U / ${diffPct.toFixed(2)}%)`;
+                                    } else if (context.datasetIndex === 1) {
+                                        return ` 📏 初始基准: ${initialCapital.toFixed(2)} USDT`;
+                                    } else if (context.datasetIndex === 2) {
+                                        if (ev.pnl === null) return null;
+                                        const p = ev.pnl;
+                                        return ` 📊 当单盈亏: ${p >= 0 ? '+' : ''}${p.toFixed(2)} USDT (${ev.roi !== undefined ? (ev.roi >= 0 ? '+' : '') + ev.roi.toFixed(1) + '%' : ''}) | [${ev.inst} ${ev.side} ${ev.lever || ''}]`;
+                                    }
+                                    return null;
                                 }
                             }
                         }
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false },
+                            ticks: { font: { size: 10, family: 'JetBrains Mono' }, color: '#707E94', maxRotation: 25, minRotation: 0 }
+                        },
+                        yEquity: {
+                            type: 'linear',
+                            position: 'left',
+                            min: yEquityMin,
+                            max: yEquityMax,
+                            grid: { color: 'rgba(255, 255, 255, 0.03)' },
+                            ticks: {
+                                font: { size: 10, family: 'JetBrains Mono' },
+                                color: '#0ECB81',
+                                callback: value => value.toFixed(0) + ' U'
+                            }
+                        },
+                        yPnL: {
+                            type: 'linear',
+                            position: 'right',
+                            grid: { color: 'rgba(255, 255, 255, 0.04)' },
+                            ticks: {
+                                font: { size: 10, family: 'JetBrains Mono' },
+                                color: '#707E94',
+                                callback: value => (value >= 0 ? '+' : '') + value.toFixed(0) + ' U'
+                            },
+                            suggestedMin: -80,
+                            suggestedMax: 30
+                        }
                     }
-                });
-            }
-            // MODE 2: Closed Trades PnL Bar Chart
-            else if (currentChartMode === 'trades') {
-                const closedTrades = (allTrades || []).filter(t => t.status !== 'holding');
-                if (closedTrades.length === 0) {
-                    return;
                 }
-
-                const labels = closedTrades.map(t => {
-                    const timePart = (t.close_time || t.open_time || '').substring(11, 16);
-                    return `${t.inst} (${timePart})`;
-                });
-                const pnlValues = closedTrades.map(t => Number(t.pnl || 0.0));
-                const colors = pnlValues.map(p => p >= 0 ? '#0ECB81' : '#F6465D');
-                const borderColors = pnlValues.map(p => p >= 0 ? '#059669' : '#BE123C');
-
-                equityChartInstance = new Chart(ctx, {
-                    type: 'bar',
-                    data: {
-                        labels: labels,
-                        datasets: [
-                            {
-                                label: '逐单已结净盈亏 (USDT)',
-                                data: pnlValues,
-                                backgroundColor: colors,
-                                borderColor: borderColors,
-                                borderWidth: 1,
-                                borderRadius: 4
-                            }
-                        ]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        layout: { padding: { left: 10, right: 10, top: 5, bottom: 5 } },
-                        plugins: {
-                            legend: { display: false },
-                            tooltip: {
-                                backgroundColor: '#0E121B',
-                                borderColor: '#1A2232',
-                                borderWidth: 1,
-                                padding: 10,
-                                titleFont: { size: 11, family: 'JetBrains Mono' },
-                                bodyFont: { size: 12, family: 'JetBrains Mono', weight: 'bold' },
-                                callbacks: {
-                                    label: function(context) {
-                                        const idx = context.dataIndex;
-                                        const t = closedTrades[idx];
-                                        const pnl = context.parsed.y;
-                                        const roi = Number(t.roi_pct || 0.0);
-                                        return ` [${t.inst} ${t.side} ${t.lever || '3x'}] 净盈亏: ${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)} U (${roi >= 0 ? '+' : ''}${roi.toFixed(1)}%) | 策略: ${t.strategy || '--'}`;
-                                    }
-                                }
-                            }
-                        },
-                        scales: {
-                            x: {
-                                grid: { display: false },
-                                ticks: { font: { size: 10, family: 'JetBrains Mono' }, color: '#707E94' }
-                            },
-                            y: {
-                                grid: { color: 'rgba(255, 255, 255, 0.03)' },
-                                ticks: {
-                                    font: { size: 10, family: 'JetBrains Mono' },
-                                    color: '#707E94',
-                                    callback: value => (value >= 0 ? '+' : '') + value.toFixed(0) + ' U'
-                                }
-                            }
-                        }
-                    }
-                });
-            }
+            });
         }
 
         if (window.lucide) lucide.createIcons();
