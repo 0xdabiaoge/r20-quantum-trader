@@ -175,22 +175,23 @@ def fetch_single_instrument_package(item: Dict[str, Any]) -> Dict[str, Any]:
                 raw_candles = d["data"]
                 pkg["recent_15m"] = [[float(c[1]), float(c[2]), float(c[3]), float(c[4]), round(float(c[5]), 1)] for c in raw_candles[:12]]
                 
-                # Calculate indicators
+                # Calculate 15M indicators
                 if len(raw_candles) >= 15:
                     closes = [float(c[4]) for c in reversed(raw_candles)]
                     highs = [float(c[2]) for c in reversed(raw_candles)]
                     lows = [float(c[3]) for c in reversed(raw_candles)]
                     vols = [float(c[5]) for c in reversed(raw_candles)]
 
-                    # ATR 14
+                    # ATR 15M
                     tr_list = []
                     for i in range(1, len(closes)):
                         tr = max(highs[i] - lows[i], abs(highs[i] - closes[i-1]), abs(lows[i] - closes[i-1]))
                         tr_list.append(tr)
                     if len(tr_list) >= 14:
-                        pkg["atr"] = round(sum(tr_list[-14:]) / 14, 4)
+                        pkg["atr_15m"] = round(sum(tr_list[-14:]) / 14, 4)
+                        pkg["atr"] = pkg["atr_15m"]
 
-                    # RSI 14
+                    # RSI 15M
                     diffs = [closes[i] - closes[i-1] for i in range(1, len(closes))]
                     gains = [d if d > 0 else 0 for d in diffs]
                     losses = [-d if d < 0 else 0 for d in diffs]
@@ -199,6 +200,7 @@ def fetch_single_instrument_package(item: Dict[str, Any]) -> Dict[str, Any]:
                         avg_l = sum(losses[-14:]) / 14
                         rs = (avg_g / avg_l) if avg_l > 0 else 100.0
                         pkg["rsi"] = round(100.0 - (100.0 / (1.0 + rs)), 1)
+                        pkg["rsi_15m"] = pkg["rsi"]
 
                     # VWAP Bias
                     pv_sum = sum(closes[i] * vols[i] for i in range(len(closes)))
@@ -224,23 +226,67 @@ def fetch_single_instrument_package(item: Dict[str, Any]) -> Dict[str, Any]:
     except Exception:
         pass
 
-    # 3. 1H Candles (recent 8)
+    # 3. 1H Candles (recent 24, about 24 hours) & 1H ATR / 1H RSI
     try:
-        req = urllib.request.Request(f"https://www.okx.com/api/v5/market/candles?instId={inst_id}&bar=1H&limit=8", headers=headers)
+        req = urllib.request.Request(f"https://www.okx.com/api/v5/market/candles?instId={inst_id}&bar=1H&limit=24", headers=headers)
         with urllib.request.urlopen(req, timeout=3) as resp:
             d = json.loads(resp.read().decode("utf-8"))
             if d.get("code") == "0" and d.get("data"):
-                pkg["recent_1h"] = [[float(c[1]), float(c[2]), float(c[3]), float(c[4]), round(float(c[5]), 1)] for c in d["data"]]
+                raw_1h = d["data"]
+                pkg["recent_1h"] = [[float(c[1]), float(c[2]), float(c[3]), float(c[4]), round(float(c[5]), 1)] for c in raw_1h[:12]]
+                if len(raw_1h) >= 15:
+                    closes_1h = [float(c[4]) for c in reversed(raw_1h)]
+                    highs_1h = [float(c[2]) for c in reversed(raw_1h)]
+                    lows_1h = [float(c[3]) for c in reversed(raw_1h)]
+                    
+                    tr_list_1h = []
+                    for i in range(1, len(closes_1h)):
+                        tr = max(highs_1h[i] - lows_1h[i], abs(highs_1h[i] - closes_1h[i-1]), abs(lows_1h[i] - closes_1h[i-1]))
+                        tr_list_1h.append(tr)
+                    if len(tr_list_1h) >= 14:
+                        pkg["atr_1h"] = round(sum(tr_list_1h[-14:]) / 14, 4)
+                        pkg["atr"] = pkg["atr_1h"]  # Elevate primary ATR to 1H
+
+                    diffs_1h = [closes_1h[i] - closes_1h[i-1] for i in range(1, len(closes_1h))]
+                    gains_1h = [d if d > 0 else 0 for d in diffs_1h]
+                    losses_1h = [-d if d < 0 else 0 for d in diffs_1h]
+                    if len(gains_1h) >= 14:
+                        avg_g_1h = sum(gains_1h[-14:]) / 14
+                        avg_l_1h = sum(losses_1h[-14:]) / 14
+                        rs_1h = (avg_g_1h / avg_l_1h) if avg_l_1h > 0 else 100.0
+                        pkg["rsi_1h"] = round(100.0 - (100.0 / (1.0 + rs_1h)), 1)
+                    
+                    # 1H Swing Structure
+                    if len(closes_1h) >= 10:
+                        ma7_1h = sum(closes_1h[-7:]) / 7
+                        ma20_1h = sum(closes_1h[-20:]) / min(len(closes_1h), 20)
+                        if closes_1h[-1] > ma7_1h > ma20_1h:
+                            pkg["structure_1h"] = "1H_SWING_BULL"
+                        elif closes_1h[-1] < ma7_1h < ma20_1h:
+                            pkg["structure_1h"] = "1H_SWING_BEAR"
+                        else:
+                            pkg["structure_1h"] = "1H_SWING_CHOP"
     except Exception:
         pass
 
-    # 4. 4H Candles (recent 6, about 24 hours)
+    # 4. 4H Candles (recent 16, about 64 hours) & 4H Macro Structure
     try:
-        req = urllib.request.Request(f"https://www.okx.com/api/v5/market/candles?instId={inst_id}&bar=4H&limit=6", headers=headers)
+        req = urllib.request.Request(f"https://www.okx.com/api/v5/market/candles?instId={inst_id}&bar=4H&limit=16", headers=headers)
         with urllib.request.urlopen(req, timeout=3) as resp:
             d = json.loads(resp.read().decode("utf-8"))
             if d.get("code") == "0" and d.get("data"):
-                pkg["recent_4h"] = [[float(c[1]), float(c[2]), float(c[3]), float(c[4]), round(float(c[5]), 1)] for c in d["data"]]
+                raw_4h = d["data"]
+                pkg["recent_4h"] = [[float(c[1]), float(c[2]), float(c[3]), float(c[4]), round(float(c[5]), 1)] for c in raw_4h[:8]]
+                if len(raw_4h) >= 8:
+                    closes_4h = [float(c[4]) for c in reversed(raw_4h)]
+                    ma5_4h = sum(closes_4h[-5:]) / 5
+                    ma12_4h = sum(closes_4h[-12:]) / min(len(closes_4h), 12)
+                    if closes_4h[-1] > ma5_4h > ma12_4h:
+                        pkg["macro_4h"] = "4H_MACRO_BULL (大级别多头通道)"
+                    elif closes_4h[-1] < ma5_4h < ma12_4h:
+                        pkg["macro_4h"] = "4H_MACRO_BEAR (大级别空头承压)"
+                    else:
+                        pkg["macro_4h"] = "4H_MACRO_RANGE (大级别区间震荡)"
     except Exception:
         pass
 
@@ -321,41 +367,41 @@ def fetch_single_instrument_package(item: Dict[str, Any]) -> Dict[str, Any]:
     return pkg
 
 SYSTEM_PROMPT = """你是一名管理顶级加密量化对冲基金的首席AI交易官。
-你的职责：在一次扫描中全景综合 OKX 六大加密永续合约的原生多周期K线(4H/1H/15M)、OKX官方顶级聪明钱(SmartMoney Top100)实盘胜率与持仓成本、三大核心数理底座【因果微积分动力学(速度v/加速度a/冲量I/冲击jerk) + 定积分能量与偏离面积(净做功/VWAP偏离面积) + 概率论与随机过程(条件延续胜率%/95%VaR/偏度峰度肥尾)】、即时盘口深度、衍生品筹码(资金费率/OI未平仓量/多空比/Taker主动买卖)、量化多因子指标(ADX趋势强度/ATR/RSI/VWAP偏离/量比/OBV)以及当前账户可用USDT余额与已有持仓，给出具有精确保证金分配、杠杆倍数设定、多空方向裁决与盈亏比≥2.0止盈止损点位的完整交易与持仓决策。
+你的核心交易哲学：【三重滤网波段交易体系 (Triple Screen Swing Trading System)】。
+从15M超短噪音中彻底解脱，以 1H~4H 核心波段为主轴，拉大止盈空间与持仓容忍度，追求高胜率与高赔率(R:R ≥ 2.5)。
 
-核心交易准则与高胜率铁律：
-1. 顶级聪明钱 (SmartMoney) 方向对齐：
-   - 重点参考 OKX 实盘 80%+ 胜率聪明钱的主力加权多空比与 24H 资金净流入；
-   - 严禁逆全网顶级聪明钱主力大势盲目重仓开单；在聪明钱建仓成本价附近寻找高确定性共振点位。
-2. 📐 三大底层数理基石 (Calculus, Integrals & Probability) 综合判定铁律：
-   - 【微积分动力学 (Calculus Dynamics)】：
-     • 速度 v 反映即时价格位移速率，冲量 I 反映多周期累计惯性；
-     • 📈 扩张加速 (BULL_ACCELERATING, a > +0.10)：动能持续放大，允许积极捕捉突破或顺势加仓；
-     • ⚠️ 顶部失速减速 (BULL_DECELERATING, a < -0.20)：价格虽涨但动能急剧失速衰竭，【坚决禁止追涨开多】，等待回踩企稳；
-     • 📉 破位下泄加速 (BEAR_ACCELERATING, a < -0.10)：空头动能加速下泄，顺势破位做空；
-     • 🛡️ 底部减速企稳 (BEAR_DECELERATING, a > +0.20)：砸盘动能衰减钝化，【坚决禁止追空】，防范 V 型反弹；
-     • 🌪️ 冲击加加速度 jerk 防御：若出现高冲击异动 (|jerk| ≥ 1.8 或 SHOCK_HIGH_JERK)，代表遭遇极端异动洗盘，强制降低仓位或观望(WAIT)。
-   - 【定积分能量与偏离面积 (Definite Integrals & Work Done)】：
-     • 动能净做功定积分 (energy_integral > 0)：衡量多头历史做功累计的真实能量储备；
-     • 均值偏离面积定积分 (deviation_area_integral)：衡量价格偏离价值中枢的累计拉伸面积；若偏离面积严重过载 (|area| ≥ 2.5)，强烈提示均值回归引力，切忌在拉伸末端追单。
-   - 【概率论与随机过程 (Probability & Extreme Value Risk)】：
-     • 条件延续概率 (continuation_prob_pct ≥ 70%)：基于分布函数计算的多头顺势确定性，给予多头强赋能；
-     • 条件击穿概率 (breakdown_prob_pct ≥ 70%)：空头破位确定性；
-     • 极端肥尾与在险价值 (Kurtosis ≥ 1.5, 95% VaR & CVaR)：若出现严重非对称偏度或超额厚尾，必须严格按 VaR 风险边界收缩单笔保证金与杠杆倍数。
-3. 趋势强度硬过滤 (ADX 过滤器)：
-   - 若 1H ADX < 20 (表明当前处于无量窄幅拉锯的垃圾震荡市)，必须坚决观望(WAIT)，彻底杜绝假突破与反复止损磨损；
-   - 若 1H ADX ≥ 22 且伴随放量、微积分加速度与价格共振，方可积极捕捉主升/破位趋势。
-4. 追求极致风险收益比 (Risk/Reward ≥ 2.0)：入场位、止盈位与止损位必须逻辑自洽，空间测算严密。
+三重滤网核心决策铁律：
+1. 🛡️ 第一重滤网：4H 宏观结构与大趋势（一票否决权）：
+   - 4H 是大资金流动性与趋势方向的最高指引；
+   - 若 4H 处于清晰下降通道 / 空头承压结构 (4H_MACRO_BEAR)，【一票否决任何做多开仓信号 (BUY_LONG)】，严禁在 15M 反弹时摸左侧接飞刀；
+   - 若 4H 处于清晰上升通道 / 多头主升结构 (4H_MACRO_BULL)，【一票否决任何盲目猜顶做空 (SELL_SHORT)】；
+   - 顺大势者昌，逆大势者亡。
+
+2. 📐 第二重滤网：1H 数理动力学、能量做功与波段决策中枢（核心裁决层）：
+   - 依据 1H K线与微积分动力学判断波段势能：
+     • 速度 v 与动能加速度 a：📈 扩张加速 (BULL_ACCELERATING, a > +0.10) 顺势捕捉主升浪；⚠️ 顶部失速 (BULL_DECELERATING, a < -0.20) 严禁追涨；📉 下泄加速顺势破位做空；🛡️ 底部减速企稳严禁追空；
+     • 动能净做功积分 (energy_integral) 与均值偏离面积定积分 (deviation_area_integral)：避免在偏离面积严重过载末端追单；
+     • 概率论与条件胜率 (continuation_prob_pct / breakdown_prob_pct) 与 95% VaR 在险价值：量化顺势概率与极端尾部风险；
+   - 1H ADX 趋势门禁：若 1H ADX < 20 (垃圾震荡市)，必须坚决观望 (WAIT)，杜绝无量震荡反复磨损；
+   - 宽止损与大波段保护 (1.5x ~ 2.0x 1H ATR)：
+     • 彻底废除 15M 紧止损，止损距离必须基于 1.5x ~ 2.0x 1H ATR，给波段足够的正常呼吸与震荡空间，彻底免疫 15M 局部毛刺插针；
+     • 目标盈亏比锁定 R:R ≥ 2.5（单笔止盈空间 ≥ 2.5% ~ 6.0%），波段持仓预期 3~12 小时。
+
+3. ⚡ 第三重滤网：15M 盘口执行与微观入场过滤（纯只读执行辅助）：
+   - 15M K线与即时盘口微观深度仅用于：判断短线是否超买超卖、寻找优质的买一/卖一 Maker 挂单与顺势回踩触发点；
+   - 严禁单凭 15M 单根 K 线的微小形态或无量假突破做开平仓决定。
+
+4. 👑 顶级聪明钱 (SmartMoney Top100) 方向共振：
+   - 重点参考 OKX 实盘 80%+ 胜率聪明钱的主力加权多空比与 24H 资金净流入；在聪明钱建仓成本价附近寻找高确定性共振点位。
+
 5. 动态自适应头寸与杠杆规划：
-   - 必须结合当前账户可用USDT余额 (usdt_available) 规划拟投入保证金 (margin_usdt)，单笔保证金建议为可用余额的 5% ~ 20%，不可超负荷孤注一掷。
-   - 杠杆倍数 (leverage) 需依据市场波动率(ATR)与置信度动态决定：高波动标的(SUI/DOGE)建议 2x~3x，主流低波标的(BTC/ETH)可 3x~5x，严禁过高杠杆。
-6. 任何关键行情缺失、标记为 DATA_INVALID、价格结构不合法或无法计算真实 R:R 时，必须 WAIT；不得猜测缺失数据。
-7. 长期记忆、偏好标的和历史胜率只能作为弱先验，绝不得覆盖本轮原始行情、持仓风险和硬门禁。
-8. 顺势浮盈金字塔加仓 (Pyramiding) 准则：
-   - 对于已有持仓标的，若底仓已处于保本/显著浮盈状态（ROI ≥ +0.8% 或已推保本止损），且盘面出现强劲的二浪突破、动量延续、微积分加速度为正(a ≥ 0)、多头延续概率 ≥ 40% 且聪明钱持续加码，允许在 decisions 中输出同向开仓指令（如多单输出 BUY_LONG 顺势加多 / 空单输出 SELL_SHORT 顺势加空），单次加仓仓位建议 ≤ 底仓，置信度需 ≥ 75%；
-   - 严禁对处于浮亏、未脱离成本区或动能失速减速(a < 0)的仓位进行任何形式的逆势补仓（Averaging Down）。
-9. 必须认真审查在途未成交限价挂单 (pending_orders)：若行情已大幅偏离、市场逻辑反转或挂单已过时，必须在 pending_orders_management 中果断输出 CANCEL 撤单指令，防止挂单成交在不利位置；有效挂单输出 KEEP 维持。
-10. 必须输出严格标准 JSON 对象，包含全市场宏观评估(macro_assessment)、在途持仓管理(position_management)、在途挂单管理(pending_orders_management)与针对每个标的的决策字典(decisions)。
+   - 单笔保证金 (margin_usdt) 控制在可用余额的 5% ~ 20%（单笔 100~400 U 标准波段仓位）；
+   - 杠杆倍数 (leverage) 严密控制在 2x ~ 5x（主流币 BTC/ETH 3x~5x，高波币 2x~3x）。
+
+6. 顺势浮盈金字塔加仓 (Pyramiding) 准则：
+   - 仅允许对底仓已盈利/保本、且 1H 顺势动量持续加速(a ≥ 0) 的优质波段追加 1 次仓位，严禁逆势补仓。
+
+7. 必须输出严格标准 JSON 对象，包含全市场宏观评估(macro_assessment)、在途持仓管理(position_management)、在途挂单管理(pending_orders_management)与针对每个标的的决策字典(decisions)。
 """
 
 def construct_full_market_prompt(packages: List[Dict[str, Any]], pos_summary: str = "当前总持仓 0/6", active_positions_detail: List[Dict[str, Any]] = None, pending_orders_detail: List[Dict[str, Any]] = None, current_time_str: str = "", usdt_available: float = 0.0) -> str:
@@ -395,16 +441,18 @@ def construct_full_market_prompt(packages: List[Dict[str, Any]], pos_summary: st
         )
         info = f"""---------------------------------------------------------
 【{p['name']} ({p['instId']})】| 数据质量: {quality} | 现价: {p['price']} | 24H涨跌: {p['chg24h']}% | 盘口买/卖: {p['bidPx']}/{p['askPx']}
+- 🏛️ 三重滤网宏观结构: 4H宏观大势={p.get('macro_4h', '4H_MACRO_RANGE')} | 1H波段结构={p.get('structure_1h', '1H_SWING_CHOP')}
 - 👑 顶级聪明钱 (SmartMoney Top100): 加权做多占比={sm.get('weighted_long_pct', 50)}% | 24H净流入={sm.get('net_flow_usdt', '--')} | 多头均价={sm.get('avg_long_entry', '--')} | 空头均价={sm.get('avg_short_entry', '--')} | {sm.get('top_win_rate', '')}
-- 📐 量化趋势与因子: 1H ADX趋势强度={adx_val} (注:<20无趋势垃圾市, ≥22强单边) | ATR(14)={p.get('atr', '--')} | RSI(14)={p.get('rsi', '--')} | VWAP乖离={p.get('vwap_bias', '--')}% | 15M量比={p.get('vol_ratio', '--')}x | OBV资金流={p.get('obv_flow', '--')}
+- 📐 1H核心波段指标: 1H ATR(14)={p.get('atr_1h', p.get('atr', '--'))} (止损基准: 1.5~2.0x 1H ATR) | 1H RSI(14)={p.get('rsi_1h', '--')} | 1H ADX趋势强度={adx_val} (注:<20无趋势垃圾市, ≥22强单边)
+- ⚡ 15M微观执行参考: 15M ATR={p.get('atr_15m', '--')} | 15M RSI={p.get('rsi_15m', '--')} | VWAP乖离={p.get('vwap_bias', '--')}% | 15M量比={p.get('vol_ratio', '--')}x | OBV资金流={p.get('obv_flow', '--')}
 - ∫ 微积分与定积分: {calc_line}
 - ⚡ 能量与偏离面积分: {integral_line}
 - ⚅ 概率论与统计分布: {prob_line}
 - ∂ 分周期速度/加速度/冲量: {calc_tf_line or '数据不足'}
 - 衍生品博弈: 资金费率: {p['fundingRate']}% | OI未平仓: {p['oiUsd']} | 多空比: {p['lsRatio']} | 5M主动吃单净差: {p['takerNetUsd']}
 - 15M K线(倒序12根 [O,H,L,C,V]): {k15}
-- 1H K线(倒序8根 [O,H,L,C,V]): {k1h}
-- 4H K线(倒序6根 [O,H,L,C,V]): {k4h}"""
+- 1H K线(倒序12根 [O,H,L,C,V]): {k1h}
+- 4H K线(倒序8根 [O,H,L,C,V]): {k4h}"""
         market_lines.append(info)
 
     all_market_str = "\n".join(market_lines)

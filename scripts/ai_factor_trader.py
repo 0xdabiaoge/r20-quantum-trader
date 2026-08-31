@@ -92,10 +92,10 @@ ASSET_CLASS_PROFILES = {
     },
     "crypto": {
         "entry_threshold": 2.2,
-        "min_profit_ratio": 0.0120,
+        "min_profit_ratio": 0.0200,
         "tp_atr_mult": 2.5,
-        "sl_atr_mult": 1.4,
-        "trailing_kick_in": 1.3,
+        "sl_atr_mult": 1.5,
+        "trailing_kick_in": 1.5,
         "trailing_pullback": 0.60
     }
 }
@@ -720,6 +720,12 @@ def fetch_single_instrument_data(item, all_positions, usdt_available):
         closes_1h = [float(c[4]) for c in c_1h]
         highs_1h = [float(c[2]) for c in c_1h]
         lows_1h = [float(c[3]) for c in c_1h]
+        
+        # 1H ATR 14 for Macro Swing Protection
+        f["atr_1h"] = calc_atr(c_1h, 14)
+        f["atr_15m"] = f["atr"]
+        f["atr"] = max(f["atr_1h"], f["atr_15m"] * 1.5, f["price"] * 0.012)
+        f["atr_pct"] = (f["atr"] / f["price"]) * 100.0
         
         e9_1h = calc_ema(closes_1h, 9)
         e21_1h = calc_ema(closes_1h, 21)

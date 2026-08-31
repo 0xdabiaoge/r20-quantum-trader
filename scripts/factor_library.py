@@ -64,6 +64,8 @@ def compute_instrument_factors(item: Dict[str, Any], smart_money_pool: Dict[str,
         "volatility_channel": {
             "atr_14": 0.0,
             "atr_pct": 0.0,
+            "atr_1h": 0.0,
+            "atr_1h_pct": 0.0,
             "bb_width_1h": 0.0,
             "volatility_regime": "NORMAL"
         },
@@ -256,6 +258,29 @@ def compute_instrument_factors(item: Dict[str, Any], smart_money_pool: Dict[str,
                         factors["probability_theory"]["is_fat_tail"] = p_th.get("is_fat_tail", False)
                 except Exception:
                     pass
+    except Exception:
+        pass
+
+    # 3.5. 1H Candles -> 1H ATR & 1H RSI
+    try:
+        req = urllib.request.Request(f"https://www.okx.com/api/v5/market/candles?instId={inst_id}&bar=1H&limit=24", headers=headers)
+        with urllib.request.urlopen(req, timeout=3) as resp:
+            d = json.loads(resp.read().decode("utf-8"))
+            if d.get("code") == "0" and d.get("data") and len(d["data"]) >= 15:
+                raw_1h = d["data"]
+                closes_1h = [safe_float(c[4]) for c in reversed(raw_1h)]
+                highs_1h = [safe_float(c[2]) for c in reversed(raw_1h)]
+                lows_1h = [safe_float(c[3]) for c in reversed(raw_1h)]
+
+                tr_list_1h = []
+                for i in range(1, len(closes_1h)):
+                    tr = max(highs_1h[i] - lows_1h[i], abs(highs_1h[i] - closes_1h[i-1]), abs(lows_1h[i] - closes_1h[i-1]))
+                    tr_list_1h.append(tr)
+                if len(tr_list_1h) >= 14:
+                    atr_1h = sum(tr_list_1h[-14:]) / 14
+                    factors["volatility_channel"]["atr_1h"] = round(atr_1h, 4)
+                    if factors["price"] > 0:
+                        factors["volatility_channel"]["atr_1h_pct"] = round(atr_1h / factors["price"] * 100, 2)
     except Exception:
         pass
 
