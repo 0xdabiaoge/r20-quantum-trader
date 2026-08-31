@@ -38,7 +38,7 @@ TARGET_INSTRUMENTS = [
     {"instId": "BTC-USDT-SWAP", "name": "BTC", "type": "crypto", "sz": "1", "ctVal": 0.01},
     {"instId": "ETH-USDT-SWAP", "name": "ETH", "type": "crypto", "sz": "3", "ctVal": 0.1},
     {"instId": "SOL-USDT-SWAP", "name": "SOL", "type": "crypto", "sz": "7", "ctVal": 1.0},
-    {"instId": "DOGE-USDT-SWAP", "name": "DOGE", "type": "crypto", "sz": "100", "ctVal": 100.0},
+    {"instId": "DOGE-USDT-SWAP", "name": "DOGE", "type": "crypto", "sz": "10", "ctVal": 1000.0},
     {"instId": "SUI-USDT-SWAP", "name": "SUI", "type": "crypto", "sz": "50", "ctVal": 1.0},
     {"instId": "LINK-USDT-SWAP", "name": "LINK", "type": "crypto", "sz": "64", "ctVal": 1.0},
 ]
@@ -149,13 +149,16 @@ def update_cache_cycle():
                     ct_val = target_item.get("ctVal", 1.0)
                     break
             
-            notional_usdt = round(pos_sz * ct_val * (mark_px if mark_px > 0 else avg_px), 2)
+            okx_notional = float(p.get("notionalUsd", 0) or 0)
+            okx_imr = float(p.get("imr", 0) or 0)
+
+            notional_usdt = round(okx_notional if okx_notional > 0 else (pos_sz * ct_val * (mark_px if mark_px > 0 else avg_px)), 2)
             raw_upl_ratio = float(p.get("uplRatio", 0.0) or 0.0)
             real_roi_pct = round(raw_upl_ratio * 100, 2)
             price_chg = round(((mark_px - avg_px) / avg_px * 100) if avg_px > 0 else 0, 2)
 
             lever_val = float(p.get("lever", "3") or 3.0)
-            margin_usdt_val = round(notional_usdt / lever_val, 2) if lever_val > 0 else notional_usdt
+            margin_usdt_val = round(okx_imr if okx_imr > 0 else (notional_usdt / lever_val), 2)
 
             positions.append({
                 "instId": p.get("instId"),

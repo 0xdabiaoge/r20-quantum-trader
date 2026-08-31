@@ -21,7 +21,7 @@ TARGET_INSTRUMENTS = [
     {"instId": "BTC-USDT-SWAP", "name": "BTC", "type": "crypto", "ctVal": 0.01},
     {"instId": "ETH-USDT-SWAP", "name": "ETH", "type": "crypto", "ctVal": 0.1},
     {"instId": "SOL-USDT-SWAP", "name": "SOL", "type": "crypto", "ctVal": 1.0},
-    {"instId": "DOGE-USDT-SWAP", "name": "DOGE", "type": "crypto", "ctVal": 100.0},
+    {"instId": "DOGE-USDT-SWAP", "name": "DOGE", "type": "crypto", "ctVal": 1000.0},
     {"instId": "SUI-USDT-SWAP", "name": "SUI", "type": "crypto", "ctVal": 1.0},
     {"instId": "LINK-USDT-SWAP", "name": "LINK", "type": "crypto", "ctVal": 1.0},
 ]

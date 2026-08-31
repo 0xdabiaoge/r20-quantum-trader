@@ -60,7 +60,7 @@ TARGET_INSTRUMENTS = [
     {"instId": "BTC-USDT-SWAP", "name": "BTC", "type": "crypto", "base_sz": 1, "precision": 1, "ctVal": 0.01, "risk_per_trade_usd": 15.0},
     {"instId": "ETH-USDT-SWAP", "name": "ETH", "type": "crypto", "base_sz": 3, "precision": 2, "ctVal": 0.1, "risk_per_trade_usd": 15.0},
     {"instId": "SOL-USDT-SWAP", "name": "SOL", "type": "crypto", "base_sz": 7, "precision": 2, "ctVal": 1.0, "risk_per_trade_usd": 15.0},
-    {"instId": "DOGE-USDT-SWAP", "name": "DOGE", "type": "crypto", "base_sz": 100, "precision": 4, "ctVal": 100.0, "risk_per_trade_usd": 15.0},
+    {"instId": "DOGE-USDT-SWAP", "name": "DOGE", "type": "crypto", "base_sz": 10, "precision": 4, "ctVal": 1000.0, "risk_per_trade_usd": 15.0},
     {"instId": "SUI-USDT-SWAP", "name": "SUI", "type": "crypto", "base_sz": 50, "precision": 4, "ctVal": 1.0, "risk_per_trade_usd": 15.0},
     {"instId": "LINK-USDT-SWAP", "name": "LINK", "type": "crypto", "base_sz": 64, "precision": 3, "ctVal": 1.0, "risk_per_trade_usd": 15.0},
 ]
