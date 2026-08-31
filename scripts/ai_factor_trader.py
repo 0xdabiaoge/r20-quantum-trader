@@ -1009,9 +1009,24 @@ def execute_ai_position_management(real_pos_dict, trackers, timestamp_full, exec
 
         elif action == "UPDATE_SL":
             new_sl = float(instruction.get("suggested_sl_price", 0) or 0)
-            tightens_risk = new_sl > 0 and ((pos_side == "long" and avg_px < new_sl < current_px) or (pos_side == "short" and current_px < new_sl < avg_px))
+            atr_val = max(float(position.get("atr_1h", 0) or 0), float(position.get("atr", 0) or 0), current_px * 0.012)
+            
+            # Anti-premature trailing fix:
+            # 1. Do NOT move SL up until price is at least +1.2x ATR above entry (meaningful profit)
+            # 2. Maintain at least 0.8x ATR breathing buffer between current price and new SL to prevent tagging by noise
+            if pos_side == "long":
+                min_profit_reached = (current_px - avg_px) >= 1.2 * atr_val
+                safe_buffer_from_current = (current_px - new_sl) >= 0.7 * atr_val
+                tightens_risk = new_sl > 0 and avg_px <= new_sl < current_px and min_profit_reached and safe_buffer_from_current
+            elif pos_side == "short":
+                min_profit_reached = (avg_px - current_px) >= 1.2 * atr_val
+                safe_buffer_from_current = (new_sl - current_px) >= 0.7 * atr_val
+                tightens_risk = new_sl > 0 and current_px < new_sl <= avg_px and min_profit_reached and safe_buffer_from_current
+            else:
+                tightens_risk = False
+
             if not tightens_risk:
-                executed_actions.append(f"[{name}] AI止损未收紧风险，拒绝更新")
+                executed_actions.append(f"[{name}] 浮盈空间不足或与现价缓冲过近({current_px} vs 拟调SL {new_sl})，拒绝过早收紧止损")
                 continue
             algo_orders = run_json_cmd(f"okx --demo swap algo orders --instId {inst_id} --json") or []
             live_algo = next((o for o in algo_orders if o.get("state") == "live" and o.get("posSide") == pos_side and o.get("slTriggerPx")), None)

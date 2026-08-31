@@ -199,18 +199,23 @@ def build_lifecycle_ledger():
                 cl_ord_id = str(matched_close.get("clOrdId", ""))
                 
                 if algo_id:
-                    exit_reason = "🛑 触发云端止损" if net_pnl < 0 else "🎯 触发云端止盈"
+                    if net_pnl > 3.0:
+                        exit_reason = "🎯 目标止盈达成"
+                    elif net_pnl < -1.0:
+                        exit_reason = "🛑 触发云端止损"
+                    else:
+                        exit_reason = "🛡️ 移动止损保本出场"
                 elif cl_ord_id.startswith("O") or "CLI" in matched_close.get("tag", ""):
-                    if net_pnl > 1.0:
+                    if net_pnl > 3.0:
                         exit_reason = "✨ 移动止盈锁利"
                     elif net_pnl < -1.0:
                         exit_reason = "🛑 策略风控止损"
                     else:
                         exit_reason = "⏱️ 超时/保本平仓"
                 else:
-                    exit_reason = "🎯 目标止盈" if net_pnl > 0 else "🛑 止损离场"
+                    exit_reason = "🎯 目标止盈达成" if net_pnl > 3.0 else ("🛑 止损离场" if net_pnl < -1.0 else "🛡️ 保本平仓")
             else:
-                exit_reason = "🎯 止盈平仓" if net_pnl > 0 else "🛑 止损出场"
+                exit_reason = "🎯 目标止盈达成" if net_pnl > 3.0 else ("🛑 止损出场" if net_pnl < -1.0 else "🛡️ 保本平仓")
 
         trades_lifecycle.append({
             "id": f"pos_hist_{u_ts}_{inst}",
