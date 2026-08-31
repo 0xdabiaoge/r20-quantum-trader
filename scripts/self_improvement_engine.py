@@ -82,17 +82,28 @@ def log_msg(msg: str):
         pass
 
 def get_cpa_client_config() -> Tuple[str, str]:
+    """Dynamically resolve LLM API base URL and API Key from environment or local encrypted vault."""
+    # 1. First priority: standard environment variables
+    env_base_url = os.getenv("LLM_BASE_URL") or os.getenv("OPENAI_BASE_URL")
+    env_api_key = os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY")
+    if env_base_url and env_api_key:
+        return env_base_url, env_api_key
+
+    # 2. Second priority: QwenPaw encrypted secret store (if available locally)
     try:
         sys.path.append("/app/venv/lib/python3.11/site-packages")
         from qwenpaw.security.secret_store import decrypt
-        with open("/app/working.secret/providers/custom/cpa.json", "r") as f:
-            d = json.load(f)
-        api_key = decrypt(d.get("api_key", ""))
-        base_url = d.get("base_url", "https://cpa.r20.cn/v1")
-        return base_url, api_key
+        secret_file = "/app/working.secret/providers/custom/cpa.json"
+        if os.path.exists(secret_file):
+            with open(secret_file, "r", encoding="utf-8") as f:
+                d = json.load(f)
+            api_key = decrypt(d.get("api_key", "")) if d.get("api_key") else ""
+            base_url = d.get("base_url", "https://api.openai.com/v1")
+            return base_url, api_key
     except Exception as e:
-        log_msg(f"[AI Evolution] Warning loading secret: {e}")
-        return "https://cpa.r20.cn/v1", ""
+        log_msg(f"[AI Evolution] Warning loading local secret store: {e}")
+
+    return env_base_url or "https://api.openai.com/v1", env_api_key or ""
 
 def load_closed_trades():
     account_init_file = os.path.join(DATA_DIR, "account_initial_state.json")
