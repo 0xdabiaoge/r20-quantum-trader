@@ -780,33 +780,170 @@
         </div>
     </div>
 
-    <!-- 3. Coin Detail & Factor Modal -->
-    <div id="coin-factor-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-        <div class="bg-[#0E121B] border border-[#1A2232] rounded-2xl w-full max-w-lg shadow-2xl p-5 space-y-3 font-mono">
-            <div class="flex items-center justify-between pb-3 border-b border-[#1A2232]">
-                <div class="flex items-center space-x-2">
-                    <span id="modal-coin-name" class="text-base font-extrabold text-white">BTC</span>
-                    <span id="modal-coin-badge" class="text-xs px-2 py-0.5 rounded font-bold">--</span>
+    <!-- 3. Coin Detail & Factor Deep Dive Modal (全维量化与数理推演穿透弹窗) -->
+    <div id="coin-factor-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md">
+        <div class="bg-[#0D111A] border border-[#1E293B] rounded-2xl w-full max-w-3xl shadow-2xl p-4 sm:p-6 space-y-3.5 font-mono max-h-[92vh] overflow-y-auto custom-scrollbar">
+            <!-- Modal Header -->
+            <div class="flex items-center justify-between pb-3.5 border-b border-[#1A2232]">
+                <div class="flex items-center space-x-3">
+                    <div class="w-9 h-9 rounded-xl bg-blue-500/10 text-blue-400 font-extrabold flex items-center justify-center border border-blue-500/20 text-sm">
+                        <span id="modal-coin-symbol-icon">ETH</span>
+                    </div>
+                    <div>
+                        <div class="flex items-center space-x-2">
+                            <span id="modal-coin-name" class="text-base sm:text-lg font-extrabold text-white">ETH</span>
+                            <span id="modal-coin-instid" class="text-[11px] text-[#707E94]">ETH-USDT-SWAP</span>
+                            <span id="modal-coin-badge" class="text-xs px-2 py-0.5 rounded font-bold">--</span>
+                        </div>
+                        <div class="flex items-center space-x-2 text-xs mt-0.5">
+                            <span class="text-[#707E94]">现价: <strong id="modal-coin-price" class="text-white">--</strong></span>
+                            <span class="text-[#1A2232]">•</span>
+                            <span class="text-[#707E94]">24H涨跌: <strong id="modal-coin-chg" class="text-white">--</strong></span>
+                            <span class="text-[#1A2232]">•</span>
+                            <span class="text-[#707E94]">Alpha分: <strong id="modal-coin-alpha" class="text-white">--</strong></span>
+                        </div>
+                    </div>
                 </div>
-                <button onclick="closeCoinFactorModal()" class="w-7 h-7 rounded-lg bg-[#141B26] text-[#707E94] hover:text-white flex items-center justify-center border border-[#1A2232]">
+                <button onclick="closeCoinFactorModal()" class="w-8 h-8 rounded-lg bg-[#141B26] text-[#707E94] hover:text-white flex items-center justify-center border border-[#1A2232] transition">
                     <i data-lucide="x" class="w-4 h-4"></i>
                 </button>
             </div>
-            <div class="grid grid-cols-2 gap-2 text-xs">
-                <div class="p-2.5 rounded-lg bg-[#0A0D14] border border-[#161D2B]"><span class="text-[#707E94] block text-[10px]">现价</span><strong id="modal-coin-price" class="text-white">--</strong></div>
-                <div class="p-2.5 rounded-lg bg-[#0A0D14] border border-[#161D2B]"><span class="text-[#707E94] block text-[10px]">AI置信度</span><strong id="modal-coin-confidence" class="text-[#0ECB81]">--</strong></div>
+
+            <!-- Section 1: AI 大脑长思考链决策与点位几何规划 -->
+            <div class="p-3.5 rounded-xl bg-[#090C12] border border-[#161D2B] space-y-2.5">
+                <div class="flex items-center justify-between text-xs pb-2 border-b border-[#141B26]">
+                    <span class="text-white font-bold flex items-center">
+                        <span class="w-2 h-2 rounded-full bg-purple-400 mr-2"></span> AI 首席交易官推演与点位规划
+                    </span>
+                    <div class="flex items-center space-x-2 text-[11px]">
+                        <span class="text-[#707E94]">置信度: <strong id="modal-coin-confidence" class="text-[#0ECB81]">--</strong></span>
+                        <span class="text-[#1A2232]">•</span>
+                        <span class="text-[#707E94]">推荐杠杆: <strong id="modal-coin-leverage" class="text-white">--</strong></span>
+                        <span class="text-[#1A2232]">•</span>
+                        <span class="text-[#707E94]">建议保证金: <strong id="modal-coin-margin" class="text-white">--</strong></span>
+                    </div>
+                </div>
+
+                <!-- Price Geometry (Entry / TP / SL / R:R) -->
+                <div class="grid grid-cols-4 gap-2 text-center text-xs">
+                    <div class="p-2 rounded-lg bg-[#0E121B] border border-[#1A2232]">
+                        <span class="text-[#707E94] block text-[10px]">建议入场 Entry</span>
+                        <strong id="modal-coin-entry" class="text-white">--</strong>
+                    </div>
+                    <div class="p-2 rounded-lg bg-[#0E121B] border border-[#1A2232]">
+                        <span class="text-[#707E94] block text-[10px]">止盈目标 TP</span>
+                        <strong id="modal-coin-tp" class="text-[#0ECB81]">--</strong>
+                    </div>
+                    <div class="p-2 rounded-lg bg-[#0E121B] border border-[#1A2232]">
+                        <span class="text-[#707E94] block text-[10px]">止损保护 SL</span>
+                        <strong id="modal-coin-sl" class="text-[#F6465D]">--</strong>
+                    </div>
+                    <div class="p-2 rounded-lg bg-[#0E121B] border border-[#1A2232]">
+                        <span class="text-[#707E94] block text-[10px]">盈亏比 R:R</span>
+                        <strong id="modal-coin-rr" class="text-blue-400">≥ 2.0</strong>
+                    </div>
+                </div>
+
+                <!-- Rationale -->
+                <div class="p-2.5 rounded-lg bg-[#0E121B] border border-[#1A2232] text-xs space-y-1">
+                    <span class="text-[#707E94] block text-[10px]">核心决策逻辑 (Reasoning Summary)</span>
+                    <p id="modal-factor-desc" class="text-[#EAECEF] font-sans leading-relaxed text-[11px]">--</p>
+                </div>
             </div>
-            <div class="p-2.5 rounded-lg bg-[#0A0D14] border border-[#161D2B] space-y-1">
-                <span class="text-[#707E94] block text-[10px]">多周期价格结构 (Market Structure)</span>
-                <p id="modal-factor-mstruct" class="text-xs text-[#EAECEF]">--</p>
+
+            <!-- Section 2: 三大底层数理基石全景透视 (微积分 · 定积分 · 概率论) -->
+            <div class="p-3.5 rounded-xl bg-[#090C12] border border-[#161D2B] space-y-2.5">
+                <div class="flex items-center justify-between text-xs pb-2 border-b border-[#141B26]">
+                    <span class="text-white font-bold flex items-center">
+                        <span class="w-2 h-2 rounded-full bg-blue-400 mr-2"></span> 三大底层数理金融基石
+                    </span>
+                    <span id="modal-math-regime-badge" class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20">--</span>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+                    <!-- Col 1: Calculus -->
+                    <div class="p-2.5 rounded-lg bg-[#0E121B] border border-[#1A2232] space-y-1.5 flex flex-col justify-between">
+                        <div class="flex items-center justify-between text-[11px] font-bold text-blue-400 pb-1 border-b border-[#161D2B]">
+                            <span>微积分动力学</span>
+                            <span id="modal-calc-state" class="text-[9px] text-[#707E94] truncate max-w-[100px]">--</span>
+                        </div>
+                        <div class="space-y-1 text-[11px]">
+                            <div class="flex justify-between"><span class="text-[#707E94]">瞬时速度 v:</span><strong id="modal-calc-v" class="text-white">--</strong></div>
+                            <div class="flex justify-between"><span class="text-[#707E94]">动能加速度 a:</span><strong id="modal-calc-a" class="text-white">--</strong></div>
+                            <div class="flex justify-between"><span class="text-[#707E94]">累计冲量 I:</span><strong id="modal-calc-i" class="text-white">--</strong></div>
+                            <div class="flex justify-between"><span class="text-[#707E94]">加加速度冲击 j:</span><strong id="modal-calc-j" class="text-white">--</strong></div>
+                        </div>
+                    </div>
+
+                    <!-- Col 2: Integrals -->
+                    <div class="p-2.5 rounded-lg bg-[#0E121B] border border-[#1A2232] space-y-1.5 flex flex-col justify-between">
+                        <div class="flex items-center justify-between text-[11px] font-bold text-emerald-400 pb-1 border-b border-[#161D2B]">
+                            <span>定积分能量学</span>
+                            <span id="modal-int-state" class="text-[9px] text-[#707E94] truncate max-w-[100px]">--</span>
+                        </div>
+                        <div class="space-y-1 text-[11px]">
+                            <div class="flex justify-between"><span class="text-[#707E94]">动能做功积分:</span><strong id="modal-int-energy" class="text-white">--</strong></div>
+                            <div class="flex justify-between"><span class="text-[#707E94]">偏离面积积分:</span><strong id="modal-int-dev" class="text-white">--</strong></div>
+                            <div class="flex justify-between"><span class="text-[#707E94]">量价功率做功:</span><strong id="modal-int-vol" class="text-white">--</strong></div>
+                            <div class="flex justify-between"><span class="text-[#707E94]">能量储备态:</span><strong id="modal-int-regime" class="text-white text-[10px] truncate max-w-[90px]">--</strong></div>
+                        </div>
+                    </div>
+
+                    <!-- Col 3: Probability -->
+                    <div class="p-2.5 rounded-lg bg-[#0E121B] border border-[#1A2232] space-y-1.5 flex flex-col justify-between">
+                        <div class="flex items-center justify-between text-[11px] font-bold text-purple-400 pb-1 border-b border-[#161D2B]">
+                            <span>概率论与统计风险</span>
+                            <span id="modal-prob-state" class="text-[9px] text-[#707E94] truncate max-w-[100px]">--</span>
+                        </div>
+                        <div class="space-y-1 text-[11px]">
+                            <div class="flex justify-between"><span class="text-[#707E94]">多头延续胜率:</span><strong id="modal-prob-cont" class="text-[#0ECB81]">--</strong></div>
+                            <div class="flex justify-between"><span class="text-[#707E94]">空头击穿概率:</span><strong id="modal-prob-break" class="text-[#F6465D]">--</strong></div>
+                            <div class="flex justify-between"><span class="text-[#707E94]">95%在险价值 VaR:</span><strong id="modal-prob-var" class="text-white">--</strong></div>
+                            <div class="flex justify-between"><span class="text-[#707E94]">偏度S / 峰度K:</span><strong id="modal-prob-sk" class="text-white">--</strong></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Math Rationale -->
+                <div class="p-2.5 rounded-lg bg-[#0E121B] border border-[#1A2232] text-xs space-y-1">
+                    <span class="text-[#707E94] block text-[10px]">数理与概率依据 (Mathematical Physics Rationale)</span>
+                    <p id="modal-math-rationale" class="text-[#EAECEF] font-sans leading-relaxed text-[11px]">--</p>
+                </div>
             </div>
-            <div class="p-2.5 rounded-lg bg-[#0A0D14] border border-[#161D2B] space-y-1">
-                <span class="text-[#707E94] block text-[10px]">资金与主力动能 (Volume & Flow)</span>
-                <p id="modal-factor-flow" class="text-xs text-[#EAECEF]">--</p>
-            </div>
-            <div class="p-2.5 rounded-lg bg-[#0A0D14] border border-[#161D2B] space-y-1">
-                <span class="text-[#707E94] block text-[10px]">AI大脑决策摘要 (Reasoning Rationale)</span>
-                <p id="modal-factor-desc" class="text-xs text-[#EAECEF]">--</p>
+
+            <!-- Section 3: 聪明钱主力与量化因子筹码 -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                <!-- Smart Money Box -->
+                <div class="p-3.5 rounded-xl bg-[#090C12] border border-[#161D2B] space-y-2">
+                    <div class="flex items-center justify-between text-xs pb-1.5 border-b border-[#141B26]">
+                        <span class="text-white font-bold flex items-center">
+                            <span class="w-2 h-2 rounded-full bg-purple-400 mr-2"></span> OKX Top100 聪明钱主力
+                        </span>
+                    </div>
+                    <div class="space-y-1.5 text-[11px]">
+                        <div class="flex justify-between"><span class="text-[#707E94]">加权做多占比:</span><strong id="modal-sm-long" class="text-purple-300">--</strong></div>
+                        <div class="flex justify-between"><span class="text-[#707E94]">24H 净流入流出:</span><strong id="modal-sm-flow" class="text-white">--</strong></div>
+                        <div class="flex justify-between"><span class="text-[#707E94]">多头持仓均价:</span><strong id="modal-sm-long-px" class="text-[#0ECB81]">--</strong></div>
+                        <div class="flex justify-between"><span class="text-[#707E94]">空头持仓均价:</span><strong id="modal-sm-short-px" class="text-[#F6465D]">--</strong></div>
+                        <div class="flex justify-between"><span class="text-[#707E94]">主力胜率状态:</span><strong id="modal-sm-status" class="text-white">--</strong></div>
+                    </div>
+                </div>
+
+                <!-- Quant Factors & Derivatives Box -->
+                <div class="p-3.5 rounded-xl bg-[#090C12] border border-[#161D2B] space-y-2">
+                    <div class="flex items-center justify-between text-xs pb-1.5 border-b border-[#141B26]">
+                        <span class="text-white font-bold flex items-center">
+                            <span class="w-2 h-2 rounded-full bg-emerald-400 mr-2"></span> 量化多因子与衍生品筹码
+                        </span>
+                    </div>
+                    <div class="space-y-1.5 text-[11px]">
+                        <div class="flex justify-between"><span class="text-[#707E94]">1H ADX 趋势强度:</span><strong id="modal-factor-adx" class="text-white">--</strong></div>
+                        <div class="flex justify-between"><span class="text-[#707E94]">RSI(14) 动量指标:</span><strong id="modal-factor-rsi" class="text-white">--</strong></div>
+                        <div class="flex justify-between"><span class="text-[#707E94]">VWAP 偏离度:</span><strong id="modal-factor-vwap" class="text-white">--</strong></div>
+                        <div class="flex justify-between"><span class="text-[#707E94]">资金费率 / OI:</span><strong id="modal-factor-fr-oi" class="text-white">--</strong></div>
+                        <div class="flex justify-between"><span class="text-[#707E94]">盘口买卖深度比:</span><strong id="modal-factor-depth" class="text-white">--</strong></div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -1848,10 +1985,25 @@
             const modal = document.getElementById('coin-factor-modal');
             if (!modal) return;
 
-            const f = (rawJsonData.factors || []).find(item => item.name === ccy || item.instId.startsWith(ccy)) || {};
+            const f = (rawJsonData.factors || []).find(item => item.name === ccy || (item.instId && item.instId.startsWith(ccy))) || {};
             const thought = f.thought_process || {};
+            const libList = (rawJsonData.factor_library && rawJsonData.factor_library.instruments) ? rawJsonData.factor_library.instruments : (rawJsonData.factor_library_snapshot || []);
+            const lib = (Array.isArray(libList) ? libList : []).find(l => l.name === ccy || (l.instId && l.instId.startsWith(ccy))) || {};
 
+            // Header Elements
             document.getElementById('modal-coin-name').innerText = ccy;
+            document.getElementById('modal-coin-symbol-icon').innerText = ccy;
+            document.getElementById('modal-coin-instid').innerText = f.instId || `${ccy}-USDT-SWAP`;
+
+            const chg = Number(f.chg24h || 0);
+            const chgEl = document.getElementById('modal-coin-chg');
+            chgEl.innerText = `${chg > 0 ? '+' : ''}${chg}%`;
+            chgEl.className = chg >= 0 ? 'text-[#0ECB81] font-bold' : 'text-[#F6465D] font-bold';
+
+            const alphaScore = lib.composite_alpha_score !== undefined ? lib.composite_alpha_score : (f.composite_alpha_score || '--');
+            const alphaEl = document.getElementById('modal-coin-alpha');
+            alphaEl.innerText = `${Number(alphaScore) > 0 ? '+' : ''}${alphaScore}`;
+            alphaEl.className = Number(alphaScore) > 20 ? 'text-[#0ECB81] font-bold' : (Number(alphaScore) < -20 ? 'text-[#F6465D] font-bold' : 'text-[#EAECEF] font-bold');
 
             const action = f.action || 'WAIT';
             const badgeEl = document.getElementById('modal-coin-badge');
@@ -1861,6 +2013,9 @@
             } else if (action === 'SELL_SHORT') {
                 badgeEl.innerText = '🔴 建议做空 SELL';
                 badgeEl.className = 'text-xs px-2 py-0.5 rounded font-mono font-bold bg-[#F6465D]/10 text-[#F6465D] border border-[#F6465D]/30';
+            } else if (action === 'SCALE_IN') {
+                badgeEl.innerText = '⚡ 顺势加多 SCALE-IN';
+                badgeEl.className = 'text-xs px-2 py-0.5 rounded font-mono font-bold bg-[#3875F6]/15 text-blue-400 border border-[#3875F6]/30';
             } else {
                 badgeEl.innerText = 'AI观望 WAIT';
                 badgeEl.className = 'text-xs px-2 py-0.5 rounded font-mono font-bold bg-[#141B26] text-[#707E94] border border-[#1A2232]';
@@ -1868,10 +2023,114 @@
 
             document.getElementById('modal-coin-price').innerText = f.price || '--';
             document.getElementById('modal-coin-confidence').innerText = `${f.confidence || 75}%`;
+            document.getElementById('modal-coin-leverage').innerText = f.leverage ? `${f.leverage}x` : '3x';
+            document.getElementById('modal-coin-margin').innerText = f.margin_usdt ? `${Number(f.margin_usdt).toFixed(1)} U` : '50.0 U';
 
-            document.getElementById('modal-factor-mstruct').innerText = thought.market_structure || f.market_structure || f.confluence_15m || '多周期价格行为整固中';
-            document.getElementById('modal-factor-flow').innerText = thought.volume_and_oi || f.volume_and_oi || f.confluence_1h || 'OI未平仓量与主动买卖吃单流监控';
+            // Trade Geometry
+            document.getElementById('modal-coin-entry').innerText = f.entry_price || f.price || '--';
+            document.getElementById('modal-coin-tp').innerText = f.take_profit_price || '--';
+            document.getElementById('modal-coin-sl').innerText = f.stop_loss_price || '--';
+
+            let rrText = '≥ 2.0';
+            if (f.entry_price && f.take_profit_price && f.stop_loss_price) {
+                const entry = Number(f.entry_price);
+                const tp = Number(f.take_profit_price);
+                const sl = Number(f.stop_loss_price);
+                const profitDiff = Math.abs(tp - entry);
+                const lossDiff = Math.abs(entry - sl);
+                if (lossDiff > 0) {
+                    rrText = `${(profitDiff / lossDiff).toFixed(2)} R`;
+                }
+            }
+            document.getElementById('modal-coin-rr').innerText = rrText;
+
+            // Rationale Summaries
             document.getElementById('modal-factor-desc').innerText = f.reason || f.desc || `【${ccy}】AI大脑判定当前风险收益比不足，建议空仓观望。`;
+
+            // Section 2: Calculus, Integrals & Probability
+            const cd = lib.calculus_dynamics || f.calculus || {};
+            const dInt = lib.definite_integrals || cd.definite_integrals || {};
+            const pTh = lib.probability_theory || cd.probability_theory || {};
+
+            const calcRegime = cd.regime || 'RANGE_LOW_VELOCITY';
+            document.getElementById('modal-math-regime-badge').innerText = calcRegime;
+
+            // Calculus
+            document.getElementById('modal-calc-state').innerText = calcRegime;
+            const cV = cd.velocity !== undefined ? Number(cd.velocity).toFixed(2) : '--';
+            const cA = cd.acceleration !== undefined ? Number(cd.acceleration).toFixed(2) : '--';
+            const cI = cd.impulse !== undefined ? Number(cd.impulse).toFixed(2) : '--';
+            const cJ = cd.jerk !== undefined ? Number(cd.jerk).toFixed(2) : (cd.max_abs_jerk !== undefined ? Number(cd.max_abs_jerk).toFixed(2) : '--');
+
+            const cVEl = document.getElementById('modal-calc-v');
+            cVEl.innerText = `${Number(cV) > 0 ? '+' : ''}${cV}`;
+            cVEl.className = Number(cV) >= 0 ? 'text-[#0ECB81] font-bold' : 'text-[#F6465D] font-bold';
+
+            const cAEl = document.getElementById('modal-calc-a');
+            cAEl.innerText = `${Number(cA) > 0 ? '+' : ''}${cA}`;
+            cAEl.className = Number(cA) >= 0 ? 'text-[#0ECB81] font-bold' : 'text-[#F6465D] font-bold';
+
+            const cIEl = document.getElementById('modal-calc-i');
+            cIEl.innerText = `${Number(cI) > 0 ? '+' : ''}${cI}`;
+            cIEl.className = Number(cI) >= 0 ? 'text-[#0ECB81] font-bold' : 'text-[#F6465D] font-bold';
+
+            document.getElementById('modal-calc-j').innerText = cJ;
+
+            // Integrals
+            const eInt = dInt.energy_integral !== undefined ? Number(dInt.energy_integral).toFixed(2) : '--';
+            const devArea = dInt.deviation_area_integral !== undefined ? Number(dInt.deviation_area_integral).toFixed(2) : '--';
+            const volAction = dInt.volume_action_integral !== undefined ? Number(dInt.volume_action_integral).toFixed(2) : '--';
+            const intRegime = dInt.integral_regime || dInt.regime || 'BALANCED';
+
+            document.getElementById('modal-int-state').innerText = intRegime;
+            const eIntEl = document.getElementById('modal-int-energy');
+            eIntEl.innerText = `${Number(eInt) > 0 ? '+' : ''}${eInt}`;
+            eIntEl.className = Number(eInt) >= 0 ? 'text-[#0ECB81] font-bold' : 'text-[#F6465D] font-bold';
+
+            document.getElementById('modal-int-dev').innerText = devArea;
+            document.getElementById('modal-int-vol').innerText = volAction;
+            document.getElementById('modal-int-regime').innerText = intRegime;
+
+            // Probability
+            const pCont = pTh.continuation_prob_pct !== undefined ? `${Number(pTh.continuation_prob_pct).toFixed(1)}%` : '50.0%';
+            const pBreak = pTh.breakdown_prob_pct !== undefined ? `${Number(pTh.breakdown_prob_pct).toFixed(1)}%` : '50.0%';
+            const var95 = pTh.var_95_pct !== undefined ? `${Number(pTh.var_95_pct).toFixed(2)}%` : '1.50%';
+            const sk = pTh.skewness !== undefined ? `${Number(pTh.skewness).toFixed(1)} / ${Number(pTh.kurtosis || 0).toFixed(1)}` : '0.0 / 0.0';
+
+            document.getElementById('modal-prob-state').innerText = pTh.prob_regime || (pTh.is_fat_tail ? '⚠️肥尾风险' : '高斯平衡');
+            document.getElementById('modal-prob-cont').innerText = pCont;
+            document.getElementById('modal-prob-break').innerText = pBreak;
+            document.getElementById('modal-prob-var').innerText = var95;
+            document.getElementById('modal-prob-sk').innerText = sk;
+
+            document.getElementById('modal-math-rationale').innerText = thought.math_prob_rationale || thought.calculus_dynamics || f.math_prob_rationale || f.calculus_dynamics || `微积分速度 ${cV}，加速度 ${cA}，定积分做功 ${eInt}，多头延续胜率 ${pCont}。`;
+
+            // Section 3: Smart Money
+            const sm = lib.smart_money_derivatives || f.smart_money || {};
+            const smLong = sm.weighted_long_pct !== undefined ? `${sm.weighted_long_pct}%` : '50.0%';
+            const smFlow = sm.smart_money_flow_usd || sm.net_flow_usdt || '0 U';
+            const smLongPx = sm.avg_long_entry || '--';
+            const smShortPx = sm.avg_short_entry || '--';
+            const smStatus = sm.top_win_rate || 'OKX Top100 实盘主力';
+
+            document.getElementById('modal-sm-long').innerText = smLong;
+            const smFlowEl = document.getElementById('modal-sm-flow');
+            smFlowEl.innerText = smFlow;
+            smFlowEl.className = String(smFlow).includes('-') ? 'text-[#F6465D] font-bold' : 'text-[#0ECB81] font-bold';
+
+            document.getElementById('modal-sm-long-px').innerText = smLongPx;
+            document.getElementById('modal-sm-short-px').innerText = smShortPx;
+            document.getElementById('modal-sm-status').innerText = smStatus;
+
+            // Section 4: Quant Factors & Microstructure
+            const tm = lib.trend_momentum || {};
+            const ms = lib.microstructure || {};
+
+            document.getElementById('modal-factor-adx').innerText = tm.adx_1h || f.adx_1h || '--';
+            document.getElementById('modal-factor-rsi').innerText = tm.rsi_14 !== undefined ? tm.rsi_14 : (f.rsi || '--');
+            document.getElementById('modal-factor-vwap').innerText = f.vwap_bias !== undefined ? `${f.vwap_bias > 0 ? '+' : ''}${f.vwap_bias}%` : '--';
+            document.getElementById('modal-factor-fr-oi').innerText = `${f.fundingRate || '0.00%'} / ${f.oiUsd || '--'}`;
+            document.getElementById('modal-factor-depth').innerText = `${ms.bid_ask_depth_ratio || 1.0}x (买:${ms.bid_px || f.bidPx || '--'} / 卖:${ms.ask_px || f.askPx || '--'})`;
 
             modal.classList.remove('hidden');
             modal.style.display = 'flex';
