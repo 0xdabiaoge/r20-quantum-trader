@@ -1415,6 +1415,15 @@
                 const calcA = cd.acceleration !== undefined ? Number(cd.acceleration).toFixed(2) : '--';
                 const calcI = cd.impulse !== undefined ? Number(cd.impulse).toFixed(2) : '--';
 
+                const dInt = lib.definite_integrals || (cd.definite_integrals || {});
+                const energyInt = dInt.energy_integral !== undefined ? Number(dInt.energy_integral).toFixed(2) : '--';
+                const devArea = dInt.deviation_area_integral !== undefined ? Number(dInt.deviation_area_integral).toFixed(2) : '--';
+
+                const pTh = lib.probability_theory || (cd.probability_theory || {});
+                const pCont = pTh.continuation_prob_pct !== undefined ? `${Number(pTh.continuation_prob_pct).toFixed(0)}%` : '50%';
+                const var95 = pTh.var_95_pct !== undefined ? `${Number(pTh.var_95_pct).toFixed(1)}%` : '1.5%';
+                const isFatTail = pTh.is_fat_tail || false;
+
                 html += `
                     <div onclick="openCoinFactorModal('${instName}')" class="terminal-panel p-3.5 hover:border-[#3875F6] cursor-pointer transition flex flex-col justify-between space-y-2.5">
                         <!-- Top Bar: Asset & Price -->
@@ -1458,19 +1467,31 @@
                             </div>
                         </div>
 
-                        <!-- 3. Calculus Dynamics (∫ 微积分状态) -->
+                        <!-- 3. Math & Physics Foundations: Calculus & Definite Integrals (∫ 微积分与定积分) -->
                         <div class="terminal-subpanel px-2.5 py-1.5 flex items-center justify-between text-[10px] font-mono">
                             <div>
-                                <span class="text-[#707E94] block text-[9px]">微积分态: <strong class="text-blue-400">${calcRegime}</strong></span>
-                                <span class="text-[#EAECEF]">速度: ${calcV > 0 ? '+' : ''}${calcV}</span>
+                                <span class="text-[#707E94] block text-[9px]">数理态: <strong class="text-blue-400">${calcRegime}</strong></span>
+                                <span class="text-[#EAECEF]">速度:${calcV > 0 ? '+' : ''}${calcV} 加速:<strong class="${Number(calcA) >= 0 ? 'text-[#0ECB81]' : 'text-[#F6465D]'}">${calcA > 0 ? '+' : ''}${calcA}</strong></span>
                             </div>
                             <div class="text-right">
-                                <span class="text-[#707E94] block text-[9px]">冲量: <strong class="${Number(calcI) >= 0 ? 'text-[#0ECB81]' : 'text-[#F6465D]'}">${calcI > 0 ? '+' : ''}${calcI}</strong></span>
-                                <span class="${Number(calcA) >= 0 ? 'text-[#0ECB81]' : 'text-[#F6465D]'}">加速度: ${calcA > 0 ? '+' : ''}${calcA}</span>
+                                <span class="text-[#707E94] block text-[9px]">定积分做功: <strong class="${Number(energyInt) >= 0 ? 'text-[#0ECB81]' : 'text-[#F6465D]'}">${energyInt > 0 ? '+' : ''}${energyInt}</strong></span>
+                                <span class="text-[#707E94]">偏离面积: ${devArea}</span>
                             </div>
                         </div>
 
-                        <!-- 4. Smart Money -->
+                        <!-- 4. Probability Theory & Stochastic Risk (⚅ 概率论与统计分布) -->
+                        <div class="terminal-subpanel px-2.5 py-1.5 flex items-center justify-between text-[10px] font-mono">
+                            <div>
+                                <span class="text-[#707E94] block text-[9px]">多头延续胜率</span>
+                                <strong class="${Number(pCont.replace('%','')) >= 65 ? 'text-[#0ECB81]' : (Number(pCont.replace('%','')) <= 35 ? 'text-[#F6465D]' : 'text-[#EAECEF]')}">${pCont}</strong>
+                            </div>
+                            <div class="text-right">
+                                <span class="text-[#707E94] block text-[9px]">95% 在险价值 VaR</span>
+                                <span class="${isFatTail ? 'text-amber-400 font-bold' : 'text-[#707E94]'}">${var95} ${isFatTail ? '⚠️肥尾' : ''}</span>
+                            </div>
+                        </div>
+
+                        <!-- 5. Smart Money -->
                         <div class="terminal-subpanel px-2.5 py-1.5 flex items-center justify-between text-[10px] font-mono">
                             <div>
                                 <span class="text-[#707E94] block text-[9px]">聪明钱主力 (Top100)</span>
@@ -1482,12 +1503,12 @@
                             </div>
                         </div>
 
-                        <!-- 5. Rationale Snippet -->
+                        <!-- 6. Rationale Snippet -->
                         <div class="text-[11px] text-[#707E94] font-sans leading-relaxed line-clamp-2">
                             ${reason}
                         </div>
 
-                        <!-- 6. Bottom Status -->
+                        <!-- 7. Bottom Status -->
                         <div class="pt-2 border-t border-[#161D2B] flex items-center justify-between">
                             <span class="text-[10px] text-[#707E94] font-mono">费率: ${fr} | OI: ${oi}</span>
                             ${actionBadge}

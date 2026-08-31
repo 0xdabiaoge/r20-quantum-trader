@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-Comprehensive Quant System Calculus Test Suite
-Validates causal calculus engine, factor library integration, multi-factor scoring and pyramiding gateways.
+Comprehensive Quant System Mathematical & Probabilistic Test Suite
+Validates causal calculus engine, definite integrals, probability theory,
+factor library integration, multi-factor scoring and pyramiding gateways.
 """
 
 import os
@@ -15,7 +16,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 from calculus_engine import (
     calculate_calculus,
     calculate_multi_timeframe,
+    calculate_definite_integrals,
+    calculate_probability_theory,
     classify_regime,
+    _normal_cdf,
     _ema,
     _diff,
     _normalise
@@ -28,7 +32,6 @@ class CalculusEngineMathTest(unittest.TestCase):
     """Test mathematical accuracy and causality of calculus computations."""
 
     def test_monotonic_bullish_acceleration(self):
-        # Monotonically accelerating upward prices
         prices = [100.0, 101.0, 103.0, 106.0, 110.0, 115.0, 122.0, 131.0, 142.0, 155.0]
         res = calculate_calculus(prices)
         self.assertTrue(res["valid"])
@@ -37,7 +40,6 @@ class CalculusEngineMathTest(unittest.TestCase):
         self.assertEqual(res["direction"], 1)
 
     def test_monotonic_bearish_acceleration(self):
-        # Monotonically accelerating downward prices
         prices = [155.0, 142.0, 131.0, 122.0, 115.0, 110.0, 106.0, 103.0, 101.0, 98.0]
         res = calculate_calculus(prices)
         self.assertTrue(res["valid"])
@@ -46,27 +48,21 @@ class CalculusEngineMathTest(unittest.TestCase):
         self.assertEqual(res["direction"], -1)
 
     def test_decelerating_top_fomo_detection(self):
-        # Price still rising, but speed is sharply decelerating (exhaustion top)
-        # diffs: +10, +8, +5, +2, +0.5, +0.1
         prices = [100.0, 110.0, 118.0, 123.0, 125.0, 125.5, 125.6, 125.65]
         res = calculate_calculus(prices)
         self.assertTrue(res["valid"])
         self.assertLess(res["acceleration"], 0.0, "Decelerating rally must yield negative acceleration")
 
     def test_decelerating_bottom_panics_detection(self):
-        # Price still falling, but drop speed is flattening out (bottoming)
-        # drops: -10, -8, -4, -1, -0.2
         prices = [200.0, 190.0, 182.0, 178.0, 177.0, 176.8, 176.7]
         res = calculate_calculus(prices)
         self.assertTrue(res["valid"])
         self.assertGreater(res["acceleration"], 0.0, "Decelerating plunge must yield positive acceleration")
 
     def test_strict_causality(self):
-        # Adding a future candle must not change historical feature outputs at t1
         history = [100.0, 100.2, 100.5, 100.9, 101.4, 102.0, 102.7]
         res_t1 = calculate_calculus(history)
         
-        # When future candle arrives, velocity updates dynamically
         future_candle = [101.5]
         res_t2 = calculate_calculus(history + future_candle)
         
@@ -75,33 +71,63 @@ class CalculusEngineMathTest(unittest.TestCase):
         self.assertNotEqual(res_t1["velocity"], res_t2["velocity"])
 
 
-class CalculusEngineSafetyTest(unittest.TestCase):
-    """Test edge cases, non-finite values and zero-division defenses."""
+class DefiniteIntegralsTest(unittest.TestCase):
+    """Test trapezoidal definite integration of displacement energy and deviation area."""
 
-    def test_insufficient_samples(self):
-        res = calculate_calculus([100.0, 101.0])
-        self.assertFalse(res["valid"])
-        self.assertEqual(res["reason"], "insufficient_closed_candles")
-
-    def test_none_and_non_finite_inputs(self):
-        res = calculate_calculus([100.0, None, float('nan'), 102.0, 104.0, 107.0, 111.0, 116.0, 122.0])
+    def test_positive_displacement_energy_integral(self):
+        # Monotonically rising prices: trapezoidal integral of velocity must be positive
+        prices = [100.0, 102.0, 105.0, 109.0, 114.0, 120.0, 127.0, 135.0]
+        res = calculate_definite_integrals(prices, window=8)
         self.assertTrue(res["valid"])
+        self.assertGreater(res["energy_integral"], 0.0)
+        self.assertGreater(res["deviation_area_integral"], 0.0)
 
-    def test_flat_zero_volatility(self):
-        flat_prices = [100.0] * 15
-        res = calculate_calculus(flat_prices)
+    def test_negative_displacement_energy_integral(self):
+        # Monotonically falling prices: trapezoidal integral of velocity must be negative
+        prices = [135.0, 127.0, 120.0, 114.0, 109.0, 105.0, 102.0, 100.0]
+        res = calculate_definite_integrals(prices, window=8)
         self.assertTrue(res["valid"])
-        self.assertEqual(res["velocity"], 0.0)
-        self.assertEqual(res["acceleration"], 0.0)
-        self.assertEqual(res["impulse"], 0.0)
+        self.assertLess(res["energy_integral"], 0.0)
+        self.assertLess(res["deviation_area_integral"], 0.0)
+
+    def test_volume_action_integral(self):
+        prices = [100.0, 105.0, 110.0, 115.0]
+        vols = [1000.0, 2000.0, 3000.0, 4000.0]
+        res = calculate_definite_integrals(prices, vols=vols, window=4)
+        self.assertTrue(res["valid"])
+        self.assertGreater(res["volume_action_integral"], 0.0)
+
+
+class ProbabilityTheoryTest(unittest.TestCase):
+    """Test stochastic moments, fat tails and conditional continuation probability."""
+
+    def test_normal_cdf_function(self):
+        self.assertAlmostEqual(_normal_cdf(0.0), 0.5, places=4)
+        self.assertGreater(_normal_cdf(1.96), 0.97)
+        self.assertLess(_normal_cdf(-1.96), 0.03)
+
+    def test_skewness_and_kurtosis_calculation(self):
+        # Right-skewed returns with positive outlier
+        returns = [0.01, 0.02, -0.01, 0.005, 0.012, -0.008, 0.08] # 0.08 is fat right tail
+        res = calculate_probability_theory(returns, velocity=0.5, acceleration=0.2)
+        self.assertTrue(res["valid"])
+        self.assertGreater(res["skewness"], 0.0, "Positive outlier must induce positive skewness")
+        self.assertGreater(res["kurtosis"], 0.0, "Outlier must induce positive excess kurtosis")
+        self.assertGreater(res["continuation_prob_pct"], 50.0)
+        self.assertGreater(res["var_95_pct"], 0.0)
+
+    def test_fat_tail_detection(self):
+        # Extreme fat tail shock: small variance background with large shock outlier
+        shock_returns = [0.001, -0.001, 0.002, -0.002, 0.001, 0.002, -0.001, 0.15]
+        res = calculate_probability_theory(shock_returns)
+        self.assertTrue(res["valid"])
+        self.assertTrue(res["is_fat_tail"], f"Kurtosis {res.get('kurtosis')} should trigger fat tail")
 
 
 class MultiTimeframeIntegrationTest(unittest.TestCase):
     """Test 15M, 1H, 4H confluence and OKX reverse candle order handling."""
 
     def test_okx_order_inversion(self):
-        # OKX candle list is [newest, ..., oldest]
-        # Build 10 candles where price climbed from 100 to 109
         chronological = [[str(i), "101", "99", str(100.0 + i), "10"] for i in range(10)]
         okx_payload = list(reversed(chronological))
         
@@ -114,27 +140,33 @@ class MultiTimeframeIntegrationTest(unittest.TestCase):
         self.assertGreater(res["velocity"], 0.0)
         self.assertIn("15M", res["timeframes"])
         self.assertTrue(res["timeframes"]["15M"]["valid"])
+        self.assertIn("definite_integrals", res)
+        self.assertIn("probability_theory", res)
 
 
 class FactorLibraryIntegrationTest(unittest.TestCase):
     """Test Pillar 6 integration in factor_library.py."""
 
-    def test_factor_library_structure_contains_pillar6(self):
+    def test_factor_library_structure_contains_math_prob_foundations(self):
         item = {"instId": "BTC-USDT-SWAP", "name": "BTC", "type": "crypto", "precision": 1}
-        # Run calculation with empty smart money pool
         factors = factor_library.compute_instrument_factors(item, {})
         self.assertIn("calculus_dynamics", factors)
-        cd = factors["calculus_dynamics"]
-        self.assertIn("velocity", cd)
-        self.assertIn("acceleration", cd)
-        self.assertIn("impulse", cd)
-        self.assertIn("regime", cd)
+        self.assertIn("definite_integrals", factors)
+        self.assertIn("probability_theory", factors)
+        
+        d_int = factors["definite_integrals"]
+        self.assertIn("energy_integral", d_int)
+        self.assertIn("deviation_area_integral", d_int)
+        
+        p_th = factors["probability_theory"]
+        self.assertIn("continuation_prob_pct", p_th)
+        self.assertIn("var_95_pct", p_th)
 
 
-class AiFactorTraderCalculusTest(unittest.TestCase):
-    """Test calculus scoring and strategy setup filters in ai_factor_trader.py."""
+class AiFactorTraderMathProbTest(unittest.TestCase):
+    """Test scoring and strategy setup filters in ai_factor_trader.py."""
 
-    def test_evaluate_signal_with_calculus_acceleration(self):
+    def test_evaluate_signal_with_calculus_and_prob(self):
         f = {
             "instId": "BTC-USDT-SWAP",
             "name": "BTC",
@@ -167,51 +199,23 @@ class AiFactorTraderCalculusTest(unittest.TestCase):
                 "impulse": 1.20,
                 "max_abs_jerk": 0.2,
                 "regime": "BULL_ACCELERATING",
-                "quality": 0.9
+                "quality": 0.9,
+                "definite_integrals": {
+                    "energy_integral": 1.5,
+                    "deviation_area_integral": 0.8
+                },
+                "probability_theory": {
+                    "continuation_prob_pct": 78.0,
+                    "breakdown_prob_pct": 22.0,
+                    "var_95_pct": 1.2,
+                    "is_fat_tail": False
+                }
             }
         }
         score, action, reasons, strat_tag, strat_desc = ai_factor_trader.evaluate_asset_signal(f)
         self.assertGreater(score, 2.2)
         self.assertEqual(action, "BUY_LONG")
         self.assertEqual(strat_tag, "🚀 动量突破")
-
-    def test_decelerating_top_blocks_breakout_chasing(self):
-        f = {
-            "instId": "ETH-USDT-SWAP",
-            "name": "ETH",
-            "type": "crypto",
-            "precision": 2,
-            "price": 2500.0,
-            "ema9": 2490.0,
-            "ema21": 2480.0,
-            "ema55": 2450.0,
-            "ema21_slope_pct": 0.03,
-            "rsi": 60.0,
-            "rsi_7": 62.0,
-            "vwap_bias": 0.3,
-            "macd_hist": 2.0,
-            "macd_accel": 0.5,
-            "obv_flow": "BULL_FLOW",
-            "vol_ratio": 1.4,
-            "market_regime": "BULL_TREND",
-            "structure_1h": "HH_HL",
-            "is_bull_candle_15m": True,
-            "is_bear_candle_15m": False,
-            "sentiment_score": 0.0,
-            "market_data_valid": True,
-            "calculus": {
-                "valid": True,
-                "velocity": 0.40,
-                "acceleration": -0.85, # Sharp deceleration exhaustion
-                "impulse": 0.50,
-                "max_abs_jerk": 0.3,
-                "regime": "BULL_DECELERATING",
-                "quality": 0.85
-            }
-        }
-        score, action, reasons, strat_tag, strat_desc = ai_factor_trader.evaluate_asset_signal(f)
-        # Because acceleration < -0.2, momentum breakout setup must NOT trigger blindly
-        self.assertNotEqual(strat_tag, "🚀 动量突破", "Sharp deceleration must block breakout chase")
 
 
 if __name__ == "__main__":

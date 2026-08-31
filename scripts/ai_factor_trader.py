@@ -1121,7 +1121,7 @@ def evaluate_asset_signal(f):
     score_sent = max(-0.8, min(0.8, sent_score * 1.5))
 
     # -------------------------------------------------------------------------
-    # 📊 Sub-Factor 5: Causal Calculus Dynamics (-1.2 ~ +1.2)
+    # 📊 Sub-Factor 5: Causal Calculus, Definite Integrals & Probability (-1.5 ~ +1.5)
     # -------------------------------------------------------------------------
     score_calc = 0.0
     c_dyn = f.get("calculus", {})
@@ -1131,14 +1131,35 @@ def evaluate_asset_signal(f):
     c_j = abs(float(c_dyn.get("max_abs_jerk", 0.0) or 0.0))
     c_regime = c_dyn.get("regime", "")
 
+    # 1. Calculus Dynamics
     if c_regime == "BULL_ACCELERATING" or (c_v > 0.2 and c_a > 0.1 and c_i > 0):
-        score_calc += 0.8
+        score_calc += 0.6
     elif c_regime == "BULL_DECELERATING" or (c_v > 0.2 and c_a < -0.3):
-        score_calc -= 0.6 # Anti-FOMO deceleration penalty
+        score_calc -= 0.5 # Anti-FOMO deceleration penalty
     elif c_regime == "BEAR_ACCELERATING" or (c_v < -0.2 and c_a < -0.1 and c_i < 0):
-        score_calc -= 0.8
+        score_calc -= 0.6
     elif c_regime == "BEAR_DECELERATING" or (c_v < -0.2 and c_a > 0.3):
-        score_calc += 0.6 # Anti-bottom chasing penalty
+        score_calc += 0.5 # Anti-bottom chasing penalty
+
+    # 2. Definite Integrals (Energy & Area Accumulation)
+    d_int = c_dyn.get("definite_integrals", {})
+    e_int = float(d_int.get("energy_integral", 0.0) or 0.0)
+    dev_area = float(d_int.get("deviation_area_integral", 0.0) or 0.0)
+    if e_int > 1.0 and dev_area > 0.6:
+        score_calc += 0.4 # Net positive kinetic work done
+    elif e_int < -1.0 and dev_area < -0.6:
+        score_calc -= 0.4 # Net negative depletion
+
+    # 3. Probability Theory & Stochastic Risk
+    p_th = c_dyn.get("probability_theory", {})
+    p_cont = float(p_th.get("continuation_prob_pct", 50.0) or 50.0)
+    p_break = float(p_th.get("breakdown_prob_pct", 50.0) or 50.0)
+    if p_cont >= 70.0:
+        score_calc += 0.4
+    elif p_break >= 70.0:
+        score_calc -= 0.4
+
+    score_calc = max(-1.5, min(1.5, score_calc))
 
     # -------------------------------------------------------------------------
     # 🎯 Continuous Synthesis Multi-Factor Alpha Score
@@ -1475,10 +1496,12 @@ def execute_portfolio():
                     # 2. Maximum 1 scale-in per position to prevent overconcentration.
                     # 3. Combined margin must not exceed MAX_SINGLE_ASSET_MARGIN.
                     # 4. AI Confidence must be >= 75%.
-                    # 5. Calculus Momentum Hard Gateway: Acceleration must not be decelerating sharply (a >= -0.25)
+                    # 5. Calculus Momentum & Probability Gateway: Acceleration a >= -0.25 and Continuation Prob >= 40%
                     c_dyn = f.get("calculus", {})
                     c_accel = float(c_dyn.get("acceleration", 0.0) or 0.0)
-                    calculus_accel_ok = (c_accel >= -0.25)
+                    p_th = c_dyn.get("probability_theory", {})
+                    p_cont = float(p_th.get("continuation_prob_pct", 50.0) or 50.0)
+                    calculus_accel_ok = (c_accel >= -0.25 and p_cont >= 40.0)
 
                     is_profit_or_breakeven = (pos_upl > 0 and pos_upl_ratio >= MIN_SCALE_IN_PROFIT_RATIO) or (trailing_sl > 0 and trailing_sl >= pos_avg_px)
                     planned_margin = ai_margin if ai_margin > 0 else (actual_sz * ct_val * f["price"] / max(1.0, ai_lever))
@@ -1487,7 +1510,7 @@ def execute_portfolio():
                     if is_profit_or_breakeven and scale_count < MAX_SCALE_IN_COUNT and within_margin_cap and ai_conf >= MIN_SCALE_IN_CONFIDENCE and calculus_accel_ok:
                         allow_entry = True
                         is_scale_in = True
-                        print(f"[Pyramiding] {f['name']} 满足顺势浮盈加多条件: 底仓浮盈={pos_upl:+.2f}U ({pos_upl_ratio*100:+.1f}%), 已加仓{scale_count}次, 微积分加速度={c_accel:+.2f}, 计划加仓{actual_sz}张")
+                        print(f"[Pyramiding] {f['name']} 满足顺势浮盈加多条件: 底仓浮盈={pos_upl:+.2f}U ({pos_upl_ratio*100:+.1f}%), 已加仓{scale_count}次, 微积分加速度={c_accel:+.2f}, 延续概率={p_cont:.1f}%, 计划加仓{actual_sz}张")
                     else:
                         if not is_profit_or_breakeven:
                             print(f"[Pyramiding 拦截] {f['name']} 底仓未达浮盈保本门禁 (浮盈={pos_upl:+.2f}U ROI={pos_upl_ratio*100:+.1f}%), 严禁逆势加仓")
@@ -1498,7 +1521,7 @@ def execute_portfolio():
                         elif ai_conf < MIN_SCALE_IN_CONFIDENCE:
                             print(f"[Pyramiding 拦截] {f['name']} AI加仓置信度不足 ({ai_conf:.0f}% < {MIN_SCALE_IN_CONFIDENCE}%)")
                         elif not calculus_accel_ok:
-                            print(f"[Pyramiding 拦截] {f['name']} 微积分动能严重失速衰竭 (加速度={c_accel:+.2f} < -0.25)，禁止追多加仓")
+                            print(f"[Pyramiding 拦截] {f['name']} 数理动能衰竭或延续概率偏低 (加速度={c_accel:+.2f}, 概率={p_cont:.1f}%)，禁止追多加仓")
 
                 if allow_entry:
                     limit_px = round(ai_decision.get("entry_price") if (ai_decision and ai_decision.get("entry_price", 0) > 0) else (f.get("bidPx") or f["price"]), prec)
@@ -1549,12 +1572,14 @@ def execute_portfolio():
 
                     c_dyn = f.get("calculus", {})
                     c_accel = float(c_dyn.get("acceleration", 0.0) or 0.0)
-                    calculus_accel_ok = (c_accel <= 0.25)
+                    p_th = c_dyn.get("probability_theory", {})
+                    p_break = float(p_th.get("breakdown_prob_pct", 50.0) or 50.0)
+                    calculus_accel_ok = (c_accel <= 0.25 and p_break >= 40.0)
 
                     if is_profit_or_breakeven and scale_count < MAX_SCALE_IN_COUNT and within_margin_cap and ai_conf >= MIN_SCALE_IN_CONFIDENCE and calculus_accel_ok:
                         allow_entry = True
                         is_scale_in = True
-                        print(f"[Pyramiding] {f['name']} 满足顺势浮盈加空条件: 底仓浮盈={pos_upl:+.2f}U ({pos_upl_ratio*100:+.1f}%), 已加仓{scale_count}次, 微积分加速度={c_accel:+.2f}, 计划加仓{actual_sz}张")
+                        print(f"[Pyramiding] {f['name']} 满足顺势浮盈加空条件: 底仓浮盈={pos_upl:+.2f}U ({pos_upl_ratio*100:+.1f}%), 已加仓{scale_count}次, 微积分加速度={c_accel:+.2f}, 击穿概率={p_break:.1f}%, 计划加仓{actual_sz}张")
                     else:
                         if not is_profit_or_breakeven:
                             print(f"[Pyramiding 拦截] {f['name']} 底仓未达浮盈保本门禁 (浮盈={pos_upl:+.2f}U ROI={pos_upl_ratio*100:+.1f}%), 严禁逆势加仓")
@@ -1565,7 +1590,7 @@ def execute_portfolio():
                         elif ai_conf < MIN_SCALE_IN_CONFIDENCE:
                             print(f"[Pyramiding 拦截] {f['name']} AI加仓置信度不足 ({ai_conf:.0f}% < {MIN_SCALE_IN_CONFIDENCE}%)")
                         elif not calculus_accel_ok:
-                            print(f"[Pyramiding 拦截] {f['name']} 微积分动能严重失速减速 (加速度={c_accel:+.2f} > 0.25)，禁止追空加仓")
+                            print(f"[Pyramiding 拦截] {f['name']} 数理动能失速企稳或击穿概率偏低 (加速度={c_accel:+.2f}, 概率={p_break:.1f}%)，禁止追空加仓")
 
                 if allow_entry:
                     limit_px = round(ai_decision.get("entry_price") if (ai_decision and ai_decision.get("entry_price", 0) > 0) else (f.get("askPx") or f["price"]), prec)

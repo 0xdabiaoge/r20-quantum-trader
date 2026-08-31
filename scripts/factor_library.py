@@ -96,7 +96,7 @@ def compute_instrument_factors(item: Dict[str, Any], smart_money_pool: Dict[str,
             "signal": "NEUTRAL"
         },
 
-        # Pillar 6: Calculus Dynamics (Velocity, Acceleration, Impulse & Jerk)
+        # Pillar 6: Calculus, Definite Integrals & Probability Theory
         "calculus_dynamics": {
             "velocity": 0.0,
             "acceleration": 0.0,
@@ -105,6 +105,22 @@ def compute_instrument_factors(item: Dict[str, Any], smart_money_pool: Dict[str,
             "regime": "RANGE_LOW_VELOCITY",
             "quality": 0.0,
             "direction": 0
+        },
+        "definite_integrals": {
+            "energy_integral": 0.0,
+            "deviation_area_integral": 0.0,
+            "volume_action_integral": 0.0,
+            "integral_regime": "BALANCED_ENERGY"
+        },
+        "probability_theory": {
+            "skewness": 0.0,
+            "kurtosis": 0.0,
+            "continuation_prob_pct": 50.0,
+            "breakdown_prob_pct": 50.0,
+            "var_95_pct": 1.5,
+            "cvar_95_pct": 2.2,
+            "prob_regime": "GAUSSIAN_BALANCED",
+            "is_fat_tail": False
         },
         
         # Composite Factor Score (-100 to +100)
@@ -206,12 +222,13 @@ def compute_instrument_factors(item: Dict[str, Any], smart_money_pool: Dict[str,
                     elif closes[i] < closes[i-1]: obv -= vols[i]
                 factors["volume_money_flow"]["obv_flow"] = "BULL_FLOW" if obv > 0 else ("BEAR_FLOW" if obv < 0 else "NEUTRAL")
 
-                # Pillar 6 Calculus Dynamics (15M High-Resolution)
+                # Pillar 6: Calculus, Definite Integrals & Probability Theory (15M High-Resolution)
                 try:
                     sys.path.append(os.path.join(WORKSPACE_DIR, "scripts"))
                     from calculus_engine import calculate_calculus
-                    c_res = calculate_calculus(closes, highs, lows)
+                    c_res = calculate_calculus(closes, highs, lows, vols)
                     if c_res.get("valid"):
+                        # Calculus Dynamics
                         factors["calculus_dynamics"]["velocity"] = c_res.get("velocity", 0.0)
                         factors["calculus_dynamics"]["acceleration"] = c_res.get("acceleration", 0.0)
                         factors["calculus_dynamics"]["impulse"] = c_res.get("impulse", 0.0)
@@ -219,6 +236,24 @@ def compute_instrument_factors(item: Dict[str, Any], smart_money_pool: Dict[str,
                         factors["calculus_dynamics"]["regime"] = c_res.get("regime", "RANGE_LOW_VELOCITY")
                         factors["calculus_dynamics"]["quality"] = c_res.get("quality", 0.0)
                         factors["calculus_dynamics"]["direction"] = c_res.get("direction", 0)
+
+                        # Definite Integrals
+                        d_int = c_res.get("definite_integrals", {})
+                        factors["definite_integrals"]["energy_integral"] = d_int.get("energy_integral", 0.0)
+                        factors["definite_integrals"]["deviation_area_integral"] = d_int.get("deviation_area_integral", 0.0)
+                        factors["definite_integrals"]["volume_action_integral"] = d_int.get("volume_action_integral", 0.0)
+                        factors["definite_integrals"]["integral_regime"] = d_int.get("integral_regime", "BALANCED_ENERGY")
+
+                        # Probability Theory & Stochastic Modeling
+                        p_th = c_res.get("probability_theory", {})
+                        factors["probability_theory"]["skewness"] = p_th.get("skewness", 0.0)
+                        factors["probability_theory"]["kurtosis"] = p_th.get("kurtosis", 0.0)
+                        factors["probability_theory"]["continuation_prob_pct"] = p_th.get("continuation_prob_pct", 50.0)
+                        factors["probability_theory"]["breakdown_prob_pct"] = p_th.get("breakdown_prob_pct", 50.0)
+                        factors["probability_theory"]["var_95_pct"] = p_th.get("var_95_pct", 1.5)
+                        factors["probability_theory"]["cvar_95_pct"] = p_th.get("cvar_95_pct", 2.2)
+                        factors["probability_theory"]["prob_regime"] = p_th.get("prob_regime", "GAUSSIAN_BALANCED")
+                        factors["probability_theory"]["is_fat_tail"] = p_th.get("is_fat_tail", False)
                 except Exception:
                     pass
     except Exception:
@@ -342,7 +377,7 @@ def compute_instrument_factors(item: Dict[str, Any], smart_money_pool: Dict[str,
     if depth_r >= 1.4: score += 15.0
     elif depth_r <= 0.7: score -= 15.0
 
-    # 6. Calculus Dynamics Modulation (Velocity, Acceleration, Impulse & Jerk Risk)
+    # 6. Calculus, Definite Integrals & Probability Theory Modulation
     c_dyn = factors["calculus_dynamics"]
     c_v = c_dyn.get("velocity", 0.0)
     c_a = c_dyn.get("acceleration", 0.0)
@@ -360,9 +395,31 @@ def compute_instrument_factors(item: Dict[str, Any], smart_money_pool: Dict[str,
     elif c_regime == "BEAR_DECELERATING" or (c_v < -0.2 and c_a > 0.3):
         score += 10.0 # Anti-bottom chasing penalty
 
-    # High Jerk Shock Risk Penalty
-    if c_j >= 1.8 or c_regime == "SHOCK_HIGH_JERK":
-        score *= 0.6 # dampen conviction under high-jerk shock
+    # 7. Definite Integrals & Energy Modulation
+    d_int = factors.get("definite_integrals", {})
+    e_int = d_int.get("energy_integral", 0.0)
+    dev_area = d_int.get("deviation_area_integral", 0.0)
+    if e_int > 1.2 and dev_area > 0.8:
+        score += 10.0 # Multi-period net positive displacement energy
+    elif e_int < -1.2 and dev_area < -0.8:
+        score -= 10.0 # Multi-period net negative depletion
+    elif abs(dev_area) >= 2.8:
+        # Overstretched deviation integral penalty: trigger mean-reversion caution
+        score *= 0.8
+
+    # 8. Probability Theory & Stochastic Risk
+    p_th = factors.get("probability_theory", {})
+    p_cont = p_th.get("continuation_prob_pct", 50.0)
+    p_break = p_th.get("breakdown_prob_pct", 50.0)
+    is_fat = p_th.get("is_fat_tail", False)
+    if p_cont >= 72.0:
+        score += 10.0 # High conditional continuation probability
+    elif p_break >= 72.0:
+        score -= 10.0 # High conditional breakdown probability
+
+    # High Jerk or Extreme Fat Tail Shock Dampener
+    if c_j >= 1.8 or c_regime == "SHOCK_HIGH_JERK" or (is_fat and p_th.get("kurtosis", 0) >= 3.5):
+        score *= 0.6 # dampen conviction under high-jerk shock / extreme fat tails
 
     factors["composite_alpha_score"] = round(score, 1)
 

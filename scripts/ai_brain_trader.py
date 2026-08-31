@@ -321,20 +321,27 @@ def fetch_single_instrument_package(item: Dict[str, Any]) -> Dict[str, Any]:
     return pkg
 
 SYSTEM_PROMPT = """你是一名管理顶级加密量化对冲基金的首席AI交易官。
-你的职责：在一次扫描中全景综合 OKX 六大加密永续合约的原生多周期K线(4H/1H/15M)、OKX官方顶级聪明钱(SmartMoney Top100)实盘胜率与持仓成本、因果微积分状态估计(速度v/动能加速度a/累计冲量I/冲击jerk)、即时盘口深度、衍生品筹码(资金费率/OI未平仓量/多空比/Taker主动买卖)、量化多因子指标(ADX趋势强度/ATR/RSI/VWAP偏离/量比/OBV)以及当前账户可用USDT余额与已有持仓，给出具有精确保证金分配、杠杆倍数设定、多空方向裁决与盈亏比≥2.0止盈止损点位的完整交易与持仓决策。
+你的职责：在一次扫描中全景综合 OKX 六大加密永续合约的原生多周期K线(4H/1H/15M)、OKX官方顶级聪明钱(SmartMoney Top100)实盘胜率与持仓成本、三大核心数理底座【因果微积分动力学(速度v/加速度a/冲量I/冲击jerk) + 定积分能量与偏离面积(净做功/VWAP偏离面积) + 概率论与随机过程(条件延续胜率%/95%VaR/偏度峰度肥尾)】、即时盘口深度、衍生品筹码(资金费率/OI未平仓量/多空比/Taker主动买卖)、量化多因子指标(ADX趋势强度/ATR/RSI/VWAP偏离/量比/OBV)以及当前账户可用USDT余额与已有持仓，给出具有精确保证金分配、杠杆倍数设定、多空方向裁决与盈亏比≥2.0止盈止损点位的完整交易与持仓决策。
 
 核心交易准则与高胜率铁律：
 1. 顶级聪明钱 (SmartMoney) 方向对齐：
    - 重点参考 OKX 实盘 80%+ 胜率聪明钱的主力加权多空比与 24H 资金净流入；
    - 严禁逆全网顶级聪明钱主力大势盲目重仓开单；在聪明钱建仓成本价附近寻找高确定性共振点位。
-2. 📐 因果微积分动力学 (Calculus Dynamics) 动能与加速度判定铁律：
-   - 【速度 v 与 冲量 I】：v 反映即时价格位移速率，I 反映多周期累计趋势惯性（同向正值代表多头主升，负值代表空头主跌）；
-   - 【加速度 a 判定趋势扩张 vs 衰竭】：
+2. 📐 三大底层数理基石 (Calculus, Integrals & Probability) 综合判定铁律：
+   - 【微积分动力学 (Calculus Dynamics)】：
+     • 速度 v 反映即时价格位移速率，冲量 I 反映多周期累计惯性；
      • 📈 扩张加速 (BULL_ACCELERATING, a > +0.10)：动能持续放大，允许积极捕捉突破或顺势加仓；
-     • ⚠️ 顶部失速减速 (BULL_DECELERATING, a < -0.20)：价格虽仍在上涨但动能急剧失速衰竭，【坚决禁止追涨开多】，严防摸顶被套，等待回踩企稳；
+     • ⚠️ 顶部失速减速 (BULL_DECELERATING, a < -0.20)：价格虽涨但动能急剧失速衰竭，【坚决禁止追涨开多】，等待回踩企稳；
      • 📉 破位下泄加速 (BEAR_ACCELERATING, a < -0.10)：空头动能加速下泄，顺势破位做空；
      • 🛡️ 底部减速企稳 (BEAR_DECELERATING, a > +0.20)：砸盘动能衰减钝化，【坚决禁止追空】，防范 V 型反弹；
-   - 【冲击加加速度 jerk 防御】：若出现高冲击异动 (|jerk| ≥ 1.8 或 SHOCK_HIGH_JERK)，代表行情遭遇极端异动洗盘，必须强制降低仓位或保持观望(WAIT)。
+     • 🌪️ 冲击加加速度 jerk 防御：若出现高冲击异动 (|jerk| ≥ 1.8 或 SHOCK_HIGH_JERK)，代表遭遇极端异动洗盘，强制降低仓位或观望(WAIT)。
+   - 【定积分能量与偏离面积 (Definite Integrals & Work Done)】：
+     • 动能净做功定积分 (energy_integral > 0)：衡量多头历史做功累计的真实能量储备；
+     • 均值偏离面积定积分 (deviation_area_integral)：衡量价格偏离价值中枢的累计拉伸面积；若偏离面积严重过载 (|area| ≥ 2.5)，强烈提示均值回归引力，切忌在拉伸末端追单。
+   - 【概率论与随机过程 (Probability & Extreme Value Risk)】：
+     • 条件延续概率 (continuation_prob_pct ≥ 70%)：基于分布函数计算的多头顺势确定性，给予多头强赋能；
+     • 条件击穿概率 (breakdown_prob_pct ≥ 70%)：空头破位确定性；
+     • 极端肥尾与在险价值 (Kurtosis ≥ 1.5, 95% VaR & CVaR)：若出现严重非对称偏度或超额厚尾，必须严格按 VaR 风险边界收缩单笔保证金与杠杆倍数。
 3. 趋势强度硬过滤 (ADX 过滤器)：
    - 若 1H ADX < 20 (表明当前处于无量窄幅拉锯的垃圾震荡市)，必须坚决观望(WAIT)，彻底杜绝假突破与反复止损磨损；
    - 若 1H ADX ≥ 22 且伴随放量、微积分加速度与价格共振，方可积极捕捉主升/破位趋势。
@@ -345,7 +352,7 @@ SYSTEM_PROMPT = """你是一名管理顶级加密量化对冲基金的首席AI�
 6. 任何关键行情缺失、标记为 DATA_INVALID、价格结构不合法或无法计算真实 R:R 时，必须 WAIT；不得猜测缺失数据。
 7. 长期记忆、偏好标的和历史胜率只能作为弱先验，绝不得覆盖本轮原始行情、持仓风险和硬门禁。
 8. 顺势浮盈金字塔加仓 (Pyramiding) 准则：
-   - 对于已有持仓标的，若底仓已处于保本/显著浮盈状态（ROI ≥ +0.8% 或已推保本止损），且盘面出现强劲的二浪突破、动量延续、微积分加速度为正(a ≥ 0)且聪明钱持续加码，允许在 decisions 中输出同向开仓指令（如多单输出 BUY_LONG 顺势加多 / 空单输出 SELL_SHORT 顺势加空），单次加仓仓位建议 ≤ 底仓，置信度需 ≥ 75%；
+   - 对于已有持仓标的，若底仓已处于保本/显著浮盈状态（ROI ≥ +0.8% 或已推保本止损），且盘面出现强劲的二浪突破、动量延续、微积分加速度为正(a ≥ 0)、多头延续概率 ≥ 40% 且聪明钱持续加码，允许在 decisions 中输出同向开仓指令（如多单输出 BUY_LONG 顺势加多 / 空单输出 SELL_SHORT 顺势加空），单次加仓仓位建议 ≤ 底仓，置信度需 ≥ 75%；
    - 严禁对处于浮亏、未脱离成本区或动能失速减速(a < 0)的仓位进行任何形式的逆势补仓（Averaging Down）。
 9. 必须认真审查在途未成交限价挂单 (pending_orders)：若行情已大幅偏离、市场逻辑反转或挂单已过时，必须在 pending_orders_management 中果断输出 CANCEL 撤单指令，防止挂单成交在不利位置；有效挂单输出 KEEP 维持。
 10. 必须输出严格标准 JSON 对象，包含全市场宏观评估(macro_assessment)、在途持仓管理(position_management)、在途挂单管理(pending_orders_management)与针对每个标的的决策字典(decisions)。
@@ -365,20 +372,34 @@ def construct_full_market_prompt(packages: List[Dict[str, Any]], pos_summary: st
         adx_val = p.get("adx_1h", "--")
         calc = p.get("calculus", {})
         calc_tfs = calc.get("timeframes", {}) if isinstance(calc, dict) else {}
+        d_int = calc.get("definite_integrals", {}) if isinstance(calc, dict) else {}
+        p_th = calc.get("probability_theory", {}) if isinstance(calc, dict) else {}
+
         calc_line = (
-            f"状态={calc.get('regime', 'DATA_UNRELIABLE')} | 速度={calc.get('velocity', '--')} "
+            f"动力学态={calc.get('regime', 'DATA_UNRELIABLE')} | 速度={calc.get('velocity', '--')} "
             f"| 加速度={calc.get('acceleration', '--')} | 累计冲量={calc.get('impulse', '--')} "
-            f"| 最大冲击变化={calc.get('max_abs_jerk', '--')} | 质量={calc.get('quality', 0)}"
+            f"| 冲击变化={calc.get('max_abs_jerk', '--')} | 质量={calc.get('quality', 0)}"
+        )
+        integral_line = (
+            f"动能净做功积分={d_int.get('energy_integral', '--')} | VWAP偏离面积分={d_int.get('deviation_area_integral', '--')} "
+            f"| 量能功率积分={d_int.get('volume_action_integral', '--')} | 能量态={d_int.get('regime', 'BALANCED')}"
+        )
+        prob_line = (
+            f"多头延续胜率={p_th.get('continuation_prob_pct', 50)}% | 空头击穿概率={p_th.get('breakdown_prob_pct', 50)}% "
+            f"| 偏度S={p_th.get('skewness', 0)} | 超额峰度K={p_th.get('kurtosis', 0)} | 95%在险价值VaR={p_th.get('var_95_pct', '--')}% "
+            f"| 尾部风险={p_th.get('regime', 'BALANCED')}"
         )
         calc_tf_line = "；".join(
-            f"{tf}:v={v.get('velocity', '--')},a={v.get('acceleration', '--')},I={v.get('impulse', '--')},状态={v.get('regime', '--')}"
+            f"{tf}:v={v.get('velocity', '--')},a={v.get('acceleration', '--')},I={v.get('impulse', '--')},态={v.get('regime', '--')}"
             for tf, v in calc_tfs.items() if isinstance(v, dict)
         )
         info = f"""---------------------------------------------------------
 【{p['name']} ({p['instId']})】| 数据质量: {quality} | 现价: {p['price']} | 24H涨跌: {p['chg24h']}% | 盘口买/卖: {p['bidPx']}/{p['askPx']}
 - 👑 顶级聪明钱 (SmartMoney Top100): 加权做多占比={sm.get('weighted_long_pct', 50)}% | 24H净流入={sm.get('net_flow_usdt', '--')} | 多头均价={sm.get('avg_long_entry', '--')} | 空头均价={sm.get('avg_short_entry', '--')} | {sm.get('top_win_rate', '')}
 - 📐 量化趋势与因子: 1H ADX趋势强度={adx_val} (注:<20无趋势垃圾市, ≥22强单边) | ATR(14)={p.get('atr', '--')} | RSI(14)={p.get('rsi', '--')} | VWAP乖离={p.get('vwap_bias', '--')}% | 15M量比={p.get('vol_ratio', '--')}x | OBV资金流={p.get('obv_flow', '--')}
-- ∫ 微积分状态 (因果已收盘K线): {calc_line}
+- ∫ 微积分与定积分: {calc_line}
+- ⚡ 能量与偏离面积分: {integral_line}
+- ⚅ 概率论与统计分布: {prob_line}
 - ∂ 分周期速度/加速度/冲量: {calc_tf_line or '数据不足'}
 - 衍生品博弈: 资金费率: {p['fundingRate']}% | OI未平仓: {p['oiUsd']} | 多空比: {p['lsRatio']} | 5M主动吃单净差: {p['takerNetUsd']}
 - 15M K线(倒序12根 [O,H,L,C,V]): {k15}
@@ -536,6 +557,7 @@ def construct_full_market_prompt(packages: List[Dict[str, Any]], pos_summary: st
       "summary_reason": "30字内核心逻辑",
       "market_structure": "4H/1H趋势与15M短线形态",
       "calculus_dynamics": "微积分速度/加速度/冲量与动能扩张/衰竭推演简述",
+      "math_prob_rationale": "定积分做功能量+延续胜率%+VaR在险价值依据简述",
       "volume_and_oi": "量能/筹码流向简述"
     }},
     ... (依次包含全部标的)
