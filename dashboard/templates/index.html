@@ -402,10 +402,10 @@
                     </div>
                     <div class="flex items-center space-x-2 text-xs font-mono">
                         <span class="inline-flex items-center px-2 py-0.5 rounded bg-[#0A0D14] text-[#0ECB81] border border-[#1A2232]">
-                            <span class="w-2 h-0.5 bg-[#0ECB81] mr-1.5"></span> 总权益(左轴)
+                            <span class="w-2 h-0.5 bg-[#0ECB81] mr-1.5"></span> 官方总权益(左轴)
                         </span>
                         <span class="inline-flex items-center px-2 py-0.5 rounded bg-[#0A0D14] text-[#F6465D] border border-[#1A2232]">
-                            <span class="w-2 h-0.5 bg-[#F6465D] mr-1.5"></span> 动态回撤(右轴)
+                            <span class="w-2 h-0.5 bg-[#F6465D] mr-1.5"></span> 动态回撤深度(右轴)
                         </span>
                     </div>
                 </div>
@@ -1918,7 +1918,7 @@
             }
         }
 
-        // Render Chart (Institutional Double-Axis)
+        // Render Chart (Institutional Double-Axis: Positive Drawdown Depth)
         function renderChart(snapshots) {
             const ctx = document.getElementById('equityChart');
             if (!ctx) return;
@@ -1935,10 +1935,11 @@
             const labels = points.map(p => (p.time || '').substring(11, 16) || p.time);
             const equityValues = points.map(p => Number(p.total_eq || p.equity || 10000.0));
 
+            // Calculate Positive Drawdown Depth (%) from Peak (Higher line = Deeper drawdown risk)
             let peak = equityValues[0];
             const drawdownValues = equityValues.map(eq => {
                 if (eq > peak) peak = eq;
-                const dd = peak > 0 ? ((eq - peak) / peak * 100) : 0;
+                const dd = peak > 0 ? ((peak - eq) / peak * 100) : 0;
                 return Number(dd.toFixed(2));
             });
 
@@ -1965,12 +1966,12 @@
                             yAxisID: 'yEquity'
                         },
                         {
-                            label: '动态回撤 (%)',
+                            label: '动态回撤深度 (%)',
                             data: drawdownValues,
                             borderColor: '#F6465D',
                             borderWidth: 1.5,
                             borderDash: [3, 3],
-                            backgroundColor: 'rgba(246, 70, 93, 0.03)',
+                            backgroundColor: 'rgba(246, 70, 93, 0.05)',
                             fill: true,
                             tension: 0.2,
                             pointRadius: 0,
@@ -2009,7 +2010,7 @@
                                     if (context.datasetIndex === 0) {
                                         return ` 总权益: ${context.parsed.y.toFixed(2)} USDT`;
                                     } else {
-                                        return ` 动态回撤: ${context.parsed.y.toFixed(2)} %`;
+                                        return ` 动态回撤深度: ${context.parsed.y.toFixed(2)} %`;
                                     }
                                 }
                             }
@@ -2039,8 +2040,8 @@
                                 color: '#F6465D',
                                 callback: value => value.toFixed(1) + '%'
                             },
-                            suggestedMax: 0.5,
-                            suggestedMin: -3.0
+                            suggestedMin: 0.0,
+                            suggestedMax: 5.0
                         }
                     }
                 }
