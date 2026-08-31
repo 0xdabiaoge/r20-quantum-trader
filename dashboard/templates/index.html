@@ -391,34 +391,27 @@
                 </div>
             </div>
 
-            <!-- 3. 资产总权益与逐单盈亏 -->
+            <!-- 3. 资产总权益与绩效走势 -->
             <div class="terminal-panel p-4 sm:p-5">
-                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-3 mb-2.5 border-b border-[#1A2232]">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-3 mb-3 border-b border-[#1A2232]">
                     <div class="flex items-center space-x-2">
-                        <div class="w-2 h-2 rounded-full bg-[#3875F6]"></div>
-                        <h2 class="text-xs sm:text-sm font-bold text-white font-mono tracking-wide">总权益与逐单盈亏透视</h2>
+                        <div class="w-2 h-2 rounded-full bg-[#0ECB81]"></div>
+                        <h2 class="text-xs sm:text-sm font-bold text-white font-mono tracking-wide">官方账户总权益走势</h2>
                     </div>
 
-                    <!-- Clean Dual-Axis Legend -->
-                    <div class="flex items-center space-x-3 text-[11px] font-mono">
-                        <span class="inline-flex items-center text-[#0ECB81]">
-                            <span class="w-2.5 h-0.5 bg-[#0ECB81] mr-1.5 rounded-full"></span> 账户总权益
-                        </span>
-                        <span class="inline-flex items-center text-[#707E94]">
-                            <span class="w-2.5 h-0.5 border-t border-dashed border-[#707E94] mr-1.5"></span> 初始基准 (4192.61 U)
-                        </span>
-                        <span class="inline-flex items-center text-[#EAECEF]">
-                            <span class="w-2 h-2 bg-[#0ECB81] mr-0.5 rounded-sm"></span><span class="w-2 h-2 bg-[#F6465D] mr-1.5 rounded-sm"></span> 逐单盈亏柱
-                        </span>
+                    <!-- Clean Segmented View Mode Switcher -->
+                    <div class="flex items-center bg-[#0B0F17] p-0.5 rounded-lg border border-[#1A2232] text-[11px] font-mono self-start sm:self-auto">
+                        <button onclick="setChartMode('equity')" id="chart-mode-equity" class="px-3 py-1 rounded bg-[#1C2436] text-white font-bold transition">总权益走势</button>
+                        <button onclick="setChartMode('trades')" id="chart-mode-trades" class="px-3 py-1 rounded text-[#707E94] hover:text-white transition">逐单盈亏柱</button>
                     </div>
                 </div>
 
                 <!-- Sub-bar with Summary Metrics -->
-                <div class="flex items-center justify-between text-[11px] font-mono text-[#707E94] mb-2 px-0.5">
+                <div class="flex flex-wrap items-center justify-between gap-2 text-xs font-mono text-[#707E94] mb-3 px-1">
                     <div class="flex items-center space-x-3">
                         <span>初始本金: <strong id="chart-stat-base" class="text-[#EAECEF]">4,192.61 U</strong></span>
-                        <span class="hidden sm:inline">•</span>
-                        <span class="hidden sm:inline">峰值 ATH: <strong id="chart-stat-peak" class="text-[#0ECB81]">4,192.61 U</strong></span>
+                        <span class="text-[#1A2232]">•</span>
+                        <span>最高峰值: <strong id="chart-stat-peak" class="text-[#0ECB81]">4,192.61 U</strong></span>
                     </div>
                     <div>
                         <span>最大动态回撤: <strong id="chart-stat-maxdd" class="text-[#F6465D]">-3.72%</strong></span>
@@ -1941,7 +1934,26 @@
             }
         }
 
-        // Render Chart (Institutional Dual-Axis Overlay: Total Equity Line + Trade PnL Bars)
+        let currentChartMode = 'equity';
+
+        function setChartMode(mode) {
+            currentChartMode = mode;
+            ['equity', 'trades'].forEach(m => {
+                const btn = document.getElementById(`chart-mode-${m}`);
+                if (btn) {
+                    if (m === mode) {
+                        btn.className = 'px-3 py-1 rounded bg-[#1C2436] text-white font-bold transition';
+                    } else {
+                        btn.className = 'px-3 py-1 rounded text-[#707E94] hover:text-white transition';
+                    }
+                }
+            });
+            if (rawJsonData) {
+                renderChart(rawJsonData.snapshots || []);
+            }
+        }
+
+        // Render Chart Engine (Multi-Mode Financial Charting)
         function renderChart(snapshots) {
             const ctx = document.getElementById('equityChart');
             if (!ctx) return;
@@ -1949,60 +1961,15 @@
             const acc = rawJsonData?.account || {};
             const initialCapital = Number(acc.initial_capital || 4192.61);
             const closedTrades = (allTrades || []).filter(t => t.status !== 'holding');
+            const points = (snapshots && snapshots.length > 0) ? snapshots : [];
 
-            // Build chronological event list
-            const events = [
-                {
-                    label: '起步 (08-30 15:00)',
-                    time: '2026-08-30 15:00:00',
-                    equity: initialCapital,
-                    pnl: null,
-                    inst: '',
-                    side: '',
-                    strategy: '初始本金基准'
-                }
-            ];
-
-            // Closed trades in chronological order (oldest to newest)
-            const sortedTrades = [...closedTrades].reverse();
-            let runningEquity = initialCapital;
-
-            sortedTrades.forEach(t => {
-                const pnl = Number(t.pnl || 0.0);
-                runningEquity += pnl;
-                const tTime = t.close_time || t.open_time || '';
-                const timeSub = tTime.length >= 16 ? tTime.substring(5, 16) : tTime;
-                events.push({
-                    label: `${t.inst} (${timeSub})`,
-                    time: tTime,
-                    equity: Number(runningEquity.toFixed(2)),
-                    pnl: pnl,
-                    roi: Number(t.roi_pct || 0.0),
-                    inst: t.inst || '',
-                    side: t.side || '',
-                    lever: t.lever || '3x',
-                    strategy: t.strategy || '--'
-                });
-            });
-
-            // Current Live point
-            const currentLiveEquity = Number(acc.total_eq !== undefined ? acc.total_eq : (acc.equity !== undefined ? acc.equity : runningEquity));
-            events.push({
-                label: '实时最新 (LIVE)',
-                time: '实时',
-                equity: Number(currentLiveEquity.toFixed(2)),
-                pnl: null,
-                inst: 'LIVE',
-                side: '',
-                strategy: '实时在途持仓与盘口'
-            });
-
-            // Calculate peak and max drawdown for HUD stats
+            // 1. Calculate peak and max drawdown for HUD stats
+            const allEq = points.length > 0 ? points.map(p => Number(p.total_eq || p.equity || initialCapital)) : [initialCapital];
             let peakVal = initialCapital;
             let maxDdPct = 0;
-            events.forEach(e => {
-                if (e.equity > peakVal) peakVal = e.equity;
-                const dd = peakVal > 0 ? ((peakVal - e.equity) / peakVal * 100) : 0;
+            allEq.forEach(eq => {
+                if (eq > peakVal) peakVal = eq;
+                const dd = peakVal > 0 ? ((peakVal - eq) / peakVal * 100) : 0;
                 if (dd > maxDdPct) maxDdPct = dd;
             });
 
@@ -2018,134 +1985,185 @@
                 equityChartInstance = null;
             }
 
-            const labels = events.map(e => e.label);
-            const equityValues = events.map(e => e.equity);
-            const baselineValues = events.map(() => initialCapital);
-            const pnlValues = events.map(e => e.pnl);
-            const pnlColors = events.map(e => (e.pnl === null ? 'transparent' : (e.pnl >= 0 ? '#0ECB81' : '#F6465D')));
-            const pnlBorders = events.map(e => (e.pnl === null ? 'transparent' : (e.pnl >= 0 ? '#059669' : '#BE123C')));
+            // ==========================================
+            // MODE 1: 总权益走势 (Default High-Res Smooth Line)
+            // ==========================================
+            if (currentChartMode === 'equity') {
+                // Ensure we have data to plot
+                const displayPoints = points.length > 0 ? points : [
+                    { time: '2026-08-30 15:00:00', total_eq: initialCapital }
+                ];
 
-            // Calculate min/max equity for tight, professional charting scale
-            const validEquities = equityValues.filter(v => typeof v === 'number' && !isNaN(v));
-            const minEq = validEquities.length > 0 ? Math.min(...validEquities, initialCapital) : 3800;
-            const maxEq = validEquities.length > 0 ? Math.max(...validEquities, initialCapital) : 4300;
-            const yEquityMin = Math.max(0, Math.floor((minEq - 80) / 50) * 50);
-            const yEquityMax = Math.ceil((maxEq + 50) / 50) * 50;
+                const labels = displayPoints.map(p => {
+                    const t = p.time || '';
+                    return t.length >= 16 ? t.substring(5, 16) : t;
+                });
+                const equityValues = displayPoints.map(p => Number(p.total_eq !== undefined ? p.total_eq : (p.equity !== undefined ? p.equity : initialCapital)));
+                const baselineValues = displayPoints.map(() => initialCapital);
 
-            equityChartInstance = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: labels,
-                    datasets: [
-                        {
-                            type: 'line',
-                            label: '账户总权益 (USDT)',
-                            data: equityValues,
-                            borderColor: '#0ECB81',
-                            borderWidth: 2.2,
-                            backgroundColor: 'rgba(14, 203, 129, 0.05)',
-                            fill: true,
-                            tension: 0.25,
-                            pointRadius: 3,
-                            pointHoverRadius: 6,
-                            pointBackgroundColor: '#0ECB81',
-                            yAxisID: 'yEquity',
-                            order: 1
-                        },
-                        {
-                            type: 'line',
-                            label: '初始本金基准',
-                            data: baselineValues,
-                            borderColor: '#707E94',
-                            borderWidth: 1.5,
-                            borderDash: [4, 4],
-                            fill: false,
-                            pointRadius: 0,
-                            pointHoverRadius: 0,
-                            yAxisID: 'yEquity',
-                            order: 2
-                        },
-                        {
-                            type: 'bar',
-                            label: '逐单净盈亏 (USDT)',
-                            data: pnlValues,
-                            backgroundColor: pnlColors,
-                            borderColor: pnlBorders,
-                            borderWidth: 1,
-                            borderRadius: 4,
-                            barPercentage: 0.55,
-                            yAxisID: 'yPnL',
-                            order: 3
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    layout: { padding: { left: 10, right: 10, top: 5, bottom: 5 } },
-                    interaction: { mode: 'index', intersect: false },
-                    plugins: {
-                        legend: { display: false },
-                        tooltip: {
-                            backgroundColor: '#0E121B',
-                            borderColor: '#1A2232',
-                            borderWidth: 1,
-                            padding: 10,
-                            titleFont: { size: 11, family: 'JetBrains Mono' },
-                            bodyFont: { size: 11, family: 'JetBrains Mono' },
-                            callbacks: {
-                                label: function(context) {
-                                    const idx = context.dataIndex;
-                                    const ev = events[idx];
-                                    if (context.datasetIndex === 0) {
-                                        const eq = context.parsed.y;
-                                        const diff = eq - initialCapital;
-                                        const diffPct = (diff / initialCapital) * 100;
-                                        return ` 💰 账户总权益: ${eq.toFixed(2)} USDT (${diff >= 0 ? '+' : ''}${diff.toFixed(2)} U / ${diffPct.toFixed(2)}%)`;
-                                    } else if (context.datasetIndex === 1) {
+                const validEquities = equityValues.filter(v => typeof v === 'number' && !isNaN(v));
+                const minEq = validEquities.length > 0 ? Math.min(...validEquities, initialCapital) : 3900;
+                const maxEq = validEquities.length > 0 ? Math.max(...validEquities, initialCapital) : 4300;
+                const yMin = Math.max(0, Math.floor((minEq - 50) / 50) * 50);
+                const yMax = Math.ceil((maxEq + 50) / 50) * 50;
+
+                equityChartInstance = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: '账户总权益 (USDT)',
+                                data: equityValues,
+                                borderColor: '#0ECB81',
+                                borderWidth: 2.2,
+                                backgroundColor: 'rgba(14, 203, 129, 0.08)',
+                                fill: true,
+                                tension: 0.2,
+                                pointRadius: displayPoints.length < 15 ? 3 : 0,
+                                pointHoverRadius: 5,
+                                pointBackgroundColor: '#0ECB81',
+                                yAxisID: 'y'
+                            },
+                            {
+                                label: '初始本金基准 (4192.61 U)',
+                                data: baselineValues,
+                                borderColor: '#707E94',
+                                borderWidth: 1.2,
+                                borderDash: [4, 4],
+                                fill: false,
+                                pointRadius: 0,
+                                pointHoverRadius: 0,
+                                yAxisID: 'y'
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        layout: { padding: { left: 5, right: 5, top: 5, bottom: 5 } },
+                        interaction: { mode: 'index', intersect: false },
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                backgroundColor: '#0E121B',
+                                borderColor: '#1A2232',
+                                borderWidth: 1,
+                                padding: 10,
+                                titleFont: { size: 11, family: 'JetBrains Mono' },
+                                bodyFont: { size: 11, family: 'JetBrains Mono' },
+                                callbacks: {
+                                    label: function(context) {
+                                        if (context.datasetIndex === 0) {
+                                            const eq = context.parsed.y;
+                                            const diff = eq - initialCapital;
+                                            const diffPct = (diff / initialCapital) * 100;
+                                            return ` 💰 账户总权益: ${eq.toFixed(2)} USDT (${diff >= 0 ? '+' : ''}${diff.toFixed(2)} U / ${diffPct.toFixed(2)}%)`;
+                                        }
                                         return ` 📏 初始基准: ${initialCapital.toFixed(2)} USDT`;
-                                    } else if (context.datasetIndex === 2) {
-                                        if (ev.pnl === null) return null;
-                                        const p = ev.pnl;
-                                        return ` 📊 当单盈亏: ${p >= 0 ? '+' : ''}${p.toFixed(2)} USDT (${ev.roi !== undefined ? (ev.roi >= 0 ? '+' : '') + ev.roi.toFixed(1) + '%' : ''}) | [${ev.inst} ${ev.side} ${ev.lever || ''}]`;
                                     }
-                                    return null;
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                grid: { color: 'rgba(255, 255, 255, 0.02)' },
+                                ticks: { font: { size: 10, family: 'JetBrains Mono' }, color: '#707E94', maxTicksLimit: 6 }
+                            },
+                            y: {
+                                min: yMin,
+                                max: yMax,
+                                grid: { color: 'rgba(255, 255, 255, 0.03)' },
+                                ticks: {
+                                    font: { size: 10, family: 'JetBrains Mono' },
+                                    color: '#0ECB81',
+                                    callback: value => value.toFixed(0) + ' U'
                                 }
                             }
                         }
+                    }
+                });
+            }
+            // ==========================================
+            // MODE 2: 纯逐单盈亏柱 (Closed Trades Bar Chart)
+            // ==========================================
+            else if (currentChartMode === 'trades') {
+                const sortedTrades = [...closedTrades].reverse();
+                if (sortedTrades.length === 0) {
+                    sortedTrades.push({
+                        inst: 'BTC',
+                        close_time: '2026-08-30 15:00:00',
+                        pnl: 0,
+                        roi_pct: 0,
+                        strategy: '初始基准'
+                    });
+                }
+
+                const labels = sortedTrades.map(t => {
+                    const timePart = (t.close_time || t.open_time || '').substring(5, 16);
+                    return `${t.inst} (${timePart})`;
+                });
+                const pnlValues = sortedTrades.map(t => Number(t.pnl || 0.0));
+                const colors = pnlValues.map(p => p >= 0 ? '#0ECB81' : '#F6465D');
+                const borderColors = pnlValues.map(p => p >= 0 ? '#059669' : '#BE123C');
+
+                equityChartInstance = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: '逐单已结净盈亏 (USDT)',
+                                data: pnlValues,
+                                backgroundColor: colors,
+                                borderColor: borderColors,
+                                borderWidth: 1,
+                                borderRadius: 4,
+                                barPercentage: 0.5
+                            }
+                        ]
                     },
-                    scales: {
-                        x: {
-                            grid: { display: false },
-                            ticks: { font: { size: 10, family: 'JetBrains Mono' }, color: '#707E94', maxRotation: 25, minRotation: 0 }
-                        },
-                        yEquity: {
-                            type: 'linear',
-                            position: 'left',
-                            min: yEquityMin,
-                            max: yEquityMax,
-                            grid: { color: 'rgba(255, 255, 255, 0.03)' },
-                            ticks: {
-                                font: { size: 10, family: 'JetBrains Mono' },
-                                color: '#0ECB81',
-                                callback: value => value.toFixed(0) + ' U'
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        layout: { padding: { left: 5, right: 5, top: 5, bottom: 5 } },
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                backgroundColor: '#0E121B',
+                                borderColor: '#1A2232',
+                                borderWidth: 1,
+                                padding: 10,
+                                titleFont: { size: 11, family: 'JetBrains Mono' },
+                                bodyFont: { size: 11, family: 'JetBrains Mono' },
+                                callbacks: {
+                                    label: function(context) {
+                                        const idx = context.dataIndex;
+                                        const t = sortedTrades[idx];
+                                        const pnl = context.parsed.y;
+                                        const roi = Number(t.roi_pct || 0.0);
+                                        return ` [${t.inst || ''} ${t.side || ''} ${t.lever || '3x'}] 净盈亏: ${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)} U (${roi >= 0 ? '+' : ''}${roi.toFixed(1)}%) | 策略: ${t.strategy || '--'}`;
+                                    }
+                                }
                             }
                         },
-                        yPnL: {
-                            type: 'linear',
-                            position: 'right',
-                            grid: { color: 'rgba(255, 255, 255, 0.04)' },
-                            ticks: {
-                                font: { size: 10, family: 'JetBrains Mono' },
-                                color: '#707E94',
-                                callback: value => (value >= 0 ? '+' : '') + value.toFixed(0) + ' U'
+                        scales: {
+                            x: {
+                                grid: { display: false },
+                                ticks: { font: { size: 10, family: 'JetBrains Mono' }, color: '#707E94', maxTicksLimit: 6 }
                             },
-                            suggestedMin: -80,
-                            suggestedMax: 30
+                            y: {
+                                grid: { color: 'rgba(255, 255, 255, 0.03)' },
+                                ticks: {
+                                    font: { size: 10, family: 'JetBrains Mono' },
+                                    color: '#707E94',
+                                    callback: value => (value >= 0 ? '+' : '') + value.toFixed(0) + ' U'
+                                }
+                            }
                         }
                     }
-                }
-            });
+                });
+            }
         }
 
         if (window.lucide) lucide.createIcons();
