@@ -92,11 +92,11 @@ ASSET_CLASS_PROFILES = {
     },
     "crypto": {
         "entry_threshold": 2.2,
-        "min_profit_ratio": 0.0200,
-        "tp_atr_mult": 2.5,
-        "sl_atr_mult": 1.5,
-        "trailing_kick_in": 1.5,
-        "trailing_pullback": 0.60
+        "min_profit_ratio": 0.0250,
+        "tp_atr_mult": 2.8,
+        "sl_atr_mult": 1.4,
+        "trailing_kick_in": 2.2,
+        "trailing_pullback": 0.80
     }
 }
 
@@ -874,15 +874,15 @@ def manage_position_tp_and_trailing(f, curr_pos, trackers, timestamp_full, execu
         cur_profit_px = entry_px - cur_px
         peak_profit_px = entry_px - t["lowWaterMark"]
 
-    # 1. Volatility Time-Stop Exit (After 3.5 Hours consolidation without expansion)
+    # 1. Volatility Time-Stop Exit (After 8 Hours dead consolidation without expansion)
     hold_duration_sec = now_ts - t["entryTs"]
-    if hold_duration_sec > 12600 and abs(cur_profit_px) < 0.25 * atr:
+    if hold_duration_sec > 28800 and abs(cur_profit_px) < 0.15 * atr:
         closed, close_detail = close_position_confirmed(inst_id, "long" if is_long else "short", pos_sz)
         if not closed:
             executed_actions.append(f"[{name}] 时间止损平仓失败，仓位仍保留: {close_detail}")
             return False, "平仓失败"
         close_fee = (pos_sz * ct_val * cur_px) * TAKER_FEE_RATE
-        executed_actions.append(f"[{name}] ⌛ 超过 3.5 小时无波动横盘，时间止损平仓释放保证金")
+        executed_actions.append(f"[{name}] ⌛ 超过 8 小时无波动横盘，时间止损平仓释放保证金")
         record_trade({
             "is_trade": True,
             "time": timestamp_full,
