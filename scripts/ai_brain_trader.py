@@ -26,6 +26,7 @@ AI_LAST_PROMPT_FILE = os.path.join(DATA_DIR, "ai_brain_last_prompt.txt")
 FACTOR_LIBRARY_FILE = os.path.join(DATA_DIR, "factor_library_snapshot.json")
 NEWS_SENTIMENT_FILE = os.path.join(DATA_DIR, "news_sentiment.json")
 AI_MEMORY_MD_FILE = os.path.join(DATA_DIR, "AI_TRADING_MEMORY.md")
+CALCULUS_SNAPSHOT_FILE = os.path.join(DATA_DIR, "calculus_snapshot.json")
 AI_MEMORY_FILE = os.path.join(DATA_DIR, "ai_trading_memory.json")
 AI_BRAIN_LOCK_FILE = os.path.join(DATA_DIR, ".ai_brain_cycle.lock")
 DECISION_MAX_AGE_SECONDS = 300
@@ -146,6 +147,7 @@ def fetch_single_instrument_package(item: Dict[str, Any]) -> Dict[str, Any]:
         "recent_15m": [],
         "recent_1h": [],
         "recent_4h": [],
+        "calculus": {"valid": False, "regime": "DATA_UNRELIABLE", "quality": 0.0},
         "data_quality": "invalid"
     }
 
@@ -306,6 +308,15 @@ def fetch_single_instrument_package(item: Dict[str, Any]) -> Dict[str, Any]:
         and len(pkg["recent_1h"]) >= 8
         and len(pkg["recent_4h"]) >= 6
     )
+    try:
+        from calculus_engine import calculate_multi_timeframe
+        pkg["calculus"] = calculate_multi_timeframe({
+            "15M": pkg["recent_15m"],
+            "1H": pkg["recent_1h"],
+            "4H": pkg["recent_4h"],
+        })
+    except Exception as exc:
+        pkg["calculus"] = {"valid": False, "regime": "DATA_UNRELIABLE", "quality": 0.0, "error": str(exc)}
     pkg["data_quality"] = "valid" if required_market_data else "invalid"
     return pkg
 
@@ -344,11 +355,23 @@ def construct_full_market_prompt(packages: List[Dict[str, Any]], pos_summary: st
         
         sm = p.get("smart_money", {})
         adx_val = p.get("adx_1h", "--")
-        
+        calc = p.get("calculus", {})
+        calc_tfs = calc.get("timeframes", {}) if isinstance(calc, dict) else {}
+        calc_line = (
+            f"状态={calc.get('regime', 'DATA_UNRELIABLE')} | 速度={calc.get('velocity', '--')} "
+            f"| 加速度={calc.get('acceleration', '--')} | 累计冲量={calc.get('impulse', '--')} "
+            f"| 最大冲击变化={calc.get('max_abs_jerk', '--')} | 质量={calc.get('quality', 0)}"
+        )
+        calc_tf_line = "；".join(
+            f"{tf}:v={v.get('velocity', '--')},a={v.get('acceleration', '--')},I={v.get('impulse', '--')},状态={v.get('regime', '--')}"
+            for tf, v in calc_tfs.items() if isinstance(v, dict)
+        )
         info = f"""---------------------------------------------------------
 【{p['name']} ({p['instId']})】| 数据质量: {quality} | 现价: {p['price']} | 24H涨跌: {p['chg24h']}% | 盘口买/卖: {p['bidPx']}/{p['askPx']}
 - 👑 顶级聪明钱 (SmartMoney Top100): 加权做多占比={sm.get('weighted_long_pct', 50)}% | 24H净流入={sm.get('net_flow_usdt', '--')} | 多头均价={sm.get('avg_long_entry', '--')} | 空头均价={sm.get('avg_short_entry', '--')} | {sm.get('top_win_rate', '')}
 - 📐 量化趋势与因子: 1H ADX趋势强度={adx_val} (注:<20无趋势垃圾市, ≥22强单边) | ATR(14)={p.get('atr', '--')} | RSI(14)={p.get('rsi', '--')} | VWAP乖离={p.get('vwap_bias', '--')}% | 15M量比={p.get('vol_ratio', '--')}x | OBV资金流={p.get('obv_flow', '--')}
+- ∫ 微积分状态 (因果已收盘K线): {calc_line}
+- ∂ 分周期速度/加速度/冲量: {calc_tf_line or '数据不足'}
 - 衍生品博弈: 资金费率: {p['fundingRate']}% | OI未平仓: {p['oiUsd']} | 多空比: {p['lsRatio']} | 5M主动吃单净差: {p['takerNetUsd']}
 - 15M K线(倒序12根 [O,H,L,C,V]): {k15}
 - 1H K线(倒序8根 [O,H,L,C,V]): {k1h}
@@ -584,6 +607,22 @@ def execute_batch_ai_brain_cycle(pos_summary: str = "当前总持仓 0/6", activ
                 pending_orders_list = []
     except Exception as e:
         print(f"[AI Brain Batch] Pending orders fetch warning: {e}")
+
+    try:
+        calculus_snapshot = {
+            "timestamp": time_str,
+            "engine": "causal-calculus-v1",
+            "instruments": [
+                {"name": p.get("name"), "instId": p.get("instId"), "calculus": p.get("calculus", {})}
+                for p in packages
+            ],
+        }
+        tmp_calc = CALCULUS_SNAPSHOT_FILE + ".tmp"
+        with open(tmp_calc, "w", encoding="utf-8") as f:
+            json.dump(calculus_snapshot, f, ensure_ascii=False, indent=2)
+        os.replace(tmp_calc, CALCULUS_SNAPSHOT_FILE)
+    except Exception as exc:
+        print(f"[AI Brain] Calculus snapshot warning: {exc}")
 
     prompt = construct_full_market_prompt(packages, pos_summary, active_positions_detail, pending_orders_detail=pending_orders_list, current_time_str=time_str, usdt_available=usdt_available)
     
