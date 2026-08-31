@@ -1998,7 +1998,7 @@
             if (!ctx) return;
 
             const acc = rawJsonData?.account || {};
-            const initialCapital = Number(acc.initial_capital || 4192.61);
+            const initialCapital = Number(acc.initial_capital || 4061.04);
             const closedTrades = (allTrades || []).filter(t => t.status !== 'holding');
             const points = (snapshots && snapshots.length > 0) ? snapshots : [];
 
@@ -2030,7 +2030,7 @@
             if (currentChartMode === 'equity') {
                 // Ensure we have data to plot
                 const displayPoints = points.length > 0 ? points : [
-                    { time: '2026-08-30 15:00:00', total_eq: initialCapital }
+                    { time: '2026-08-31 06:57:38', total_eq: initialCapital }
                 ];
 
                 const labels = displayPoints.map(p => {
@@ -2065,7 +2065,7 @@
                                 yAxisID: 'y'
                             },
                             {
-                                label: '初始本金基准 (4192.61 U)',
+                                label: '初始本金基准 (4061.04 U)',
                                 data: baselineValues,
                                 borderColor: '#707E94',
                                 borderWidth: 1.2,
@@ -2131,7 +2131,7 @@
                 if (sortedTrades.length === 0) {
                     sortedTrades.push({
                         inst: 'BTC',
-                        close_time: '2026-08-30 15:00:00',
+                        close_time: '2026-08-31 06:57:38',
                         pnl: 0,
                         roi_pct: 0,
                         strategy: '初始基准'
