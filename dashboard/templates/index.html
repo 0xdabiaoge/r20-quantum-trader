@@ -243,10 +243,10 @@
             <div class="terminal-panel p-3.5 sm:p-4">
                 <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 divide-y lg:divide-y-0 lg:divide-x divide-[#1A2232]">
                     
-                    <!-- Tile 1: 账户总权益 (Total Equity) -->
+                    <!-- Tile 1: 官方账户总权益 -->
                     <div class="flex flex-col justify-between pt-2 lg:pt-0 lg:px-2 first:pt-0 first:px-0">
                         <div class="flex items-center justify-between text-[11px] text-[#707E94] font-semibold">
-                            <span>官方账户总权益 (EQUITY)</span>
+                            <span>官方账户总权益</span>
                             <span class="font-mono text-[10px] text-[#3875F6]">USDT</span>
                         </div>
                         <div class="my-1">
@@ -254,14 +254,14 @@
                         </div>
                         <div class="flex items-center justify-between text-[11px] font-mono text-[#707E94] pt-1.5 border-t border-[#161D2B]">
                             <span>可用: <strong id="metric-avail" class="text-[#EAECEF]">--</strong></span>
-                            <span id="metric-margin-usage" class="text-[#707E94]">占用率: 0%</span>
+                            <span id="metric-margin-usage" class="text-[#707E94]">保证金占用: 0%</span>
                         </div>
                     </div>
 
-                    <!-- Tile 2: 累计净收益 (NAV Return) -->
+                    <!-- Tile 2: 累计净收益 -->
                     <div class="flex flex-col justify-between pt-2 lg:pt-0 lg:px-4">
                         <div class="flex items-center justify-between text-[11px] text-[#707E94] font-semibold">
-                            <span>累计净收益 (NAV PnL)</span>
+                            <span>累计净收益</span>
                             <span id="metric-cum-roi" class="font-mono text-[10px] font-bold text-[#0ECB81]">--</span>
                         </div>
                         <div class="my-1 flex items-baseline space-x-1.5">
@@ -269,15 +269,15 @@
                             <span class="text-[10px] font-mono text-[#707E94]">USDT</span>
                         </div>
                         <div class="flex items-center justify-between text-[11px] font-mono text-[#707E94] pt-1.5 border-t border-[#161D2B]">
-                            <span>ROI: <strong id="metric-cum-roi-label" class="text-[#0ECB81]">--</strong></span>
+                            <span>收益率: <strong id="metric-cum-roi-label" class="text-[#0ECB81]">--</strong></span>
                             <span>累计手续费: <strong id="metric-cum-fees" class="text-[#EAECEF]">--</strong></span>
                         </div>
                     </div>
 
-                    <!-- Tile 3: 今日已结盈亏 (Realized PnL) -->
+                    <!-- Tile 3: 今日已结盈亏 -->
                     <div class="flex flex-col justify-between pt-2 lg:pt-0 lg:px-4">
                         <div class="flex items-center justify-between text-[11px] text-[#707E94] font-semibold">
-                            <span>今日已结盈亏 (REALIZED)</span>
+                            <span>今日已结盈亏</span>
                             <span id="metric-today-wr" class="font-mono text-[10px] font-bold text-[#EAECEF]">胜率: 0%</span>
                         </div>
                         <div class="my-1 flex items-baseline space-x-1.5">
@@ -285,15 +285,15 @@
                             <span class="text-[10px] font-mono text-[#707E94]">USDT</span>
                         </div>
                         <div class="flex items-center justify-between text-[11px] font-mono text-[#707E94] pt-1.5 border-t border-[#161D2B]">
-                            <span class="text-[#707E94]">今日基准: 00:00~24:00</span>
-                            <span>手续费: <strong id="metric-fees" class="text-[#EAECEF]">0 U</strong></span>
+                            <span>今日战绩: <strong id="metric-today-record" class="text-white">0胜 / 0负</strong></span>
+                            <span>今日手续费: <strong id="metric-fees" class="text-[#EAECEF]">0 U</strong></span>
                         </div>
                     </div>
 
-                    <!-- Tile 4: 在途持仓浮盈 (Active Positions & UPL) -->
+                    <!-- Tile 4: 在途持仓浮盈 -->
                     <div class="flex flex-col justify-between pt-2 lg:pt-0 lg:px-4">
                         <div class="flex items-center justify-between text-[11px] text-[#707E94] font-semibold">
-                            <span>在途持仓浮盈 (UNREALIZED)</span>
+                            <span>在途持仓浮盈</span>
                             <span id="metric-pos-count" class="font-mono text-[10px] font-bold text-[#3875F6]">0/6 仓</span>
                         </div>
                         <div class="my-1 flex items-baseline space-x-1.5">
@@ -302,19 +302,19 @@
                         </div>
                         <div class="flex items-center justify-between text-[11px] font-mono text-[#707E94] pt-1.5 border-t border-[#161D2B]">
                             <span id="metric-pos-direction">0 多 / 0 空</span>
-                            <span class="text-[#0ECB81] font-semibold">100% 云端OCO保护</span>
+                            <span class="text-[#0ECB81] font-semibold">云端止盈止损守护</span>
                         </div>
                     </div>
 
                 </div>
             </div>
             
-            <!-- 1. 实盘活动持仓 (Active Positions) -->
+            <!-- 1. 实盘在途持仓 -->
             <div class="terminal-panel p-4 sm:p-5">
                 <div class="flex items-center justify-between pb-3.5 mb-3 border-b border-[#1A2232]">
                     <div class="flex items-center space-x-2">
                         <div class="w-2 h-2 rounded-full bg-[#0ECB81]"></div>
-                        <h2 class="text-xs sm:text-sm font-bold text-white font-mono tracking-wide uppercase">实盘在途持仓 (Active Positions)</h2>
+                        <h2 class="text-xs sm:text-sm font-bold text-white font-mono tracking-wide">实盘在途持仓</h2>
                         <span class="text-[11px] text-[#707E94] hidden sm:inline">• 交易所毫秒级实时盯盘</span>
                     </div>
                     <div class="flex items-center space-x-2">
@@ -351,13 +351,13 @@
                 </div>
             </div>
 
-            <!-- 2. 在途限价挂单 (Pending Maker Orders) -->
+            <!-- 2. 在途限价挂单 -->
             <div class="terminal-panel p-4 sm:p-5">
                 <div class="flex items-center justify-between pb-3.5 mb-3 border-b border-[#1A2232]">
                     <div class="flex items-center space-x-2">
                         <div class="w-2 h-2 rounded-full bg-[#F0B90B]"></div>
-                        <h2 class="text-xs sm:text-sm font-bold text-white font-mono tracking-wide uppercase">在途限价挂单 (Pending Maker Orders)</h2>
-                        <span class="text-[11px] text-[#707E94] hidden sm:inline">• 盘口 Maker 挂单 (费率仅万2) · AI自主审查动态撤单</span>
+                        <h2 class="text-xs sm:text-sm font-bold text-white font-mono tracking-wide">在途限价挂单</h2>
+                        <span class="text-[11px] text-[#707E94] hidden sm:inline">• 盘口做市挂单 · 费率仅万2 · AI动态撤单</span>
                     </div>
                     <span class="px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-[#0A0D14] text-[#F0B90B] border border-[#1A2232]">
                         <span id="pending-orders-count">0</span> 笔挂单在途
@@ -391,24 +391,24 @@
                 </div>
             </div>
 
-            <!-- 3. 资产总权益与逐单盈亏叠加透视 (Equity & Trade PnL Combo) -->
+            <!-- 3. 资产总权益与逐单盈亏 -->
             <div class="terminal-panel p-4 sm:p-5">
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-3 mb-2.5 border-b border-[#1A2232]">
                     <div class="flex items-center space-x-2">
                         <div class="w-2 h-2 rounded-full bg-[#3875F6]"></div>
-                        <h2 class="text-xs sm:text-sm font-bold text-white font-mono tracking-wide uppercase">资产总权益与逐单盈亏叠加透视 (Equity & Trade PnL)</h2>
+                        <h2 class="text-xs sm:text-sm font-bold text-white font-mono tracking-wide">总权益与逐单盈亏透视</h2>
                     </div>
 
                     <!-- Clean Dual-Axis Legend -->
                     <div class="flex items-center space-x-3 text-[11px] font-mono">
                         <span class="inline-flex items-center text-[#0ECB81]">
-                            <span class="w-2.5 h-0.5 bg-[#0ECB81] mr-1.5 rounded-full"></span> 账户总权益(左轴)
+                            <span class="w-2.5 h-0.5 bg-[#0ECB81] mr-1.5 rounded-full"></span> 账户总权益
                         </span>
                         <span class="inline-flex items-center text-[#707E94]">
-                            <span class="w-2.5 h-0.5 border-t border-dashed border-[#707E94] mr-1.5"></span> 初始基准(4192.61 U)
+                            <span class="w-2.5 h-0.5 border-t border-dashed border-[#707E94] mr-1.5"></span> 初始基准 (4192.61 U)
                         </span>
                         <span class="inline-flex items-center text-[#EAECEF]">
-                            <span class="w-2 h-2 bg-[#0ECB81] mr-0.5 rounded-sm"></span><span class="w-2 h-2 bg-[#F6465D] mr-1.5 rounded-sm"></span> 逐单盈亏柱(右轴)
+                            <span class="w-2 h-2 bg-[#0ECB81] mr-0.5 rounded-sm"></span><span class="w-2 h-2 bg-[#F6465D] mr-1.5 rounded-sm"></span> 逐单盈亏柱
                         </span>
                     </div>
                 </div>
@@ -440,7 +440,7 @@
                 <div class="flex items-center justify-between pb-3.5 mb-3 border-b border-[#1A2232]">
                     <div class="flex items-center space-x-2">
                         <div class="w-2 h-2 rounded-full bg-[#3875F6]"></div>
-                        <h2 class="text-xs sm:text-sm font-bold text-white font-mono tracking-wide uppercase">AI 大脑实时决策与全维因子矩阵 (6 大核心加密资产)</h2>
+                        <h2 class="text-xs sm:text-sm font-bold text-white font-mono tracking-wide">AI 大脑实时决策与全维因子矩阵 (6 大核心加密资产)</h2>
                     </div>
                     <div class="flex items-center space-x-2">
                         <div class="hidden sm:flex items-center space-x-1.5 px-2 py-0.5 rounded bg-[#0A0D14] border border-[#1A2232] text-xs font-mono">
@@ -464,7 +464,7 @@
                 <div class="flex items-center justify-between pb-3.5 mb-3 border-b border-[#1A2232]">
                     <div class="flex items-center space-x-2">
                         <div class="w-2 h-2 rounded-full bg-cyan-400"></div>
-                        <h2 class="text-xs sm:text-sm font-bold text-white font-mono tracking-wide uppercase">AI 大脑历史决策推演审计流 (Decision Audit Log)</h2>
+                        <h2 class="text-xs sm:text-sm font-bold text-white font-mono tracking-wide">AI 大脑历史决策推演审计流</h2>
                     </div>
                 </div>
                 <div id="ai-history-timeline" class="space-y-3 max-h-[420px] overflow-y-auto custom-scrollbar pr-1">
@@ -481,7 +481,7 @@
                 <div class="flex items-center justify-between pb-3.5 mb-3 border-b border-[#1A2232]">
                     <div class="flex items-center space-x-2">
                         <div class="w-2 h-2 rounded-full bg-[#F0B90B]"></div>
-                        <h2 class="text-xs sm:text-sm font-bold text-white font-mono tracking-wide uppercase">全网重大资讯与多币种舆情指数 (News Intelligence)</h2>
+                        <h2 class="text-xs sm:text-sm font-bold text-white font-mono tracking-wide">全网重大资讯与多币种舆情指数</h2>
                     </div>
                     <div class="text-xs font-mono text-[#707E94]">
                         宏观环境: <strong id="news-macro-env" class="text-[#0ECB81]">偏多震荡</strong>
@@ -492,7 +492,7 @@
                     <!-- Left: Coins Sentiment (5 cols) -->
                     <div class="lg:col-span-5 terminal-subpanel p-3.5">
                         <div class="flex items-center justify-between mb-2.5 pb-2 border-b border-[#161D2B]">
-                            <h3 class="text-xs font-bold text-white font-mono uppercase">标的多空情绪指数</h3>
+                            <h3 class="text-xs font-bold text-white font-mono">标的多空情绪指数</h3>
                             <span id="news-sentiment-time" class="text-[10px] font-mono text-[#707E94]">--</span>
                         </div>
                         <div id="coin-sentiments-grid" class="grid grid-cols-2 sm:grid-cols-5 gap-2">
@@ -503,7 +503,7 @@
                     <!-- Right: News Feed (7 cols) -->
                     <div class="lg:col-span-7 terminal-subpanel p-3.5 flex flex-col justify-between">
                         <div class="flex items-center justify-between mb-2.5 pb-2 border-b border-[#161D2B]">
-                            <h3 class="text-xs font-bold text-white font-mono uppercase">24H 重点快讯情报流</h3>
+                            <h3 class="text-xs font-bold text-white font-mono">24H 重点快讯情报流</h3>
                             <span id="news-feed-time" class="text-[10px] font-mono text-[#3875F6]">实时抓取</span>
                         </div>
                         <div id="news-headlines-container" class="space-y-2 max-h-[340px] overflow-y-auto custom-scrollbar pr-1">
@@ -523,7 +523,7 @@
                 <div class="flex items-center justify-between pb-3.5 mb-3 border-b border-[#1A2232]">
                     <div class="flex items-center space-x-2">
                         <div class="w-2 h-2 rounded-full bg-purple-400"></div>
-                        <h2 class="text-xs sm:text-sm font-bold text-white font-mono tracking-wide uppercase">AI 交易大脑启发式长期记忆库 (AI Trading Memory)</h2>
+                        <h2 class="text-xs sm:text-sm font-bold text-white font-mono tracking-wide">AI 交易大脑启发式长期记忆库</h2>
                     </div>
                     <div class="flex items-center space-x-2">
                         <div class="hidden sm:flex items-center space-x-1.5 px-2 py-0.5 rounded bg-[#0A0D14] border border-[#1A2232] text-xs font-mono">
@@ -547,7 +547,7 @@
                 <div class="flex items-center justify-between pb-3.5 mb-3 border-b border-[#1A2232]">
                     <div class="flex items-center space-x-2">
                         <div class="w-2 h-2 rounded-full bg-indigo-400"></div>
-                        <h2 class="text-xs sm:text-sm font-bold text-white font-mono tracking-wide uppercase">AI 认知复盘与痛点归因 (Cognitive Post-Mortem)</h2>
+                        <h2 class="text-xs sm:text-sm font-bold text-white font-mono tracking-wide">AI 认知复盘与痛点归因</h2>
                     </div>
                     <div class="text-xs font-mono text-[#707E94] hidden sm:flex items-center space-x-1.5">
                         <span>决策机制:</span>
@@ -557,7 +557,7 @@
 
                 <div class="terminal-subpanel p-3.5">
                     <div class="flex items-center justify-between mb-2.5 pb-2 border-b border-[#161D2B]">
-                        <h3 class="text-xs font-bold text-white font-mono uppercase">AI 逐单归因与痛点诊断</h3>
+                        <h3 class="text-xs font-bold text-white font-mono">AI 逐单归因与痛点诊断</h3>
                         <span id="lab-insights-time" class="text-[10px] font-mono text-[#707E94]">--</span>
                     </div>
                     <div id="ai-insights-container" class="space-y-2 text-xs max-h-[300px] overflow-y-auto custom-scrollbar pr-1">
@@ -568,7 +568,7 @@
 
             <!-- 3. Performance Leaderboard -->
             <div class="terminal-panel p-4 sm:p-5">
-                <h3 class="text-xs sm:text-sm font-bold text-white font-mono uppercase mb-3">标的盈亏与胜率贡献榜</h3>
+                <h3 class="text-xs sm:text-sm font-bold text-white font-mono mb-3">标的盈亏与胜率贡献榜</h3>
                 <div class="overflow-x-auto custom-scrollbar">
                     <table class="w-full text-left font-mono">
                         <thead>
@@ -597,7 +597,7 @@
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-3.5 mb-3 border-b border-[#1A2232]">
                     <div class="flex items-center space-x-2">
                         <div class="w-2 h-2 rounded-full bg-blue-500"></div>
-                        <h2 class="text-xs sm:text-sm font-bold text-white font-mono tracking-wide uppercase">生命周期交易台账 (Lifecycle Trades)</h2>
+                        <h2 class="text-xs sm:text-sm font-bold text-white font-mono tracking-wide">生命周期交易台账</h2>
                     </div>
                     
                     <!-- Search & Filter Pill Buttons -->
@@ -636,7 +636,7 @@
                 <div class="flex items-center justify-between pb-3.5 mb-3 border-b border-[#1A2232]">
                     <div class="flex items-center space-x-2">
                         <i data-lucide="terminal" class="w-3.5 h-3.5 text-blue-400"></i>
-                        <h3 class="text-xs font-bold text-white font-mono tracking-wide uppercase">R20 AI 大脑量化引擎巡检日志</h3>
+                        <h3 class="text-xs font-bold text-white font-mono tracking-wide">AI 大脑量化引擎巡检日志</h3>
                     </div>
                 </div>
                 <div id="logs-container" class="terminal-subpanel text-[#EAECEF] p-3.5 font-mono text-xs max-h-60 overflow-y-auto custom-scrollbar space-y-1">
@@ -1121,7 +1121,9 @@
                     todayPnlEl.className = `text-xl sm:text-2xl font-extrabold font-mono tracking-tight ${todayPnl >= 0 ? 'text-[#0ECB81]' : 'text-[#F6465D]'}`;
                 }
                 const todayWrEl = document.getElementById('metric-today-wr');
-                if (todayWrEl) todayWrEl.innerText = `胜率: ${todayWr.toFixed(1)}% (${todayWins}胜/${todayLosses}负)`;
+                if (todayWrEl) todayWrEl.innerText = `胜率: ${todayWr.toFixed(1)}%`;
+                const todayRecEl = document.getElementById('metric-today-record');
+                if (todayRecEl) todayRecEl.innerText = `${todayWins}胜 / ${todayLosses}负`;
                 const todayFeeEl = document.getElementById('metric-fees');
                 if (todayFeeEl) todayFeeEl.innerText = `${todayFee.toFixed(2)} U`;
 
