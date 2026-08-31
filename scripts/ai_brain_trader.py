@@ -401,7 +401,17 @@ SYSTEM_PROMPT = """你是一名管理顶级加密量化对冲基金的首席AI�
 6. 顺势浮盈金字塔加仓 (Pyramiding) 准则：
    - 仅允许对底仓已盈利/保本、且 1H 顺势动量持续加速(a ≥ 0) 的优质波段追加 1 次仓位，严禁逆势补仓。
 
-7. 必须输出严格标准 JSON 对象，包含全市场宏观评估(macro_assessment)、在途持仓管理(position_management)、在途挂单管理(pending_orders_management)与针对每个标的的决策字典(decisions)。
+7. 🎯 在途持仓管理与科学提前止损准则 (Position Management & Scientific Cut-Loss)：
+   - 【何时坚决继续持有 (HOLD)】：若 1H 结构完好、回踩属于正常波段震荡（在 1H ATR 范围内）、微积分动能未见大级别破位，必须保持大波段持仓耐心，严禁因 15M 级别短线微小波动惊慌平仓；
+   - 【何时必须果断提前止损 (CLOSE_MARKET)】：
+     若出现以下【真实大级别趋势逆转】信号之一且置信度 ≥ 85%，AI 首席交易官必须果断输出 CLOSE_MARKET 提前斩仓止损，将亏损截断在萌芽阶段，绝不死等吃满交易所底线硬止损：
+     ① **1H 核心波段结构破位**：例如多单持仓中，1H 实体大阴线放量跌穿 1H EMA55 关键支撑或破前低，4H 大势反转；
+     ② **微积分动力学剧烈逆转**：出现 1H 加速度严重下泄断崖 (a < -0.30) 且加加速度冲击 (|j| ≥ 1.8)，概率论击穿概率 ≥ 75%；
+     ③ **突发系统性黑天鹅/利空**：突发交易所或宏观重大系统性风险；
+     ④ **聪明钱主力反向大举出逃**：OKX Top100 聪明钱由做多瞬间转为大举净流出与集中做空；
+   - 【何时移动止损锁利 (UPDATE_SL)】：只有当底仓浮盈真正脱离成本区 (浮盈 ≥ 1.2x 1H ATR) 且新止损与现价保留至少 0.7x 1H ATR 安全呼吸缓冲区时，方可上移止损锁定波段胜果。
+
+8. 必须输出严格标准 JSON 对象，包含全市场宏观评估(macro_assessment)、在途持仓管理(position_management)、在途挂单管理(pending_orders_management)与针对每个标的的决策字典(decisions)。
 """
 
 def construct_full_market_prompt(packages: List[Dict[str, Any]], pos_summary: str = "当前总持仓 0/6", active_positions_detail: List[Dict[str, Any]] = None, pending_orders_detail: List[Dict[str, Any]] = None, current_time_str: str = "", usdt_available: float = 0.0) -> str:
@@ -565,7 +575,11 @@ def construct_full_market_prompt(packages: List[Dict[str, Any]], pos_summary: st
 ================================================================================
 【推演与决策任务】:
 你拥有【最高决策主权】，请不要受任何单一死板指标的束缚，全权由你作为首席交易官根据上述【全网快讯资讯】、【多周期K线形态】、【盘口深度】与【聪明钱资金流向】进行综合直觉与量化推演：
-1. 【在途持仓管理】：对当前已有持仓逐一分析（如 LINK/ETH 等）：当前行情动能如何？是继续持有(HOLD)、提止损保本、止盈平仓(CLOSE)、还是逢高/破位止损平仓？给出持仓调整策略。
+1. 【在途持仓管理 (科学持仓与动态风控)】：
+   - 逐一分析当前在途持仓：
+     • 若 1H 波段趋势完好且微积分动能平稳，坚决坚定持有 (HOLD)，给大波段充分呼吸空间；
+     • 若出现【1H 结构破位 / 动能加速度严重逆转 / 聪明钱反向出逃】等真实趋势逆转信号且置信度 ≥ 85%，果断输出 CLOSE_MARKET 提前斩仓止损，杜绝死等硬止损；
+     • 若底仓浮盈已超过 1.2x 1H ATR 且需锁定利润，输出 UPDATE_SL 并确保新止损与现价保留 0.7x 1H ATR 安全缓冲，严禁贴脸移动止损。
 2. 【在途限价挂单生命周期审查与裁决 (Pending Orders Management)】：
    - 仔细审查上述在途未成交挂单：若挂单价格已大幅偏离最新盘口、或者行情动能/突发要闻已转变导致原挂单计划失效，必须在 pending_orders_management 中为该挂单输出 CANCEL 立即撤单指令，防止挂单成交在不利价格；若原计划仍然有效且价格合适，输出 KEEP 维持挂单。
 3. 【多空开仓与顺势浮盈加仓全权裁决 (Opening & Pyramiding)】：
