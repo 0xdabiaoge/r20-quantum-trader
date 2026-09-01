@@ -31,6 +31,9 @@ from r20_backend.audit import recent as recent_audit, record as audit_record
 from r20_backend.schedule_store import load_schedule, save_schedule
 from r20_backend.wechat_login import create_qrcode, latest_session, qrcode_status
 from r20_backend.wechat_watcher import public_state as wechat_watcher_state, reset_watcher_state, start_watcher, stop_watcher
+from r20_gateway.publisher import DB_PATH as GATEWAY_DB_PATH
+from r20_gateway.store import GatewayStore
+from r20_gateway.supervisor import start_supervisor as start_gateway_supervisor, stop_supervisor as stop_gateway_supervisor
 from scripts.instrument_pool import from_okx_instrument, load_instruments, save_instruments
 
 PROMPT_OVERRIDE_FILE = DATA_DIR / "system_prompt_override.txt"
@@ -40,7 +43,9 @@ STARTED_AT = time.time()
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     start_watcher()
+    start_gateway_supervisor()
     yield
+    stop_gateway_supervisor()
     stop_watcher()
 
 
@@ -242,6 +247,23 @@ def admin_audit(x_r20_admin_token: str | None = Header(default=None), limit: int
     refresh_settings()
     require_admin_header(x_r20_admin_token)
     return {"records": recent_audit(limit)}
+
+
+@app.get("/api/v1/admin/gateway")
+def gateway_status(x_r20_admin_token: str | None = Header(default=None), limit: int = 50) -> dict[str, Any]:
+    refresh_settings()
+    require_admin_header(x_r20_admin_token)
+    store = GatewayStore(GATEWAY_DB_PATH)
+    pid_file = DATA_DIR / "r20_gateway.pid"
+    pid = int(pid_file.read_text().strip()) if pid_file.exists() and pid_file.read_text().strip().isdigit() else 0
+    running = False
+    if pid:
+        try:
+            os.kill(pid, 0)
+            running = True
+        except OSError:
+            pass
+    return {"version": "0.1.0", "running": running, "pid": pid or None, "stats": store.stats(), "deliveries": store.recent(limit)}
 
 
 @app.get("/api/v1/admin/config")

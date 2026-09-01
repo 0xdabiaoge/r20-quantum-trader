@@ -97,6 +97,42 @@ def _send_wechat_ilink(env: dict[str, str], message: str) -> tuple[bool, str]:
     return True, detail
 
 
+def enabled_channels(env: dict[str, str] | None = None) -> list[str]:
+    env = env or _env()
+    channels = []
+    for channel in ("webhook", "wechat", "wechat_ilink", "telegram", "qq"):
+        if env.get(f"R20_NOTIFY_{channel.upper()}_ENABLED") == "1":
+            channels.append(channel)
+    return channels
+
+
+def send_channel(channel: str, message: str, env: dict[str, str] | None = None) -> tuple[bool, str]:
+    env = env or _env()
+    if channel == "webhook":
+        url = env.get("R20_NOTIFICATION_WEBHOOK", "")
+        if not url:
+            return False, "通用 Webhook URL 未配置"
+        ok, detail, response = _post_json(url, {"source": "R20 Quantum Trader", "message": message})
+        return ok, detail if ok else f"{detail} {response}"
+    if channel == "wechat":
+        url = env.get("R20_WECHAT_WEBHOOK", "")
+        if not url:
+            return False, "企业微信 Webhook 未配置"
+        ok, detail, response = _post_json(url, {"msgtype": "text", "text": {"content": message}})
+        return ok, detail if ok else f"{detail} {response}"
+    if channel == "wechat_ilink":
+        return _send_wechat_ilink(env, message)
+    if channel == "telegram":
+        token, chat_id = env.get("R20_TELEGRAM_BOT_TOKEN", ""), env.get("R20_TELEGRAM_CHAT_ID", "")
+        if not token or not chat_id:
+            return False, "Telegram Bot Token / Chat ID 未完整配置"
+        ok, detail, response = _post_json(f"https://api.telegram.org/bot{urllib.parse.quote(token, safe='')}/sendMessage", {"chat_id": chat_id, "text": message})
+        return ok, detail if ok else f"{detail} {response}"
+    if channel == "qq":
+        return _send_qq(env, message)
+    return False, f"未知通知通道：{channel}"
+
+
 def notify(text: str) -> dict[str, str]:
     env = _env()
     tz_bj = datetime.timezone(datetime.timedelta(hours=8))
