@@ -18,12 +18,17 @@ class OKXClient:
 
     def _request(self, method: str, path: str, params: dict[str, Any] | None = None) -> Any:
         params = params or {}
-        query = urlencode(params)
-        url = f"{self.base_url}{path}" + (f"?{query}" if query else "")
+        method = method.upper()
+        query = urlencode(params) if method == "GET" else ""
+        request_path = path + (f"?{query}" if query else "")
+        url = f"{self.base_url}{request_path}"
+        body = json.dumps(params, separators=(",", ":")).encode("utf-8") if method != "GET" else None
         headers = {"User-Agent": "R20-Standalone/5.4.2"}
+        if body:
+            headers["Content-Type"] = "application/json"
         if settings.okx_api_key and settings.okx_secret_key and settings.okx_passphrase:
             timestamp = datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
-            prehash = timestamp + method.upper() + path + (f"?{query}" if query else "")
+            prehash = timestamp + method + request_path + (body.decode("utf-8") if body else "")
             digest = hmac.new(settings.okx_secret_key.encode(), prehash.encode(), hashlib.sha256).digest()
             headers.update({
                 "OK-ACCESS-KEY": settings.okx_api_key,
@@ -33,7 +38,7 @@ class OKXClient:
             })
             if settings.okx_simulated:
                 headers["x-simulated-trading"] = "1"
-        req = Request(url, headers=headers, method=method.upper())
+        req = Request(url, data=body, headers=headers, method=method)
         with urlopen(req, timeout=10) as response:
             payload = json.loads(response.read().decode("utf-8"))
         if payload.get("code") not in (None, "0", 0):
@@ -57,3 +62,12 @@ class OKXClient:
 
     def positions(self) -> Any:
         return self._request("GET", "/api/v5/account/positions", {"instType": "SWAP"})
+
+    def close_position(self, inst_id: str, pos_side: str) -> Any:
+        if pos_side not in {"long", "short"}:
+            raise ValueError("pos_side must be long or short")
+        return self._request(
+            "POST",
+            "/api/v5/trade/close-position",
+            {"instId": inst_id, "mgnMode": "cross", "posSide": pos_side, "autoCxl": "true"},
+        )

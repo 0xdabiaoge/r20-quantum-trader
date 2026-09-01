@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>R20 管理后台</title>
+  <style>
+    :root { color-scheme: dark; --bg:#090d14; --panel:#101722; --line:#223047; --text:#e6edf7; --muted:#8492a6; --blue:#3b82f6; --green:#10b981; --red:#f43f5e; }
+    * { box-sizing:border-box; } body { margin:0; background:var(--bg); color:var(--text); font:14px ui-monospace,SFMono-Regular,Menlo,monospace; }
+    main { max-width:980px; margin:0 auto; padding:32px 20px 64px; } header { display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--line); padding-bottom:18px; margin-bottom:22px; }
+    h1 { margin:0; font-size:20px; } .version { color:var(--blue); } .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; } section { border:1px solid var(--line); background:var(--panel); padding:18px; border-radius:8px; }
+    section.wide { grid-column:1 / -1; } h2 { font-size:14px; margin:0 0 14px; } label { display:block; color:var(--muted); margin:11px 0 5px; } input, select { width:100%; border:1px solid var(--line); border-radius:5px; background:#0b111b; color:var(--text); padding:10px; font:inherit; }
+    button { border:1px solid #285ab0; background:#123466; color:#eaf2ff; padding:10px 14px; border-radius:5px; cursor:pointer; font:inherit; } button.danger { border-color:#8e2940; background:#4a1722; } button:disabled { opacity:.45; cursor:not-allowed; }
+    .row { display:flex; gap:10px; align-items:center; } .status { color:var(--muted); font-size:12px; } .notice { margin-top:12px; min-height:18px; } .ok { color:var(--green); } .error { color:var(--red); } .warn { color:#fbbf24; } .check { display:flex; gap:8px; align-items:center; margin-top:14px; color:var(--text); } .check input { width:auto; }
+    .credentials { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; color:var(--muted); font-size:12px; } .credentials strong { display:block; color:var(--text); overflow-wrap:anywhere; margin-top:4px; }
+    @media(max-width:700px) { .grid { grid-template-columns:1fr; } .credentials { grid-template-columns:1fr; } }
+  </style>
+</head>
+<body><main>
+  <header><div><h1>R20 QUANTUM / 管理后台 <span class="version">v5.4.2</span></h1><p class="status">独立部署配置面 · 密钥仅本机 .env 保存 · API 始终脱敏回显</p></div><div class="row"><input id="header_token" type="password" placeholder="管理员令牌" style="width:220px"><button id="unlock">解锁后台</button><a href="/docs" class="status">API Docs</a></div></header>
+  <section class="wide"><h2>当前配置状态</h2><div id="credentials" class="credentials">加载中...</div><div id="notice" class="notice"></div></section>
+  <div class="grid">
+    <section><h2>OKX 交易所</h2><label>API Key</label><input id="okx_api_key" type="password" placeholder="留空则保持现有值"><label>Secret Key</label><input id="okx_secret_key" type="password" placeholder="留空则保持现有值"><label>Passphrase</label><input id="okx_passphrase" type="password" placeholder="留空则保持现有值"><label>环境</label><select id="okx_simulated"><option value="false">实盘</option><option value="true">模拟盘</option></select><p class="status">保存后，独立 REST 后台立即使用新凭证；旧 CLI 执行链需按部署文档迁移。</p></section>
+    <section><h2>LLM 主脑</h2><label>Base URL</label><input id="llm_base_url" placeholder="https://api.openai.com/v1"><label>API Key</label><input id="llm_api_key" type="password" placeholder="留空则保持现有值"><label>模型</label><input id="llm_model" placeholder="gemini-3.7-flash-high"><p class="status">策略脚本在下一次独立进程执行时读取新的 .env。</p></section>
+    <section><h2>通知</h2><label>通知 Webhook</label><input id="notification_webhook" placeholder="https://..."><p class="status">发送 JSON：source、timestamp、message。空值可清除通知通道。</p></section>
+    <section><h2>管理员与手动平仓</h2><label>管理员令牌</label><input id="admin_token" type="password" placeholder="首次设置必填；留空保持现有值"><label class="check"><input id="manual_close_enabled" type="checkbox"> 允许后台手动平仓</label><p class="status">手动平仓需要：开启本开关 + 管理员令牌 + 精确确认短语。默认关闭。</p></section>
+  </div>
+  <section class="wide"><div class="row"><button id="save">保存配置</button><span class="status">保存会把 `.env` 权限收紧为 0600。</span></div></section>
+  <section class="wide"><h2>手动平仓（高风险操作）</h2><div class="grid"><div><label>合约</label><input id="close_inst" placeholder="BTC-USDT-SWAP"><label>方向</label><select id="close_side"><option value="long">平多</option><option value="short">平空</option></select></div><div><label>管理员令牌</label><input id="close_token" type="password"><label>确认短语</label><input id="close_confirm" placeholder="CLOSE BTC-USDT-SWAP LONG"><button id="close" class="danger">确认市价平仓</button></div></div><p class="status">操作会调用 OKX 官方 close-position，附带 `autoCxl=true`。只允许平已有的单边仓位。</p></section>
+</main><script>
+const $=id=>document.getElementById(id); let token=''; const notice=(text,kind='')=>{const el=$('notice');el.className='notice '+kind;el.textContent=text};
+async function api(path, options={}) { const headers={'Content-Type':'application/json','X-R20-Admin-Token':token,...(options.headers||{})}; const r=await fetch(path,{...options,headers}); const d=await r.json(); if(!r.ok) throw new Error(d.detail||'请求失败'); return d; }
+function setStatus(data){ const c=data.configuration; $('credentials').innerHTML=Object.entries(c).map(([key,val])=>`<div>${key}<strong>${val || '未配置'}</strong></div>`).join(''); $('llm_base_url').value=data.editable.llm_base_url||''; $('llm_model').value=data.editable.llm_model||''; $('notification_webhook').value=data.editable.notification_webhook||''; $('okx_simulated').value=String(data.editable.okx_simulated); $('manual_close_enabled').checked=data.editable.manual_close_enabled; }
+async function load(){try{setStatus(await api('/api/v1/admin/config'));notice('后台已解锁。','ok')}catch(e){notice(e.message,'error')}}
+$('unlock').onclick=()=>{token=$('header_token').value;load()};
+$('save').onclick=async()=>{ const body={okx_api_key:$('okx_api_key').value||undefined,okx_secret_key:$('okx_secret_key').value||undefined,okx_passphrase:$('okx_passphrase').value||undefined,okx_simulated:$('okx_simulated').value==='true',llm_base_url:$('llm_base_url').value,llm_api_key:$('llm_api_key').value||undefined,llm_model:$('llm_model').value,notification_webhook:$('notification_webhook').value,admin_token:$('admin_token').value||undefined,manual_close_enabled:$('manual_close_enabled').checked}; try{const result=await api('/api/v1/admin/config',{method:'PUT',body:JSON.stringify(body)}); notice('配置已安全写入本地 .env，并已刷新独立后台配置。'+(result.restart_note||''),'ok');['okx_api_key','okx_secret_key','okx_passphrase','llm_api_key','admin_token'].forEach(id=>$(id).value=''); await load()}catch(e){notice(e.message,'error')}};
+$('close').onclick=async()=>{try{const d=await api('/api/v1/admin/positions/close',{method:'POST',body:JSON.stringify({inst_id:$('close_inst').value,position_side:$('close_side').value,admin_token:$('close_token').value,confirmation:$('close_confirm').value})});notice('OKX 已受理平仓请求：'+JSON.stringify(d.result),'ok')}catch(e){notice('平仓未执行：'+e.message,'error')}};
+</script></body></html>

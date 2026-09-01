@@ -19,6 +19,8 @@ chmod 600 .env
 
 Set `LLM_*` and `OKX_*` credentials in `.env`. Never commit this file.
 
+Before the first launch, set a random `R20_SETUP_TOKEN` in `.env`. Open `/admin`, enter it to unlock the setup page, then set a permanent administrator token. The page never displays configured secret values. `.env` is written atomically and set to permission mode `0600`.
+
 The standalone backend uses `OKX_*` for native read-only REST calls. Existing strategy execution remains on the local OKX CLI bridge during this migration phase; move that bridge's credentials to the target host before enabling the scheduler.
 
 ## Run Locally
