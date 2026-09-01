@@ -904,18 +904,64 @@ def manage_position_tp_and_trailing(f, curr_pos, trackers, timestamp_full, execu
         if pos_key in trackers: del trackers[pos_key]
         return True, "时间止损"
 
-    # 2. Peak Pullback Trailing Exit (Dynamic Whole Position Exit)
-    trailing_kick = profile.get("trailing_kick_in", 1.2) * atr
-    trailing_pull = profile.get("trailing_pullback", 0.5) * atr
-
+    # 2. Three-Tier Ratchet Profit-Locking & Momentum Take-Profit Engine
+    # Tier 1: Breakeven Lock at +1.0x ATR profit (Guarantee 100% risk-free trade)
+    # Tier 2: 50% Profit Lock-In at +1.8x ATR profit (Lock in at least +0.9x ATR solid profit)
+    # Tier 3: Kinetic Reversal Exit from Peak (Protect accumulated big wins)
+    
+    tier1_breakeven_trigger = 1.0 * atr
+    tier2_lock_trigger = 1.8 * atr
+    
     if is_long:
-        if peak_profit_px >= trailing_kick and cur_px <= (t["highWaterMark"] - trailing_pull):
+        # Dynamic Ratchet Stop Calculation
+        dynamic_floor_sl = t["trailingStopPx"]
+        if peak_profit_px >= tier2_lock_trigger:
+            dynamic_floor_sl = max(dynamic_floor_sl, entry_px + 0.9 * atr)
+            t["stage_desc"] = f"锁定大波段利润 (保底止损 {dynamic_floor_sl})"
+        elif peak_profit_px >= tier1_breakeven_trigger:
+            dynamic_floor_sl = max(dynamic_floor_sl, entry_px + 0.0015 * entry_px)
+            t["stage_desc"] = f"已推保本无风险 (保底止损 {dynamic_floor_sl})"
+        t["trailingStopPx"] = dynamic_floor_sl
+
+        # A. Hit Ratchet Floor Stop (Locked Profit Trigger)
+        if cur_px <= dynamic_floor_sl and peak_profit_px >= tier1_breakeven_trigger:
             closed, close_detail = close_position_confirmed(inst_id, "long", pos_sz)
             if not closed:
-                executed_actions.append(f"[{name}] 移动止盈平多失败，仓位仍保留: {close_detail}")
+                executed_actions.append(f"[{name}] 锁利平多失败，仓位仍保留: {close_detail}")
                 return False, "平仓失败"
             close_fee = (pos_sz * ct_val * cur_px) * TAKER_FEE_RATE
-            executed_actions.append(f"[{name}] 🎯 触发高点回撤移动止盈 ({curr_pos['upl']:+.2f}U)")
+            pnl_val = curr_pos["upl"]
+            executed_actions.append(f"[{name}] 🛡️ 触发阶梯动态锁利平仓 (净盈亏: {pnl_val:+.2f}U)")
+            record_trade({
+                "is_trade": True,
+                "time": timestamp_full,
+                "inst": name,
+                "name": name,
+                "action": "平仓",
+                "action_type": "阶梯锁利",
+                "direction": "平多",
+                "side": "多单阶梯锁利平仓",
+                "size": pos_sz,
+                "sz": pos_sz,
+                "price": cur_px,
+                "fee": close_fee,
+                "pnl": pnl_val,
+                "remark": f"最高 {t['highWaterMark']} 触发阶梯利润锁定线 {dynamic_floor_sl}"
+            })
+            if notify_trade_close:
+                notify_trade_close(name, pnl_val, "阶梯锁利平仓", cur_px)
+            if pos_key in trackers: del trackers[pos_key]
+            return True, "已阶梯锁利"
+
+        # B. Kinetic Momentum Pullback Exit from Peak (Pullback >= 0.5x ATR when profit >= 1.5x ATR)
+        if peak_profit_px >= 1.5 * atr and cur_px <= (t["highWaterMark"] - 0.5 * atr):
+            closed, close_detail = close_position_confirmed(inst_id, "long", pos_sz)
+            if not closed:
+                executed_actions.append(f"[{name}] 动能见顶移动止盈失败，仓位仍保留: {close_detail}")
+                return False, "平仓失败"
+            close_fee = (pos_sz * ct_val * cur_px) * TAKER_FEE_RATE
+            pnl_val = curr_pos["upl"]
+            executed_actions.append(f"[{name}] 🎯 触发高点回撤动能止盈 (净盈亏: {pnl_val:+.2f}U)")
             record_trade({
                 "is_trade": True,
                 "time": timestamp_full,
@@ -924,27 +970,69 @@ def manage_position_tp_and_trailing(f, curr_pos, trackers, timestamp_full, execu
                 "action": "平仓",
                 "action_type": "移动止盈",
                 "direction": "平多",
-                "side": "多单高点回撤平仓",
+                "side": "多单高点回撤止盈",
                 "size": pos_sz,
                 "sz": pos_sz,
                 "price": cur_px,
                 "fee": close_fee,
-                "pnl": curr_pos["upl"],
-                "remark": f"最高 {t['highWaterMark']} 回撤触及移动止盈线"
+                "pnl": pnl_val,
+                "remark": f"最高 {t['highWaterMark']} 动能回撤触及移动止盈线"
             })
             if notify_trade_close:
-                notify_trade_close(name, curr_pos["upl"], "移动止盈", cur_px)
+                notify_trade_close(name, pnl_val, "移动止盈", cur_px)
             if pos_key in trackers: del trackers[pos_key]
             return True, "已移动止盈"
 
     else:
-        if peak_profit_px >= trailing_kick and cur_px >= (t["lowWaterMark"] + trailing_pull):
+        # Dynamic Ratchet Stop Calculation for Short
+        dynamic_floor_sl = t["trailingStopPx"]
+        if peak_profit_px >= tier2_lock_trigger:
+            dynamic_floor_sl = min(dynamic_floor_sl, entry_px - 0.9 * atr)
+            t["stage_desc"] = f"锁定大波段利润 (保底止损 {dynamic_floor_sl})"
+        elif peak_profit_px >= tier1_breakeven_trigger:
+            dynamic_floor_sl = min(dynamic_floor_sl, entry_px - 0.0015 * entry_px)
+            t["stage_desc"] = f"已推保本无风险 (保底止损 {dynamic_floor_sl})"
+        t["trailingStopPx"] = dynamic_floor_sl
+
+        # A. Hit Ratchet Floor Stop (Locked Profit Trigger)
+        if cur_px >= dynamic_floor_sl and peak_profit_px >= tier1_breakeven_trigger:
             closed, close_detail = close_position_confirmed(inst_id, "short", pos_sz)
             if not closed:
-                executed_actions.append(f"[{name}] 移动止盈平空失败，仓位仍保留: {close_detail}")
+                executed_actions.append(f"[{name}] 锁利平空失败，仓位仍保留: {close_detail}")
                 return False, "平仓失败"
             close_fee = (pos_sz * ct_val * cur_px) * TAKER_FEE_RATE
-            executed_actions.append(f"[{name}] 🎯 触发低点反弹移动止盈 ({curr_pos['upl']:+.2f}U)")
+            pnl_val = curr_pos["upl"]
+            executed_actions.append(f"[{name}] 🛡️ 触发阶梯动态锁利平仓 (净盈亏: {pnl_val:+.2f}U)")
+            record_trade({
+                "is_trade": True,
+                "time": timestamp_full,
+                "inst": name,
+                "name": name,
+                "action": "平仓",
+                "action_type": "阶梯锁利",
+                "direction": "平空",
+                "side": "空单阶梯锁利平仓",
+                "size": pos_sz,
+                "sz": pos_sz,
+                "price": cur_px,
+                "fee": close_fee,
+                "pnl": pnl_val,
+                "remark": f"最低 {t['lowWaterMark']} 触发阶梯利润锁定线 {dynamic_floor_sl}"
+            })
+            if notify_trade_close:
+                notify_trade_close(name, pnl_val, "阶梯锁利平仓", cur_px)
+            if pos_key in trackers: del trackers[pos_key]
+            return True, "已阶梯锁利"
+
+        # B. Kinetic Momentum Pullback Exit from Peak
+        if peak_profit_px >= 1.5 * atr and cur_px >= (t["lowWaterMark"] + 0.5 * atr):
+            closed, close_detail = close_position_confirmed(inst_id, "short", pos_sz)
+            if not closed:
+                executed_actions.append(f"[{name}] 动能见底移动止盈失败，仓位仍保留: {close_detail}")
+                return False, "平仓失败"
+            close_fee = (pos_sz * ct_val * cur_px) * TAKER_FEE_RATE
+            pnl_val = curr_pos["upl"]
+            executed_actions.append(f"[{name}] 🎯 触发低点反弹动能止盈 (净盈亏: {pnl_val:+.2f}U)")
             record_trade({
                 "is_trade": True,
                 "time": timestamp_full,
@@ -953,16 +1041,16 @@ def manage_position_tp_and_trailing(f, curr_pos, trackers, timestamp_full, execu
                 "action": "平仓",
                 "action_type": "移动止盈",
                 "direction": "平空",
-                "side": "空单低点反弹平仓",
+                "side": "空单低点反弹止盈",
                 "size": pos_sz,
                 "sz": pos_sz,
                 "price": cur_px,
                 "fee": close_fee,
-                "pnl": curr_pos["upl"],
-                "remark": f"最低 {t['lowWaterMark']} 反弹触及移动止盈线"
+                "pnl": pnl_val,
+                "remark": f"最低 {t['lowWaterMark']} 动能反弹触及移动止盈线"
             })
             if notify_trade_close:
-                notify_trade_close(name, curr_pos["upl"], "移动止盈", cur_px)
+                notify_trade_close(name, pnl_val, "移动止盈", cur_px)
             if pos_key in trackers: del trackers[pos_key]
             return True, "已移动止盈"
 
