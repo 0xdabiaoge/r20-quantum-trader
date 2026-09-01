@@ -87,6 +87,8 @@ def _run() -> None:
         env = _env()
         token = env.get("R20_WECHAT_BOT_TOKEN", "")
         base_url = env.get("R20_WECHAT_BASE_URL", "https://ilinkai.weixin.qq.com")
+        if env.get("R20_WECHAT_CONTEXT_TOKEN") and env.get("R20_WECHAT_USER_ID"):
+            state["user_configured"] = True
         if not token:
             state.update({"status": "waiting_for_binding", "cursor": ""})
             _save_state(state)
