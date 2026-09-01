@@ -446,9 +446,12 @@ def notification_config(x_r20_admin_token: str | None = Header(default=None)) ->
         "wechat_ilink": {
             "enabled": os.getenv("R20_NOTIFY_WECHAT_ILINK_ENABLED", "0") == "1",
             "bot_token": mask(os.getenv("R20_WECHAT_BOT_TOKEN", "")),
+            "bot_configured": bool(os.getenv("R20_WECHAT_BOT_TOKEN", "")),
             "base_url": os.getenv("R20_WECHAT_BASE_URL", "https://ilinkai.weixin.qq.com"),
             "user_id": os.getenv("R20_WECHAT_USER_ID", ""),
             "context_token": mask(os.getenv("R20_WECHAT_CONTEXT_TOKEN", "")),
+            "context_configured": bool(os.getenv("R20_WECHAT_CONTEXT_TOKEN", "")),
+            "ready": bool(os.getenv("R20_WECHAT_BOT_TOKEN", "") and os.getenv("R20_WECHAT_USER_ID", "") and os.getenv("R20_WECHAT_CONTEXT_TOKEN", "")),
         },
         "telegram": {"enabled": os.getenv("R20_NOTIFY_TELEGRAM_ENABLED", "0") == "1", "bot_token": mask(os.getenv("R20_TELEGRAM_BOT_TOKEN", "")), "chat_id": os.getenv("R20_TELEGRAM_CHAT_ID", "")},
         "qq": {
