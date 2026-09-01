@@ -1287,6 +1287,7 @@ def run_backup(payload: BackupRequest, x_r20_admin_token: str | None = Header(de
     return {"completed": True, "output": result.stdout[-2500:]}
 
 
+@app.get("/health", include_in_schema=False)
 @app.get("/api/v1/health")
 def health() -> dict[str, Any]:
     return {
