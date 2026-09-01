@@ -18,7 +18,15 @@ import subprocess
 import sys
 import hashlib
 import time
+from pathlib import Path
 import bypy
+
+_BOOTSTRAP_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _BOOTSTRAP_ROOT not in sys.path:
+    sys.path.insert(0, _BOOTSTRAP_ROOT)
+
+from backup_runtime import retain_local_archive, sqlite_hot_backups
+from r20_backend.backup_store import load_backup_methods
 
 WORKSPACE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(WORKSPACE_DIR, "data")
@@ -83,8 +91,18 @@ def run_backup_and_cleanup():
     date_str = now_bj.strftime("%Y-%m-%d")
     now_str = now_bj.strftime("%Y-%m-%d %H:%M:%S")
 
-    # 1. Execute Pre-Backup Sync
-    pre_backup_sync()
+    methods = load_backup_methods()
+    baidu_enabled = bool(methods["baidu"]["enabled"])
+    local_enabled = bool(methods["local"]["enabled"])
+    sqlite_enabled = bool(methods["sqlite"]["enabled"])
+
+    # SQLite-only mode does not need an expensive full tar archive or OKX ledger sync.
+    if baidu_enabled or local_enabled:
+        pre_backup_sync()
+    else:
+        sqlite_copies = sqlite_hot_backups(now_bj.strftime("%Y%m%d_%H%M%S"), int(methods["sqlite"]["retention"])) if sqlite_enabled else []
+        print(f"✅ SQLite-only 灾备完成，共生成 {len(sqlite_copies)} 个一致性快照。")
+        return
 
     backup_filename = f"r20_system_backup_{date_str}.tar.gz"
     backup_path = os.path.join(BACKUPS_DIR, backup_filename)
@@ -116,8 +134,10 @@ def run_backup_and_cleanup():
         print(f"❌ 打包失败: {e}")
         return
 
-    # 3. Upload to Baidu Netdisk (with Auto-Retry)
-    upload_success = upload_to_baidu_netdisk(backup_path, backup_filename)
+    # 3. Execute enabled backup backends independently.
+    upload_success = upload_to_baidu_netdisk(backup_path, backup_filename) if baidu_enabled else False
+    local_copy = retain_local_archive(Path(backup_path), int(methods["local"]["retention"])) if local_enabled else None
+    sqlite_copies = sqlite_hot_backups(now_bj.strftime("%Y%m%d_%H%M%S"), int(methods["sqlite"]["retention"])) if sqlite_enabled else []
 
     # 4. Status Notification
     ledger_file = os.path.join(DATA_DIR, "trading_ledger.json")
@@ -141,23 +161,26 @@ def run_backup_and_cleanup():
         f"• 归档包大小：{file_size_kb} KB\n"
         f"• 完整性校验：SHA256 {checksum_val[:16]}...\n"
         f"• 今日平仓盈亏：{net_pnl:+.2f} USDT\n"
-        f"• 云端上传状态：{'✅ 成功同步云端' if upload_success else '⚠️ 上传待重试'}\n"
-        f"• 服务器磁盘优化：本地压缩包已按策略自动销毁清理，保持 0 冗余占用！"
+        f"• 百度网盘：{'✅ 成功同步云端' if upload_success else ('⏸️ 已关闭' if not baidu_enabled else '⚠️ 上传待重试')}\n"
+        f"• 本地滚动归档：{'✅ ' + str(local_copy) if local_copy else '⏸️ 已关闭'}\n"
+        f"• SQLite 热备：{'✅ ' + str(len(sqlite_copies)) + ' 个数据库' if sqlite_enabled else '⏸️ 已关闭'}\n"
+        f"• 临时压缩包：任务结束后清理；本地滚动归档使用独立保留策略。"
     )
 
     if send_qq_message:
         send_qq_message(notify_msg)
 
-    # 5. Clean up local tar.gz if successfully uploaded to preserve disk space
-    if upload_success:
+    # 5. Temporary archive is deleted when at least one enabled backend completed safely.
+    backend_success = upload_success or bool(local_copy)
+    if backend_success:
         try:
             if os.path.exists(backup_path):
                 os.remove(backup_path)
-                print(f"🧹 本地归档包已按策略自动销毁清理 (0 磁盘占用): {backup_path}")
+                print(f"🧹 临时归档包已清理: {backup_path}")
         except Exception as e:
             print(f"清理文件失败: {e}")
     else:
-        print(f"⚠️ 云端上传未成功，本地保留备份包以便应急恢复: {backup_path}")
+        print(f"⚠️ 没有备份后端成功完成，本地保留临时包以便应急恢复: {backup_path}")
 
     print("🎉 每日凌晨 02:00 百度网盘灾备云上传与自动清理流程执行完毕。")
 

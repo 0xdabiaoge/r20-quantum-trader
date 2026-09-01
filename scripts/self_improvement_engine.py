@@ -35,10 +35,12 @@ REPORT_JSON_FILE = os.path.join(DATA_DIR, "self_improvement_report.json")
 AI_DECISIONS_FILE = os.path.join(DATA_DIR, "ai_brain_decisions.json")
 AI_MEMORY_FILE = os.path.join(DATA_DIR, "ai_trading_memory.json")
 AI_MEMORY_MD_FILE = os.path.join(DATA_DIR, "AI_TRADING_MEMORY.md")
+EVOLUTION_LAST_PROMPT_FILE = os.path.join(DATA_DIR, "self_improvement_last_prompt.txt")
 LOG_FILE = os.path.join(LOGS_DIR, "self_improvement.log")
 EVOLUTION_LOCK_FILE = os.path.join(DATA_DIR, ".self_improvement.lock")
 
 from instrument_pool import load_instruments
+from prompt_library import active_profile, append_layer
 from r20_gateway.telemetry import ModelCallTelemetry
 TARGET_INSTRUMENTS = [item["name"] for item in load_instruments()]
 
@@ -214,11 +216,27 @@ def call_llm_evolution_review(closed_trades: List[Dict[str, Any]], existing_memo
 }}
 """
 
+    profile = active_profile()
+    effective_evolution_system = append_layer(
+        EVOLUTION_SYSTEM_PROMPT, profile.get("evolution_system", ""), f"{profile.get('name', '稳健')}自进化系统提示词模板"
+    )
+    effective_evolution_user = append_layer(
+        prompt, profile.get("evolution_user", ""), f"{profile.get('name', '稳健')}自进化用户提示词模板"
+    )
+    try:
+        snapshot = f"【SYSTEM PROMPT】:\n{effective_evolution_system.strip()}\n\n{'='*70}\n【USER PROMPT ({now_bj_str})】：\n{effective_evolution_user.strip()}"
+        fd, temp_path = tempfile.mkstemp(prefix=".evolution-prompt-", suffix=".tmp", dir=DATA_DIR)
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(snapshot)
+        os.replace(temp_path, EVOLUTION_LAST_PROMPT_FILE)
+    except OSError:
+        pass
+
     payload = {
         "model": "gemini-3.7-flash-high",
         "messages": [
-            {"role": "system", "content": EVOLUTION_SYSTEM_PROMPT},
-            {"role": "user", "content": prompt}
+            {"role": "system", "content": effective_evolution_system},
+            {"role": "user", "content": effective_evolution_user}
         ],
         "reasoning_effort": os.environ.get("LLM_REASONING_EFFORT", "high"),
         "temperature": 0.2,
@@ -236,7 +254,7 @@ def call_llm_evolution_review(closed_trades: List[Dict[str, Any]], existing_memo
     )
 
     telemetry = ModelCallTelemetry(
-        "self_improvement", payload["model"], payload["reasoning_effort"], EVOLUTION_SYSTEM_PROMPT, prompt
+        "self_improvement", payload["model"], payload["reasoning_effort"], effective_evolution_system, effective_evolution_user
     )
     try:
         t0 = time.time()

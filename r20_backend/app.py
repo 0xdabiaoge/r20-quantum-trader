@@ -25,9 +25,11 @@ from contextlib import asynccontextmanager
 from pydantic import BaseModel, Field
 from r20_backend.config import refresh_settings, settings
 from r20_backend.okx_client import OKXClient
+from r20_backend.prompt_views import EVOLUTION_USER_TEMPLATE, TRADING_USER_TEMPLATE, rendered_snapshots
 from r20_backend.settings_store import mask, update_env
 from r20_backend.notifications import test_channel
 from r20_backend.audit import recent as recent_audit, record as audit_record
+from r20_backend.backup_store import load_backup_methods, save_backup_methods
 from r20_backend.schedule_store import load_schedule, save_schedule
 from r20_backend.wechat_login import create_qrcode, latest_session, qrcode_status
 from r20_backend.wechat_watcher import public_state as wechat_watcher_state, reset_watcher_state, start_watcher, stop_watcher
@@ -39,6 +41,7 @@ from r20_gateway.secrets import status as secret_store_status
 from r20_gateway.store import GatewayStore
 from r20_gateway.supervisor import start_supervisor as start_gateway_supervisor, stop_supervisor as stop_gateway_supervisor
 from scripts.instrument_pool import from_okx_instrument, load_instruments, save_instruments
+from scripts.prompt_library import PRESETS, active_profile, all_profiles, append_layer, load_library, save_library
 
 PROMPT_OVERRIDE_FILE = DATA_DIR / "system_prompt_override.txt"
 BACKUP_LOG_FILE = ROOT / "logs" / "r20_backup_manual.log"
@@ -97,6 +100,26 @@ class UpdateRequest(BaseModel):
 
 class PromptOverrideRequest(BaseModel):
     content: str = Field(max_length=12000)
+
+
+class PromptLibraryUpdate(BaseModel):
+    active_style: str = Field(pattern=r"^(stable|aggressive|custom)$")
+    trading_system: str = Field(default="", max_length=12000)
+    trading_user: str = Field(default="", max_length=12000)
+    evolution_system: str = Field(default="", max_length=12000)
+    evolution_user: str = Field(default="", max_length=12000)
+
+
+class ChannelToggleRequest(BaseModel):
+    enabled: bool
+
+
+class BackupMethodsUpdate(BaseModel):
+    baidu_enabled: bool
+    local_enabled: bool
+    local_retention: int = Field(ge=1, le=30)
+    sqlite_enabled: bool
+    sqlite_retention: int = Field(ge=1, le=90)
 
 
 class NotificationConfigUpdate(BaseModel):
@@ -478,6 +501,50 @@ def update_application(payload: UpdateRequest, x_r20_admin_token: str | None = H
     }
 
 
+@app.get("/api/v1/admin/prompt-library")
+def prompt_library(x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
+    refresh_settings()
+    require_admin_header(x_r20_admin_token)
+    from scripts.ai_brain_trader import SYSTEM_PROMPT
+    from scripts.self_improvement_engine import EVOLUTION_SYSTEM_PROMPT
+    library = load_library()
+    profile = active_profile()
+    return {
+        "active_style": library["active_style"],
+        "profiles": all_profiles(),
+        "base_templates": {
+            "trading_system": SYSTEM_PROMPT,
+            "trading_user": TRADING_USER_TEMPLATE,
+            "evolution_system": EVOLUTION_SYSTEM_PROMPT,
+            "evolution_user": EVOLUTION_USER_TEMPLATE,
+        },
+        "effective_templates": {
+            "trading_system": append_layer(SYSTEM_PROMPT, profile.get("trading_system", ""), f"{profile.get('name')}交易系统提示词模板"),
+            "trading_user": append_layer(TRADING_USER_TEMPLATE, profile.get("trading_user", ""), f"{profile.get('name')}交易用户提示词模板"),
+            "evolution_system": append_layer(EVOLUTION_SYSTEM_PROMPT, profile.get("evolution_system", ""), f"{profile.get('name')}自进化系统提示词模板"),
+            "evolution_user": append_layer(EVOLUTION_USER_TEMPLATE, profile.get("evolution_user", ""), f"{profile.get('name')}自进化用户提示词模板"),
+        },
+        "snapshots": rendered_snapshots(),
+        "transport": "python-direct",
+    }
+
+
+@app.put("/api/v1/admin/prompt-library")
+def update_prompt_library(payload: PromptLibraryUpdate, x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
+    refresh_settings()
+    require_admin_header(x_r20_admin_token)
+    library = load_library()
+    library["active_style"] = payload.active_style
+    library["custom"] = {
+        "id": "custom", "name": "自定义", "description": "管理员自定义风格附加层。", "editable": True,
+        "trading_system": payload.trading_system.strip(), "trading_user": payload.trading_user.strip(),
+        "evolution_system": payload.evolution_system.strip(), "evolution_user": payload.evolution_user.strip(),
+    }
+    save_library(library)
+    audit_record("prompt.library.update", "success", {"active_style": payload.active_style, "custom_characters": sum(len(getattr(payload, key)) for key in ("trading_system", "trading_user", "evolution_system", "evolution_user"))})
+    return {"saved": True, "active_style": payload.active_style, "restart_note": "下一次 Python 交易主脑与自进化进程自动读取选中风格。"}
+
+
 @app.get("/api/v1/admin/prompts")
 def prompt_override(x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
     refresh_settings()
@@ -538,6 +605,32 @@ def notification_config(x_r20_admin_token: str | None = Header(default=None)) ->
     }
 
 
+@app.put("/api/v1/admin/channels/{channel}/toggle")
+def toggle_channel(channel: str, payload: ChannelToggleRequest, x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
+    refresh_settings()
+    require_admin_header(x_r20_admin_token)
+    keys = {
+        "qq": "R20_NOTIFY_QQ_ENABLED", "wechat_ilink": "R20_NOTIFY_WECHAT_ILINK_ENABLED",
+        "telegram": "R20_NOTIFY_TELEGRAM_ENABLED", "wechat": "R20_NOTIFY_WECHAT_ENABLED",
+        "webhook": "R20_NOTIFY_WEBHOOK_ENABLED",
+    }
+    if channel not in keys:
+        raise HTTPException(status_code=404, detail="未知频道")
+    if payload.enabled:
+        readiness = {
+            "qq": bool(os.getenv("R20_QQ_APP_ID") and os.getenv("R20_QQ_CLIENT_SECRET") and os.getenv("R20_QQ_OPENID")),
+            "wechat_ilink": bool(os.getenv("R20_WECHAT_BOT_TOKEN") and os.getenv("R20_WECHAT_USER_ID") and os.getenv("R20_WECHAT_CONTEXT_TOKEN")),
+            "telegram": bool(os.getenv("R20_TELEGRAM_BOT_TOKEN") and os.getenv("R20_TELEGRAM_CHAT_ID")),
+            "wechat": bool(os.getenv("R20_WECHAT_WEBHOOK")),
+            "webhook": bool(settings.notification_webhook),
+        }
+        if not readiness[channel]:
+            raise HTTPException(status_code=409, detail="频道凭证或目标未配置完整，请先保存配置再启用")
+    update_env({keys[channel]: "1" if payload.enabled else "0"})
+    audit_record("channel.toggle", "success", {"channel": channel, "enabled": payload.enabled})
+    return {"channel": channel, "enabled": payload.enabled}
+
+
 @app.put("/api/v1/admin/notifications")
 def update_notification_config(payload: NotificationConfigUpdate, x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
     refresh_settings()
@@ -545,6 +638,17 @@ def update_notification_config(payload: NotificationConfigUpdate, x_r20_admin_to
     for value, title in ((payload.webhook_url, "通用 Webhook"), (payload.wechat_webhook, "企业微信 Webhook")):
         if value and not value.startswith(("https://", "http://")):
             raise HTTPException(status_code=400, detail=f"{title} 必须以 http:// 或 https:// 开头")
+    existing = os.environ
+    readiness = {
+        "QQ": (payload.qq_enabled, bool(payload.qq_app_id and (payload.qq_client_secret or existing.get("R20_QQ_CLIENT_SECRET")) and payload.qq_openid)),
+        "微信 iLink": (payload.wechat_ilink_enabled, bool((payload.wechat_bot_token or existing.get("R20_WECHAT_BOT_TOKEN")) and payload.wechat_user_id and (payload.wechat_context_token or existing.get("R20_WECHAT_CONTEXT_TOKEN")))),
+        "Telegram": (payload.telegram_enabled, bool((payload.telegram_bot_token or existing.get("R20_TELEGRAM_BOT_TOKEN")) and payload.telegram_chat_id)),
+        "企业微信": (payload.wechat_enabled, bool(payload.wechat_webhook)),
+        "通用 Webhook": (payload.webhook_enabled, bool(payload.webhook_url)),
+    }
+    incomplete = [name for name, (enabled, ready) in readiness.items() if enabled and not ready]
+    if incomplete:
+        raise HTTPException(status_code=409, detail=f"以下频道配置不完整，无法启用：{'、'.join(incomplete)}")
     update_env({
         "R20_NOTIFY_WEBHOOK_ENABLED": "1" if payload.webhook_enabled else "0",
         "R20_NOTIFICATION_WEBHOOK": payload.webhook_url,
@@ -677,16 +781,36 @@ def sync_wechat_session(x_r20_admin_token: str | None = Header(default=None)) ->
     return {"synced": True, "user_id": result["user_id"], "context_configured": True}
 
 
+@app.put("/api/v1/admin/backups/methods")
+def update_backup_methods(payload: BackupMethodsUpdate, x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
+    refresh_settings()
+    require_admin_header(x_r20_admin_token)
+    methods = {
+        "baidu": {"enabled": payload.baidu_enabled, "retention": 0},
+        "local": {"enabled": payload.local_enabled, "retention": payload.local_retention},
+        "sqlite": {"enabled": payload.sqlite_enabled, "retention": payload.sqlite_retention},
+    }
+    if not any(item["enabled"] for item in methods.values()):
+        raise HTTPException(status_code=400, detail="至少启用一种灾备方式")
+    save_backup_methods(methods)
+    audit_record("backup.methods.update", "success", {key: value["enabled"] for key, value in methods.items()})
+    return {"saved": True, "methods": load_backup_methods()}
+
+
 @app.get("/api/v1/admin/backups")
 def backup_status(x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
     refresh_settings()
     require_admin_header(x_r20_admin_token)
     backups_dir = ROOT / "backups"
-    local_archives = [{"name": item.name, "bytes": item.stat().st_size, "mtime": int(item.stat().st_mtime)} for item in backups_dir.glob("*.tar.gz")] if backups_dir.exists() else []
+    archive_paths = list(backups_dir.glob("*.tar.gz")) + list((backups_dir / "local").glob("*.tar.gz")) if backups_dir.exists() else []
+    local_archives = [{"name": str(item.relative_to(backups_dir)), "bytes": item.stat().st_size, "mtime": int(item.stat().st_mtime)} for item in archive_paths]
+    sqlite_snapshots = [{"name": item.name, "bytes": item.stat().st_size, "mtime": int(item.stat().st_mtime)} for item in (backups_dir / "sqlite").glob("*.db")] if (backups_dir / "sqlite").exists() else []
     return {
-        "schedule": "每天北京时间 02:00，上传百度网盘成功后自动删除本地压缩包",
+        "schedule": "每天北京时间 02:00，由 Gateway Scheduler 执行全部已启用灾备方式",
         "script": str(SCRIPTS_DIR / "nightly_backup_and_clean.py"),
+        "methods": load_backup_methods(),
         "local_archives": sorted(local_archives, key=lambda item: item["mtime"], reverse=True),
+        "sqlite_snapshots": sorted(sqlite_snapshots, key=lambda item: item["mtime"], reverse=True),
         "last_log": BACKUP_LOG_FILE.read_text(encoding="utf-8")[-4000:] if BACKUP_LOG_FILE.exists() else "尚无后台手动灾备日志",
     }
 

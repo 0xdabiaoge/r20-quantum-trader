@@ -58,6 +58,7 @@ backups/
 *.tar.gz
 *.zip
 *.pid
+*_TODO.md
 
 # OS & Editor
 .DS_Store

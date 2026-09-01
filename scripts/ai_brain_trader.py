@@ -42,6 +42,7 @@ AI_BRAIN_LOCK_FILE = os.path.join(DATA_DIR, ".ai_brain_cycle.lock")
 DECISION_MAX_AGE_SECONDS = 300
 
 from instrument_pool import load_instruments
+from prompt_library import active_profile, append_layer
 from r20_gateway.telemetry import ModelCallTelemetry
 
 TARGET_INSTRUMENTS = load_instruments()
@@ -636,7 +637,8 @@ def construct_full_market_prompt(packages: List[Dict[str, Any]], pos_summary: st
   }}
 }}
 """
-    return prompt
+    profile = active_profile()
+    return append_layer(prompt, profile.get("trading_user", ""), f"{profile.get('name', '稳健')}交易用户提示词模板")
 
 @single_brain_cycle
 def execute_batch_ai_brain_cycle(pos_summary: str = "当前总持仓 0/6", active_positions_detail: List[Dict[str, Any]] = None, usdt_available: float = 0.0) -> Optional[Dict[str, Any]]:
@@ -729,7 +731,10 @@ def execute_batch_ai_brain_cycle(pos_summary: str = "当前总持仓 0/6", activ
 
     prompt = construct_full_market_prompt(packages, pos_summary, active_positions_detail, pending_orders_detail=pending_orders_list, current_time_str=time_str, usdt_available=usdt_available)
     
-    effective_system_prompt = get_effective_system_prompt()
+    profile = active_profile()
+    effective_system_prompt = append_layer(
+        get_effective_system_prompt(), profile.get("trading_system", ""), f"{profile.get('name', '稳健')}交易系统提示词模板"
+    )
 
     # Save Realtime Prompt Snapshot for Web Transparent Inspection
     try:
