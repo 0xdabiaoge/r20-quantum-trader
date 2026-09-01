@@ -19,9 +19,10 @@ SCRIPTS_DIR = ROOT / "scripts"
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(SCRIPTS_DIR))
 
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 from contextlib import asynccontextmanager
+from contextvars import ContextVar
 from pydantic import BaseModel, Field
 from r20_backend.config import refresh_settings, settings
 from r20_backend.okx_client import OKXClient
@@ -29,6 +30,7 @@ from r20_backend.prompt_views import EVOLUTION_USER_TEMPLATE, TRADING_USER_TEMPL
 from r20_backend.settings_store import mask, update_env
 from r20_backend.notifications import test_channel
 from r20_backend.audit import recent as recent_audit, record as audit_record
+from r20_backend.admin_auth import AdminAuthStore
 from r20_backend.backup_store import load_backup_methods, save_backup_methods
 from r20_backend.schedule_store import load_schedule, save_schedule
 from r20_backend.wechat_login import create_qrcode, latest_session, qrcode_status
@@ -46,9 +48,12 @@ from scripts.prompt_library import PRESETS, active_profile, all_profiles, append
 PROMPT_OVERRIDE_FILE = DATA_DIR / "system_prompt_override.txt"
 BACKUP_LOG_FILE = ROOT / "logs" / "r20_backup_manual.log"
 STARTED_AT = time.time()
+REQUEST_SESSION: ContextVar[str] = ContextVar("r20_admin_session", default="")
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    refresh_settings()
+    admin_auth.initialize_from_legacy(settings.admin_token or settings.setup_token)
     start_watcher()
     start_gateway_supervisor()
     yield
@@ -57,8 +62,40 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="R20 Quantum Trader Standalone Backend", version="5.4.2", lifespan=lifespan)
+
+
+@app.middleware("http")
+async def admin_session_context(request: Request, call_next):
+    token = REQUEST_SESSION.set(request.headers.get("X-R20-Session", ""))
+    try:
+        return await call_next(request)
+    finally:
+        REQUEST_SESSION.reset(token)
+
+
 okx = OKXClient()
+admin_auth = AdminAuthStore()
 ADMIN_HTML = ROOT / "r20_backend" / "admin.html"
+
+
+class AdminLoginRequest(BaseModel):
+    username: str = Field(min_length=3, max_length=32)
+    password: str = Field(min_length=1, max_length=128)
+
+
+class AdminCreateRequest(BaseModel):
+    username: str = Field(min_length=3, max_length=32)
+    password: str = Field(min_length=12, max_length=128)
+    role: str = Field(default="admin", pattern=r"^(superadmin|admin)$")
+
+
+class AdminPasswordRequest(BaseModel):
+    current_password: str = Field(default="", max_length=128)
+    new_password: str = Field(min_length=12, max_length=128)
+
+
+class AdminEnabledRequest(BaseModel):
+    enabled: bool
 
 
 class AdminConfigUpdate(BaseModel):
@@ -71,7 +108,6 @@ class AdminConfigUpdate(BaseModel):
     llm_model: str | None = None
     llm_reasoning_effort: str | None = Field(default=None, pattern=r"^(low|medium|high)$")
     notification_webhook: str | None = None
-    admin_token: str | None = None
     manual_close_enabled: bool | None = None
 
 
@@ -90,7 +126,7 @@ class InstrumentDeleteRequest(BaseModel):
 class ManualCloseRequest(BaseModel):
     inst_id: str = Field(pattern=r"^[A-Z0-9]+-USDT-SWAP$")
     position_side: str = Field(pattern=r"^(long|short)$")
-    admin_token: str
+    admin_password: str = Field(min_length=1, max_length=128)
     confirmation: str
 
 
@@ -165,8 +201,27 @@ def require_admin_token(token: str) -> None:
         raise HTTPException(status_code=403, detail="管理员令牌无效")
 
 
-def require_admin_header(x_r20_admin_token: str | None) -> None:
-    require_admin_token(x_r20_admin_token or "")
+def current_admin(x_r20_session: str | None = None, x_r20_admin_token: str | None = None) -> dict[str, Any]:
+    user = admin_auth.validate_session(x_r20_session or "")
+    if user:
+        return user
+    if x_r20_admin_token and not admin_auth.has_users():
+        require_admin_token(x_r20_admin_token)
+        return {"id": 0, "username": "legacy-token", "role": "legacy", "enabled": 1}
+    raise HTTPException(status_code=401, detail="管理员会话已失效，请重新登录")
+
+
+def require_admin_header(x_r20_admin_token: str | None = None, x_r20_session: str | None = None) -> dict[str, Any]:
+    return current_admin(x_r20_session or REQUEST_SESSION.get(), x_r20_admin_token)
+
+
+def require_superadmin(x_r20_session: str | None = None) -> dict[str, Any]:
+    user = admin_auth.validate_session(x_r20_session or REQUEST_SESSION.get())
+    if not user:
+        raise HTTPException(status_code=401, detail="管理员会话已失效，请重新登录")
+    if user["role"] != "superadmin":
+        raise HTTPException(status_code=403, detail="仅超级管理员可以执行此操作")
+    return user
 
 
 def read_json(filename: str, default: Any) -> Any:
@@ -266,6 +321,84 @@ def admin_page() -> FileResponse:
     return FileResponse(ADMIN_HTML)
 
 
+@app.get("/api/v1/admin/auth/status")
+def admin_auth_status() -> dict[str, Any]:
+    return {"initialized": admin_auth.has_users(), "mode": "account-password", "session_hours": 12}
+
+
+@app.post("/api/v1/admin/auth/login")
+def admin_login(payload: AdminLoginRequest) -> dict[str, Any]:
+    try:
+        result = admin_auth.login(payload.username, payload.password)
+    except PermissionError as exc:
+        audit_record("admin.login", "failed", {"username": payload.username})
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+    audit_record("admin.login", "success", {"username": result["user"]["username"]})
+    return result
+
+
+@app.post("/api/v1/admin/auth/logout")
+def admin_logout(x_r20_session: str | None = Header(default=None)) -> dict[str, Any]:
+    user = admin_auth.validate_session(x_r20_session or "")
+    admin_auth.logout(x_r20_session or "")
+    if user:
+        audit_record("admin.logout", "success", {"username": user["username"]})
+    return {"logged_out": True}
+
+
+@app.get("/api/v1/admin/auth/me")
+def admin_me(x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    user = current_admin(x_r20_session, None)
+    if user.get("role") == "legacy":
+        raise HTTPException(status_code=401, detail="请使用管理员账号密码登录")
+    return {"user": user}
+
+
+@app.get("/api/v1/admin/users")
+def admin_users(x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    actor = require_superadmin(x_r20_session)
+    return {"users": admin_auth.list_users(), "current_user_id": actor["id"]}
+
+
+@app.post("/api/v1/admin/users")
+def create_admin_user(payload: AdminCreateRequest, x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    actor = require_superadmin(x_r20_session)
+    try:
+        user = admin_auth.create_user(payload.username, payload.password, payload.role)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    audit_record("admin.user.create", "success", {"actor": actor["username"], "username": user["username"], "role": user["role"]})
+    return {"created": user}
+
+
+@app.put("/api/v1/admin/users/{user_id}/enabled")
+def update_admin_enabled(user_id: int, payload: AdminEnabledRequest, x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    actor = require_superadmin(x_r20_session)
+    try:
+        admin_auth.set_enabled(user_id, payload.enabled, actor["id"])
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    audit_record("admin.user.enabled", "success", {"actor": actor["username"], "user_id": user_id, "enabled": payload.enabled})
+    return {"user": admin_auth.get_user(user_id)}
+
+
+@app.put("/api/v1/admin/users/{user_id}/password")
+def update_admin_password(user_id: int, payload: AdminPasswordRequest, x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    actor = current_admin(x_r20_session, None)
+    if actor.get("role") == "legacy":
+        raise HTTPException(status_code=401, detail="请使用管理员账号密码登录")
+    if actor["id"] != user_id and actor["role"] != "superadmin":
+        raise HTTPException(status_code=403, detail="只能修改自己的密码")
+    if actor["id"] == user_id and not admin_auth.verify_password(actor["id"], payload.current_password):
+        raise HTTPException(status_code=403, detail="当前密码不正确")
+    try:
+        admin_auth.change_password(user_id, payload.new_password)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    audit_record("admin.password.update", "success", {"actor": actor["username"], "user_id": user_id})
+    return {"changed": True, "reauthenticate": True}
+
+
 @app.get("/api/v1/admin/overview")
 def admin_overview(x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
     refresh_settings()
@@ -336,12 +469,13 @@ def admin_config(x_r20_admin_token: str | None = Header(default=None)) -> dict[s
     refresh_settings()
     require_admin_header(x_r20_admin_token)
     return {
+        "authentication_mode": "account-password",
         "configuration": {
             "OKX API Key": "已设置" if settings.okx_api_key else "未设置",
             "OKX Secret Key": "已设置" if settings.okx_secret_key else "未设置",
             "OKX Passphrase": "已设置" if settings.okx_passphrase else "未设置",
             "LLM API Key": "已设置" if settings.llm_api_key else "未设置",
-            "管理员令牌": "已设置" if settings.admin_token else "使用首次引导令牌",
+            "管理员系统": "账号密码 + 服务端会话" if admin_auth.has_users() else "尚未初始化",
             "通知 Webhook": "已设置" if settings.notification_webhook else "未设置",
             "手动平仓": "已启用" if settings.manual_close_enabled else "已禁用",
         },
@@ -375,7 +509,6 @@ def update_admin_config(payload: AdminConfigUpdate, x_r20_admin_token: str | Non
         "LLM_MODEL": data.get("llm_model"),
         "LLM_REASONING_EFFORT": data.get("llm_reasoning_effort"),
         "R20_NOTIFICATION_WEBHOOK": data.get("notification_webhook"),
-        "R20_ADMIN_TOKEN": data.get("admin_token"),
         "R20_MANUAL_CLOSE_ENABLED": "1" if data.get("manual_close_enabled") else "0" if "manual_close_enabled" in data else None,
     }
     update_env(env_values)
@@ -391,7 +524,9 @@ def update_admin_config(payload: AdminConfigUpdate, x_r20_admin_token: str | Non
 def manual_close_position(payload: ManualCloseRequest) -> dict[str, Any]:
     if not settings.manual_close_enabled:
         raise HTTPException(status_code=403, detail="后台手动平仓功能未启用")
-    require_admin_token(payload.admin_token)
+    actor = require_admin_header()
+    if actor.get("role") == "legacy" or not admin_auth.verify_password(int(actor["id"]), payload.admin_password):
+        raise HTTPException(status_code=403, detail="管理员密码验证失败")
     expected_confirmation = f"CLOSE {payload.inst_id} {payload.position_side.upper()}"
     if payload.confirmation.strip().upper() != expected_confirmation:
         raise HTTPException(status_code=400, detail=f"确认短语必须精确为：{expected_confirmation}")
@@ -463,6 +598,26 @@ def delete_admin_instrument(inst_id: str, payload: InstrumentDeleteRequest, x_r2
     save_instruments(updated)
     audit_record("instrument.remove", "success", {"instId": inst_id})
     return {"removed": inst_id, "count": len(updated), "effective": "next_process_cycle"}
+
+
+@app.get("/api/v1/admin/about")
+def admin_about(x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
+    require_admin_header(x_r20_admin_token)
+    import platform
+    store = GatewayStore(GATEWAY_DB_PATH)
+    return {
+        "product": {"name": "R20 Quantum Trader", "version": "5.4.2", "control_plane": "R20 Gateway Runtime", "gateway_version": "0.3.0"},
+        "runtime": {"python": platform.python_version(), "platform": platform.platform(), "backend_pid": os.getpid(), "gateway": gateway_status(x_r20_admin_token)},
+        "components": [
+            {"name": "FastAPI Control Plane", "version": "5.4.2"},
+            {"name": "Gateway Event Runtime", "version": "0.3.0"},
+            {"name": "Tencent iLink Protocol", "version": "2.4.8"},
+            {"name": "SQLite", "version": __import__("sqlite3").sqlite_version},
+        ],
+        "repository": {"url": "https://github.com/555cute/r20-quantum-trader", "branch": git(["branch", "--show-current"]), "commit": git(["rev-parse", "--short", "HEAD"])},
+        "update": update_status(),
+        "security": {"authentication": "PBKDF2-SHA256 + server-side sessions", "session_hours": 12, "plugin_policy": "builtin-only", "prompt_transport": "python-direct"},
+    }
 
 
 @app.get("/api/v1/admin/update-status")

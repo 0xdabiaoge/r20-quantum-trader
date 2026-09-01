@@ -40,10 +40,13 @@ id_rsa
 id_rsa.pub
 token.json
 credentials.json
+.r20-admin-bootstrap
 
 # Live Real-Money Ledger & Private DBs (CRITICAL)
 data/*.json
 data/*.db
+data/*.db-wal
+data/*.db-shm
 data/*.sqlite
 data/*.xlsx
 data/*.csv
