@@ -47,6 +47,10 @@ class ManualCloseRequest(BaseModel):
     confirmation: str
 
 
+class UpdateRequest(BaseModel):
+    confirmation: str
+
+
 def require_admin_token(token: str) -> None:
     expected = settings.admin_token or settings.setup_token
     if not expected:
@@ -70,6 +74,32 @@ def read_json(filename: str, default: Any) -> Any:
 def script_state(script_name: str) -> dict[str, Any]:
     path = SCRIPTS_DIR / script_name
     return {"name": script_name, "exists": path.exists(), "path": str(path)}
+
+
+def git(command: list[str]) -> str:
+    result = subprocess.run(["git", *command], cwd=ROOT, text=True, capture_output=True, timeout=30)
+    if result.returncode:
+        raise RuntimeError(result.stderr.strip() or result.stdout.strip() or "git command failed")
+    return result.stdout.strip()
+
+
+def update_status() -> dict[str, Any]:
+    try:
+        local = git(["rev-parse", "--short", "HEAD"])
+        branch = git(["branch", "--show-current"])
+        dirty = bool(git(["status", "--porcelain"]))
+        remote = ""
+        behind = ahead = 0
+        try:
+            git(["fetch", "--quiet", "origin", branch])
+            remote = git(["rev-parse", "--short", f"origin/{branch}"])
+            ahead, behind = [int(item) for item in git(["rev-list", "--left-right", "--count", f"HEAD...origin/{branch}"]).split()]
+        except RuntimeError:
+            pass
+        return {"branch": branch, "local": local, "remote": remote, "behind": behind, "ahead": ahead, "dirty": dirty}
+    except RuntimeError as exc:
+        return {"error": str(exc)}
+
 
 
 @app.get("/admin", include_in_schema=False)
@@ -145,6 +175,41 @@ def manual_close_position(payload: ManualCloseRequest) -> dict[str, Any]:
         return {"accepted": True, "instId": payload.inst_id, "positionSide": payload.position_side, "result": result}
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"OKX 平仓请求失败：{exc}") from exc
+
+
+@app.get("/api/v1/admin/update-status")
+def admin_update_status(x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
+    refresh_settings()
+    require_admin_header(x_r20_admin_token)
+    return update_status()
+
+
+@app.post("/api/v1/admin/update")
+def update_application(payload: UpdateRequest, x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
+    refresh_settings()
+    require_admin_header(x_r20_admin_token)
+    if payload.confirmation.strip().upper() != "UPDATE R20":
+        raise HTTPException(status_code=400, detail="确认短语必须精确为：UPDATE R20")
+    status_before = update_status()
+    if status_before.get("error"):
+        raise HTTPException(status_code=502, detail=status_before["error"])
+    if status_before["dirty"]:
+        raise HTTPException(status_code=409, detail="工作区存在未提交修改；为防止覆盖本地改动，后台拒绝更新")
+    if not status_before["remote"]:
+        raise HTTPException(status_code=502, detail="无法读取远程仓库状态")
+    try:
+        output = git(["pull", "--ff-only", "origin", status_before["branch"]])
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=f"更新失败：{exc}") from exc
+    status_after = update_status()
+    return {
+        "updated": status_before["local"] != status_after.get("local"),
+        "before": status_before,
+        "after": status_after,
+        "git_output": output,
+        "restart_required": True,
+        "restart_note": "请重启 r20-quantum 与 r20-scheduler 服务，让新代码接管后台与调度。",
+    }
 
 
 @app.get("/api/v1/health")

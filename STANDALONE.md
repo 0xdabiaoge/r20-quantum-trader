@@ -47,7 +47,7 @@ The backend exposes only read-only control-plane endpoints:
 - `GET /api/v1/market/{instId}`
 - `GET /api/v1/account/positions`
 
-No HTTP trade-trigger endpoint is exposed. Trade execution stays inside the scheduler-launched, file-locked execution process.
+No HTTP trade-trigger endpoint is exposed except the separately enabled, confirmation-protected manual close action. The admin console also supports a protected update check and `git pull --ff-only`; it refuses to update a dirty worktree and never restarts services automatically.
 
 ## systemd
 
