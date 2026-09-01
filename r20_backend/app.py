@@ -31,7 +31,11 @@ from r20_backend.settings_store import mask, update_env
 from r20_backend.notifications import test_channel
 from r20_backend.audit import recent as recent_audit, record as audit_record
 from r20_backend.admin_auth import AdminAuthStore
-from r20_backend.backup_store import load_backup_methods, save_backup_methods
+from r20_backend.backup_store import (
+    create_job as create_backup_job, delete_job as delete_backup_job, export_job as export_backup_job,
+    get_job as get_backup_job, import_job as import_backup_job, list_jobs as list_backup_jobs,
+    load_backup_methods, save_backup_methods, update_job as update_backup_job, validate_backup_job,
+)
 from r20_backend.schedule_store import load_schedule, save_schedule
 from r20_backend.wechat_login import create_qrcode, latest_session, qrcode_status
 from r20_backend.wechat_watcher import public_state as wechat_watcher_state, reset_watcher_state, start_watcher, stop_watcher
@@ -43,7 +47,11 @@ from r20_gateway.secrets import status as secret_store_status
 from r20_gateway.store import GatewayStore
 from r20_gateway.supervisor import start_supervisor as start_gateway_supervisor, stop_supervisor as stop_gateway_supervisor
 from scripts.instrument_pool import from_okx_instrument, load_instruments, save_instruments
-from scripts.prompt_library import PRESETS, active_profile, all_profiles, append_layer, load_library, save_library
+from scripts.prompt_library import (
+    PRESETS, TEMPLATE_KEYS, active_profile, activate_profile, all_profiles, append_layer,
+    create_profile, delete_profile, export_profile, get_profile, import_profile,
+    load_library, profile_history, rollback_profile, save_library, update_profile, validate_profile,
+)
 
 PROMPT_OVERRIDE_FILE = DATA_DIR / "system_prompt_override.txt"
 BACKUP_LOG_FILE = ROOT / "logs" / "r20_backup_manual.log"
@@ -144,6 +152,56 @@ class PromptLibraryUpdate(BaseModel):
     trading_user: str = Field(default="", max_length=12000)
     evolution_system: str = Field(default="", max_length=12000)
     evolution_user: str = Field(default="", max_length=12000)
+
+
+class PromptProfileCreateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=60)
+    description: str = Field(default="", max_length=240)
+    source_id: str = Field(default="stable", max_length=80)
+
+
+class PromptProfileUpdateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=60)
+    description: str = Field(default="", max_length=240)
+    enabled: bool = True
+    trading_system: str = Field(default="", max_length=12000)
+    trading_user: str = Field(default="", max_length=12000)
+    evolution_system: str = Field(default="", max_length=12000)
+    evolution_user: str = Field(default="", max_length=12000)
+    note: str = Field(default="后台更新", max_length=240)
+
+
+class PromptImportRequest(BaseModel):
+    payload: dict[str, Any]
+    name_override: str = Field(default="", max_length=60)
+
+
+class PromptRollbackRequest(BaseModel):
+    revision_id: str = Field(min_length=1, max_length=80)
+
+
+class BackupJobCreateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+    source_id: str = Field(default="nightly-default", max_length=80)
+
+
+class BackupJobUpdateRequest(BaseModel):
+    job: dict[str, Any]
+
+
+class BackupJobRunRequest(BaseModel):
+    confirmation: str
+
+
+class BackupJobImportRequest(BaseModel):
+    payload: dict[str, Any]
+    name_override: str = Field(default="", max_length=80)
+
+
+class BackupVerifyRequest(BaseModel):
+    archive_path: str = Field(min_length=1, max_length=300)
+    expected_sha256: str = Field(default="", max_length=64)
+    key_env: str = Field(default="", max_length=64)
 
 
 class ChannelToggleRequest(BaseModel):
@@ -291,7 +349,10 @@ def runtime_overview() -> dict[str, Any]:
 
 
 def git(command: list[str]) -> str:
-    result = subprocess.run(["git", *command], cwd=ROOT, text=True, capture_output=True, timeout=30)
+    try:
+        result = subprocess.run(["git", *command], cwd=ROOT, text=True, capture_output=True, timeout=30)
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(f"git command timed out after {exc.timeout}s") from exc
     if result.returncode:
         raise RuntimeError(result.stderr.strip() or result.stdout.strip() or "git command failed")
     return result.stdout.strip()
@@ -666,6 +727,7 @@ def prompt_library(x_r20_admin_token: str | None = Header(default=None)) -> dict
     profile = active_profile()
     return {
         "active_style": library["active_style"],
+        "active_profile_id": library["active_profile_id"],
         "profiles": all_profiles(),
         "base_templates": {
             "trading_system": SYSTEM_PROMPT,
@@ -698,6 +760,86 @@ def update_prompt_library(payload: PromptLibraryUpdate, x_r20_admin_token: str |
     save_library(library)
     audit_record("prompt.library.update", "success", {"active_style": payload.active_style, "custom_characters": sum(len(getattr(payload, key)) for key in ("trading_system", "trading_user", "evolution_system", "evolution_user"))})
     return {"saved": True, "active_style": payload.active_style, "restart_note": "下一次 Python 交易主脑与自进化进程自动读取选中风格。"}
+
+
+@app.get("/api/v1/admin/prompt-profiles")
+def prompt_profiles(x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
+    require_admin_header(x_r20_admin_token)
+    library = load_library()
+    return {"active_profile_id": library["active_profile_id"], "profiles": all_profiles(), "allowed_variables": sorted(__import__("scripts.prompt_library", fromlist=["ALLOWED_VARIABLES"]).ALLOWED_VARIABLES)}
+
+
+@app.post("/api/v1/admin/prompt-profiles")
+def create_prompt_profile_api(payload: PromptProfileCreateRequest, x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    actor = require_superadmin(x_r20_session)
+    try: profile = create_profile(payload.name, payload.description, payload.source_id)
+    except ValueError as exc: raise HTTPException(status_code=400, detail=str(exc)) from exc
+    audit_record("prompt.profile.create", "success", {"actor": actor["username"], "profile_id": profile["id"]})
+    return {"profile": profile}
+
+
+@app.put("/api/v1/admin/prompt-profiles/{profile_id}")
+def update_prompt_profile_api(profile_id: str, payload: PromptProfileUpdateRequest, x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    actor = require_superadmin(x_r20_session)
+    try: profile = update_profile(profile_id, payload.model_dump(exclude={"note"}), payload.note)
+    except ValueError as exc: raise HTTPException(status_code=400, detail=str(exc)) from exc
+    audit_record("prompt.profile.update", "success", {"actor": actor["username"], "profile_id": profile_id})
+    return {"profile": profile, "validation": validate_profile(profile)}
+
+
+@app.post("/api/v1/admin/prompt-profiles/{profile_id}/activate")
+def activate_prompt_profile_api(profile_id: str, x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    actor = require_superadmin(x_r20_session)
+    try: profile = activate_profile(profile_id)
+    except ValueError as exc: raise HTTPException(status_code=409, detail=str(exc)) from exc
+    audit_record("prompt.profile.activate", "success", {"actor": actor["username"], "profile_id": profile_id})
+    return {"active_profile_id": profile_id, "profile": profile}
+
+
+@app.delete("/api/v1/admin/prompt-profiles/{profile_id}")
+def delete_prompt_profile_api(profile_id: str, x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    actor = require_superadmin(x_r20_session)
+    try: delete_profile(profile_id)
+    except ValueError as exc: raise HTTPException(status_code=409, detail=str(exc)) from exc
+    audit_record("prompt.profile.delete", "success", {"actor": actor["username"], "profile_id": profile_id})
+    return {"deleted": True}
+
+
+@app.post("/api/v1/admin/prompt-profiles/validate")
+def validate_prompt_profile_api(payload: PromptProfileUpdateRequest, x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
+    require_admin_header(x_r20_admin_token)
+    return validate_profile(payload.model_dump())
+
+
+@app.get("/api/v1/admin/prompt-profiles/{profile_id}/history")
+def prompt_profile_history_api(profile_id: str, x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
+    require_admin_header(x_r20_admin_token)
+    return {"history": profile_history(profile_id)}
+
+
+@app.post("/api/v1/admin/prompt-profiles/{profile_id}/rollback")
+def rollback_prompt_profile_api(profile_id: str, payload: PromptRollbackRequest, x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    actor = require_superadmin(x_r20_session)
+    try: profile = rollback_profile(profile_id, payload.revision_id)
+    except ValueError as exc: raise HTTPException(status_code=404, detail=str(exc)) from exc
+    audit_record("prompt.profile.rollback", "success", {"actor": actor["username"], "profile_id": profile_id, "revision_id": payload.revision_id})
+    return {"profile": profile}
+
+
+@app.get("/api/v1/admin/prompt-profiles/{profile_id}/export")
+def export_prompt_profile_api(profile_id: str, x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
+    require_admin_header(x_r20_admin_token)
+    try: return export_profile(profile_id)
+    except ValueError as exc: raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.post("/api/v1/admin/prompt-profiles/import")
+def import_prompt_profile_api(payload: PromptImportRequest, x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    actor = require_superadmin(x_r20_session)
+    try: profile = import_profile(payload.payload, payload.name_override)
+    except ValueError as exc: raise HTTPException(status_code=400, detail=str(exc)) from exc
+    audit_record("prompt.profile.import", "success", {"actor": actor["username"], "profile_id": profile["id"]})
+    return {"profile": profile}
 
 
 @app.get("/api/v1/admin/prompts")
@@ -936,6 +1078,95 @@ def sync_wechat_session(x_r20_admin_token: str | None = Header(default=None)) ->
     return {"synced": True, "user_id": result["user_id"], "context_configured": True}
 
 
+@app.get("/api/v1/admin/backup-jobs")
+def backup_jobs_api(x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
+    require_admin_header(x_r20_admin_token)
+    manifests_dir = ROOT / "backups" / "manifests"
+    manifests = []
+    for path in sorted(manifests_dir.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)[:50] if manifests_dir.exists() else []:
+        try:
+            item = json.loads(path.read_text(encoding="utf-8")); item["manifest_file"] = path.name; manifests.append(item)
+        except (OSError, json.JSONDecodeError): pass
+    jobs = list_backup_jobs()
+    return {"jobs": jobs, "validations": {job["id"]: validate_backup_job(job) for job in jobs}, "recent_manifests": manifests, "timezone": "Asia/Shanghai", "limits": {"maximum_jobs": 12}}
+
+
+@app.post("/api/v1/admin/backup-jobs")
+def create_backup_job_api(payload: BackupJobCreateRequest, x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    actor = require_superadmin(x_r20_session)
+    try: job = create_backup_job(payload.name, payload.source_id)
+    except ValueError as exc: raise HTTPException(status_code=400, detail=str(exc)) from exc
+    audit_record("backup.job.create", "success", {"actor": actor["username"], "job_id": job["id"]})
+    return {"job": job}
+
+
+@app.put("/api/v1/admin/backup-jobs/{job_id}")
+def update_backup_job_api(job_id: str, payload: BackupJobUpdateRequest, x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    actor = require_superadmin(x_r20_session)
+    try: job = update_backup_job(job_id, payload.job)
+    except ValueError as exc: raise HTTPException(status_code=400, detail=str(exc)) from exc
+    audit_record("backup.job.update", "success", {"actor": actor["username"], "job_id": job_id, "enabled": job["enabled"]})
+    return {"job": job, "validation": validate_backup_job(job)}
+
+
+@app.delete("/api/v1/admin/backup-jobs/{job_id}")
+def delete_backup_job_api(job_id: str, x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    actor = require_superadmin(x_r20_session)
+    try: delete_backup_job(job_id)
+    except ValueError as exc: raise HTTPException(status_code=409, detail=str(exc)) from exc
+    audit_record("backup.job.delete", "success", {"actor": actor["username"], "job_id": job_id})
+    return {"deleted": True}
+
+
+@app.post("/api/v1/admin/backup-jobs/validate")
+def validate_backup_job_api(payload: BackupJobUpdateRequest, x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
+    require_admin_header(x_r20_admin_token)
+    return validate_backup_job(payload.job)
+
+
+@app.post("/api/v1/admin/backup-jobs/{job_id}/run")
+def run_backup_job_api(job_id: str, payload: BackupJobRunRequest, x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    actor = require_superadmin(x_r20_session)
+    if payload.confirmation.strip().upper() != f"BACKUP {job_id}".upper():
+        raise HTTPException(status_code=400, detail=f"确认短语必须精确为：BACKUP {job_id}")
+    try: get_backup_job(job_id)
+    except ValueError as exc: raise HTTPException(status_code=404, detail=str(exc)) from exc
+    script = SCRIPTS_DIR / "nightly_backup_and_clean.py"
+    result = subprocess.run([sys.executable, str(script), "--job-id", job_id], cwd=ROOT, text=True, capture_output=True, timeout=1800)
+    BACKUP_LOG_FILE.parent.mkdir(exist_ok=True); BACKUP_LOG_FILE.write_text(result.stdout + "\n" + result.stderr, encoding="utf-8")
+    audit_record("backup.job.run", "success" if result.returncode == 0 else "failed", {"actor": actor["username"], "job_id": job_id, "returncode": result.returncode})
+    if result.returncode: raise HTTPException(status_code=502, detail=f"灾备任务失败：{result.stderr[-800:] or result.stdout[-800:]}")
+    return {"completed": True, "output": result.stdout[-4000:]}
+
+
+@app.get("/api/v1/admin/backup-jobs/{job_id}/export")
+def export_backup_job_api(job_id: str, x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
+    require_admin_header(x_r20_admin_token)
+    try: return export_backup_job(job_id)
+    except ValueError as exc: raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.post("/api/v1/admin/backup-jobs/import")
+def import_backup_job_api(payload: BackupJobImportRequest, x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    actor = require_superadmin(x_r20_session)
+    try: job = import_backup_job(payload.payload, payload.name_override)
+    except ValueError as exc: raise HTTPException(status_code=400, detail=str(exc)) from exc
+    audit_record("backup.job.import", "success", {"actor": actor["username"], "job_id": job["id"]})
+    return {"job": job}
+
+
+@app.post("/api/v1/admin/backup-jobs/verify")
+def verify_backup_archive_api(payload: BackupVerifyRequest, x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    actor = require_superadmin(x_r20_session)
+    candidate = (ROOT / payload.archive_path).resolve()
+    if not candidate.is_relative_to((ROOT / "backups").resolve()): raise HTTPException(status_code=400, detail="只能验证项目 backups/ 目录内的归档")
+    from scripts.backup_runtime import verify_archive
+    try: result = verify_archive(candidate, payload.expected_sha256, payload.key_env)
+    except Exception as exc: raise HTTPException(status_code=409, detail=str(exc)) from exc
+    audit_record("backup.archive.verify", "success", {"actor": actor["username"], "archive": str(candidate.relative_to(ROOT)), "members": result["members"]})
+    return result
+
+
 @app.put("/api/v1/admin/backups/methods")
 def update_backup_methods(payload: BackupMethodsUpdate, x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
     refresh_settings()
@@ -964,6 +1195,7 @@ def backup_status(x_r20_admin_token: str | None = Header(default=None)) -> dict[
         "schedule": "每天北京时间 02:00，由 Gateway Scheduler 执行全部已启用灾备方式",
         "script": str(SCRIPTS_DIR / "nightly_backup_and_clean.py"),
         "methods": load_backup_methods(),
+        "jobs": list_backup_jobs(),
         "local_archives": sorted(local_archives, key=lambda item: item["mtime"], reverse=True),
         "sqlite_snapshots": sorted(sqlite_snapshots, key=lambda item: item["mtime"], reverse=True),
         "last_log": BACKUP_LOG_FILE.read_text(encoding="utf-8")[-4000:] if BACKUP_LOG_FILE.exists() else "尚无后台手动灾备日志",

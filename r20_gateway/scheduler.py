@@ -9,6 +9,7 @@ import sys
 from typing import Any
 
 from r20_backend.schedule_store import load_schedule
+from r20_backend.backup_store import list_jobs as list_backup_jobs
 from r20_gateway.store import GatewayStore
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -32,15 +33,28 @@ JOBS = (
     JobSpec("news", "news_sentiment_harvester.py", 10 * 60, 300),
     JobSpec("daily_briefing", "daily_summary_and_backup.py", None, 600, "briefing_times", ("08:00", "20:00")),
     JobSpec("self_improvement", "self_improvement_engine.py", None, 1200, "self_improvement_time", ("20:00",)),
-    JobSpec("nightly_backup", "nightly_backup_and_clean.py", None, 1800, "backup_time", ("02:00",)),
 )
+
+
+def backup_job_specs() -> tuple[JobSpec, ...]:
+    specs: list[JobSpec] = []
+    for index, job in enumerate(list_backup_jobs()):
+        if not job.get("enabled"):
+            continue
+        name = "nightly_backup" if index == 0 or job.get("id") == "nightly-default" else f"backup:{job['id']}"
+        specs.append(JobSpec(name, "nightly_backup_and_clean.py", None, 1800, f"backup_job:{job['id']}", tuple(job.get("schedule_times", ["02:00"]))))
+    return tuple(specs)
+
+
+def current_jobs() -> tuple[JobSpec, ...]:
+    return (*JOBS, *backup_job_specs())
 
 
 def scheduler_snapshot(store: GatewayStore) -> dict[str, Any]:
     schedule = load_schedule()
     now = datetime.now(BJ_TZ)
     jobs = []
-    for spec in JOBS:
+    for spec in current_jobs():
         raw = store.get_state(f"job.last.{spec.name}")
         try:
             last = datetime.fromisoformat(raw) if raw else None
@@ -74,11 +88,13 @@ class GatewayScheduler:
 
     def initialize_migration_baseline(self, now: datetime | None = None) -> None:
         now = now or datetime.now(BJ_TZ)
-        for spec in JOBS:
+        for spec in current_jobs():
             if not self.store.get_state(f"job.last.{spec.name}"):
                 self.store.set_state(f"job.last.{spec.name}", now.isoformat())
 
     def _scheduled_times(self, spec: JobSpec, schedule: dict[str, Any]) -> tuple[str, ...]:
+        if spec.schedule_key.startswith("backup_job:"):
+            return spec.default_times
         value = schedule.get(spec.schedule_key)
         if isinstance(value, list):
             return tuple(str(item) for item in value)
@@ -102,8 +118,11 @@ class GatewayScheduler:
     def _execute(self, spec: JobSpec) -> None:
         run_id = self.store.begin_job(spec.name)
         try:
+            command = [sys.executable, str(SCRIPTS / spec.script)]
+            if spec.schedule_key.startswith("backup_job:"):
+                command.extend(["--job-id", spec.schedule_key.split(":", 1)[1]])
             result = subprocess.run(
-                [sys.executable, str(SCRIPTS / spec.script)],
+                command,
                 cwd=ROOT,
                 text=True,
                 capture_output=True,
@@ -121,7 +140,7 @@ class GatewayScheduler:
         self.running = {name: future for name, future in self.running.items() if not future.done()}
         schedule = load_schedule()
         launched: list[str] = []
-        for spec in JOBS:
+        for spec in current_jobs():
             if spec.name in self.running or not self.due(spec, now, schedule):
                 continue
             self.store.set_state(f"job.last.{spec.name}", now.isoformat())
@@ -133,7 +152,7 @@ class GatewayScheduler:
         schedule = load_schedule()
         result = []
         now = datetime.now(BJ_TZ)
-        for spec in JOBS:
+        for spec in current_jobs():
             last = self._last_at(spec.name)
             result.append({
                 "name": spec.name,
