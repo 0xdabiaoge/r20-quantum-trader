@@ -15,7 +15,51 @@ async function overview(){let h=await api('/api/v1/health');let s=await api('/ap
 async function prompt(){let d=await api('/api/v1/admin/prompts');$('promptContent').value=d.content;$('promptState').textContent=d.enabled?'覆盖层已启用':'使用内置默认提示词'}async function notifications(){let d=await api('/api/v1/admin/notifications');$('webhookEnabled').checked=d.webhook.enabled;$('webhookUrl').value=d.webhook.url;$('wechatEnabled').checked=d.wechat.enabled;$('wechatUrl').value=d.wechat.webhook;$('telegramEnabled').checked=d.telegram.enabled;$('telegramChat').value=d.telegram.chat_id;$('qqEnabled').checked=d.qq.enabled;$('qqCommand').value=''}async function backups(){let d=await api('/api/v1/admin/backups');$('backupSummary').innerHTML=`计划：${d.schedule}<br>本地归档：${d.local_archives.length?'发现 '+d.local_archives.length+' 个（异常保留）':'无残留包，符合上传成功后清理策略'}`;$('backupLog').textContent=d.last_log}async function updates(){let d=await api('/api/v1/admin/update-status');cards('updateStatus',{分支:d.branch,本地:d.local,远端:d.remote||'不可用',可更新:(d.behind||0)+' 个提交',工作区:d.dirty?'有未提交改动':'干净'})}
 $('unlock').onclick=async()=>{token=$('token').value;try{lock(false);await Promise.all([loadConfig(),overview(),prompt(),notifications(),backups(),updates()]);note('后台已解锁。','ok')}catch(e){lock(true);note(e.message,'err')}};document.querySelectorAll('.nav').forEach(b=>b.onclick=()=>{document.querySelectorAll('.nav').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));$(b.dataset.view).classList.add('active');$('title').textContent=titles[b.dataset.view]});
 $('saveLlm').onclick=async()=>{try{await api('/api/v1/admin/config',{method:'PUT',body:JSON.stringify({llm_base_url:$('llmUrl').value,llm_api_key:$('llmKey').value||undefined,llm_model:$('llmModel').value})});$('llmKey').value='';note('LLM 配置已保存。','ok')}catch(e){note(e.message,'err')}};$('savePrompt').onclick=async()=>{try{let d=await api('/api/v1/admin/prompts',{method:'PUT',body:JSON.stringify({content:$('promptContent').value})});$('promptState').textContent=d.enabled?'覆盖层已启用':'使用内置默认提示词';note(d.restart_note,'ok')}catch(e){note(e.message,'err')}};$('clearPrompt').onclick=async()=>{$('promptContent').value='';$('savePrompt').click()};
-$('saveNotify').onclick=async()=>{try{await api('/api/v1/admin/notifications',{method:'PUT',body:JSON.stringify({webhook_enabled:$('webhookEnabled').checked,webhook_url:$('webhookUrl').value,wechat_enabled:$('wechatEnabled').checked,wechat_webhook:$('wechatUrl').value,telegram_enabled:$('telegramEnabled').checked,telegram_bot_token:$('telegramToken').value||undefined,telegram_chat_id:$('telegramChat').value,qq_enabled:$('qqEnabled').checked,qq_bridge_command:$('qqCommand').value})});$('telegramToken').value='';note('通知配置已保存。','ok')}catch(e){note(e.message,'err)}};document.querySelectorAll('.testNotify').forEach(b=>b.onclick=async()=>{try{let d=await api('/api/v1/admin/notifications/test',{method:'POST',body:JSON.stringify({channel:b.dataset.channel})});note(JSON.stringify(d.result),'ok')}catch(e){note(e.message,'err)}});
-$('runBackup').onclick=async()=>{try{let d=await api('/api/v1/admin/backups/run',{method:'POST',body:JSON.stringify({confirmation:$('backupConfirm').value})});$('backupLog').textContent=d.output;note('灾备任务完成。','ok');backups()}catch(e){note(e.message,'err)}};$('checkUpdate').onclick=updates;$('runUpdate').onclick=async()=>{try{let d=await api('/api/v1/admin/update',{method:'POST',body:JSON.stringify({confirmation:$('updateConfirm').value})});note((d.updated?'更新完成。':'已是最新版本。')+d.restart_note,'ok');updates()}catch(e){note(e.message,'err)}};
-$('saveOkx').onclick=async()=>{try{await api('/api/v1/admin/config',{method:'PUT',body:JSON.stringify({okx_api_key:$('okxKey').value||undefined,okx_secret_key:$('okxSecret').value||undefined,okx_passphrase:$('okxPass').value||undefined,okx_simulated:$('okxSim').value==='true'})});['okxKey','okxSecret','okxPass'].forEach(x=>$(x).value='');note('OKX 配置已保存。','ok')}catch(e){note(e.message,'err)}};$('saveRisk').onclick=async()=>{try{await api('/api/v1/admin/config',{method:'PUT',body:JSON.stringify({manual_close_enabled:$('manualEnabled').checked,admin_token:$('newAdminToken').value||undefined})});$('newAdminToken').value='';note('风控设置已保存。','ok')}catch(e){note(e.message,'err)}};$('closePosition').onclick=async()=>{try{let d=await api('/api/v1/admin/positions/close',{method:'POST',body:JSON.stringify({inst_id:$('closeInst').value,position_side:$('closeSide').value,admin_token:$('closeToken').value,confirmation:$('closeConfirm').value})});note('OKX 已受理：'+JSON.stringify(d.result),'ok')}catch(e){note('平仓未执行：'+e.message,'err)}};
+async function saveNotifications(){
+  const payload={
+    webhook_enabled:$('webhookEnabled').checked, webhook_url:$('webhookUrl').value,
+    wechat_enabled:$('wechatEnabled').checked, wechat_webhook:$('wechatUrl').value,
+    telegram_enabled:$('telegramEnabled').checked, telegram_bot_token:$('telegramToken').value||undefined,
+    telegram_chat_id:$('telegramChat').value, qq_enabled:$('qqEnabled').checked,
+    qq_bridge_command:$('qqCommand').value
+  };
+  try { await api('/api/v1/admin/notifications',{method:'PUT',body:JSON.stringify(payload)}); $('telegramToken').value=''; note('通知配置已保存。','ok'); }
+  catch(e) { note(e.message,'err'); }
+}
+$('saveNotify').onclick=saveNotifications;
+document.querySelectorAll('.testNotify').forEach(button=>{
+  button.onclick=async()=>{
+    try { const result=await api('/api/v1/admin/notifications/test',{method:'POST',body:JSON.stringify({channel:button.dataset.channel})}); note(JSON.stringify(result.result),'ok'); }
+    catch(e) { note(e.message,'err'); }
+  };
+});
+async function runManualBackup(){
+  try { const result=await api('/api/v1/admin/backups/run',{method:'POST',body:JSON.stringify({confirmation:$('backupConfirm').value})}); $('backupLog').textContent=result.output; note('灾备任务完成。','ok'); await backups(); }
+  catch(e) { note(e.message,'err'); }
+}
+async function runApplicationUpdate(){
+  try { const result=await api('/api/v1/admin/update',{method:'POST',body:JSON.stringify({confirmation:$('updateConfirm').value})}); note((result.updated?'更新完成。':'已是最新版本。')+result.restart_note,'ok'); await updates(); }
+  catch(e) { note(e.message,'err'); }
+}
+$('runBackup').onclick=runManualBackup;
+$('checkUpdate').onclick=updates;
+$('runUpdate').onclick=runApplicationUpdate;
+async function saveOkx(){
+  const payload={okx_api_key:$('okxKey').value||undefined,okx_secret_key:$('okxSecret').value||undefined,okx_passphrase:$('okxPass').value||undefined,okx_simulated:$('okxSim').value==='true'};
+  try { await api('/api/v1/admin/config',{method:'PUT',body:JSON.stringify(payload)}); ['okxKey','okxSecret','okxPass'].forEach(id=>$(id).value=''); note('OKX 配置已保存。','ok'); }
+  catch(e) { note(e.message,'err'); }
+}
+async function saveRisk(){
+  const payload={manual_close_enabled:$('manualEnabled').checked,admin_token:$('newAdminToken').value||undefined};
+  try { await api('/api/v1/admin/config',{method:'PUT',body:JSON.stringify(payload)}); $('newAdminToken').value=''; note('风控设置已保存。','ok'); }
+  catch(e) { note(e.message,'err'); }
+}
+async function closePosition(){
+  const payload={inst_id:$('closeInst').value,position_side:$('closeSide').value,admin_token:$('closeToken').value,confirmation:$('closeConfirm').value};
+  try { const result=await api('/api/v1/admin/positions/close',{method:'POST',body:JSON.stringify(payload)}); note('OKX 已受理：'+JSON.stringify(result.result),'ok'); }
+  catch(e) { note('平仓未执行：'+e.message,'err'); }
+}
+$('saveOkx').onclick=saveOkx;
+$('saveRisk').onclick=saveRisk;
+$('closePosition').onclick=closePosition;
 </script></body></html>
