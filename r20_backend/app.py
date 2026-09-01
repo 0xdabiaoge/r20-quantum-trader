@@ -462,6 +462,7 @@ def notification_config(x_r20_admin_token: str | None = Header(default=None)) ->
             "context_configured": bool(os.getenv("R20_WECHAT_CONTEXT_TOKEN", "")),
             "ready": bool(os.getenv("R20_WECHAT_BOT_TOKEN", "") and os.getenv("R20_WECHAT_USER_ID", "") and os.getenv("R20_WECHAT_CONTEXT_TOKEN", "")),
             "watcher": wechat_watcher_state(),
+            "protocol": "Tencent iLink 2.4.8",
         },
         "telegram": {"enabled": os.getenv("R20_NOTIFY_TELEGRAM_ENABLED", "0") == "1", "bot_token": mask(os.getenv("R20_TELEGRAM_BOT_TOKEN", "")), "chat_id": os.getenv("R20_TELEGRAM_CHAT_ID", "")},
         "qq": {

@@ -13,6 +13,7 @@ from typing import Any
 
 from r20_backend.config import ROOT
 from r20_backend.settings_store import update_env
+from r20_backend.wechat_protocol import base_info, common_headers
 
 STATE_FILE = ROOT / "data" / "wechat_session_state.json"
 _stop = threading.Event()
@@ -63,22 +64,29 @@ def public_state() -> dict[str, Any]:
 
 
 def _poll(token: str, base_url: str, cursor: str) -> dict[str, Any]:
-    uin = base64.b64encode(str(secrets.randbelow(0xFFFFFFFF)).encode()).decode()
-    body = json.dumps({"get_updates_buf": cursor, "base_info": {"channel_version": "1.0.2"}}).encode("utf-8")
+    body = json.dumps({"get_updates_buf": cursor, "base_info": base_info()}).encode("utf-8")
     request = urllib.request.Request(
         f"{base_url.rstrip('/')}/ilink/bot/getupdates",
         data=body,
-        headers={
-            "Content-Type": "application/json",
-            "AuthorizationType": "ilink_bot_token",
-            "X-WECHAT-UIN": uin,
-            "Authorization": f"Bearer {token}",
-            "User-Agent": "R20-Standalone/5.4.2",
-        },
+        headers={"User-Agent": "R20-Standalone/5.4.2", **common_headers(token)},
         method="POST",
     )
     with urllib.request.urlopen(request, timeout=45) as response:
         return json.loads(response.read().decode("utf-8") or "{}")
+
+
+def _notify_lifecycle(token: str, base_url: str, action: str) -> None:
+    body = json.dumps({"base_info": base_info()}).encode("utf-8")
+    request = urllib.request.Request(
+        f"{base_url.rstrip('/')}/ilink/bot/msg/notify{action}",
+        data=body,
+        headers={"User-Agent": "R20-Standalone/5.4.2", **common_headers(token)},
+        method="POST",
+    )
+    with urllib.request.urlopen(request, timeout=10) as response:
+        payload = json.loads(response.read().decode("utf-8") or "{}")
+    if payload.get("ret", 0) not in (0, None):
+        raise RuntimeError(f"notify{action} ret={payload.get('ret')}")
 
 
 def _run() -> None:
@@ -96,6 +104,15 @@ def _run() -> None:
             continue
         try:
             payload = _poll(token, base_url, str(state.get("cursor", "")))
+            ret = payload.get("ret", 0)
+            errcode = payload.get("errcode", 0)
+            if ret not in (0, None) or errcode not in (0, None):
+                if ret == -14 or errcode == -14:
+                    state.update({"status": "token_stale_relogin_required", "cursor": ""})
+                    _save_state(state)
+                    _stop.wait(3600)
+                    continue
+                raise RuntimeError(f"getupdates ret={ret} errcode={errcode}")
             state["cursor"] = payload.get("get_updates_buf") or state.get("cursor", "")
             state["status"] = "listening"
             for message in payload.get("msgs") or payload.get("messages") or []:
@@ -120,6 +137,12 @@ def start_watcher() -> None:
     global _thread
     if _thread and _thread.is_alive():
         return
+    env = _env()
+    if env.get("R20_WECHAT_BOT_TOKEN"):
+        try:
+            _notify_lifecycle(env["R20_WECHAT_BOT_TOKEN"], env.get("R20_WECHAT_BASE_URL", "https://ilinkai.weixin.qq.com"), "start")
+        except Exception:
+            pass
     _stop.clear()
     _thread = threading.Thread(target=_run, name="r20-wechat-session-watcher", daemon=True)
     _thread.start()
@@ -127,3 +150,9 @@ def start_watcher() -> None:
 
 def stop_watcher() -> None:
     _stop.set()
+    env = _env()
+    if env.get("R20_WECHAT_BOT_TOKEN"):
+        try:
+            _notify_lifecycle(env["R20_WECHAT_BOT_TOKEN"], env.get("R20_WECHAT_BASE_URL", "https://ilinkai.weixin.qq.com"), "stop")
+        except Exception:
+            pass

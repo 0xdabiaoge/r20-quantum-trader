@@ -10,6 +10,7 @@ import urllib.request
 import uuid
 from pathlib import Path
 from typing import Any
+from r20_backend.wechat_protocol import base_info as wechat_base_info, common_headers as wechat_common_headers
 
 ROOT = Path(__file__).resolve().parents[1]
 QQ_TOKEN_URL = "https://bots.qq.com/app/getAppAccessToken"
@@ -63,13 +64,7 @@ def _send_qq(env: dict[str, str], message: str) -> tuple[bool, str]:
 
 
 def _wechat_headers(bot_token: str) -> dict[str, str]:
-    uin = base64.b64encode(str(secrets.randbelow(0xFFFFFFFF)).encode()).decode()
-    return {
-        "Content-Type": "application/json",
-        "AuthorizationType": "ilink_bot_token",
-        "X-WECHAT-UIN": uin,
-        "Authorization": f"Bearer {bot_token}",
-    }
+    return wechat_common_headers(bot_token)
 
 
 def _send_wechat_ilink(env: dict[str, str], message: str) -> tuple[bool, str]:
@@ -89,10 +84,17 @@ def _send_wechat_ilink(env: dict[str, str], message: str) -> tuple[bool, str]:
             "context_token": context_token,
             "item_list": [{"type": 1, "text_item": {"text": message}}],
         },
-        "base_info": {"channel_version": "2.0.1"},
+        "base_info": wechat_base_info(),
     }
     ok, detail, response = _post_json(f"{base_url}/ilink/bot/sendmessage", payload, _wechat_headers(token))
-    return ok, detail if ok else f"{detail} {response}"
+    if not ok:
+        return False, f"{detail} {response}"
+    ret = response.get("ret", 0) if isinstance(response, dict) else 0
+    if ret not in (0, None):
+        if ret == -2:
+            return False, "微信业务拒绝 ret=-2：会话 Context Token 已失效；请向 Bot 发送新消息以刷新会话"
+        return False, f"微信业务拒绝 ret={ret} errmsg={response.get('errmsg', '')}"
+    return True, detail
 
 
 def notify(text: str) -> dict[str, str]:
