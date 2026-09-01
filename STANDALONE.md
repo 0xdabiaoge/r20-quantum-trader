@@ -19,6 +19,8 @@ chmod 600 .env
 
 Set `LLM_*` and `OKX_*` credentials in `.env`. Never commit this file.
 
+The standalone backend uses `OKX_*` for native read-only REST calls. Existing strategy execution remains on the local OKX CLI bridge during this migration phase; move that bridge's credentials to the target host before enabling the scheduler.
+
 ## Run Locally
 
 Terminal 1:
