@@ -1,9 +1,12 @@
 """Standalone control plane: read-only monitoring plus process health."""
 from __future__ import annotations
+import base64
 import hashlib
 import hmac
+import io
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -14,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = ROOT / "data"
 SCRIPTS_DIR = ROOT / "scripts"
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(SCRIPTS_DIR))
 
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
@@ -23,6 +27,8 @@ from r20_backend.okx_client import OKXClient
 from r20_backend.settings_store import mask, update_env
 from r20_backend.notifications import test_channel
 from r20_backend.audit import recent as recent_audit, record as audit_record
+from r20_backend.schedule_store import load_schedule, save_schedule
+from r20_backend.wechat_login import create_qrcode, latest_session, qrcode_status
 from scripts.instrument_pool import from_okx_instrument, load_instruments, save_instruments
 
 PROMPT_OVERRIDE_FILE = DATA_DIR / "system_prompt_override.txt"
@@ -92,6 +98,14 @@ class NotificationConfigUpdate(BaseModel):
 
 class NotificationTestRequest(BaseModel):
     channel: str = Field(pattern=r"^(webhook|wechat|wechat_ilink|telegram|qq)$")
+
+
+class NotificationScheduleUpdate(BaseModel):
+    briefing_times: list[str] = Field(min_length=1, max_length=6)
+
+
+class WechatQrStatusRequest(BaseModel):
+    qrcode: str = Field(min_length=1, max_length=500)
 
 
 class BackupRequest(BaseModel):
@@ -395,8 +409,16 @@ def update_application(payload: UpdateRequest, x_r20_admin_token: str | None = H
 def prompt_override(x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
     refresh_settings()
     require_admin_header(x_r20_admin_token)
+    from scripts.ai_brain_trader import SYSTEM_PROMPT
     content = PROMPT_OVERRIDE_FILE.read_text(encoding="utf-8") if PROMPT_OVERRIDE_FILE.exists() else ""
-    return {"content": content, "enabled": bool(content), "path": str(PROMPT_OVERRIDE_FILE)}
+    effective = SYSTEM_PROMPT if not content.strip() else f"{SYSTEM_PROMPT}\n\n【管理员提示词覆盖层（同样必须遵守上述风控和 JSON 约束）】\n{content.strip()}"
+    return {
+        "content": content,
+        "enabled": bool(content.strip()),
+        "base_prompt": SYSTEM_PROMPT,
+        "effective_prompt": effective,
+        "path": str(PROMPT_OVERRIDE_FILE),
+    }
 
 
 @app.put("/api/v1/admin/prompts")
@@ -480,6 +502,99 @@ def send_notification_test(payload: NotificationTestRequest, x_r20_admin_token: 
     result = test_channel(payload.channel)
     audit_record("notifications.test", "completed", {"channel": payload.channel, "result": result})
     return {"channel": payload.channel, "result": result}
+
+
+@app.get("/api/v1/admin/notifications/schedule")
+def notification_schedule(x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
+    refresh_settings()
+    require_admin_header(x_r20_admin_token)
+    schedule = load_schedule()
+    return {
+        **schedule,
+        "event_notifications": "开仓、平仓与风险事件实时推送，不受每日简报时间限制",
+        "restart_note": "保存后调度器将在 60 秒内读取新时间，无需重启。",
+    }
+
+
+@app.put("/api/v1/admin/notifications/schedule")
+def update_notification_schedule(payload: NotificationScheduleUpdate, x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
+    refresh_settings()
+    require_admin_header(x_r20_admin_token)
+    normalized: list[str] = []
+    for value in payload.briefing_times:
+        value = value.strip()
+        try:
+            parsed = time.strptime(value, "%H:%M")
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=f"无效时间：{value}；必须使用 HH:MM 24 小时格式") from exc
+        canonical = f"{parsed.tm_hour:02d}:{parsed.tm_min:02d}"
+        if canonical not in normalized:
+            normalized.append(canonical)
+    normalized.sort()
+    schedule = load_schedule()
+    schedule["briefing_times"] = normalized
+    save_schedule(schedule)
+    audit_record("notifications.schedule", "success", {"briefing_times": normalized, "timezone": "Asia/Shanghai"})
+    return {**schedule, "saved": True, "restart_note": "调度器将在 60 秒内读取新时间。"}
+
+
+@app.post("/api/v1/admin/notifications/wechat/qr")
+def create_wechat_qr(x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
+    refresh_settings()
+    require_admin_header(x_r20_admin_token)
+    base_url = os.getenv("R20_WECHAT_BASE_URL", "https://ilinkai.weixin.qq.com")
+    try:
+        result = create_qrcode(base_url)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"获取微信登录二维码失败：{exc}") from exc
+    audit_record("wechat.qr.create", "success", {})
+    try:
+        import qrcode as qr_library
+        image = qr_library.make(result["image_content"])
+        buffer = io.BytesIO()
+        image.save(buffer, format="PNG")
+        image_data = base64.b64encode(buffer.getvalue()).decode("ascii")
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"二维码渲染失败：{exc}") from exc
+    return {"qrcode": result["qrcode"], "image_data": f"data:image/png;base64,{image_data}", "expires_hint": result["expires_hint"]}
+
+
+@app.post("/api/v1/admin/notifications/wechat/qr/status")
+def check_wechat_qr(payload: WechatQrStatusRequest, x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
+    refresh_settings()
+    require_admin_header(x_r20_admin_token)
+    base_url = os.getenv("R20_WECHAT_BASE_URL", "https://ilinkai.weixin.qq.com")
+    try:
+        result = qrcode_status(payload.qrcode, base_url)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"查询微信扫码状态失败：{exc}") from exc
+    if result["status"] == "confirmed" and result["bot_token"]:
+        update_env({
+            "R20_WECHAT_BOT_TOKEN": result["bot_token"],
+            "R20_WECHAT_BASE_URL": result["base_url"],
+            "R20_WECHAT_USER_ID": result["user_id"] or None,
+            "R20_NOTIFY_WECHAT_ILINK_ENABLED": "1",
+        })
+        audit_record("wechat.qr.confirm", "success", {"bot_id": result["bot_id"], "user_id_configured": bool(result["user_id"])})
+        return {"status": "confirmed", "configured": True, "bot_id": result["bot_id"], "user_id": result["user_id"], "context_required": True}
+    return {"status": result["status"], "configured": False}
+
+
+@app.post("/api/v1/admin/notifications/wechat/session")
+def sync_wechat_session(x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
+    refresh_settings()
+    require_admin_header(x_r20_admin_token)
+    bot_token = os.getenv("R20_WECHAT_BOT_TOKEN", "")
+    base_url = os.getenv("R20_WECHAT_BASE_URL", "https://ilinkai.weixin.qq.com")
+    if not bot_token:
+        raise HTTPException(status_code=409, detail="请先完成微信扫码绑定")
+    try:
+        result = latest_session(bot_token, base_url)
+    except Exception as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    update_env({"R20_WECHAT_USER_ID": result["user_id"], "R20_WECHAT_CONTEXT_TOKEN": result["context_token"]})
+    audit_record("wechat.session.sync", "success", {"user_id": result["user_id"]})
+    return {"synced": True, "user_id": result["user_id"], "context_configured": True}
 
 
 @app.get("/api/v1/admin/backups")

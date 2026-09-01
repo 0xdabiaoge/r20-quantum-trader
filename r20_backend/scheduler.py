@@ -12,6 +12,11 @@ import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+try:
+    from r20_backend.schedule_store import load_schedule
+except ModuleNotFoundError:
+    from schedule_store import load_schedule
+
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = ROOT / "scripts"
 DATA = ROOT / "data"
@@ -44,10 +49,14 @@ def run_script(name: str) -> None:
         logging.info("job=%s completed stdout=%s", name, result.stdout[-500:])
 
 
-def due_daily(now: datetime, hour: int, minute: int, last_run: datetime | None) -> bool:
+def due_daily(now: datetime, schedule_time: str, last_run: datetime | None) -> bool:
+    try:
+        hour, minute = [int(part) for part in schedule_time.split(":", 1)]
+    except (TypeError, ValueError):
+        return False
     if (now.hour, now.minute) != (hour, minute):
         return False
-    return not last_run or last_run.date() != now.date()
+    return not last_run or last_run.date() != now.date() or (last_run.hour, last_run.minute) != (hour, minute)
 
 
 def main() -> None:
@@ -73,13 +82,15 @@ def main() -> None:
             if not last["news"] or (current - last["news"]).total_seconds() >= 10 * 60:
                 run_script("news")
                 last["news"] = datetime.now(tz)
-            if due_daily(now, 8, 0, last["daily_briefing"]) or due_daily(now, 20, 0, last["daily_briefing"]):
+            schedule = load_schedule()
+            briefing_times = schedule.get("briefing_times", ["08:00", "20:00"])
+            if any(due_daily(now, schedule_time, last["daily_briefing"]) for schedule_time in briefing_times):
                 run_script("daily_briefing")
                 last["daily_briefing"] = now
-            if due_daily(now, 20, 0, last["self_improvement"]):
+            if due_daily(now, schedule.get("self_improvement_time", "20:00"), last["self_improvement"]):
                 run_script("self_improvement")
                 last["self_improvement"] = now
-            if due_daily(now, 2, 0, last["nightly_backup"]):
+            if due_daily(now, schedule.get("backup_time", "02:00"), last["nightly_backup"]):
                 run_script("nightly_backup")
                 last["nightly_backup"] = now
             time.sleep(5)
