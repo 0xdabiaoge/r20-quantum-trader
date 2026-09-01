@@ -19,6 +19,8 @@ from calculus_engine import (
     calculate_definite_integrals,
     calculate_probability_theory,
     classify_regime,
+    classify_integral_regime,
+    classify_probability_regime,
     _normal_cdf,
     _ema,
     _diff,
@@ -142,6 +144,22 @@ class MultiTimeframeIntegrationTest(unittest.TestCase):
         self.assertTrue(res["timeframes"]["15M"]["valid"])
         self.assertIn("definite_integrals", res)
         self.assertIn("probability_theory", res)
+        self.assertEqual(res["definite_integrals"]["regime"], "POSITIVE_ENERGY_EXPANSION")
+        self.assertIn(res["probability_theory"]["regime"], {
+            "HIGH_PROB_BULL_CONTINUATION", "POSITIVE_SKEW_UPSIDE", "NEGATIVE_SKEW_DOWNSIDE", "EXTREME_FAT_TAIL_RISK"
+        })
+
+    def test_aggregate_regime_classifiers_prioritise_risk(self):
+        self.assertEqual(classify_integral_regime(1.2, 0.8), "POSITIVE_ENERGY_EXPANSION")
+        self.assertEqual(classify_integral_regime(0.2, 3.0), "OVERSTRETCHED_MEAN_REVERSION")
+        self.assertEqual(
+            classify_probability_regime(-0.8, 1.0, 78.0, 22.0, False),
+            "NEGATIVE_SKEW_DOWNSIDE",
+        )
+        self.assertEqual(
+            classify_probability_regime(0.1, 0.2, 78.0, 22.0, False),
+            "HIGH_PROB_BULL_CONTINUATION",
+        )
 
 
 class FactorLibraryIntegrationTest(unittest.TestCase):

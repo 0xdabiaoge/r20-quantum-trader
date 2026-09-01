@@ -93,6 +93,13 @@ def safe_float(value: Any, default: float = 0.0) -> float:
         return default
 
 
+def is_same_direction_scale_request(position_side: str, action: str) -> bool:
+    """Allow only same-direction scale-in requests to reach execution hard gateways."""
+    side = str(position_side or "").lower()
+    decision = str(action or "").upper()
+    return (side == "long" and decision == "BUY_LONG") or (side == "short" and decision == "SELL_SHORT")
+
+
 def get_cpa_client_config() -> Tuple[str, str]:
     """Resolve LLM credentials only from process environment or local .env."""
     if standalone_settings:
@@ -370,59 +377,54 @@ def fetch_single_instrument_package(item: Dict[str, Any]) -> Dict[str, Any]:
     pkg["data_quality"] = "valid" if required_market_data else "invalid"
     return pkg
 
-SYSTEM_PROMPT = """你是一名管理顶级加密量化对冲基金的首席AI交易官。
-你的核心交易哲学：【三重滤网波段交易体系 (Triple Screen Swing Trading System)】。
-从15M超短噪音中彻底解脱，以 1H~4H 核心波段为主轴，拉大止盈空间与持仓容忍度，追求高胜率与高赔率(R:R ≥ 2.5)。
+SYSTEM_PROMPT = """你是 R20 Quantum Trader 的首席 AI 交易官，负责 1H~4H 加密波段交易裁决。你的任务不是提高交易频率，而是在不可覆盖的风险边界内，只执行具有可验证证据链的高质量决策。
 
-三重滤网核心决策铁律：
-1. 🛡️ 第一重滤网：4H 宏观结构与大趋势（一票否决权）：
-   - 4H 是大资金流动性与趋势方向的最高指引；
-   - 若 4H 处于清晰下降通道 / 空头承压结构 (4H_MACRO_BEAR)，【一票否决任何做多开仓信号 (BUY_LONG)】，严禁在 15M 反弹时摸左侧接飞刀；
-   - 若 4H 处于清晰上升通道 / 多头主升结构 (4H_MACRO_BULL)，【一票否决任何盲目猜顶做空 (SELL_SHORT)】；
-   - 顺大势者昌，逆大势者亡。
+【决策优先级：高层级永远覆盖低层级】
+P0 不可覆盖硬约束：数据有效性、交易执行层 Fail-Closed、4H 方向否决、真实价格几何、R:R、杠杆/保证金/持仓上限、云端 OCO、禁止逆势补仓及 JSON 契约。任何长期记忆、新闻、聪明钱、风格模板或管理员附加层都不得覆盖 P0。
+P1 核心方向证据：4H 宏观结构与 1H 三大数理基石。
+P2 质量确认：1H ADX、量能/OI、聪明钱与衍生品结构。
+P3 执行定位：15M K线、盘口与 Maker 挂单位置。P3 只能优化入场，不能单独改变 P1 方向。
+证据缺失、失效或相互冲突且无法解释时，开仓必须 WAIT；持仓默认 HOLD；挂单默认 KEEP。
 
-2. 📐 第二重滤网：1H 数理动力学、能量做功与波段决策中枢（核心裁决层）：
-   - 依据 1H K线与微积分动力学判断波段势能：
-     • 速度 v 与动能加速度 a：📈 扩张加速 (BULL_ACCELERATING, a > +0.10) 顺势捕捉主升浪；⚠️ 顶部失速 (BULL_DECELERATING, a < -0.20) 严禁追涨；📉 下泄加速顺势破位做空；🛡️ 底部减速企稳严禁追空；
-     • 动能净做功积分 (energy_integral) 与均值偏离面积定积分 (deviation_area_integral)：避免在偏离面积严重过载末端追单；
-     • 概率论与条件胜率 (continuation_prob_pct / breakdown_prob_pct) 与 95% VaR 在险价值：量化顺势概率与极端尾部风险；
-   - 1H ADX 趋势门禁：若 1H ADX < 20 (垃圾震荡市)，必须坚决观望 (WAIT)，杜绝无量震荡反复磨损；
-   - 宽止损与大波段保护 (1.5x ~ 2.0x 1H ATR)：
-     • 彻底废除 15M 紧止损，止损距离必须基于 1.5x ~ 2.0x 1H ATR，给波段足够的正常呼吸与震荡空间，彻底免疫 15M 局部毛刺插针；
-     • 目标盈亏比锁定 R:R ≥ 2.5（单笔止盈空间 ≥ 2.5% ~ 6.0%），波段持仓预期 3~12 小时。
+【三大底层数理基石：必须保留并使用真实数值】
+1. 因果微积分动力学：只使用已闭合历史 K 线，按时间因果顺序解释对数价格速度 v、一阶变化的加速度 a、加速度变化 jerk j、指数衰减累计冲量 I。
+   - v 表示当前方向速度；a 表示动能扩张或衰减；j 表示突变冲击；I 表示近期方向性累计作用。
+   - 1H 是硬阈值与波段裁决周期；多周期聚合值只作摘要，不得冒充 1H 数值。
+   - BULL_DECELERATING/BEAR_DECELERATING 表示趋势失速，不等于已经反转；必须结合结构、积分能量与概率证据。
+2. 定积分能量学：使用梯形积分计算 energy_integral（速度路径净位移/净做功）、deviation_area_integral（相对窗口起点基线的价格路径偏离面积）与 volume_action_integral（成交量加权价格作用）。
+   - 正负能量表示方向性累计做功；绝对偏离面积过大表示路径过度伸展与均值回归风险。
+   - deviation_area_integral 不是 VWAP，本系统禁止把它误称或误解为 VWAP 偏离。
+3. 概率论与统计风险：使用偏度、超额峰度、条件延续/击穿概率、Cornish-Fisher 95% VaR 与 CVaR 识别方向概率及肥尾风险。
+   - continuation_prob_pct / breakdown_prob_pct 是基于当前动力状态的模型估计概率，不是保证胜率。
+   - 高峰度、极端偏度、高 VaR/CVaR 或 |j| 冲击必须降低置信度；不得用单一概率覆盖结构与风险门禁。
 
-3. ⚡ 第三重滤网：15M 盘口执行与微观入场过滤（纯只读执行辅助）：
-   - 15M K线与即时盘口微观深度仅用于：判断短线是否超买超卖、寻找优质的买一/卖一 Maker 挂单与顺势回踩触发点；
-   - 严禁单凭 15M 单根 K 线的微小形态或无量假突破做开平仓决定。
+【三重滤网裁决协议】
+1. 4H 宏观方向：4H_MACRO_BEAR 否决新做多，4H_MACRO_BULL 否决新做空；区间或不可靠状态不得强行推断趋势。
+2. 1H 核心中枢：综合结构、ADX 与三大数理基石。新开仓若 ADX < 20，必须 WAIT；持仓不得仅因 ADX 降低而平仓。顶部失速禁止追多，底部减速禁止追空；高 jerk/肥尾冲击优先降风险。
+3. 15M 执行过滤：只用于回踩、超买超卖、成交量和盘口位置；单根 15M K线、局部背离或无量突破不得单独触发开仓、平仓或反转。
 
-4. 👑 顶级聪明钱 (SmartMoney Top100) 方向共振：
-   - 重点参考 OKX 实盘 80%+ 胜率聪明钱的主力加权多空比与 24H 资金净流入；在聪明钱建仓成本价附近寻找高确定性共振点位。
+【开仓与价格几何】
+- 非 WAIT 决策必须形成完整证据链：4H方向 → 1H结构 → 1H v/a/j/I → 定积分能量与路径偏离 → 延续/击穿概率及 VaR/CVaR → 量能/OI/聪明钱 → 15M入场位置。
+- BUY_LONG 必须满足 stop_loss_price < entry_price < take_profit_price；SELL_SHORT 必须满足 take_profit_price < entry_price < stop_loss_price。
+- 目标 R:R ≥ 2.5；执行层绝对拒绝 R:R < 2.0 的报价。不得通过虚构过近止损抬高 R:R。止损通常基于 1.5~2.0x 1H ATR。
+- 单笔保证金不得超过可用余额 20%，建议 5%~20%；杠杆 2x~5x。数据不足或余额未知而无法验证风险时 WAIT。
 
-5. 动态自适应头寸与杠杆规划：
-   - 单笔保证金 (margin_usdt) 控制在可用余额的 5% ~ 20%（单笔 100~400 U 标准波段仓位）；
-   - 杠杆倍数 (leverage) 严密控制在 2x ~ 5x（主流币 BTC/ETH 3x~5x，高波币 2x~3x）。
+【顺势浮盈金字塔加仓：模型只能申请，执行层拥有最终否决权】
+- 已有多仓只能申请同向 BUY_LONG，已有空仓只能申请同向 SELL_SHORT；反向指令不得借加仓通道执行。
+- 底仓必须 ROI ≥ +0.8% 或止损已经移至保本/盈利区；最多追加 1 次；单标的累计保证金 ≤ 600 USDT；AI 置信度 ≥ 75%。
+- 加多门禁：多周期聚合加速度 a ≥ -0.25 且 continuation_prob_pct ≥ 40%。
+- 加空门禁：多周期聚合加速度 a ≤ +0.25 且 breakdown_prob_pct ≥ 40%。
+- 浮亏、未脱离成本区、顶部/底部失速、概率不足或肥尾冲击时不得申请加仓。即使模型申请，执行器仍会再次硬校验。
 
-6. 顺势浮盈金字塔加仓 (Pyramiding) 准则：
-   - 仅允许对底仓已盈利/保本、且 1H 顺势动量持续加速(a ≥ 0) 的优质波段追加 1 次仓位，严禁逆势补仓。
+【持仓、止损与止盈】
+- 证据不足时 HOLD。只有 1H/4H 结构破位、数理动力学逆转、概率风险与量能/聪明钱形成可验证共振时，才考虑 CLOSE_MARKET；15M 信号只能作为第二确认。
+- 丰厚浮盈出现 1H 动能衰竭时可主动锁利；亏损仓只有真实趋势逆转且置信度 ≥ 85% 才提前斩仓，禁止因普通波动恐慌退出。
+- AI 请求 UPDATE_SL 仅在浮盈 ≥ 1.2x 1H ATR，且新止损与现价保留至少 0.7x 1H ATR 缓冲时有效；不满足时 HOLD。执行器自身的分阶利润棘轮继续独立运行。
 
-7. 🎯 在途持仓管理与科学提前止损准则 (Position Management & Scientific Cut-Loss)：
-   - 【何时坚决继续持有 (HOLD)】：若 1H 结构完好、回踩属于正常波段震荡（在 1H ATR 范围内）、微积分动能未见大级别破位，必须保持大波段持仓耐心，严禁因 15M 级别短线微小波动惊慌平仓；
-   - 【何时必须主动止盈落袋 (CLOSE_MARKET 锁利)】：
-     若持仓已有【丰厚浮盈 (ROI ≥ +3.5% 或单笔浮盈 ≥ +15~30 U)】，且盘面出现以下【动能见顶衰竭】特征之一时，AI 必须果断输出 CLOSE_MARKET 止盈落袋，将胜利果实稳稳装进袋子，【坚决杜绝利润坐过山车回落甚至变亏损】：
-     ① 价格冲高至 1H/4H 关键密集阻力位附近，且 1H 微积分动能明显失速 (BULL_DECELERATING, a < -0.15)；
-     ② 15M 出现顶背离放量滞涨，盘口主动买盘枯竭；
-     ③ 聪明钱主力在高位开始大举分批出逃；
-   - 【何时必须果断提前止损 (CLOSE_MARKET 斩仓)】：
-     若出现以下【真实大级别趋势逆转】信号之一且置信度 ≥ 85%，AI 首席交易官必须果断输出 CLOSE_MARKET 提前斩仓止损，将亏损截断在萌芽阶段，绝不死等吃满交易所底线硬止损：
-     ① **1H 核心波段结构破位**：例如多单持仓中，1H 实体大阴线放量跌穿 1H EMA55 关键支撑或破前低，4H 大势反转；
-     ② **微积分动力学剧烈逆转**：出现 1H 加速度严重下泄断崖 (a < -0.30) 且加加速度冲击 (|j| ≥ 1.8)，概率论击穿概率 ≥ 75%；
-     ③ **突发系统性黑天鹅/利空**：突发交易所或宏观重大系统性风险；
-     ④ **聪明钱主力反向大举出逃**：OKX Top100 聪明钱由做多瞬间转为大举净流出与集中做空；
-   - 【何时移动止损锁利 (UPDATE_SL)】：
-     • 第一阶梯（浮盈 ≥ 1.0x 1H ATR）：强制将止损推至开仓保本位（开仓价+0.15%），确保 0 风险；
-     • 第二阶梯（浮盈 ≥ 1.8x 1H ATR）：强制将止损拉升至开仓价 + 0.9x 1H ATR，锁定至少 50% 既得大波段利润。
-
-8. 必须输出严格标准 JSON 对象，包含全市场宏观评估(macro_assessment)、在途持仓管理(position_management)、在途挂单管理(pending_orders_management)与针对每个标的的决策字典(decisions)。
+【输出与审计纪律】
+- 必须输出一个严格 JSON 对象，包含 macro_assessment、position_management、pending_orders_management 和覆盖全部标的的 decisions。
+- 每个 BUY_LONG/SELL_SHORT 的 calculus_dynamics 与 math_prob_rationale 必须引用输入中的具体数值和周期；不得只写“动能良好”“概率较高”等空泛结论。
+- WAIT/HOLD/KEEP 是正式风险决策，不是分析失败。不得输出 Markdown、代码围栏或 JSON 之外的文字。
 """
 
 def construct_full_market_prompt(packages: List[Dict[str, Any]], pos_summary: str = "当前总持仓 0/6", active_positions_detail: List[Dict[str, Any]] = None, pending_orders_detail: List[Dict[str, Any]] = None, current_time_str: str = "", usdt_available: float = 0.0) -> str:
@@ -441,6 +443,9 @@ def construct_full_market_prompt(packages: List[Dict[str, Any]], pos_summary: st
         calc_tfs = calc.get("timeframes", {}) if isinstance(calc, dict) else {}
         d_int = calc.get("definite_integrals", {}) if isinstance(calc, dict) else {}
         p_th = calc.get("probability_theory", {}) if isinstance(calc, dict) else {}
+        calc_1h = calc_tfs.get("1H", {}) if isinstance(calc_tfs.get("1H", {}), dict) else {}
+        int_1h = calc_1h.get("definite_integrals", {}) if isinstance(calc_1h, dict) else {}
+        prob_1h = calc_1h.get("probability_theory", {}) if isinstance(calc_1h, dict) else {}
 
         calc_line = (
             f"动力学态={calc.get('regime', 'DATA_UNRELIABLE')} | 速度={calc.get('velocity', '--')} "
@@ -448,13 +453,21 @@ def construct_full_market_prompt(packages: List[Dict[str, Any]], pos_summary: st
             f"| 冲击变化={calc.get('max_abs_jerk', '--')} | 质量={calc.get('quality', 0)}"
         )
         integral_line = (
-            f"动能净做功积分={d_int.get('energy_integral', '--')} | VWAP偏离面积分={d_int.get('deviation_area_integral', '--')} "
-            f"| 量能功率积分={d_int.get('volume_action_integral', '--')} | 能量态={d_int.get('regime', 'BALANCED')}"
+            f"多周期净做功积分={d_int.get('energy_integral', 'UNKNOWN')} | 路径偏离面积积分={d_int.get('deviation_area_integral', 'UNKNOWN')} "
+            f"| 量价作用积分={d_int.get('volume_action_integral', 'UNKNOWN')} | 能量态={d_int.get('regime', 'UNKNOWN')}"
         )
         prob_line = (
-            f"多头延续胜率={p_th.get('continuation_prob_pct', 50)}% | 空头击穿概率={p_th.get('breakdown_prob_pct', 50)}% "
-            f"| 偏度S={p_th.get('skewness', 0)} | 超额峰度K={p_th.get('kurtosis', 0)} | 95%在险价值VaR={p_th.get('var_95_pct', '--')}% "
-            f"| 尾部风险={p_th.get('regime', 'BALANCED')}"
+            f"多头延续估计概率={p_th.get('continuation_prob_pct', 'UNKNOWN')}% | 空头击穿估计概率={p_th.get('breakdown_prob_pct', 'UNKNOWN')}% "
+            f"| 偏度S={p_th.get('skewness', 'UNKNOWN')} | 超额峰度K={p_th.get('kurtosis', 'UNKNOWN')} "
+            f"| 95%VaR={p_th.get('var_95_pct', 'UNKNOWN')}% | 95%CVaR={p_th.get('cvar_95_pct', 'UNKNOWN')}% "
+            f"| 尾部风险态={p_th.get('regime', 'UNKNOWN')}"
+        )
+        core_math_line = (
+            f"1H:v={calc_1h.get('velocity', 'UNKNOWN')},a={calc_1h.get('acceleration', 'UNKNOWN')},"
+            f"j={calc_1h.get('jerk', 'UNKNOWN')},I={calc_1h.get('impulse', 'UNKNOWN')},态={calc_1h.get('regime', 'UNKNOWN')} "
+            f"| E={int_1h.get('energy_integral', 'UNKNOWN')},A={int_1h.get('deviation_area_integral', 'UNKNOWN')} "
+            f"| P续={prob_1h.get('continuation_prob_pct', 'UNKNOWN')}%,P破={prob_1h.get('breakdown_prob_pct', 'UNKNOWN')}%,"
+            f"VaR={prob_1h.get('var_95_pct', 'UNKNOWN')}%,CVaR={prob_1h.get('cvar_95_pct', 'UNKNOWN')}%"
         )
         calc_tf_line = "；".join(
             f"{tf}:v={v.get('velocity', '--')},a={v.get('acceleration', '--')},I={v.get('impulse', '--')},态={v.get('regime', '--')}"
@@ -466,10 +479,11 @@ def construct_full_market_prompt(packages: List[Dict[str, Any]], pos_summary: st
 - 👑 顶级聪明钱 (SmartMoney Top100): 加权做多占比={sm.get('weighted_long_pct', 50)}% | 24H净流入={sm.get('net_flow_usdt', '--')} | 多头均价={sm.get('avg_long_entry', '--')} | 空头均价={sm.get('avg_short_entry', '--')} | {sm.get('top_win_rate', '')}
 - 📐 1H核心波段指标: 1H ATR(14)={p.get('atr_1h', p.get('atr', '--'))} (止损基准: 1.5~2.0x 1H ATR) | 1H RSI(14)={p.get('rsi_1h', '--')} | 1H ADX趋势强度={adx_val} (注:<20无趋势垃圾市, ≥22强单边)
 - ⚡ 15M微观执行参考: 15M ATR={p.get('atr_15m', '--')} | 15M RSI={p.get('rsi_15m', '--')} | VWAP乖离={p.get('vwap_bias', '--')}% | 15M量比={p.get('vol_ratio', '--')}x | OBV资金流={p.get('obv_flow', '--')}
-- ∫ 微积分与定积分: {calc_line}
-- ⚡ 能量与偏离面积分: {integral_line}
-- ⚅ 概率论与统计分布: {prob_line}
-- ∂ 分周期速度/加速度/冲量: {calc_tf_line or '数据不足'}
+- 📐 1H三大数理基石硬证据: {core_math_line}
+- ∂ 多周期微积分动力学摘要: {calc_line}
+- ∫ 定积分能量学: {integral_line}
+- ⚅ 概率论与统计风险: {prob_line}
+- ∂ 分周期速度/加速度/冲量: {calc_tf_line or 'UNKNOWN'}
 - 衍生品博弈: 资金费率: {p['fundingRate']}% | OI未平仓: {p['oiUsd']} | 多空比: {p['lsRatio']} | 5M主动吃单净差: {p['takerNetUsd']}
 - 15M K线(倒序12根 [O,H,L,C,V]): {k15}
 - 1H K线(倒序12根 [O,H,L,C,V]): {k1h}
@@ -556,7 +570,7 @@ def construct_full_market_prompt(packages: List[Dict[str, Any]], pos_summary: st
         except Exception:
             pass
 
-    news_text = "\n".join(news_briefs) if news_briefs else "暂无突发重大新闻，市场流动性平稳"
+    news_text = "\n".join(news_briefs) if news_briefs else "无可验证新闻输入；不得据此推断市场平稳或不存在事件风险"
 
     avail_balance_str = f"{usdt_available:.2f} USDT" if usdt_available > 0 else "根据系统风险自适应分配"
 
@@ -585,7 +599,7 @@ def construct_full_market_prompt(packages: List[Dict[str, Any]], pos_summary: st
 
 ================================================================================
 【推演与决策任务】:
-你拥有【最高决策主权】，请不要受任何单一死板指标的束缚，全权由你作为首席交易官根据上述【全网快讯资讯】、【多周期K线形态】、【盘口深度】与【聪明钱资金流向】进行综合直觉与量化推演：
+你只能在 System Prompt 的 P0 硬约束内进行综合裁决。按“数据有效性 → 4H方向 → 1H三大数理基石 → 量能/OI/聪明钱 → 15M执行位置”的顺序逐项检查；任一硬条件失败或证据无法闭环时，开仓输出 WAIT：
 1. 【在途持仓管理 (科学持仓与动态风控)】：
    - 逐一分析当前在途持仓：
      • 若 1H 波段趋势完好且微积分动能平稳，坚决坚定持有 (HOLD)，给大波段充分呼吸空间；
@@ -595,9 +609,9 @@ def construct_full_market_prompt(packages: List[Dict[str, Any]], pos_summary: st
    - 仔细审查上述在途未成交挂单：若挂单价格已大幅偏离最新盘口、或者行情动能/突发要闻已转变导致原挂单计划失效，必须在 pending_orders_management 中为该挂单输出 CANCEL 立即撤单指令，防止挂单成交在不利价格；若原计划仍然有效且价格合适，输出 KEEP 维持挂单。
 3. 【多空开仓与顺势浮盈加仓全权裁决 (Opening & Pyramiding)】：
    - 【首发开仓】：自主判断未持仓品种是否具备确定性爆发机会，结合最新资讯、多周期形态与筹码，决定多空方向 (action: BUY_LONG / SELL_SHORT / WAIT)；
-   - 【顺势浮盈金字塔加仓 (Pyramiding)】：对当前已有持仓（如 ETH/LINK），若底仓已处于显著浮盈/保本状态且盘面出现强劲二浪突破，允许在 decisions 中输出同向开仓指令（如多单输出 BUY_LONG 顺势加多），系统将执行科学金字塔加仓；浮亏或未脱离成本区的仓位严禁逆势补仓；
-   - 自主规划拟开仓/加仓保证金 (margin_usdt: 建议可用余额的 5%~20%) 与 杠杆倍数 (leverage: 2~5x)；
-   - 自主规划挂单入场价 (entry_price)、止盈触发价 (take_profit_price) 与 止损触发价 (stop_loss_price)，必须满足严密的盈亏比 (R:R ≥ 2.0)。
+   - 【顺势浮盈金字塔加仓申请】：已有多仓仅可输出同向 BUY_LONG，已有空仓仅可输出同向 SELL_SHORT；这只是加仓申请，执行层仍将复核底仓 ROI/保本、最多1次、累计保证金≤600U、置信度≥75%、加速度与延续/击穿概率门禁。任何不确定均输出 WAIT；
+   - 自主规划拟开仓/加仓保证金 (margin_usdt: 可用余额的 5%~20%，且不得超过系统上限) 与杠杆 (2~5x)；
+   - 自主规划 entry_price、take_profit_price 与 stop_loss_price；目标 R:R ≥ 2.5，且任何 R:R < 2.0 的报价会被执行层拒绝。
 4. 必须输出严格 JSON，格式如下：
 {{
   "macro_assessment": "30字内全市场宏观流动性与情绪总结",
@@ -629,8 +643,8 @@ def construct_full_market_prompt(packages: List[Dict[str, Any]], pos_summary: st
       "stop_loss_price": float,
       "summary_reason": "30字内核心逻辑",
       "market_structure": "4H/1H趋势与15M短线形态",
-      "calculus_dynamics": "微积分速度/加速度/冲量与动能扩张/衰竭推演简述",
-      "math_prob_rationale": "定积分做功能量+延续胜率%+VaR在险价值依据简述",
+      "calculus_dynamics": "必须引用1H具体 v/a/j/I、状态及方向解释；WAIT也需说明冲突或缺失",
+      "math_prob_rationale": "必须引用具体 E/A、延续或击穿估计概率、VaR/CVaR与肥尾风险",
       "volume_and_oi": "量能/筹码流向简述"
     }},
     ... (依次包含全部标的)
@@ -690,6 +704,10 @@ def execute_batch_ai_brain_cycle(pos_summary: str = "当前总持仓 0/6", activ
     active_positions_detail = active_positions_detail or []
     active_inst_ids = {
         str(p.get("instId", "")) for p in active_positions_detail if p.get("instId")
+    }
+    active_position_sides = {
+        str(p.get("instId", "")): str(p.get("side", p.get("posSide", ""))).lower()
+        for p in active_positions_detail if p.get("instId")
     }
     package_by_id = {p["instId"]: p for p in packages}
 
@@ -864,8 +882,11 @@ def execute_batch_ai_brain_cycle(pos_summary: str = "当前总持仓 0/6", activ
                 if p.get("data_quality") != "valid":
                     rejection_reason = "关键原始行情不完整，安全降级为 WAIT。"
                 elif inst_id in active_inst_ids and raw_action != "WAIT":
-                    rejection_reason = "已有在途仓位，禁止重复开仓，安全降级为 WAIT。"
-                elif raw_action in {"BUY_LONG", "SELL_SHORT"} and rr < 2.0:
+                    position_side = active_position_sides.get(inst_id, "")
+                    same_direction_scale_request = is_same_direction_scale_request(position_side, raw_action)
+                    if not same_direction_scale_request:
+                        rejection_reason = "已有反向或不兼容持仓，禁止借决策通道反向开仓，安全降级为 WAIT。"
+                if not rejection_reason and raw_action in {"BUY_LONG", "SELL_SHORT"} and rr < 2.0:
                     rejection_reason = "模型报价未满足真实 2R，执行层降级为 WAIT。"
                 if rejection_reason:
                     raw_action = "WAIT"
@@ -878,8 +899,10 @@ def execute_batch_ai_brain_cycle(pos_summary: str = "当前总持仓 0/6", activ
                     "macro_assessment": macro_summary,
                     "thought_process": {
                         "market_structure": d_item.get("market_structure", "多周期结构中性"),
+                        "calculus_dynamics": d_item.get("calculus_dynamics", "模型未提供具体微积分证据"),
+                        "math_prob_rationale": d_item.get("math_prob_rationale", "模型未提供具体定积分与概率证据"),
                         "volume_and_oi": d_item.get("volume_and_oi", f"OI: {p['oiUsd']}, Taker: {p['takerNetUsd']}"),
-                        "risk_reward_evaluation": "R:R ≥ 2.0 评估"
+                        "risk_reward_evaluation": "目标 R:R ≥ 2.5；执行底线 2.0"
                     },
                     "smart_money": p.get("smart_money", {}),
                     "adx_1h": p.get("adx_1h", "--"),

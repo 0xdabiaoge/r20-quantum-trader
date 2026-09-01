@@ -70,6 +70,38 @@ def classify_regime(velocity: float, acceleration: float, impulse: float, jerk: 
     return "BEAR_STABLE"
 
 
+def classify_integral_regime(energy: float, deviation_area: float) -> str:
+    """Classify aggregate path-energy state from aggregate integral values."""
+    if energy > 0.8 and deviation_area > 0.5:
+        return "POSITIVE_ENERGY_EXPANSION"
+    if energy < -0.8 and deviation_area < -0.5:
+        return "NEGATIVE_ENERGY_DEPLETION"
+    if abs(deviation_area) >= 2.5:
+        return "OVERSTRETCHED_MEAN_REVERSION"
+    return "BALANCED_ENERGY"
+
+
+def classify_probability_regime(
+    skewness: float,
+    kurtosis: float,
+    continuation_prob: float,
+    breakdown_prob: float,
+    is_fat_tail: bool,
+) -> str:
+    """Classify aggregate stochastic state, prioritising tail/asymmetry risk over direction."""
+    if is_fat_tail and kurtosis >= 3.0:
+        return "EXTREME_FAT_TAIL_RISK"
+    if skewness > 0.6:
+        return "POSITIVE_SKEW_UPSIDE"
+    if skewness < -0.6:
+        return "NEGATIVE_SKEW_DOWNSIDE"
+    if continuation_prob >= 70.0:
+        return "HIGH_PROB_BULL_CONTINUATION"
+    if breakdown_prob >= 70.0:
+        return "HIGH_PROB_BEAR_BREAKDOWN"
+    return "GAUSSIAN_BALANCED"
+
+
 # =============================================================================
 # 1. DEFINITE INTEGRAL FOUNDATION (定积分数学体系)
 # =============================================================================
@@ -84,7 +116,7 @@ def calculate_definite_integrals(
     
     Metrics:
     1. energy_integral (动能净做功积分): \int_{t-T}^t v(tau) d tau
-    2. deviation_area_integral (偏离面积分): \int_{t-T}^t (P - VWAP)/VWAP d tau
+    2. deviation_area_integral (路径偏离面积分): \int_{t-T}^t (P - P0)/P0 d tau
     3. volume_action_integral (量价做功功率积分): \int (dP/P) * Vol d tau
     """
     prices = _finite(closes)
@@ -137,14 +169,7 @@ def calculate_definite_integrals(
     volume_action = _normalise(volume_action_raw, 0.01, bound=5.0)
 
     # Integral Regime Classification
-    if energy_integral > 0.8 and deviation_area > 0.5:
-        integral_regime = "POSITIVE_ENERGY_EXPANSION" # 多头能量持续蓄积做功
-    elif energy_integral < -0.8 and deviation_area < -0.5:
-        integral_regime = "NEGATIVE_ENERGY_DEPLETION" # 空头能量单向消耗下泄
-    elif abs(deviation_area) >= 2.5:
-        integral_regime = "OVERSTRETCHED_MEAN_REVERSION" # 面积严重过载，面临强均值回归
-    else:
-        integral_regime = "BALANCED_ENERGY"
+    integral_regime = classify_integral_regime(energy_integral, deviation_area)
 
     return {
         "valid": True,
@@ -223,18 +248,9 @@ def calculate_probability_theory(
     kurtosis_bounded = max(-2.0, min(10.0, kurtosis))
     is_fat_tail = bool(kurtosis_bounded >= 1.5 or abs(skewness_bounded) >= 1.2)
 
-    if is_fat_tail and kurtosis_bounded >= 3.0:
-        prob_regime = "EXTREME_FAT_TAIL_RISK"
-    elif skewness_bounded > 0.6:
-        prob_regime = "POSITIVE_SKEW_UPSIDE"
-    elif skewness_bounded < -0.6:
-        prob_regime = "NEGATIVE_SKEW_DOWNSIDE"
-    elif continuation_prob >= 70.0:
-        prob_regime = "HIGH_PROB_BULL_CONTINUATION"
-    elif breakdown_prob >= 70.0:
-        prob_regime = "HIGH_PROB_BEAR_BREAKDOWN"
-    else:
-        prob_regime = "GAUSSIAN_BALANCED"
+    prob_regime = classify_probability_regime(
+        skewness_bounded, kurtosis_bounded, continuation_prob, breakdown_prob, is_fat_tail
+    )
 
     return {
         "valid": True,
@@ -401,6 +417,11 @@ def calculate_multi_timeframe(candles_by_tf: Dict[str, Sequence[Sequence[float]]
     max_cvar_95 = max((p["cvar_95_pct"] for p in prob_valid), default=2.2)
     any_fat_tail = any(p["is_fat_tail"] for p in prob_valid)
 
+    aggregate_integral_regime = classify_integral_regime(avg_energy_int, avg_dev_area)
+    aggregate_prob_regime = classify_probability_regime(
+        avg_skewness, avg_kurtosis, avg_continuation_prob, avg_breakdown_prob, any_fat_tail
+    )
+
     return {
         "valid": True,
         "timeframes": result,
@@ -415,7 +436,7 @@ def calculate_multi_timeframe(candles_by_tf: Dict[str, Sequence[Sequence[float]]
             "energy_integral": round(avg_energy_int, 4),
             "deviation_area_integral": round(avg_dev_area, 4),
             "volume_action_integral": round(avg_vol_action, 4),
-            "regime": int_valid[0].get("integral_regime", "BALANCED") if int_valid else "BALANCED"
+            "regime": aggregate_integral_regime
         },
         # Unified Probability Theory
         "probability_theory": {
@@ -426,6 +447,6 @@ def calculate_multi_timeframe(candles_by_tf: Dict[str, Sequence[Sequence[float]]
             "var_95_pct": round(max_var_95, 2),
             "cvar_95_pct": round(max_cvar_95, 2),
             "is_fat_tail": any_fat_tail,
-            "regime": prob_valid[0].get("prob_regime", "BALANCED") if prob_valid else "BALANCED"
+            "regime": aggregate_prob_regime
         }
     }

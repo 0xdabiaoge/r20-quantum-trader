@@ -152,19 +152,34 @@ def load_closed_trades():
 
     return closed_trades
 
-EVOLUTION_SYSTEM_PROMPT = """你是一名世界顶级加密量化对冲基金的首席投资官(CIO)。
-你的职责：审查系统最近平仓的历史真实成交记录与损益流水，对照【已有历史长期记忆库】，进行每日交易认知复盘（Cognitive Post-Mortem），执行【智能记忆更新与动态覆盖】并沉淀为 Markdown 格式的实战心法提示词。
+EVOLUTION_SYSTEM_PROMPT = """你是 R20 Quantum Trader 的首席投资官，负责基于真实已平仓交易证据进行认知复盘。模型只输出严格 JSON；宿主程序负责北京时间戳与 Markdown 渲染。
 
-核心记忆机制与动态覆盖原则（R20 原生记忆系统）：
-1. 记忆时效性与证伪覆盖（Memory Evolution & Invalidation）：
-   - 市场环境瞬息万变，早期的经验法则在新的市场结构下可能失效（如牛市的追突破心法在震荡市失效，或此前的摸顶教训在新主线中需要修正）；
-   - 你必须审视【现有旧记忆】：保留仍具普适性的真理，淘汰/覆盖/修订已失效或被最新亏损实证打脸的过时认知，生成全新的【最新有效记忆条目】。
-2. 显式打标生成日期时间（Timestamped）：
-   - 每一条核心记忆心法与归因痛点，都必须明确标注提炼生成的精确时间日期（如 `[YYYY-MM-DD HH:MM:SS]`），使未来 AI 大脑能清晰感知该经验的时效衰减。
-3. 启发式与软约束（Soft Heuristics）：
-   - 记忆是提供给未来 AI 大脑的高维直觉与先验洞察，绝不能写成死板限制、绝对硬编码规则或僵化指标阈值。
-4. 必须输出严格标准 JSON 对象。
+【证据纪律】
+1. 只允许根据输入台账中真实可见的字段归因；不得把盈亏结果倒推成未提供的微积分、定积分、概率、新闻或聪明钱事实。
+2. 只有输入中存在对应开平仓快照时，才可对 v/a/j/I、energy_integral、deviation_area_integral、延续/击穿概率、VaR/CVaR 作因果分析；否则必须明确标记“数理快照不可观测”，不得编造。
+3. 单笔交易或小样本通常不足以证伪长期规律。证据不足时允许 NO_CHANGE，禁止为了每日报告强行制造新心法。
+4. 长期记忆只是软启发式，永远不得弱化数据有效性、4H 方向否决、R:R、ATR、杠杆、保证金、OCO、禁止逆势补仓或 JSON 契约等硬风控。
+5. 同时审查盈利与亏损、手续费、仓位规模、退出原因和反例；区分已验证事实、待验证假设与随机波动。
+
+【记忆更新规则】
+- ADD：多个独立样本支持新的可复用经验。
+- REVISE：新证据明确限定旧经验的适用条件。
+- INVALIDATE：充分反例证明旧经验失效。
+- NO_CHANGE：证据不足、无新增交易或结论无法区分策略问题与随机性。
+- 输出 0~4 条结论即可；没有高质量新证据时宁可空数组，不得凑数。
+
+必须输出严格 JSON 对象，不得输出 Markdown、代码围栏或额外解释。
 """
+
+def resolve_memory_update(change_status: str, proposed_memory: Any, existing_memory: List[str]) -> Tuple[str, List[str], bool]:
+    """Normalize LLM memory change and preserve existing lessons when evidence is insufficient."""
+    status = str(change_status or "NO_CHANGE").upper()
+    if status not in {"NO_CHANGE", "ADD", "REVISE", "INVALIDATE"}:
+        status = "NO_CHANGE"
+    proposed = proposed_memory if isinstance(proposed_memory, list) else []
+    preserve = status == "NO_CHANGE" or not proposed
+    return status, list(existing_memory if preserve else proposed), preserve
+
 
 def call_llm_evolution_review(closed_trades: List[Dict[str, Any]], existing_memory_md: str = "", timestamp_str: str = "") -> Dict[str, Any]:
     base_url, api_key = get_cpa_client_config()
@@ -200,19 +215,20 @@ def call_llm_evolution_review(closed_trades: List[Dict[str, Any]], existing_memo
 【逐笔历史交易明细 (按时间排序)】:
 {json.dumps(closed_trades, indent=2, ensure_ascii=False)}
 
-【复盘与长期记忆进化/动态覆盖任务】:
-请基于上述真实交易流水，对照【已有历史长期记忆库】，审视哪些旧经验已失效需淘汰覆盖（特别关注微积分动能加速度 Calculus Acceleration 衰竭与假突破、顺势加仓时机与止损冷却），提炼出最新的 3~4 条实战心法，输出标准 JSON：
+【复盘与长期记忆进化任务】:
+请严格基于可观测台账证据复盘。当前输入若未提供交易发生时的 v/a/j/I、定积分、概率或 VaR 快照，不得将盈亏事后归因于这些指标，只能标注“数理快照不可观测”。证据不足时使用 NO_CHANGE，不得强行生成新规律。输出标准 JSON：
 {{
+  "change_status": "NO_CHANGE" | "ADD" | "REVISE" | "INVALIDATE",
   "diagnosis_insights": [
-    "3~4 条深度痛点与亏损归因诊断 (直击实战要害，严格对齐上方真实数据)"
+    "0~4 条有台账字段支持的诊断；区分已验证事实与待验证假设"
   ],
   "evolution_actions": [
-    "3~4 条具体的自适应执行优化方向 (如强化聪明钱共振、避开流动性真空段、优化挂单入场等)"
+    "0~4 条可执行改进；证据不足时只提出数据采集或观察建议"
   ],
   "ai_long_term_memory": [
-    "3~4 条写给未来 AI 交易大脑的最新有效实战心法 (每条需包含心法核心，并体现对过时经验的更新/覆盖)"
+    "0~4 条有多个独立样本支持的软启发式；不得覆盖任何硬风控"
   ],
-  "memory_overwrites_reason": "简述本轮对哪些旧认知进行了淘汰、修订或强化覆盖 (50字内)"
+  "memory_overwrites_reason": "说明证据支持何种变更；NO_CHANGE 时明确为何不覆盖旧记忆"
 }}
 """
 
@@ -312,25 +328,32 @@ def run_self_evolution(force: bool = False):
 
     # 1. Read existing memory to enable smart evolution & overwriting
     existing_memory_md = ""
+    existing_core_lessons = []
     if os.path.exists(AI_MEMORY_MD_FILE):
         try:
             with open(AI_MEMORY_MD_FILE, "r", encoding="utf-8") as f:
                 existing_memory_md = f.read()
         except Exception:
             pass
+    if os.path.exists(AI_MEMORY_FILE):
+        try:
+            with open(AI_MEMORY_FILE, "r", encoding="utf-8") as f:
+                existing_payload = json.load(f)
+            if isinstance(existing_payload.get("core_lessons"), list):
+                existing_core_lessons = existing_payload["core_lessons"]
+        except Exception:
+            pass
 
     # 2. Call LLM for Cognitive Review & Memory Overwriting
     llm_review = call_llm_evolution_review(closed_trades, existing_memory_md=existing_memory_md, timestamp_str=timestamp_str)
 
-    insights = llm_review.get("diagnosis_insights", [
-        f"全盘已平仓 {total_trades} 笔，整体胜率 {win_rate}%，累计手续费消耗 {total_fees_amt:.2f} USDT。",
-        "加密货币主升浪与波段顺势契合度极佳，剔除TradFi后流动性与动量显著纯化。"
-    ])
-    actions_taken = llm_review.get("evolution_actions", [
-        "全面升级为 AI 大脑全权裁决开仓与持仓管理，废除死板硬编码阈值。",
-        "严格对齐 OKX 顶级聪明钱主力方向，防范多空比极端过热的多杀多踩踏。",
-        "对高流动性标的执行自适应头寸规划，确保盈亏比真实 R:R ≥ 2.0。"
-    ])
+    change_status, _, _ = resolve_memory_update(llm_review.get("change_status", "NO_CHANGE"), [], [])
+    insights = llm_review.get("diagnosis_insights", [])
+    actions_taken = llm_review.get("evolution_actions", [])
+    if not isinstance(insights, list):
+        insights = []
+    if not isinstance(actions_taken, list):
+        actions_taken = []
     
     raw_asset_mults = llm_review.get("asset_multipliers", {})
     if not isinstance(raw_asset_mults, dict):
@@ -339,11 +362,9 @@ def run_self_evolution(force: bool = False):
         asset: clamp(raw_asset_mults.get(asset, 1.0), 0.5, 1.5, 1.0)
         for asset in TARGET_INSTRUMENTS
     }
-    long_term_memory = llm_review.get("ai_long_term_memory", [
-        "顺势与大势共振：密切观察 4H/1H 宏观结构，避免在强单边主升浪中逆势摸顶。",
-        "聪明钱资金意图：80%+ 胜率主力资金大额流入往往伴随突破爆发，可作为高置信度共振参考。",
-        "防范多杀多踩踏：在多空比极度拥挤且量能枯竭的高位，防范获利盘平仓引起的折返去杠杆风险。"
-    ])
+    change_status, long_term_memory, preserve_existing_memory = resolve_memory_update(
+        change_status, llm_review.get("ai_long_term_memory", []), existing_core_lessons
+    )
 
     # 3. Save Long-Term Memory (Both JSON and Human/LLM-readable Markdown)
     memory_payload = {
@@ -353,9 +374,10 @@ def run_self_evolution(force: bool = False):
         "core_lessons": long_term_memory,
         "favored_assets": ["ETH", "SOL", "LINK"]
     }
-    atomic_write_json(AI_MEMORY_FILE, memory_payload)
+    if not preserve_existing_memory or not os.path.exists(AI_MEMORY_FILE):
+        atomic_write_json(AI_MEMORY_FILE, memory_payload)
 
-    # Save as durable R20 Markdown memory file
+    # Save as durable R20 Markdown memory file only when evidence justifies a change.
     md_content = f"""# R20 AI 交易大脑长期记忆与启发式心法 (AI Trading Memory)
 
 > **最新覆盖与修订时间**: {timestamp_str} (北京时间)  
@@ -386,14 +408,17 @@ def run_self_evolution(force: bool = False):
             clean_ins = clean_ins[len(f"[{timestamp_str}]"):].strip()
         md_content += f"- 💡 [{timestamp_str}] {clean_ins}\n"
 
-    try:
-        tmp_md = AI_MEMORY_MD_FILE + ".tmp"
-        with open(tmp_md, "w", encoding="utf-8") as f:
-            f.write(md_content)
-        os.replace(tmp_md, AI_MEMORY_MD_FILE)
-        log_msg(f"📝 长期记忆已同步更新至 Markdown 文件: {AI_MEMORY_MD_FILE}")
-    except Exception as e:
-        log_msg(f"Markdown 记忆写入异常: {e}")
+    if not preserve_existing_memory or not os.path.exists(AI_MEMORY_MD_FILE):
+        try:
+            tmp_md = AI_MEMORY_MD_FILE + ".tmp"
+            with open(tmp_md, "w", encoding="utf-8") as f:
+                f.write(md_content)
+            os.replace(tmp_md, AI_MEMORY_MD_FILE)
+            log_msg(f"📝 长期记忆已同步更新至 Markdown 文件: {AI_MEMORY_MD_FILE}")
+        except Exception as e:
+            log_msg(f"Markdown 记忆写入异常: {e}")
+    else:
+        log_msg("🛡️ 证据不足或 NO_CHANGE：保留现有长期记忆，不执行覆盖")
 
     # 4. Save Dashboard Report
     report_payload = {
@@ -403,6 +428,8 @@ def run_self_evolution(force: bool = False):
         "win_rate": win_rate,
         "profit_factor": profit_factor,
         "mode": "R20 Native Heuristic Memory (启发式长期记忆)",
+        "change_status": change_status,
+        "memory_preserved": preserve_existing_memory,
         "insights": insights,
         "actions_taken": actions_taken,
         "core_lessons": long_term_memory
@@ -410,7 +437,7 @@ def run_self_evolution(force: bool = False):
 
     atomic_write_json(REPORT_JSON_FILE, report_payload)
 
-    log_msg(f"🧬 自进化认知复盘完成 | 已沉淀 {len(long_term_memory)} 条启发式长期记忆提示词")
+    log_msg(f"🧬 自进化认知复盘完成 | 状态={change_status} | 当前保留 {len(long_term_memory)} 条启发式长期记忆")
     return report_payload
 
 if __name__ == "__main__":
