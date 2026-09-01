@@ -160,14 +160,19 @@ def build_lifecycle_ledger():
         net_pnl = round(gross_pnl + fee, 2)
         lever = int(float(h.get("lever", "3") or 3))
         
-        # Calculate Margin
+        # Calculate Margin & Real Position Size
         ct_val = get_ct_val(inst)
-        # We estimate notional from pnl and price change, or average size
-        pnl_ratio = float(h.get("pnlRatio", 0) or 0)
-        margin_usdt = 1000.0 # Standard demo pos ~1000 U
-        if pnl_ratio != 0:
-            est_margin = abs(gross_pnl / pnl_ratio)
-            margin_usdt = round(est_margin, 2)
+        close_pos_sz = float(h.get("closeTotalPos", 0) or h.get("openMaxPos", 0) or 0)
+        
+        if close_pos_sz > 0 and open_px > 0 and ct_val > 0:
+            notional = close_pos_sz * ct_val * open_px
+            margin_usdt = round(notional / lever, 2) if lever > 0 else round(notional, 2)
+        else:
+            pnl_ratio = float(h.get("pnlRatio", 0) or 0)
+            margin_usdt = 500.0 # Standard fallback
+            if pnl_ratio != 0:
+                est_margin = abs(gross_pnl / pnl_ratio)
+                margin_usdt = round(est_margin, 2)
         
         roi_pct = round((net_pnl / margin_usdt * 100) if margin_usdt > 0 else 0.0, 2)
 
