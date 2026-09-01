@@ -64,15 +64,22 @@ class NotificationConfigUpdate(BaseModel):
     webhook_url: str = ""
     wechat_enabled: bool = False
     wechat_webhook: str = ""
+    wechat_ilink_enabled: bool = False
+    wechat_bot_token: str | None = None
+    wechat_base_url: str = "https://ilinkai.weixin.qq.com"
+    wechat_user_id: str = ""
+    wechat_context_token: str | None = None
     telegram_enabled: bool = False
     telegram_bot_token: str | None = None
     telegram_chat_id: str = ""
     qq_enabled: bool = False
-    qq_bridge_command: str = ""
+    qq_app_id: str = ""
+    qq_client_secret: str | None = None
+    qq_openid: str = ""
 
 
 class NotificationTestRequest(BaseModel):
-    channel: str = Field(pattern=r"^(webhook|wechat|telegram|qq)$")
+    channel: str = Field(pattern=r"^(webhook|wechat|wechat_ilink|telegram|qq)$")
 
 
 class BackupRequest(BaseModel):
@@ -269,8 +276,20 @@ def notification_config(x_r20_admin_token: str | None = Header(default=None)) ->
     return {
         "webhook": {"enabled": os.getenv("R20_NOTIFY_WEBHOOK_ENABLED", "0") == "1", "url": settings.notification_webhook},
         "wechat": {"enabled": os.getenv("R20_NOTIFY_WECHAT_ENABLED", "0") == "1", "webhook": os.getenv("R20_WECHAT_WEBHOOK", "")},
+        "wechat_ilink": {
+            "enabled": os.getenv("R20_NOTIFY_WECHAT_ILINK_ENABLED", "0") == "1",
+            "bot_token": mask(os.getenv("R20_WECHAT_BOT_TOKEN", "")),
+            "base_url": os.getenv("R20_WECHAT_BASE_URL", "https://ilinkai.weixin.qq.com"),
+            "user_id": os.getenv("R20_WECHAT_USER_ID", ""),
+            "context_token": mask(os.getenv("R20_WECHAT_CONTEXT_TOKEN", "")),
+        },
         "telegram": {"enabled": os.getenv("R20_NOTIFY_TELEGRAM_ENABLED", "0") == "1", "bot_token": mask(os.getenv("R20_TELEGRAM_BOT_TOKEN", "")), "chat_id": os.getenv("R20_TELEGRAM_CHAT_ID", "")},
-        "qq": {"enabled": os.getenv("R20_NOTIFY_QQ_ENABLED", "0") == "1", "bridge_configured": bool(os.getenv("R20_QQ_BRIDGE_COMMAND", ""))},
+        "qq": {
+            "enabled": os.getenv("R20_NOTIFY_QQ_ENABLED", "0") == "1",
+            "app_id": os.getenv("R20_QQ_APP_ID", ""),
+            "client_secret": mask(os.getenv("R20_QQ_CLIENT_SECRET", "")),
+            "openid": os.getenv("R20_QQ_OPENID", ""),
+        },
     }
 
 
@@ -286,11 +305,18 @@ def update_notification_config(payload: NotificationConfigUpdate, x_r20_admin_to
         "R20_NOTIFICATION_WEBHOOK": payload.webhook_url,
         "R20_NOTIFY_WECHAT_ENABLED": "1" if payload.wechat_enabled else "0",
         "R20_WECHAT_WEBHOOK": payload.wechat_webhook,
+        "R20_NOTIFY_WECHAT_ILINK_ENABLED": "1" if payload.wechat_ilink_enabled else "0",
+        "R20_WECHAT_BOT_TOKEN": payload.wechat_bot_token,
+        "R20_WECHAT_BASE_URL": payload.wechat_base_url,
+        "R20_WECHAT_USER_ID": payload.wechat_user_id,
+        "R20_WECHAT_CONTEXT_TOKEN": payload.wechat_context_token,
         "R20_NOTIFY_TELEGRAM_ENABLED": "1" if payload.telegram_enabled else "0",
         "R20_TELEGRAM_BOT_TOKEN": payload.telegram_bot_token,
         "R20_TELEGRAM_CHAT_ID": payload.telegram_chat_id,
         "R20_NOTIFY_QQ_ENABLED": "1" if payload.qq_enabled else "0",
-        "R20_QQ_BRIDGE_COMMAND": payload.qq_bridge_command,
+        "R20_QQ_APP_ID": payload.qq_app_id,
+        "R20_QQ_CLIENT_SECRET": payload.qq_client_secret,
+        "R20_QQ_OPENID": payload.qq_openid,
     })
     return {"saved": True, "restart_note": "通知配置已写入 .env；下一轮脚本执行会读取新通道。"}
 

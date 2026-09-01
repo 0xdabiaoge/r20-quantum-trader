@@ -1,15 +1,19 @@
-"""R20 notification fan-out with independently configurable delivery channels."""
+"""R20-native notification fan-out. No QwenPaw/OpenClaw runtime dependency."""
 from __future__ import annotations
+import base64
 import datetime
 import json
 import os
-import subprocess
+import secrets
 import urllib.parse
 import urllib.request
+import uuid
 from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
+QQ_TOKEN_URL = "https://bots.qq.com/app/getAppAccessToken"
+QQ_API_BASE = "https://api.sgroup.qq.com"
 
 
 def _env() -> dict[str, str]:
@@ -23,18 +27,72 @@ def _env() -> dict[str, str]:
     return {**values, **os.environ}
 
 
-def _post_json(url: str, payload: dict[str, Any]) -> tuple[bool, str]:
-    request = urllib.request.Request(
-        url,
-        data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-        headers={"Content-Type": "application/json", "User-Agent": "R20-Standalone/5.4.2"},
-        method="POST",
-    )
+def _post_json(url: str, payload: dict[str, Any], headers: dict[str, str] | None = None) -> tuple[bool, str, dict[str, Any]]:
+    request_headers = {"Content-Type": "application/json", "User-Agent": "R20-Standalone/5.4.2"}
+    request_headers.update(headers or {})
+    request = urllib.request.Request(url, data=json.dumps(payload, ensure_ascii=False).encode("utf-8"), headers=request_headers, method="POST")
     try:
         with urllib.request.urlopen(request, timeout=15) as response:
-            return 200 <= response.status < 300, f"HTTP {response.status}"
+            raw = response.read().decode("utf-8")
+            try:
+                data = json.loads(raw) if raw else {}
+            except json.JSONDecodeError:
+                data = {"raw": raw}
+            return 200 <= response.status < 300, f"HTTP {response.status}", data
     except Exception as exc:
-        return False, str(exc)
+        return False, str(exc), {}
+
+
+def _send_qq(env: dict[str, str], message: str) -> tuple[bool, str]:
+    app_id = env.get("R20_QQ_APP_ID", "")
+    secret = env.get("R20_QQ_CLIENT_SECRET", "")
+    openid = env.get("R20_QQ_OPENID", "")
+    if not app_id or not secret or not openid:
+        return False, "QQ App ID / Client Secret / OpenID 未完整配置"
+    ok, detail, token_data = _post_json(QQ_TOKEN_URL, {"appId": app_id, "clientSecret": secret})
+    access_token = token_data.get("access_token") if ok else ""
+    if not access_token:
+        return False, f"QQ access token 获取失败：{detail}"
+    sequence = int(datetime.datetime.now().timestamp() * 1000) % 1_000_000
+    ok, detail, response = _post_json(
+        f"{QQ_API_BASE}/v2/users/{urllib.parse.quote(openid, safe='')}/messages",
+        {"content": message, "msg_type": 0, "msg_seq": sequence},
+        {"Authorization": f"QQBot {access_token}"},
+    )
+    return ok, detail if ok else f"{detail} {response}"
+
+
+def _wechat_headers(bot_token: str) -> dict[str, str]:
+    uin = base64.b64encode(str(secrets.randbelow(0xFFFFFFFF)).encode()).decode()
+    return {
+        "Content-Type": "application/json",
+        "AuthorizationType": "ilink_bot_token",
+        "X-WECHAT-UIN": uin,
+        "Authorization": f"Bearer {bot_token}",
+    }
+
+
+def _send_wechat_ilink(env: dict[str, str], message: str) -> tuple[bool, str]:
+    token = env.get("R20_WECHAT_BOT_TOKEN", "")
+    user_id = env.get("R20_WECHAT_USER_ID", "")
+    context_token = env.get("R20_WECHAT_CONTEXT_TOKEN", "")
+    base_url = env.get("R20_WECHAT_BASE_URL", "https://ilinkai.weixin.qq.com").rstrip("/")
+    if not token or not user_id or not context_token:
+        return False, "微信 Bot Token / 用户 ID / Context Token 未完整配置"
+    payload = {
+        "msg": {
+            "from_user_id": "",
+            "to_user_id": user_id,
+            "client_id": str(uuid.uuid4()),
+            "message_type": 2,
+            "message_state": 2,
+            "context_token": context_token,
+            "item_list": [{"type": 1, "text_item": {"text": message}}],
+        },
+        "base_info": {"channel_version": "2.0.1"},
+    }
+    ok, detail, response = _post_json(f"{base_url}/ilink/bot/sendmessage", payload, _wechat_headers(token))
+    return ok, detail if ok else f"{detail} {response}"
 
 
 def notify(text: str) -> dict[str, str]:
@@ -45,45 +103,42 @@ def notify(text: str) -> dict[str, str]:
     result: dict[str, str] = {}
 
     if env.get("R20_NOTIFY_WEBHOOK_ENABLED") == "1" and env.get("R20_NOTIFICATION_WEBHOOK"):
-        ok, detail = _post_json(env["R20_NOTIFICATION_WEBHOOK"], {"source": "R20 Quantum Trader", "timestamp": timestamp, "message": message})
+        ok, detail, _ = _post_json(env["R20_NOTIFICATION_WEBHOOK"], {"source": "R20 Quantum Trader", "timestamp": timestamp, "message": message})
         result["webhook"] = "sent" if ok else f"failed: {detail}"
 
     if env.get("R20_NOTIFY_WECHAT_ENABLED") == "1" and env.get("R20_WECHAT_WEBHOOK"):
-        ok, detail = _post_json(env["R20_WECHAT_WEBHOOK"], {"msgtype": "text", "text": {"content": message}})
+        ok, detail, _ = _post_json(env["R20_WECHAT_WEBHOOK"], {"msgtype": "text", "text": {"content": message}})
         result["wechat"] = "sent" if ok else f"failed: {detail}"
+
+    if env.get("R20_NOTIFY_WECHAT_ILINK_ENABLED") == "1":
+        ok, detail = _send_wechat_ilink(env, message)
+        result["wechat_ilink"] = "sent" if ok else f"failed: {detail}"
 
     if env.get("R20_NOTIFY_TELEGRAM_ENABLED") == "1" and env.get("R20_TELEGRAM_BOT_TOKEN") and env.get("R20_TELEGRAM_CHAT_ID"):
         token = urllib.parse.quote(env["R20_TELEGRAM_BOT_TOKEN"], safe="")
-        url = f"https://api.telegram.org/bot{token}/sendMessage"
-        ok, detail = _post_json(url, {"chat_id": env["R20_TELEGRAM_CHAT_ID"], "text": message})
+        ok, detail, _ = _post_json(f"https://api.telegram.org/bot{token}/sendMessage", {"chat_id": env["R20_TELEGRAM_CHAT_ID"], "text": message})
         result["telegram"] = "sent" if ok else f"failed: {detail}"
 
-    # Compatibility bridge: only enabled explicitly, so standalone installs need not have QwenPaw.
     if env.get("R20_NOTIFY_QQ_ENABLED") == "1":
-        command = env.get("R20_QQ_BRIDGE_COMMAND", "")
-        if not command:
-            result["qq"] = "failed: QQ bridge command is not configured"
-        else:
-            try:
-                completed = subprocess.run(command, input=message, shell=True, text=True, capture_output=True, timeout=20)
-                result["qq"] = "sent" if completed.returncode == 0 else f"failed: {completed.stderr.strip() or completed.stdout.strip()}"
-            except Exception as exc:
-                result["qq"] = f"failed: {exc}"
+        ok, detail = _send_qq(env, message)
+        result["qq"] = "sent" if ok else f"failed: {detail}"
     return result
 
 
 def send_qq_message(text: str) -> bool:
-    """Compatibility symbol retained for existing strategy and backup scripts."""
-    result = notify(text)
-    return any(value == "sent" for value in result.values())
+    """Compatibility symbol retained for existing strategy scripts."""
+    return any(value == "sent" for value in notify(text).values())
 
 
 def test_channel(channel: str) -> dict[str, str]:
     env = _env()
     key = f"R20_NOTIFY_{channel.upper()}_ENABLED"
-    original = env.get(key, "0")
+    previous = os.environ.get(key)
     os.environ[key] = "1"
     try:
         return notify(f"🔔 {channel.upper()} 通知测试：R20 独立后台连接正常。")
     finally:
-        os.environ[key] = original
+        if previous is None:
+            os.environ.pop(key, None)
+        else:
+            os.environ[key] = previous
