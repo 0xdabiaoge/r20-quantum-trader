@@ -89,6 +89,10 @@ class GatewayScheduler:
     def due(self, spec: JobSpec, now: datetime, schedule: dict[str, Any]) -> bool:
         last = self._last_at(spec.name)
         if spec.interval_seconds:
+            if spec.name == "trader":
+                slot = int(now.timestamp()) // spec.interval_seconds
+                last_slot = int(last.timestamp()) // spec.interval_seconds if last else -1
+                return slot > last_slot and int(now.timestamp()) % spec.interval_seconds < 10
             return not last or (now - last).total_seconds() >= spec.interval_seconds
         minute = now.strftime("%H:%M")
         if minute not in self._scheduled_times(spec, schedule):
