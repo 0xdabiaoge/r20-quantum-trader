@@ -1,8 +1,9 @@
+from okx_runtime import replace_cli_prefix as okx_private_command
 import subprocess
 import json
 import datetime
 
-res = subprocess.run("okx --demo account bills --limit 100 --json", shell=True, capture_output=True, text=True)
+res = subprocess.run(okx_private_command("okx account bills --limit 100 --json"), shell=True, capture_output=True, text=True)
 bills = json.loads(res.stdout) if res.stdout else []
 
 print("=== 01:11:20 REBOOT AFTERMATH BILLS (Chronological) ===")

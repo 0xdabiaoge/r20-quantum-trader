@@ -13,6 +13,9 @@ import sys
 import tarfile
 import tempfile
 import time
+import urllib.error
+import urllib.parse
+import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterable
@@ -24,7 +27,7 @@ SQLITE_DIR = BACKUPS / "sqlite"
 MANIFEST_DIR = BACKUPS / "manifests"
 BJ_TZ = timezone(timedelta(hours=8))
 MAGIC = b"R20GCM2\x00"
-MANDATORY_EXCLUDES = (".git/**", ".env", ".okx/**", "backups/**", "logs/**", "data/r20_admin.db*", "data/*.db-wal", "data/*.db-shm", "**/__pycache__/**", "*.pyc")
+MANDATORY_EXCLUDES = (".git/**", ".env", ".okx/**", ".bypy/**", "backups/**", "logs/**", "data/r20_admin.db*", "data/*.enc", "data/.*_key", "data/credentials/**", "data/*.db-wal", "data/*.db-shm", "**/__pycache__/**", "*.pyc")
 SCOPE_PATHS = {
     "data": ("data",), "scripts": ("scripts",), "dashboard": ("dashboard",), "r20_backend": ("r20_backend",), "r20_gateway": ("r20_gateway",),
     "tests": ("tests",), "recovery_guide": ("RECOVERY_GUIDE.md",), "agent_profile": ("SOUL.md", "PROFILE.md", "AGENTS.md", "MEMORY.md"),
@@ -167,6 +170,156 @@ def upload_baidu(source: Path, remote_path: str, retries: int) -> dict[str, Any]
     return {"success": False, "attempts": retries, "destination": destination, "error": last}
 
 
+def _credentials(target: dict[str, Any]) -> dict[str, str]:
+    from r20_backend.backup_secrets import load_credentials
+    return load_credentials(str(target.get("credential_ref") or f"backup:{target['id']}"))
+
+
+def _urlencoded_json(url: str, data: dict[str, Any] | None = None, timeout: int = 60) -> dict[str, Any]:
+    body = urllib.parse.urlencode(data).encode() if data is not None else None
+    request = urllib.request.Request(url, data=body, headers={"User-Agent": "R20-Backup/5.4.2"}, method="POST" if body is not None else "GET")
+    with urllib.request.urlopen(request, timeout=timeout) as response: raw = response.read().decode("utf-8")
+    payload = json.loads(raw or "{}")
+    if payload.get("errno") not in (None, 0) or payload.get("error"):
+        raise RuntimeError(str(payload.get("errmsg") or payload.get("error_description") or payload))
+    return payload
+
+
+def _multipart_upload(url: str, field_name: str, filename: str, content: bytes, timeout: int = 180) -> dict[str, Any]:
+    boundary = f"----R20{hashlib.sha256(os.urandom(16)).hexdigest()[:24]}"
+    body = (f"--{boundary}\r\nContent-Disposition: form-data; name=\"{field_name}\"; filename=\"{filename}\"\r\nContent-Type: application/octet-stream\r\n\r\n").encode() + content + f"\r\n--{boundary}--\r\n".encode()
+    request = urllib.request.Request(url, data=body, headers={"Content-Type": f"multipart/form-data; boundary={boundary}", "User-Agent": "R20-Backup/5.4.2"}, method="POST")
+    with urllib.request.urlopen(request, timeout=timeout) as response: payload = json.loads(response.read().decode("utf-8") or "{}")
+    if payload.get("errno") not in (None, 0): raise RuntimeError(str(payload.get("errmsg") or payload))
+    return payload
+
+
+def upload_baidu_oauth(source: Path, target: dict[str, Any]) -> dict[str, Any]:
+    from r20_backend.backup_secrets import save_credentials
+    creds = _credentials(target); app_key = creds.get("app_key", ""); app_secret = creds.get("app_secret", ""); refresh_token = creds.get("refresh_token", "")
+    if not app_key or not app_secret or not refresh_token: raise RuntimeError("百度官方 OAuth 需要 App Key、App Secret 与 Refresh Token")
+    token_url = "https://openapi.baidu.com/oauth/2.0/token?" + urllib.parse.urlencode({"grant_type":"refresh_token","refresh_token":refresh_token,"client_id":app_key,"client_secret":app_secret})
+    token = _urlencoded_json(token_url); access_token = str(token.get("access_token") or "")
+    if not access_token: raise RuntimeError("百度 OAuth 未返回 Access Token")
+    if token.get("refresh_token") and token["refresh_token"] != refresh_token:
+        save_credentials(str(target.get("credential_ref")), {"refresh_token": token["refresh_token"]})
+    chunk_size = 4 * 1024 * 1024; block_list: list[str] = []
+    with source.open("rb") as handle:
+        while True:
+            chunk = handle.read(chunk_size)
+            if not chunk: break
+            block_list.append(hashlib.md5(chunk).hexdigest())
+    remote_dir = str(target.get("remote_path") or "R20_Backups").strip("/")
+    remote_path = f"/apps/R20QuantumTrader/{remote_dir}/{source.name}" if remote_dir else f"/apps/R20QuantumTrader/{source.name}"
+    precreate_url = "https://pan.baidu.com/rest/2.0/xpan/file?method=precreate&access_token=" + urllib.parse.quote(access_token, safe="")
+    common = {"path":remote_path,"size":source.stat().st_size,"isdir":0,"autoinit":1,"rtype":3,"block_list":json.dumps(block_list)}
+    precreated = _urlencoded_json(precreate_url, common); upload_id = str(precreated.get("uploadid") or "")
+    if not upload_id: raise RuntimeError("百度网盘预创建未返回 uploadid")
+    with source.open("rb") as handle:
+        for part_seq in range(len(block_list)):
+            chunk = handle.read(chunk_size)
+            upload_url = "https://d.pcs.baidu.com/rest/2.0/pcs/superfile2?" + urllib.parse.urlencode({"method":"upload","type":"tmpfile","access_token":access_token,"path":remote_path,"uploadid":upload_id,"partseq":part_seq})
+            uploaded = _multipart_upload(upload_url, "file", source.name, chunk)
+            if uploaded.get("md5") and uploaded["md5"] != block_list[part_seq]: raise RuntimeError(f"百度分片 {part_seq} MD5 校验失败")
+    create_url = "https://pan.baidu.com/rest/2.0/xpan/file?method=create&access_token=" + urllib.parse.quote(access_token, safe="")
+    created = _urlencoded_json(create_url, {**common,"uploadid":upload_id})
+    return {"success":True,"attempts":1,"destination":remote_path,"fs_id":str(created.get("fs_id") or "")}
+
+
+def upload_s3(source: Path, target: dict[str, Any]) -> dict[str, Any]:
+    """S3-compatible SigV4 upload without a mandatory boto3 dependency."""
+    import hmac
+    creds = _credentials(target); access = creds.get("access_key_id", ""); secret = creds.get("secret_access_key", "")
+    if not access or not secret: raise RuntimeError("S3 Access Key / Secret Key 未配置")
+    endpoint = str(target["endpoint"]).rstrip("/"); bucket = str(target["bucket"]); region = str(target.get("region") or "us-east-1")
+    key = "/".join(x for x in [str(target.get("remote_path") or "").strip("/"), source.name] if x)
+    parsed = urllib.parse.urlparse(endpoint); host = parsed.netloc
+    path = f"/{bucket}/{urllib.parse.quote(key, safe='/')}" if target.get("force_path_style") else f"/{urllib.parse.quote(key, safe='/')}"
+    if not target.get("force_path_style"): host = f"{bucket}.{host}"
+    now = datetime.now(timezone.utc); amzdate = now.strftime("%Y%m%dT%H%M%SZ"); datestamp = now.strftime("%Y%m%d")
+    payload_hash = calculate_sha256(source)
+    headers = {"host": host, "x-amz-content-sha256": payload_hash, "x-amz-date": amzdate, "content-length": str(source.stat().st_size)}
+    if creds.get("session_token"): headers["x-amz-security-token"] = creds["session_token"]
+    signed_headers = ";".join(sorted(headers)); canonical_headers = "".join(f"{k}:{headers[k]}\n" for k in sorted(headers))
+    canonical = f"PUT\n{path}\n\n{canonical_headers}\n{signed_headers}\n{payload_hash}"
+    scope = f"{datestamp}/{region}/s3/aws4_request"; string_to_sign = f"AWS4-HMAC-SHA256\n{amzdate}\n{scope}\n{hashlib.sha256(canonical.encode()).hexdigest()}"
+    sign=lambda key,msg:hmac.new(key,msg.encode(),hashlib.sha256).digest()
+    signing=sign(sign(sign(sign(("AWS4"+secret).encode(),datestamp),region),"s3"),"aws4_request")
+    headers["authorization"] = f"AWS4-HMAC-SHA256 Credential={access}/{scope}, SignedHeaders={signed_headers}, Signature={hmac.new(signing,string_to_sign.encode(),hashlib.sha256).hexdigest()}"
+    url=f"{parsed.scheme}://{host}{path}"
+    import http.client
+    connection = (http.client.HTTPSConnection if parsed.scheme == "https" else http.client.HTTPConnection)(host, timeout=300)
+    connection.putrequest("PUT", path, skip_host=True); [connection.putheader(k, v) for k, v in headers.items()]; connection.endheaders()
+    with source.open("rb") as handle:
+        while True:
+            chunk = handle.read(1024 * 1024)
+            if not chunk: break
+            connection.send(chunk)
+    response = connection.getresponse(); response.read(); connection.close()
+    if response.status not in (200,201): raise RuntimeError(f"S3 HTTP {response.status}")
+    return {"success":True,"attempts":1,"destination":f"s3://{bucket}/{key}"}
+
+
+def upload_oss(source: Path, target: dict[str, Any]) -> dict[str, Any]:
+    import oss2
+    creds=_credentials(target); access=creds.get("access_key_id",""); secret=creds.get("secret_access_key","")
+    if not access or not secret: raise RuntimeError("OSS AccessKey ID / Secret 未配置")
+    key="/".join(x for x in [str(target.get("remote_path") or "").strip("/"),source.name] if x)
+    bucket=oss2.Bucket(oss2.Auth(access,secret),str(target["endpoint"]),str(target["bucket"])); bucket.put_object_from_file(key,str(source))
+    return {"success":True,"attempts":1,"destination":f"oss://{target['bucket']}/{key}"}
+
+
+def upload_webdav(source: Path, target: dict[str, Any]) -> dict[str, Any]:
+    creds=_credentials(target); endpoint=str(target["endpoint"]).rstrip("/"); remote=str(target.get("remote_path") or "").strip("/")
+    auth=""; username=creds.get("username",""); password=creds.get("password","")
+    if username: auth="Basic "+base64.b64encode(f"{username}:{password}".encode()).decode()
+    current=endpoint
+    for part in [x for x in remote.split("/") if x]:
+        current += "/"+urllib.parse.quote(part,safe="")
+        req=urllib.request.Request(current,headers={"Authorization":auth} if auth else {},method="MKCOL")
+        try: urllib.request.urlopen(req,timeout=20).close()
+        except urllib.error.HTTPError as exc:
+            if exc.code not in (301,302,405): raise
+    url=current+"/"+urllib.parse.quote(source.name,safe=""); parsed=urllib.parse.urlparse(url)
+    import http.client
+    connection=(http.client.HTTPSConnection if parsed.scheme=="https" else http.client.HTTPConnection)(parsed.netloc,timeout=300)
+    path=parsed.path+(f"?{parsed.query}" if parsed.query else ""); connection.putrequest("PUT",path)
+    connection.putheader("Content-Type","application/octet-stream"); connection.putheader("Content-Length",str(source.stat().st_size))
+    if auth: connection.putheader("Authorization",auth)
+    connection.endheaders()
+    with source.open("rb") as handle:
+        while True:
+            chunk=handle.read(1024*1024)
+            if not chunk: break
+            connection.send(chunk)
+    response=connection.getresponse(); response.read(); connection.close()
+    if response.status not in (200,201,204): raise RuntimeError(f"WebDAV HTTP {response.status}")
+    return {"success":True,"attempts":1,"destination":url}
+
+
+def deliver_target(source: Path, target: dict[str, Any]) -> dict[str, Any]:
+    target_type=target["type"]
+    if target_type in {"s3","oss","webdav","aliyundrive","quark"}:
+        from r20_backend.net_security import validate_outbound_url
+        target = {**target, "endpoint": validate_outbound_url(str(target.get("endpoint") or ""), allow_private=bool(target.get("allow_private_endpoint")))}
+    if target_type=="baidu":
+        if target.get("auth_mode","bypy")=="oauth": return upload_baidu_oauth(source,target)
+        return upload_baidu(source,target.get("remote_path","R20_Backups"),int(target.get("retries",3)))
+    if target_type=="local":
+        destination=(ROOT/str(target.get("path") or "backups/local")).resolve()
+        return {"success":True,"attempts":1,"destination":str(retain_local_archive(source,int(target.get("retention",3)),destination).relative_to(ROOT))}
+    upload = upload_s3 if target_type == "s3" else upload_oss if target_type == "oss" else upload_webdav if target_type in {"webdav","aliyundrive","quark"} else None
+    if not upload: raise RuntimeError(f"不支持的灾备目标：{target_type}")
+    last = ""; retries = int(target.get("retries", 3))
+    for attempt in range(1, retries + 1):
+        try:
+            result = upload(source, target); result["attempts"] = attempt; return result
+        except Exception as exc:
+            last = f"{type(exc).__name__}: {exc}"
+            if attempt < retries: time.sleep(min(attempt * 5, 30))
+    return {"success": False, "attempts": retries, "error": last}
+
+
 def run_backup_job(job: dict[str, Any]) -> dict[str, Any]:
     started = datetime.now(BJ_TZ); stamp = started.strftime("%Y%m%d_%H%M%S")
     result: dict[str, Any] = {"job_id": job["id"], "job_name": job["name"], "started_at": started.strftime("%Y-%m-%d %H:%M:%S"), "status": "running", "targets": [], "sqlite": [], "errors": []}
@@ -185,10 +338,8 @@ def run_backup_job(job: dict[str, Any]) -> dict[str, Any]:
             verification = verify_archive(archive, result["sha256"], str(job.get("encryption", {}).get("key_env", "")))
             result["archive_members"] = verification["members"]; result["archive_roots"] = verification["roots"]
             for target in enabled_file_targets:
-                if target["type"] == "baidu": target_result = upload_baidu(archive, target.get("remote_path", "R20_Backups"), int(target.get("retries", 3)))
-                else:
-                    destination = (ROOT / str(target.get("path") or "backups/local")).resolve()
-                    target_result = {"success": True, "attempts": 1, "destination": str(retain_local_archive(archive, int(target.get("retention", 3)), destination).relative_to(ROOT))}
+                try: target_result = deliver_target(archive, target)
+                except Exception as exc: target_result = {"success": False, "attempts": 1, "error": f"{type(exc).__name__}: {exc}"}
                 result["targets"].append({"id": target["id"], "type": target["type"], **target_result})
         if job.get("sqlite", {}).get("enabled"):
             sqlite_dir = SQLITE_DIR / str(job["id"])
@@ -196,9 +347,10 @@ def run_backup_job(job: dict[str, Any]) -> dict[str, Any]:
         target_success = [x for x in result["targets"] if x.get("success")]
         target_failure = [x for x in result["targets"] if not x.get("success")]
         any_success = bool(target_success or result["sqlite"])
+        all_file_targets_succeeded = bool(enabled_file_targets) and not target_failure and len(target_success) == len(enabled_file_targets)
         result["status"] = "success" if any_success and not target_failure else "partial" if any_success else "failed"
         if target_failure: result["errors"].extend(str(x.get("error") or "目标失败") for x in target_failure)
-        if archive and job.get("cleanup_local_on_success") and any_success:
+        if archive and job.get("cleanup_local_on_success") and all_file_targets_succeeded:
             archive.unlink(missing_ok=True); result["temporary_cleaned"] = True
         elif archive: result["temporary_cleaned"] = False
     except Exception as exc:

@@ -14,6 +14,7 @@ from typing import Any
 from r20_backend.config import ROOT
 from r20_backend.settings_store import update_env
 from r20_backend.wechat_protocol import base_info, common_headers
+from r20_backend.net_security import validate_wechat_base_url
 
 STATE_FILE = ROOT / "data" / "wechat_session_state.json"
 _stop = threading.Event()
@@ -28,7 +29,11 @@ def _env() -> dict[str, str]:
             if "=" in line and not line.lstrip().startswith("#"):
                 key, value = line.split("=", 1)
                 values[key.strip()] = value.strip()
-    return {**values, **os.environ}
+    try:
+        from r20_gateway.secrets import load_secrets
+        encrypted = load_secrets()
+    except Exception: encrypted = {}
+    return {**os.environ, **values, **encrypted}
 
 
 def _load_state() -> dict[str, Any]:
@@ -91,10 +96,18 @@ def _notify_lifecycle(token: str, base_url: str, action: str) -> None:
 
 def _run() -> None:
     state = _load_state()
+    active_token_fingerprint = ""
     while not _stop.is_set():
         env = _env()
         token = env.get("R20_WECHAT_BOT_TOKEN", "")
-        base_url = env.get("R20_WECHAT_BASE_URL", "https://ilinkai.weixin.qq.com")
+        token_fingerprint = __import__("hashlib").sha256(token.encode()).hexdigest()[:12] if token else ""
+        if token_fingerprint != active_token_fingerprint:
+            state.update({"cursor": "", "status": "binding_updated" if token else "waiting_for_binding", "user_configured": False, "token_fingerprint": token_fingerprint})
+            active_token_fingerprint = token_fingerprint
+            _save_state(state)
+        try: base_url = validate_wechat_base_url(env.get("R20_WECHAT_BASE_URL", "https://ilinkai.weixin.qq.com"))
+        except ValueError:
+            state["status"] = "invalid_base_url"; _save_state(state); _stop.wait(3); continue
         if env.get("R20_WECHAT_CONTEXT_TOKEN") and env.get("R20_WECHAT_USER_ID"):
             state["user_configured"] = True
         if not token:
@@ -110,7 +123,7 @@ def _run() -> None:
                 if ret == -14 or errcode == -14:
                     state.update({"status": "token_stale_relogin_required", "cursor": ""})
                     _save_state(state)
-                    _stop.wait(3600)
+                    _stop.wait(3)
                     continue
                 raise RuntimeError(f"getupdates ret={ret} errcode={errcode}")
             state["cursor"] = payload.get("get_updates_buf") or state.get("cursor", "")
@@ -119,7 +132,11 @@ def _run() -> None:
                 context_token = message.get("context_token") or message.get("contextToken") or ""
                 user_id = message.get("from_user_id") or message.get("fromUserId") or ""
                 if context_token and user_id and str(user_id).endswith("@im.wechat"):
-                    update_env({"R20_WECHAT_USER_ID": user_id, "R20_WECHAT_CONTEXT_TOKEN": context_token})
+                    from r20_gateway.secrets import save_secrets
+                    from r20_backend.settings_store import remove_env
+                    save_secrets({"R20_WECHAT_CONTEXT_TOKEN": context_token})
+                    remove_env({"R20_WECHAT_CONTEXT_TOKEN"})
+                    update_env({"R20_WECHAT_USER_ID": user_id})
                     state["last_message_at"] = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
                     state["user_configured"] = True
             _save_state(state)
@@ -131,6 +148,16 @@ def _run() -> None:
 
 def reset_watcher_state() -> None:
     _save_state({"cursor": "", "status": "binding_updated", "last_message_at": "", "user_configured": False})
+    stop_watcher(); start_watcher()
+
+
+def request_session_capture() -> dict[str, Any]:
+    """Ask the single watcher to capture the next user message instead of competing getupdates calls."""
+    state = _load_state()
+    state["status"] = "waiting_for_user_message"
+    state["user_configured"] = False
+    _save_state(state)
+    return public_state()
 
 
 def start_watcher() -> None:
@@ -149,7 +176,10 @@ def start_watcher() -> None:
 
 
 def stop_watcher() -> None:
+    global _thread
     _stop.set()
+    if _thread and _thread.is_alive() and _thread is not threading.current_thread(): _thread.join(timeout=6)
+    if _thread and not _thread.is_alive(): _thread = None
     env = _env()
     if env.get("R20_WECHAT_BOT_TOKEN"):
         try:

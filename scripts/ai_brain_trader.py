@@ -6,6 +6,7 @@ Maintains a validated live decision cache and durable Web audit history.
 """
 
 import os
+from okx_runtime import replace_cli_prefix as okx_private_command
 import sys
 import json
 import time
@@ -722,7 +723,7 @@ def execute_batch_ai_brain_cycle(pos_summary: str = "当前总持仓 0/6", activ
     # Fetch live pending limit orders from exchange
     pending_orders_list = []
     try:
-        ord_cmd = "okx --demo swap orders --json 2>/dev/null"
+        ord_cmd = okx_private_command("okx swap orders --json 2>/dev/null")
         ord_res = subprocess.run(ord_cmd, shell=True, capture_output=True, text=True, timeout=8)
         if ord_res.stdout:
             pending_orders_list = json.loads(ord_res.stdout)
@@ -853,7 +854,7 @@ def execute_batch_ai_brain_cycle(pos_summary: str = "当前总持仓 0/6", activ
                     p_inst_id = str(p_order.get("instId", ""))
                     p_reason = str(p_order.get("reason", "模型指示撤销该挂单"))
                     if p_act == "CANCEL" and p_ord_id and p_inst_id:
-                        cxl_cmd = f"okx --demo swap cancel {p_inst_id} --ordId {p_ord_id} --json"
+                        cxl_cmd = okx_private_command(f"okx swap cancel {p_inst_id} --ordId {p_ord_id} --json")
                         cxl_res = subprocess.run(cxl_cmd, shell=True, capture_output=True, text=True, timeout=10)
                         print(f"[AI Brain Batch] 🛑 AI自主撤回失效/过时限价单: {p_inst_id} (ordId={p_ord_id}, 原因={p_reason})")
 

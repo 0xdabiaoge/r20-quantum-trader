@@ -70,9 +70,10 @@
 ## 🌟 核心交易系统特性 (v5.4.2 独立化升级)
 
 ### 🧩 0. 独立化运行底座与自有后台
-- **零 QwenPaw 运行时依赖**：移除 Python 依赖、QwenPaw 加密密钥库回退、QwenPaw 通知通道与 Console 文件写入；LLM / OKX 凭证统一只从本地 `.env` 读取。
-- **自有 FastAPI 控制平面**：新增 `r20_backend`，提供只读健康检查、策略缓存、因子快照、台账、原生 OKX REST 行情与账户持仓 API；不开放 HTTP 下单接口。
-- **独立调度守护**：新增 `r20_backend.scheduler` 与 systemd 单元，接管 15 分钟交易、60 秒因子、10 分钟快讯、日报、复盘和异地灾备调度；现有执行期仍通过本机 OKX CLI bridge 访问交易所，文件锁与 Fail-Closed 逻辑保持不变。
+- **零 QwenPaw 运行时依赖**：交易、通知、提示词、灾备和后台控制均由 R20 原生组件完成；API Key 与云存储凭证保存到本地加密 Secret Store，公开配置只保留引用。
+- **自有 FastAPI 控制平面**：`r20_backend` 提供只读监控、简化策略编辑器、通知诊断、插件化灾备、管理员系统，以及默认关闭且需密码复核的“从 OKX 当前持仓快速平仓”。
+- **OKX 双环境隔离**：实盘 LIVE 与模拟盘 DEMO 凭证独立保存；策略、账本、监控和快速平仓共享统一环境选择器，模拟盘请求自动带 `x-simulated-trading: 1`。
+- **独立调度守护**：Gateway 接管 15 分钟交易、60 秒因子、10 分钟快讯、日报、复盘和多目标灾备调度；执行期通过本机 OKX CLI bridge 访问交易所，文件锁与 Fail-Closed 逻辑保持不变。
 - **部署说明**：见 [`STANDALONE.md`](STANDALONE.md)，迁移独立部署时必须先关闭旧 QwenPaw Cron，以避免双重执行。
 
 
@@ -188,7 +189,7 @@ pip install -r requirements.txt
 ### 2. 配置环境变量
 ```bash
 cp env.example .env
-# 编辑 .env 文件填入你的 LLM API Key 以及 OKX API 凭证
+# 编辑 .env：填入 LLM Key，并分别配置 OKX LIVE / DEMO Key；默认选择 DEMO
 vim .env
 ```
 
@@ -230,7 +231,8 @@ r20-quantum-trader/
 │   ├── news_sentiment_harvester.py   # 实时快讯情报采集与三级黑天鹅避险哨兵
 │   ├── daemon_web_sync.py            # 60 秒因子并发计算与 Web 数据同步守护进程
 │   ├── qq_notifier.py                # QQ 即时交易挂单、加仓与平仓推送通知
-│   └── nightly_backup_and_clean.py   # 凌晨 02:00 百度网盘异地云灾备归档与 SHA-256 校验
+│   ├── backup_runtime.py             # 多任务、多目标、加密、校验与清理策略
+│   └── okx_runtime.py                # LIVE/DEMO 环境与双凭证统一选择器
 ├── dashboard/                        # Web 极客监控控制台
 │   ├── app.py                        # FastAPI 毫秒级内存缓存后端
 │   └── templates/index.html          # Modern Dark Glassmorphism 5 大 Tab 监控页面
@@ -247,7 +249,7 @@ r20-quantum-trader/
 ## 🛡️ 安全与隐私声明
 
 本项目在开源架构设计上严格执行**金融级隐私与数据解耦标准**：
-- 真实 OKX 交易密钥（`.okx/`）与大模型 API Key 严格采用环境变量与密文存储解耦，**源码中 100% 零硬编码密钥**；
+- OKX LIVE/DEMO Key、大模型 API Key、微信 Token 与灾备凭证采用环境选择器和本地加密 Secret Store 解耦，**源码、任务 JSON 与导出文件中 100% 零硬编码密钥**；
 - 实盘私有账本与资金流水已被 `.gitignore` 彻底物理隔离，绝不上云；
 - 开源代码库已经过自动化敏感特征全量静态穿透审计。
 

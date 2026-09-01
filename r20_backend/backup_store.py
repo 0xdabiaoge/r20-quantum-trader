@@ -15,13 +15,13 @@ CONFIG_FILE = ROOT / "data" / "backup_methods.json"
 BJ_TZ = timezone(timedelta(hours=8))
 MAX_JOBS = 12
 ALLOWED_SCOPES = {"data", "scripts", "dashboard", "r20_backend", "r20_gateway", "tests", "recovery_guide", "agent_profile", "root_configs"}
-ALLOWED_TARGETS = {"baidu", "local"}
+ALLOWED_TARGETS = {"baidu", "local", "s3", "oss", "webdav", "aliyundrive", "quark"}
 DEFAULT_CONFIG = {
-    "baidu": {"enabled": True, "label": "百度网盘全量灾备", "retention": 0},
-    "local": {"enabled": False, "label": "本地滚动全量归档", "retention": 3},
+    "baidu": {"enabled": False, "label": "百度网盘全量灾备", "retention": 0},
+    "local": {"enabled": True, "label": "本地滚动全量归档", "retention": 3},
     "sqlite": {"enabled": False, "label": "SQLite 热备快照", "retention": 7},
 }
-DEFAULT_EXCLUDES = [".git/**", ".env", ".okx/**", "backups/**", "logs/**", "**/__pycache__/**", "*.pyc", "data/r20_admin.db*", "data/*.db-wal", "data/*.db-shm"]
+DEFAULT_EXCLUDES = [".git/**", ".env", ".okx/**", ".bypy/**", "backups/**", "logs/**", "**/__pycache__/**", "*.pyc", "data/r20_admin.db*", "data/*.enc", "data/.*_key", "data/credentials/**", "data/*.db-wal", "data/*.db-shm"]
 TIME_RE = re.compile(r"^(?:[01]\d|2[0-3]):[0-5]\d$")
 ENV_RE = re.compile(r"^[A-Z][A-Z0-9_]{2,63}$")
 
@@ -38,8 +38,8 @@ def _default_job() -> dict[str, Any]:
         "encryption": {"enabled": False, "key_env": "R20_BACKUP_ENCRYPTION_KEY"},
         "sqlite": {"enabled": False, "retention": 7},
         "targets": [
-            {"id": "baidu-default", "type": "baidu", "enabled": True, "remote_path": "R20_Backups", "retention": 0, "retries": 3},
-            {"id": "local-default", "type": "local", "enabled": False, "path": "backups/local", "retention": 3, "retries": 1},
+            {"id": "baidu-default", "type": "baidu", "enabled": False, "remote_path": "R20_Backups", "retention": 0, "retries": 3, "auth_mode": "bypy"},
+            {"id": "local-default", "type": "local", "enabled": True, "path": "backups/local", "retention": 3, "retries": 1},
         ],
         "cleanup_local_on_success": True, "notify_on_success": True, "notify_on_failure": True,
         "created_at": _now(), "updated_at": _now(),
@@ -63,10 +63,16 @@ def _atomic_write(payload: dict[str, Any]) -> None:
 
 def _normalize_target(raw: dict[str, Any]) -> dict[str, Any]:
     target_type = str(raw.get("type") or "local")
+    target_id = str(raw.get("id") or f"target-{uuid.uuid4().hex[:10]}")
     return {
-        "id": str(raw.get("id") or f"target-{uuid.uuid4().hex[:10]}"), "type": target_type, "enabled": bool(raw.get("enabled", True)),
-        "remote_path": str(raw.get("remote_path") or "R20_Backups").strip()[:240], "path": str(raw.get("path") or "backups/local").strip()[:240],
-        "retention": max(0, min(int(raw.get("retention", 3)), 365)), "retries": max(1, min(int(raw.get("retries", 3)), 10)),
+        "id": target_id, "type": target_type, "label": str(raw.get("label") or target_type.upper()).strip()[:80], "enabled": bool(raw.get("enabled", True)),
+        "credential_ref": str(raw.get("credential_ref") or f"backup:{target_id}").strip()[:100],
+        "auth_mode": str(raw.get("auth_mode") or ("bypy" if target_type == "baidu" else "webdav" if target_type in {"aliyundrive", "quark"} else "native"))[:30],
+        "endpoint": str(raw.get("endpoint") or "").strip()[:300], "region": str(raw.get("region") or "").strip()[:80],
+        "bucket": str(raw.get("bucket") or "").strip()[:120], "remote_path": str(raw.get("remote_path") or "R20_Backups").strip()[:240],
+        "path": str(raw.get("path") or "backups/local").strip()[:240], "force_path_style": bool(raw.get("force_path_style", False)), "allow_private_endpoint": bool(raw.get("allow_private_endpoint", False)),
+        "retention": max(1, min(int(raw.get("retention", 3)), 365)) if target_type == "local" else 0, "retries": max(1, min(int(raw.get("retries", 3)), 10)),
+        "experimental": target_type == "quark" and str(raw.get("auth_mode") or "webdav") == "oauth",
     }
 
 
@@ -133,7 +139,26 @@ def validate_backup_job(job: dict[str, Any], raise_error: bool = False) -> dict[
         if target.get("type") == "local":
             candidate = (ROOT / str(target.get("path") or "")).resolve()
             if not candidate.is_relative_to((ROOT / "backups").resolve()): errors.append("本地目标必须位于项目 backups/ 目录内")
-        if target.get("type") == "baidu" and ".." in Path(str(target.get("remote_path") or "")).parts: errors.append("百度网盘路径不能包含 ..")
+            if int(target.get("retention", 0)) < 1: errors.append("本地归档至少保留 1 份")
+        if target.get("type") != "local" and ".." in Path(str(target.get("remote_path") or "")).parts: errors.append(f"{target.get('type')} 远程路径不能包含 ..")
+        if target.get("type") in {"s3", "oss"} and target.get("enabled"):
+            if not target.get("endpoint") or not target.get("bucket"): errors.append(f"{target.get('type').upper()} 目标必须配置 Endpoint 与 Bucket")
+        if target.get("type") in {"s3", "oss", "webdav", "aliyundrive", "quark"} and target.get("enabled") and target.get("endpoint"):
+            try:
+                from r20_backend.net_security import validate_outbound_url
+                validate_outbound_url(str(target.get("endpoint")), allow_private=bool(target.get("allow_private_endpoint")))
+            except ValueError as exc: errors.append(f"{target.get('label') or target.get('type')} Endpoint：{exc}")
+        if target.get("type") == "quark" and target.get("experimental"): warnings.append("夸克原生 OAuth 仍属实验性，推荐通过 OpenList/WebDAV 接入")
+        if target.get("enabled"):
+            try:
+                from r20_backend.backup_secrets import load_credentials
+                fields = set(load_credentials(str(target.get("credential_ref") or "")))
+            except Exception: fields = set()
+            required = {"s3": {"access_key_id", "secret_access_key"}, "oss": {"access_key_id", "secret_access_key"}}.get(str(target.get("type")), set())
+            if target.get("type") == "baidu" and target.get("auth_mode") == "oauth": required = {"app_key", "app_secret", "refresh_token"}
+            missing = sorted(required - fields)
+            if missing: errors.append(f"{target.get('label') or target.get('type')} 凭证未完整配置：{', '.join(missing)}")
+            if target.get("type") == "baidu" and target.get("auth_mode") == "bypy" and not (Path.home() / ".bypy").exists(): errors.append("百度 ByPy 尚未在当前运行用户下授权")
     if enc.get("enabled") and not os.getenv(str(enc.get("key_env") or "")): warnings.append("加密密钥环境变量尚未配置，任务运行时将 Fail-Closed")
     result = {"valid": not errors, "errors": list(dict.fromkeys(errors)), "warnings": warnings}
     if raise_error and errors: raise ValueError("；".join(result["errors"]))
@@ -149,12 +174,21 @@ def get_job(job_id: str) -> dict[str, Any]:
     return job
 
 
+def _rekey_targets(targets: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    result = copy.deepcopy(targets)
+    for target in result:
+        target_id = f"{target.get('type','target')}-{uuid.uuid4().hex[:10]}"
+        target["id"] = target_id; target["credential_ref"] = f"backup:{target_id}"
+        target.pop("credential_status", None)
+    return result
+
+
 def create_job(name: str, source_id: str = "nightly-default") -> dict[str, Any]:
     config = load_backup_config()
     if len(config["jobs"]) >= MAX_JOBS: raise ValueError(f"灾备任务最多 {MAX_JOBS} 个")
     try: source = get_job(source_id)
     except ValueError: source = _default_job()
-    job = _normalize_job({**source, "id": f"backup-{uuid.uuid4().hex[:10]}", "name": name, "enabled": False, "created_at": _now(), "updated_at": _now()})
+    job = _normalize_job({**source, "targets": _rekey_targets(source.get("targets", [])), "id": f"backup-{uuid.uuid4().hex[:10]}", "name": name, "enabled": False, "created_at": _now(), "updated_at": _now()})
     config["jobs"].append(job); save_backup_config(config); return job
 
 
@@ -180,6 +214,7 @@ def export_job(job_id: str) -> dict[str, Any]:
     job = get_job(job_id)
     safe = copy.deepcopy(job)
     safe["id"] = ""; safe["enabled"] = False; safe["created_at"] = ""; safe["updated_at"] = ""
+    safe["targets"] = [{**target, "id": "", "credential_ref": ""} for target in safe.get("targets", [])]
     # Only the environment variable name is exported; no secret value ever enters config.
     return {"format": "r20-backup-job", "version": 1, "exported_at": _now(), "job": safe}
 
@@ -188,7 +223,7 @@ def import_job(payload: dict[str, Any], name_override: str = "") -> dict[str, An
     if payload.get("format") != "r20-backup-job" or not isinstance(payload.get("job"), dict): raise ValueError("无效的 R20 灾备任务文件")
     config = load_backup_config()
     if len(config["jobs"]) >= MAX_JOBS: raise ValueError(f"灾备任务最多 {MAX_JOBS} 个")
-    raw = copy.deepcopy(payload["job"]); raw["id"] = f"backup-{uuid.uuid4().hex[:10]}"; raw["name"] = name_override or str(raw.get("name") or "导入灾备任务"); raw["enabled"] = False; raw["created_at"] = _now(); raw["updated_at"] = _now()
+    raw = copy.deepcopy(payload["job"]); raw["id"] = f"backup-{uuid.uuid4().hex[:10]}"; raw["targets"] = _rekey_targets(raw.get("targets", [])); raw["name"] = name_override or str(raw.get("name") or "导入灾备任务"); raw["enabled"] = False; raw["created_at"] = _now(); raw["updated_at"] = _now()
     job = _normalize_job(raw); validate_backup_job(job, raise_error=True); config["jobs"].append(job); save_backup_config(config); return job
 
 

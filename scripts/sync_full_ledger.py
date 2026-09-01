@@ -5,6 +5,7 @@ Directly reads OKX official `account positions-history` & `account positions` AP
 Eliminates bills heuristic split-error, accurately records real position-level trades!
 """
 
+from okx_runtime import replace_cli_prefix as okx_private_command
 import subprocess
 import json
 import os
@@ -57,14 +58,14 @@ def build_lifecycle_ledger():
     tz_bj = datetime.timezone(datetime.timedelta(hours=8))
 
     # 1. Fetch OKX Official Positions History (Official position-level closed trades)
-    res_hist = subprocess.run("okx --demo account positions-history --limit 100 --json", shell=True, capture_output=True, text=True)
+    res_hist = subprocess.run(okx_private_command("okx account positions-history --limit 100 --json"), shell=True, capture_output=True, text=True)
     pos_history = json.loads(res_hist.stdout) if res_hist.stdout else []
 
     # 2. Fetch OKX Current Live Positions (Holding trades)
-    res_pos = subprocess.run("okx --demo account positions --json", shell=True, capture_output=True, text=True)
+    res_pos = subprocess.run(okx_private_command("okx account positions --json"), shell=True, capture_output=True, text=True)
     pos_data = json.loads(res_pos.stdout) if res_pos.stdout else []
 
-    res_orders = subprocess.run("okx --demo swap orders --history --limit 100 --json", shell=True, capture_output=True, text=True)
+    res_orders = subprocess.run(okx_private_command("okx swap orders --history --limit 100 --json"), shell=True, capture_output=True, text=True)
     orders_history = json.loads(res_orders.stdout) if res_orders.stdout else []
     close_orders = [o for o in orders_history if str(o.get('reduceOnly', '')).lower() == 'true' and o.get('state') == 'filled']
 

@@ -1,6 +1,7 @@
 """
 Web Dashboard Application Module
 """
+from scripts.okx_runtime import replace_cli_prefix as okx_private_command
 import os
 import json
 import time
@@ -81,7 +82,7 @@ def update_cache_cycle():
 
     source_errors = []
     # 1. Fetch OKX Live Balance (Strictly USDT Contract Sub-account)
-    balance_ok, bal_data, balance_error = run_json_cmd_status("okx --demo account balance --json")
+    balance_ok, bal_data, balance_error = run_json_cmd_status(okx_private_command("okx account balance --json"))
     if not balance_ok:
         source_errors.append(f"balance: {balance_error}")
         bal_data = []
@@ -100,7 +101,7 @@ def update_cache_cycle():
                 break
 
     # 2. Fetch OKX Live Positions
-    positions_ok, pos_data, positions_error = run_json_cmd_status("okx --demo account positions --json")
+    positions_ok, pos_data, positions_error = run_json_cmd_status(okx_private_command("okx account positions --json"))
     if not positions_ok:
         source_errors.append(f"positions: {positions_error}")
         pos_data = []
@@ -186,7 +187,7 @@ def update_cache_cycle():
             })
 
     # 2.5 Fetch OKX Live Pending Maker Orders
-    orders_ok, orders_data, orders_error = run_json_cmd_status("okx --demo swap orders --json")
+    orders_ok, orders_data, orders_error = run_json_cmd_status(okx_private_command("okx swap orders --json"))
     pending_orders_list = []
     if isinstance(orders_data, list):
         for o in orders_data:
@@ -251,7 +252,7 @@ def update_cache_cycle():
 
     # Exchange algo orders are the source of truth for live TP/SL protection.
     for position in positions:
-        algo_ok, algo_orders, algo_error = run_json_cmd_status(f"okx --demo swap algo orders --instId {position['instId']} --json")
+        algo_ok, algo_orders, algo_error = run_json_cmd_status(okx_private_command(f"okx swap algo orders --instId {position['instId']} --json"))
         if not algo_ok:
             source_errors.append(f"algo {position['instId']}: {algo_error}")
             algo_orders = []
@@ -298,7 +299,7 @@ def update_cache_cycle():
             pass
 
     # 4. Load Bills and Real Order-Level Ledger
-    bills_ok, bills_data, bills_error = run_json_cmd_status("okx --demo account bills --limit 100 --json")
+    bills_ok, bills_data, bills_error = run_json_cmd_status(okx_private_command("okx account bills --limit 100 --json"))
     if not bills_ok:
         source_errors.append(f"bills: {bills_error}")
         bills_data = []

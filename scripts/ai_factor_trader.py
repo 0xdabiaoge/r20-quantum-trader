@@ -20,6 +20,7 @@ Architecture:
 """
 
 import os
+from okx_runtime import freeze_environment as freeze_okx_environment, replace_cli_prefix as okx_private_command, unfreeze_environment as unfreeze_okx_environment
 import json
 import time
 import datetime
@@ -248,7 +249,7 @@ def load_adaptive_config():
 def clean_stale_open_orders():
     """Cancel stale unfilled swap orders and report only exchange-confirmed cancellations."""
     try:
-        orders_res = run_json_cmd("okx --demo swap orders --json")
+        orders_res = run_json_cmd(okx_private_command("okx swap orders --json"))
         if orders_res and isinstance(orders_res, list):
             now_ts = int(time.time() * 1000)
             for ord_item in orders_res:
@@ -257,7 +258,7 @@ def clean_stale_open_orders():
                 state = str(ord_item.get("state", "live")).lower()
                 c_time = int(ord_item.get("cTime", now_ts) or now_ts)
                 if state in {"live", "partially_filled"} and ord_id and now_ts - c_time > 240000:
-                    result = run_cmd_result(f"okx --demo swap cancel {inst_id} --ordId {ord_id} --json")
+                    result = run_cmd_result(okx_private_command(f"okx swap cancel {inst_id} --ordId {ord_id} --json"))
                     if result["ok"]:
                         print(f"[挂单生命周期管理] 自动撤销超时挂单: {inst_id} (ordId={ord_id}, state={state})")
                     else:
@@ -333,7 +334,7 @@ def is_circuit_breaker_active():
 
 def query_positions() -> Tuple[bool, List[Dict[str, Any]], str]:
     """Distinguish an exchange-confirmed empty account from a failed query."""
-    result = run_cmd_result("okx --demo account positions --json", timeout=20)
+    result = run_cmd_result(okx_private_command("okx account positions --json"), timeout=20)
     if not result["ok"] or not isinstance(result.get("data"), list):
         return False, [], result["stderr"] or result["stdout"] or "invalid positions response"
     return True, result["data"], ""
@@ -342,7 +343,7 @@ def query_positions() -> Tuple[bool, List[Dict[str, Any]], str]:
 def close_position_confirmed(inst_id: str, pos_side: str, before_size: float) -> Tuple[bool, str]:
     """Close a position and verify at the exchange before changing local state."""
     result = run_cmd_result(
-        f"okx --demo swap close --instId {inst_id} --mgnMode cross --posSide {pos_side} --autoCxl --json",
+        okx_private_command(f"okx swap close --instId {inst_id} --mgnMode cross --posSide {pos_side} --autoCxl --json"),
         timeout=20,
     )
     if not result["ok"]:
@@ -384,8 +385,8 @@ def prune_trackers(trackers: Dict[str, Any], real_pos_dict: Dict[str, Any]) -> i
 
 def submit_protected_limit_order(inst_id: str, side: str, pos_side: str, size: int, price: float, tp_px: float, sl_px: float) -> Tuple[bool, str]:
     """Submit a protected limit order; acceptance is not treated as a fill."""
-    command = (
-        f"okx --demo swap place --instId {inst_id} --tdMode cross --side {side} "
+    command = okx_private_command(
+        f"okx swap place --instId {inst_id} --tdMode cross --side {side} "
         f"--posSide {pos_side} --ordType limit --px {price} --sz {size} "
         f"--tpTriggerPx {tp_px} --tpOrdPx=-1 --slTriggerPx {sl_px} --slOrdPx=-1 --json"
     )
@@ -1111,12 +1112,12 @@ def execute_ai_position_management(real_pos_dict, trackers, timestamp_full, exec
             if not tightens_risk:
                 executed_actions.append(f"[{name}] 浮盈空间不足或与现价缓冲过近({current_px} vs 拟调SL {new_sl})，拒绝过早收紧止损")
                 continue
-            algo_orders = run_json_cmd(f"okx --demo swap algo orders --instId {inst_id} --json") or []
+            algo_orders = run_json_cmd(okx_private_command(f"okx swap algo orders --instId {inst_id} --json")) or []
             live_algo = next((o for o in algo_orders if o.get("state") == "live" and o.get("posSide") == pos_side and o.get("slTriggerPx")), None)
             if not live_algo:
                 executed_actions.append(f"[{name}] 未找到真实云端止损单，无法更新")
                 continue
-            result = run_json_cmd(f"okx --demo swap algo amend --instId {inst_id} --algoId {live_algo['algoId']} --newSlTriggerPx {new_sl} --newSlOrdPx=-1 --json")
+            result = run_json_cmd(okx_private_command(f"okx swap algo amend --instId {inst_id} --algoId {live_algo['algoId']} --newSlTriggerPx {new_sl} --newSlOrdPx=-1 --json"))
             if result is not None:
                 executed_actions.append(f"[{name}] 云端止损收紧至 {new_sl}: {reason}")
                 tracker = trackers.get(f"{inst_id}_{pos_side}")
@@ -1370,8 +1371,11 @@ def single_trader_cycle(func):
             lock_handle.truncate()
             lock_handle.write(str(os.getpid()))
             lock_handle.flush()
+            cycle_environment = freeze_okx_environment()
+            print(f"[Trader] OKX environment frozen for cycle: {cycle_environment.mode.upper()} / {cycle_environment.identity}")
             return func(*args, **kwargs)
         finally:
+            unfreeze_okx_environment()
             fcntl.flock(lock_handle.fileno(), fcntl.LOCK_UN)
             lock_handle.close()
     return wrapped
@@ -1423,7 +1427,7 @@ def execute_portfolio():
     long_count = real_long_count
     short_count = real_short_count
 
-    pending_result = run_cmd_result("okx --demo swap orders --json", timeout=20)
+    pending_result = run_cmd_result(okx_private_command("okx swap orders --json"), timeout=20)
     if not pending_result["ok"] or not isinstance(pending_result.get("data"), list):
         print(f"[Trader] Abort: unable to verify pending orders: {pending_result['stderr'] or pending_result['stdout']}")
         return None
@@ -1447,7 +1451,7 @@ def execute_portfolio():
     reserved_long_count = long_count + pending_long_count
     reserved_short_count = short_count + pending_short_count
 
-    bal_res = run_json_cmd("okx --demo account balance --json")
+    bal_res = run_json_cmd(okx_private_command("okx account balance --json"))
     if not isinstance(bal_res, list):
         print("[Trader] Abort: unable to verify account balance")
         return None

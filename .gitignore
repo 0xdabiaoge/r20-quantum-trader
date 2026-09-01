@@ -52,6 +52,10 @@ data/*.xlsx
 data/*.csv
 data/*.lock
 data/*.tmp
+data/*.enc
+data/.*secret_key
+data/credentials/
+OPEN_SOURCE_CONTROL_TODO.md
 !data/.gitkeep
 
 # Live Logs & Backups & PIDs

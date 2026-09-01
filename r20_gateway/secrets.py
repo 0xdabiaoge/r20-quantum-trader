@@ -12,7 +12,9 @@ ROOT = Path(__file__).resolve().parents[1]
 KEY_FILE = ROOT / "data" / ".r20_secret_key"
 STORE_FILE = ROOT / "data" / "r20_secrets.enc"
 SECRET_KEYS = {
-    "OKX_API_KEY", "OKX_SECRET_KEY", "OKX_PASSPHRASE", "LLM_API_KEY",
+    "OKX_API_KEY", "OKX_SECRET_KEY", "OKX_PASSPHRASE",
+    "OKX_LIVE_API_KEY", "OKX_LIVE_SECRET_KEY", "OKX_LIVE_PASSPHRASE",
+    "OKX_DEMO_API_KEY", "OKX_DEMO_SECRET_KEY", "OKX_DEMO_PASSPHRASE", "LLM_API_KEY",
     "R20_NOTIFICATION_WEBHOOK", "R20_WECHAT_WEBHOOK", "R20_WECHAT_BOT_TOKEN",
     "R20_WECHAT_CONTEXT_TOKEN", "R20_TELEGRAM_BOT_TOKEN", "R20_QQ_CLIENT_SECRET",
     "R20_ADMIN_TOKEN", "R20_SETUP_TOKEN",
@@ -57,6 +59,17 @@ def load_secrets() -> dict[str, str]:
 def save_secrets(values: Mapping[str, str]) -> None:
     current = load_secrets()
     current.update({key: value for key, value in values.items() if key in SECRET_KEYS and value})
+    fernet = _fernet(True)
+    assert fernet is not None
+    ciphertext = fernet.encrypt(json.dumps(current, ensure_ascii=False, sort_keys=True).encode("utf-8"))
+    _atomic_write(STORE_FILE, ciphertext)
+
+
+def delete_secrets(keys: list[str] | tuple[str, ...] | set[str]) -> None:
+    current = load_secrets()
+    for key in keys:
+        current.pop(str(key), None)
+        os.environ.pop(str(key), None)
     fernet = _fernet(True)
     assert fernet is not None
     ciphertext = fernet.encrypt(json.dumps(current, ensure_ascii=False, sort_keys=True).encode("utf-8"))

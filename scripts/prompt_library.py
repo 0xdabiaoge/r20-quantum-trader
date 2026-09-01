@@ -37,8 +37,9 @@ PRESETS: dict[str, dict[str, Any]] = {
 }
 
 EMPTY_CUSTOM = {
-    "id": "custom-default", "name": "自定义方案", "description": "管理员自定义策略附加层。", "editable": True,
-    "enabled": True, "created_at": "", "updated_at": "",
+    "id": "custom-default", "name": "自定义方案", "description": "用自然语言调整策略，硬风控始终由系统锁定。", "editable": True,
+    "enabled": True, "created_at": "", "updated_at": "", "editor_mode": "simple",
+    "simple_policy": {"strategy": "", "review_focus": "", "participation": "balanced", "evidence": "strict", "risk_budget": "middle"},
     "trading_system": "", "trading_user": "", "evolution_system": "", "evolution_user": "",
 }
 
@@ -81,6 +82,13 @@ def _clean_profile(raw: dict[str, Any], profile_id: str | None = None) -> dict[s
     result["description"] = str(result.get("description") or "").strip()[:240]
     result["editable"] = True
     result["enabled"] = bool(result.get("enabled", True))
+    result["editor_mode"] = str(raw.get("editor_mode") or ("advanced" if any(raw.get(k) for k in TEMPLATE_KEYS) else "simple"))
+    if result["editor_mode"] not in {"simple", "advanced"}: result["editor_mode"] = "simple"
+    policy = raw.get("simple_policy") if isinstance(raw.get("simple_policy"), dict) else {}
+    result["simple_policy"] = {
+        "strategy": str(policy.get("strategy") or "").strip()[:8000], "review_focus": str(policy.get("review_focus") or "").strip()[:4000],
+        "participation": str(policy.get("participation") or "balanced"), "evidence": str(policy.get("evidence") or "strict"), "risk_budget": str(policy.get("risk_budget") or "middle"),
+    }
     result["created_at"] = str(result.get("created_at") or now)
     result["updated_at"] = str(result.get("updated_at") or now)
     for key in TEMPLATE_KEYS:
@@ -132,7 +140,9 @@ def save_library(payload: dict[str, Any]) -> None:
         legacy_update = payload.get("active_profile_id", "stable") == persisted_active and mapped_active != current_mapped
     if legacy_update:
         existing = load_library()
-        custom = _clean_profile(payload.get("custom") or existing.get("custom") or {}, "custom-default")
+        legacy_custom = copy.deepcopy(payload.get("custom") or existing.get("custom") or {})
+        if any(legacy_custom.get(key) for key in TEMPLATE_KEYS): legacy_custom["editor_mode"] = "advanced"
+        custom = _clean_profile(legacy_custom, "custom-default")
         existing["profiles"][custom["id"]] = custom
         style = str(payload.get("active_style") or "stable")
         existing["active_profile_id"] = style if style in PRESETS else custom["id"]
@@ -142,11 +152,36 @@ def save_library(payload: dict[str, Any]) -> None:
     _atomic_write(LIBRARY_FILE, normalized)
 
 
+def resolve_profile(profile: dict[str, Any]) -> dict[str, Any]:
+    """Compile simple user strategy into safe System layers; advanced profiles remain byte-compatible."""
+    resolved = copy.deepcopy(profile)
+    if resolved.get("editor_mode") != "simple": return resolved
+    policy = resolved.get("simple_policy") or {}; strategy = str(policy.get("strategy") or "").strip(); review = str(policy.get("review_focus") or "").strip()
+    participation = {"conservative":"稳健参与，证据不足时等待", "balanced":"均衡参与高质量机会", "active":"积极参与证据完整的趋势机会"}.get(policy.get("participation"), "均衡参与高质量机会")
+    evidence = {"strict":"要求多周期、动力学、能量与概率风险严格共振", "balanced":"允许轻微证据分歧但必须可解释", "trend":"趋势与动力学优先，风险异常仍等待"}.get(policy.get("evidence"), "要求多周期、动力学、能量与概率风险严格共振")
+    risk = {"low":"优先使用允许风险区间低位", "middle":"优先使用允许风险区间中位", "high":"强信号可使用允许风险区间高位但绝不突破硬上限"}.get(policy.get("risk_budget"), "优先使用允许风险区间中位")
+    resolved["trading_system"] = f"【用户策略偏好·简单模式】\n{participation}；{evidence}；{risk}。\n{strategy}".strip()
+    resolved["trading_user"] = ""
+    resolved["evolution_system"] = f"【用户复盘关注·简单模式】\n围绕用户策略检查执行一致性，不得修改 P0、OCO、JSON 契约或风险硬门禁。\n{review or strategy}".strip()
+    resolved["evolution_user"] = ""
+    return resolved
+
+
 def validate_profile(profile: dict[str, Any]) -> dict[str, Any]:
     errors: list[str] = []
     warnings: list[str] = []
     name = str(profile.get("name") or "").strip()
     if not 1 <= len(name) <= 60: errors.append("方案名称长度必须为 1-60")
+    policy = profile.get("simple_policy") if isinstance(profile.get("simple_policy"), dict) else {}
+    if profile.get("editor_mode") == "simple":
+        strategy = str(policy.get("strategy") or ""); review = str(policy.get("review_focus") or "")
+        if not strategy.strip(): warnings.append("简单策略说明为空，将仅使用选择项和系统基础提示词")
+        for label,value in (("策略说明",strategy),("复盘重点",review)):
+            for pattern,message in _FORBIDDEN:
+                if pattern.search(value): errors.append(f"{label}：{message}")
+        if policy.get("participation","balanced") not in {"conservative","balanced","active"}: errors.append("参与风格无效")
+        if policy.get("evidence","strict") not in {"strict","balanced","trend"}: errors.append("证据要求无效")
+        if policy.get("risk_budget","middle") not in {"low","middle","high"}: errors.append("风险预算无效")
     total = 0
     for key in TEMPLATE_KEYS:
         value = str(profile.get(key) or "")
@@ -162,7 +197,7 @@ def validate_profile(profile: dict[str, Any]) -> dict[str, Any]:
                 errors.append(f"{key}：{message}")
                 break
     if total > MAX_PROFILE_CHARS: errors.append(f"四类模板合计不得超过 {MAX_PROFILE_CHARS} 字符")
-    if not total: warnings.append("当前方案四类附加模板均为空，将只使用不可修改的基础提示词")
+    if not total and profile.get("editor_mode") != "simple": warnings.append("当前方案四类附加模板均为空，将只使用不可修改的基础提示词")
     return {"valid": not errors, "errors": list(dict.fromkeys(errors)), "warnings": warnings, "characters": total}
 
 
@@ -173,7 +208,7 @@ def _revision(profile: dict[str, Any], action: str, note: str = "") -> dict[str,
 def create_profile(name: str, description: str = "", source_id: str = "stable", note: str = "创建方案") -> dict[str, Any]:
     library = load_library()
     source = get_profile(source_id)
-    profile = _clean_profile({**source, "id": f"custom-{uuid.uuid4().hex[:10]}", "name": name, "description": description, "created_at": _now(), "updated_at": _now()})
+    profile = _clean_profile({**source, "id": f"custom-{uuid.uuid4().hex[:10]}", "name": name, "description": description, "editor_mode": "simple", "simple_policy": {"strategy": "", "review_focus": "", "participation": "balanced", "evidence": "strict", "risk_budget": "middle"}, "created_at": _now(), "updated_at": _now()})
     check = validate_profile(profile)
     if not check["valid"]: raise ValueError("；".join(check["errors"]))
     library["profiles"][profile["id"]] = profile
@@ -187,7 +222,9 @@ def update_profile(profile_id: str, changes: dict[str, Any], note: str = "更新
     library = load_library()
     if profile_id not in library["profiles"]: raise ValueError("提示词方案不存在")
     current = library["profiles"][profile_id]
-    updated = _clean_profile({**current, **{k: v for k, v in changes.items() if k in {"name", "description", "enabled", *TEMPLATE_KEYS}}, "updated_at": _now()}, profile_id)
+    accepted = {k: v for k, v in changes.items() if k in {"name", "description", "enabled", "editor_mode", "simple_policy", *TEMPLATE_KEYS}}
+    if "editor_mode" not in accepted and any(str(accepted.get(key) or "").strip() for key in TEMPLATE_KEYS): accepted["editor_mode"] = "advanced"
+    updated = _clean_profile({**current, **accepted, "updated_at": _now()}, profile_id)
     check = validate_profile(updated)
     if not check["valid"]: raise ValueError("；".join(check["errors"]))
     library["profiles"][profile_id] = updated
@@ -239,12 +276,15 @@ def rollback_profile(profile_id: str, revision_id: str) -> dict[str, Any]:
 
 def export_profile(profile_id: str) -> dict[str, Any]:
     profile = get_profile(profile_id)
-    return {"format": "r20-prompt-profile", "version": 1, "exported_at": _now(), "profile": {k: profile.get(k) for k in ("name", "description", *TEMPLATE_KEYS)}}
+    return {"format": "r20-prompt-profile", "version": 2, "exported_at": _now(), "profile": {k: profile.get(k) for k in ("name", "description", "editor_mode", "simple_policy", *TEMPLATE_KEYS)}}
 
 
 def import_profile(payload: dict[str, Any], name_override: str = "") -> dict[str, Any]:
     if payload.get("format") != "r20-prompt-profile" or not isinstance(payload.get("profile"), dict): raise ValueError("无效的 R20 提示词方案文件")
     source = payload["profile"]
+    if source.get("editor_mode") == "simple" or (not source.get("editor_mode") and source.get("simple_policy")):
+        profile = create_profile(name_override or str(source.get("name") or "导入方案"), str(source.get("description") or ""), "stable", "导入简单方案")
+        return update_profile(profile["id"], {"editor_mode": "simple", "simple_policy": source.get("simple_policy") or {}}, "导入简单策略")
     return create_profile(name_override or str(source.get("name") or "导入方案"), str(source.get("description") or ""), "stable", "导入方案") if not any(source.get(k) for k in TEMPLATE_KEYS) else _import_with_templates(source, name_override)
 
 
@@ -254,7 +294,7 @@ def _import_with_templates(source: dict[str, Any], name_override: str) -> dict[s
 
 
 def active_profile() -> dict[str, Any]:
-    return get_profile(load_library()["active_profile_id"])
+    return resolve_profile(get_profile(load_library()["active_profile_id"]))
 
 
 def all_profiles() -> list[dict[str, Any]]:

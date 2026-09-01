@@ -11,6 +11,7 @@ import uuid
 from pathlib import Path
 from typing import Any
 from r20_backend.wechat_protocol import base_info as wechat_base_info, common_headers as wechat_common_headers
+from r20_backend.net_security import validate_wechat_base_url
 
 ROOT = Path(__file__).resolve().parents[1]
 QQ_TOKEN_URL = "https://bots.qq.com/app/getAppAccessToken"
@@ -25,7 +26,12 @@ def _env() -> dict[str, str]:
             if "=" in line and not line.lstrip().startswith("#"):
                 key, value = line.split("=", 1)
                 values[key.strip()] = value.strip()
-    return {**values, **os.environ}
+    # Dynamic encrypted secrets override both stale inherited values and legacy .env values.
+    try:
+        from r20_gateway.secrets import load_secrets
+        encrypted = load_secrets()
+    except Exception: encrypted = {}
+    return {**os.environ, **values, **encrypted}
 
 
 def _post_json(url: str, payload: dict[str, Any], headers: dict[str, str] | None = None) -> tuple[bool, str, dict[str, Any]]:
@@ -71,7 +77,8 @@ def _send_wechat_ilink(env: dict[str, str], message: str) -> tuple[bool, str]:
     token = env.get("R20_WECHAT_BOT_TOKEN", "")
     user_id = env.get("R20_WECHAT_USER_ID", "")
     context_token = env.get("R20_WECHAT_CONTEXT_TOKEN", "")
-    base_url = env.get("R20_WECHAT_BASE_URL", "https://ilinkai.weixin.qq.com").rstrip("/")
+    try: base_url = validate_wechat_base_url(env.get("R20_WECHAT_BASE_URL", "https://ilinkai.weixin.qq.com"))
+    except ValueError as exc: return False, f"微信 Base URL 无效：{exc}"
     if not token or not user_id or not context_token:
         return False, "微信 Bot Token / 用户 ID / Context Token 未完整配置"
     payload = {
@@ -90,11 +97,15 @@ def _send_wechat_ilink(env: dict[str, str], message: str) -> tuple[bool, str]:
     if not ok:
         return False, f"{detail} {response}"
     ret = response.get("ret", 0) if isinstance(response, dict) else 0
-    if ret not in (0, None):
-        if ret == -2:
-            return False, "微信业务拒绝 ret=-2：会话 Context Token 已失效；请向 Bot 发送新消息以刷新会话"
-        return False, f"微信业务拒绝 ret={ret} errmsg={response.get('errmsg', '')}"
-    return True, detail
+    errcode = response.get("errcode", 0) if isinstance(response, dict) else 0
+    if ret not in (0, None) or errcode not in (0, None):
+        code = ret if ret not in (0, None) else errcode
+        if code == -2:
+            return False, "微信会话 Context Token 已失效；请向 Bot 发送一条新文字消息，系统将自动刷新会话"
+        if code == -14:
+            return False, "微信 Bot Token 已失效；请重新扫码绑定"
+        return False, f"微信业务拒绝 ret={ret} errcode={errcode} errmsg={response.get('errmsg', '')}"
+    return True, f"{detail} ret={ret} errcode={errcode}"
 
 
 def enabled_channels(env: dict[str, str] | None = None) -> list[str]:
@@ -169,14 +180,8 @@ def send_qq_message(text: str) -> bool:
 
 
 def test_channel(channel: str) -> dict[str, str]:
+    """Strictly test only the selected channel; another channel cannot mask failure."""
     env = _env()
-    key = f"R20_NOTIFY_{channel.upper()}_ENABLED"
-    previous = os.environ.get(key)
-    os.environ[key] = "1"
-    try:
-        return notify(f"🔔 {channel.upper()} 通知测试：R20 独立后台连接正常。")
-    finally:
-        if previous is None:
-            os.environ.pop(key, None)
-        else:
-            os.environ[key] = previous
+    timestamp = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d %H:%M:%S")
+    ok, detail = send_channel(channel, f"【R20 Quantum Trader】{timestamp}\n🔔 {channel.upper()} 通知测试：指定通道连接正常。", env)
+    return {channel: "sent" if ok else f"failed: {detail}"}

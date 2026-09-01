@@ -26,9 +26,12 @@ from contextvars import ContextVar
 from pydantic import BaseModel, Field
 from r20_backend.config import refresh_settings, settings
 from r20_backend.okx_client import OKXClient
+from r20_backend.okx_trade_service import account_snapshot as okx_account_snapshot, fast_close_confirmed
+from r20_backend.backup_secrets import credential_status as backup_credential_status, save_credentials as save_backup_credentials
+from r20_backend.net_security import validate_wechat_base_url
 from r20_backend.prompt_views import EVOLUTION_USER_TEMPLATE, TRADING_USER_TEMPLATE, rendered_snapshots
-from r20_backend.settings_store import mask, update_env
-from r20_backend.notifications import test_channel
+from r20_backend.settings_store import mask, remove_env, update_env
+from r20_backend.notifications import _env as notification_env, test_channel
 from r20_backend.audit import recent as recent_audit, record as audit_record
 from r20_backend.admin_auth import AdminAuthStore
 from r20_backend.backup_store import (
@@ -37,20 +40,20 @@ from r20_backend.backup_store import (
     load_backup_methods, save_backup_methods, update_job as update_backup_job, validate_backup_job,
 )
 from r20_backend.schedule_store import load_schedule, save_schedule
-from r20_backend.wechat_login import create_qrcode, latest_session, qrcode_status
-from r20_backend.wechat_watcher import public_state as wechat_watcher_state, reset_watcher_state, start_watcher, stop_watcher
+from r20_backend.wechat_login import create_qrcode, qrcode_status
+from r20_backend.wechat_watcher import public_state as wechat_watcher_state, request_session_capture, reset_watcher_state, start_watcher, stop_watcher
 from r20_gateway.agents import agent_statuses
 from r20_gateway.publisher import DB_PATH as GATEWAY_DB_PATH
 from r20_gateway.plugins import plugin_statuses
 from r20_gateway.scheduler import scheduler_snapshot
-from r20_gateway.secrets import status as secret_store_status
+from r20_gateway.secrets import delete_secrets, save_secrets, status as secret_store_status
 from r20_gateway.store import GatewayStore
 from r20_gateway.supervisor import start_supervisor as start_gateway_supervisor, stop_supervisor as stop_gateway_supervisor
 from scripts.instrument_pool import from_okx_instrument, load_instruments, save_instruments
 from scripts.prompt_library import (
     PRESETS, TEMPLATE_KEYS, active_profile, activate_profile, all_profiles, append_layer,
     create_profile, delete_profile, export_profile, get_profile, import_profile,
-    load_library, profile_history, rollback_profile, save_library, update_profile, validate_profile,
+    load_library, profile_history, resolve_profile, rollback_profile, save_library, update_profile, validate_profile,
 )
 
 PROMPT_OVERRIDE_FILE = DATA_DIR / "system_prompt_override.txt"
@@ -107,6 +110,13 @@ class AdminEnabledRequest(BaseModel):
 
 
 class AdminConfigUpdate(BaseModel):
+    okx_environment: str | None = Field(default=None, pattern=r"^(demo|live)$")
+    okx_live_api_key: str | None = None
+    okx_live_secret_key: str | None = None
+    okx_live_passphrase: str | None = None
+    okx_demo_api_key: str | None = None
+    okx_demo_secret_key: str | None = None
+    okx_demo_passphrase: str | None = None
     okx_api_key: str | None = None
     okx_secret_key: str | None = None
     okx_passphrase: str | None = None
@@ -133,7 +143,10 @@ class InstrumentDeleteRequest(BaseModel):
 
 class ManualCloseRequest(BaseModel):
     inst_id: str = Field(pattern=r"^[A-Z0-9]+-USDT-SWAP$")
-    position_side: str = Field(pattern=r"^(long|short)$")
+    position_side: str = Field(pattern=r"^(long|short|net)$")
+    position_id: str = Field(default="", max_length=80)
+    expected_size: float = Field(gt=0)
+    environment_id: str = Field(min_length=8, max_length=100)
     admin_password: str = Field(min_length=1, max_length=128)
     confirmation: str
 
@@ -164,6 +177,8 @@ class PromptProfileUpdateRequest(BaseModel):
     name: str = Field(min_length=1, max_length=60)
     description: str = Field(default="", max_length=240)
     enabled: bool = True
+    editor_mode: str = Field(default="simple", pattern=r"^(simple|advanced)$")
+    simple_policy: dict[str, Any] = Field(default_factory=dict)
     trading_system: str = Field(default="", max_length=12000)
     trading_user: str = Field(default="", max_length=12000)
     evolution_system: str = Field(default="", max_length=12000)
@@ -187,6 +202,11 @@ class BackupJobCreateRequest(BaseModel):
 
 class BackupJobUpdateRequest(BaseModel):
     job: dict[str, Any]
+
+
+class BackupCredentialUpdateRequest(BaseModel):
+    credential_ref: str = Field(min_length=1, max_length=100)
+    credentials: dict[str, str]
 
 
 class BackupJobRunRequest(BaseModel):
@@ -532,15 +552,18 @@ def admin_config(x_r20_admin_token: str | None = Header(default=None)) -> dict[s
     return {
         "authentication_mode": "account-password",
         "configuration": {
-            "OKX API Key": "已设置" if settings.okx_api_key else "未设置",
-            "OKX Secret Key": "已设置" if settings.okx_secret_key else "未设置",
-            "OKX Passphrase": "已设置" if settings.okx_passphrase else "未设置",
+            "OKX 当前环境": "模拟盘 DEMO" if settings.okx_simulated else "实盘 LIVE",
+            "OKX 实盘凭证": "已完整配置" if settings.okx_live_configured else "未完整配置",
+            "OKX 模拟盘凭证": "已完整配置" if settings.okx_demo_configured else "使用 OAuth/旧凭证或未配置",
             "LLM API Key": "已设置" if settings.llm_api_key else "未设置",
             "管理员系统": "账号密码 + 服务端会话" if admin_auth.has_users() else "尚未初始化",
             "通知 Webhook": "已设置" if settings.notification_webhook else "未设置",
             "手动平仓": "已启用" if settings.manual_close_enabled else "已禁用",
         },
         "editable": {
+            "okx_environment": settings.okx_environment,
+            "okx_live_configured": settings.okx_live_configured,
+            "okx_demo_configured": settings.okx_demo_configured,
             "okx_simulated": settings.okx_simulated,
             "llm_base_url": settings.llm_base_url,
             "llm_model": settings.llm_model,
@@ -552,21 +575,37 @@ def admin_config(x_r20_admin_token: str | None = Header(default=None)) -> dict[s
 
 
 @app.put("/api/v1/admin/config")
-def update_admin_config(payload: AdminConfigUpdate, x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
+def update_admin_config(payload: AdminConfigUpdate, x_r20_admin_token: str | None = Header(default=None), x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
     refresh_settings()
-    require_admin_header(x_r20_admin_token)
     data = payload.model_dump(exclude_none=True)
+    sensitive = any(key.startswith("okx_") or key == "manual_close_enabled" for key in data)
+    if sensitive: require_superadmin(x_r20_session)
+    else: require_admin_header(x_r20_admin_token)
     if "llm_base_url" in data and data["llm_base_url"] and not data["llm_base_url"].startswith(("https://", "http://")):
         raise HTTPException(status_code=400, detail="LLM Base URL 必须以 http:// 或 https:// 开头")
     if "notification_webhook" in data and data["notification_webhook"] and not data["notification_webhook"].startswith(("https://", "http://")):
         raise HTTPException(status_code=400, detail="Webhook 必须以 http:// 或 https:// 开头")
-    env_values = {
-        "OKX_API_KEY": data.get("okx_api_key"),
-        "OKX_SECRET_KEY": data.get("okx_secret_key"),
-        "OKX_PASSPHRASE": data.get("okx_passphrase"),
-        "OKX_IS_SIMULATED": "1" if data.get("okx_simulated") else "0" if "okx_simulated" in data else None,
-        "LLM_BASE_URL": data.get("llm_base_url"),
+    selected_mode = data.get("okx_environment") or ("demo" if data.get("okx_simulated") else "live" if "okx_simulated" in data else None)
+    if selected_mode and selected_mode != settings.okx_environment:
+        import fcntl
+        lock_path = DATA_DIR / ".ai_factor_trader.lock"; lock_path.parent.mkdir(parents=True, exist_ok=True)
+        with lock_path.open("a+", encoding="utf-8") as lock_handle:
+            try: fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError: raise HTTPException(status_code=409, detail="交易周期正在执行，OKX 环境已冻结；请等待本周期结束后再切换")
+            finally:
+                try: fcntl.flock(lock_handle.fileno(), fcntl.LOCK_UN)
+                except OSError: pass
+    secret_values = {
+        "OKX_LIVE_API_KEY": data.get("okx_live_api_key"), "OKX_LIVE_SECRET_KEY": data.get("okx_live_secret_key"), "OKX_LIVE_PASSPHRASE": data.get("okx_live_passphrase"),
+        "OKX_DEMO_API_KEY": data.get("okx_demo_api_key"), "OKX_DEMO_SECRET_KEY": data.get("okx_demo_secret_key"), "OKX_DEMO_PASSPHRASE": data.get("okx_demo_passphrase"),
+        "OKX_API_KEY": data.get("okx_api_key"), "OKX_SECRET_KEY": data.get("okx_secret_key"), "OKX_PASSPHRASE": data.get("okx_passphrase"),
         "LLM_API_KEY": data.get("llm_api_key"),
+    }
+    save_secrets({key: value for key, value in secret_values.items() if value})
+    env_values = {
+        "R20_OKX_ENV": selected_mode,
+        "OKX_IS_SIMULATED": "1" if selected_mode == "demo" else "0" if selected_mode else None,
+        "LLM_BASE_URL": data.get("llm_base_url"),
         "LLM_MODEL": data.get("llm_model"),
         "LLM_REASONING_EFFORT": data.get("llm_reasoning_effort"),
         "R20_NOTIFICATION_WEBHOOK": data.get("notification_webhook"),
@@ -581,25 +620,41 @@ def update_admin_config(payload: AdminConfigUpdate, x_r20_admin_token: str | Non
     }
 
 
+@app.get("/api/v1/admin/okx/account-snapshot")
+def admin_okx_account_snapshot(x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
+    require_admin_header(x_r20_admin_token)
+    try: return okx_account_snapshot()
+    except Exception as exc: raise HTTPException(status_code=502, detail=f"获取 OKX 当前订单失败：{exc}") from exc
+
+
 @app.post("/api/v1/admin/positions/close")
 def manual_close_position(payload: ManualCloseRequest) -> dict[str, Any]:
     if not settings.manual_close_enabled:
         raise HTTPException(status_code=403, detail="后台手动平仓功能未启用")
-    actor = require_admin_header()
+    actor = require_superadmin(REQUEST_SESSION.get())
+    import fcntl
+    lock_path = DATA_DIR / ".ai_factor_trader.lock"; lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with lock_path.open("a+", encoding="utf-8") as lock_handle:
+        try: fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError: raise HTTPException(status_code=409, detail="交易主循环正在执行，暂不允许后台快速平仓；请等待本周期结束")
+        finally:
+            try: fcntl.flock(lock_handle.fileno(), fcntl.LOCK_UN)
+            except OSError: pass
     if actor.get("role") == "legacy" or not admin_auth.verify_password(int(actor["id"]), payload.admin_password):
         raise HTTPException(status_code=403, detail="管理员密码验证失败")
-    expected_confirmation = f"CLOSE {payload.inst_id} {payload.position_side.upper()}"
+    expected_confirmation = f"CLOSE {settings.okx_environment.upper()} {payload.inst_id} {payload.position_side.upper()} {payload.expected_size:g}"
     if payload.confirmation.strip().upper() != expected_confirmation:
         raise HTTPException(status_code=400, detail=f"确认短语必须精确为：{expected_confirmation}")
-    if not settings.okx_api_key or not settings.okx_secret_key or not settings.okx_passphrase:
-        raise HTTPException(status_code=503, detail="OKX API 凭证未完整配置")
     try:
-        result = okx.close_position(payload.inst_id, payload.position_side)
-        audit_record("position.close", "accepted", {"instId": payload.inst_id, "side": payload.position_side})
-        return {"accepted": True, "instId": payload.inst_id, "positionSide": payload.position_side, "result": result}
+        result = fast_close_confirmed(payload.inst_id, payload.position_side, payload.position_id, payload.expected_size, payload.environment_id)
+        audit_record("position.close", "confirmed_closed", {"instId": payload.inst_id, "side": payload.position_side, "environment": settings.okx_environment, "size": payload.expected_size})
+        return result
+    except ValueError as exc:
+        audit_record("position.close", "rejected", {"instId": payload.inst_id, "error": str(exc)[:300]})
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     except Exception as exc:
-        audit_record("position.close", "failed", {"instId": payload.inst_id, "side": payload.position_side, "error": str(exc)[:300]})
-        raise HTTPException(status_code=502, detail=f"OKX 平仓请求失败：{exc}") from exc
+        audit_record("position.close", "verification_failed", {"instId": payload.inst_id, "side": payload.position_side, "error": str(exc)[:300]})
+        raise HTTPException(status_code=502, detail=f"OKX 快速平仓未完成确认：{exc}") from exc
 
 
 @app.get("/api/v1/admin/instruments")
@@ -728,7 +783,7 @@ def prompt_library(x_r20_admin_token: str | None = Header(default=None)) -> dict
     return {
         "active_style": library["active_style"],
         "active_profile_id": library["active_profile_id"],
-        "profiles": all_profiles(),
+        "profiles": [{**item, "resolved_templates": {key: resolve_profile(item).get(key, "") for key in TEMPLATE_KEYS}} for item in all_profiles()],
         "base_templates": {
             "trading_system": SYSTEM_PROMPT,
             "trading_user": TRADING_USER_TEMPLATE,
@@ -877,28 +932,20 @@ def update_prompt_override(payload: PromptOverrideRequest, x_r20_admin_token: st
 def notification_config(x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
     refresh_settings()
     require_admin_header(x_r20_admin_token)
+    env = notification_env()
     return {
-        "webhook": {"enabled": os.getenv("R20_NOTIFY_WEBHOOK_ENABLED", "0") == "1", "url": settings.notification_webhook},
-        "wechat": {"enabled": os.getenv("R20_NOTIFY_WECHAT_ENABLED", "0") == "1", "webhook": os.getenv("R20_WECHAT_WEBHOOK", "")},
+        "webhook": {"enabled": env.get("R20_NOTIFY_WEBHOOK_ENABLED", "0") == "1", "url": env.get("R20_NOTIFICATION_WEBHOOK", "")},
+        "wechat": {"enabled": env.get("R20_NOTIFY_WECHAT_ENABLED", "0") == "1", "webhook": env.get("R20_WECHAT_WEBHOOK", "")},
         "wechat_ilink": {
-            "enabled": os.getenv("R20_NOTIFY_WECHAT_ILINK_ENABLED", "0") == "1",
-            "bot_token": mask(os.getenv("R20_WECHAT_BOT_TOKEN", "")),
-            "bot_configured": bool(os.getenv("R20_WECHAT_BOT_TOKEN", "")),
-            "base_url": os.getenv("R20_WECHAT_BASE_URL", "https://ilinkai.weixin.qq.com"),
-            "user_id": os.getenv("R20_WECHAT_USER_ID", ""),
-            "context_token": mask(os.getenv("R20_WECHAT_CONTEXT_TOKEN", "")),
-            "context_configured": bool(os.getenv("R20_WECHAT_CONTEXT_TOKEN", "")),
-            "ready": bool(os.getenv("R20_WECHAT_BOT_TOKEN", "") and os.getenv("R20_WECHAT_USER_ID", "") and os.getenv("R20_WECHAT_CONTEXT_TOKEN", "")),
-            "watcher": wechat_watcher_state(),
-            "protocol": "Tencent iLink 2.4.8",
+            "enabled": env.get("R20_NOTIFY_WECHAT_ILINK_ENABLED", "0") == "1",
+            "bot_token": mask(env.get("R20_WECHAT_BOT_TOKEN", "")), "bot_configured": bool(env.get("R20_WECHAT_BOT_TOKEN", "")),
+            "base_url": env.get("R20_WECHAT_BASE_URL", "https://ilinkai.weixin.qq.com"), "user_id": env.get("R20_WECHAT_USER_ID", ""),
+            "context_token": mask(env.get("R20_WECHAT_CONTEXT_TOKEN", "")), "context_configured": bool(env.get("R20_WECHAT_CONTEXT_TOKEN", "")),
+            "ready": bool(env.get("R20_WECHAT_BOT_TOKEN") and env.get("R20_WECHAT_USER_ID") and env.get("R20_WECHAT_CONTEXT_TOKEN")),
+            "watcher": wechat_watcher_state(), "protocol": "Tencent iLink 2.4.8",
         },
-        "telegram": {"enabled": os.getenv("R20_NOTIFY_TELEGRAM_ENABLED", "0") == "1", "bot_token": mask(os.getenv("R20_TELEGRAM_BOT_TOKEN", "")), "chat_id": os.getenv("R20_TELEGRAM_CHAT_ID", "")},
-        "qq": {
-            "enabled": os.getenv("R20_NOTIFY_QQ_ENABLED", "0") == "1",
-            "app_id": os.getenv("R20_QQ_APP_ID", ""),
-            "client_secret": mask(os.getenv("R20_QQ_CLIENT_SECRET", "")),
-            "openid": os.getenv("R20_QQ_OPENID", ""),
-        },
+        "telegram": {"enabled": env.get("R20_NOTIFY_TELEGRAM_ENABLED", "0") == "1", "bot_token": mask(env.get("R20_TELEGRAM_BOT_TOKEN", "")), "chat_id": env.get("R20_TELEGRAM_CHAT_ID", "")},
+        "qq": {"enabled": env.get("R20_NOTIFY_QQ_ENABLED", "0") == "1", "app_id": env.get("R20_QQ_APP_ID", ""), "client_secret": mask(env.get("R20_QQ_CLIENT_SECRET", "")), "openid": env.get("R20_QQ_OPENID", "")},
     }
 
 
@@ -914,12 +961,13 @@ def toggle_channel(channel: str, payload: ChannelToggleRequest, x_r20_admin_toke
     if channel not in keys:
         raise HTTPException(status_code=404, detail="未知频道")
     if payload.enabled:
+        env = notification_env()
         readiness = {
-            "qq": bool(os.getenv("R20_QQ_APP_ID") and os.getenv("R20_QQ_CLIENT_SECRET") and os.getenv("R20_QQ_OPENID")),
-            "wechat_ilink": bool(os.getenv("R20_WECHAT_BOT_TOKEN") and os.getenv("R20_WECHAT_USER_ID") and os.getenv("R20_WECHAT_CONTEXT_TOKEN")),
-            "telegram": bool(os.getenv("R20_TELEGRAM_BOT_TOKEN") and os.getenv("R20_TELEGRAM_CHAT_ID")),
-            "wechat": bool(os.getenv("R20_WECHAT_WEBHOOK")),
-            "webhook": bool(settings.notification_webhook),
+            "qq": bool(env.get("R20_QQ_APP_ID") and env.get("R20_QQ_CLIENT_SECRET") and env.get("R20_QQ_OPENID")),
+            "wechat_ilink": bool(env.get("R20_WECHAT_BOT_TOKEN") and env.get("R20_WECHAT_USER_ID") and env.get("R20_WECHAT_CONTEXT_TOKEN")),
+            "telegram": bool(env.get("R20_TELEGRAM_BOT_TOKEN") and env.get("R20_TELEGRAM_CHAT_ID")),
+            "wechat": bool(env.get("R20_WECHAT_WEBHOOK")),
+            "webhook": bool(env.get("R20_NOTIFICATION_WEBHOOK")),
         }
         if not readiness[channel]:
             raise HTTPException(status_code=409, detail="频道凭证或目标未配置完整，请先保存配置再启用")
@@ -929,13 +977,15 @@ def toggle_channel(channel: str, payload: ChannelToggleRequest, x_r20_admin_toke
 
 
 @app.put("/api/v1/admin/notifications")
-def update_notification_config(payload: NotificationConfigUpdate, x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
+def update_notification_config(payload: NotificationConfigUpdate, x_r20_admin_token: str | None = Header(default=None), x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
     refresh_settings()
-    require_admin_header(x_r20_admin_token)
+    require_superadmin(x_r20_session)
     for value, title in ((payload.webhook_url, "通用 Webhook"), (payload.wechat_webhook, "企业微信 Webhook")):
         if value and not value.startswith(("https://", "http://")):
             raise HTTPException(status_code=400, detail=f"{title} 必须以 http:// 或 https:// 开头")
-    existing = os.environ
+    try: wechat_base_url = validate_wechat_base_url(payload.wechat_base_url)
+    except ValueError as exc: raise HTTPException(status_code=400, detail=f"微信 Base URL：{exc}") from exc
+    existing = notification_env()
     readiness = {
         "QQ": (payload.qq_enabled, bool(payload.qq_app_id and (payload.qq_client_secret or existing.get("R20_QQ_CLIENT_SECRET")) and payload.qq_openid)),
         "微信 iLink": (payload.wechat_ilink_enabled, bool((payload.wechat_bot_token or existing.get("R20_WECHAT_BOT_TOKEN")) and payload.wechat_user_id and (payload.wechat_context_token or existing.get("R20_WECHAT_CONTEXT_TOKEN")))),
@@ -946,23 +996,20 @@ def update_notification_config(payload: NotificationConfigUpdate, x_r20_admin_to
     incomplete = [name for name, (enabled, ready) in readiness.items() if enabled and not ready]
     if incomplete:
         raise HTTPException(status_code=409, detail=f"以下频道配置不完整，无法启用：{'、'.join(incomplete)}")
+    secret_values = {
+        "R20_NOTIFICATION_WEBHOOK": payload.webhook_url, "R20_WECHAT_WEBHOOK": payload.wechat_webhook,
+        "R20_WECHAT_BOT_TOKEN": payload.wechat_bot_token, "R20_WECHAT_CONTEXT_TOKEN": payload.wechat_context_token,
+        "R20_TELEGRAM_BOT_TOKEN": payload.telegram_bot_token, "R20_QQ_CLIENT_SECRET": payload.qq_client_secret,
+    }
+    save_secrets({key: value for key, value in secret_values.items() if value})
+    remove_env(set(secret_values))
     update_env({
         "R20_NOTIFY_WEBHOOK_ENABLED": "1" if payload.webhook_enabled else "0",
-        "R20_NOTIFICATION_WEBHOOK": payload.webhook_url,
         "R20_NOTIFY_WECHAT_ENABLED": "1" if payload.wechat_enabled else "0",
-        "R20_WECHAT_WEBHOOK": payload.wechat_webhook,
         "R20_NOTIFY_WECHAT_ILINK_ENABLED": "1" if payload.wechat_ilink_enabled else "0",
-        "R20_WECHAT_BOT_TOKEN": payload.wechat_bot_token,
-        "R20_WECHAT_BASE_URL": payload.wechat_base_url,
-        "R20_WECHAT_USER_ID": payload.wechat_user_id,
-        "R20_WECHAT_CONTEXT_TOKEN": payload.wechat_context_token,
-        "R20_NOTIFY_TELEGRAM_ENABLED": "1" if payload.telegram_enabled else "0",
-        "R20_TELEGRAM_BOT_TOKEN": payload.telegram_bot_token,
-        "R20_TELEGRAM_CHAT_ID": payload.telegram_chat_id,
-        "R20_NOTIFY_QQ_ENABLED": "1" if payload.qq_enabled else "0",
-        "R20_QQ_APP_ID": payload.qq_app_id,
-        "R20_QQ_CLIENT_SECRET": payload.qq_client_secret,
-        "R20_QQ_OPENID": payload.qq_openid,
+        "R20_WECHAT_BASE_URL": wechat_base_url, "R20_WECHAT_USER_ID": payload.wechat_user_id,
+        "R20_NOTIFY_TELEGRAM_ENABLED": "1" if payload.telegram_enabled else "0", "R20_TELEGRAM_CHAT_ID": payload.telegram_chat_id,
+        "R20_NOTIFY_QQ_ENABLED": "1" if payload.qq_enabled else "0", "R20_QQ_APP_ID": payload.qq_app_id, "R20_QQ_OPENID": payload.qq_openid,
     })
     audit_record("notifications.update", "success", {
         "webhook": payload.webhook_enabled,
@@ -1042,19 +1089,17 @@ def create_wechat_qr(x_r20_admin_token: str | None = Header(default=None)) -> di
 def check_wechat_qr(payload: WechatQrStatusRequest, x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
     refresh_settings()
     require_admin_header(x_r20_admin_token)
-    base_url = os.getenv("R20_WECHAT_BASE_URL", "https://ilinkai.weixin.qq.com")
+    try: base_url = validate_wechat_base_url(os.getenv("R20_WECHAT_BASE_URL", "https://ilinkai.weixin.qq.com"))
+    except ValueError as exc: raise HTTPException(status_code=400, detail=f"微信 Base URL：{exc}") from exc
     try:
         result = qrcode_status(payload.qrcode, base_url)
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"查询微信扫码状态失败：{exc}") from exc
     if result["status"] == "confirmed" and result["bot_token"]:
-        update_env({
-            "R20_WECHAT_BOT_TOKEN": result["bot_token"],
-            "R20_WECHAT_BASE_URL": result["base_url"],
-            "R20_WECHAT_USER_ID": result["user_id"] or None,
-            "R20_WECHAT_CONTEXT_TOKEN": "",
-            "R20_NOTIFY_WECHAT_ILINK_ENABLED": "1",
-        })
+        save_secrets({"R20_WECHAT_BOT_TOKEN": result["bot_token"]})
+        delete_secrets({"R20_WECHAT_CONTEXT_TOKEN"})
+        remove_env({"R20_WECHAT_BOT_TOKEN", "R20_WECHAT_CONTEXT_TOKEN"})
+        update_env({"R20_WECHAT_BASE_URL": result["base_url"], "R20_WECHAT_USER_ID": result["user_id"] or None, "R20_NOTIFY_WECHAT_ILINK_ENABLED": "1"})
         reset_watcher_state()
         audit_record("wechat.qr.confirm", "success", {"bot_id": result["bot_id"], "user_id_configured": bool(result["user_id"])})
         return {"status": "confirmed", "configured": True, "bot_id": result["bot_id"], "user_id": result["user_id"], "context_required": True}
@@ -1065,17 +1110,38 @@ def check_wechat_qr(payload: WechatQrStatusRequest, x_r20_admin_token: str | Non
 def sync_wechat_session(x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
     refresh_settings()
     require_admin_header(x_r20_admin_token)
-    bot_token = os.getenv("R20_WECHAT_BOT_TOKEN", "")
-    base_url = os.getenv("R20_WECHAT_BASE_URL", "https://ilinkai.weixin.qq.com")
-    if not bot_token:
+    env = notification_env()
+    if not env.get("R20_WECHAT_BOT_TOKEN", ""):
         raise HTTPException(status_code=409, detail="请先完成微信扫码绑定")
-    try:
-        result = latest_session(bot_token, base_url)
-    except Exception as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
-    update_env({"R20_WECHAT_USER_ID": result["user_id"], "R20_WECHAT_CONTEXT_TOKEN": result["context_token"]})
-    audit_record("wechat.session.sync", "success", {"user_id": result["user_id"]})
-    return {"synced": True, "user_id": result["user_id"], "context_configured": True}
+    state = wechat_watcher_state()
+    if state.get("user_configured") and env.get("R20_WECHAT_CONTEXT_TOKEN"):
+        return {"synced": True, "user_id": env.get("R20_WECHAT_USER_ID", ""), "context_configured": True, "watcher": state}
+    state = request_session_capture()
+    audit_record("wechat.session.capture_requested", "success", {"watcher": state.get("status")})
+    return {"synced": False, "waiting": True, "instruction": "现在向微信 Bot 发送一条文字消息，后台监听器将自动捕获会话。", "watcher": state}
+
+
+@app.get("/api/v1/admin/backup-target-types")
+def backup_target_types(x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
+    require_admin_header(x_r20_admin_token)
+    return {"target_types": [
+        {"type":"local","label":"本地归档","auth":"none","description":"项目 backups/ 内滚动保留"},
+        {"type":"baidu","label":"百度网盘","auth":"bypy-oauth","description":"支持 ByPy 兼容授权；原生 OAuth 配置槽保留"},
+        {"type":"s3","label":"S3 兼容存储","auth":"access-key","description":"AWS S3、R2、MinIO、COS 等 S3 兼容端点"},
+        {"type":"oss","label":"阿里云 OSS","auth":"access-key","description":"官方 oss2 SDK"},
+        {"type":"webdav","label":"WebDAV / NAS / OpenList","auth":"basic","description":"标准 WebDAV PUT/MKCOL"},
+        {"type":"aliyundrive","label":"阿里云盘","auth":"webdav-or-oauth","description":"推荐开放平台或 OpenList WebDAV 桥接"},
+        {"type":"quark","label":"夸克网盘（实验性）","auth":"webdav-or-experimental-oauth","description":"官方开放平台仍在内测，推荐 OpenList WebDAV 桥接"},
+    ]}
+
+
+@app.put("/api/v1/admin/backup-credentials")
+def update_backup_credentials(payload: BackupCredentialUpdateRequest, x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    actor = require_superadmin(x_r20_session)
+    try: status = save_backup_credentials(payload.credential_ref, payload.credentials)
+    except ValueError as exc: raise HTTPException(status_code=400, detail=str(exc)) from exc
+    audit_record("backup.credentials.update", "success", {"actor": actor["username"], "credential_ref": payload.credential_ref, "fields": status["fields"]})
+    return {"saved": True, "credential_ref": payload.credential_ref, "status": status}
 
 
 @app.get("/api/v1/admin/backup-jobs")
@@ -1088,6 +1154,8 @@ def backup_jobs_api(x_r20_admin_token: str | None = Header(default=None)) -> dic
             item = json.loads(path.read_text(encoding="utf-8")); item["manifest_file"] = path.name; manifests.append(item)
         except (OSError, json.JSONDecodeError): pass
     jobs = list_backup_jobs()
+    for job in jobs:
+        for target in job.get("targets", []): target["credential_status"] = backup_credential_status(str(target.get("credential_ref") or ""))
     return {"jobs": jobs, "validations": {job["id"]: validate_backup_job(job) for job in jobs}, "recent_manifests": manifests, "timezone": "Asia/Shanghai", "limits": {"maximum_jobs": 12}}
 
 
@@ -1278,7 +1346,8 @@ def market(inst_id: str) -> dict[str, Any]:
 
 
 @app.get("/api/v1/account/positions")
-def positions() -> dict[str, Any]:
+def positions(x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
+    require_admin_header(x_r20_admin_token)
     if not settings.okx_api_key:
         raise HTTPException(status_code=503, detail="OKX credentials are not configured in .env")
     try:

@@ -119,6 +119,8 @@ class BackupJobV2Tests(unittest.TestCase):
         (root / "data").mkdir(parents=True)
         (root / "data" / "public.json").write_text("ok")
         (root / "data" / "r20_admin.db").write_text("secret")
+        (root / "data" / "r20_backup_secrets.enc").write_text("ciphertext")
+        (root / "data" / ".r20_backup_secret_key").write_text("key")
         old_root, old_backups = runtime.ROOT, runtime.BACKUPS
         runtime.ROOT, runtime.BACKUPS = root, root / "backups"
         try:
@@ -129,6 +131,7 @@ class BackupJobV2Tests(unittest.TestCase):
                 names = handle.getnames()
             self.assertIn("data/public.json", names)
             self.assertNotIn("data/r20_admin.db", names)
+            self.assertFalse(any(name.endswith(".enc") or "secret_key" in name for name in names))
         finally:
             runtime.ROOT, runtime.BACKUPS = old_root, old_backups
 

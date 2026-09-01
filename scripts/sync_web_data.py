@@ -2,6 +2,7 @@
 """Generate local R20 dashboard cache without an external console dependency."""
 
 import os
+from okx_runtime import replace_cli_prefix as okx_private_command
 import json
 import time
 import subprocess
@@ -50,7 +51,7 @@ def generate_trading_data():
     is_authenticated = auth_data.get("status") == "logged_in"
 
     # 1. Balance
-    bal_data = run_json_cmd("okx --demo account balance --json") or []
+    bal_data = run_json_cmd(okx_private_command("okx account balance --json")) or []
     usdt_bal = {}
     if bal_data and isinstance(bal_data, list) and "details" in bal_data[0]:
         for d in bal_data[0]["details"]:
@@ -64,7 +65,7 @@ def generate_trading_data():
     upl_acc = float(usdt_bal.get("upl", 0) or 0)
 
     # 2. Positions
-    pos_data = run_json_cmd("okx --demo account positions --json") or []
+    pos_data = run_json_cmd(okx_private_command("okx account positions --json")) or []
     positions = []
     long_count = 0
     short_count = 0
@@ -110,7 +111,7 @@ def generate_trading_data():
             pass
 
     # 3. Bills & Today PnL
-    bills_data = run_json_cmd("okx --demo account bills --limit 100 --json") or []
+    bills_data = run_json_cmd(okx_private_command("okx account bills --limit 100 --json")) or []
     today_realized_gross = 0.0
     today_fees = 0.0
     today_funding = 0.0

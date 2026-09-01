@@ -10,14 +10,14 @@ import scripts.backup_runtime as runtime
 
 
 class BackupMethodTests(unittest.TestCase):
-    def test_defaults_keep_only_baidu_enabled(self):
+    def test_open_source_defaults_keep_local_enabled_and_cloud_opt_in(self):
         with tempfile.TemporaryDirectory() as td:
             original = store.CONFIG_FILE
             store.CONFIG_FILE = Path(td) / "backup.json"
             try:
                 methods = store.load_backup_methods()
-                self.assertTrue(methods["baidu"]["enabled"])
-                self.assertFalse(methods["local"]["enabled"])
+                self.assertFalse(methods["baidu"]["enabled"])
+                self.assertTrue(methods["local"]["enabled"])
                 self.assertFalse(methods["sqlite"]["enabled"])
             finally:
                 store.CONFIG_FILE = original

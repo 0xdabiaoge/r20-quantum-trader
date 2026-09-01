@@ -1,4 +1,5 @@
 import os
+from okx_runtime import replace_cli_prefix as okx_private_command
 import json
 import datetime
 import subprocess
@@ -23,7 +24,7 @@ def generate_live_snapshots():
             pass
 
     # Fetch live OKX balance
-    res_bal = subprocess.run("okx --demo account balance --json", shell=True, capture_output=True, text=True)
+    res_bal = subprocess.run(okx_private_command("okx account balance --json"), shell=True, capture_output=True, text=True)
     current_eq = initial_cap
     if res_bal.stdout:
         try:
@@ -36,7 +37,7 @@ def generate_live_snapshots():
             pass
 
     # Read OKX bills to construct intermediate equity points
-    res_bills = subprocess.run("okx --demo account bills --limit 100 --json", shell=True, capture_output=True, text=True)
+    res_bills = subprocess.run(okx_private_command("okx account bills --limit 100 --json"), shell=True, capture_output=True, text=True)
     bills = json.loads(res_bills.stdout) if res_bills.stdout else []
 
     snapshots = [

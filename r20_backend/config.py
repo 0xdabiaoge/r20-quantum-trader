@@ -35,10 +35,13 @@ class Settings:
     host: str = "0.0.0.0"
     port: int = 8080
     okx_base_url: str = "https://www.okx.com"
+    okx_environment: str = "demo"
     okx_api_key: str = ""
     okx_secret_key: str = ""
     okx_passphrase: str = ""
-    okx_simulated: bool = False
+    okx_live_configured: bool = False
+    okx_demo_configured: bool = False
+    okx_simulated: bool = True
     llm_base_url: str = "https://api.openai.com/v1"
     llm_api_key: str = ""
     llm_model: str = "gemini-3.7-flash-high"
@@ -54,11 +57,21 @@ def refresh_settings() -> Settings:
     load_encrypted_secrets()
     settings.host = os.getenv("DASHBOARD_HOST", "0.0.0.0")
     settings.port = int(os.getenv("DASHBOARD_PORT", "8080"))
-    settings.okx_base_url = os.getenv("OKX_BASE_URL", "https://www.okx.com")
-    settings.okx_api_key = os.getenv("OKX_API_KEY", "")
-    settings.okx_secret_key = os.getenv("OKX_SECRET_KEY", "")
-    settings.okx_passphrase = os.getenv("OKX_PASSPHRASE", "")
-    settings.okx_simulated = os.getenv("OKX_IS_SIMULATED", "0") == "1"
+    from scripts.okx_runtime import selected_environment
+    selected = selected_environment()
+    settings.okx_base_url = selected.base_url
+    settings.okx_environment = selected.mode
+    settings.okx_api_key = selected.api_key
+    settings.okx_secret_key = selected.secret_key
+    settings.okx_passphrase = selected.passphrase
+    try:
+        from r20_gateway.secrets import load_secrets
+        secret_values = load_secrets()
+    except Exception: secret_values = {}
+    effective = {**os.environ, **secret_values}
+    settings.okx_live_configured = bool(effective.get("OKX_LIVE_API_KEY") and effective.get("OKX_LIVE_SECRET_KEY") and effective.get("OKX_LIVE_PASSPHRASE"))
+    settings.okx_demo_configured = bool(effective.get("OKX_DEMO_API_KEY") and effective.get("OKX_DEMO_SECRET_KEY") and effective.get("OKX_DEMO_PASSPHRASE"))
+    settings.okx_simulated = selected.simulated
     settings.llm_base_url = os.getenv("LLM_BASE_URL", "https://api.openai.com/v1")
     settings.llm_api_key = os.getenv("LLM_API_KEY", "")
     settings.llm_model = os.getenv("LLM_MODEL", "gemini-3.7-flash-high")

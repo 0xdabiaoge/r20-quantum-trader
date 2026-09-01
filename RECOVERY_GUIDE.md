@@ -11,7 +11,7 @@
 - **自进化心法引擎**：`scripts/self_improvement_engine.py`（每日 20:00 深度复盘真实流水，提炼 3 大启发式心法沉淀至 `data/AI_TRADING_MEMORY.md`）
 - **全网快讯情报流**：`scripts/news_sentiment_harvester.py`（OKX 最新与重大快讯双路聚合）
 - **Web 监控大屏**：`dashboard/app.py` + `dashboard/templates/index.html`（Bloomberg/Linear 级 Dark Glassmorphism 极客交易终端，支持全局 Prompt 悬浮透视抽屉）
-- **异地云灾备**：`scripts/nightly_backup_and_clean.py`（每日凌晨 02:00 自动打包全量代码、数据、Prompt、Agent 配置并同步至百度网盘，本地 0 冗余占用）
+- **插件化灾备**：`scripts/backup_runtime.py` + 后台“灾备中心”（按任务配置本地、百度官方 OAuth/ByPy、S3 兼容、阿里云 OSS、WebDAV/OpenList、阿里云盘桥接与实验性夸克桥接；凭证独立加密，任务导出不含密钥）
 - **核心数据资产清单**：
   - `data/trading_ledger.json` & `trading_ledger.xlsx`（全量交易流水账本与资金费记录）
   - `data/AI_TRADING_MEMORY.md`（QwenPaw 原生带时间戳启发式实战心法长期记忆）
@@ -27,7 +27,7 @@
 ## 2. 新环境一键恢复步骤
 
 ### 步骤 1：解压最新灾备包
-从百度网盘（`/我的应用数据/bypy/R20_Backups/`）下载最新的 `r20_system_backup_YYYY-MM-DD.tar.gz` 上传至工作区并解压：
+从后台配置的任一成功灾备目标下载最新归档。百度 ByPy 兼容目录通常为 `/我的应用数据/bypy/R20_Backups/`；官方 OAuth 默认应用目录为 `/apps/R20QuantumTrader/R20_Backups/`；S3/OSS/WebDAV 使用任务中配置的远程前缀。上传至工作区并解压：
 ```bash
 cd /app/working/workspaces/default
 tar -zxvf r20_system_backup_*.tar.gz
@@ -54,7 +54,7 @@ nohup /app/venv/bin/python3 -m uvicorn dashboard.app:app --host 0.0.0.0 --port 8
 # 1. 启动 60 秒因子计算与快讯同步守护进程 (后台常驻)
 nohup python3 /app/working/workspaces/default/scripts/daemon_web_sync.py > /tmp/daemon_sync.log 2>&1 &
 
-# 2. 检查并恢复 QwenPaw Cron 任务 (15m主循环、20:00每日自进化、早8晚8战报、02:00百度网盘备份)
+# 2. 检查并恢复调度任务（15m主循环、20:00每日自进化、早8晚8战报、02:00插件化灾备）
 qwenpaw cron list --agent-id default
 ```
 
