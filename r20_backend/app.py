@@ -21,6 +21,7 @@ sys.path.insert(0, str(SCRIPTS_DIR))
 
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
+from contextlib import asynccontextmanager
 from pydantic import BaseModel, Field
 from r20_backend.config import refresh_settings, settings
 from r20_backend.okx_client import OKXClient
@@ -29,13 +30,21 @@ from r20_backend.notifications import test_channel
 from r20_backend.audit import recent as recent_audit, record as audit_record
 from r20_backend.schedule_store import load_schedule, save_schedule
 from r20_backend.wechat_login import create_qrcode, latest_session, qrcode_status
+from r20_backend.wechat_watcher import public_state as wechat_watcher_state, reset_watcher_state, start_watcher, stop_watcher
 from scripts.instrument_pool import from_okx_instrument, load_instruments, save_instruments
 
 PROMPT_OVERRIDE_FILE = DATA_DIR / "system_prompt_override.txt"
 BACKUP_LOG_FILE = ROOT / "logs" / "r20_backup_manual.log"
 STARTED_AT = time.time()
 
-app = FastAPI(title="R20 Quantum Trader Standalone Backend", version="5.4.2")
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    start_watcher()
+    yield
+    stop_watcher()
+
+
+app = FastAPI(title="R20 Quantum Trader Standalone Backend", version="5.4.2", lifespan=lifespan)
 okx = OKXClient()
 ADMIN_HTML = ROOT / "r20_backend" / "admin.html"
 
@@ -452,6 +461,7 @@ def notification_config(x_r20_admin_token: str | None = Header(default=None)) ->
             "context_token": mask(os.getenv("R20_WECHAT_CONTEXT_TOKEN", "")),
             "context_configured": bool(os.getenv("R20_WECHAT_CONTEXT_TOKEN", "")),
             "ready": bool(os.getenv("R20_WECHAT_BOT_TOKEN", "") and os.getenv("R20_WECHAT_USER_ID", "") and os.getenv("R20_WECHAT_CONTEXT_TOKEN", "")),
+            "watcher": wechat_watcher_state(),
         },
         "telegram": {"enabled": os.getenv("R20_NOTIFY_TELEGRAM_ENABLED", "0") == "1", "bot_token": mask(os.getenv("R20_TELEGRAM_BOT_TOKEN", "")), "chat_id": os.getenv("R20_TELEGRAM_CHAT_ID", "")},
         "qq": {
@@ -576,8 +586,10 @@ def check_wechat_qr(payload: WechatQrStatusRequest, x_r20_admin_token: str | Non
             "R20_WECHAT_BOT_TOKEN": result["bot_token"],
             "R20_WECHAT_BASE_URL": result["base_url"],
             "R20_WECHAT_USER_ID": result["user_id"] or None,
+            "R20_WECHAT_CONTEXT_TOKEN": "",
             "R20_NOTIFY_WECHAT_ILINK_ENABLED": "1",
         })
+        reset_watcher_state()
         audit_record("wechat.qr.confirm", "success", {"bot_id": result["bot_id"], "user_id_configured": bool(result["user_id"])})
         return {"status": "confirmed", "configured": True, "bot_id": result["bot_id"], "user_id": result["user_id"], "context_required": True}
     return {"status": result["status"], "configured": False}
