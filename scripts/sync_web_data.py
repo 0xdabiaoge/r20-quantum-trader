@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
-"""
-Sync quantitative trading data to QwenPaw Web Console static directory.
-Provides JSON ledger and multi-factor matrix directly to Web UI.
-"""
+"""Generate local R20 dashboard cache without an external console dependency."""
 
 import os
 import json
@@ -10,14 +7,13 @@ import time
 import subprocess
 import datetime
 
-WORKSPACE_DIR = "/app/working/workspaces/default"
+WORKSPACE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(WORKSPACE_DIR, "data")
 LOGS_DIR = os.path.join(WORKSPACE_DIR, "logs")
 LEDGER_JSON_FILE = os.path.join(DATA_DIR, "trading_ledger.json")
 SNAPSHOTS_JSON_FILE = os.path.join(DATA_DIR, "snapshots.json")
 LOG_FILE = os.path.join(LOGS_DIR, "trading.log")
-CONSOLE_DIR = "/app/venv/lib/python3.11/site-packages/qwenpaw/console"
-DATA_JSON_PATH = os.path.join(CONSOLE_DIR, "trading_data.json")
+DATA_JSON_PATH = os.path.join(DATA_DIR, "trading_data.json")
 
 TARGET_INSTRUMENTS = [
     {"instId": "BTC-USDT-SWAP", "name": "BTC"},
@@ -286,7 +282,8 @@ def generate_trading_data():
         }
     }
 
-    # Write atomic JSON to console dir
+    # Write atomic JSON to local project data cache
+    os.makedirs(DATA_DIR, exist_ok=True)
     temp_path = DATA_JSON_PATH + ".tmp"
     with open(temp_path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)

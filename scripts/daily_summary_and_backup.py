@@ -12,7 +12,7 @@ import datetime
 import subprocess
 import sys
 
-WORKSPACE_DIR = "/app/working/workspaces/default"
+WORKSPACE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(WORKSPACE_DIR, "data")
 BACKUPS_DIR = os.path.join(WORKSPACE_DIR, "backups")
 LEDGER_JSON_FILE = os.path.join(DATA_DIR, "trading_ledger.json")

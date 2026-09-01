@@ -14,7 +14,7 @@ import glob
 import subprocess
 import datetime
 
-WORKSPACE_DIR = "/app/working/workspaces/default"
+WORKSPACE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LOGS_DIR = os.path.join(WORKSPACE_DIR, "logs")
 MAX_LOG_SIZE_MB = 10
 BACKUP_COUNT = 3

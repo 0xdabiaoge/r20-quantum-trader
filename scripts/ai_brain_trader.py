@@ -17,7 +17,16 @@ import fcntl
 from typing import Dict, Any, List, Optional, Tuple
 from concurrent.futures import ThreadPoolExecutor
 
-WORKSPACE_DIR = "/app/working/workspaces/default"
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
+try:
+    from r20_backend.config import settings as standalone_settings
+except ImportError:
+    standalone_settings = None
+
+WORKSPACE_DIR = PROJECT_ROOT
 DATA_DIR = os.path.join(WORKSPACE_DIR, "data")
 AI_DECISION_CACHE_FILE = os.path.join(DATA_DIR, "ai_brain_decisions.json")
 AI_DECISION_HISTORY_FILE = os.path.join(DATA_DIR, "ai_brain_history.json")
@@ -87,28 +96,13 @@ def safe_float(value: Any, default: float = 0.0) -> float:
 
 
 def get_cpa_client_config() -> Tuple[str, str]:
-    """Dynamically resolve LLM API base URL and API Key from environment or local encrypted vault."""
-    # 1. First priority: standard environment variables
-    env_base_url = os.getenv("LLM_BASE_URL") or os.getenv("OPENAI_BASE_URL")
-    env_api_key = os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY")
-    if env_base_url and env_api_key:
-        return env_base_url, env_api_key
-
-    # 2. Second priority: QwenPaw encrypted secret store (if available locally)
-    try:
-        sys.path.append("/app/venv/lib/python3.11/site-packages")
-        from qwenpaw.security.secret_store import decrypt
-        secret_file = "/app/working.secret/providers/custom/cpa.json"
-        if os.path.exists(secret_file):
-            with open(secret_file, "r", encoding="utf-8") as f:
-                d = json.load(f)
-            api_key = decrypt(d.get("api_key", "")) if d.get("api_key") else ""
-            base_url = d.get("base_url", "https://api.openai.com/v1")
-            return base_url, api_key
-    except Exception as e:
-        print(f"[AI Brain] Warning loading local secret store: {e}")
-
-    return env_base_url or "https://api.openai.com/v1", env_api_key or ""
+    """Resolve LLM credentials only from process environment or local .env."""
+    if standalone_settings:
+        return standalone_settings.llm_base_url, standalone_settings.llm_api_key
+    return (
+        os.getenv("LLM_BASE_URL") or os.getenv("OPENAI_BASE_URL") or "https://api.openai.com/v1",
+        os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY") or "",
+    )
 
 def fetch_single_instrument_package(item: Dict[str, Any]) -> Dict[str, Any]:
     inst_id = item["instId"]
@@ -514,13 +508,13 @@ def construct_full_market_prompt(packages: List[Dict[str, Any]], pos_summary: st
     pending_orders_text = "\n".join(pending_lines)
 
     memory_lessons = ""
-    # Priority 1: Read Human/LLM Markdown Memory (QwenPaw-native)
+    # Priority 1: Read durable R20 Markdown trading memory
     if os.path.exists(AI_MEMORY_MD_FILE):
         try:
             with open(AI_MEMORY_MD_FILE, "r", encoding="utf-8") as f:
                 md_text = f.read().strip()
                 if md_text:
-                    memory_lessons = f"""======================= 【QwenPaw 启发式实战认知与长期记忆 (Markdown)】 =======================
+                    memory_lessons = f"""======================= 【R20 启发式实战认知与长期记忆 (Markdown)】 =======================
 {md_text}
 """
         except Exception:
@@ -532,7 +526,7 @@ def construct_full_market_prompt(packages: List[Dict[str, Any]], pos_summary: st
                 lessons = mem.get("core_lessons", [])
                 if lessons:
                     formatted_lessons = "\n".join([f"  • {item}" for item in lessons])
-                    memory_lessons = f"""======================= 【QwenPaw 启发式实战认知与长期记忆】 =======================
+                    memory_lessons = f"""======================= 【R20 启发式实战认知与长期记忆】 =======================
 【每日复盘提炼的心法与直觉提示词 (供决策参考，不设死板禁令)】:
 {formatted_lessons}
 """

@@ -6,7 +6,7 @@
 
 <br/>
 
-[![Version](https://img.shields.io/badge/Version-v5.4.1-6366F1.svg)](https://github.com/555cute/r20-quantum-trader/releases)
+[![Version](https://img.shields.io/badge/Version-v5.4.2-6366F1.svg)](https://github.com/555cute/r20-quantum-trader/releases)
 [![LINUX DO](https://img.shields.io/badge/Community-LINUX%20DO-EA580C.svg)](https://linux.do/)
 [![License](https://img.shields.io/badge/License-MIT-10B981.svg)](https://opensource.org/licenses/MIT)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
@@ -67,7 +67,14 @@
 
 ---
 
-## 🌟 核心交易系统特性 (v5.4.1 重大升级)
+## 🌟 核心交易系统特性 (v5.4.2 独立化升级)
+
+### 🧩 0. 独立化运行底座与自有后台
+- **零 QwenPaw 运行时依赖**：移除 Python 依赖、QwenPaw 加密密钥库回退、QwenPaw 通知通道与 Console 文件写入；LLM / OKX 凭证统一只从本地 `.env` 读取。
+- **自有 FastAPI 控制平面**：新增 `r20_backend`，提供只读健康检查、策略缓存、因子快照、台账、原生 OKX REST 行情与账户持仓 API；不开放 HTTP 下单接口。
+- **独立调度守护**：新增 `r20_backend.scheduler` 与 systemd 单元，接管 15 分钟交易、60 秒因子、10 分钟快讯、日报、复盘和异地灾备调度；现有交易脚本的文件锁与 Fail-Closed 逻辑保持不变。
+- **部署说明**：见 [`STANDALONE.md`](STANDALONE.md)，迁移独立部署时必须先关闭旧 QwenPaw Cron，以避免双重执行。
+
 
 ### 🏛️ 1. 三重滤网大级别波段体系 (Triple Screen Swing Trading System)
 - **4H 宏观结构层（一票否决权）**: 顺大势。若 4H 处于清晰下降通道 / 空头承压结构（`4H_MACRO_BEAR`），**一票否决任何做多开仓信号**，严禁在 15M 反弹时摸左侧接飞刀；若 4H 为上升通道 / 多头主升结构（`4H_MACRO_BULL`），**一票否决盲目摸顶做空**。

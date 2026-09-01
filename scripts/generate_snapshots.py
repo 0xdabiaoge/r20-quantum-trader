@@ -3,7 +3,7 @@ import json
 import datetime
 import subprocess
 
-DATA_DIR = "/app/working/workspaces/default/data"
+DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
 SNAPSHOTS_FILE = os.path.join(DATA_DIR, "snapshots.json")
 ACCOUNT_INIT_FILE = os.path.join(DATA_DIR, "account_initial_state.json")
 

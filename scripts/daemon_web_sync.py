@@ -28,7 +28,7 @@ def main():
         # 1. Harvest OKX News & Macro Sentiment every 10 minutes (600s)
         if now_ts - last_news_time > 600:
             try:
-                subprocess.run("python3 /app/working/workspaces/default/scripts/news_sentiment_harvester.py", shell=True, timeout=30)
+                subprocess.run([sys.executable, os.path.join(BASE_DIR, "news_sentiment_harvester.py")], timeout=30)
                 last_news_time = now_ts
             except Exception:
                 pass
@@ -36,7 +36,7 @@ def main():
         # 2. Update 5-Pillar Quantitative Factor Library every 60 seconds
         if now_ts - last_factor_time > 60:
             try:
-                subprocess.run("python3 /app/working/workspaces/default/scripts/factor_library.py", shell=True, timeout=15)
+                subprocess.run([sys.executable, os.path.join(BASE_DIR, "factor_library.py")], timeout=15)
                 last_factor_time = now_ts
             except Exception:
                 pass

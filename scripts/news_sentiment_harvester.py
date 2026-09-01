@@ -15,7 +15,7 @@ import datetime
 import subprocess
 import re
 
-WORKSPACE_DIR = "/app/working/workspaces/default"
+WORKSPACE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(WORKSPACE_DIR, "data")
 NEWS_CACHE_FILE = os.path.join(DATA_DIR, "news_sentiment.json")
 CIRCUIT_BREAKER_FILE = os.path.join(DATA_DIR, "circuit_breaker.json")

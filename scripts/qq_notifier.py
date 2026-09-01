@@ -1,64 +1,42 @@
 #!/usr/bin/env python3
-"""
-QQ Channel Notification Dispatcher for R20 Trading System
-Pushes real-time trading signals, TP/SL executions, circuit breakers & daily summaries to user via QQ.
+"""Generic R20 notification dispatcher.
+
+Set R20_NOTIFICATION_WEBHOOK to a trusted endpoint that accepts JSON POST payloads.
+The trading engine remains fully functional when notifications are not configured.
 """
 
-import subprocess
-import json
 import datetime
+import json
 import os
+import urllib.request
 
-AGENT_ID = os.getenv("QQ_AGENT_ID", "default")
-CHANNEL = os.getenv("QQ_CHANNEL", "qq")
+NOTIFICATION_WEBHOOK = os.getenv("R20_NOTIFICATION_WEBHOOK", "")
 
-def get_target_credentials():
-    """Dynamically resolve active QQ user & session ID from environment or chats.json."""
-    user = os.getenv("QQ_TARGET_USER")
-    session = os.getenv("QQ_TARGET_SESSION")
-    
-    if not user or user == "YOUR_QQ_USER_ID" or not session or "YOUR_QQ_USER_ID" in session:
-        workspace_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        chats_file = os.path.join(workspace_dir, "chats.json")
-        if os.path.exists(chats_file):
-            try:
-                with open(chats_file, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                for chat in data.get("chats", []):
-                    if chat.get("channel") == "qq" and chat.get("user_id") and chat.get("user_id") != "default":
-                        user = chat.get("user_id")
-                        session = chat.get("session_id") or f"qq:{user}"
-                        break
-            except Exception:
-                pass
-    
-    # Fallback to authentic channel ID if not set
-    user = user or "AA31F7DAFFCFEB8DACBF41BA7B6D5A02"
-    session = session or f"qq:{user}"
-    return user, session
-
-TARGET_USER, TARGET_SESSION = get_target_credentials()
 
 def send_qq_message(text: str) -> bool:
-    """Send text message to user's QQ channel via qwenpaw channels send"""
+    """Backward-compatible name; delivery is now an optional generic webhook."""
+    if not NOTIFICATION_WEBHOOK:
+        print("[R20 Notification] No webhook configured; notification retained in process log")
+        return False
+
     tz_bj = datetime.timezone(datetime.timedelta(hours=8))
     now_str = datetime.datetime.now(tz_bj).strftime("%H:%M:%S")
-    formatted_msg = f"⚡【R20量化系统】{now_str}\n{text.strip()}"
-    
-    cmd = [
-        "qwenpaw", "channels", "send",
-        "--agent-id", AGENT_ID,
-        "--channel", CHANNEL,
-        "--target-user", TARGET_USER,
-        "--target-session", TARGET_SESSION,
-        "--text", formatted_msg
-    ]
-    
+    payload = json.dumps({
+        "source": "R20 Quantum Trader",
+        "timestamp": now_str,
+        "message": text.strip(),
+    }).encode("utf-8")
+    request = urllib.request.Request(
+        NOTIFICATION_WEBHOOK,
+        data=payload,
+        headers={"Content-Type": "application/json", "User-Agent": "R20-Standalone/5.4.2"},
+        method="POST",
+    )
     try:
-        res = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
-        return res.returncode == 0
-    except Exception as e:
-        print(f"Failed to send QQ notification: {e}")
+        with urllib.request.urlopen(request, timeout=15) as response:
+            return 200 <= response.status < 300
+    except Exception as exc:
+        print(f"[R20 Notification] Delivery failed: {exc}")
         return False
 
 def notify_trade_open(inst: str, side: str, sz: int, px: float, strategy: str, reason: str):

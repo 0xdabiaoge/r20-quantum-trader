@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-R20 AI LLM-Native Self-Improvement & Strategy Evolution Engine v5.4.1 (self_improvement_engine.py)
+R20 AI LLM-Native Self-Improvement & Strategy Evolution Engine v5.4.2 (self_improvement_engine.py)
 Focuses purely on Crypto Alpha generation & dynamic quantitative risk adaptation.
 Eliminates rigid cooldown bans in favor of dynamic volatility-adjusted thresholds,
 asymmetric Kelly bet-sizing, and LLM cognitive post-mortem lessons.
@@ -17,7 +17,16 @@ import fcntl
 import hashlib
 from typing import Dict, Any, List, Optional, Tuple
 
-WORKSPACE_DIR = "/app/working/workspaces/default"
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
+try:
+    from r20_backend.config import settings as standalone_settings
+except ImportError:
+    standalone_settings = None
+
+WORKSPACE_DIR = PROJECT_ROOT
 DATA_DIR = os.path.join(WORKSPACE_DIR, "data")
 LOGS_DIR = os.path.join(WORKSPACE_DIR, "logs")
 
@@ -82,28 +91,13 @@ def log_msg(msg: str):
         pass
 
 def get_cpa_client_config() -> Tuple[str, str]:
-    """Dynamically resolve LLM API base URL and API Key from environment or local encrypted vault."""
-    # 1. First priority: standard environment variables
-    env_base_url = os.getenv("LLM_BASE_URL") or os.getenv("OPENAI_BASE_URL")
-    env_api_key = os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY")
-    if env_base_url and env_api_key:
-        return env_base_url, env_api_key
-
-    # 2. Second priority: QwenPaw encrypted secret store (if available locally)
-    try:
-        sys.path.append("/app/venv/lib/python3.11/site-packages")
-        from qwenpaw.security.secret_store import decrypt
-        secret_file = "/app/working.secret/providers/custom/cpa.json"
-        if os.path.exists(secret_file):
-            with open(secret_file, "r", encoding="utf-8") as f:
-                d = json.load(f)
-            api_key = decrypt(d.get("api_key", "")) if d.get("api_key") else ""
-            base_url = d.get("base_url", "https://api.openai.com/v1")
-            return base_url, api_key
-    except Exception as e:
-        log_msg(f"[AI Evolution] Warning loading local secret store: {e}")
-
-    return env_base_url or "https://api.openai.com/v1", env_api_key or ""
+    """Resolve LLM credentials only from process environment or local .env."""
+    if standalone_settings:
+        return standalone_settings.llm_base_url, standalone_settings.llm_api_key
+    return (
+        os.getenv("LLM_BASE_URL") or os.getenv("OPENAI_BASE_URL") or "https://api.openai.com/v1",
+        os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY") or "",
+    )
 
 def load_closed_trades():
     account_init_file = os.path.join(DATA_DIR, "account_initial_state.json")
@@ -157,7 +151,7 @@ def load_closed_trades():
 EVOLUTION_SYSTEM_PROMPT = """你是一名世界顶级加密量化对冲基金的首席投资官(CIO)。
 你的职责：审查系统最近平仓的历史真实成交记录与损益流水，对照【已有历史长期记忆库】，进行每日交易认知复盘（Cognitive Post-Mortem），执行【智能记忆更新与动态覆盖】并沉淀为 Markdown 格式的实战心法提示词。
 
-核心记忆机制与动态覆盖原则（参考 QwenPaw 记忆系统）：
+核心记忆机制与动态覆盖原则（R20 原生记忆系统）：
 1. 记忆时效性与证伪覆盖（Memory Evolution & Invalidation）：
    - 市场环境瞬息万变，早期的经验法则在新的市场结构下可能失效（如牛市的追突破心法在震荡市失效，或此前的摸顶教训在新主线中需要修正）；
    - 你必须审视【现有旧记忆】：保留仍具普适性的真理，淘汰/覆盖/修订已失效或被最新亏损实证打脸的过时认知，生成全新的【最新有效记忆条目】。
@@ -264,7 +258,7 @@ def run_self_evolution(force: bool = False):
     tz_bj = datetime.timezone(datetime.timedelta(hours=8))
     now_bj = datetime.datetime.now(tz_bj)
     timestamp_str = now_bj.strftime("%Y-%m-%d %H:%M:%S")
-    log_msg("🧬 启动 R20 AI 大脑自进化认知复盘与实战心法提炼 (v5.4.1 Crypto Focus)...")
+    log_msg("🧬 启动 R20 AI 大脑自进化认知复盘与实战心法提炼 (v5.4.2 Crypto Focus)...")
 
     closed_trades = load_closed_trades()
     total_trades = len(closed_trades)
@@ -336,7 +330,7 @@ def run_self_evolution(force: bool = False):
     }
     atomic_write_json(AI_MEMORY_FILE, memory_payload)
 
-    # Save as QwenPaw-style Markdown Memory File
+    # Save as durable R20 Markdown memory file
     md_content = f"""# R20 AI 交易大脑长期记忆与启发式心法 (AI Trading Memory)
 
 > **最新覆盖与修订时间**: {timestamp_str} (北京时间)  
@@ -383,7 +377,7 @@ def run_self_evolution(force: bool = False):
         "total_trades": total_trades,
         "win_rate": win_rate,
         "profit_factor": profit_factor,
-        "mode": "QwenPaw-Style Heuristic Memory (启发式长期记忆)",
+        "mode": "R20 Native Heuristic Memory (启发式长期记忆)",
         "insights": insights,
         "actions_taken": actions_taken,
         "core_lessons": long_term_memory

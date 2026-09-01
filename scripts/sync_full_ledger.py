@@ -11,7 +11,7 @@ import os
 import datetime
 import tempfile
 
-WORKSPACE_DIR = "/app/working/workspaces/default"
+WORKSPACE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(WORKSPACE_DIR, "data")
 LEDGER_JSON_FILE = os.path.join(DATA_DIR, "trading_ledger.json")
 INITIAL_STATE_FILE = os.path.join(DATA_DIR, "account_initial_state.json")

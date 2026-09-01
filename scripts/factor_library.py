@@ -18,7 +18,7 @@ import urllib.request
 from typing import Dict, Any, List, Optional
 from concurrent.futures import ThreadPoolExecutor
 
-WORKSPACE_DIR = "/app/working/workspaces/default"
+WORKSPACE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(WORKSPACE_DIR, "data")
 FACTOR_LIB_CACHE_FILE = os.path.join(DATA_DIR, "factor_library_snapshot.json")
 
