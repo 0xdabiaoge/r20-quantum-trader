@@ -22,9 +22,11 @@ from r20_backend.config import refresh_settings, settings
 from r20_backend.okx_client import OKXClient
 from r20_backend.settings_store import mask, update_env
 from r20_backend.notifications import test_channel
+from r20_backend.audit import recent as recent_audit, record as audit_record
 
 PROMPT_OVERRIDE_FILE = DATA_DIR / "system_prompt_override.txt"
 BACKUP_LOG_FILE = ROOT / "logs" / "r20_backup_manual.log"
+STARTED_AT = time.time()
 
 app = FastAPI(title="R20 Quantum Trader Standalone Backend", version="5.4.2")
 okx = OKXClient()
@@ -111,6 +113,59 @@ def script_state(script_name: str) -> dict[str, Any]:
     return {"name": script_name, "exists": path.exists(), "path": str(path)}
 
 
+def file_health(filename: str, expected_interval: int) -> dict[str, Any]:
+    path = DATA_DIR / filename
+    if not path.exists():
+        return {"name": filename, "exists": False, "age_seconds": None, "fresh": False}
+    age = max(0, int(time.time() - path.stat().st_mtime))
+    return {"name": filename, "exists": True, "age_seconds": age, "fresh": age <= expected_interval * 2, "bytes": path.stat().st_size}
+
+
+def log_tail(filename: str, lines: int = 30) -> str:
+    path = ROOT / "logs" / filename
+    if not path.exists():
+        return "暂无日志"
+    return "\n".join(path.read_text(encoding="utf-8", errors="replace").splitlines()[-max(1, min(lines, 200)):])
+
+
+def decision_summary() -> list[dict[str, Any]]:
+    raw = read_json("ai_brain_decisions.json", {})
+    result = []
+    for inst_id, item in raw.items():
+        decision = item.get("decision", {}) if isinstance(item, dict) else {}
+        result.append({
+            "instId": inst_id,
+            "action": decision.get("action", "WAIT"),
+            "confidence": decision.get("confidence", 0),
+            "summary": decision.get("summary_reason", ""),
+            "updated_at": item.get("time_str", "") if isinstance(item, dict) else "",
+        })
+    return result
+
+
+def runtime_overview() -> dict[str, Any]:
+    health_files = [
+        file_health("ai_brain_decisions.json", 15 * 60),
+        file_health("factor_library_snapshot.json", 60),
+        file_health("news_sentiment.json", 10 * 60),
+        file_health("trading_ledger.json", 15 * 60),
+    ]
+    positions_payload = read_json("position_trackers.json", {})
+    return {
+        "service": {"version": "5.4.2", "pid": os.getpid(), "uptime_seconds": int(time.time() - STARTED_AT)},
+        "credentials": {"okx": bool(settings.okx_api_key and settings.okx_secret_key and settings.okx_passphrase), "llm": bool(settings.llm_api_key)},
+        "data_health": health_files,
+        "decisions": decision_summary(),
+        "trackers": len(positions_payload) if isinstance(positions_payload, dict) else 0,
+        "logs": {
+            "trader": log_tail("ai_factor_trader.log", 18),
+            "backend": log_tail("r20_backend.log", 18),
+            "scheduler": log_tail("r20_scheduler.log", 18),
+        },
+        "audit": recent_audit(20),
+    }
+
+
 def git(command: list[str]) -> str:
     result = subprocess.run(["git", *command], cwd=ROOT, text=True, capture_output=True, timeout=30)
     if result.returncode:
@@ -140,6 +195,20 @@ def update_status() -> dict[str, Any]:
 @app.get("/admin", include_in_schema=False)
 def admin_page() -> FileResponse:
     return FileResponse(ADMIN_HTML)
+
+
+@app.get("/api/v1/admin/overview")
+def admin_overview(x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
+    refresh_settings()
+    require_admin_header(x_r20_admin_token)
+    return runtime_overview()
+
+
+@app.get("/api/v1/admin/audit")
+def admin_audit(x_r20_admin_token: str | None = Header(default=None), limit: int = 50) -> dict[str, Any]:
+    refresh_settings()
+    require_admin_header(x_r20_admin_token)
+    return {"records": recent_audit(limit)}
 
 
 @app.get("/api/v1/admin/config")
@@ -188,6 +257,7 @@ def update_admin_config(payload: AdminConfigUpdate, x_r20_admin_token: str | Non
         "R20_MANUAL_CLOSE_ENABLED": "1" if data.get("manual_close_enabled") else "0" if "manual_close_enabled" in data else None,
     }
     update_env(env_values)
+    audit_record("config.update", "success", {"fields": sorted(data.keys())})
     return {
         "updated": True,
         "restart_note": "Long-running strategy processes read updated .env on their next execution cycle.",
@@ -207,8 +277,10 @@ def manual_close_position(payload: ManualCloseRequest) -> dict[str, Any]:
         raise HTTPException(status_code=503, detail="OKX API 凭证未完整配置")
     try:
         result = okx.close_position(payload.inst_id, payload.position_side)
+        audit_record("position.close", "accepted", {"instId": payload.inst_id, "side": payload.position_side})
         return {"accepted": True, "instId": payload.inst_id, "positionSide": payload.position_side, "result": result}
     except Exception as exc:
+        audit_record("position.close", "failed", {"instId": payload.inst_id, "side": payload.position_side, "error": str(exc)[:300]})
         raise HTTPException(status_code=502, detail=f"OKX 平仓请求失败：{exc}") from exc
 
 
@@ -237,6 +309,7 @@ def update_application(payload: UpdateRequest, x_r20_admin_token: str | None = H
     except RuntimeError as exc:
         raise HTTPException(status_code=502, detail=f"更新失败：{exc}") from exc
     status_after = update_status()
+    audit_record("application.update", "success", {"before": status_before.get("local"), "after": status_after.get("local")})
     return {
         "updated": status_before["local"] != status_after.get("local"),
         "before": status_before,
@@ -266,6 +339,7 @@ def update_prompt_override(payload: PromptOverrideRequest, x_r20_admin_token: st
         os.replace(temp, PROMPT_OVERRIDE_FILE)
     elif PROMPT_OVERRIDE_FILE.exists():
         PROMPT_OVERRIDE_FILE.unlink()
+    audit_record("prompt.update", "success", {"enabled": bool(content), "characters": len(content)})
     return {"saved": True, "enabled": bool(content), "restart_note": "下一次 AI 推演循环将自动叠加此提示词覆盖层。"}
 
 
@@ -318,6 +392,13 @@ def update_notification_config(payload: NotificationConfigUpdate, x_r20_admin_to
         "R20_QQ_CLIENT_SECRET": payload.qq_client_secret,
         "R20_QQ_OPENID": payload.qq_openid,
     })
+    audit_record("notifications.update", "success", {
+        "webhook": payload.webhook_enabled,
+        "wechat": payload.wechat_enabled,
+        "wechat_ilink": payload.wechat_ilink_enabled,
+        "telegram": payload.telegram_enabled,
+        "qq": payload.qq_enabled,
+    })
     return {"saved": True, "restart_note": "通知配置已写入 .env；下一轮脚本执行会读取新通道。"}
 
 
@@ -326,6 +407,7 @@ def send_notification_test(payload: NotificationTestRequest, x_r20_admin_token: 
     refresh_settings()
     require_admin_header(x_r20_admin_token)
     result = test_channel(payload.channel)
+    audit_record("notifications.test", "completed", {"channel": payload.channel, "result": result})
     return {"channel": payload.channel, "result": result}
 
 
@@ -354,7 +436,9 @@ def run_backup(payload: BackupRequest, x_r20_admin_token: str | None = Header(de
     BACKUP_LOG_FILE.parent.mkdir(exist_ok=True)
     BACKUP_LOG_FILE.write_text(result.stdout + "\n" + result.stderr, encoding="utf-8")
     if result.returncode:
+        audit_record("backup.run", "failed", {"returncode": result.returncode})
         raise HTTPException(status_code=502, detail=f"灾备任务失败：{result.stderr[-800:] or result.stdout[-800:]}")
+    audit_record("backup.run", "success", {})
     return {"completed": True, "output": result.stdout[-2500:]}
 
 
