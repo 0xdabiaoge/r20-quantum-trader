@@ -37,6 +37,7 @@ NEWS_SENTIMENT_FILE = os.path.join(DATA_DIR, "news_sentiment.json")
 AI_MEMORY_MD_FILE = os.path.join(DATA_DIR, "AI_TRADING_MEMORY.md")
 CALCULUS_SNAPSHOT_FILE = os.path.join(DATA_DIR, "calculus_snapshot.json")
 AI_MEMORY_FILE = os.path.join(DATA_DIR, "ai_trading_memory.json")
+PROMPT_OVERRIDE_FILE = os.path.join(DATA_DIR, "system_prompt_override.txt")
 AI_BRAIN_LOCK_FILE = os.path.join(DATA_DIR, ".ai_brain_cycle.lock")
 DECISION_MAX_AGE_SECONDS = 300
 
@@ -103,6 +104,18 @@ def get_cpa_client_config() -> Tuple[str, str]:
         os.getenv("LLM_BASE_URL") or os.getenv("OPENAI_BASE_URL") or "https://api.openai.com/v1",
         os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY") or "",
     )
+
+def get_effective_system_prompt() -> str:
+    """Append a locally managed admin override without replacing audited safety rules."""
+    try:
+        if os.path.exists(PROMPT_OVERRIDE_FILE):
+            override = open(PROMPT_OVERRIDE_FILE, "r", encoding="utf-8").read().strip()
+            if override:
+                return f"{SYSTEM_PROMPT}\n\n【管理员提示词覆盖层（同样必须遵守上述风控和 JSON 约束）】\n{override}"
+    except OSError:
+        pass
+    return SYSTEM_PROMPT
+
 
 def fetch_single_instrument_package(item: Dict[str, Any]) -> Dict[str, Any]:
     inst_id = item["instId"]
@@ -720,11 +733,13 @@ def execute_batch_ai_brain_cycle(pos_summary: str = "当前总持仓 0/6", activ
 
     prompt = construct_full_market_prompt(packages, pos_summary, active_positions_detail, pending_orders_detail=pending_orders_list, current_time_str=time_str, usdt_available=usdt_available)
     
+    effective_system_prompt = get_effective_system_prompt()
+
     # Save Realtime Prompt Snapshot for Web Transparent Inspection
     try:
         tmp_prompt = AI_LAST_PROMPT_FILE + ".tmp"
         with open(tmp_prompt, "w", encoding="utf-8") as f:
-            f.write(f"【SYSTEM PROMPT】:\n{SYSTEM_PROMPT.strip()}\n\n{'='*70}\n【USER PROMPT ({time_str})】:\n{prompt.strip()}")
+            f.write(f"【SYSTEM PROMPT】:\n{effective_system_prompt.strip()}\n\n{'='*70}\n【USER PROMPT ({time_str})】：\n{prompt.strip()}")
         os.replace(tmp_prompt, AI_LAST_PROMPT_FILE)
     except Exception:
         pass
@@ -732,7 +747,7 @@ def execute_batch_ai_brain_cycle(pos_summary: str = "当前总持仓 0/6", activ
     payload = {
         "model": "gemini-3.7-flash-high",
         "messages": [
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": effective_system_prompt},
             {"role": "user", "content": prompt}
         ],
         "reasoning_effort": "high",
@@ -896,7 +911,7 @@ def execute_batch_ai_brain_cycle(pos_summary: str = "当前总持仓 0/6", activ
             })
 
             # Record durable history for Web Audit
-            full_prompt_text = f"【SYSTEM PROMPT】:\n{SYSTEM_PROMPT.strip()}\n\n{'='*70}\n【USER PROMPT ({time_str})】:\n{prompt.strip()}"
+            full_prompt_text = f"【SYSTEM PROMPT】：\n{effective_system_prompt.strip()}\n\n{'='*70}\n【USER PROMPT ({time_str})】：\n{prompt.strip()}"
             history_record = {
                 "time": time_str,
                 "macro_assessment": macro_summary,

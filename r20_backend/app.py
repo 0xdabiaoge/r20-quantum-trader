@@ -21,6 +21,10 @@ from pydantic import BaseModel, Field
 from r20_backend.config import refresh_settings, settings
 from r20_backend.okx_client import OKXClient
 from r20_backend.settings_store import mask, update_env
+from r20_backend.notifications import test_channel
+
+PROMPT_OVERRIDE_FILE = DATA_DIR / "system_prompt_override.txt"
+BACKUP_LOG_FILE = ROOT / "logs" / "r20_backup_manual.log"
 
 app = FastAPI(title="R20 Quantum Trader Standalone Backend", version="5.4.2")
 okx = OKXClient()
@@ -48,6 +52,30 @@ class ManualCloseRequest(BaseModel):
 
 
 class UpdateRequest(BaseModel):
+    confirmation: str
+
+
+class PromptOverrideRequest(BaseModel):
+    content: str = Field(max_length=12000)
+
+
+class NotificationConfigUpdate(BaseModel):
+    webhook_enabled: bool = False
+    webhook_url: str = ""
+    wechat_enabled: bool = False
+    wechat_webhook: str = ""
+    telegram_enabled: bool = False
+    telegram_bot_token: str | None = None
+    telegram_chat_id: str = ""
+    qq_enabled: bool = False
+    qq_bridge_command: str = ""
+
+
+class NotificationTestRequest(BaseModel):
+    channel: str = Field(pattern=r"^(webhook|wechat|telegram|qq)$")
+
+
+class BackupRequest(BaseModel):
     confirmation: str
 
 
@@ -210,6 +238,98 @@ def update_application(payload: UpdateRequest, x_r20_admin_token: str | None = H
         "restart_required": True,
         "restart_note": "请重启 r20-quantum 与 r20-scheduler 服务，让新代码接管后台与调度。",
     }
+
+
+@app.get("/api/v1/admin/prompts")
+def prompt_override(x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
+    refresh_settings()
+    require_admin_header(x_r20_admin_token)
+    content = PROMPT_OVERRIDE_FILE.read_text(encoding="utf-8") if PROMPT_OVERRIDE_FILE.exists() else ""
+    return {"content": content, "enabled": bool(content), "path": str(PROMPT_OVERRIDE_FILE)}
+
+
+@app.put("/api/v1/admin/prompts")
+def update_prompt_override(payload: PromptOverrideRequest, x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
+    refresh_settings()
+    require_admin_header(x_r20_admin_token)
+    content = payload.content.strip()
+    if content:
+        temp = PROMPT_OVERRIDE_FILE.with_suffix(".tmp")
+        temp.write_text(content + "\n", encoding="utf-8")
+        os.replace(temp, PROMPT_OVERRIDE_FILE)
+    elif PROMPT_OVERRIDE_FILE.exists():
+        PROMPT_OVERRIDE_FILE.unlink()
+    return {"saved": True, "enabled": bool(content), "restart_note": "下一次 AI 推演循环将自动叠加此提示词覆盖层。"}
+
+
+@app.get("/api/v1/admin/notifications")
+def notification_config(x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
+    refresh_settings()
+    require_admin_header(x_r20_admin_token)
+    return {
+        "webhook": {"enabled": os.getenv("R20_NOTIFY_WEBHOOK_ENABLED", "0") == "1", "url": settings.notification_webhook},
+        "wechat": {"enabled": os.getenv("R20_NOTIFY_WECHAT_ENABLED", "0") == "1", "webhook": os.getenv("R20_WECHAT_WEBHOOK", "")},
+        "telegram": {"enabled": os.getenv("R20_NOTIFY_TELEGRAM_ENABLED", "0") == "1", "bot_token": mask(os.getenv("R20_TELEGRAM_BOT_TOKEN", "")), "chat_id": os.getenv("R20_TELEGRAM_CHAT_ID", "")},
+        "qq": {"enabled": os.getenv("R20_NOTIFY_QQ_ENABLED", "0") == "1", "bridge_configured": bool(os.getenv("R20_QQ_BRIDGE_COMMAND", ""))},
+    }
+
+
+@app.put("/api/v1/admin/notifications")
+def update_notification_config(payload: NotificationConfigUpdate, x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
+    refresh_settings()
+    require_admin_header(x_r20_admin_token)
+    for value, title in ((payload.webhook_url, "通用 Webhook"), (payload.wechat_webhook, "企业微信 Webhook")):
+        if value and not value.startswith(("https://", "http://")):
+            raise HTTPException(status_code=400, detail=f"{title} 必须以 http:// 或 https:// 开头")
+    update_env({
+        "R20_NOTIFY_WEBHOOK_ENABLED": "1" if payload.webhook_enabled else "0",
+        "R20_NOTIFICATION_WEBHOOK": payload.webhook_url,
+        "R20_NOTIFY_WECHAT_ENABLED": "1" if payload.wechat_enabled else "0",
+        "R20_WECHAT_WEBHOOK": payload.wechat_webhook,
+        "R20_NOTIFY_TELEGRAM_ENABLED": "1" if payload.telegram_enabled else "0",
+        "R20_TELEGRAM_BOT_TOKEN": payload.telegram_bot_token,
+        "R20_TELEGRAM_CHAT_ID": payload.telegram_chat_id,
+        "R20_NOTIFY_QQ_ENABLED": "1" if payload.qq_enabled else "0",
+        "R20_QQ_BRIDGE_COMMAND": payload.qq_bridge_command,
+    })
+    return {"saved": True, "restart_note": "通知配置已写入 .env；下一轮脚本执行会读取新通道。"}
+
+
+@app.post("/api/v1/admin/notifications/test")
+def send_notification_test(payload: NotificationTestRequest, x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
+    refresh_settings()
+    require_admin_header(x_r20_admin_token)
+    result = test_channel(payload.channel)
+    return {"channel": payload.channel, "result": result}
+
+
+@app.get("/api/v1/admin/backups")
+def backup_status(x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
+    refresh_settings()
+    require_admin_header(x_r20_admin_token)
+    backups_dir = ROOT / "backups"
+    local_archives = [{"name": item.name, "bytes": item.stat().st_size, "mtime": int(item.stat().st_mtime)} for item in backups_dir.glob("*.tar.gz")] if backups_dir.exists() else []
+    return {
+        "schedule": "每天北京时间 02:00，上传百度网盘成功后自动删除本地压缩包",
+        "script": str(SCRIPTS_DIR / "nightly_backup_and_clean.py"),
+        "local_archives": sorted(local_archives, key=lambda item: item["mtime"], reverse=True),
+        "last_log": BACKUP_LOG_FILE.read_text(encoding="utf-8")[-4000:] if BACKUP_LOG_FILE.exists() else "尚无后台手动灾备日志",
+    }
+
+
+@app.post("/api/v1/admin/backups/run")
+def run_backup(payload: BackupRequest, x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
+    refresh_settings()
+    require_admin_header(x_r20_admin_token)
+    if payload.confirmation.strip().upper() != "BACKUP R20":
+        raise HTTPException(status_code=400, detail="确认短语必须精确为：BACKUP R20")
+    script = SCRIPTS_DIR / "nightly_backup_and_clean.py"
+    result = subprocess.run([sys.executable, str(script)], cwd=ROOT, text=True, capture_output=True, timeout=600)
+    BACKUP_LOG_FILE.parent.mkdir(exist_ok=True)
+    BACKUP_LOG_FILE.write_text(result.stdout + "\n" + result.stderr, encoding="utf-8")
+    if result.returncode:
+        raise HTTPException(status_code=502, detail=f"灾备任务失败：{result.stderr[-800:] or result.stdout[-800:]}")
+    return {"completed": True, "output": result.stdout[-2500:]}
 
 
 @app.get("/api/v1/health")
