@@ -56,14 +56,9 @@ except Exception:
     execute_batch_ai_brain_cycle = None
     get_latest_ai_decision = None
 
-TARGET_INSTRUMENTS = [
-    {"instId": "BTC-USDT-SWAP", "name": "BTC", "type": "crypto", "base_sz": 1, "precision": 1, "ctVal": 0.01, "risk_per_trade_usd": 15.0},
-    {"instId": "ETH-USDT-SWAP", "name": "ETH", "type": "crypto", "base_sz": 3, "precision": 2, "ctVal": 0.1, "risk_per_trade_usd": 15.0},
-    {"instId": "SOL-USDT-SWAP", "name": "SOL", "type": "crypto", "base_sz": 7, "precision": 2, "ctVal": 1.0, "risk_per_trade_usd": 15.0},
-    {"instId": "DOGE-USDT-SWAP", "name": "DOGE", "type": "crypto", "base_sz": 10, "precision": 4, "ctVal": 1000.0, "risk_per_trade_usd": 15.0},
-    {"instId": "SUI-USDT-SWAP", "name": "SUI", "type": "crypto", "base_sz": 50, "precision": 4, "ctVal": 1.0, "risk_per_trade_usd": 15.0},
-    {"instId": "LINK-USDT-SWAP", "name": "LINK", "type": "crypto", "base_sz": 64, "precision": 3, "ctVal": 1.0, "risk_per_trade_usd": 15.0},
-]
+from instrument_pool import load_instruments
+
+TARGET_INSTRUMENTS = load_instruments()
 
 ASSET_CLASS_PROFILES = {
     "commodity": {
@@ -1463,7 +1458,7 @@ def execute_portfolio():
                 usdt_available = float(d.get("availBal", 0.0))
                 break
 
-    # 2. Parallel Fetch the six-instrument crypto universe
+    # 2. Parallel fetch for the configured crypto universe
     with ThreadPoolExecutor(max_workers=len(TARGET_INSTRUMENTS)) as executor:
         all_factors = list(executor.map(lambda item: fetch_single_instrument_data(item, all_positions, usdt_available), TARGET_INSTRUMENTS))
 

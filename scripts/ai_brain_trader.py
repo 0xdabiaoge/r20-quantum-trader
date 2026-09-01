@@ -41,14 +41,9 @@ PROMPT_OVERRIDE_FILE = os.path.join(DATA_DIR, "system_prompt_override.txt")
 AI_BRAIN_LOCK_FILE = os.path.join(DATA_DIR, ".ai_brain_cycle.lock")
 DECISION_MAX_AGE_SECONDS = 300
 
-TARGET_INSTRUMENTS = [
-    {"instId": "BTC-USDT-SWAP", "name": "BTC", "type": "crypto", "ccy": "BTC", "precision": 1},
-    {"instId": "ETH-USDT-SWAP", "name": "ETH", "type": "crypto", "ccy": "ETH", "precision": 2},
-    {"instId": "SOL-USDT-SWAP", "name": "SOL", "type": "crypto", "ccy": "SOL", "precision": 2},
-    {"instId": "DOGE-USDT-SWAP", "name": "DOGE", "type": "crypto", "ccy": "DOGE", "precision": 4},
-    {"instId": "SUI-USDT-SWAP", "name": "SUI", "type": "crypto", "ccy": "SUI", "precision": 4},
-    {"instId": "LINK-USDT-SWAP", "name": "LINK", "type": "crypto", "ccy": "LINK", "precision": 3},
-]
+from instrument_pool import load_instruments
+
+TARGET_INSTRUMENTS = load_instruments()
 
 def atomic_write_json(path: str, payload: Any) -> None:
     """Replace JSON atomically so readers never observe a partial cache."""
@@ -654,7 +649,7 @@ def execute_batch_ai_brain_cycle(pos_summary: str = "当前总持仓 0/6", activ
     now_bj = datetime.datetime.now(tz_bj)
     time_str = now_bj.strftime("%Y-%m-%d %H:%M:%S")
 
-    print("[AI Brain Batch] 并行获取 6 币种原生行情、技术指标与顶级聪明钱数据...")
+    print(f"[AI Brain Batch] 并行获取 {len(TARGET_INSTRUMENTS)} 币种原生行情、技术指标与顶级聪明钱数据...")
     with ThreadPoolExecutor(max_workers=8) as executor:
         packages = list(executor.map(fetch_single_instrument_package, TARGET_INSTRUMENTS))
 
@@ -750,7 +745,7 @@ def execute_batch_ai_brain_cycle(pos_summary: str = "当前总持仓 0/6", activ
             {"role": "system", "content": effective_system_prompt},
             {"role": "user", "content": prompt}
         ],
-        "reasoning_effort": "high",
+        "reasoning_effort": os.environ.get("LLM_REASONING_EFFORT", "high"),
         "temperature": 0.15,
         "response_format": {"type": "json_object"}
     }

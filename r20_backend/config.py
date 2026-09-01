@@ -33,6 +33,7 @@ class Settings:
     llm_base_url: str = "https://api.openai.com/v1"
     llm_api_key: str = ""
     llm_model: str = "gemini-3.7-flash-high"
+    llm_reasoning_effort: str = "high"
     notification_webhook: str = ""
     setup_token: str = ""
     admin_token: str = ""
@@ -51,6 +52,7 @@ def refresh_settings() -> Settings:
     settings.llm_base_url = os.getenv("LLM_BASE_URL", "https://api.openai.com/v1")
     settings.llm_api_key = os.getenv("LLM_API_KEY", "")
     settings.llm_model = os.getenv("LLM_MODEL", "gemini-3.7-flash-high")
+    settings.llm_reasoning_effort = os.getenv("LLM_REASONING_EFFORT", "high")
     settings.notification_webhook = os.getenv("R20_NOTIFICATION_WEBHOOK", "")
     settings.setup_token = os.getenv("R20_SETUP_TOKEN", "")
     settings.admin_token = os.getenv("R20_ADMIN_TOKEN", "")

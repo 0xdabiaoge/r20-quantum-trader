@@ -17,14 +17,9 @@ LEDGER_JSON_FILE = os.path.join(DATA_DIR, "trading_ledger.json")
 INITIAL_STATE_FILE = os.path.join(DATA_DIR, "account_initial_state.json")
 POSITION_TRACKER_FILE = os.path.join(DATA_DIR, "position_trackers.json")
 
-TARGET_INSTRUMENTS = [
-    {"instId": "BTC-USDT-SWAP", "name": "BTC", "type": "crypto", "ctVal": 0.01},
-    {"instId": "ETH-USDT-SWAP", "name": "ETH", "type": "crypto", "ctVal": 0.1},
-    {"instId": "SOL-USDT-SWAP", "name": "SOL", "type": "crypto", "ctVal": 1.0},
-    {"instId": "DOGE-USDT-SWAP", "name": "DOGE", "type": "crypto", "ctVal": 1000.0},
-    {"instId": "SUI-USDT-SWAP", "name": "SUI", "type": "crypto", "ctVal": 1.0},
-    {"instId": "LINK-USDT-SWAP", "name": "LINK", "type": "crypto", "ctVal": 1.0},
-]
+from instrument_pool import load_instruments
+
+TARGET_INSTRUMENTS = load_instruments()
 
 def get_ct_val(inst_name):
     for item in TARGET_INSTRUMENTS:

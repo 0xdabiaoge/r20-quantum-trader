@@ -19,7 +19,8 @@ WORKSPACE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(WORKSPACE_DIR, "data")
 NEWS_CACHE_FILE = os.path.join(DATA_DIR, "news_sentiment.json")
 CIRCUIT_BREAKER_FILE = os.path.join(DATA_DIR, "circuit_breaker.json")
-TARGET_COINS = ["BTC", "ETH", "SOL", "DOGE", "SUI", "LINK"]
+from instrument_pool import load_instruments
+TARGET_COINS = [item["name"] for item in load_instruments()]
 
 # Institutional-Grade Extreme Black-Swan Regular Expressions
 # Only trigger circuit breaker for existential, catastrophic, systemic market shocks

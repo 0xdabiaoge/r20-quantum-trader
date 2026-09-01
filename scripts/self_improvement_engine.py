@@ -38,7 +38,8 @@ AI_MEMORY_MD_FILE = os.path.join(DATA_DIR, "AI_TRADING_MEMORY.md")
 LOG_FILE = os.path.join(LOGS_DIR, "self_improvement.log")
 EVOLUTION_LOCK_FILE = os.path.join(DATA_DIR, ".self_improvement.lock")
 
-TARGET_INSTRUMENTS = ["BTC", "ETH", "SOL", "DOGE", "SUI", "LINK"]
+from instrument_pool import load_instruments
+TARGET_INSTRUMENTS = [item["name"] for item in load_instruments()]
 
 def atomic_write_json(path: str, payload: Any) -> None:
     os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -218,7 +219,7 @@ def call_llm_evolution_review(closed_trades: List[Dict[str, Any]], existing_memo
             {"role": "system", "content": EVOLUTION_SYSTEM_PROMPT},
             {"role": "user", "content": prompt}
         ],
-        "reasoning_effort": "high",
+        "reasoning_effort": os.environ.get("LLM_REASONING_EFFORT", "high"),
         "temperature": 0.2,
         "response_format": {"type": "json_object"}
     }

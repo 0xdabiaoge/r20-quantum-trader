@@ -23,6 +23,7 @@ from r20_backend.okx_client import OKXClient
 from r20_backend.settings_store import mask, update_env
 from r20_backend.notifications import test_channel
 from r20_backend.audit import recent as recent_audit, record as audit_record
+from scripts.instrument_pool import from_okx_instrument, load_instruments, save_instruments
 
 PROMPT_OVERRIDE_FILE = DATA_DIR / "system_prompt_override.txt"
 BACKUP_LOG_FILE = ROOT / "logs" / "r20_backup_manual.log"
@@ -41,9 +42,18 @@ class AdminConfigUpdate(BaseModel):
     llm_base_url: str | None = None
     llm_api_key: str | None = None
     llm_model: str | None = None
+    llm_reasoning_effort: str | None = Field(default=None, pattern=r"^(low|medium|high)$")
     notification_webhook: str | None = None
     admin_token: str | None = None
     manual_close_enabled: bool | None = None
+
+
+class InstrumentAddRequest(BaseModel):
+    inst_id: str = Field(pattern=r"^[A-Z0-9]{2,15}-USDT-SWAP$")
+
+
+class InstrumentDeleteRequest(BaseModel):
+    confirmation: str
 
 
 class ManualCloseRequest(BaseModel):
@@ -217,18 +227,19 @@ def admin_config(x_r20_admin_token: str | None = Header(default=None)) -> dict[s
     require_admin_header(x_r20_admin_token)
     return {
         "configuration": {
-            "OKX API Key": mask(settings.okx_api_key),
-            "OKX Secret Key": mask(settings.okx_secret_key),
-            "OKX Passphrase": mask(settings.okx_passphrase),
-            "LLM API Key": mask(settings.llm_api_key),
-            "管理员令牌": "已设置" if settings.admin_token else "未设置",
-            "通知 Webhook": mask(settings.notification_webhook),
+            "OKX API Key": "已设置" if settings.okx_api_key else "未设置",
+            "OKX Secret Key": "已设置" if settings.okx_secret_key else "未设置",
+            "OKX Passphrase": "已设置" if settings.okx_passphrase else "未设置",
+            "LLM API Key": "已设置" if settings.llm_api_key else "未设置",
+            "管理员令牌": "已设置" if settings.admin_token else "使用首次引导令牌",
+            "通知 Webhook": "已设置" if settings.notification_webhook else "未设置",
             "手动平仓": "已启用" if settings.manual_close_enabled else "已禁用",
         },
         "editable": {
             "okx_simulated": settings.okx_simulated,
             "llm_base_url": settings.llm_base_url,
             "llm_model": settings.llm_model,
+            "llm_reasoning_effort": settings.llm_reasoning_effort,
             "notification_webhook": settings.notification_webhook,
             "manual_close_enabled": settings.manual_close_enabled,
         },
@@ -252,6 +263,7 @@ def update_admin_config(payload: AdminConfigUpdate, x_r20_admin_token: str | Non
         "LLM_BASE_URL": data.get("llm_base_url"),
         "LLM_API_KEY": data.get("llm_api_key"),
         "LLM_MODEL": data.get("llm_model"),
+        "LLM_REASONING_EFFORT": data.get("llm_reasoning_effort"),
         "R20_NOTIFICATION_WEBHOOK": data.get("notification_webhook"),
         "R20_ADMIN_TOKEN": data.get("admin_token"),
         "R20_MANUAL_CLOSE_ENABLED": "1" if data.get("manual_close_enabled") else "0" if "manual_close_enabled" in data else None,
@@ -282,6 +294,65 @@ def manual_close_position(payload: ManualCloseRequest) -> dict[str, Any]:
     except Exception as exc:
         audit_record("position.close", "failed", {"instId": payload.inst_id, "side": payload.position_side, "error": str(exc)[:300]})
         raise HTTPException(status_code=502, detail=f"OKX 平仓请求失败：{exc}") from exc
+
+
+@app.get("/api/v1/admin/instruments")
+def admin_instruments(x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
+    refresh_settings()
+    require_admin_header(x_r20_admin_token)
+    trackers = read_json("position_trackers.json", {})
+    active = set(trackers.keys()) if isinstance(trackers, dict) else set()
+    return {
+        "instruments": [{**item, "protected": item["instId"] == "BTC-USDT-SWAP", "has_tracker": item["instId"] in active or item["name"] in active} for item in load_instruments()],
+        "limits": {"minimum": 1, "maximum": 6, "btc_required": True},
+    }
+
+
+@app.post("/api/v1/admin/instruments")
+def add_admin_instrument(payload: InstrumentAddRequest, x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
+    refresh_settings()
+    require_admin_header(x_r20_admin_token)
+    inst_id = payload.inst_id.upper()
+    current = load_instruments()
+    if any(item["instId"] == inst_id for item in current):
+        raise HTTPException(status_code=409, detail="该币种已在交易池中")
+    if len(current) >= 6:
+        raise HTTPException(status_code=409, detail="交易池最多允许 6 个币种；请先删除一个无持仓币种")
+    try:
+        matches = okx.instruments("SWAP", inst_id)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"OKX 合约校验失败：{exc}") from exc
+    raw = matches[0] if matches else {}
+    if raw.get("instId") != inst_id or raw.get("settleCcy") != "USDT" or raw.get("state") != "live":
+        raise HTTPException(status_code=400, detail="仅允许添加 OKX 在线可交易的 USDT 永续合约")
+    item = from_okx_instrument(raw)
+    save_instruments([*current, item])
+    audit_record("instrument.add", "success", {"instId": inst_id})
+    return {"added": item, "count": len(current) + 1, "effective": "next_process_cycle"}
+
+
+@app.delete("/api/v1/admin/instruments/{inst_id}")
+def delete_admin_instrument(inst_id: str, payload: InstrumentDeleteRequest, x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
+    refresh_settings()
+    require_admin_header(x_r20_admin_token)
+    inst_id = inst_id.upper()
+    if payload.confirmation.strip().upper() != f"REMOVE {inst_id}":
+        raise HTTPException(status_code=400, detail=f"确认短语必须精确为：REMOVE {inst_id}")
+    if inst_id == "BTC-USDT-SWAP":
+        raise HTTPException(status_code=403, detail="BTC 是全局黑天鹅哨兵基准，不允许从交易池删除")
+    current = load_instruments()
+    if len(current) <= 1:
+        raise HTTPException(status_code=409, detail="交易池至少保留 1 个币种")
+    if not any(item["instId"] == inst_id for item in current):
+        raise HTTPException(status_code=404, detail="该币种不在交易池中")
+    trackers = read_json("position_trackers.json", {})
+    coin = inst_id.split("-", 1)[0]
+    if isinstance(trackers, dict) and (inst_id in trackers or coin in trackers):
+        raise HTTPException(status_code=409, detail="该币种存在持仓追踪记录，为防止失去风控接管，禁止删除")
+    updated = [item for item in current if item["instId"] != inst_id]
+    save_instruments(updated)
+    audit_record("instrument.remove", "success", {"instId": inst_id})
+    return {"removed": inst_id, "count": len(updated), "effective": "next_process_cycle"}
 
 
 @app.get("/api/v1/admin/update-status")

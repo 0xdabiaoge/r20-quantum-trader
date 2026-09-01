@@ -15,14 +15,9 @@ SNAPSHOTS_JSON_FILE = os.path.join(DATA_DIR, "snapshots.json")
 LOG_FILE = os.path.join(LOGS_DIR, "trading.log")
 DATA_JSON_PATH = os.path.join(DATA_DIR, "trading_data.json")
 
-TARGET_INSTRUMENTS = [
-    {"instId": "BTC-USDT-SWAP", "name": "BTC"},
-    {"instId": "ETH-USDT-SWAP", "name": "ETH"},
-    {"instId": "SOL-USDT-SWAP", "name": "SOL"},
-    {"instId": "DOGE-USDT-SWAP", "name": "DOGE"},
-    {"instId": "SUI-USDT-SWAP", "name": "SUI"},
-    {"instId": "LINK-USDT-SWAP", "name": "LINK"},
-]
+from instrument_pool import load_instruments
+
+TARGET_INSTRUMENTS = load_instruments()
 
 def run_json_cmd(cmd: str, timeout: int = 15):
     try:
