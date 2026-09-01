@@ -49,6 +49,12 @@ The backend exposes only read-only control-plane endpoints:
 
 No HTTP trade-trigger endpoint is exposed except the separately enabled, confirmation-protected manual close action. The admin console also supports a protected update check and `git pull --ff-only`; it refuses to update a dirty worktree and never restarts services automatically.
 
+## QwenPaw Container Coexistence
+
+When `www.r20.cn` is already reverse-proxied into a QwenPaw container, keep QwenPaw on its existing port and let the R20 standalone gateway own port `8080`. `r20_backend.app` mounts the existing dashboard at `/`, while `/admin` and `/api/v1/*` remain R20-native routes. This preserves the hostname, reverse-proxy rules, dashboard paths, QwenPaw process, and QwenPaw backup layout.
+
+Add the `[program:r20-backend]` block from the container supervisor configuration and restart the container during a maintenance window so supervisord adopts it. Do not run the legacy `dashboard.app` Uvicorn process at the same time as `r20_backend.app`.
+
 ## systemd
 
 Copy `deploy/r20-quantum.service` and `deploy/r20-scheduler.service` to `/etc/systemd/system/`, update `WorkingDirectory` and `EnvironmentFile`, then:

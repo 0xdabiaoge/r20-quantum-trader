@@ -280,6 +280,12 @@ def positions() -> dict[str, Any]:
         raise HTTPException(status_code=502, detail=f"OKX account request failed: {exc}") from exc
 
 
+# Preserve the existing public dashboard and its relative-path API contract at /.
+# Admin and /api/v1 routes above are evaluated before this catch-all mount.
+from dashboard.app import app as dashboard_app
+app.mount("/", dashboard_app)
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host=settings.host, port=settings.port)
