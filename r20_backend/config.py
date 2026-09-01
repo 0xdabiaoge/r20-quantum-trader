@@ -6,6 +6,14 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def load_encrypted_secrets() -> None:
+    try:
+        from r20_gateway.secrets import inject_into_environment
+        inject_into_environment()
+    except Exception:
+        pass
+
+
 def load_dotenv(path: Path) -> None:
     if not path.exists():
         return
@@ -18,6 +26,7 @@ def load_dotenv(path: Path) -> None:
 
 
 load_dotenv(ROOT / ".env")
+load_encrypted_secrets()
 
 
 @dataclass
@@ -42,6 +51,7 @@ class Settings:
 
 def refresh_settings() -> Settings:
     load_dotenv(ROOT / ".env")
+    load_encrypted_secrets()
     settings.host = os.getenv("DASHBOARD_HOST", "0.0.0.0")
     settings.port = int(os.getenv("DASHBOARD_PORT", "8080"))
     settings.okx_base_url = os.getenv("OKX_BASE_URL", "https://www.okx.com")

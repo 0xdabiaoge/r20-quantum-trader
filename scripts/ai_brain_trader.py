@@ -42,6 +42,7 @@ AI_BRAIN_LOCK_FILE = os.path.join(DATA_DIR, ".ai_brain_cycle.lock")
 DECISION_MAX_AGE_SECONDS = 300
 
 from instrument_pool import load_instruments
+from r20_gateway.telemetry import ModelCallTelemetry
 
 TARGET_INSTRUMENTS = load_instruments()
 
@@ -760,6 +761,9 @@ def execute_batch_ai_brain_cycle(pos_summary: str = "当前总持仓 0/6", activ
         }
     )
 
+    telemetry = ModelCallTelemetry(
+        "trading_brain", payload["model"], payload["reasoning_effort"], effective_system_prompt, prompt
+    )
     try:
         t0 = time.time()
         print("[AI Brain Batch] 🚀 正在发起单次全市场大模型宏观决策推演 (Gemini 3.7)...")
@@ -941,10 +945,12 @@ def execute_batch_ai_brain_cycle(pos_summary: str = "当前总持仓 0/6", activ
             atomic_write_json(AI_DECISION_HISTORY_FILE, history_list)
 
             latency = round(time.time() - t0, 2)
+            telemetry.finish("success", res, output_chars=len(content))
             print(f"[AI Brain Batch] ✅ 6 币种全景决策完成 (耗时 {latency}s, 宏观基调: {macro_summary})")
             return standard_cache
 
     except Exception as e:
+        telemetry.finish("failed", error=e)
         print(f"[AI Brain Batch] Error in batch inference: {e}")
         return None
 

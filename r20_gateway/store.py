@@ -48,6 +48,24 @@ CREATE TABLE IF NOT EXISTS runtime_state (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS model_calls (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  caller TEXT NOT NULL,
+  model TEXT NOT NULL,
+  reasoning_effort TEXT NOT NULL,
+  status TEXT NOT NULL,
+  started_at TEXT NOT NULL,
+  duration_ms INTEGER NOT NULL,
+  input_chars INTEGER NOT NULL,
+  output_chars INTEGER NOT NULL,
+  prompt_fingerprint TEXT NOT NULL,
+  prompt_transport TEXT NOT NULL DEFAULT 'python-direct',
+  input_tokens INTEGER,
+  output_tokens INTEGER,
+  total_tokens INTEGER,
+  error_type TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_model_calls_caller ON model_calls(caller, id DESC);
 """
 
 
@@ -142,6 +160,35 @@ class GatewayStore:
         with self.connect() as connection:
             rows = connection.execute("SELECT * FROM job_runs ORDER BY id DESC LIMIT ?", (max(1, min(limit, 200)),)).fetchall()
         return [dict(row) for row in rows]
+
+    def record_model_call(self, record: dict[str, Any]) -> int:
+        columns = (
+            "caller", "model", "reasoning_effort", "status", "started_at", "duration_ms",
+            "input_chars", "output_chars", "prompt_fingerprint", "prompt_transport",
+            "input_tokens", "output_tokens", "total_tokens", "error_type",
+        )
+        with self.connect() as connection:
+            cursor = connection.execute(
+                f"INSERT INTO model_calls({','.join(columns)}) VALUES ({','.join('?' for _ in columns)})",
+                tuple(record.get(column) for column in columns),
+            )
+            return int(cursor.lastrowid)
+
+    def model_calls(self, limit: int = 50) -> list[dict[str, Any]]:
+        with self.connect() as connection:
+            rows = connection.execute("SELECT * FROM model_calls ORDER BY id DESC LIMIT ?", (max(1, min(limit, 200)),)).fetchall()
+        return [dict(row) for row in rows]
+
+    def model_stats(self) -> dict[str, Any]:
+        with self.connect() as connection:
+            row = connection.execute(
+                """SELECT COUNT(*) total_calls,
+                   SUM(CASE WHEN status='success' THEN 1 ELSE 0 END) successful_calls,
+                   COALESCE(ROUND(AVG(duration_ms)),0) avg_duration_ms,
+                   COALESCE(SUM(total_tokens),0) total_tokens
+                   FROM model_calls"""
+            ).fetchone()
+        return {key: int(row[key] or 0) for key in ("total_calls", "successful_calls", "avg_duration_ms", "total_tokens")}
 
     def set_state(self, key: str, value: str) -> None:
         with self.connect() as connection:

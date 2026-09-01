@@ -39,6 +39,7 @@ LOG_FILE = os.path.join(LOGS_DIR, "self_improvement.log")
 EVOLUTION_LOCK_FILE = os.path.join(DATA_DIR, ".self_improvement.lock")
 
 from instrument_pool import load_instruments
+from r20_gateway.telemetry import ModelCallTelemetry
 TARGET_INSTRUMENTS = [item["name"] for item in load_instruments()]
 
 def atomic_write_json(path: str, payload: Any) -> None:
@@ -234,6 +235,9 @@ def call_llm_evolution_review(closed_trades: List[Dict[str, Any]], existing_memo
         }
     )
 
+    telemetry = ModelCallTelemetry(
+        "self_improvement", payload["model"], payload["reasoning_effort"], EVOLUTION_SYSTEM_PROMPT, prompt
+    )
     try:
         t0 = time.time()
         log_msg("🚀 正在调用 Gemini 3.7 进行 AI 大脑深度认知复盘与策略参数优化...")
@@ -248,9 +252,11 @@ def call_llm_evolution_review(closed_trades: List[Dict[str, Any]], existing_memo
                 content = content[:-3]
             
             review_json = json.loads(content.strip())
+            telemetry.finish("success", res, output_chars=len(content))
             log_msg(f"✅ AI 大脑认知复盘完成 (耗时 {round(time.time() - t0, 2)}s)")
             return review_json
     except Exception as e:
+        telemetry.finish("failed", error=e)
         log_msg(f"Error in LLM evolution review: {e}")
         return {}
 

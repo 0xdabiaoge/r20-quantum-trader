@@ -31,9 +31,11 @@ from r20_backend.audit import recent as recent_audit, record as audit_record
 from r20_backend.schedule_store import load_schedule, save_schedule
 from r20_backend.wechat_login import create_qrcode, latest_session, qrcode_status
 from r20_backend.wechat_watcher import public_state as wechat_watcher_state, reset_watcher_state, start_watcher, stop_watcher
+from r20_gateway.agents import agent_statuses
 from r20_gateway.publisher import DB_PATH as GATEWAY_DB_PATH
 from r20_gateway.plugins import plugin_statuses
 from r20_gateway.scheduler import scheduler_snapshot
+from r20_gateway.secrets import status as secret_store_status
 from r20_gateway.store import GatewayStore
 from r20_gateway.supervisor import start_supervisor as start_gateway_supervisor, stop_supervisor as stop_gateway_supervisor
 from scripts.instrument_pool import from_okx_instrument, load_instruments, save_instruments
@@ -283,6 +285,20 @@ def replay_gateway_delivery(delivery_id: int, payload: GatewayReplayRequest, x_r
         raise HTTPException(status_code=409, detail="仅允许重放当前处于 dead 状态的投递")
     audit_record("gateway.delivery.replay", "accepted", {"delivery_id": delivery_id})
     return {"accepted": True, "delivery_id": delivery_id, "status": "pending"}
+
+
+@app.get("/api/v1/admin/agents")
+def admin_agents(x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
+    refresh_settings()
+    require_admin_header(x_r20_admin_token)
+    store = GatewayStore(GATEWAY_DB_PATH)
+    return {
+        "agents": agent_statuses(store.job_runs(100)),
+        "model_stats": store.model_stats(),
+        "model_calls": store.model_calls(50),
+        "prompt_policy": "交易主脑和自进化均由 Python 直接构造并传输提示词；Gateway 只记录无内容遥测。",
+        "secret_store": secret_store_status(),
+    }
 
 
 @app.get("/api/v1/admin/plugins")
