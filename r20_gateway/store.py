@@ -34,6 +34,20 @@ CREATE TABLE IF NOT EXISTS deliveries (
   UNIQUE(event_id, channel)
 );
 CREATE INDEX IF NOT EXISTS idx_deliveries_due ON deliveries(status, next_attempt_at);
+CREATE TABLE IF NOT EXISTS job_runs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  job_name TEXT NOT NULL,
+  status TEXT NOT NULL,
+  started_at TEXT NOT NULL,
+  finished_at TEXT NOT NULL DEFAULT '',
+  return_code INTEGER,
+  detail TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_job_runs_name ON job_runs(job_name, id DESC);
+CREATE TABLE IF NOT EXISTS runtime_state (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
 """
 
 
@@ -99,6 +113,61 @@ class GatewayStore:
     def recover_processing(self) -> None:
         with self.connect() as connection:
             connection.execute("UPDATE deliveries SET status='retry' WHERE status='processing'")
+
+    def replay_dead(self, delivery_id: int) -> bool:
+        now = datetime.now(BJ_TZ).strftime("%Y-%m-%d %H:%M:%S")
+        with self.connect() as connection:
+            cursor = connection.execute(
+                "UPDATE deliveries SET status='pending', attempts=0, next_attempt_at=?, last_error='', delivered_at='' WHERE id=? AND status='dead'",
+                (now, delivery_id),
+            )
+            return cursor.rowcount == 1
+
+    def begin_job(self, job_name: str) -> int:
+        now = datetime.now(BJ_TZ).strftime("%Y-%m-%d %H:%M:%S")
+        with self.connect() as connection:
+            cursor = connection.execute("INSERT INTO job_runs(job_name,status,started_at) VALUES (?,'running',?)", (job_name, now))
+            return int(cursor.lastrowid)
+
+    def finish_job(self, run_id: int, return_code: int, detail: str) -> None:
+        now = datetime.now(BJ_TZ).strftime("%Y-%m-%d %H:%M:%S")
+        status = "success" if return_code == 0 else "failed"
+        with self.connect() as connection:
+            connection.execute(
+                "UPDATE job_runs SET status=?, finished_at=?, return_code=?, detail=? WHERE id=?",
+                (status, now, return_code, detail[-2000:], run_id),
+            )
+
+    def job_runs(self, limit: int = 30) -> list[dict[str, Any]]:
+        with self.connect() as connection:
+            rows = connection.execute("SELECT * FROM job_runs ORDER BY id DESC LIMIT ?", (max(1, min(limit, 200)),)).fetchall()
+        return [dict(row) for row in rows]
+
+    def set_state(self, key: str, value: str) -> None:
+        with self.connect() as connection:
+            connection.execute("INSERT INTO runtime_state(key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", (key, value))
+
+    def get_state(self, key: str, default: str = "") -> str:
+        with self.connect() as connection:
+            row = connection.execute("SELECT value FROM runtime_state WHERE key=?", (key,)).fetchone()
+        return str(row["value"]) if row else default
+
+    def event_health(self) -> dict[str, int]:
+        with self.connect() as connection:
+            row = connection.execute(
+                """SELECT
+                   SUM(CASE WHEN priority>=90 THEN 1 ELSE 0 END) critical_total,
+                   SUM(CASE WHEN priority>=90 AND delivered=0 AND delivery_count>0 THEN 1 ELSE 0 END) critical_unmet,
+                   SUM(CASE WHEN priority>=90 AND delivered=0 AND delivery_count>0 AND dead=delivery_count THEN 1 ELSE 0 END) critical_failed,
+                   SUM(CASE WHEN priority>=90 AND delivery_count=0 THEN 1 ELSE 0 END) critical_unroutable
+                   FROM (
+                     SELECT e.event_id,e.priority,COUNT(d.id) delivery_count,
+                       SUM(CASE WHEN d.status='delivered' THEN 1 ELSE 0 END) delivered,
+                       SUM(CASE WHEN d.status='dead' THEN 1 ELSE 0 END) dead
+                     FROM events e LEFT JOIN deliveries d ON d.event_id=e.event_id GROUP BY e.event_id
+                   )"""
+            ).fetchone()
+        return {key: int(row[key] or 0) for key in ("critical_total", "critical_unmet", "critical_failed", "critical_unroutable")}
 
     def stats(self) -> dict[str, int]:
         with self.connect() as connection:

@@ -8,6 +8,7 @@ from pathlib import Path
 
 from r20_gateway.channels import NotificationChannelAdapter
 from r20_gateway.publisher import DB_PATH
+from r20_gateway.scheduler import GatewayScheduler
 from r20_gateway.store import GatewayStore
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -45,8 +46,13 @@ def run() -> None:
     signal.signal(signal.SIGINT, stop)
     store = GatewayStore(DB_PATH)
     store.recover_processing()
-    log("gateway worker started")
+    scheduler = GatewayScheduler(store)
+    scheduler.initialize_migration_baseline()
+    log("gateway worker started with scheduler ownership")
     while RUNNING:
+        launched = scheduler.tick()
+        for job_name in launched:
+            log(f"scheduled job={job_name}")
         deliveries = store.claim_due(20)
         if not deliveries:
             time.sleep(1)
@@ -63,6 +69,7 @@ def run() -> None:
             except Exception as exc:
                 store.fail(int(delivery["id"]), int(delivery["attempts"]), str(exc))
                 log(f"delivery exception event={delivery['event_id']} channel={delivery['channel']} type={type(exc).__name__}")
+    scheduler.shutdown()
     log("gateway worker stopped")
 
 

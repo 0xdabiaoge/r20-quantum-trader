@@ -32,6 +32,8 @@ from r20_backend.schedule_store import load_schedule, save_schedule
 from r20_backend.wechat_login import create_qrcode, latest_session, qrcode_status
 from r20_backend.wechat_watcher import public_state as wechat_watcher_state, reset_watcher_state, start_watcher, stop_watcher
 from r20_gateway.publisher import DB_PATH as GATEWAY_DB_PATH
+from r20_gateway.plugins import plugin_statuses
+from r20_gateway.scheduler import scheduler_snapshot
 from r20_gateway.store import GatewayStore
 from r20_gateway.supervisor import start_supervisor as start_gateway_supervisor, stop_supervisor as stop_gateway_supervisor
 from scripts.instrument_pool import from_okx_instrument, load_instruments, save_instruments
@@ -66,6 +68,10 @@ class AdminConfigUpdate(BaseModel):
     notification_webhook: str | None = None
     admin_token: str | None = None
     manual_close_enabled: bool | None = None
+
+
+class GatewayReplayRequest(BaseModel):
+    confirmation: str
 
 
 class InstrumentAddRequest(BaseModel):
@@ -263,7 +269,27 @@ def gateway_status(x_r20_admin_token: str | None = Header(default=None), limit: 
             running = True
         except OSError:
             pass
-    return {"version": "0.1.0", "running": running, "pid": pid or None, "stats": store.stats(), "deliveries": store.recent(limit)}
+    return {"version": "0.2.0", "running": running, "pid": pid or None, "stats": store.stats(), "event_health": store.event_health(), "deliveries": store.recent(limit), "scheduler": scheduler_snapshot(store)}
+
+
+@app.post("/api/v1/admin/gateway/deliveries/{delivery_id}/replay")
+def replay_gateway_delivery(delivery_id: int, payload: GatewayReplayRequest, x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
+    refresh_settings()
+    require_admin_header(x_r20_admin_token)
+    if payload.confirmation.strip().upper() != f"REPLAY {delivery_id}":
+        raise HTTPException(status_code=400, detail=f"确认短语必须精确为：REPLAY {delivery_id}")
+    store = GatewayStore(GATEWAY_DB_PATH)
+    if not store.replay_dead(delivery_id):
+        raise HTTPException(status_code=409, detail="仅允许重放当前处于 dead 状态的投递")
+    audit_record("gateway.delivery.replay", "accepted", {"delivery_id": delivery_id})
+    return {"accepted": True, "delivery_id": delivery_id, "status": "pending"}
+
+
+@app.get("/api/v1/admin/plugins")
+def admin_plugins(x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
+    refresh_settings()
+    require_admin_header(x_r20_admin_token)
+    return {"plugins": plugin_statuses(), "installation_policy": "builtin-only", "reason": "实盘控制面不允许远程上传或执行任意插件代码"}
 
 
 @app.get("/api/v1/admin/config")

@@ -42,12 +42,23 @@ class GatewayStoreTests(unittest.TestCase):
         self.store.recover_processing()
         self.assertEqual(self.store.stats()["retry"], 1)
 
+    def test_critical_event_requires_one_delivered_channel(self):
+        event = GatewayEvent("trade.closed", "平仓", "done", priority=95)
+        self.store.publish(event, ["qq", "wechat_ilink"])
+        self.assertEqual(self.store.event_health()["critical_unmet"], 1)
+        due = self.store.claim_due()
+        self.store.complete(due[0]["id"])
+        self.assertEqual(self.store.event_health()["critical_unmet"], 0)
+
     def test_failed_delivery_becomes_dead_letter(self):
         event = GatewayEvent("service.degraded", "服务", "down")
         self.store.publish(event, ["qq"])
         row = self.store.claim_due()[0]
         self.store.fail(row["id"], 5, "terminal", max_attempts=6)
         self.assertEqual(self.store.stats()["dead"], 1)
+        self.assertTrue(self.store.replay_dead(row["id"]))
+        self.assertEqual(self.store.stats()["pending"], 1)
+        self.assertFalse(self.store.replay_dead(row["id"]))
 
 
 if __name__ == "__main__":
