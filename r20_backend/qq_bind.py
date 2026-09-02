@@ -52,7 +52,7 @@ def _post_qq(path: str, payload: dict[str, Any], timeout: int = 12) -> dict[str,
     request = urllib.request.Request(
         f"https://{QQ_HOST}{path}",
         data=body,
-        headers={"Content-Type": "application/json", "Accept": "application/json", "User-Agent": "R20-Standalone/6.1.0-preview"},
+        headers={"Content-Type": "application/json", "Accept": "application/json", "User-Agent": "R20-Standalone/6.2.0"},
         method="POST",
     )
     with urllib.request.urlopen(request, timeout=timeout) as response:

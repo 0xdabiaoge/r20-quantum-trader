@@ -40,16 +40,16 @@ class AdminApiTests(unittest.TestCase):
         self.assertEqual(self.client.get("/api/v1/admin/users", headers=operator).status_code, 403)
         self.assertEqual(self.client.get("/api/v1/admin/about", headers=operator).status_code, 200)
 
-    def test_health_and_about_report_610_preview(self):
+    def test_health_and_about_report_620_release(self):
         health=self.client.get("/api/v1/health")
         self.assertEqual(health.status_code,200,health.text)
-        self.assertEqual(health.json()["version"],"6.1.0-preview")
+        self.assertEqual(health.json()["version"],"6.2.0")
         headers=self.login("admin","InitialAdmin123456")
         about=self.client.get("/api/v1/admin/about",headers=headers)
         self.assertEqual(about.status_code,200,about.text)
-        self.assertEqual(about.json()["product"]["version"],"6.1.0-preview")
+        self.assertEqual(about.json()["product"]["version"],"6.2.0")
         versions={item["name"]:item["version"] for item in about.json()["components"]}
-        self.assertEqual(versions["FastAPI Control Plane"],"6.1.0-preview")
+        self.assertEqual(versions["FastAPI Control Plane"],"6.2.0")
 
     def test_legacy_header_disabled_after_initialization(self):
         response = self.client.get("/api/v1/admin/overview", headers={"X-R20-Admin-Token": "InitialAdmin123456"})
