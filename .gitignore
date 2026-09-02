@@ -98,6 +98,7 @@ browser_screenshot_*.png
 dashboard_*.png
 linux_do_*.png
 baidu_auth_*.png
+!docs/images/*.png
 fix_*.py
 ui_patch.py
 refine_*.py
