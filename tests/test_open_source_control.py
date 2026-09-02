@@ -78,10 +78,10 @@ class OKXEnvironmentTests(unittest.TestCase):
 
 
 class WechatTests(unittest.TestCase):
-    def test_wire_protocol_matches_current_ilink_clients(self):
-        self.assertEqual(wechat_protocol.base_info()["channel_version"], "2.0.1")
+    def test_wire_protocol_matches_current_tencent_plugin(self):
+        self.assertEqual(wechat_protocol.base_info()["channel_version"], "2.4.8")
         headers=wechat_protocol.common_headers("token")
-        self.assertEqual(headers["iLink-App-ClientVersion"], "1")
+        self.assertEqual(headers["iLink-App-ClientVersion"], "132104")
         self.assertEqual(headers["Authorization"], "Bearer token")
 
     def test_dotenv_overrides_stale_process_environment(self):
@@ -104,6 +104,13 @@ class WechatTests(unittest.TestCase):
         self.assertIn("已受理", detail)
         self.assertIn("非客户端送达回执", detail)
         self.assertIn("client_id=r20-wechat-", detail)
+
+    def test_empty_business_response_is_unknown_not_success(self):
+        env={"R20_WECHAT_BOT_TOKEN":"T","R20_WECHAT_USER_ID":"U","R20_WECHAT_CONTEXT_TOKEN":"C"}
+        with patch.object(notifications, "_post_json", return_value=(True,"HTTP 200",{})):
+            ok, detail=notifications._send_wechat_ilink(env,"hello")
+        self.assertFalse(ok)
+        self.assertIn("空业务响应", detail)
 
     def test_bot_echo_cannot_replace_user_context_token(self):
         self.assertTrue(wechat_watcher._is_user_message({"message_type":1}))

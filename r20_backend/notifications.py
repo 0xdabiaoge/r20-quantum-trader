@@ -113,6 +113,8 @@ def _send_wechat_ilink(env: dict[str, str], message: str) -> tuple[bool, str]:
     if not ok:
         return False, f"{detail} {response}"
     response = response if isinstance(response, dict) else {}
+    if "ret" not in response and "errcode" not in response:
+        return False, f"微信 iLink 返回空业务响应，无法证明服务端受理；client_id={client_id} {detail}"
     ret, errcode = response.get("ret", 0), response.get("errcode", 0)
     if ret not in (0, None) or errcode not in (0, None):
         code = ret if ret not in (0, None) else errcode

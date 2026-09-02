@@ -3,11 +3,10 @@ from __future__ import annotations
 import base64
 import secrets
 
-# Tencent's getupdates/sendmessage contract currently advertises channel 2.0.1.
-# Keep the HTTP client header independent from the message body protocol.
-PROTOCOL_VERSION = "2.0.1"
+# Match Tencent's current official openclaw-weixin package metadata exactly.
+PROTOCOL_VERSION = "2.4.8"
 ILINK_APP_ID = "bot"
-ILINK_APP_CLIENT_VERSION = "1"
+ILINK_APP_CLIENT_VERSION = str((2 << 16) | (4 << 8) | 8)
 BOT_AGENT = "R20/6.0.0-preview"
 
 
