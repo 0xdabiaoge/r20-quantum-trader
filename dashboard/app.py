@@ -545,6 +545,7 @@ def update_cache_cycle():
             # read from local files and should always be fresh even in STALE mode.
             _inject_local_data_into_stale(stale, stale_positions, timestamp_full)
             CACHE_DATA = stale
+            LAST_CACHE_TIME = time.time()
             return
         CACHE_DATA = {
             "timestamp": timestamp_full,
@@ -553,6 +554,7 @@ def update_cache_cycle():
             "positions_summary": {"total": 0, "max_positions": len(TARGET_INSTRUMENTS), "items": []},
             "factors": [], "trades": [], "logs": [], "snapshots": [],
         }
+        LAST_CACHE_TIME = time.time()
         return
 
     # Exchange algo orders are the source of truth for live TP/SL protection.
