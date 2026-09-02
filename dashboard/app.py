@@ -2,6 +2,7 @@
 Web Dashboard Application Module
 """
 from scripts.okx_runtime import replace_cli_prefix as okx_private_command
+from scripts.instrument_pool import load_instruments
 import os
 import json
 import time
@@ -63,6 +64,69 @@ def run_json_cmd_status(cmd):
 def run_json_cmd(cmd):
     ok, data, _ = run_json_cmd_status(cmd)
     return data if ok else None
+
+def _safe_float(value, default=0.0):
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def load_position_trackers():
+    try:
+        with open(POSITION_TRACKER_FILE, "r", encoding="utf-8") as handle:
+            data = json.load(handle)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def enrich_position_risk_fields(positions, trackers=None):
+    """Add margin and stop-line fields even when OKX protection lookup is unavailable."""
+    trackers = trackers if isinstance(trackers, dict) else load_position_trackers()
+    contract_values = {item.get("instId"): _safe_float(item.get("ctVal"), 1.0) for item in load_instruments()}
+    for position in positions or []:
+        inst_id = str(position.get("instId") or "")
+        side = str(position.get("posSide") or position.get("side") or "net").lower()
+        position["posSide"] = side
+        tracker = trackers.get(f"{inst_id}_{side}", {})
+        size = abs(_safe_float(position.get("pos_sz", position.get("pos"))))
+        price = _safe_float(position.get("markPx")) or _safe_float(position.get("avgPx"))
+        notional = abs(_safe_float(position.get("notional_usdt"))) or round(size * contract_values.get(inst_id, 1.0) * price, 2)
+        leverage = abs(_safe_float(position.get("lever"), 1.0)) or 1.0
+        exchange_margin = abs(_safe_float(position.get("imr")))
+        existing_margin = abs(_safe_float(position.get("margin_usdt")))
+        if exchange_margin > 0:
+            margin = exchange_margin
+            margin_source = "exchange_imr"
+        elif existing_margin > 0:
+            margin = existing_margin
+            margin_source = str(position.get("marginSource") or "cached")
+        else:
+            margin = round(notional / leverage, 2) if notional > 0 else 0.0
+            margin_source = "notional_div_leverage"
+        exchange_stop = _safe_float(position.get("exchangeSl"))
+        tracker_stop = _safe_float(position.get("trailingSl")) or _safe_float(tracker.get("trailingStopPx"))
+        exchange_tp = _safe_float(position.get("exchangeTp"))
+        tracker_tp = _safe_float(tracker.get("takeProfitPx"))
+        position.update({
+            "pos_sz": size,
+            "notional_usdt": round(notional, 2),
+            "margin_usdt": round(margin, 2) if margin > 0 else None,
+            "marginSource": margin_source,
+            "trailingSl": tracker_stop or None,
+            "displayStop": exchange_stop or tracker_stop or None,
+            "stopSource": "exchange_cloud" if exchange_stop else ("local_tracker" if tracker_stop else "unavailable"),
+            "displayTakeProfit": exchange_tp or tracker_tp or None,
+            "stageDesc": position.get("stageDesc") or tracker.get("stage_desc") or "持有监控中",
+            "strategyTag": position.get("strategyTag") or tracker.get("strategy_tag") or ("顺势做多" if "long" in side else "逢高做空"),
+            "cloudProtectionLastVerified": (tracker.get("cloudProtection") or {}).get("verifiedAt"),
+            "cloudProtectionLastDetail": (tracker.get("cloudProtection") or {}).get("detail"),
+        })
+        if position.get("protectionStatus") in {None, "unknown_stale"} and position["cloudProtectionLastVerified"]:
+            position["protectionStatus"] = "verification_stale"
+    return positions
+
 
 def _is_meaningful_dashboard_snapshot(data):
     return isinstance(data, dict) and isinstance(data.get("account"), dict) and bool(data.get("account")) and "total_eq" in data["account"]
@@ -145,13 +209,7 @@ def update_cache_cycle():
     long_count = 0
     short_count = 0
 
-    trackers = {}
-    if os.path.exists(POSITION_TRACKER_FILE):
-        try:
-            with open(POSITION_TRACKER_FILE, "r", encoding="utf-8") as f:
-                trackers = json.load(f)
-        except Exception:
-            pass
+    trackers = load_position_trackers()
 
     if isinstance(pos_data, list):
         for p in pos_data:
@@ -205,6 +263,8 @@ def update_cache_cycle():
                 "pos_sz": pos_sz,
                 "notional_usdt": notional_usdt,
                 "margin_usdt": margin_usdt_val,
+                "marginSource": "exchange_imr" if okx_imr > 0 else "notional_div_leverage",
+                "imr": okx_imr or None,
                 "lever": p.get("lever", "3"),
                 "avgPx": avg_px,
                 "markPx": mark_px,
@@ -295,6 +355,8 @@ def update_cache_cycle():
     if not balance_ok or not positions_ok:
         if _is_meaningful_dashboard_snapshot(CACHE_DATA):
             stale = dict(CACHE_DATA)
+            stale_positions = (stale.get("positions_summary") or {}).get("items", [])
+            enrich_position_risk_fields(stale_positions, trackers)
             stale["data_health"] = {
                 "status": "STALE",
                 "partial": True,
@@ -322,9 +384,9 @@ def update_cache_cycle():
             algo_orders = []
         matching_algos = [
             o for o in algo_orders
-            if o.get("state") == "live"
-            and o.get("posSide") == position["posSide"]
-            and str(o.get("reduceOnly", "")).lower() == "true"
+            if str(o.get("state", "live")).lower() in {"live", "effective"}
+            and str(o.get("posSide", "net")).lower() in {position["posSide"], "net"}
+            and str(o.get("reduceOnly", "true")).lower() in {"true", "1", "yes"}
         ]
         protected_size = sum(float(o.get("sz", 0) or 0) for o in matching_algos if o.get("slTriggerPx"))
         full_coverage = protected_size >= float(position["pos_sz"]) * 0.999
@@ -348,6 +410,8 @@ def update_cache_cycle():
             position["protectionStatus"] = "unprotected"
             position["protectionCoveragePct"] = 0.0
             position["protectionAlgoId"] = ""
+
+    enrich_position_risk_fields(positions, trackers)
 
     # 3. Read Reset Initial State
     account_init_file = os.path.join(DATA_DIR, "account_initial_state.json")

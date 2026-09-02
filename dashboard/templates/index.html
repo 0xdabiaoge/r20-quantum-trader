@@ -1336,19 +1336,22 @@
 
                 const instName = p.name || p.instId.replace('-USDT-SWAP', '');
                 const lever = p.lever ? `${p.lever}x` : '3x';
-                const marginUsdt = p.margin_usdt ? Number(p.margin_usdt).toFixed(1) : '--';
-                const notionalUsdt = p.notional_usdt ? Number(p.notional_usdt).toFixed(1) : '--';
+                const hasMargin = p.margin_usdt !== null && p.margin_usdt !== undefined && Number.isFinite(Number(p.margin_usdt));
+                const marginUsdt = hasMargin ? Number(p.margin_usdt).toFixed(2) : '--';
+                const marginSource = p.marginSource === 'exchange_imr' ? '交易所保证金' : (p.marginSource === 'notional_div_leverage' ? '名义价值÷杠杆' : '最后有效值');
+                const notionalUsdt = p.notional_usdt !== null && p.notional_usdt !== undefined ? Number(p.notional_usdt).toFixed(2) : '--';
                 const avgPrice = p.avgPx || '--';
                 const markPrice = p.markPx || '--';
-                const stopPrice = p.exchangeSl || '--';
+                const stopPrice = p.displayStop || p.exchangeSl || p.trailingSl || '--';
+                const stopSource = p.stopSource === 'exchange_cloud' ? '交易所云端止损' : (p.stopSource === 'local_tracker' ? '本地风控止损线' : '止损来源不可用');
                 const protectionStatus = p.protectionStatus || 'unprotected';
                 const coverage = Number(p.protectionCoveragePct || 0);
                 const protectionLabel = protectionStatus === 'fully_protected'
                     ? `完整OCO保护 ${coverage.toFixed(0)}%`
-                    : (protectionStatus === 'partially_protected' ? `部分保护 ${coverage.toFixed(0)}%` : '未检测到云端保护');
+                    : (protectionStatus === 'partially_protected' ? `部分保护 ${coverage.toFixed(0)}%` : (protectionStatus === 'verification_stale' ? '云端保护上次已确认 · 当前待复核' : '未检测到云端保护'));
                 const protectionClass = protectionStatus === 'fully_protected'
                     ? 'text-[#0ECB81]'
-                    : (protectionStatus === 'partially_protected' ? 'text-[#F0B90B]' : 'text-[#F6465D]');
+                    : (protectionStatus === 'partially_protected' || protectionStatus === 'verification_stale' ? 'text-[#F0B90B]' : 'text-[#F6465D]');
                 const stratTag = (p.strategyTag || (isLong ? '顺势做多' : '逢高做空')).replace(/^[^\u4e00-\u9fa5a-zA-Z0-9]+/, '').trim();
 
                 // 1. Desktop Row
@@ -1364,15 +1367,15 @@
                         <td>
                             <div class="inline-flex items-center space-x-1.5">
                                 <span class="px-1.5 py-0.2 rounded text-[10px] font-bold border ${sideBadge}">${isLong ? '做多' : '做空'}</span>
-                                <span class="font-bold text-white">${marginUsdt} U</span>
-                                <span class="text-[10px] text-[#707E94]">(${notionalUsdt} U / ${p.pos}张)</span>
+                                <div><span class="font-bold text-white">${marginUsdt} U</span><div class="text-[9px] text-[#707E94]">${marginSource} · 名义 ${notionalUsdt} U · ${p.pos}张</div></div>
                             </div>
                         </td>
                         <td class="text-[#707E94]">${avgPrice}</td>
                         <td class="text-white font-bold">${markPrice}</td>
                         <td>
                             <div class="${protectionClass} font-bold">${stopPrice}</div>
-                            <div class="text-[9px] text-[#707E94]">${protectionLabel}</div>
+                            <div class="text-[9px] text-[#707E94]">${stopSource}</div>
+                            <div class="text-[9px] ${protectionClass}">${protectionLabel}</div>
                         </td>
                         <td class="text-right font-extrabold ${pnlClass}">
                             ${isProfit ? '+' : ''}${upl.toFixed(2)} U
@@ -1399,8 +1402,9 @@
                         <div class="grid grid-cols-2 gap-1.5 text-xs pt-2 border-t border-[#161D2B] text-[#707E94]">
                             <div>开仓均价: <span class="text-white">${avgPrice}</span></div>
                             <div>标记现价: <span class="text-blue-400 font-bold">${markPrice}</span></div>
-                            <div>保证金: <span class="text-white">${marginUsdt} U</span></div>
-                            <div>云端止损: <span class="${protectionClass}">${stopPrice}</span></div>
+                            <div>保证金: <span class="text-white">${marginUsdt} U</span><div class="text-[9px]">${marginSource}</div></div>
+                            <div>止损线: <span class="${protectionClass}">${stopPrice}</span><div class="text-[9px]">${stopSource}</div></div>
+                            <div class="col-span-2 text-[9px] ${protectionClass}">${protectionLabel}</div>
                         </div>
                     </div>
                 `;
