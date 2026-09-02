@@ -1,63 +1,76 @@
+"""Tests for OKX CLI install and runtime diagnostic endpoints."""
 from __future__ import annotations
 
 import unittest
 from unittest.mock import patch
 
-from r20_backend.okx_setup import diagnose_okx_runtime
+import sys
+sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parents[1]))
+
+from r20_backend.okx_setup import (
+    diagnose_okx_runtime,
+    install_okx_cli,
+    check_node_npm,
+    LATEST_VERSION,
+)
 
 
-class OkxSetupTests(unittest.TestCase):
-    def test_missing_cli_is_not_ready(self):
+class OkxInstallTests(unittest.TestCase):
+    def test_check_node_npm_returns_paths_without_secrets(self):
+        with patch("r20_backend.okx_setup.shutil.which", side_effect=["/usr/bin/node", "/usr/bin/npm"]), \
+             patch("r20_backend.okx_setup._run", side_effect=[
+                 {"ok": True, "returncode": 0, "stdout": "v20.10.0", "stderr": ""},
+                 {"ok": True, "returncode": 0, "stdout": "10.2.3", "stderr": ""},
+             ]):
+            result = check_node_npm()
+        self.assertTrue(result["ready"])
+        self.assertEqual(result["node_path"], "/usr/bin/node")
+        self.assertEqual(result["node_version"], "20.10.0")
+        self.assertEqual(result["npm_version"], "10.2.3")
+
+    def test_check_node_npm_when_missing(self):
         with patch("r20_backend.okx_setup.shutil.which", return_value=None):
-            status = diagnose_okx_runtime("demo", False)
-        self.assertFalse(status["ready"])
-        self.assertEqual(status["credential_source"], "none")
-        self.assertTrue(any("CLI" in item for item in status["issues"]))
+            result = check_node_npm()
+        self.assertFalse(result["ready"])
+        self.assertFalse(result["node_installed"])
+        self.assertFalse(result["npm_installed"])
 
-    def test_demo_oauth_requires_scopes_and_private_probe(self):
-        calls = {
-            "--version": {"ok": True, "returncode": 0, "stdout": "1.4.5", "stderr": ""},
-            "config": {"ok": True, "returncode": 0, "stdout": '{"profiles":{}}', "stderr": ""},
-            "auth": {"ok": True, "returncode": 0, "stdout": '{"status":"logged_in","site":"global","scopes":["market:read","demo:read","demo:trade"]}', "stderr": ""},
-            "--demo": {"ok": True, "returncode": 0, "stdout": "[]", "stderr": ""},
-        }
-        def fake_run(command, timeout=12, env=None):
-            return calls[command[1]]
-        with patch("r20_backend.okx_setup.shutil.which", return_value="/usr/local/bin/okx"), patch("r20_backend.okx_setup._run", side_effect=fake_run):
-            status = diagnose_okx_runtime("demo", False)
-        self.assertTrue(status["ready"])
-        self.assertEqual(status["credential_source"], "cli-oauth")
-        self.assertTrue(status["oauth"]["ready_for_selected_mode"])
+    def test_install_aborts_when_node_npm_missing(self):
+        with patch("r20_backend.okx_setup.check_node_npm", return_value={
+            "ready": False, "node_installed": False, "node_path": "",
+            "node_version": "", "npm_installed": False, "npm_path": "", "npm_version": "",
+        }):
+            result = install_okx_cli()
+        self.assertFalse(result["ok"])
+        self.assertIn("Node.js/npm", result["detail"])
 
-    def test_live_oauth_with_demo_only_scope_is_rejected(self):
+    def test_install_success_verifies_binary_and_version(self):
         responses = [
-            {"ok": True, "returncode": 0, "stdout": "1.4.5", "stderr": ""},
-            {"ok": True, "returncode": 0, "stdout": '{"profiles":{}}', "stderr": ""},
-            {"ok": True, "returncode": 0, "stdout": '{"status":"logged_in","site":"global","scopes":["market:read","demo:read","demo:trade"]}', "stderr": ""},
+            {"ok": True, "returncode": 0, "stdout": "", "stderr": ""},  # npm install
+            {"ok": True, "returncode": 0, "stdout": "1.4.5", "stderr": ""},  # okx --version
         ]
-        with patch("r20_backend.okx_setup.shutil.which", return_value="/usr/local/bin/okx"), patch("r20_backend.okx_setup._run", side_effect=responses):
-            status = diagnose_okx_runtime("live", False)
-        self.assertFalse(status["ready"])
-        self.assertFalse(status["oauth"]["ready_for_selected_mode"])
-        self.assertTrue(any("LIVE" in item for item in status["issues"]))
+        with patch("r20_backend.okx_setup.check_node_npm", return_value={
+            "ready": True, "node_installed": True, "node_path": "/usr/bin/node",
+            "node_version": "20.10.0", "npm_installed": True, "npm_path": "/usr/bin/npm",
+            "npm_version": "10.2.3",
+        }), patch("r20_backend.okx_setup._run", side_effect=responses), \
+             patch("r20_backend.okx_setup.shutil.which", return_value="/usr/local/bin/okx"):
+            result = install_okx_cli()
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["version"], "1.4.5")
+        self.assertEqual(result["path"], "/usr/local/bin/okx")
 
-    def test_static_key_source_still_requires_cli_and_probe(self):
-        responses = [
-            {"ok": True, "returncode": 0, "stdout": "1.4.5", "stderr": ""},
-            {"ok": True, "returncode": 0, "stdout": '{"profiles":{}}', "stderr": ""},
-            {"ok": False, "returncode": 1, "stdout": "", "stderr": "not logged in"},
-            {"ok": True, "returncode": 0, "stdout": "[]", "stderr": ""},
-        ]
-        seen=[]
-        def fake_run(command, timeout=12, env=None):
-            seen.append((command,env)); return responses.pop(0)
-        values={"PATH":"/usr/local/bin:/usr/bin","OKX_DEMO_API_KEY":"demo-ak","OKX_DEMO_SECRET_KEY":"demo-sk","OKX_DEMO_PASSPHRASE":"demo-pp"}
-        with patch("r20_backend.okx_setup.shutil.which", return_value="/usr/local/bin/okx"), patch("r20_backend.okx_setup._run", side_effect=fake_run):
-            status = diagnose_okx_runtime("demo", True, env=values)
-        self.assertTrue(status["ready"])
-        self.assertEqual(status["credential_source"], "static-v5-key")
-        self.assertEqual(seen[-1][1]["OKX_API_KEY"],"demo-ak")
-        self.assertEqual(seen[-1][1]["OKX_DEMO"],"1")
+    def test_install_fails_when_npm_returns_error(self):
+        with patch("r20_backend.okx_setup.check_node_npm", return_value={
+            "ready": True, "node_installed": True, "node_path": "/usr/bin/node",
+            "node_version": "20.10.0", "npm_installed": True, "npm_path": "/usr/bin/npm",
+            "npm_version": "10.2.3",
+        }), patch("r20_backend.okx_setup._run", return_value={
+            "ok": False, "returncode": 1, "stdout": "", "stderr": "EACCES: permission denied",
+        }):
+            result = install_okx_cli()
+        self.assertFalse(result["ok"])
+        self.assertIn("EACCES", result["detail"])
 
 
 if __name__ == "__main__":

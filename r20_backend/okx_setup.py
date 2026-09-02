@@ -11,6 +11,69 @@ from typing import Any, Mapping
 
 MIN_OKX_CLI = (1, 4, 4)
 INSTALL_COMMAND = "npm install -g @okx_ai/okx-trade-cli@^1.4.4"
+LATEST_VERSION = "1.4.5"
+
+
+def check_node_npm() -> dict[str, Any]:
+    """Check Node.js and npm availability without leaking anything."""
+    node = shutil.which("node")
+    npm = shutil.which("npm")
+    node_version = ""
+    npm_version = ""
+    if node:
+        r = _run([node, "--version"], timeout=8)
+        node_version = r["stdout"].replace("v", "") if r["ok"] else ""
+    if npm:
+        r = _run([npm, "--version"], timeout=8)
+        npm_version = r["stdout"] if r["ok"] else ""
+    return {
+        "node_installed": bool(node),
+        "node_path": node or "",
+        "node_version": node_version,
+        "npm_installed": bool(npm),
+        "npm_path": npm or "",
+        "npm_version": npm_version,
+        "ready": bool(node and npm),
+    }
+
+
+def install_okx_cli() -> dict[str, Any]:
+    """Install or upgrade OKX CLI via npm. Returns the result and post-install diagnostics."""
+    prereq = check_node_npm()
+    if not prereq["ready"]:
+        return {
+            "ok": False,
+            "detail": f"Node.js/npm 未安装（node={prereq['node_path']}, npm={prereq['npm_path']}）",
+            "prerequisite": prereq,
+            "install_command": INSTALL_COMMAND,
+        }
+    npm_bin = prereq["npm_path"]
+    r = _run([npm_bin, "install", "-g", "@okx_ai/okx-trade-cli@^1.4.4"], timeout=120)
+    if not r["ok"]:
+        return {
+            "ok": False,
+            "detail": f"npm install 失败：{r['stderr'] or r['stdout'] or 'unknown error'[:500]}",
+            "prerequisite": prereq,
+            "install_command": INSTALL_COMMAND,
+        }
+    # Verify post-install
+    binary = shutil.which("okx")
+    if not binary:
+        return {
+            "ok": False,
+            "detail": "安装完成但 PATH 中仍找不到 okx；请检查 npm global bin 目录是否在服务 PATH 中",
+            "prerequisite": prereq,
+            "install_command": INSTALL_COMMAND,
+        }
+    vr = _run([binary, "--version"], timeout=8)
+    version = vr["stdout"].splitlines()[0] if vr["stdout"] else ""
+    return {
+        "ok": True,
+        "detail": f"OKX CLI 安装成功：{binary} v{version}",
+        "path": binary,
+        "version": version,
+        "prerequisite": prereq,
+    }
 
 
 def _run(command: list[str], timeout: int = 12, env: Mapping[str, str] | None = None) -> dict[str, Any]:
