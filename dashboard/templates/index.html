@@ -197,15 +197,15 @@
                 </div>
 
                 <!-- Live Engine Telemetry Ping -->
-                <div class="hidden xl:flex items-center space-x-3 text-[11px] font-mono text-[#707E94] border-l border-[#1A2232] pl-3.5">
+                <div class="hidden lg:flex items-center space-x-3 text-[11px] font-mono text-[#707E94] border-l border-[#1A2232] pl-3.5">
                     <div class="flex items-center space-x-1.5">
-                        <span class="w-2 h-2 rounded-full bg-[#0ECB81] live-ping"></span>
-                        <span class="text-[#EAECEF] font-semibold">OKX V5 API</span>
+                        <span id="topbar-status-dot" class="w-2 h-2 rounded-full bg-[#0ECB81] live-ping"></span>
+                        <span id="topbar-status-text" class="text-[#EAECEF] font-semibold">OKX V5 API</span>
                     </div>
                     <span>•</span>
-                    <div>LATENCY <strong class="text-[#0ECB81]">14ms</strong></div>
+                    <div>LATENCY <strong id="topbar-latency" class="text-[#0ECB81]">--ms</strong></div>
                     <span>•</span>
-                    <div>POLL <strong class="text-[#3875F6]">15M CO-T</strong></div>
+                    <div>更新于 <strong id="topbar-update-clock" class="text-white font-mono">--:--:--</strong></div>
                 </div>
             </div>
 
@@ -1222,12 +1222,46 @@
             }
         };
 
+        let isFetchingTerminalData = false;
         async function loadAllData() {
+            if (isFetchingTerminalData) return;
+            isFetchingTerminalData = true;
+            const t0 = performance.now();
             try {
-                const res = await fetch('/api/all?t=' + Date.now());
+                const res = await fetch('/api/all?t=' + Date.now(), { cache: 'no-store' });
                 if (!res.ok) throw new Error('API HTTP ' + res.status);
                 const data = await res.json();
                 rawJsonData = data;
+
+                // Update Telemetry in Top Bar
+                const latencyMs = Math.max(1, Math.round(performance.now() - t0));
+                const topbarLatencyEl = document.getElementById('topbar-latency');
+                if (topbarLatencyEl) topbarLatencyEl.innerText = `${latencyMs}ms`;
+
+                const topbarClockEl = document.getElementById('topbar-update-clock');
+                if (topbarClockEl) {
+                    const now = new Date();
+                    const hh = String(now.getHours()).padStart(2, '0');
+                    const mm = String(now.getMinutes()).padStart(2, '0');
+                    const ss = String(now.getSeconds()).padStart(2, '0');
+                    topbarClockEl.innerText = `${hh}:${mm}:${ss}`;
+                }
+
+                const healthStatus = data.data_health?.status || 'LIVE';
+                const topbarDotEl = document.getElementById('topbar-status-dot');
+                const topbarTextEl = document.getElementById('topbar-status-text');
+                if (topbarDotEl && topbarTextEl) {
+                    if (healthStatus === 'LIVE') {
+                        topbarDotEl.className = 'w-2 h-2 rounded-full bg-[#0ECB81] live-ping';
+                        topbarTextEl.innerText = 'OKX V5 API · LIVE';
+                    } else if (healthStatus === 'STALE') {
+                        topbarDotEl.className = 'w-2 h-2 rounded-full bg-[#F0B90B] live-ping';
+                        topbarTextEl.innerText = 'OKX 上游繁忙 · 降级快照';
+                    } else {
+                        topbarDotEl.className = 'w-2 h-2 rounded-full bg-[#F6465D] live-ping';
+                        topbarTextEl.innerText = 'OKX 离线';
+                    }
+                }
 
                 // 1. Account Summary
                 const acc = data.account || {};
@@ -1336,6 +1370,7 @@
             } catch (err) {
                 console.error('Failed to load terminal data:', err);
             } finally {
+                isFetchingTerminalData = false;
                 if (window.lucide) lucide.createIcons();
             }
         }
@@ -2313,11 +2348,6 @@
             const statMaxDdEl = document.getElementById('chart-stat-maxdd');
             if (statMaxDdEl) statMaxDdEl.innerText = `-${maxDdPct.toFixed(2)}%`;
 
-            if (equityChartInstance) {
-                equityChartInstance.destroy();
-                equityChartInstance = null;
-            }
-
             // ==========================================
             // MODE 1: 总权益走势 (Default High-Res Smooth Line)
             // ==========================================
@@ -2339,6 +2369,23 @@
                 const maxEq = validEquities.length > 0 ? Math.max(...validEquities, initialCapital) : 4300;
                 const yMin = Math.max(0, Math.floor((minEq - 50) / 50) * 50);
                 const yMax = Math.ceil((maxEq + 50) / 50) * 50;
+
+                if (equityChartInstance && equityChartInstance.config?.type === 'line') {
+                    equityChartInstance.data.labels = labels;
+                    equityChartInstance.data.datasets[0].data = equityValues;
+                    equityChartInstance.data.datasets[1].data = baselineValues;
+                    if (equityChartInstance.options?.scales?.y) {
+                        equityChartInstance.options.scales.y.min = yMin;
+                        equityChartInstance.options.scales.y.max = yMax;
+                    }
+                    equityChartInstance.update('none');
+                    return;
+                }
+
+                if (equityChartInstance) {
+                    equityChartInstance.destroy();
+                    equityChartInstance = null;
+                }
 
                 equityChartInstance = new Chart(ctx, {
                     type: 'line',
@@ -2439,6 +2486,20 @@
                 const pnlValues = sortedTrades.map(t => Number(t.pnl || 0.0));
                 const colors = pnlValues.map(p => p >= 0 ? '#0ECB81' : '#F6465D');
                 const borderColors = pnlValues.map(p => p >= 0 ? '#059669' : '#BE123C');
+
+                if (equityChartInstance && equityChartInstance.config?.type === 'bar') {
+                    equityChartInstance.data.labels = labels;
+                    equityChartInstance.data.datasets[0].data = pnlValues;
+                    equityChartInstance.data.datasets[0].backgroundColor = colors;
+                    equityChartInstance.data.datasets[0].borderColor = borderColors;
+                    equityChartInstance.update('none');
+                    return;
+                }
+
+                if (equityChartInstance) {
+                    equityChartInstance.destroy();
+                    equityChartInstance = null;
+                }
 
                 equityChartInstance = new Chart(ctx, {
                     type: 'bar',

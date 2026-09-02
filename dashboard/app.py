@@ -1081,12 +1081,18 @@ async def index(request: Request):
 @app.get("/api/all")
 async def get_all_data():
     data = await refresh_cache_if_needed(3.0)
-    return JSONResponse(data)
+    return JSONResponse(
+        data,
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+    )
 
 @app.get("/api/overview")
 async def get_overview():
     data = await refresh_cache_if_needed(3.0)
-    return JSONResponse(data)
+    return JSONResponse(
+        data,
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+    )
 
 if __name__ == "__main__":
     import uvicorn
