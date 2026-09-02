@@ -11,6 +11,7 @@ import subprocess
 import shutil
 import asyncio
 import tempfile
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -339,7 +340,36 @@ def persist_dashboard_cache(data):
 CACHE_DATA = load_persisted_dashboard_cache()
 LAST_CACHE_TIME = 0
 CACHE_LOCK = None
-SYNC_EXECUTOR = ThreadPoolExecutor(max_workers=2, thread_name_prefix="dashboard_sync")
+SYNC_EXECUTOR = ThreadPoolExecutor(max_workers=6, thread_name_prefix="dashboard_sync")
+_BG_WORKER_THREAD = None
+_BG_WORKER_RUNNING = False
+
+def _dashboard_background_worker_loop():
+    global _BG_WORKER_RUNNING
+    # Initial small pause so server boots cleanly
+    time.sleep(0.5)
+    while _BG_WORKER_RUNNING:
+        try:
+            update_cache_cycle()
+        except Exception:
+            pass
+        # Refresh every 2 seconds in background
+        time.sleep(2.0)
+
+def start_dashboard_background_worker():
+    global _BG_WORKER_THREAD, _BG_WORKER_RUNNING
+    if _BG_WORKER_THREAD is None or not _BG_WORKER_THREAD.is_alive():
+        _BG_WORKER_RUNNING = True
+        _BG_WORKER_THREAD = threading.Thread(
+            target=_dashboard_background_worker_loop,
+            daemon=True,
+            name="dashboard_cache_worker"
+        )
+        _BG_WORKER_THREAD.start()
+
+def stop_dashboard_background_worker():
+    global _BG_WORKER_RUNNING
+    _BG_WORKER_RUNNING = False
 
 def get_cache_lock():
     global CACHE_LOCK
@@ -355,11 +385,26 @@ def update_cache_cycle():
     timestamp_full = now_bj.strftime("%Y-%m-%d %H:%M:%S (北京时间)")
 
     source_errors = []
-    # 1. Fetch OKX Live Balance (Strictly USDT Contract Sub-account)
-    balance_ok, bal_data, balance_error = run_json_cmd_status(okx_private_command("okx account balance --json"))
+
+    # Parallel Phase 1: Fetch Balance, Positions, and Maker Orders concurrently
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        f_bal = pool.submit(run_json_cmd_status, okx_private_command("okx account balance --json"))
+        f_pos = pool.submit(run_json_cmd_status, okx_private_command("okx account positions --json"))
+        f_ord = pool.submit(run_json_cmd_status, okx_private_command("okx swap orders --json"))
+        balance_ok, bal_data, balance_error = f_bal.result()
+        positions_ok, pos_data, positions_error = f_pos.result()
+        orders_ok, orders_data, orders_error = f_ord.result()
+
     if not balance_ok:
         source_errors.append(f"balance: {balance_error}")
         bal_data = []
+    if not positions_ok:
+        source_errors.append(f"positions: {positions_error}")
+        pos_data = []
+    if not orders_ok:
+        source_errors.append(f"orders: {orders_error}")
+        orders_data = []
+
     total_eq = 0.0
     avail_eq = 0.0
     cash_bal = 0.0
@@ -374,11 +419,6 @@ def update_cache_cycle():
                 upl_acc = float(d.get("upl", 0.0) or 0.0)
                 break
 
-    # 2. Fetch OKX Live Positions
-    positions_ok, pos_data, positions_error = run_json_cmd_status(okx_private_command("okx account positions --json"))
-    if not positions_ok:
-        source_errors.append(f"positions: {positions_error}")
-        pos_data = []
     positions = []
     total_pos_upl = 0.0
     long_count = 0
@@ -456,8 +496,7 @@ def update_cache_cycle():
                 "tp2Hit": t_info.get("tp2_hit", False)
             })
 
-    # 2.5 Fetch OKX Live Pending Maker Orders
-    orders_ok, orders_data, orders_error = run_json_cmd_status(okx_private_command("okx swap orders --json"))
+    # Parse Pending Maker Orders
     pending_orders_list = []
     if isinstance(orders_data, list):
         for o in orders_data:
@@ -557,40 +596,53 @@ def update_cache_cycle():
         LAST_CACHE_TIME = time.time()
         return
 
-    # Exchange algo orders are the source of truth for live TP/SL protection.
-    for position in positions:
-        algo_ok, algo_orders, algo_error = run_json_cmd_status(okx_private_command(f"okx swap algo orders --instId {position['instId']} --json"))
-        if not algo_ok:
-            source_errors.append(f"algo {position['instId']}: {algo_error}")
-            algo_orders = []
-        matching_algos = [
-            o for o in algo_orders
-            if str(o.get("state", "live")).lower() in {"live", "effective"}
-            and str(o.get("posSide", "net")).lower() in {position["posSide"], "net"}
-            and str(o.get("reduceOnly", "true")).lower() in {"true", "1", "yes"}
-        ]
-        protected_size = sum(float(o.get("sz", 0) or 0) for o in matching_algos if o.get("slTriggerPx"))
-        full_coverage = protected_size >= float(position["pos_sz"]) * 0.999
-        live_algo = next((o for o in matching_algos if o.get("slTriggerPx") and o.get("tpTriggerPx")), None)
-        if live_algo and full_coverage:
-            position["exchangeSl"] = float(live_algo.get("slTriggerPx", 0) or 0)
-            position["exchangeTp"] = float(live_algo.get("tpTriggerPx", 0) or 0)
-            position["protectionStatus"] = "fully_protected"
-            position["protectionCoveragePct"] = 100.0
-            position["protectionAlgoId"] = live_algo.get("algoId", "")
-        elif matching_algos:
-            sl_algo = next((o for o in matching_algos if o.get("slTriggerPx")), {})
-            position["exchangeSl"] = float(sl_algo.get("slTriggerPx", 0) or 0) or None
-            position["exchangeTp"] = float(sl_algo.get("tpTriggerPx", 0) or 0) or None
-            position["protectionStatus"] = "partially_protected"
-            position["protectionCoveragePct"] = round(min(100.0, protected_size / max(position["pos_sz"], 1e-12) * 100), 1)
-            position["protectionAlgoId"] = sl_algo.get("algoId", "")
-        else:
-            position["exchangeSl"] = None
-            position["exchangeTp"] = None
-            position["protectionStatus"] = "unprotected"
-            position["protectionCoveragePct"] = 0.0
-            position["protectionAlgoId"] = ""
+    # Parallel Phase 2: Exchange algo orders for live TP/SL protection
+    if positions:
+        with ThreadPoolExecutor(max_workers=min(len(positions), 6)) as pool:
+            futures = {
+                pos["instId"]: pool.submit(
+                    run_json_cmd_status,
+                    okx_private_command(f"okx swap algo orders --instId {pos['instId']} --json")
+                )
+                for pos in positions
+            }
+            algo_results = {inst_id: f.result() for inst_id, f in futures.items()}
+
+        for position in positions:
+            algo_ok, algo_orders, algo_error = algo_results.get(position["instId"], (False, [], "timeout"))
+            if not algo_ok:
+                source_errors.append(f"algo {position['instId']}: {algo_error}")
+                algo_orders = []
+            matching_algos = [
+                o for o in (algo_orders or [])
+                if str(o.get("state", "live")).lower() in {"live", "effective"}
+                and str(o.get("posSide", "net")).lower() in {position["posSide"], "net"}
+                and str(o.get("reduceOnly", "true")).lower() in {"true", "1", "yes"}
+            ]
+            protected_size = sum(float(o.get("sz", 0) or 0) for o in matching_algos if o.get("slTriggerPx"))
+            full_coverage = protected_size >= float(position["pos_sz"]) * 0.999
+            live_algo = next((o for o in matching_algos if o.get("slTriggerPx") and o.get("tpTriggerPx")), None)
+            if live_algo and full_coverage:
+                position["exchangeSl"] = float(live_algo.get("slTriggerPx", 0) or 0)
+                position["exchangeTp"] = float(live_algo.get("tpTriggerPx", 0) or 0)
+                position["protectionStatus"] = "fully_protected"
+                position["protectionCoveragePct"] = 100.0
+                position["protectionAlgoId"] = live_algo.get("algoId", "")
+            elif matching_algos:
+                sl_algo = next((o for o in matching_algos if o.get("slTriggerPx")), {})
+                position["exchangeSl"] = float(sl_algo.get("slTriggerPx", 0) or 0) or None
+                position["exchangeTp"] = float(sl_algo.get("tpTriggerPx", 0) or 0) or None
+                position["protectionStatus"] = "partially_protected"
+                position["protectionCoveragePct"] = round(min(100.0, protected_size / max(position["pos_sz"], 1e-12) * 100), 1)
+                position["protectionAlgoId"] = sl_algo.get("algoId", "")
+            else:
+                position["exchangeSl"] = None
+                position["exchangeTp"] = None
+                position["protectionStatus"] = "unprotected"
+                position["protectionCoveragePct"] = 0.0
+                position["protectionAlgoId"] = ""
+    else:
+        algo_results = {}
 
     enrich_position_risk_fields(positions, trackers)
 
@@ -1072,6 +1124,9 @@ async def refresh_cache_if_needed(ttl_seconds: float = 3.0):
         await loop.run_in_executor(SYNC_EXECUTOR, update_cache_cycle)
         return CACHE_DATA
 
+# Auto-start background worker to keep in-memory cache pre-warmed
+start_dashboard_background_worker()
+
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     return templates.TemplateResponse(
@@ -1082,7 +1137,12 @@ async def index(request: Request):
 
 @app.get("/api/all")
 async def get_all_data():
-    data = await refresh_cache_if_needed(3.0)
+    global CACHE_DATA, LAST_CACHE_TIME
+    # Return pre-warmed in-memory snapshot immediately (<1ms)
+    if not CACHE_DATA or time.time() - LAST_CACHE_TIME > 12.0:
+        data = await refresh_cache_if_needed(2.5)
+    else:
+        data = CACHE_DATA
     return JSONResponse(
         data,
         headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
@@ -1090,7 +1150,11 @@ async def get_all_data():
 
 @app.get("/api/overview")
 async def get_overview():
-    data = await refresh_cache_if_needed(3.0)
+    global CACHE_DATA, LAST_CACHE_TIME
+    if not CACHE_DATA or time.time() - LAST_CACHE_TIME > 12.0:
+        data = await refresh_cache_if_needed(2.5)
+    else:
+        data = CACHE_DATA
     return JSONResponse(
         data,
         headers={"Cache-Control": "no-cache, no-store, must-revalidate"},

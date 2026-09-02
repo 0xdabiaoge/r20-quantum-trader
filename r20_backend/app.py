@@ -64,7 +64,17 @@ async def lifespan(_: FastAPI):
     refresh_settings()
     admin_auth.initialize_from_legacy(settings.admin_token or settings.setup_token)
     start_gateway_supervisor()
+    try:
+        from dashboard.app import start_dashboard_background_worker
+        start_dashboard_background_worker()
+    except Exception:
+        pass
     yield
+    try:
+        from dashboard.app import stop_dashboard_background_worker
+        stop_dashboard_background_worker()
+    except Exception:
+        pass
     stop_gateway_supervisor()
 
 
