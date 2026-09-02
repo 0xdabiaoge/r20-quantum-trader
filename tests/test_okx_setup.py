@@ -17,16 +17,19 @@ from r20_backend.okx_setup import (
 
 class OkxInstallTests(unittest.TestCase):
     def test_check_node_npm_returns_paths_without_secrets(self):
-        with patch("r20_backend.okx_setup.shutil.which", side_effect=["/usr/bin/node", "/usr/bin/npm"]), \
+        with patch("r20_backend.okx_setup.shutil.which", side_effect=["/usr/bin/node", "/usr/bin/npm", "/usr/local/bin/okx"]), \
              patch("r20_backend.okx_setup._run", side_effect=[
                  {"ok": True, "returncode": 0, "stdout": "v20.10.0", "stderr": ""},
                  {"ok": True, "returncode": 0, "stdout": "10.2.3", "stderr": ""},
+                 {"ok": True, "returncode": 0, "stdout": "1.4.5", "stderr": ""},
              ]):
             result = check_node_npm()
         self.assertTrue(result["ready"])
         self.assertEqual(result["node_path"], "/usr/bin/node")
         self.assertEqual(result["node_version"], "20.10.0")
         self.assertEqual(result["npm_version"], "10.2.3")
+        self.assertTrue(result["okx_installed"])
+        self.assertTrue(result["okx_supported"])
 
     def test_check_node_npm_when_missing(self):
         with patch("r20_backend.okx_setup.shutil.which", return_value=None):
@@ -62,6 +65,19 @@ class OkxInstallTests(unittest.TestCase):
         self.assertEqual(result["path"], "/usr/local/bin/okx")
         self.assertEqual(result["previous_version"], "1.4.4")
         self.assertTrue(result["restart_gateway_recommended"])
+
+    def test_transient_okx_503_is_reported_as_upstream_not_auth_failure(self):
+        responses = [
+            {"ok": True, "returncode": 0, "stdout": "1.4.5", "stderr": ""},
+            {"ok": True, "returncode": 0, "stdout": '{"profiles":{}}', "stderr": ""},
+            {"ok": True, "returncode": 0, "stdout": '{"status":"logged_in","site":"global","scopes":["market:read","demo:read","demo:trade"]}', "stderr": ""},
+            {"ok": False, "returncode": 1, "stdout": "", "stderr": "HTTP 503 Service temporarily unavailable"},
+        ]
+        with patch("r20_backend.okx_setup.shutil.which", return_value="/usr/local/bin/okx"), patch("r20_backend.okx_setup._run", side_effect=responses):
+            status=diagnose_okx_runtime("demo",False)
+        self.assertFalse(status["ready"])
+        self.assertTrue(any("上游" in item for item in status["issues"]))
+        self.assertTrue(any("无需重新安装" in item for item in status["steps"]))
 
     def test_install_fails_when_npm_returns_error(self):
         with patch("r20_backend.okx_setup.check_node_npm", return_value={

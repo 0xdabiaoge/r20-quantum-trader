@@ -26,6 +26,11 @@ def check_node_npm() -> dict[str, Any]:
     if npm:
         r = _run([npm, "--version"], timeout=8)
         npm_version = r["stdout"] if r["ok"] else ""
+    okx = shutil.which("okx")
+    okx_version = ""
+    if okx:
+        r = _run([okx, "--version"], timeout=8)
+        okx_version = r["stdout"].splitlines()[0] if r["ok"] and r["stdout"] else ""
     return {
         "node_installed": bool(node),
         "node_path": node or "",
@@ -33,14 +38,19 @@ def check_node_npm() -> dict[str, Any]:
         "npm_installed": bool(npm),
         "npm_path": npm or "",
         "npm_version": npm_version,
-        "ready": bool(node and npm),
+        "prerequisites_ready": bool(node and npm),
+        "okx_installed": bool(okx),
+        "okx_path": okx or "",
+        "okx_version": okx_version,
+        "okx_supported": _version_tuple(okx_version) >= MIN_OKX_CLI,
+        "ready": bool(node and npm and okx and _version_tuple(okx_version) >= MIN_OKX_CLI),
     }
 
 
 def install_okx_cli() -> dict[str, Any]:
     """Install or upgrade OKX CLI via npm. Returns the result and post-install diagnostics."""
     prereq = check_node_npm()
-    if not prereq["ready"]:
+    if not prereq.get("prerequisites_ready", prereq.get("ready", False)):
         return {
             "ok": False,
             "detail": f"Node.js/npm 未安装（node={prereq['node_path']}, npm={prereq['npm_path']}）",
@@ -203,8 +213,13 @@ def diagnose_okx_runtime(selected_mode: str, static_configured: bool, *, env: Ma
             "随后运行：okx auth login --manual --site <站点>，在浏览器完成授权",
         ])
     elif not status["read_probe"]["ok"]:
-        status["issues"].append("OKX 凭证存在，但当前环境私有只读探针失败")
-        status["steps"].append("检查授权是否包含当前环境 read/trade 权限，以及服务 HOME/PATH 是否与登录用户一致")
+        detail = status["read_probe"]["detail"]
+        if any(token in detail for token in ("HTTP 503", "50013", "Systems are busy", "Service temporarily unavailable")):
+            status["issues"].append("OKX 上游当前繁忙或暂时不可用；系统已 Fail-Closed，不会在状态不明时下单")
+            status["steps"].append("等待 1-2 分钟后点击“重新诊断”；无需重新安装 CLI 或重新授权 OAuth")
+        else:
+            status["issues"].append("OKX 凭证存在，但当前环境私有只读探针失败")
+            status["steps"].append("检查授权是否包含当前环境 read/trade 权限，以及服务 HOME/PATH 是否与登录用户一致")
     if status["ready"]:
         status["steps"].append("运行依赖与当前环境授权已就绪；建议先在 DEMO 完成下单、撤单、平仓和 OCO 验证")
     return status
