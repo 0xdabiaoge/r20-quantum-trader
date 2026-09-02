@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 import r20_backend.notifications as notifications
 import r20_backend.wechat_watcher as wechat_watcher
+import r20_backend.wechat_protocol as wechat_protocol
 import r20_backend.okx_trade_service as trade_service
 import scripts.okx_runtime as okx_runtime
 import scripts.prompt_library as prompts
@@ -77,6 +78,12 @@ class OKXEnvironmentTests(unittest.TestCase):
 
 
 class WechatTests(unittest.TestCase):
+    def test_wire_protocol_matches_current_ilink_clients(self):
+        self.assertEqual(wechat_protocol.base_info()["channel_version"], "2.0.1")
+        headers=wechat_protocol.common_headers("token")
+        self.assertEqual(headers["iLink-App-ClientVersion"], "1")
+        self.assertEqual(headers["Authorization"], "Bearer token")
+
     def test_dotenv_overrides_stale_process_environment(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp); (root/".env").write_text("R20_WECHAT_CONTEXT_TOKEN=NEW\n")

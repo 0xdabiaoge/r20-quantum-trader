@@ -751,7 +751,7 @@ def admin_about(x_r20_admin_token: str | None = Header(default=None)) -> dict[st
         "components": [
             {"name": "FastAPI Control Plane", "version": "6.0.0-preview"},
             {"name": "Gateway Event Runtime", "version": GATEWAY_VERSION},
-            {"name": "Tencent iLink Protocol", "version": "2.4.8"},
+            {"name": "Tencent iLink Protocol", "version": "2.0.1"},
             {"name": "SQLite", "version": __import__("sqlite3").sqlite_version},
         ],
         "repository": {"url": "https://github.com/555cute/r20-quantum-trader", "branch": git(["branch", "--show-current"]), "commit": git(["rev-parse", "--short", "HEAD"])},
@@ -977,7 +977,7 @@ def notification_config(x_r20_admin_token: str | None = Header(default=None)) ->
             "base_url": env.get("R20_WECHAT_BASE_URL", "https://ilinkai.weixin.qq.com"), "user_id": env.get("R20_WECHAT_USER_ID", ""),
             "context_token": mask(env.get("R20_WECHAT_CONTEXT_TOKEN", "")), "context_configured": bool(env.get("R20_WECHAT_CONTEXT_TOKEN", "")),
             "ready": bool(env.get("R20_WECHAT_BOT_TOKEN") and env.get("R20_WECHAT_USER_ID") and env.get("R20_WECHAT_CONTEXT_TOKEN")),
-            "watcher": wechat_watcher_state(), "protocol": "Tencent iLink 2.4.8", "delivery_semantics": "腾讯 iLink 受理，不等于微信客户端送达或已读",
+            "watcher": wechat_watcher_state(), "protocol": "Tencent iLink 2.0.1", "delivery_semantics": "腾讯 iLink 受理，不等于微信客户端送达或已读",
         },
         "telegram": {"enabled": env.get("R20_NOTIFY_TELEGRAM_ENABLED", "0") == "1", "bot_token": mask(env.get("R20_TELEGRAM_BOT_TOKEN", "")), "chat_id": env.get("R20_TELEGRAM_CHAT_ID", "")},
         "qq": {"enabled": env.get("R20_NOTIFY_QQ_ENABLED", "0") == "1", "app_id": env.get("R20_QQ_APP_ID", ""), "client_secret": mask(env.get("R20_QQ_CLIENT_SECRET", "")), "openid": env.get("R20_QQ_OPENID", "")},
