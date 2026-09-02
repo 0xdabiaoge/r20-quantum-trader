@@ -6,35 +6,35 @@
 
 **独立 Gateway · 多因子推演 · 交易执行 · 只读监控 · 管理控制面 · 多通道通知 · 加密灾备**
 
-[![Release](https://img.shields.io/badge/release-v6.0.0--preview-3875F6?style=flat-square)](https://github.com/555cute/r20-quantum-trader/releases/tag/v6.0.0-preview)
+[![Release](https://img.shields.io/badge/release-v6.1.0--preview-3875F6?style=flat-square)](https://github.com/555cute/r20-quantum-trader/releases/tag/v6.1.0-preview)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![OKX](https://img.shields.io/badge/Exchange-OKX-111827?style=flat-square)](https://www.okx.com/)
-[![Tests](https://img.shields.io/badge/tests-103%2F103-0ECB81?style=flat-square)](#验证与测试)
+[![Tests](https://img.shields.io/badge/tests-110%2F110-0ECB81?style=flat-square)](#验证与测试)
 [![License](https://img.shields.io/badge/license-MIT-10B981?style=flat-square)](LICENSE)
 
-[在线只读终端](https://www.r20.cn/) · [v6.0.0 Preview](https://github.com/555cute/r20-quantum-trader/releases/tag/v6.0.0-preview) · [独立部署](STANDALONE.md) · [恢复指南](RECOVERY_GUIDE.md)
+[在线只读终端](https://www.r20.cn/) · [v6.1.0 Preview](https://github.com/555cute/r20-quantum-trader/releases/tag/v6.1.0-preview) · [独立部署](STANDALONE.md) · [恢复指南](RECOVERY_GUIDE.md)
 
 </div>
 
 ---
 
-![R20 v6.0.0 Preview 实盘终端](docs/images/v600_terminal_overview.png)
+![R20 v6.1.0 Preview 实盘终端](docs/images/v600_terminal_overview.png)
 
 > [!WARNING]
 > R20 是研究型自动化交易项目，不构成投资建议，也不承诺收益。建议先使用 OKX **DEMO 模拟盘**完成配置、通知、止盈止损与故障恢复验证，再评估是否连接真实资金。
 
-## v6.0.0 Preview 是什么
+## v6.1.0 Preview 是什么
 
 R20 把行情、数理因子、LLM 裁决、交易执行、通知、调度和灾备收敛到一套可审计的本地运行时中。公开 Web 端始终保持**只读监控**；所有敏感配置和受保护操作都放在独立管理员控制面中。
 
-v6.0.0 Preview 的重点不是增加更多按钮，而是让关键链路更可控：
+v6.1.0 Preview 重点完善从模型决策到交易所保护的完整闭环：
 
-- **R20 原生 Gateway**：事件队列、通知投递、定时任务与 Worker 生命周期不再依赖外部 Agent 调度。
-- **OKX LIVE / DEMO 隔离**：两套凭证独立保存；模拟盘请求自动携带 `x-simulated-trading: 1`。
-- **模块化提示词管线**：交易 System、交易 User、自进化 System、自进化 User 分别由有序模块编译；P0、JSON 契约和实时数据模块受保护。
-- **插件化灾备**：本地、S3、OSS、WebDAV/OpenList 与百度网盘官方 OAuth 等目标统一进入备份任务模型。
-- **可靠通知通道**：QQ 官方 Bot、企业微信、Telegram 与通用 Webhook，可独立诊断、测试和启停。
-- **Fail-Closed 执行边界**：持仓查询异常、流动性价差超限或必要保护缺失时，中止交易循环，而不是带病执行。
+- **交易保护闭环**：硬止损、成交确认、订单 ID 校验、超时挂单 Fail-Closed，以及云端 OCO 全仓覆盖核验、自动补建和失败安全退出。
+- **稳健均衡裁决**：保留 P0 硬约束，修复软指标分歧导致的永久 WAIT；ADX 灰区、趋势减速与短周期回抽改为按风险减仓处理。
+- **独立 OKX 引导**：后台检测 Node.js、npm、OKX CLI、OAuth 站点与权限，并提供超级管理员确认保护的一键安装或升级。
+- **提示词实时一致**：运行代码、活动方案和后台编辑器同步；关键安全模块锁定为当前版本，旧自定义方案不能冻结过期阈值。
+- **后台交互反馈**：全局请求状态、按钮 loading/disabled、错误提示、确认执行状态和局部加载失败隔离。
+- **R20 原生 Gateway**：事件队列、通知投递、定时任务与 Worker 生命周期不依赖 QwenPaw Cron。
 
 ## 产品界面
 
@@ -262,14 +262,14 @@ python3 -m r20_gateway.worker
 
 ## 验证与测试
 
-v6.0.0 Preview 发布候选已通过：
+v6.1.0 Preview 发布候选已通过：
 
 ```bash
 python3 -m compileall -q r20_backend r20_gateway scripts
 python3 -m unittest discover -s tests -v
 ```
 
-当前结果：**103 / 103 tests passed**。
+当前结果：**110 / 110 tests passed**。
 
 测试覆盖管理员认证、提示词模块保护、Gateway 调度与持久队列、插件注册、灾备、OKX 控制面、通知通道业务码和数理因子等关键路径。真实交易、真实通知和灾备目标仍必须在部署者自己的 DEMO 环境中逐项验收。
 
@@ -292,7 +292,7 @@ r20-quantum-trader/
 
 ## 版本与路线
 
-当前公开版本：[`v6.0.0-preview`](https://github.com/555cute/r20-quantum-trader/releases/tag/v6.0.0-preview)
+当前公开版本：[`v6.1.0-preview`](https://github.com/555cute/r20-quantum-trader/releases/tag/v6.1.0-preview)
 
 Preview 阶段重点验证：
 

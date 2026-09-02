@@ -1,6 +1,6 @@
-# R20 Quantum Trader v6.0.0 Preview Standalone Deployment
+# R20 Quantum Trader v6.1.0 Preview Standalone Deployment
 
-v6.0.0-preview removes the runtime dependency on QwenPaw. The product is now composed of:
+v6.1.0-preview removes the runtime dependency on QwenPaw. The product is now composed of:
 
 - `r20_backend.app`: standalone FastAPI control plane and read-only monitoring API.
 - `r20_gateway.worker`: the R20-native, single-owner scheduler and durable notification-delivery worker for the 15-minute trader, 60-second factor refresh, 10-minute news refresh, daily reports, evolution review, and nightly backup.
