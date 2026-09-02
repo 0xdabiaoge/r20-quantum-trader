@@ -215,19 +215,19 @@
                     <i data-lucide="layout-grid" class="w-3.5 h-3.5"></i>
                     <span>实盘矩阵</span>
                 </button>
-                <button onclick="switchMainTab('factors')" id="top-nav-btn-factors" class="px-3.5 py-1.5 rounded-md text-xs font-semibold text-[#707E94] hover:text-white transition flex items-center space-x-1.5">
+                <button onclick="switchMainTab('factors')" id="top-nav-btn-factors" class="px-3.5 py-1.5 rounded-md text-xs font-semibold text-[#707E94] hover:text-white transition whitespace-nowrap flex items-center space-x-1.5">
                     <i data-lucide="cpu" class="w-3.5 h-3.5"></i>
                     <span>AI推演</span>
                 </button>
-                <button onclick="switchMainTab('news')" id="top-nav-btn-news" class="px-3.5 py-1.5 rounded-md text-xs font-semibold text-[#707E94] hover:text-white transition flex items-center space-x-1.5">
+                <button onclick="switchMainTab('news')" id="top-nav-btn-news" class="px-3.5 py-1.5 rounded-md text-xs font-semibold text-[#707E94] hover:text-white transition whitespace-nowrap flex items-center space-x-1.5">
                     <i data-lucide="newspaper" class="w-3.5 h-3.5"></i>
                     <span>全网舆情</span>
                 </button>
-                <button onclick="switchMainTab('lab')" id="top-nav-btn-lab" class="px-3.5 py-1.5 rounded-md text-xs font-semibold text-[#707E94] hover:text-white transition flex items-center space-x-1.5">
+                <button onclick="switchMainTab('lab')" id="top-nav-btn-lab" class="px-3.5 py-1.5 rounded-md text-xs font-semibold text-[#707E94] hover:text-white transition whitespace-nowrap flex items-center space-x-1.5">
                     <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
                     <span>自进化</span>
                 </button>
-                <button onclick="switchMainTab('history')" id="top-nav-btn-history" class="px-3.5 py-1.5 rounded-md text-xs font-semibold text-[#707E94] hover:text-white transition flex items-center space-x-1.5">
+                <button onclick="switchMainTab('history')" id="top-nav-btn-history" class="px-3.5 py-1.5 rounded-md text-xs font-semibold text-[#707E94] hover:text-white transition whitespace-nowrap flex items-center space-x-1.5">
                     <i data-lucide="receipt" class="w-3.5 h-3.5"></i>
                     <span>交易台账</span>
                 </button>
@@ -1055,6 +1055,7 @@
 
         // Tab Switching (hash-routed: refresh / back-forward / deep-link keep the active tab)
         const TAB_NAMES = ['trading', 'factors', 'news', 'lab', 'history'];
+        const TAB_TITLES = { trading: '实盘矩阵', factors: 'AI推演', news: '全网舆情', lab: '自进化', history: '交易台账' };
         window.switchMainTab = function(tabName, syncHash) {
             if (TAB_NAMES.indexOf(tabName) === -1) tabName = 'trading';
             const tabs = TAB_NAMES;
@@ -1072,9 +1073,9 @@
                 }
                 if (topBtn) {
                     if (t === tabName) {
-                        topBtn.className = 'px-3.5 py-1.5 rounded-md text-xs font-bold text-white transition tab-btn-active flex items-center space-x-1.5';
+                        topBtn.className = 'px-3.5 py-1.5 rounded-md text-xs font-bold text-white transition tab-btn-active whitespace-nowrap flex items-center space-x-1.5';
                     } else {
-                        topBtn.className = 'px-3.5 py-1.5 rounded-md text-xs font-semibold text-[#707E94] hover:text-white transition flex items-center space-x-1.5';
+                        topBtn.className = 'px-3.5 py-1.5 rounded-md text-xs font-semibold text-[#707E94] hover:text-white transition whitespace-nowrap flex items-center space-x-1.5';
                     }
                 }
                 if (btmBtn) {
@@ -1094,7 +1095,7 @@
                     try { history.pushState(null, '', target); } catch (e) { window.location.hash = tabName; }
                 }
             }
-            document.title = `${{ trading: '实盘矩阵', factors: 'AI推演', news: '全网舆情', lab: '自进化', history: '交易台账' }[tabName]} · R20 Quantum Trader`;
+            document.title = `${TAB_TITLES[tabName] || '实盘矩阵'} · R20 Quantum Trader`;
             if (window.lucide) lucide.createIcons();
         };
         window.handleHashRoute = function() {
