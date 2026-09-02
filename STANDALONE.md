@@ -5,7 +5,8 @@ v6.0.0-preview removes the runtime dependency on QwenPaw. The product is now com
 - `r20_backend.app`: standalone FastAPI control plane and read-only monitoring API.
 - `r20_gateway.worker`: the R20-native, single-owner scheduler and durable notification-delivery worker for the 15-minute trader, 60-second factor refresh, 10-minute news refresh, daily reports, evolution review, and nightly backup.
 - `scripts/`: strategy and execution modules, run as isolated Python processes.
-- `.env`: only source for LLM, OKX, and optional notification credentials.
+- `.env` + encrypted R20 Secret Store: LLM, optional OKX API Key, and notification credentials.
+- Official `okx` CLI: required by the strategy execution path. CLI OAuth is an optional local credential source and is bound to the Linux service user's `HOME`.
 
 ## Install
 
@@ -13,15 +14,24 @@ v6.0.0-preview removes the runtime dependency on QwenPaw. The product is now com
 python3 -m venv .venv
 . .venv/bin/activate
 pip install -r requirements.txt
+npm install -g @okx_ai/okx-trade-cli@^1.4.4
 cp env.example .env
 chmod 600 .env
+python scripts/r20_okx_setup.py  # read-only preflight; READY is required
 ```
 
 Set `LLM_*` and `OKX_*` credentials in `.env`. Never commit this file.
 
 Before the first launch, set a random `R20_SETUP_TOKEN` in `.env`. Open `/admin`, enter it to unlock the setup page, then set a permanent administrator token. The page never displays configured secret values. `.env` is written atomically and set to permission mode `0600`.
 
-The standalone backend uses `OKX_*` for native read-only REST calls. Existing strategy execution remains on the local OKX CLI bridge during this migration phase; move that bridge's credentials to the target host before enabling the scheduler.
+R20 does not execute QwenPaw Skills. The strategy process calls the official `okx` CLI directly, while the control plane prefers signed OKX V5 requests when an environment-specific API Key is configured and otherwise uses safe CLI fallback paths.
+
+Choose one credential model:
+
+1. **Environment-specific API Key (recommended for servers):** create separate LIVE and DEMO keys, configure them in `/admin`, never grant withdrawal permission, and bind the key to the server IP where possible.
+2. **CLI OAuth (personal single-user deployment):** as the same Linux user that runs both services, run `okx config show --json`, `okx auth status --json`, explicitly choose `global` / `eea` / `us` / `tr`, then run `okx auth login --manual --site <site>`. Complete the browser device flow and run `python scripts/r20_okx_setup.py`.
+
+Never copy or publish another installation's `~/.okx/`; it contains machine-local authorization state. Both services must use the same `User`, `HOME`, and a `PATH` containing the `okx` binary. The supplied systemd units use the dedicated `r20` user and `/home/r20`; adjust both units together if your deployment user differs.
 
 ## Run Locally
 
@@ -65,3 +75,12 @@ sudo systemctl enable --now r20-quantum r20-gateway
 ```
 
 Before enabling `r20-gateway`, disable the old QwenPaw cron jobs to prevent duplicate execution. Do not run both schedulers simultaneously. The current Gateway worker owns the scheduler; the legacy `r20_backend.scheduler` and `deploy/r20-scheduler.service` are retained only for compatibility and must not run alongside it.
+
+Before starting the Gateway, verify dependency visibility under the exact service identity:
+
+```sh
+sudo -u r20 env HOME=/home/r20 PATH=/opt/r20-quantum-trader/.venv/bin:/usr/local/bin:/usr/bin:/bin \
+  /opt/r20-quantum-trader/.venv/bin/python /opt/r20-quantum-trader/scripts/r20_okx_setup.py
+```
+
+If this is not `READY`, keep the Gateway stopped. Do not solve it by copying a developer's `.okx` directory.

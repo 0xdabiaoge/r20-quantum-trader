@@ -44,6 +44,26 @@ class AdminApiTests(unittest.TestCase):
         response = self.client.get("/api/v1/admin/overview", headers={"X-R20-Admin-Token": "InitialAdmin123456"})
         self.assertEqual(response.status_code, 401)
 
+    def test_okx_runtime_diagnostic_requires_session_and_never_returns_secrets(self):
+        self.assertEqual(self.client.get("/api/v1/admin/okx/runtime").status_code, 401)
+        headers = self.login("admin", "InitialAdmin123456")
+        fake = {
+            "selected_mode": "demo", "ready": True, "credential_source": "cli-oauth",
+            "cli": {"installed": True, "path": "/usr/local/bin/okx", "version": "1.4.5", "supported": True},
+            "oauth": {"status": "logged_in", "site": "global", "scopes": ["market:read", "demo:read", "demo:trade"], "ready_for_selected_mode": True},
+            "api_key_profiles": [], "static_credentials_configured": False,
+            "read_probe": {"ok": True, "detail": "OKX 私有只读探针通过"},
+            "issues": [], "steps": [], "install_command": "npm install -g @okx_ai/okx-trade-cli@^1.4.4",
+        }
+        from unittest.mock import patch
+        with patch.object(app_module, "diagnose_okx_runtime", return_value=fake):
+            response = self.client.get("/api/v1/admin/okx/runtime", headers=headers)
+        self.assertEqual(response.status_code, 200, response.text)
+        text = response.text.lower()
+        self.assertNotIn("secret_key", text)
+        self.assertNotIn("passphrase", text)
+        self.assertEqual(response.json()["credential_source"], "cli-oauth")
+
 
 if __name__ == "__main__":
     unittest.main()

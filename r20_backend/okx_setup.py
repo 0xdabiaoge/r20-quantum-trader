@@ -1,0 +1,139 @@
+"""Local OKX CLI/OAuth dependency diagnostics for standalone R20 deployments."""
+from __future__ import annotations
+
+import json
+import os
+import re
+import shutil
+import subprocess
+from pathlib import Path
+from typing import Any, Mapping
+
+MIN_OKX_CLI = (1, 4, 4)
+INSTALL_COMMAND = "npm install -g @okx_ai/okx-trade-cli@^1.4.4"
+
+
+def _run(command: list[str], timeout: int = 12, env: Mapping[str, str] | None = None) -> dict[str, Any]:
+    try:
+        completed = subprocess.run(command, capture_output=True, text=True, timeout=timeout, env=dict(env or os.environ))
+    except FileNotFoundError:
+        return {"ok": False, "returncode": 127, "stdout": "", "stderr": f"{command[0]} not found"}
+    except Exception as exc:
+        return {"ok": False, "returncode": -1, "stdout": "", "stderr": f"{type(exc).__name__}: {exc}"}
+    return {
+        "ok": completed.returncode == 0,
+        "returncode": completed.returncode,
+        "stdout": completed.stdout.strip(),
+        "stderr": completed.stderr.strip(),
+    }
+
+
+def _json_output(result: dict[str, Any]) -> Any:
+    if not result.get("ok") or not result.get("stdout"):
+        return None
+    try:
+        return json.loads(result["stdout"])
+    except json.JSONDecodeError:
+        return None
+
+
+def _version_tuple(text: str) -> tuple[int, int, int]:
+    match = re.search(r"(\d+)\.(\d+)\.(\d+)", text or "")
+    return tuple(int(value) for value in match.groups()) if match else (0, 0, 0)
+
+
+def _api_key_profiles(payload: Any) -> list[str]:
+    profiles = payload.get("profiles", {}) if isinstance(payload, dict) else {}
+    if isinstance(profiles, list):
+        return [str(item.get("name") or item.get("profile") or "default") for item in profiles if isinstance(item, dict) and item.get("api_key")]
+    if isinstance(profiles, dict):
+        return [str(name) for name, item in profiles.items() if isinstance(item, dict) and item.get("api_key")]
+    return []
+
+
+def diagnose_okx_runtime(selected_mode: str, static_configured: bool, *, env: Mapping[str, str] | None = None) -> dict[str, Any]:
+    """Return secret-free readiness information; performs authenticated read-only probes only."""
+    selected_mode = "live" if selected_mode == "live" else "demo"
+    binary = shutil.which("okx", path=(env or os.environ).get("PATH"))
+    status: dict[str, Any] = {
+        "selected_mode": selected_mode,
+        "cli": {"installed": bool(binary), "path": binary or "", "version": "", "supported": False},
+        "oauth": {"status": "unavailable", "site": "", "scopes": [], "ready_for_selected_mode": False},
+        "api_key_profiles": [],
+        "static_credentials_configured": bool(static_configured),
+        "credential_source": "static-v5-key" if static_configured else "none",
+        "read_probe": {"ok": False, "detail": "not run"},
+        "ready": False,
+        "issues": [],
+        "steps": [],
+        "install_command": INSTALL_COMMAND,
+    }
+    if not binary:
+        status["issues"].append("OKX CLI 未安装或服务 PATH 中不可见")
+        status["steps"].extend(["安装 Node.js 18+ 与 npm", f"执行：{INSTALL_COMMAND}", "安装后重启 r20-backend 与 r20-gateway"])
+        return status
+
+    version_result = _run([binary, "--version"], env=env)
+    version = version_result["stdout"].splitlines()[0] if version_result["stdout"] else ""
+    status["cli"].update({"version": version, "supported": _version_tuple(version) >= MIN_OKX_CLI})
+    if not status["cli"]["supported"]:
+        status["issues"].append(f"OKX CLI 版本过旧：{version or 'unknown'}，最低需要 1.4.4")
+        status["steps"].append(f"执行：{INSTALL_COMMAND}")
+
+    config_payload = _json_output(_run([binary, "config", "show", "--json"], env=env))
+    status["api_key_profiles"] = _api_key_profiles(config_payload)
+    auth_result = _run([binary, "auth", "status", "--json"], env=env)
+    auth_payload = _json_output(auth_result)
+    if isinstance(auth_payload, dict):
+        oauth_status = str(auth_payload.get("status") or "unknown")
+        scopes = [str(item) for item in auth_payload.get("scopes", []) if item]
+        required = {"market:read", f"{selected_mode}:read", f"{selected_mode}:trade"}
+        oauth_ready = oauth_status == "logged_in" and required.issubset(set(scopes))
+        status["oauth"] = {
+            "status": oauth_status,
+            "site": str(auth_payload.get("site") or ""),
+            "scopes": scopes,
+            "ready_for_selected_mode": oauth_ready,
+        }
+    else:
+        oauth_ready = False
+        status["oauth"]["detail"] = auth_result["stderr"] or "无法读取 OAuth 状态"
+
+    if static_configured:
+        status["credential_source"] = "static-v5-key"
+    elif oauth_ready:
+        status["credential_source"] = "cli-oauth"
+    elif status["api_key_profiles"]:
+        status["credential_source"] = "cli-api-key-profile"
+
+    mode_flag = f"--{selected_mode}"
+    if status["cli"]["supported"] and (static_configured or oauth_ready or status["api_key_profiles"]):
+        probe_env = dict(env or os.environ)
+        if static_configured:
+            prefix = "OKX_DEMO" if selected_mode == "demo" else "OKX_LIVE"
+            mappings = {"OKX_API_KEY": f"{prefix}_API_KEY", "OKX_SECRET_KEY": f"{prefix}_SECRET_KEY", "OKX_PASSPHRASE": f"{prefix}_PASSPHRASE"}
+            for target, source in mappings.items():
+                if probe_env.get(source):
+                    probe_env[target] = str(probe_env[source])
+            probe_env["OKX_DEMO"] = "1" if selected_mode == "demo" else "0"
+        probe = _run([binary, mode_flag, "account", "positions", "--json"], env=probe_env)
+        payload = _json_output(probe)
+        status["read_probe"] = {
+            "ok": probe["ok"] and isinstance(payload, list),
+            "detail": "OKX 私有只读探针通过" if probe["ok"] and isinstance(payload, list) else (probe["stderr"] or probe["stdout"] or "invalid response")[:300],
+        }
+
+    status["ready"] = bool(status["cli"]["supported"] and status["read_probe"]["ok"] and status["credential_source"] != "none")
+    if not static_configured and not oauth_ready and not status["api_key_profiles"]:
+        status["issues"].append(f"未找到可用于 {selected_mode.upper()} 的 OKX 凭证或 OAuth 授权")
+        status["steps"].extend([
+            "在部署 R20 的同一 Linux 用户下执行 OAuth 登录，或在后台填写对应环境 API Key",
+            "OAuth：先运行 okx config show --json 与 okx auth status --json，再明确选择 global/eea/us/tr 站点",
+            "随后运行：okx auth login --manual --site <站点>，在浏览器完成授权",
+        ])
+    elif not status["read_probe"]["ok"]:
+        status["issues"].append("OKX 凭证存在，但当前环境私有只读探针失败")
+        status["steps"].append("检查授权是否包含当前环境 read/trade 权限，以及服务 HOME/PATH 是否与登录用户一致")
+    if status["ready"]:
+        status["steps"].append("运行依赖与当前环境授权已就绪；建议先在 DEMO 完成下单、撤单、平仓和 OCO 验证")
+    return status

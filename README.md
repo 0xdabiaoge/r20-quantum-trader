@@ -9,7 +9,7 @@
 [![Release](https://img.shields.io/badge/release-v6.0.0--preview-3875F6?style=flat-square)](https://github.com/555cute/r20-quantum-trader/releases/tag/v6.0.0-preview)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![OKX](https://img.shields.io/badge/Exchange-OKX-111827?style=flat-square)](https://www.okx.com/)
-[![Tests](https://img.shields.io/badge/tests-90%2F90-0ECB81?style=flat-square)](#验证与测试)
+[![Tests](https://img.shields.io/badge/tests-103%2F103-0ECB81?style=flat-square)](#验证与测试)
 [![License](https://img.shields.io/badge/license-MIT-10B981?style=flat-square)](LICENSE)
 
 [在线只读终端](https://www.r20.cn/) · [v6.0.0 Preview](https://github.com/555cute/r20-quantum-trader/releases/tag/v6.0.0-preview) · [独立部署](STANDALONE.md) · [恢复指南](RECOVERY_GUIDE.md)
@@ -116,9 +116,14 @@ SQLite / data/*       Gateway 队列、管理员、快照与本地加密配置
 git clone https://github.com/555cute/r20-quantum-trader.git
 cd r20-quantum-trader
 
+# 推荐：同时安装 Python 依赖与官方 OKX CLI
+./deploy/install.sh
+
+# 或手动安装
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+npm install -g @okx_ai/okx-trade-cli@^1.4.4
 ```
 
 ### 2. 创建本地配置
@@ -148,7 +153,44 @@ R20_MANUAL_CLOSE_ENABLED=0
 
 首次部署推荐只配置 LLM 与 OKX DEMO。通知、提示词方案、灾备位置和管理员账号可在 `/admin` 中继续完成。
 
-### 3. 启动控制面
+### 3. 配置 OKX（独立部署必做）
+
+R20 的交易执行会直接调用官方 `okx` CLI，但**不会运行或依赖 QwenPaw Skill**。Skill 只是给聊天 Agent 阅读的操作说明；真正需要搬到新服务器的是：
+
+1. 官方 OKX CLI；
+2. R20 自己的环境选择和凭证；
+3. 如果选择 OAuth，则必须由运行 R20 服务的同一 Linux 用户完成授权。
+
+请从下面两种方式中选择一种，不要复制开发者或其他用户的 `.okx/`：
+
+#### 方式 A：DEMO API Key（推荐用于 VPS 与长期无人值守）
+
+在 OKX 的模拟交易 API 页面创建只允许交易和读取的 DEMO Key，然后登录 `/admin`，在“安全控制 → OKX 双环境凭证”填写 DEMO API Key、Secret 和 Passphrase。保持当前环境为 `DEMO`。
+
+这种方式由 R20 本地加密 Secret Store 保存，最适合 systemd 服务；不要授予提币权限，建议绑定服务器出口 IP。
+
+#### 方式 B：OKX CLI OAuth（适合个人单用户部署）
+
+先确认服务运行用户和站点。站点必须由用户明确选择：`global`、`eea`、`us` 或 `tr`，不能静默默认。
+
+```bash
+# 以下命令必须由运行 r20-backend 与 r20-gateway 的同一 Linux 用户执行
+okx config show --json
+okx auth status --json
+okx auth login --manual --site global   # 按你的实际站点替换 global
+```
+
+CLI 会返回浏览器授权地址和验证码。授权完成后，不要关注短期 access token 的 TTL；CLI 会自动刷新。随后执行只读预检：
+
+```bash
+.venv/bin/python scripts/r20_okx_setup.py
+```
+
+只有显示 `READY` 才能启动 Gateway。R20 会在当前环境缺少 `read`/`trade` 授权、CLI 不可见或私有读取失败时标记为不可运行。
+
+> OAuth 状态保存在运行用户的 `~/.okx/`。该目录是本地私有状态，已被 Git 忽略，不能提交到仓库或直接分发给新用户。systemd 的 `User`、`HOME` 和 `PATH` 必须与完成 OAuth 登录的用户一致。
+
+### 4. 启动控制面
 
 ```bash
 source .venv/bin/activate
@@ -161,7 +203,7 @@ python3 -m uvicorn r20_backend.app:app --host 0.0.0.0 --port 8080
 - 管理后台：`http://127.0.0.1:8080/admin`
 - 健康检查：`http://127.0.0.1:8080/api/v1/health`
 
-### 4. 启动唯一 Gateway Worker
+### 5. 启动唯一 Gateway Worker
 
 另开终端：
 
@@ -182,7 +224,8 @@ python3 -m r20_gateway.worker
 ### OKX 环境
 
 - 默认使用 `R20_OKX_ENV=demo`。
-- LIVE 与 DEMO API Key 必须分别创建和保存。
+- LIVE 与 DEMO API Key 必须分别创建和保存；或使用同一服务用户下的 OKX CLI OAuth。
+- R20 不依赖 QwenPaw Skill，但当前交易执行依赖官方 `okx` CLI；安装后可在后台查看 CLI、OAuth、权限和只读探针状态。
 - Web 监控、策略执行、台账同步和管理员快速平仓共享同一环境选择器。
 - 手动快速平仓默认关闭；开启后仍需管理员密码、一次性 Token 和精确确认短语。
 
@@ -226,7 +269,7 @@ python3 -m compileall -q r20_backend r20_gateway scripts
 python3 -m unittest discover -s tests -v
 ```
 
-当前结果：**90 / 90 tests passed**。
+当前结果：**103 / 103 tests passed**。
 
 测试覆盖管理员认证、提示词模块保护、Gateway 调度与持久队列、插件注册、灾备、OKX 控制面、通知通道业务码和数理因子等关键路径。真实交易、真实通知和灾备目标仍必须在部署者自己的 DEMO 环境中逐项验收。
 

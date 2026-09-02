@@ -25,6 +25,7 @@ from pydantic import BaseModel, Field
 from r20_backend.config import refresh_settings, settings
 from r20_backend.okx_client import OKXClient
 from r20_backend.okx_trade_service import account_snapshot as okx_account_snapshot, fast_close_confirmed
+from r20_backend.okx_setup import diagnose_okx_runtime
 from r20_backend.backup_secrets import credential_status as backup_credential_status, save_credentials as save_backup_credentials
 from r20_backend.prompt_views import EVOLUTION_USER_TEMPLATE, TRADING_USER_TEMPLATE, rendered_snapshots
 from r20_backend.settings_store import mask, remove_env, update_env
@@ -583,6 +584,14 @@ def admin_config(x_r20_admin_token: str | None = Header(default=None)) -> dict[s
             "manual_close_enabled": settings.manual_close_enabled,
         },
     }
+
+
+@app.get("/api/v1/admin/okx/runtime")
+def admin_okx_runtime(x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
+    refresh_settings()
+    require_admin_header(x_r20_admin_token)
+    configured = settings.okx_demo_configured if settings.okx_environment == "demo" else settings.okx_live_configured
+    return diagnose_okx_runtime(settings.okx_environment, configured)
 
 
 @app.put("/api/v1/admin/config")
