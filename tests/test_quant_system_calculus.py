@@ -258,11 +258,47 @@ class AiFactorTraderPositionProtectionTest(unittest.TestCase):
     def test_losing_position_above_hard_stop_remains_open(self):
         position={"pos":4.0,"side":"long","avgPx":103.55,"upl":-4.0}
         now=int(ai_factor_trader.time.time())
-        trackers={"SOL-USDT-SWAP_long":{"entryTs":now,"trailingStopPx":101.81,"highWaterMark":104.2,"lowWaterMark":102.5}}
+        trackers={"SOL-USDT-SWAP_long":{"entryTs":now,"trailingStopPx":101.81,"takeProfitPx":106.45,"highWaterMark":104.2,"lowWaterMark":102.5}}
         actions=[]
-        with patch.object(ai_factor_trader,"close_position_confirmed") as close:
+        with patch.object(ai_factor_trader,"ensure_cloud_position_protection",return_value=(True,"verified")), patch.object(ai_factor_trader,"close_position_confirmed") as close:
             closed,reason=ai_factor_trader.manage_position_tp_and_trailing(self._factor(102.5),position,trackers,"2026-09-02 15:00:00",actions)
         self.assertFalse(closed); self.assertEqual(reason,"持仓监控中"); close.assert_not_called()
+
+    def test_cloud_oco_gap_is_repaired_and_verified(self):
+        responses=[
+            {"ok":True,"data":[],"stderr":"","stdout":"[]"},
+            {"ok":True,"data":{"algoId":"88"},"stderr":"","stdout":"{}"},
+            {"ok":True,"data":[{"state":"live","posSide":"long","side":"sell","reduceOnly":"true","sz":"4","tpTriggerPx":"106","slTriggerPx":"101"}],"stderr":"","stdout":"[]"},
+        ]
+        with patch.object(ai_factor_trader,"run_cmd_result",side_effect=responses) as run, patch.object(ai_factor_trader.time,"sleep"):
+            ok,detail=ai_factor_trader.ensure_cloud_position_protection("SOL-USDT-SWAP","long",4,106,101)
+        self.assertTrue(ok); self.assertIn("repaired and verified",detail)
+        self.assertIn("--ordType oco",run.call_args_list[1].args[0])
+        self.assertIn("--reduceOnly",run.call_args_list[1].args[0])
+
+    def test_stale_order_query_failure_aborts_cleanup(self):
+        with patch.object(ai_factor_trader,"run_cmd_result",return_value={"ok":False,"data":None,"stderr":"timeout","stdout":""}):
+            ok,detail=ai_factor_trader.clean_stale_open_orders()
+        self.assertFalse(ok); self.assertIn("timeout",detail)
+
+    def test_stale_order_cancel_uses_valid_cli_and_fail_closed(self):
+        order={"instId":"SOL-USDT-SWAP","ordId":"11","state":"live","cTime":"1"}
+        responses=[{"ok":True,"data":[order],"stderr":"","stdout":"[]"},{"ok":False,"data":None,"stderr":"rejected","stdout":""}]
+        with patch.object(ai_factor_trader,"run_cmd_result",side_effect=responses) as run, patch.object(ai_factor_trader.time,"time",return_value=1000):
+            ok,detail=ai_factor_trader.clean_stale_open_orders()
+        self.assertFalse(ok); self.assertIn("rejected",detail)
+        self.assertIn("swap cancel SOL-USDT-SWAP --ordId 11",run.call_args_list[1].args[0])
+
+    def test_cloud_oco_failure_closes_position_fail_closed(self):
+        position={"pos":4.0,"side":"long","avgPx":103.55,"upl":-4.0}
+        now=int(ai_factor_trader.time.time())
+        trackers={"SOL-USDT-SWAP_long":{"entryTs":now,"trailingStopPx":101.81,"takeProfitPx":106.45,"highWaterMark":104.2,"lowWaterMark":102.5}}
+        actions=[]
+        with patch.object(ai_factor_trader,"ensure_cloud_position_protection",return_value=(False,"repair failed")), patch.object(ai_factor_trader,"close_position_confirmed",return_value=(True,"closed")) as close, patch.object(ai_factor_trader,"record_trade"), patch.object(ai_factor_trader,"add_stop_cooldown"):
+            closed,reason=ai_factor_trader.manage_position_tp_and_trailing(self._factor(102.5),position,trackers,"2026-09-02 15:00:00",actions)
+        self.assertTrue(closed); self.assertEqual(reason,"保护失效安全退出")
+        close.assert_called_once_with("SOL-USDT-SWAP","long",4.0)
+        self.assertNotIn("SOL-USDT-SWAP_long",trackers)
 
 
 if __name__ == "__main__":

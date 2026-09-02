@@ -246,25 +246,24 @@ def load_adaptive_config():
     """Fallback config reader maintaining compatibility."""
     return {}
 
-def clean_stale_open_orders():
-    """Cancel stale unfilled swap orders and report only exchange-confirmed cancellations."""
-    try:
-        orders_res = run_json_cmd(okx_private_command("okx swap orders --json"))
-        if orders_res and isinstance(orders_res, list):
-            now_ts = int(time.time() * 1000)
-            for ord_item in orders_res:
-                inst_id = ord_item.get("instId", "")
-                ord_id = ord_item.get("ordId", "")
-                state = str(ord_item.get("state", "live")).lower()
-                c_time = int(ord_item.get("cTime", now_ts) or now_ts)
-                if state in {"live", "partially_filled"} and ord_id and now_ts - c_time > 240000:
-                    result = run_cmd_result(okx_private_command(f"okx swap cancel {inst_id} --ordId {ord_id} --json"))
-                    if result["ok"]:
-                        print(f"[挂单生命周期管理] 自动撤销超时挂单: {inst_id} (ordId={ord_id}, state={state})")
-                    else:
-                        print(f"[挂单生命周期管理] 撤单失败: {inst_id} (ordId={ord_id}, error={result['stderr'] or result['stdout']})")
-    except Exception as e:
-        print(f"[挂单生命周期管理] 检查异常: {e}")
+def clean_stale_open_orders() -> Tuple[bool, str]:
+    """Cancel stale entry orders; any inability to verify/cancel blocks the trading cycle."""
+    result = run_cmd_result(okx_private_command("okx swap orders --json"), timeout=20)
+    if not result["ok"] or not isinstance(result.get("data"), list):
+        return False, result["stderr"] or result["stdout"] or "invalid open-orders response"
+    now_ts = int(time.time() * 1000)
+    for order in result["data"]:
+        inst_id = str(order.get("instId") or "")
+        order_id = str(order.get("ordId") or "")
+        state = str(order.get("state", "live")).lower()
+        created_at = int(order.get("cTime", now_ts) or now_ts)
+        if state not in {"live", "partially_filled"} or not order_id or now_ts - created_at <= 240000:
+            continue
+        canceled = run_cmd_result(okx_private_command(f"okx swap cancel {inst_id} --ordId {order_id} --json"), timeout=20)
+        if not canceled["ok"]:
+            return False, f"failed to cancel stale order {inst_id}/{order_id}: {canceled['stderr'] or canceled['stdout']}"
+        print(f"[挂单生命周期管理] 自动撤销超时挂单: {inst_id} (ordId={order_id}, state={state})")
+    return True, "open orders verified"
 
 def check_black_swan_sentinel() -> Tuple[bool, str]:
     """Minute-level Black Swan Sentinel: Checks for BTC 5M extreme flash-crash or catastrophic news"""
@@ -351,7 +350,7 @@ def close_position_confirmed(inst_id: str, pos_side: str, before_size: float) ->
                 if o_side in (pos_side.lower(), "net"):
                     o_id = str(o.get("ordId") or "")
                     if o_id:
-                        run_cmd_result(okx_private_command(f"okx swap cancel --instId {inst_id} --ordId {o_id} --json"), timeout=10)
+                        run_cmd_result(okx_private_command(f"okx swap cancel {inst_id} --ordId {o_id} --json"), timeout=10)
     except Exception as e:
         print(f"[Close Pre-Clean] Warning cancelling pending orders for {inst_id}: {e}")
 
@@ -417,7 +416,67 @@ def submit_protected_limit_order(inst_id: str, side: str, pos_side: str, size: i
             order_id = nested[0].get("ordId")
     elif isinstance(payload, list) and payload and isinstance(payload[0], dict):
         order_id = payload[0].get("ordId")
-    return True, str(order_id or "accepted")
+    if not order_id:
+        return False, "exchange accepted response without a verifiable order id"
+    return True, str(order_id)
+
+
+def _float_or_zero(value: Any) -> float:
+    try:
+        return abs(float(value or 0.0))
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _live_oco_coverage(orders: List[Dict[str, Any]], pos_side: str) -> float:
+    """Return contract size covered by live, reduce-only OCO TP/SL orders."""
+    coverage = 0.0
+    close_side = "sell" if pos_side == "long" else "buy"
+    for order in orders:
+        if str(order.get("state", "live")).lower() not in {"live", "effective"}:
+            continue
+        if str(order.get("posSide", "net")).lower() not in {pos_side, "net"}:
+            continue
+        if str(order.get("side", close_side)).lower() != close_side:
+            continue
+        if not order.get("tpTriggerPx") or not order.get("slTriggerPx"):
+            continue
+        reduce_only = str(order.get("reduceOnly", "true")).lower() in {"true", "1", "yes"}
+        if not reduce_only:
+            continue
+        coverage += _float_or_zero(order.get("sz") or order.get("actualSz"))
+    return coverage
+
+
+def ensure_cloud_position_protection(inst_id: str, pos_side: str, size: float, tp_px: float, sl_px: float) -> Tuple[bool, str]:
+    """Verify 100% live cloud OCO coverage, repair any gap, and verify again."""
+    query = run_cmd_result(okx_private_command(f"okx swap algo orders --instId {inst_id} --json"), timeout=20)
+    if not query["ok"] or not isinstance(query.get("data"), list):
+        return False, f"unable to verify cloud OCO: {query['stderr'] or query['stdout'] or 'invalid response'}"
+    coverage = _live_oco_coverage(query["data"], pos_side)
+    missing = max(0.0, float(size) - coverage)
+    if missing <= max(1e-12, float(size) * 0.001):
+        return True, f"cloud OCO coverage verified ({coverage:g}/{size:g})"
+
+    close_side = "sell" if pos_side == "long" else "buy"
+    command = okx_private_command(
+        f"okx swap algo place --instId {inst_id} --side {close_side} --posSide {pos_side} "
+        f"--tdMode cross --ordType oco --sz {missing:g} --tpTriggerPx {tp_px} --tpOrdPx=-1 "
+        f"--slTriggerPx {sl_px} --slOrdPx=-1 --reduceOnly --cxlOnClosePos --json"
+    )
+    placed = run_cmd_result(command, timeout=20)
+    if not placed["ok"]:
+        return False, f"cloud OCO repair failed: {placed['stderr'] or placed['stdout'] or 'order rejected'}"
+
+    for _ in range(4):
+        time.sleep(0.5)
+        verify = run_cmd_result(okx_private_command(f"okx swap algo orders --instId {inst_id} --json"), timeout=20)
+        if not verify["ok"] or not isinstance(verify.get("data"), list):
+            continue
+        verified_coverage = _live_oco_coverage(verify["data"], pos_side)
+        if verified_coverage + max(1e-12, float(size) * 0.001) >= float(size):
+            return True, f"cloud OCO repaired and verified ({verified_coverage:g}/{size:g})"
+    return False, "cloud OCO repair was submitted but full coverage could not be verified"
 
 
 def record_trade(trade_data):
@@ -865,6 +924,7 @@ def manage_position_tp_and_trailing(f, curr_pos, trackers, timestamp_full, execu
             "highWaterMark": cur_px,
             "lowWaterMark": cur_px,
             "trailingStopPx": round((entry_px - atr * profile["sl_atr_mult"]) if is_long else (entry_px + atr * profile["sl_atr_mult"]), prec),
+            "takeProfitPx": round((entry_px + max(atr * profile["tp_atr_mult"], entry_px * profile["min_profit_ratio"])) if is_long else (entry_px - max(atr * profile["tp_atr_mult"], entry_px * profile["min_profit_ratio"])), prec),
             "stage_desc": "持有监控中"
         }
 
@@ -918,6 +978,34 @@ def manage_position_tp_and_trailing(f, curr_pos, trackers, timestamp_full, execu
             notify_trade_close(name, pnl_val, "硬止损平仓", cur_px)
         trackers.pop(pos_key, None)
         return True, "已硬止损"
+
+    default_tp_dist = max(atr * profile["tp_atr_mult"], entry_px * profile["min_profit_ratio"])
+    if not _float_or_zero(t.get("takeProfitPx")):
+        t["takeProfitPx"] = round(entry_px + default_tp_dist if is_long else entry_px - default_tp_dist, prec)
+    protected, protection_detail = ensure_cloud_position_protection(
+        inst_id, "long" if is_long else "short", pos_sz, float(t["takeProfitPx"]), hard_stop_px
+    )
+    if not protected:
+        closed, close_detail = close_position_confirmed(inst_id, "long" if is_long else "short", pos_sz)
+        if not closed:
+            executed_actions.append(f"[{name}] 🚨 云端 OCO 缺失且安全退出失败: {protection_detail}; {close_detail}")
+            return False, "保护与退出均失败"
+        pnl_val = curr_pos["upl"]
+        executed_actions.append(f"[{name}] 🧯 云端 OCO 无法确认，已安全平仓: {protection_detail}")
+        record_trade({
+            "is_trade": True, "time": timestamp_full, "inst": name, "name": name,
+            "action": "平仓", "action_type": "保护失效退出",
+            "direction": f"平{'多' if is_long else '空'}", "side": f"{'多' if is_long else '空'}单保护失效退出",
+            "size": pos_sz, "sz": pos_sz, "price": cur_px,
+            "fee": (pos_sz * ct_val * cur_px) * TAKER_FEE_RATE, "pnl": pnl_val,
+            "remark": f"云端 OCO 无法达到全仓覆盖，交易所确认安全平仓：{protection_detail}"
+        })
+        add_stop_cooldown(inst_id, "long" if is_long else "short", "云端保护失效")
+        if notify_trade_close:
+            notify_trade_close(name, pnl_val, "云端保护失效退出", cur_px)
+        trackers.pop(pos_key, None)
+        return True, "保护失效安全退出"
+    t["cloudProtection"] = {"verifiedAt": timestamp_full, "detail": protection_detail}
 
     # 2. Volatility Time-Stop Exit (After 8 Hours dead consolidation without expansion)
     hold_duration_sec = now_ts - t["entryTs"]
@@ -1440,7 +1528,10 @@ def execute_portfolio():
     timestamp_full = now_dt.strftime("%Y-%m-%d %H:%M:%S")
 
     # 0. Clean Stale Open Orders & Harvest Real-time News Sentiment
-    clean_stale_open_orders()
+    orders_ok, orders_error = clean_stale_open_orders()
+    if not orders_ok:
+        print(f"[Trader] Abort: unable to verify/cancel stale open orders: {orders_error}")
+        return None
     try:
         harvester_script = os.path.join(WORKSPACE_DIR, "scripts", "news_sentiment_harvester.py")
         if os.path.exists(harvester_script):
