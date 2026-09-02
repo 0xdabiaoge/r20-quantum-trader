@@ -44,6 +44,25 @@ class AdminApiTests(unittest.TestCase):
         response = self.client.get("/api/v1/admin/overview", headers={"X-R20-Admin-Token": "InitialAdmin123456"})
         self.assertEqual(response.status_code, 401)
 
+    def test_okx_cli_check_and_install_require_valid_session_and_confirmation(self):
+        self.assertEqual(self.client.get("/api/v1/admin/okx/cli-check").status_code, 401)
+        self.assertEqual(self.client.post("/api/v1/admin/okx/install-cli", json={"confirmation":"INSTALL OKX CLI"}).status_code, 401)
+        root = self.login("admin", "InitialAdmin123456")
+        from unittest.mock import patch
+        with patch.object(app_module, "check_node_npm", return_value={"ready":True,"node_installed":True,"node_path":"/usr/bin/node","node_version":"20","npm_installed":True,"npm_path":"/usr/bin/npm","npm_version":"10"}):
+            checked=self.client.get("/api/v1/admin/okx/cli-check",headers=root)
+        self.assertEqual(checked.status_code,200,checked.text)
+        self.assertTrue(checked.json()["ready"])
+        bad=self.client.post("/api/v1/admin/okx/install-cli",headers=root,json={"confirmation":"YES"})
+        self.assertEqual(bad.status_code,422)
+        wrong=self.client.post("/api/v1/admin/okx/install-cli",headers=root,json={"confirmation":"INSTALL SOMETHING"})
+        self.assertEqual(wrong.status_code,400)
+        installed={"ok":True,"detail":"OKX CLI 安装成功","path":"/usr/local/bin/okx","version":"1.4.5"}
+        with patch.object(app_module,"install_okx_cli",return_value=installed):
+            response=self.client.post("/api/v1/admin/okx/install-cli",headers=root,json={"confirmation":"INSTALL OKX CLI"})
+        self.assertEqual(response.status_code,200,response.text)
+        self.assertEqual(response.json()["version"],"1.4.5")
+
     def test_okx_runtime_diagnostic_requires_session_and_never_returns_secrets(self):
         self.assertEqual(self.client.get("/api/v1/admin/okx/runtime").status_code, 401)
         headers = self.login("admin", "InitialAdmin123456")

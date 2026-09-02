@@ -108,6 +108,10 @@ class AdminUnlockRequest(BaseModel):
     confirmation: str = Field(min_length=12, max_length=100)
 
 
+class OkxCliInstallRequest(BaseModel):
+    confirmation: str = Field(min_length=8, max_length=80)
+
+
 class AdminConfigUpdate(BaseModel):
     okx_environment: str | None = Field(default=None, pattern=r"^(demo|live)$")
     okx_live_api_key: str | None = None
@@ -595,17 +599,23 @@ def admin_okx_runtime(x_r20_admin_token: str | None = Header(default=None)) -> d
 
 
 @app.get("/api/v1/admin/okx/cli-check")
-def admin_okx_cli_check(x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
+def admin_okx_cli_check(x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
     """Check Node.js/npm/OKX CLI prerequisites without side effects."""
-    require_admin_header(x_r20_admin_token)
+    require_admin_header(x_r20_session=x_r20_session)
     return check_node_npm()
 
 
 @app.post("/api/v1/admin/okx/install-cli")
-def admin_okx_install_cli(x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
-    """One-click install or upgrade OKX CLI via npm. Requires superadmin."""
-    require_superadmin(REQUEST.get())
-    return install_okx_cli()
+def admin_okx_install_cli(payload: OkxCliInstallRequest, x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    """One-click install or upgrade OKX CLI via npm. Requires superadmin and explicit confirmation."""
+    actor = require_superadmin(x_r20_session)
+    if payload.confirmation.strip().upper() != "INSTALL OKX CLI":
+        raise HTTPException(status_code=400, detail="确认短语必须精确为：INSTALL OKX CLI")
+    result = install_okx_cli()
+    audit_record("okx.cli.install", "success" if result.get("ok") else "failed", {"actor": actor["username"], "detail": result.get("detail", "")[:300]})
+    if not result.get("ok"):
+        raise HTTPException(status_code=502, detail=result.get("detail") or "OKX CLI 安装失败")
+    return result
 
 
 @app.put("/api/v1/admin/config")
