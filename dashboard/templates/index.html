@@ -409,9 +409,9 @@
                 <!-- Sub-bar with Summary Metrics -->
                 <div class="flex flex-wrap items-center justify-between gap-2 text-xs font-mono text-[#707E94] mb-3 px-1">
                     <div class="flex items-center space-x-3">
-                        <span>初始本金: <strong id="chart-stat-base" class="text-[#EAECEF]">4,192.61 U</strong></span>
+                        <span>初始本金: <strong id="chart-stat-base" class="text-[#EAECEF]">--</strong></span>
                         <span class="text-[#1A2232]">•</span>
-                        <span>最高峰值: <strong id="chart-stat-peak" class="text-[#0ECB81]">4,192.61 U</strong></span>
+                        <span>最高峰值: <strong id="chart-stat-peak" class="text-[#0ECB81]">--</strong></span>
                     </div>
                     <div>
                         <span>最大动态回撤: <strong id="chart-stat-maxdd" class="text-[#F6465D]">-3.72%</strong></span>
@@ -2257,7 +2257,7 @@
             if (!ctx) return;
 
             const acc = rawJsonData?.account || {};
-            const initialCapital = Number(acc.initial_capital || 4061.04);
+            const initialCapital = Number(acc.initial_capital || 10000);
             const closedTrades = (allTrades || []).filter(t => t.status !== 'holding');
             const points = (snapshots && snapshots.length > 0) ? snapshots : [];
 
@@ -2324,7 +2324,7 @@
                                 yAxisID: 'y'
                             },
                             {
-                                label: '初始本金基准 (4061.04 U)',
+                                label: `初始本金基准 (${initialCapital.toFixed(2)} U)`,
                                 data: baselineValues,
                                 borderColor: '#707E94',
                                 borderWidth: 1.2,

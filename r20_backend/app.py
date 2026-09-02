@@ -26,6 +26,7 @@ from r20_backend.config import refresh_settings, settings
 from r20_backend.okx_client import OKXClient
 from r20_backend.okx_trade_service import account_snapshot as okx_account_snapshot, fast_close_confirmed
 from r20_backend.okx_setup import diagnose_okx_runtime, install_okx_cli, check_node_npm
+from r20_backend.account_baseline import load_account_baseline, update_initial_capital
 from r20_backend.backup_secrets import credential_status as backup_credential_status, save_credentials as save_backup_credentials
 from r20_backend.prompt_views import EVOLUTION_USER_TEMPLATE, TRADING_USER_TEMPLATE, rendered_snapshots
 from r20_backend.settings_store import mask, remove_env, update_env
@@ -130,6 +131,11 @@ class AdminConfigUpdate(BaseModel):
     llm_reasoning_effort: str | None = Field(default=None, pattern=r"^(low|medium|high)$")
     notification_webhook: str | None = None
     manual_close_enabled: bool | None = None
+
+
+class InitialCapitalUpdate(BaseModel):
+    initial_capital: float = Field(gt=0, le=1_000_000_000)
+    confirmation: str = Field(min_length=1, max_length=80)
 
 
 class GatewayReplayRequest(BaseModel):
@@ -575,6 +581,7 @@ def admin_config(x_r20_admin_token: str | None = Header(default=None)) -> dict[s
             "管理员系统": "账号密码 + 服务端会话" if admin_auth.has_users() else "尚未初始化",
             "通知 Webhook": "已设置" if settings.notification_webhook else "未设置",
             "手动平仓": "已启用" if settings.manual_close_enabled else "已禁用",
+            "主页初始本金": f"{load_account_baseline()['initial_capital']:,.2f} USDT",
         },
         "editable": {
             "okx_environment": settings.okx_environment,
@@ -586,7 +593,31 @@ def admin_config(x_r20_admin_token: str | None = Header(default=None)) -> dict[s
             "llm_reasoning_effort": settings.llm_reasoning_effort,
             "notification_webhook": settings.notification_webhook,
             "manual_close_enabled": settings.manual_close_enabled,
+            "initial_capital": load_account_baseline()["initial_capital"],
+            "initial_capital_reset_time": load_account_baseline()["reset_time"],
         },
+    }
+
+
+@app.put("/api/v1/admin/account-baseline")
+def admin_update_account_baseline(payload: InitialCapitalUpdate, x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    actor = require_superadmin(x_r20_session)
+    if payload.confirmation.strip().upper() != "UPDATE CAPITAL":
+        raise HTTPException(status_code=400, detail="确认短语必须精确为：UPDATE CAPITAL")
+    try:
+        result = update_initial_capital(payload.initial_capital)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    audit_record("account.baseline.update", "success", {
+        "actor": actor["username"],
+        "previous_initial_capital": result["previous_initial_capital"],
+        "initial_capital": result["initial_capital"],
+        "reset_time_preserved": result["reset_time"],
+    })
+    return {
+        "updated": True,
+        **result,
+        "effect": "主页累计盈亏、累计 ROI 与权益基准线将按新本金重算；历史起算时间保持不变。",
     }
 
 

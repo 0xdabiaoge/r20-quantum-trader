@@ -55,6 +55,29 @@ class AdminApiTests(unittest.TestCase):
         response = self.client.get("/api/v1/admin/overview", headers={"X-R20-Admin-Token": "InitialAdmin123456"})
         self.assertEqual(response.status_code, 401)
 
+    def test_initial_capital_update_requires_superadmin_and_confirmation(self):
+        self.assertEqual(self.client.put("/api/v1/admin/account-baseline",json={"initial_capital":5000,"confirmation":"UPDATE CAPITAL"}).status_code,401)
+        root=self.login("admin","InitialAdmin123456")
+        from unittest.mock import patch
+        current={"initial_capital":4061.04,"reset_time":"2026-08-31 06:57:38"}
+        with patch.object(app_module,"load_account_baseline",return_value=current), patch.object(app_module,"update_initial_capital",return_value={"previous_initial_capital":4061.04,"initial_capital":5000.0,"reset_time":"2026-08-31 06:57:38","capital_updated_at":"2026-09-02 20:00:00"}) as update:
+            wrong=self.client.put("/api/v1/admin/account-baseline",headers=root,json={"initial_capital":5000,"confirmation":"WRONG CONFIRM"})
+            self.assertEqual(wrong.status_code,400)
+            response=self.client.put("/api/v1/admin/account-baseline",headers=root,json={"initial_capital":5000,"confirmation":"UPDATE CAPITAL"})
+        self.assertEqual(response.status_code,200,response.text)
+        update.assert_called_once_with(5000.0)
+        self.assertEqual(response.json()["reset_time"],"2026-08-31 06:57:38")
+        self.assertIn("累计盈亏",response.json()["effect"])
+
+    def test_config_exposes_initial_capital_without_secret(self):
+        root=self.login("admin","InitialAdmin123456")
+        from unittest.mock import patch
+        with patch.object(app_module,"load_account_baseline",return_value={"initial_capital":4061.04,"reset_time":"2026-08-31 06:57:38"}):
+            response=self.client.get("/api/v1/admin/config",headers=root)
+        self.assertEqual(response.status_code,200,response.text)
+        self.assertEqual(response.json()["editable"]["initial_capital"],4061.04)
+        self.assertEqual(response.json()["editable"]["initial_capital_reset_time"],"2026-08-31 06:57:38")
+
     def test_okx_cli_check_and_install_require_valid_session_and_confirmation(self):
         self.assertEqual(self.client.get("/api/v1/admin/okx/cli-check").status_code, 401)
         self.assertEqual(self.client.post("/api/v1/admin/okx/install-cli", json={"confirmation":"INSTALL OKX CLI"}).status_code, 401)
