@@ -82,6 +82,38 @@ class PromptModuleTests(unittest.TestCase):
         compiled=prompts.apply_module_layout("【新实时行情】\nlive",old,"trading_user","x")
         self.assertIn("live",compiled)
 
+    def test_trading_user_layout_preserves_runtime_values_inside_locked_slots(self):
+        base=("======================= 【当前决策时间戳与市场时效】 =======================\n"
+              "【推演基准时间】: 2026-09-02 14:15:06\n"
+              "【当前账户可用资金】: 3858.73 USDT\n\n"
+              "======================= 【账户当前持仓与风险敞口全景】 =======================\n"
+              "【账户持仓概况】: 当前系统总持仓 1/6\n"
+              "【当前活动在途持仓明细】:\n- SOL 多仓 4张\n\n"
+              "======================= 【六币种原生行情、技术指标与筹码矩阵】 =======================\n"
+              "【BTC (BTC-USDT-SWAP)】| 数据质量: valid\n- 现价: 77575\n\n"
+              "【推演与决策任务】:\n完整严格 JSON Schema")
+        layout=[
+            {"id":"t","title":"当前决策时间戳与市场时效","content":"实时插槽：北京时间、账户可用资金。","enabled":True,"locked":True,"source":"base"},
+            {"id":"p","title":"账户当前持仓与风险敞口全景","content":"实时插槽：持仓。","enabled":True,"locked":True,"source":"base"},
+            {"id":"m","title":"六币种原生行情、技术指标与筹码矩阵","content":"实时插槽：行情。","enabled":True,"locked":True,"source":"base"},
+            {"id":"d","title":"推演与决策任务","content":"【推演与决策任务】:\n完整严格 JSON Schema","enabled":True,"locked":False,"source":"base"},
+        ]
+        compiled=prompts.apply_module_layout(base,{"pipelines":{"trading_user":layout}},"trading_user","x")
+        self.assertIn("2026-09-02 14:15:06",compiled)
+        self.assertIn("3858.73 USDT",compiled)
+        self.assertIn("当前系统总持仓 1/6",compiled)
+        self.assertIn("BTC (BTC-USDT-SWAP)",compiled)
+        self.assertLess(compiled.index("2026-09-02 14:15:06"),compiled.index("当前系统总持仓 1/6"))
+        self.assertLess(compiled.index("当前系统总持仓 1/6"),compiled.index("BTC (BTC-USDT-SWAP)"))
+        self.assertLess(compiled.index("BTC (BTC-USDT-SWAP)"),compiled.index("完整严格 JSON Schema"))
+
+    def test_trading_decision_contract_cannot_be_replaced_by_editor_summary(self):
+        base="【推演与决策任务】:\n必须输出严格 JSON，包含 position_management 与 decisions"
+        layout=[{"id":"d","title":"推演与决策任务","content":"可编辑规则模块摘要","enabled":True,"locked":False,"source":"base"}]
+        compiled=prompts.apply_module_layout(base,{"pipelines":{"trading_user":layout}},"trading_user","x")
+        self.assertIn("必须输出严格 JSON",compiled)
+        self.assertNotIn("可编辑规则模块摘要",compiled)
+
 
 class GatewayFDTests(unittest.TestCase):
     def test_connections_are_closed(self):

@@ -98,7 +98,7 @@ def base_template_modules(text: str, pipeline: str) -> list[dict[str, Any]]:
     modules=text_to_modules(text,"base",locked=False)
     locked_patterns = {
         "trading_system": ("决策优先级", "输出与审计纪律"),
-        "trading_user": ("当前决策时间戳", "全网实时重大快讯", "账户当前持仓", "在途未成交", "长期记忆", "行情、技术指标", "六币种原生行情"),
+        "trading_user": ("当前决策时间戳", "全网实时重大快讯", "账户当前持仓", "在途未成交", "长期记忆", "行情、技术指标", "六币种原生行情", "推演与决策任务"),
         "evolution_system": ("不可覆盖", "输出", "JSON"),
         "evolution_user": ("当前认知复盘基准时间", "历史长期记忆库", "实盘战绩与历史交易台账"),
     }.get(pipeline, ())
@@ -394,29 +394,65 @@ def render_variables(text: str, context: dict[str, str] | None = None) -> str:
     return _VAR_RE.sub(lambda m: str(values.get(m.group(1), m.group(0))), text or "")
 
 
+def _trading_user_parent_groups(base_modules: list[dict[str, Any]], layout_titles: set[str]) -> dict[str, list[dict[str, Any]]]:
+    """Associate nested live-value modules with the preceding editor-visible section."""
+    groups: dict[str, list[dict[str, Any]]] = {}
+    current_parent = ""
+    for module in base_modules:
+        title = module["title"]
+        if title in layout_titles:
+            current_parent = title
+            groups.setdefault(title, []).append(module)
+        elif current_parent:
+            groups[current_parent].append(module)
+    return groups
+
+
 def apply_module_layout(base: str, profile: dict[str, Any], pipeline: str, label: str) -> str:
     """Build a real message from base sections plus ordered profile modules.
 
     Modules whose source is ``base`` reference the live base section by id; custom
     and legacy modules carry editable content. Locked base modules stay visible.
+    Trading-user runtime sections may contain many nested ``【...】`` labels. Those
+    live values are merged back into their parent editor slot instead of being
+    appended out of order or replaced by static placeholder text.
     """
-    base_modules=base_template_modules(base,pipeline)
-    layout=((profile.get("pipelines") or {}).get(pipeline) if isinstance(profile.get("pipelines"),dict) else None)
-    if not isinstance(layout,list) or not any(item.get("source")=="base" for item in layout):
-        custom=text_to_modules(str(profile.get(pipeline) or ""),"custom")
-        return compile_modules(base_modules+custom)
-    base_by_title={item["title"]:item for item in base_modules}; output=[]; matched=set()
+    base_modules = base_template_modules(base, pipeline)
+    layout = ((profile.get("pipelines") or {}).get(pipeline) if isinstance(profile.get("pipelines"), dict) else None)
+    if not isinstance(layout, list) or not any(item.get("source") == "base" for item in layout):
+        custom = text_to_modules(str(profile.get(pipeline) or ""), "custom")
+        return compile_modules(base_modules + custom)
+
+    base_by_title = {item["title"]: item for item in base_modules}
+    layout_titles = {str(item.get("title") or "") for item in layout if item.get("source") == "base"}
+    runtime_groups = _trading_user_parent_groups(base_modules, layout_titles) if pipeline == "trading_user" else {}
+    output: list[dict[str, Any]] = []
+    matched: set[str] = set()
+
     for item in layout:
-        if item.get("source")=="base":
-            live=base_by_title.get(str(item.get("title") or ""))
-            if live:
-                matched.add(live["title"])
-                if live.get("locked") or item.get("enabled",True):
-                    output.append({**live,"content":live["content"] if live.get("locked") else str(item.get("content") or live["content"])})
-        elif item.get("enabled",True): output.append(item)
-    # Fail-closed: dynamic or newly introduced base sections can never disappear
-    # merely because an older admin layout does not know their title.
-    output.extend(item for item in base_modules if item["title"] not in matched)
+        if item.get("source") != "base":
+            if item.get("enabled", True):
+                output.append(item)
+            continue
+
+        title = str(item.get("title") or "")
+        live = base_by_title.get(title)
+        if not live:
+            continue
+
+        group = runtime_groups.get(title, [live])
+        matched.update(module["title"] for module in group)
+        if not (live.get("locked") or item.get("enabled", True)):
+            continue
+
+        if pipeline == "trading_user" and live.get("locked"):
+            content = compile_modules(group)
+        else:
+            content = live["content"] if live.get("locked") else str(item.get("content") or live["content"])
+        output.append({**live, "content": content})
+
+    # Fail closed: preserve every live value that an older layout does not know.
+    output.extend(module for module in base_modules if module["title"] not in matched)
     return compile_modules(output)
 
 
