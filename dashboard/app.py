@@ -9,6 +9,7 @@ import datetime
 import subprocess
 import shutil
 import asyncio
+import tempfile
 from concurrent.futures import ThreadPoolExecutor
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -34,6 +35,7 @@ AI_HISTORY_FILE = os.path.join(DATA_DIR, "ai_brain_history.json")
 AI_LAST_PROMPT_FILE = os.path.join(DATA_DIR, "ai_brain_last_prompt.txt")
 FACTOR_LIBRARY_FILE = os.path.join(DATA_DIR, "factor_library_snapshot.json")
 AI_MEMORY_MD_FILE = os.path.join(DATA_DIR, "AI_TRADING_MEMORY.md")
+DASHBOARD_CACHE_FILE = os.path.join(DATA_DIR, "dashboard_last_good.json")
 
 TARGET_INSTRUMENTS = [
     {"instId": "BTC-USDT-SWAP", "name": "BTC", "type": "crypto", "sz": "1", "ctVal": 0.01},
@@ -62,7 +64,40 @@ def run_json_cmd(cmd):
     ok, data, _ = run_json_cmd_status(cmd)
     return data if ok else None
 
-CACHE_DATA = {}
+def _is_meaningful_dashboard_snapshot(data):
+    return isinstance(data, dict) and isinstance(data.get("account"), dict) and bool(data.get("account")) and "total_eq" in data["account"]
+
+
+def load_persisted_dashboard_cache():
+    try:
+        with open(DASHBOARD_CACHE_FILE, "r", encoding="utf-8") as handle:
+            data = json.load(handle)
+        return data if _is_meaningful_dashboard_snapshot(data) else {}
+    except Exception:
+        return {}
+
+
+def persist_dashboard_cache(data):
+    if not _is_meaningful_dashboard_snapshot(data):
+        return
+    cache_dir = os.path.dirname(DASHBOARD_CACHE_FILE) or DATA_DIR
+    os.makedirs(cache_dir, exist_ok=True)
+    fd, temp_path = tempfile.mkstemp(prefix=".dashboard-cache-", suffix=".json", dir=cache_dir)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            json.dump(data, handle, ensure_ascii=False, indent=2)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.chmod(temp_path, 0o600)
+        os.replace(temp_path, DASHBOARD_CACHE_FILE)
+        os.chmod(DASHBOARD_CACHE_FILE, 0o600)
+    finally:
+        if os.path.exists(temp_path):
+            os.unlink(temp_path)
+
+
+CACHE_DATA = load_persisted_dashboard_cache()
 LAST_CACHE_TIME = 0
 CACHE_LOCK = None
 SYNC_EXECUTOR = ThreadPoolExecutor(max_workers=2, thread_name_prefix="dashboard_sync")
@@ -258,7 +293,7 @@ def update_cache_cycle():
 
     # A failed core account query must never overwrite last-known-good data with zeros.
     if not balance_ok or not positions_ok:
-        if CACHE_DATA:
+        if _is_meaningful_dashboard_snapshot(CACHE_DATA):
             stale = dict(CACHE_DATA)
             stale["data_health"] = {
                 "status": "STALE",
@@ -266,7 +301,7 @@ def update_cache_cycle():
                 "errors": source_errors,
                 "last_success_at": CACHE_DATA.get("timestamp"),
                 "attempted_at": timestamp_full,
-                "cache_age_seconds": round(time.time() - LAST_CACHE_TIME, 1),
+                "cache_age_seconds": max(0.0, round(time.time() - LAST_CACHE_TIME, 1)) if LAST_CACHE_TIME > 0 else None,
             }
             CACHE_DATA = stale
             return
@@ -777,6 +812,7 @@ def update_cache_cycle():
         "ai_brain_history": ai_history_list,
         "factor_library": factor_lib_snapshot
     }
+    persist_dashboard_cache(CACHE_DATA)
     LAST_CACHE_TIME = time.time()
 
 async def refresh_cache_if_needed(ttl_seconds: float = 3.0):
