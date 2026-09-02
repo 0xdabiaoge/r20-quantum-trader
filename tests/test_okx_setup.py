@@ -74,12 +74,33 @@ class OkxInstallTests(unittest.TestCase):
             {"ok": True, "returncode": 0, "stdout": '{"profiles":{}}', "stderr": ""},
             {"ok": True, "returncode": 0, "stdout": '{"status":"logged_in","site":"global","scopes":["market:read","demo:read","demo:trade"]}', "stderr": ""},
             {"ok": False, "returncode": 1, "stdout": "", "stderr": "HTTP 503 Service temporarily unavailable"},
+            {"ok": False, "returncode": 1, "stdout": "", "stderr": "HTTP 503 Service temporarily unavailable"},
         ]
         with patch("r20_backend.okx_setup.shutil.which", return_value="/usr/local/bin/okx"), patch("r20_backend.okx_setup._run", side_effect=responses):
             status=diagnose_okx_runtime("demo",False)
         self.assertFalse(status["ready"])
-        self.assertTrue(any("上游" in item for item in status["issues"]))
+        self.assertTrue(status["degraded"])
+        self.assertTrue(any("私有接口" in item for item in status["issues"]))
         self.assertTrue(any("无需重新安装" in item for item in status["steps"]))
+
+    def test_demo_oauth_503_is_distinguished_from_auth_failure(self):
+        responses = [
+            {"ok": True, "returncode": 0, "stdout": "1.4.4", "stderr": ""},
+            {"ok": True, "returncode": 0, "stdout": '{"profiles":{}}', "stderr": ""},
+            {"ok": True, "returncode": 0, "stdout": '{"status":"logged_in","site":"global","scopes":["market:read","demo:read","demo:trade","live:read"]}', "stderr": ""},
+            {"ok": False, "returncode": 1, "stdout": "", "stderr": "Update available for @okx_ai/okx-trade-cli: 1.4.4 -> 1.4.5\nRun: npm install -g @okx_ai/okx-trade-cli\n\nError: HTTP 503 from OKX: Service temporarily unavailable. Code: 50001"},
+            {"ok": True, "returncode": 0, "stdout": "[]", "stderr": ""},
+        ]
+        with patch("r20_backend.okx_setup.shutil.which", return_value="/usr/local/bin/okx"), patch("r20_backend.okx_setup._run", side_effect=responses):
+            status = diagnose_okx_runtime("demo", False)
+        self.assertFalse(status["ready"])
+        self.assertTrue(status["degraded"])
+        self.assertTrue(status["demo_oauth_unavailable"])
+        self.assertTrue(status["live_control_probe"]["ok"])
+        self.assertNotIn("Update available", status["read_probe"]["detail"])
+        self.assertTrue(any("OAuth 授权本身正常" in item for item in status["issues"]))
+        self.assertTrue(any("模拟盘 API Key" in item for item in status["steps"]))
+        self.assertTrue(any("不会自动切换 LIVE" in item for item in status["steps"]))
 
     def test_oauth_device_login_returns_public_code_fields(self):
         responses=[

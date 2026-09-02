@@ -131,7 +131,26 @@ def _oauth_identity(payload: Any) -> str:
 
 def _is_upstream_unavailable(detail: str) -> bool:
     text = detail.lower()
-    return any(token in text for token in ("http 503", "50013", "systems are busy", "service temporarily unavailable"))
+    return any(token in text for token in ("http 503", "50001", "50013", "systems are busy", "service temporarily unavailable"))
+
+
+def _clean_probe_detail(result: Mapping[str, Any]) -> str:
+    """Keep the actionable OKX error while removing the CLI upgrade advertisement."""
+    detail = str(result.get("stderr") or result.get("stdout") or "invalid response")
+    lines = detail.splitlines()
+    filtered: list[str] = []
+    skip_upgrade_command = False
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("Update available for @okx_ai/okx-trade-cli:"):
+            skip_upgrade_command = True
+            continue
+        if skip_upgrade_command and stripped.startswith("Run: npm install -g @okx_ai/okx-trade-cli"):
+            skip_upgrade_command = False
+            continue
+        if stripped:
+            filtered.append(stripped)
+    return "\n".join(filtered)[:500] or "invalid response"
 
 
 def start_oauth_device_login(site: str, *, env: Mapping[str, str] | None = None) -> dict[str, Any]:
@@ -265,8 +284,21 @@ def diagnose_okx_runtime(selected_mode: str, static_configured: bool, *, env: Ma
         payload = _json_output(probe)
         status["read_probe"] = {
             "ok": probe["ok"] and isinstance(payload, list),
-            "detail": "OKX 私有只读探针通过" if probe["ok"] and isinstance(payload, list) else (probe["stderr"] or probe["stdout"] or "invalid response")[:300],
+            "detail": "OKX 私有只读探针通过" if probe["ok"] and isinstance(payload, list) else _clean_probe_detail(probe),
         }
+
+        # OAuth itself may be healthy while OKX rejects only the simulated
+        # private environment. A LIVE read is a safe control probe: it never
+        # changes R20's selected environment and never submits an order.
+        if selected_mode == "demo" and oauth_ready and not static_configured and not status["read_probe"]["ok"]:
+            control = _run([binary, "--live", "account", "positions", "--json"], env=probe_env)
+            control_payload = _json_output(control)
+            control_ok = bool(control["ok"] and isinstance(control_payload, list))
+            status["live_control_probe"] = {
+                "ok": control_ok,
+                "detail": "同一 OAuth 的 LIVE 私有只读探针通过" if control_ok else _clean_probe_detail(control),
+            }
+            status["demo_oauth_unavailable"] = bool(control_ok and _is_upstream_unavailable(status["read_probe"]["detail"]))
 
     status["degraded"] = bool(oauth_ready and not status["read_probe"]["ok"] and _is_upstream_unavailable(status["read_probe"]["detail"]))
     status["auth_ready"] = bool(status["cli"]["supported"] and status["credential_source"] != "none")
@@ -280,9 +312,16 @@ def diagnose_okx_runtime(selected_mode: str, static_configured: bool, *, env: Ma
         ])
     elif not status["read_probe"]["ok"]:
         detail = status["read_probe"]["detail"]
-        if _is_upstream_unavailable(detail):
-            status["issues"].append("OKX 上游当前繁忙或暂时不可用；系统已 Fail-Closed，不会在状态不明时下单")
-            status["steps"].append("等待 1-2 分钟后点击“重新诊断”；无需重新安装 CLI 或重新授权 OAuth")
+        if status.get("demo_oauth_unavailable"):
+            status["issues"].append("OAuth 授权本身正常，但 OKX 当前拒绝 DEMO 模拟盘私有接口；LIVE 只读对照探针已通过")
+            status["steps"].extend([
+                "系统保持 DEMO 且 Fail-Closed，不会自动切换 LIVE 或在状态不明时下单",
+                "这不是 CLI 安装或 OAuth 登录失败，重复安装、重复授权或短时间反复重试无法修复",
+                "若必须继续使用模拟盘，请改用 OKX 模拟盘 API Key；否则等待 OKX 修复 DEMO OAuth 服务",
+            ])
+        elif _is_upstream_unavailable(detail):
+            status["issues"].append("OKX 当前环境私有接口暂不可用；系统已 Fail-Closed，不会在状态不明时下单")
+            status["steps"].append("稍后重新诊断；无需重新安装 CLI 或重新授权 OAuth")
         else:
             status["issues"].append("OKX 凭证存在，但当前环境私有只读探针失败")
             status["steps"].append("检查授权是否包含当前环境 read/trade 权限，以及服务 HOME/PATH 是否与登录用户一致")
