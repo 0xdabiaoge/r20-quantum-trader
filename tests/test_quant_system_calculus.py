@@ -8,6 +8,7 @@ factor library integration, multi-factor scoring and pyramiding gateways.
 import os
 import sys
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 # Add scripts directory
@@ -234,6 +235,34 @@ class AiFactorTraderMathProbTest(unittest.TestCase):
         self.assertGreater(score, 2.2)
         self.assertEqual(action, "BUY_LONG")
         self.assertEqual(strat_tag, "🚀 动量突破")
+
+
+class AiFactorTraderPositionProtectionTest(unittest.TestCase):
+    def _factor(self, price=99.0):
+        return {
+            "market_data_valid": True, "instId": "SOL-USDT-SWAP", "name": "SOL",
+            "price": price, "type": "crypto", "atr": 1.0, "precision": 2, "ctVal": 1.0,
+        }
+
+    def test_losing_position_closes_when_tracker_hard_stop_is_breached(self):
+        position={"pos":4.0,"side":"long","avgPx":103.55,"upl":-18.0}
+        trackers={"SOL-USDT-SWAP_long":{"entryTs":1,"trailingStopPx":101.81,"highWaterMark":104.2,"lowWaterMark":99.0}}
+        actions=[]
+        with patch.object(ai_factor_trader,"close_position_confirmed",return_value=(True,"exchange position closed")) as close, patch.object(ai_factor_trader,"record_trade"), patch.object(ai_factor_trader,"add_stop_cooldown"):
+            closed,reason=ai_factor_trader.manage_position_tp_and_trailing(self._factor(),position,trackers,"2026-09-02 15:00:00",actions)
+        self.assertTrue(closed); self.assertEqual(reason,"已硬止损")
+        close.assert_called_once_with("SOL-USDT-SWAP","long",4.0)
+        self.assertNotIn("SOL-USDT-SWAP_long",trackers)
+        self.assertTrue(any("触发硬止损" in item for item in actions))
+
+    def test_losing_position_above_hard_stop_remains_open(self):
+        position={"pos":4.0,"side":"long","avgPx":103.55,"upl":-4.0}
+        now=int(ai_factor_trader.time.time())
+        trackers={"SOL-USDT-SWAP_long":{"entryTs":now,"trailingStopPx":101.81,"highWaterMark":104.2,"lowWaterMark":102.5}}
+        actions=[]
+        with patch.object(ai_factor_trader,"close_position_confirmed") as close:
+            closed,reason=ai_factor_trader.manage_position_tp_and_trailing(self._factor(102.5),position,trackers,"2026-09-02 15:00:00",actions)
+        self.assertFalse(closed); self.assertEqual(reason,"持仓监控中"); close.assert_not_called()
 
 
 if __name__ == "__main__":

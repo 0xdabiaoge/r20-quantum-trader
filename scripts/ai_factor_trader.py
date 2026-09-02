@@ -883,7 +883,43 @@ def manage_position_tp_and_trailing(f, curr_pos, trackers, timestamp_full, execu
         cur_profit_px = entry_px - cur_px
         peak_profit_px = entry_px - t["lowWaterMark"]
 
-    # 1. Volatility Time-Stop Exit (After 8 Hours dead consolidation without expansion)
+    # 1. Hard Stop Loss (loss protection is independent of profit-lock activation).
+    # The tracker stop is the exchange-protection source of truth; if a legacy or
+    # partially migrated position has no live cloud OCO, the local 15-minute
+    # fail-safe still closes it once the stop is breached.
+    hard_stop_px = float(t.get("trailingStopPx", 0.0) or 0.0)
+    hard_stop_hit = hard_stop_px > 0 and ((is_long and cur_px <= hard_stop_px) or (not is_long and cur_px >= hard_stop_px))
+    if hard_stop_hit:
+        closed, close_detail = close_position_confirmed(inst_id, "long" if is_long else "short", pos_sz)
+        if not closed:
+            executed_actions.append(f"[{name}] 硬止损平仓失败，仓位仍保留: {close_detail}")
+            return False, "硬止损平仓失败"
+        close_fee = (pos_sz * ct_val * cur_px) * TAKER_FEE_RATE
+        pnl_val = curr_pos["upl"]
+        executed_actions.append(f"[{name}] 🛑 触发硬止损 {hard_stop_px} 并确认平仓 (净盈亏: {pnl_val:+.2f}U)")
+        record_trade({
+            "is_trade": True,
+            "time": timestamp_full,
+            "inst": name,
+            "name": name,
+            "action": "平仓",
+            "action_type": "硬止损",
+            "direction": f"平{'多' if is_long else '空'}",
+            "side": f"{'多' if is_long else '空'}单硬止损",
+            "size": pos_sz,
+            "sz": pos_sz,
+            "price": cur_px,
+            "fee": close_fee,
+            "pnl": pnl_val,
+            "remark": f"价格 {cur_px} 触及保护止损 {hard_stop_px}，交易所确认平仓"
+        })
+        add_stop_cooldown(inst_id, "long" if is_long else "short", "硬止损")
+        if notify_trade_close:
+            notify_trade_close(name, pnl_val, "硬止损平仓", cur_px)
+        trackers.pop(pos_key, None)
+        return True, "已硬止损"
+
+    # 2. Volatility Time-Stop Exit (After 8 Hours dead consolidation without expansion)
     hold_duration_sec = now_ts - t["entryTs"]
     if hold_duration_sec > 28800 and abs(cur_profit_px) < 0.15 * atr:
         closed, close_detail = close_position_confirmed(inst_id, "long" if is_long else "short", pos_sz)
@@ -913,7 +949,7 @@ def manage_position_tp_and_trailing(f, curr_pos, trackers, timestamp_full, execu
         if pos_key in trackers: del trackers[pos_key]
         return True, "时间止损"
 
-    # 2. Three-Tier Ratchet Profit-Locking & Momentum Take-Profit Engine
+    # 3. Three-Tier Ratchet Profit-Locking & Momentum Take-Profit Engine
     # Tier 1: Breakeven Lock at +1.0x ATR profit (Guarantee 100% risk-free trade)
     # Tier 2: 50% Profit Lock-In at +1.8x ATR profit (Lock in at least +0.9x ATR solid profit)
     # Tier 3: Kinetic Reversal Exit from Peak (Protect accumulated big wins)
