@@ -255,67 +255,67 @@
         <div id="tab-content-trading" class="space-y-4">
 
             <!-- 📊 TOP QUANTITATIVE HUD RIBBON (首页专属核心指标卡) -->
-            <div class="terminal-panel p-3.5 sm:p-4">
-                <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 divide-y lg:divide-y-0 lg:divide-x divide-[#1A2232]">
+            <div class="terminal-panel p-4">
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-0 lg:divide-x divide-[#1A2232]">
                     
                     <!-- Tile 1: 官方账户总权益 -->
-                    <div class="flex flex-col justify-between pt-2 lg:pt-0 lg:px-2 first:pt-0 first:px-0">
+                    <div class="flex flex-col justify-between lg:pr-5">
                         <div class="flex items-center justify-between text-[11px] text-[#707E94] font-semibold">
                             <span>官方账户总权益</span>
                             <span class="font-mono text-[10px] text-[#3875F6]">USDT</span>
                         </div>
-                        <div class="my-1">
+                        <div class="my-1.5">
                             <span id="metric-equity" class="text-xl sm:text-2xl font-extrabold font-mono text-white tracking-tight">--</span>
                         </div>
-                        <div class="flex items-center justify-between text-[11px] font-mono text-[#707E94] pt-1.5 border-t border-[#161D2B]">
+                        <div class="flex items-center justify-between text-[11px] font-mono text-[#707E94]">
                             <span>可用: <strong id="metric-avail" class="text-[#EAECEF]">--</strong></span>
-                            <span id="metric-margin-usage" class="text-[#707E94]">保证金占用: 0%</span>
+                            <span id="metric-margin-usage" class="text-[#707E94]">占用率: 0%</span>
                         </div>
                     </div>
 
                     <!-- Tile 2: 累计净收益 -->
-                    <div class="flex flex-col justify-between pt-2 lg:pt-0 lg:px-4">
+                    <div class="flex flex-col justify-between lg:px-5">
                         <div class="flex items-center justify-between text-[11px] text-[#707E94] font-semibold">
                             <span>累计净收益</span>
                             <span id="metric-cum-roi" class="font-mono text-[10px] font-bold text-[#0ECB81]">--</span>
                         </div>
-                        <div class="my-1 flex items-baseline space-x-1.5">
+                        <div class="my-1.5 flex items-baseline space-x-1.5">
                             <span id="metric-cum-pnl" class="text-xl sm:text-2xl font-extrabold font-mono text-[#0ECB81] tracking-tight">--</span>
                             <span class="text-[10px] font-mono text-[#707E94]">USDT</span>
                         </div>
-                        <div class="flex items-center justify-between text-[11px] font-mono text-[#707E94] pt-1.5 border-t border-[#161D2B]">
+                        <div class="flex items-center justify-between text-[11px] font-mono text-[#707E94]">
                             <span>收益率: <strong id="metric-cum-roi-label" class="text-[#0ECB81]">--</strong></span>
-                            <span>累计手续费: <strong id="metric-cum-fees" class="text-[#EAECEF]">--</strong></span>
+                            <span>手续费: <strong id="metric-cum-fees" class="text-[#EAECEF]">--</strong></span>
                         </div>
                     </div>
 
                     <!-- Tile 3: 今日已结盈亏 -->
-                    <div class="flex flex-col justify-between pt-2 lg:pt-0 lg:px-4">
+                    <div class="flex flex-col justify-between lg:px-5">
                         <div class="flex items-center justify-between text-[11px] text-[#707E94] font-semibold">
                             <span>今日已结盈亏</span>
                             <span id="metric-today-wr" class="font-mono text-[10px] font-bold text-[#EAECEF]">胜率: 0%</span>
                         </div>
-                        <div class="my-1 flex items-baseline space-x-1.5">
+                        <div class="my-1.5 flex items-baseline space-x-1.5">
                             <span id="metric-realized-pnl" class="text-xl sm:text-2xl font-extrabold font-mono text-[#EAECEF] tracking-tight">--</span>
                             <span class="text-[10px] font-mono text-[#707E94]">USDT</span>
                         </div>
-                        <div class="flex items-center justify-between text-[11px] font-mono text-[#707E94] pt-1.5 border-t border-[#161D2B]">
-                            <span>今日战绩: <strong id="metric-today-record" class="text-white">0胜 / 0负</strong></span>
-                            <span>今日手续费: <strong id="metric-fees" class="text-[#EAECEF]">0 U</strong></span>
+                        <div class="flex items-center justify-between text-[11px] font-mono text-[#707E94]">
+                            <span>战绩: <strong id="metric-today-record" class="text-white">0胜 / 0负</strong></span>
+                            <span>手续费: <strong id="metric-fees" class="text-[#EAECEF]">0 U</strong></span>
                         </div>
                     </div>
 
                     <!-- Tile 4: 在途持仓浮盈 -->
-                    <div class="flex flex-col justify-between pt-2 lg:pt-0 lg:px-4">
+                    <div class="flex flex-col justify-between lg:pl-5">
                         <div class="flex items-center justify-between text-[11px] text-[#707E94] font-semibold">
                             <span>在途持仓浮盈</span>
                             <span id="metric-pos-count" class="font-mono text-[10px] font-bold text-[#3875F6]">0/6 仓</span>
                         </div>
-                        <div class="my-1 flex items-baseline space-x-1.5">
+                        <div class="my-1.5 flex items-baseline space-x-1.5">
                             <span id="metric-upl" class="text-xl sm:text-2xl font-extrabold font-mono text-white tracking-tight">--</span>
                             <span class="text-[10px] font-mono text-[#707E94]">USDT</span>
                         </div>
-                        <div class="flex items-center justify-between text-[11px] font-mono text-[#707E94] pt-1.5 border-t border-[#161D2B]">
+                        <div class="flex items-center justify-between text-[11px] font-mono text-[#707E94]">
                             <span id="metric-pos-direction">0 多 / 0 空</span>
                             <span class="text-[#0ECB81] font-semibold">云端止盈止损守护</span>
                         </div>
