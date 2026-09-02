@@ -131,26 +131,40 @@ class AdminAuthStore:
 
     def login(self, username: str, password: str) -> dict[str, Any]:
         now_epoch = int(time.time())
+        failure_message = ""
         with self.connect() as connection:
             row = connection.execute("SELECT * FROM admin_users WHERE username=? COLLATE NOCASE", (username.strip(),)).fetchone()
+            if row and not row["enabled"]:
+                failure_message = "管理员账号已停用，请联系超级管理员"
+            elif row and int(row["locked_until"]) > now_epoch:
+                remaining = max(1, int(row["locked_until"]) - now_epoch)
+                minutes = (remaining + 59) // 60
+                failure_message = f"登录失败次数过多，账号已临时锁定，请约 {minutes} 分钟后重试"
             valid = False
-            if row and row["enabled"] and int(row["locked_until"]) <= now_epoch:
+            if row and not failure_message:
                 digest, _, _ = _hash_password(password, bytes.fromhex(row["salt"]), int(row["iterations"]))
                 valid = hmac.compare_digest(digest, row["password_hash"])
-            if not valid:
+            if not valid and not failure_message:
                 if row:
                     failures = int(row["failed_attempts"]) + 1
-                    locked_until = now_epoch + 15 * 60 if failures >= 5 else int(row["locked_until"])
+                    locked_until = now_epoch + 15 * 60 if failures >= 5 else 0
                     connection.execute("UPDATE admin_users SET failed_attempts=?,locked_until=?,updated_at=? WHERE id=?", (failures, locked_until, _now_text(), row["id"]))
-                raise PermissionError("账号或密码错误，连续失败 5 次将锁定 15 分钟")
-            token = secrets.token_urlsafe(48)
-            expires = now_epoch + SESSION_SECONDS
-            connection.execute("DELETE FROM admin_sessions WHERE expires_at<=?", (now_epoch,))
-            connection.execute(
-                "INSERT INTO admin_sessions(token_hash,user_id,created_at,expires_at,last_seen_at) VALUES (?,?,?,?,?)",
-                (_token_hash(token), row["id"], now_epoch, expires, now_epoch),
-            )
-            connection.execute("UPDATE admin_users SET failed_attempts=0,locked_until=0,last_login_at=?,updated_at=? WHERE id=?", (_now_text(), _now_text(), row["id"]))
+                    failure_message = "账号或密码错误，账号已锁定 15 分钟" if locked_until else f"账号或密码错误，还可尝试 {5 - failures} 次"
+                else:
+                    failure_message = "账号或密码错误"
+            if failure_message:
+                connection.commit()
+            else:
+                token = secrets.token_urlsafe(48)
+                expires = now_epoch + SESSION_SECONDS
+                connection.execute("DELETE FROM admin_sessions WHERE expires_at<=?", (now_epoch,))
+                connection.execute(
+                    "INSERT INTO admin_sessions(token_hash,user_id,created_at,expires_at,last_seen_at) VALUES (?,?,?,?,?)",
+                    (_token_hash(token), row["id"], now_epoch, expires, now_epoch),
+                )
+                connection.execute("UPDATE admin_users SET failed_attempts=0,locked_until=0,last_login_at=?,updated_at=? WHERE id=?", (_now_text(), _now_text(), row["id"]))
+        if failure_message:
+            raise PermissionError(failure_message)
         return {"session_token": token, "expires_at": expires, "user": self.get_user(int(row["id"]))}
 
     def validate_session(self, token: str) -> dict[str, Any] | None:
@@ -176,6 +190,16 @@ class AdminAuthStore:
     def logout_user(self, user_id: int) -> None:
         with self.connect() as connection:
             connection.execute("DELETE FROM admin_sessions WHERE user_id=?", (user_id,))
+
+    def unlock_user(self, user_id: int) -> None:
+        with self.connect() as connection:
+            row = connection.execute("SELECT id FROM admin_users WHERE id=?", (user_id,)).fetchone()
+            if not row:
+                raise ValueError("管理员不存在")
+            connection.execute(
+                "UPDATE admin_users SET failed_attempts=0,locked_until=0,updated_at=? WHERE id=?",
+                (_now_text(), user_id),
+            )
 
     def change_password(self, user_id: int, new_password: str) -> None:
         if not _password_valid(new_password):

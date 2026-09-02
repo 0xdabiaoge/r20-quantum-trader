@@ -110,6 +110,10 @@ class AdminEnabledRequest(BaseModel):
     enabled: bool
 
 
+class AdminUnlockRequest(BaseModel):
+    confirmation: str = Field(min_length=12, max_length=100)
+
+
 class AdminConfigUpdate(BaseModel):
     okx_environment: str | None = Field(default=None, pattern=r"^(demo|live)$")
     okx_live_api_key: str | None = None
@@ -469,6 +473,20 @@ def update_admin_enabled(user_id: int, payload: AdminEnabledRequest, x_r20_sessi
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     audit_record("admin.user.enabled", "success", {"actor": actor["username"], "user_id": user_id, "enabled": payload.enabled})
+    return {"user": admin_auth.get_user(user_id)}
+
+
+@app.post("/api/v1/admin/users/{user_id}/unlock")
+def unlock_admin_user(user_id: int, payload: AdminUnlockRequest, x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    actor = require_superadmin(x_r20_session)
+    expected = f"UNLOCK ADMIN {user_id}"
+    if payload.confirmation.strip().upper() != expected:
+        raise HTTPException(status_code=400, detail=f"确认短语必须精确为：{expected}")
+    try:
+        admin_auth.unlock_user(user_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    audit_record("admin.user.unlock", "success", {"actor": actor["username"], "user_id": user_id})
     return {"user": admin_auth.get_user(user_id)}
 
 

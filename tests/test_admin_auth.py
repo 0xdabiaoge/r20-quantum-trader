@@ -45,6 +45,18 @@ class AdminAuthTests(unittest.TestCase):
         self.assertIsNone(self.store.validate_session(login["session_token"]))
         self.assertIsNotNone(self.store.login("operator", "NewOperatorPassword456"))
 
+    def test_failed_login_reports_remaining_attempts_and_unlocks(self):
+        user = self.store.create_user("operator", "OperatorPassword123", "admin")
+        for remaining in (4, 3, 2, 1):
+            with self.assertRaisesRegex(PermissionError, f"还可尝试 {remaining} 次"):
+                self.store.login("operator", "wrong-password")
+        with self.assertRaisesRegex(PermissionError, "已锁定 15 分钟"):
+            self.store.login("operator", "wrong-password")
+        with self.assertRaisesRegex(PermissionError, "临时锁定"):
+            self.store.login("operator", "OperatorPassword123")
+        self.store.unlock_user(user["id"])
+        self.assertEqual(self.store.login("operator", "OperatorPassword123")["user"]["username"], "operator")
+
     def test_invalid_password_policy(self):
         with self.assertRaises(ValueError):
             self.store.create_user("bob", "short", "admin")
