@@ -7,30 +7,20 @@
 **独立 Gateway · 多因子推演 · 极速内存直出 · 管理控制面 · QQ 官方 Bot 扫码绑定 · 模块化提示词 · 加密灾备**
 
 [![Release](https://img.shields.io/badge/release-v6.2.0-3875F6?style=flat-square)](https://github.com/555cute/r20-quantum-trader/releases/tag/v6.2.0)
-[![QQ Group](https://img.shields.io/badge/QQ%E4%BA%A4%E6%B5%81%E7%BE%A4-655973677-12B7F5?style=flat-square&logo=tencent-qq&logoColor=white)](#-交流群与社区支持)
+[![QQ Group](https://img.shields.io/badge/QQ%E4%BA%A4%E6%B5%81%E7%BE%A4-655973677-12B7F5?style=flat-square&logo=tencent-qq&logoColor=white)](#-社区与致谢)
 [![LINUX DO](https://img.shields.io/badge/Community-LINUX%20DO-F97316?style=flat-square&logo=linux&logoColor=white)](https://linux.do/)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![Exchange](https://img.shields.io/badge/Exchange-OKX%20V5%20Direct-111827?style=flat-square)](https://www.okx.com/)
 [![Tests](https://img.shields.io/badge/tests-135%2F135%20passed-0ECB81?style=flat-square)](#-验证与测试)
 [![License](https://img.shields.io/badge/license-MIT-10B981?style=flat-square)](LICENSE)
 
-[🌐 在线实盘大屏](https://www.r20.cn/) · [💬 QQ 交流群: 655973677](#-交流群与社区支持) · [🐧 LINUX DO 社区](https://linux.do/) · [🚀 独立部署指南](STANDALONE.md) · [📦 灾备恢复](RECOVERY_GUIDE.md)
+[🌐 在线实盘大屏](https://www.r20.cn/) · [🚀 独立部署指南](STANDALONE.md) · [📦 灾备恢复](RECOVERY_GUIDE.md) · [🐧 LINUX DO 社区](https://linux.do/)
+
+<br/>
+
+> 💬 **QQ 官方交流群**：**`655973677`** ｜ **作者 QQ**：`1090188816` ｜ 欢迎进群交流策略调优与实盘动态！
 
 </div>
-
----
-
-### 💬 交流群与社区支持
-
-欢迎各位量化交易者、AI 开发者与 LINUX DO 社区佬友加入交流！无论是实盘探讨、策略调优、Bug 反馈还是新特性建议，都欢迎进群交流：
-
-| 渠道 | 链接 / 联系方式 | 说明 |
-| :--- | :--- | :--- |
-| 💬 **官方 QQ 交流群** | **`655973677`** | 核心交流群，第一时间获取策略调优、版本更新与实盘动态 |
-| 👨‍💻 **作者 QQ** | **`1090188816`** | 商务合作、问题咨询与技术交流 |
-| 🐧 **LINUX DO 社区** | [**linux.do**](https://linux.do/) | 社区开源认可、技术探讨与佬友交流 |
-| 🌐 **实时在线大屏** | [**www.r20.cn**](https://www.r20.cn/) | 免登录查看当前 6 币种实盘矩阵与 AI 推演 |
-| 🐛 **Issue / PR** | [**GitHub Issues**](https://github.com/555cute/r20-quantum-trader/issues) | 欢迎提交代码贡献、建议与使用反馈 |
 
 ---
 
