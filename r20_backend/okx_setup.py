@@ -48,6 +48,11 @@ def install_okx_cli() -> dict[str, Any]:
             "install_command": INSTALL_COMMAND,
         }
     npm_bin = prereq["npm_path"]
+    existing_binary = shutil.which("okx")
+    existing_version = ""
+    if existing_binary:
+        current = _run([existing_binary, "--version"], timeout=8)
+        existing_version = current["stdout"].splitlines()[0] if current["stdout"] else ""
     r = _run([npm_bin, "install", "-g", "@okx_ai/okx-trade-cli@^1.4.4"], timeout=120)
     if not r["ok"]:
         return {
@@ -67,11 +72,14 @@ def install_okx_cli() -> dict[str, Any]:
         }
     vr = _run([binary, "--version"], timeout=8)
     version = vr["stdout"].splitlines()[0] if vr["stdout"] else ""
+    operation = "升级" if existing_binary and _version_tuple(version) > _version_tuple(existing_version) else "安装/校验"
     return {
         "ok": True,
-        "detail": f"OKX CLI 安装成功：{binary} v{version}",
+        "detail": f"OKX CLI {operation}成功：{binary} v{version}",
         "path": binary,
         "version": version,
+        "previous_version": existing_version,
+        "restart_gateway_recommended": bool(existing_binary and _version_tuple(version) != _version_tuple(existing_version)),
         "prerequisite": prereq,
     }
 

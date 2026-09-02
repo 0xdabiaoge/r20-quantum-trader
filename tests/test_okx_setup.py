@@ -46,6 +46,7 @@ class OkxInstallTests(unittest.TestCase):
 
     def test_install_success_verifies_binary_and_version(self):
         responses = [
+            {"ok": True, "returncode": 0, "stdout": "1.4.4", "stderr": ""},  # existing okx --version
             {"ok": True, "returncode": 0, "stdout": "", "stderr": ""},  # npm install
             {"ok": True, "returncode": 0, "stdout": "1.4.5", "stderr": ""},  # okx --version
         ]
@@ -59,6 +60,8 @@ class OkxInstallTests(unittest.TestCase):
         self.assertTrue(result["ok"])
         self.assertEqual(result["version"], "1.4.5")
         self.assertEqual(result["path"], "/usr/local/bin/okx")
+        self.assertEqual(result["previous_version"], "1.4.4")
+        self.assertTrue(result["restart_gateway_recommended"])
 
     def test_install_fails_when_npm_returns_error(self):
         with patch("r20_backend.okx_setup.check_node_npm", return_value={
