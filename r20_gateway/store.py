@@ -4,6 +4,7 @@ import json
 import sqlite3
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from contextlib import contextmanager
 from typing import Any
 
 from r20_gateway.events import GatewayEvent
@@ -75,12 +76,28 @@ class GatewayStore:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.connect() as connection:
             connection.executescript(SCHEMA)
+        self._secure_files()
 
-    def connect(self) -> sqlite3.Connection:
+    def _secure_files(self) -> None:
+        for candidate in (self.path, Path(str(self.path)+"-wal"), Path(str(self.path)+"-shm")):
+            try:
+                if candidate.exists(): candidate.chmod(0o600)
+            except OSError: pass
+
+    @contextmanager
+    def connect(self):
         connection = sqlite3.connect(self.path, timeout=10)
+        self._secure_files()
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys=ON")
-        return connection
+        try:
+            yield connection
+            connection.commit()
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            connection.close()
 
     def publish(self, event: GatewayEvent, channels: list[str]) -> str:
         with self.connect() as connection:

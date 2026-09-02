@@ -44,11 +44,12 @@ class OKXEnvironmentTests(unittest.TestCase):
         finally: okx_runtime.unfreeze_environment()
 
     def test_fast_close_rejects_environment_change_before_any_order(self):
-        fake = okx_runtime.OKXEnvironment("demo", "A", "B", "C")
-        with patch.object(trade_service, "selected_environment", return_value=fake), patch.object(trade_service, "_run") as run:
-            with self.assertRaises(ValueError):
-                trade_service.fast_close_confirmed("BTC-USDT-SWAP", "long", "1", 2, "okx:live:other")
-            run.assert_not_called()
+        snapshot_env = okx_runtime.OKXEnvironment("demo", "A", "B", "C")
+        changed_env = okx_runtime.OKXEnvironment("live", "L", "S", "P")
+        token, confirmation = trade_service._create_intent(snapshot_env, {"instId":"BTC-USDT-SWAP","posSide":"long","posId":"1","pos":"2"})
+        with patch.object(trade_service, "selected_environment", return_value=changed_env), patch.object(trade_service, "_request") as request:
+            with self.assertRaises(ValueError): trade_service.fast_close_confirmed(token, confirmation)
+            request.assert_not_called()
 
 
 class WechatTests(unittest.TestCase):

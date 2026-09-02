@@ -1,85 +1,109 @@
-"""Environment-bound OKX account snapshot and confirmed fast-close workflow."""
+"""Direct signed OKX V5 control-plane client and one-time fast-close intents."""
 from __future__ import annotations
+import base64
+import hashlib
+import hmac
 import json
-import subprocess
+import secrets
+import threading
 import time
+import urllib.parse
+import urllib.request
+from datetime import datetime, timezone
 from typing import Any
 from scripts.okx_runtime import OKXEnvironment, selected_environment
 
+_INTENTS: dict[str, dict[str, Any]] = {}
+_INTENT_LOCK = threading.Lock()
+INTENT_TTL_SECONDS = 90
 
-def _run(args: list[str], env: OKXEnvironment | None = None, timeout: int = 25) -> list[dict[str, Any]]:
+
+def _timestamp() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+
+
+def _request(method: str, path: str, params: dict[str, Any] | None = None, env: OKXEnvironment | None = None, timeout: int = 20) -> list[dict[str, Any]]:
     selected = env or selected_environment()
-    command = ["okx", f"--{selected.mode}", *args, "--json"]
-    result = subprocess.run(command, text=True, capture_output=True, timeout=timeout, env=selected.cli_env())
-    if result.returncode != 0: raise RuntimeError(result.stderr.strip() or result.stdout.strip() or "OKX CLI failed")
-    try: payload = json.loads(result.stdout)
-    except json.JSONDecodeError as exc: raise RuntimeError("OKX 返回了无效 JSON") from exc
-    if isinstance(payload, dict) and str(payload.get("code", "0")) != "0": raise RuntimeError(str(payload.get("msg") or payload))
-    data = payload.get("data", payload) if isinstance(payload, dict) else payload
-    if not isinstance(data, list): data = [data] if isinstance(data, dict) else []
-    failures = [row for row in data if isinstance(row, dict) and row.get("sCode") not in (None, 0, "0")]
-    if failures: raise RuntimeError(str(failures[0].get("sMsg") or failures[0]))
+    if not selected.configured:
+        raise RuntimeError(f"OKX {selected.mode.upper()} 静态 API Key 未完整配置；控制面不再回退到 CLI OAuth")
+    params = params or {}; method = method.upper()
+    query = urllib.parse.urlencode({k:v for k,v in params.items() if v not in (None, "")}) if method == "GET" else ""
+    request_path = path + (f"?{query}" if query else "")
+    body_text = json.dumps({k:v for k,v in params.items() if v not in (None, "")}, separators=(",", ":"), ensure_ascii=False) if method != "GET" else ""
+    timestamp = _timestamp(); prehash = timestamp + method + request_path + body_text
+    signature = base64.b64encode(hmac.new(selected.secret_key.encode(), prehash.encode(), hashlib.sha256).digest()).decode()
+    headers = {
+        "Content-Type":"application/json", "User-Agent":"R20-OKX-V5/5.4.2", "OK-ACCESS-KEY":selected.api_key,
+        "OK-ACCESS-SIGN":signature, "OK-ACCESS-TIMESTAMP":timestamp, "OK-ACCESS-PASSPHRASE":selected.passphrase,
+    }
+    if selected.simulated: headers["x-simulated-trading"] = "1"
+    request = urllib.request.Request(selected.base_url + request_path, data=body_text.encode() if body_text else None, headers=headers, method=method)
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response: payload = json.loads(response.read().decode("utf-8") or "{}")
+    except Exception as exc: raise RuntimeError(f"OKX V5 网络请求失败：{type(exc).__name__}: {exc}") from exc
+    if str(payload.get("code", "0")) != "0": raise RuntimeError(f"OKX {payload.get('code')}: {payload.get('msg') or '请求失败'}")
+    data = payload.get("data") or []
+    if not isinstance(data, list): data = [data]
+    failures = [row for row in data if isinstance(row, dict) and str(row.get("sCode", "0")) != "0"]
+    if failures: raise RuntimeError(f"OKX {failures[0].get('sCode')}: {failures[0].get('sMsg') or '业务请求失败'}")
     return [row for row in data if isinstance(row, dict)]
+
+
+def _create_intent(env: OKXEnvironment, position: dict[str, Any]) -> tuple[str, str]:
+    token = secrets.token_urlsafe(32); size = abs(float(position.get("pos", 0) or 0)); side = str(position.get("posSide") or "net").lower()
+    confirmation = f"CLOSE {env.mode.upper()} {position.get('instId')} {side.upper()} {size:g}"
+    record = {"environment_id":env.identity,"instId":str(position.get("instId")),"posSide":side,"posId":str(position.get("posId") or ""),"expected_size":size,"confirmation":confirmation,"expires_at":time.time()+INTENT_TTL_SECONDS}
+    with _INTENT_LOCK:
+        now=time.time(); stale=[key for key,value in _INTENTS.items() if value["expires_at"]<now]
+        for key in stale: _INTENTS.pop(key,None)
+        _INTENTS[token]=record
+    return token, confirmation
 
 
 def account_snapshot() -> dict[str, Any]:
     env = selected_environment()
-    positions = _run(["account", "positions"], env)
-    positions = [p for p in positions if abs(float(p.get("pos", 0) or 0)) > 1e-12]
-    orders = _run(["swap", "orders"], env)
-    return {
-        "environment": env.mode, "environment_id": env.identity, "credential_source": env.source,
-        "positions": positions, "orders": orders, "captured_at_ms": int(time.time() * 1000),
-    }
+    positions = [p for p in _request("GET", "/api/v5/account/positions", {"instType":"SWAP"}, env) if abs(float(p.get("pos",0) or 0))>1e-12]
+    orders = _request("GET", "/api/v5/trade/orders-pending", {"instType":"SWAP"}, env)
+    public_positions=[]
+    for position in positions:
+        token, confirmation = _create_intent(env, position)
+        public_positions.append({**position,"close_token":token,"close_confirmation":confirmation,"close_token_expires_in":INTENT_TTL_SECONDS})
+    return {"environment":env.mode,"environment_id":env.identity,"credential_source":"static-v5-key","positions":public_positions,"orders":orders,"captured_at_ms":int(time.time()*1000)}
 
 
-def _position_match(positions: list[dict[str, Any]], inst_id: str, pos_side: str, pos_id: str) -> dict[str, Any] | None:
-    candidates = [p for p in positions if p.get("instId") == inst_id and str(p.get("posSide", "")).lower() == pos_side]
-    if pos_id: candidates = [p for p in candidates if str(p.get("posId", "")) == pos_id]
+def _consume_intent(token: str) -> dict[str, Any]:
+    with _INTENT_LOCK: intent=_INTENTS.pop(str(token),None)
+    if not intent: raise ValueError("平仓令牌无效或已使用，请刷新当前持仓")
+    if intent["expires_at"]<time.time(): raise ValueError("平仓令牌已过期，请刷新当前持仓")
+    return intent
+
+
+def _position_match(positions: list[dict[str, Any]], intent: dict[str, Any]) -> dict[str, Any] | None:
+    candidates=[p for p in positions if p.get("instId")==intent["instId"] and str(p.get("posSide","")).lower()==intent["posSide"]]
+    if intent["posId"]: candidates=[p for p in candidates if str(p.get("posId", ""))==intent["posId"]]
     return candidates[0] if candidates else None
 
 
-def fast_close_confirmed(
-    inst_id: str, pos_side: str, pos_id: str, expected_size: float, expected_environment_id: str,
-) -> dict[str, Any]:
-    env = selected_environment()
-    if env.identity != expected_environment_id: raise ValueError("OKX 环境或凭证已变化，请刷新当前持仓后重新确认")
-    before_positions = _run(["account", "positions"], env)
-    target = _position_match(before_positions, inst_id, pos_side, pos_id)
+def fast_close_confirmed(close_token: str, confirmation: str) -> dict[str, Any]:
+    intent=_consume_intent(close_token); env=selected_environment()
+    if env.identity!=intent["environment_id"]: raise ValueError("OKX 环境或凭证已变化，请刷新当前持仓")
+    if confirmation.strip().upper()!=intent["confirmation"]: raise ValueError(f"确认短语必须精确为：{intent['confirmation']}")
+    target=_position_match(_request("GET","/api/v5/account/positions",{"instType":"SWAP","instId":intent["instId"]},env),intent)
     if not target: raise ValueError("目标仓位已不存在，请刷新")
-    actual_size = abs(float(target.get("pos", 0) or 0))
-    tolerance = max(1e-12, actual_size * 1e-6)
-    if abs(actual_size - abs(expected_size)) > tolerance: raise ValueError(f"仓位数量已从 {expected_size} 变化为 {actual_size}，请刷新后重新确认")
-    mgn_mode = str(target.get("mgnMode") or "cross")
-    # Cancel only orders that can increase this exact position. Exit/reduce orders must not be removed early.
-    live_orders = _run(["swap", "orders"], env)
-    canceled: list[str] = []
-    target_side = pos_side if pos_side in {"long", "short"} else ("long" if float(target.get("pos", 0) or 0) > 0 else "short")
-    risk_increasing_order_side = "buy" if target_side == "long" else "sell"
-    for order in live_orders:
-        if order.get("instId") != inst_id: continue
-        order_pos_side = str(order.get("posSide") or "net").lower()
-        if order_pos_side not in {target_side, "net"}: continue
-        if str(order.get("reduceOnly", "false")).lower() == "true": continue
-        if str(order.get("side") or "").lower() != risk_increasing_order_side: continue
-        order_id = str(order.get("ordId") or "")
-        if order_id:
-            _run(["swap", "cancel", inst_id, "--ordId", order_id], env); canceled.append(order_id)
-    close_result = _run(["swap", "close", "--instId", inst_id, "--mgnMode", mgn_mode, "--posSide", pos_side, "--autoCxl"], env)
-    remaining = actual_size; query_failures = 0
-    for _ in range(8):
-        time.sleep(0.75)
-        try:
-            current = _position_match(_run(["account", "positions"], env), inst_id, pos_side, pos_id)
-            remaining = abs(float(current.get("pos", 0) or 0)) if current else 0.0
-            if remaining <= tolerance: break
-        except Exception:
-            query_failures += 1
-    if remaining > tolerance:
-        status = "unknown_verification_timeout" if query_failures >= 8 else "still_open"
-        raise RuntimeError(f"平仓请求已发送但未确认归零，状态={status}，剩余仓位={remaining}；禁止重复点击，请刷新")
-    return {
-        "status": "confirmed_closed", "environment": env.mode, "environment_id": env.identity,
-        "instId": inst_id, "posSide": pos_side, "posId": pos_id, "closed_size": actual_size,
-        "canceled_entry_orders": canceled, "close_result": close_result,
-    }
+    actual=abs(float(target.get("pos",0) or 0)); tolerance=max(1e-12,actual*1e-6)
+    if abs(actual-intent["expected_size"])>tolerance: raise ValueError(f"仓位数量已从 {intent['expected_size']} 变化为 {actual}，请刷新")
+    target_side=intent["posSide"] if intent["posSide"] in {"long","short"} else ("long" if float(target.get("pos",0) or 0)>0 else "short")
+    increase_side="buy" if target_side=="long" else "sell"; canceled=[]
+    for order in _request("GET","/api/v5/trade/orders-pending",{"instType":"SWAP","instId":intent["instId"]},env):
+        if str(order.get("posSide") or "net").lower() not in {target_side,"net"}: continue
+        if str(order.get("reduceOnly","false")).lower()=="true" or str(order.get("side","")).lower()!=increase_side: continue
+        order_id=str(order.get("ordId") or "")
+        if order_id: _request("POST","/api/v5/trade/cancel-order",{"instId":intent["instId"],"ordId":order_id},env); canceled.append(order_id)
+    close_result=_request("POST","/api/v5/trade/close-position",{"instId":intent["instId"],"mgnMode":str(target.get("mgnMode") or "cross"),"posSide":intent["posSide"],"autoCxl":True,"clOrdId":f"r20close{int(time.time())}"},env)
+    remaining=actual
+    for _ in range(10):
+        time.sleep(.7); current=_position_match(_request("GET","/api/v5/account/positions",{"instType":"SWAP","instId":intent["instId"]},env),intent)
+        remaining=abs(float(current.get("pos",0) or 0)) if current else 0.0
+        if remaining<=tolerance: break
+    if remaining>tolerance: raise RuntimeError(f"平仓请求已受理但仓位未确认归零，剩余 {remaining}；请刷新，禁止重复点击")
+    return {"status":"confirmed_closed","environment":env.mode,"instId":intent["instId"],"posSide":intent["posSide"],"closed_size":actual,"canceled_entry_orders":canceled,"close_result":close_result}

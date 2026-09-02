@@ -31,7 +31,7 @@ from r20_backend.backup_secrets import credential_status as backup_credential_st
 from r20_backend.net_security import validate_wechat_base_url
 from r20_backend.prompt_views import EVOLUTION_USER_TEMPLATE, TRADING_USER_TEMPLATE, rendered_snapshots
 from r20_backend.settings_store import mask, remove_env, update_env
-from r20_backend.notifications import _env as notification_env, test_channel
+from r20_backend.notifications import _env as notification_env, diagnose_channel, test_channel
 from r20_backend.audit import recent as recent_audit, record as audit_record
 from r20_backend.admin_auth import AdminAuthStore
 from r20_backend.backup_store import (
@@ -45,15 +45,16 @@ from r20_backend.wechat_watcher import public_state as wechat_watcher_state, req
 from r20_gateway.agents import agent_statuses
 from r20_gateway.publisher import DB_PATH as GATEWAY_DB_PATH
 from r20_gateway.plugins import plugin_statuses
+from r20_gateway import __version__ as GATEWAY_VERSION
 from r20_gateway.scheduler import scheduler_snapshot
 from r20_gateway.secrets import delete_secrets, save_secrets, status as secret_store_status
 from r20_gateway.store import GatewayStore
 from r20_gateway.supervisor import start_supervisor as start_gateway_supervisor, stop_supervisor as stop_gateway_supervisor
 from scripts.instrument_pool import from_okx_instrument, load_instruments, save_instruments
 from scripts.prompt_library import (
-    PRESETS, TEMPLATE_KEYS, active_profile, activate_profile, all_profiles, append_layer,
+    PRESETS, TEMPLATE_KEYS, active_profile, activate_profile, all_profiles, apply_module_layout,
     create_profile, delete_profile, export_profile, get_profile, import_profile,
-    load_library, profile_history, resolve_profile, rollback_profile, save_library, update_profile, validate_profile,
+    load_library, pipeline_view, profile_history, resolve_profile, rollback_profile, save_library, update_profile, validate_profile,
 )
 
 PROMPT_OVERRIDE_FILE = DATA_DIR / "system_prompt_override.txt"
@@ -142,13 +143,9 @@ class InstrumentDeleteRequest(BaseModel):
 
 
 class ManualCloseRequest(BaseModel):
-    inst_id: str = Field(pattern=r"^[A-Z0-9]+-USDT-SWAP$")
-    position_side: str = Field(pattern=r"^(long|short|net)$")
-    position_id: str = Field(default="", max_length=80)
-    expected_size: float = Field(gt=0)
-    environment_id: str = Field(min_length=8, max_length=100)
+    close_token: str = Field(min_length=20, max_length=200)
     admin_password: str = Field(min_length=1, max_length=128)
-    confirmation: str
+    confirmation: str = Field(min_length=8, max_length=200)
 
 
 class UpdateRequest(BaseModel):
@@ -177,8 +174,9 @@ class PromptProfileUpdateRequest(BaseModel):
     name: str = Field(min_length=1, max_length=60)
     description: str = Field(default="", max_length=240)
     enabled: bool = True
-    editor_mode: str = Field(default="simple", pattern=r"^(simple|advanced)$")
+    editor_mode: str = Field(default="modules", pattern=r"^(simple|advanced|modules)$")
     simple_policy: dict[str, Any] = Field(default_factory=dict)
+    pipelines: dict[str, list[dict[str, Any]]] = Field(default_factory=dict)
     trading_system: str = Field(default="", max_length=12000)
     trading_user: str = Field(default="", max_length=12000)
     evolution_system: str = Field(default="", max_length=12000)
@@ -202,6 +200,16 @@ class BackupJobCreateRequest(BaseModel):
 
 class BackupJobUpdateRequest(BaseModel):
     job: dict[str, Any]
+
+
+class SimpleBackupUpdateRequest(BaseModel):
+    enabled: bool = True
+    schedule_time: str = Field(default="02:00", pattern=r"^(?:[01]\d|2[0-3]):[0-5]\d$")
+    destination: str = Field(pattern=r"^(local|s3|oss|webdav|baidu_oauth)$")
+    retention: int = Field(default=3, ge=1, le=365)
+    endpoint: str = Field(default="", max_length=300)
+    bucket: str = Field(default="", max_length=120)
+    credentials: dict[str, str] = Field(default_factory=dict)
 
 
 class BackupCredentialUpdateRequest(BaseModel):
@@ -257,6 +265,7 @@ class NotificationConfigUpdate(BaseModel):
 
 class NotificationTestRequest(BaseModel):
     channel: str = Field(pattern=r"^(webhook|wechat|wechat_ilink|telegram|qq)$")
+    confirmation: str = ""
 
 
 class NotificationScheduleUpdate(BaseModel):
@@ -508,7 +517,7 @@ def gateway_status(x_r20_admin_token: str | None = Header(default=None), limit: 
             running = True
         except OSError:
             pass
-    return {"version": "0.2.0", "running": running, "pid": pid or None, "stats": store.stats(), "event_health": store.event_health(), "deliveries": store.recent(limit), "scheduler": scheduler_snapshot(store)}
+    return {"version": GATEWAY_VERSION, "running": running, "pid": pid or None, "stats": store.stats(), "event_health": store.event_health(), "deliveries": store.recent(limit), "scheduler": scheduler_snapshot(store)}
 
 
 @app.post("/api/v1/admin/gateway/deliveries/{delivery_id}/replay")
@@ -612,6 +621,7 @@ def update_admin_config(payload: AdminConfigUpdate, x_r20_admin_token: str | Non
         "R20_MANUAL_CLOSE_ENABLED": "1" if data.get("manual_close_enabled") else "0" if "manual_close_enabled" in data else None,
     }
     update_env(env_values)
+    refresh_settings()
     audit_record("config.update", "success", {"fields": sorted(data.keys())})
     return {
         "updated": True,
@@ -629,32 +639,28 @@ def admin_okx_account_snapshot(x_r20_admin_token: str | None = Header(default=No
 
 @app.post("/api/v1/admin/positions/close")
 def manual_close_position(payload: ManualCloseRequest) -> dict[str, Any]:
+    actor = require_superadmin(REQUEST_SESSION.get())
+    refresh_settings()
     if not settings.manual_close_enabled:
         raise HTTPException(status_code=403, detail="后台手动平仓功能未启用")
-    actor = require_superadmin(REQUEST_SESSION.get())
     import fcntl
     lock_path = DATA_DIR / ".ai_factor_trader.lock"; lock_path.parent.mkdir(parents=True, exist_ok=True)
+    if actor.get("role") == "legacy" or not admin_auth.verify_password(int(actor["id"]), payload.admin_password):
+        raise HTTPException(status_code=403, detail="管理员密码验证失败")
     with lock_path.open("a+", encoding="utf-8") as lock_handle:
         try: fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError: raise HTTPException(status_code=409, detail="交易主循环正在执行，暂不允许后台快速平仓；请等待本周期结束")
-        finally:
-            try: fcntl.flock(lock_handle.fileno(), fcntl.LOCK_UN)
-            except OSError: pass
-    if actor.get("role") == "legacy" or not admin_auth.verify_password(int(actor["id"]), payload.admin_password):
-        raise HTTPException(status_code=403, detail="管理员密码验证失败")
-    expected_confirmation = f"CLOSE {settings.okx_environment.upper()} {payload.inst_id} {payload.position_side.upper()} {payload.expected_size:g}"
-    if payload.confirmation.strip().upper() != expected_confirmation:
-        raise HTTPException(status_code=400, detail=f"确认短语必须精确为：{expected_confirmation}")
-    try:
-        result = fast_close_confirmed(payload.inst_id, payload.position_side, payload.position_id, payload.expected_size, payload.environment_id)
-        audit_record("position.close", "confirmed_closed", {"instId": payload.inst_id, "side": payload.position_side, "environment": settings.okx_environment, "size": payload.expected_size})
-        return result
-    except ValueError as exc:
-        audit_record("position.close", "rejected", {"instId": payload.inst_id, "error": str(exc)[:300]})
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
-    except Exception as exc:
-        audit_record("position.close", "verification_failed", {"instId": payload.inst_id, "side": payload.position_side, "error": str(exc)[:300]})
-        raise HTTPException(status_code=502, detail=f"OKX 快速平仓未完成确认：{exc}") from exc
+        try:
+            result = fast_close_confirmed(payload.close_token, payload.confirmation)
+            audit_record("position.close", "confirmed_closed", {"instId": result.get("instId"), "side": result.get("posSide"), "environment": result.get("environment"), "size": result.get("closed_size")})
+            return result
+        except ValueError as exc:
+            audit_record("position.close", "rejected", {"error": str(exc)[:300]})
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        except Exception as exc:
+            audit_record("position.close", "verification_failed", {"error": str(exc)[:300]})
+            raise HTTPException(status_code=502, detail=f"OKX 快速平仓未完成确认：{exc}") from exc
+        finally: fcntl.flock(lock_handle.fileno(), fcntl.LOCK_UN)
 
 
 @app.get("/api/v1/admin/instruments")
@@ -722,11 +728,11 @@ def admin_about(x_r20_admin_token: str | None = Header(default=None)) -> dict[st
     import platform
     store = GatewayStore(GATEWAY_DB_PATH)
     return {
-        "product": {"name": "R20 Quantum Trader", "version": "5.4.2", "control_plane": "R20 Gateway Runtime", "gateway_version": "0.3.0"},
+        "product": {"name": "R20 Quantum Trader", "version": "5.4.2", "control_plane": "R20 Gateway Runtime", "gateway_version": GATEWAY_VERSION},
         "runtime": {"python": platform.python_version(), "platform": platform.platform(), "backend_pid": os.getpid(), "gateway": gateway_status(x_r20_admin_token)},
         "components": [
             {"name": "FastAPI Control Plane", "version": "5.4.2"},
-            {"name": "Gateway Event Runtime", "version": "0.3.0"},
+            {"name": "Gateway Event Runtime", "version": GATEWAY_VERSION},
             {"name": "Tencent iLink Protocol", "version": "2.4.8"},
             {"name": "SQLite", "version": __import__("sqlite3").sqlite_version},
         ],
@@ -783,18 +789,29 @@ def prompt_library(x_r20_admin_token: str | None = Header(default=None)) -> dict
     return {
         "active_style": library["active_style"],
         "active_profile_id": library["active_profile_id"],
-        "profiles": [{**item, "resolved_templates": {key: resolve_profile(item).get(key, "") for key in TEMPLATE_KEYS}} for item in all_profiles()],
+        "profiles": [{**item, "pipeline_views": {
+            "trading_system": pipeline_view(SYSTEM_PROMPT, item, "trading_system"),
+            "trading_user": pipeline_view(TRADING_USER_TEMPLATE, item, "trading_user"),
+            "evolution_system": pipeline_view(EVOLUTION_SYSTEM_PROMPT, item, "evolution_system"),
+            "evolution_user": pipeline_view(EVOLUTION_USER_TEMPLATE, item, "evolution_user"),
+        }} for item in all_profiles()],
         "base_templates": {
             "trading_system": SYSTEM_PROMPT,
             "trading_user": TRADING_USER_TEMPLATE,
             "evolution_system": EVOLUTION_SYSTEM_PROMPT,
             "evolution_user": EVOLUTION_USER_TEMPLATE,
         },
+        "pipelines": {
+            "trading_system": pipeline_view(SYSTEM_PROMPT, profile, "trading_system"),
+            "trading_user": pipeline_view(TRADING_USER_TEMPLATE, profile, "trading_user"),
+            "evolution_system": pipeline_view(EVOLUTION_SYSTEM_PROMPT, profile, "evolution_system"),
+            "evolution_user": pipeline_view(EVOLUTION_USER_TEMPLATE, profile, "evolution_user"),
+        },
         "effective_templates": {
-            "trading_system": append_layer(SYSTEM_PROMPT, profile.get("trading_system", ""), f"{profile.get('name')}交易系统提示词模板"),
-            "trading_user": append_layer(TRADING_USER_TEMPLATE, profile.get("trading_user", ""), f"{profile.get('name')}交易用户提示词模板"),
-            "evolution_system": append_layer(EVOLUTION_SYSTEM_PROMPT, profile.get("evolution_system", ""), f"{profile.get('name')}自进化系统提示词模板"),
-            "evolution_user": append_layer(EVOLUTION_USER_TEMPLATE, profile.get("evolution_user", ""), f"{profile.get('name')}自进化用户提示词模板"),
+            "trading_system": apply_module_layout(SYSTEM_PROMPT, profile, "trading_system", "交易 System"),
+            "trading_user": apply_module_layout(TRADING_USER_TEMPLATE, profile, "trading_user", "交易 User"),
+            "evolution_system": apply_module_layout(EVOLUTION_SYSTEM_PROMPT, profile, "evolution_system", "自进化 System"),
+            "evolution_user": apply_module_layout(EVOLUTION_USER_TEMPLATE, profile, "evolution_user", "自进化 User"),
         },
         "snapshots": rendered_snapshots(),
         "transport": "python-direct",
@@ -1021,13 +1038,21 @@ def update_notification_config(payload: NotificationConfigUpdate, x_r20_admin_to
     return {"saved": True, "restart_note": "通知配置已写入 .env；下一轮脚本执行会读取新通道。"}
 
 
+@app.post("/api/v1/admin/notifications/diagnose")
+def diagnose_notification(payload: NotificationTestRequest, x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
+    refresh_settings(); require_admin_header(x_r20_admin_token)
+    result = diagnose_channel(payload.channel)
+    audit_record("notifications.diagnose", "completed", {"channel": payload.channel, "status": result.get("status")})
+    return {"channel": payload.channel, "result": result, "sent": False}
+
+
 @app.post("/api/v1/admin/notifications/test")
-def send_notification_test(payload: NotificationTestRequest, x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
-    refresh_settings()
-    require_admin_header(x_r20_admin_token)
+def send_notification_test(payload: NotificationTestRequest, x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    refresh_settings(); require_superadmin(x_r20_session)
+    if payload.confirmation != f"SEND TEST {payload.channel.upper()}": raise HTTPException(status_code=400, detail=f"确认短语必须为：SEND TEST {payload.channel.upper()}")
     result = test_channel(payload.channel)
     audit_record("notifications.test", "completed", {"channel": payload.channel, "result": result})
-    return {"channel": payload.channel, "result": result}
+    return {"channel": payload.channel, "result": result, "sent": True, "meaning": "远端接口已受理不等于用户客户端已读"}
 
 
 @app.get("/api/v1/admin/notifications/schedule")
@@ -1121,12 +1146,74 @@ def sync_wechat_session(x_r20_admin_token: str | None = Header(default=None)) ->
     return {"synced": False, "waiting": True, "instruction": "现在向微信 Bot 发送一条文字消息，后台监听器将自动捕获会话。", "watcher": state}
 
 
+@app.get("/api/v1/admin/backups/simple")
+def simple_backup_config(x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
+    require_admin_header(x_r20_admin_token)
+    jobs = list_backup_jobs(); job = next((x for x in jobs if x.get("id") == "nightly-default"), jobs[0] if jobs else None)
+    if not job: raise HTTPException(status_code=404, detail="主灾备任务不存在")
+    target = next((x for x in job.get("targets", []) if x.get("enabled")), None)
+    if not target: target = next((x for x in job.get("targets", []) if x.get("type") == "local"), None)
+    target_type = str((target or {}).get("type") or "local"); auth_mode = str((target or {}).get("auth_mode") or "")
+    legacy_bypy = target_type == "baidu" and auth_mode != "oauth"
+    destination = "baidu_oauth" if target_type == "baidu" and not legacy_bypy else target_type if target_type in {"local","s3","oss","webdav"} else "local"
+    validation = validate_backup_job(job); latest = None
+    manifests_dir = ROOT / "backups" / "manifests"
+    for path in sorted(manifests_dir.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)[:30] if manifests_dir.exists() else []:
+        try:
+            item=json.loads(path.read_text(encoding="utf-8"))
+            if item.get("job_id")==job["id"]: latest=item; break
+        except (OSError,json.JSONDecodeError): pass
+    return {"job_id":job["id"],"target":target or {},"enabled":job["enabled"],"schedule_time":job["schedule_times"][0],"destination":destination,"retention":int((target or {}).get("retention") or 3),"legacy_bypy":legacy_bypy,"migration_note":"当前为旧版 ByPy 配置，请选择新的保存位置后保存完成迁移" if legacy_bypy else "","configured":bool((target or {}).get("credential_status",{}).get("configured")) if target else destination=="local","validation":validation,"latest":latest,"advanced_preserved":True}
+
+
+@app.put("/api/v1/admin/backups/simple")
+def update_simple_backup(payload: SimpleBackupUpdateRequest, x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    actor=require_superadmin(x_r20_session); jobs=list_backup_jobs(); job=next((x for x in jobs if x.get("id")=="nightly-default"), jobs[0] if jobs else None)
+    if not job: raise HTTPException(status_code=404,detail="主灾备任务不存在")
+    wanted_type="baidu" if payload.destination=="baidu_oauth" else payload.destination
+    existing=next((x for x in job.get("targets",[]) if x.get("type")==wanted_type and (wanted_type!="baidu" or x.get("auth_mode")=="oauth")),None)
+    if not existing:
+        target_id=f"{wanted_type}-{__import__('uuid').uuid4().hex[:10]}"; existing={"id":target_id,"type":wanted_type,"label":{"local":"本地归档","s3":"S3存储","oss":"阿里云OSS","webdav":"WebDAV/OpenList","baidu":"百度网盘"}[wanted_type],"credential_ref":f"backup:{target_id}","enabled":False,"remote_path":"R20_Backups","path":"backups/local","retention":3,"retries":3,"auth_mode":"oauth" if wanted_type=="baidu" else "native"}; job.setdefault("targets",[]).append(existing)
+    for target in job.get("targets",[]): target["enabled"] = target is existing
+    existing["retention"] = payload.retention if wanted_type=="local" else 0
+    if wanted_type in {"s3","oss","webdav"}: existing["endpoint"] = payload.endpoint.strip()
+    if wanted_type in {"s3","oss"}: existing["bucket"] = payload.bucket.strip()
+    if wanted_type=="baidu": existing["auth_mode"]="oauth"
+    if payload.credentials: save_backup_credentials(existing["credential_ref"], payload.credentials)
+    job["enabled"]=payload.enabled; job["schedule_times"]=[payload.schedule_time]
+    try: saved=update_backup_job(job["id"],job)
+    except ValueError as exc: raise HTTPException(status_code=400,detail=str(exc)) from exc
+    audit_record("backup.simple.update","success",{"actor":actor["username"],"destination":payload.destination,"enabled":payload.enabled})
+    return {"saved":True,"job":saved}
+
+
+@app.post("/api/v1/admin/backups/simple/test")
+def test_simple_backup(payload: SimpleBackupUpdateRequest, x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    require_superadmin(x_r20_session)
+    if payload.destination == "local":
+        directory=(ROOT/"backups"/"local").resolve(); directory.mkdir(parents=True,exist_ok=True)
+        if not directory.is_relative_to((ROOT/"backups").resolve()): raise HTTPException(status_code=400,detail="本地灾备目录无效")
+        return {"status":"ready","sent":False,"detail":"本地目录可写；未生成或上传归档"}
+    wanted_type="baidu" if payload.destination=="baidu_oauth" else payload.destination
+    target={"type":wanted_type,"endpoint":payload.endpoint.strip(),"bucket":payload.bucket.strip(),"auth_mode":"oauth" if wanted_type=="baidu" else "native"}
+    required={"s3":{"access_key_id","secret_access_key"},"oss":{"access_key_id","secret_access_key"},"webdav":set(),"baidu":{"app_key","app_secret","refresh_token"}}[wanted_type]
+    missing=sorted(key for key in required if not payload.credentials.get(key))
+    if missing: raise HTTPException(status_code=400,detail=f"连接信息不完整：{', '.join(missing)}")
+    if wanted_type in {"s3","oss","webdav"}:
+        try: target["endpoint"]=__import__("r20_backend.net_security",fromlist=["validate_outbound_url"]).validate_outbound_url(target["endpoint"])
+        except ValueError as exc: raise HTTPException(status_code=400,detail=str(exc)) from exc
+    if wanted_type in {"s3","oss"} and not target["bucket"]: raise HTTPException(status_code=400,detail="Bucket 不能为空")
+    # Intentionally no upload and no OAuth token exchange: this endpoint validates
+    # configuration and safe reachability only, never creates remote objects.
+    return {"status":"ready","sent":False,"detail":"配置格式与目标地址校验通过；未上传任何文件","destination":payload.destination}
+
+
 @app.get("/api/v1/admin/backup-target-types")
 def backup_target_types(x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
     require_admin_header(x_r20_admin_token)
     return {"target_types": [
         {"type":"local","label":"本地归档","auth":"none","description":"项目 backups/ 内滚动保留"},
-        {"type":"baidu","label":"百度网盘","auth":"bypy-oauth","description":"支持 ByPy 兼容授权；原生 OAuth 配置槽保留"},
+        {"type":"baidu","label":"百度网盘","auth":"oauth","description":"仅支持官方 OAuth，新配置不再提供 ByPy"},
         {"type":"s3","label":"S3 兼容存储","auth":"access-key","description":"AWS S3、R2、MinIO、COS 等 S3 兼容端点"},
         {"type":"oss","label":"阿里云 OSS","auth":"access-key","description":"官方 oss2 SDK"},
         {"type":"webdav","label":"WebDAV / NAS / OpenList","auth":"basic","description":"标准 WebDAV PUT/MKCOL"},

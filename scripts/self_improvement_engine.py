@@ -40,7 +40,7 @@ LOG_FILE = os.path.join(LOGS_DIR, "self_improvement.log")
 EVOLUTION_LOCK_FILE = os.path.join(DATA_DIR, ".self_improvement.lock")
 
 from instrument_pool import load_instruments
-from prompt_library import active_profile, append_layer
+from prompt_library import active_profile, apply_module_layout
 from r20_gateway.telemetry import ModelCallTelemetry
 TARGET_INSTRUMENTS = [item["name"] for item in load_instruments()]
 
@@ -233,12 +233,8 @@ def call_llm_evolution_review(closed_trades: List[Dict[str, Any]], existing_memo
 """
 
     profile = active_profile()
-    effective_evolution_system = append_layer(
-        EVOLUTION_SYSTEM_PROMPT, profile.get("evolution_system", ""), f"{profile.get('name', '稳健')}自进化系统提示词模板"
-    )
-    effective_evolution_user = append_layer(
-        prompt, profile.get("evolution_user", ""), f"{profile.get('name', '稳健')}自进化用户提示词模板"
-    )
+    effective_evolution_system = apply_module_layout(EVOLUTION_SYSTEM_PROMPT, profile, "evolution_system", f"{profile.get('name', '稳健')}自进化系统提示词模板")
+    effective_evolution_user = apply_module_layout(prompt, profile, "evolution_user", f"{profile.get('name', '稳健')}自进化用户提示词模板")
     try:
         snapshot = f"【SYSTEM PROMPT】:\n{effective_evolution_system.strip()}\n\n{'='*70}\n【USER PROMPT ({now_bj_str})】：\n{effective_evolution_user.strip()}"
         fd, temp_path = tempfile.mkstemp(prefix=".evolution-prompt-", suffix=".tmp", dir=DATA_DIR)
