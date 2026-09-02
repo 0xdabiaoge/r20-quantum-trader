@@ -57,6 +57,32 @@ class DashboardPersistentCacheTests(unittest.TestCase):
         self.assertFalse(dashboard._is_meaningful_dashboard_snapshot({"account": {}}))
         self.assertTrue(dashboard._is_meaningful_dashboard_snapshot({"account": {"total_eq": 0.0}}))
 
+    def test_inject_local_data_into_stale_preserves_factor_library_and_factors(self):
+        """When OKX is down, stale cache must still get fresh local factor_library + factors."""
+        temp_dir = tempfile.mkdtemp()
+        import shutil
+        factor_lib = {"timestamp": 123, "instruments": [{"name": "BTC", "instId": "BTC-USDT-SWAP", "calculus_dynamics": {"velocity": -0.78}}]}
+        trading_state = {"timestamp": 123, "instruments": [{"name": "BTC", "instId": "BTC-USDT-SWAP", "price": 77000, "rsi": 58.2}]}
+        ai_decisions = {"BTC-USDT-SWAP": {"decision": {"action": "WAIT"}, "thought_process": {}, "smart_money": {"weighted_long_pct": 65.4}, "adx_1h": 31.7}}
+        Path(temp_dir, "factor_library_snapshot.json").write_text(json.dumps(factor_lib), encoding="utf-8")
+        Path(temp_dir, "trading_state.json").write_text(json.dumps(trading_state), encoding="utf-8")
+        Path(temp_dir, "ai_brain_decisions.json").write_text(json.dumps(ai_decisions), encoding="utf-8")
+        with patch.object(dashboard, "FACTOR_LIBRARY_FILE", str(Path(temp_dir, "factor_library_snapshot.json"))), \
+             patch.object(dashboard, "STATE_JSON_FILE", str(Path(temp_dir, "trading_state.json"))), \
+             patch.object(dashboard, "AI_DECISIONS_FILE", str(Path(temp_dir, "ai_brain_decisions.json"))):
+            stale = {"account": {"total_eq": 4100}, "positions_summary": {"items": []}, "factors": []}
+            dashboard._inject_local_data_into_stale(stale, [], "2026-09-02 22:00:00 (北京时间)")
+        # factor_library should be injected from local file
+        self.assertEqual(stale["factor_library"]["instruments"][0]["calculus_dynamics"]["velocity"], -0.78)
+        # factors should be rebuilt from local trading_state + ai_brain_decisions
+        self.assertTrue(len(stale["factors"]) > 0)
+        f0 = stale["factors"][0]
+        self.assertEqual(f0["name"], "BTC")
+        self.assertEqual(f0["rsi"], 58.2)
+        self.assertEqual(f0["smart_money"]["weighted_long_pct"], 65.4)
+        self.assertEqual(f0["adx_1h"], 31.7)
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -128,6 +128,181 @@ def enrich_position_risk_fields(positions, trackers=None):
     return positions
 
 
+def _load_local_factor_library():
+    """Load factor_library_snapshot.json — a local file independent of OKX private API."""
+    if os.path.exists(FACTOR_LIBRARY_FILE):
+        try:
+            with open(FACTOR_LIBRARY_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {}
+
+
+def _build_factors_from_local_files(positions, timestamp_full):
+    """Build factors_list from trading_state.json + ai_brain_decisions.json.
+
+    These local files do not depend on OKX private endpoints, so they are
+    available even when the dashboard is in STALE/OFFLINE degraded mode.
+    """
+    factors_list = []
+    pos_map = {p.get("instId"): p for p in positions} if isinstance(positions, list) else {}
+    state_data = {}
+    ai_decisions = {}
+    if os.path.exists(AI_DECISIONS_FILE):
+        try:
+            with open(AI_DECISIONS_FILE, "r", encoding="utf-8") as f:
+                ai_decisions = json.load(f)
+        except Exception:
+            pass
+    if not os.path.exists(STATE_JSON_FILE):
+        return factors_list, state_data
+    try:
+        with open(STATE_JSON_FILE, "r", encoding="utf-8") as f:
+            state_data = json.load(f)
+    except Exception:
+        return factors_list, state_data
+    for ins in state_data.get("instruments", []):
+        inst_id = ins.get("instId")
+        ai_info = ai_decisions.get(inst_id, {})
+        ai_dec = ai_info.get("decision", {})
+        ai_thought = ai_info.get("thought_process", {})
+        action_val = ai_dec.get("action", ins.get("action", "WAIT"))
+        confidence = ai_dec.get("confidence")
+        reason = ai_dec.get("summary_reason", ins.get("desc", "等待明确形态信号"))
+        strategy_val = "🟢 建议做多" if action_val == "BUY_LONG" else ("🔴 建议做空" if action_val == "SELL_SHORT" else "⚪ AI观望")
+        score_val = 2.5 if action_val == "BUY_LONG" else (-2.5 if action_val == "SELL_SHORT" else 0.0)
+        m_struct = ai_thought.get("market_structure", f"{ins.get('market_regime', 'CHOP')} ({ins.get('trend_1h', '震荡')})")
+        v_oi = ai_thought.get("volume_and_oi", f"OBV: {ins.get('obv_flow', 'NEUTRAL')}, 量能: {ins.get('vol_ratio', 1.0)}x")
+        rr_ratio = ai_thought.get("risk_reward_evaluation", "盈亏比评估中")
+        raw_t = ai_info.get("raw_ticker", {})
+        factors_list.append({
+            "name": ins.get("name"),
+            "instId": inst_id,
+            "position": pos_map.get(inst_id),
+            "type": ins.get("type", "crypto"),
+            "price": ins.get("price", "--"),
+            "score": score_val,
+            "chg24h": raw_t.get("chg24h"),
+            "bidPx": raw_t.get("bidPx", ins.get("price", "--")),
+            "askPx": raw_t.get("askPx", ins.get("price", "--")),
+            "fundingRate": ai_info.get("raw_funding_rate") or "--",
+            "oiUsd": ai_info.get("raw_oi") or "--",
+            "takerNetUsd": ai_info.get("raw_taker_vol") or "--",
+            "lsRatio": ai_info.get("raw_ls_ratio") or "--",
+            "rsi": ins.get("rsi", 50.0),
+            "rsi_7": ins.get("rsi_7", 50.0),
+            "vwap_bias": ins.get("vwap_bias", 0.0),
+            "macd_hist": ins.get("macd_hist", 0.0),
+            "macd_accel": ins.get("macd_accel", 0.0),
+            "obv_flow": ins.get("obv_flow", "NEUTRAL"),
+            "bb_bandwidth": ins.get("bb_bandwidth", 0.0),
+            "vol_ratio": ins.get("vol_ratio", 1.0),
+            "trend_1h": ins.get("trend_1h", "震荡"),
+            "trend_4h": ins.get("trend_4h", "震荡"),
+            "market_regime": ins.get("market_regime", "CHOP"),
+            "strategy_tag": strategy_val,
+            "action": action_val,
+            "confidence": confidence,
+            "smart_money": ai_info.get("smart_money", {}),
+            "adx_1h": ai_info.get("adx_1h", "--"),
+            "leverage": ai_dec.get("leverage", 3),
+            "margin_usdt": ai_dec.get("margin_usdt", 0.0),
+            "entry_price": ai_dec.get("entry_price", 0.0),
+            "take_profit_price": ai_dec.get("take_profit_price", 0.0),
+            "stop_loss_price": ai_dec.get("stop_loss_price", 0.0),
+            "risk_reward_ratio": ai_dec.get("risk_reward_ratio", "--"),
+            "reason": reason,
+            "market_structure": m_struct,
+            "volume_and_oi": v_oi,
+            "rr_ratio": rr_ratio,
+            "thought_process": ai_thought,
+            "desc": reason,
+            "time_str": ai_info.get("time_str") or state_data.get("timestamp") or timestamp_full,
+            "timestamp": ai_info.get("timestamp"),
+        })
+    return factors_list, state_data
+
+
+def _inject_local_data_into_stale(stale, positions, timestamp_full):
+    """Inject local-only data (factor library, factors, news, review) into a stale cache.
+
+    When OKX private endpoints are unavailable, the dashboard enters STALE mode
+    and returns the last-known-good snapshot. However, local files like
+    factor_library_snapshot.json, trading_state.json, ai_brain_decisions.json,
+    news_sentiment.json and the review report do NOT depend on OKX private API
+    and should always reflect their latest on-disk state.
+    """
+    # Factor library — the source of calculus_dynamics, definite_integrals,
+    # smart_money_derivatives, probability_theory, microstructure, etc.
+    stale["factor_library"] = _load_local_factor_library()
+
+    # Factors list — rebuilt from local trading_state + ai_brain_decisions
+    factors_list, state_data = _build_factors_from_local_files(positions, timestamp_full)
+    if factors_list:
+        stale["factors"] = factors_list
+        stale["state_snapshot"] = state_data
+
+    # News intelligence — local file, no OKX dependency
+    if os.path.exists(NEWS_SENTIMENT_FILE):
+        try:
+            with open(NEWS_SENTIMENT_FILE, "r", encoding="utf-8") as f:
+                stale["news_intelligence"] = json.load(f)
+        except Exception:
+            pass
+
+    # AI brain history — local file
+    if os.path.exists(AI_HISTORY_FILE):
+        try:
+            with open(AI_HISTORY_FILE, "r", encoding="utf-8") as f:
+                stale["ai_brain_history"] = json.load(f)
+        except Exception:
+            pass
+
+    # Review report — local file
+    if os.path.exists(REPORT_JSON_FILE):
+        try:
+            with open(REPORT_JSON_FILE, "r", encoding="utf-8") as f:
+                stale["review"] = json.load(f)
+        except Exception:
+            pass
+
+    # AI last prompt — local file
+    if os.path.exists(AI_LAST_PROMPT_FILE):
+        try:
+            with open(AI_LAST_PROMPT_FILE, "r", encoding="utf-8") as f:
+                stale["ai_last_prompt"] = f.read()
+        except Exception:
+            pass
+
+    # AI trading memory — local file
+    if os.path.exists(AI_MEMORY_MD_FILE):
+        try:
+            with open(AI_MEMORY_MD_FILE, "r", encoding="utf-8") as f:
+                stale["ai_trading_memory_md"] = f.read()
+        except Exception:
+            pass
+
+    # Log lines — local file
+    if os.path.exists(LOG_FILE):
+        try:
+            with open(LOG_FILE, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+                stale["logs"] = [l.strip() for l in lines[-60:] if l.strip()]
+        except Exception:
+            pass
+
+    # Trades table — local ledger file
+    if os.path.exists(LEDGER_JSON_FILE):
+        try:
+            with open(LEDGER_JSON_FILE, "r", encoding="utf-8") as f:
+                stale["trades"] = json.load(f)[:60]
+        except Exception:
+            pass
+
+    return stale
+
+
 def _is_meaningful_dashboard_snapshot(data):
     return isinstance(data, dict) and isinstance(data.get("account"), dict) and bool(data.get("account")) and "total_eq" in data["account"]
 
@@ -365,6 +540,10 @@ def update_cache_cycle():
                 "attempted_at": timestamp_full,
                 "cache_age_seconds": max(0.0, round(time.time() - LAST_CACHE_TIME, 1)) if LAST_CACHE_TIME > 0 else None,
             }
+            # Inject local-only data that does not depend on OKX private API.
+            # factor_library, factors, news, review, logs, trades etc. are
+            # read from local files and should always be fresh even in STALE mode.
+            _inject_local_data_into_stale(stale, stale_positions, timestamp_full)
             CACHE_DATA = stale
             return
         CACHE_DATA = {
