@@ -33,9 +33,15 @@ def _run_cli(command: list[str], timeout: int = 20) -> list[dict[str, Any]]:
         raise RuntimeError(f"OKX CLI 错误：{err_msg}")
     try:
         data = json.loads(res.stdout or "[]")
-        return data if isinstance(data, list) else [data]
+        rows = data if isinstance(data, list) else [data]
     except json.JSONDecodeError as exc:
         raise RuntimeError(f"OKX CLI JSON 解析失败：{exc} stdout={res.stdout[:200]}") from exc
+    failures = [row for row in rows if isinstance(row, dict) and str(row.get("sCode", row.get("code", "0"))) != "0"]
+    if failures:
+        code = failures[0].get("sCode", failures[0].get("code", "--"))
+        message = failures[0].get("sMsg") or failures[0].get("msg") or "业务请求失败"
+        raise RuntimeError(f"OKX CLI {code}: {message}")
+    return [row for row in rows if isinstance(row, dict)]
 
 
 def _request(method: str, path: str, params: dict[str, Any] | None = None, env: OKXEnvironment | None = None, timeout: int = 20) -> list[dict[str, Any]]:
@@ -54,7 +60,7 @@ def _request(method: str, path: str, params: dict[str, Any] | None = None, env: 
                 cmd.extend(["--instId", str(params["instId"])])
             return _run_cli(cmd, timeout=timeout)
         elif path == "/api/v5/trade/cancel-order":
-            cmd = ["okx", mode_flag, "swap", "cancel", "--instId", str(params.get("instId")), "--ordId", str(params.get("ordId")), "--json"]
+            cmd = ["okx", mode_flag, "swap", "cancel", str(params.get("instId")), "--ordId", str(params.get("ordId")), "--json"]
             return _run_cli(cmd, timeout=timeout)
         elif path == "/api/v5/trade/close-position":
             cmd = ["okx", mode_flag, "swap", "close", "--instId", str(params.get("instId")), "--mgnMode", str(params.get("mgnMode", "cross")), "--posSide", str(params.get("posSide", "net")), "--autoCxl", "--json"]
@@ -128,17 +134,21 @@ def fast_close_confirmed(close_token: str, confirmation: str) -> dict[str, Any]:
     actual=abs(float(target.get("pos",0) or 0)); tolerance=max(1e-12,actual*1e-6)
     if abs(actual-intent["expected_size"])>tolerance: raise ValueError(f"仓位数量已从 {intent['expected_size']} 变化为 {actual}，请刷新")
     target_side=intent["posSide"] if intent["posSide"] in {"long","short"} else ("long" if float(target.get("pos",0) or 0)>0 else "short")
-    increase_side="buy" if target_side=="long" else "sell"; canceled=[]
+    canceled=[]; cancel_failures=[]
     for order in _request("GET","/api/v5/trade/orders-pending",{"instType":"SWAP","instId":intent["instId"]},env):
-        if str(order.get("posSide") or "net").lower() not in {target_side,"net"}: continue
-        if str(order.get("reduceOnly","false")).lower()=="true" or str(order.get("side","")).lower()!=increase_side: continue
+        order_side=str(order.get("posSide") or "net").lower()
+        if order_side not in {target_side,"net"}: continue
         order_id=str(order.get("ordId") or "")
         if order_id:
             try:
                 _request("POST","/api/v5/trade/cancel-order",{"instId":intent["instId"],"ordId":order_id},env)
                 canceled.append(order_id)
-            except Exception: pass
-    close_result=_request("POST","/api/v5/trade/close-position",{"instId":intent["instId"],"mgnMode":str(target.get("mgnMode") or "cross"),"posSide":intent["posSide"],"autoCxl":True,"clOrdId":f"r20close{int(time.time())}"},env)
+            except Exception as exc:
+                cancel_failures.append(f"{order_id}: {exc}")
+    if cancel_failures:
+        raise RuntimeError("平仓前存在无法撤销的同仓位委托：" + "; ".join(cancel_failures))
+    close_side = intent["posSide"] if intent["posSide"] in {"long", "short"} else "net"
+    close_result=_request("POST","/api/v5/trade/close-position",{"instId":intent["instId"],"mgnMode":str(target.get("mgnMode") or "cross"),"posSide":close_side,"autoCxl":True,"clOrdId":f"r20close{int(time.time())}"},env)
     remaining=actual
     for _ in range(10):
         time.sleep(.7); current=_position_match(_request("GET","/api/v5/account/positions",{"instType":"SWAP","instId":intent["instId"]},env),intent)

@@ -129,10 +129,15 @@ class GatewayStore:
                 connection.execute(f"UPDATE deliveries SET status='processing' WHERE id IN ({marks})", ids)
             return [dict(row) for row in rows]
 
-    def complete(self, delivery_id: int) -> None:
+    def complete(self, delivery_id: int, status: str = "delivered", detail: str = "") -> None:
+        if status not in {"delivered", "accepted"}:
+            raise ValueError("delivery completion status must be delivered or accepted")
         now = datetime.now(BJ_TZ).strftime("%Y-%m-%d %H:%M:%S")
         with self.connect() as connection:
-            connection.execute("UPDATE deliveries SET status='delivered', delivered_at=?, last_error='' WHERE id=?", (now, delivery_id))
+            connection.execute(
+                "UPDATE deliveries SET status=?, delivered_at=?, last_error=? WHERE id=?",
+                (status, now, detail[:1000] if status == "accepted" else "", delivery_id),
+            )
 
     def fail(self, delivery_id: int, attempts: int, error: str, max_attempts: int = 6) -> None:
         new_attempts = attempts + 1
@@ -221,12 +226,12 @@ class GatewayStore:
             row = connection.execute(
                 """SELECT
                    SUM(CASE WHEN priority>=90 THEN 1 ELSE 0 END) critical_total,
-                   SUM(CASE WHEN priority>=90 AND delivered=0 AND delivery_count>0 THEN 1 ELSE 0 END) critical_unmet,
-                   SUM(CASE WHEN priority>=90 AND delivered=0 AND delivery_count>0 AND dead=delivery_count THEN 1 ELSE 0 END) critical_failed,
+                   SUM(CASE WHEN priority>=90 AND accepted=0 AND delivery_count>0 THEN 1 ELSE 0 END) critical_unmet,
+                   SUM(CASE WHEN priority>=90 AND accepted=0 AND delivery_count>0 AND dead=delivery_count THEN 1 ELSE 0 END) critical_failed,
                    SUM(CASE WHEN priority>=90 AND delivery_count=0 THEN 1 ELSE 0 END) critical_unroutable
                    FROM (
                      SELECT e.event_id,e.priority,COUNT(d.id) delivery_count,
-                       SUM(CASE WHEN d.status='delivered' THEN 1 ELSE 0 END) delivered,
+                       SUM(CASE WHEN d.status IN ('delivered','accepted') THEN 1 ELSE 0 END) accepted,
                        SUM(CASE WHEN d.status='dead' THEN 1 ELSE 0 END) dead
                      FROM events e LEFT JOIN deliveries d ON d.event_id=e.event_id GROUP BY e.event_id
                    )"""
@@ -236,7 +241,7 @@ class GatewayStore:
     def stats(self) -> dict[str, int]:
         with self.connect() as connection:
             rows = connection.execute("SELECT status, COUNT(*) count FROM deliveries GROUP BY status").fetchall()
-        result = {"pending": 0, "processing": 0, "retry": 0, "delivered": 0, "dead": 0}
+        result = {"pending": 0, "processing": 0, "retry": 0, "accepted": 0, "delivered": 0, "dead": 0}
         result.update({row["status"]: row["count"] for row in rows})
         return result
 

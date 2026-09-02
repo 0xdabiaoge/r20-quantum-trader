@@ -34,6 +34,16 @@ class GatewayStoreTests(unittest.TestCase):
         self.assertEqual(stats["delivered"], 1)
         self.assertEqual(stats["retry"], 1)
 
+    def test_wechat_acceptance_is_distinct_from_client_delivery(self):
+        event = GatewayEvent("briefing.ready", "简报", "daily")
+        self.store.publish(event, ["wechat_ilink"])
+        row = self.store.claim_due()[0]
+        self.store.complete(row["id"], "accepted", "Tencent accepted; no device receipt")
+        self.assertEqual(self.store.stats()["accepted"], 1)
+        recent = self.store.recent(1)[0]
+        self.assertEqual(recent["status"], "accepted")
+        self.assertIn("no device receipt", recent["last_error"])
+
     def test_processing_recovered_after_restart(self):
         event = GatewayEvent("briefing.ready", "简报", "daily")
         self.store.publish(event, ["webhook"])

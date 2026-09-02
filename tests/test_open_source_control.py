@@ -52,6 +52,29 @@ class OKXEnvironmentTests(unittest.TestCase):
             with self.assertRaises(ValueError): trade_service.fast_close_confirmed(token, confirmation)
             request.assert_not_called()
 
+    def test_cli_cancel_uses_positional_instrument_argument(self):
+        env = okx_runtime.OKXEnvironment("demo", "", "", "")
+        with patch.object(trade_service, "_run_cli", return_value=[]) as run:
+            trade_service._request("POST", "/api/v5/trade/cancel-order", {"instId":"SOL-USDT-SWAP","ordId":"123"}, env)
+        self.assertEqual(run.call_args.args[0], ["okx","--demo","swap","cancel","SOL-USDT-SWAP","--ordId","123","--json"])
+
+    def test_fast_close_cancels_all_same_position_orders_before_close(self):
+        env = okx_runtime.OKXEnvironment("demo", "A", "B", "C")
+        position={"instId":"SOL-USDT-SWAP","posSide":"long","posId":"1","pos":"4","mgnMode":"cross"}
+        token, confirmation = trade_service._create_intent(env, position)
+        responses=[
+            [position],
+            [{"instId":"SOL-USDT-SWAP","posSide":"long","ordId":"11","reduceOnly":"true","side":"sell"}],
+            [], [], [],
+        ]
+        with patch.object(trade_service,"selected_environment",return_value=env), patch.object(trade_service,"_request",side_effect=responses) as request, patch.object(trade_service.time,"sleep"):
+            result=trade_service.fast_close_confirmed(token,confirmation)
+        self.assertEqual(result["status"],"confirmed_closed")
+        self.assertEqual(result["canceled_entry_orders"],["11"])
+        calls=[(c.args[0],c.args[1],c.args[2]) for c in request.call_args_list]
+        self.assertIn(("POST","/api/v5/trade/cancel-order",{"instId":"SOL-USDT-SWAP","ordId":"11"}),calls)
+        self.assertTrue(any(path=="/api/v5/trade/close-position" for _,path,_ in calls))
+
 
 class WechatTests(unittest.TestCase):
     def test_dotenv_overrides_stale_process_environment(self):
@@ -62,9 +85,9 @@ class WechatTests(unittest.TestCase):
 
     def test_errcode_is_not_reported_as_success(self):
         env={"R20_WECHAT_BOT_TOKEN":"T","R20_WECHAT_USER_ID":"U","R20_WECHAT_CONTEXT_TOKEN":"C"}
-        with patch.object(notifications, "_post_json", return_value=(True,"HTTP 200",{"errcode":-2, "errmsg":"unknown error"})):
+        with patch.object(notifications, "_post_json", return_value=(True,"HTTP 200",{"errcode":-2, "errmsg":"unknown error"})), patch.object(wechat_watcher, "mark_context_stale") as stale:
             ok, detail=notifications._send_wechat_ilink(env,"hello")
-            self.assertFalse(ok); self.assertIn("Context Token", detail)
+            self.assertFalse(ok); self.assertIn("Context Token", detail); stale.assert_called_once()
 
     def test_accepted_is_not_misreported_as_client_delivery(self):
         env={"R20_WECHAT_BOT_TOKEN":"T","R20_WECHAT_USER_ID":"U","R20_WECHAT_CONTEXT_TOKEN":"C"}
@@ -78,6 +101,12 @@ class WechatTests(unittest.TestCase):
     def test_bot_echo_cannot_replace_user_context_token(self):
         self.assertTrue(wechat_watcher._is_user_message({"message_type":1}))
         self.assertFalse(wechat_watcher._is_user_message({"message_type":2}))
+
+    def test_public_state_preserves_persisted_session_on_process_restart(self):
+        with patch.object(wechat_watcher, "ensure_watcher"), patch.object(wechat_watcher, "_load_state", return_value={"status":"listening","last_message_at":"2026-09-02 09:47:18","user_configured":True,"context_source":"user_message"}):
+            state=wechat_watcher.public_state()
+        self.assertTrue(state["user_configured"])
+        self.assertEqual(state["context_source"],"user_message")
 
     def test_channel_test_only_tests_selected_channel(self):
         with patch.object(notifications, "send_channel", return_value=(False,"wechat failed")) as send:

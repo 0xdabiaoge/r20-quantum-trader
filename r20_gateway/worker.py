@@ -61,8 +61,8 @@ def run() -> None:
             try:
                 result = NotificationChannelAdapter(str(delivery["channel"])).send(format_message(delivery))
                 if result.success:
-                    store.complete(int(delivery["id"]))
-                    log(f"delivered event={delivery['event_id']} channel={delivery['channel']}")
+                    store.complete(int(delivery["id"]), result.status, result.detail)
+                    log(f"{result.status} event={delivery['event_id']} channel={delivery['channel']} detail={result.detail}")
                 else:
                     store.fail(int(delivery["id"]), int(delivery["attempts"]), result.detail)
                     log(f"delivery failed event={delivery['event_id']} channel={delivery['channel']} detail={result.detail}")

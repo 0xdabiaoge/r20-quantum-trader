@@ -71,6 +71,9 @@ def public_state() -> dict[str, Any]:
         "user_configured": bool(state.get("user_configured")),
         "running": bool(_thread and _thread.is_alive()),
         "delivery_guarantee": "iLink accepts requests only; WeChat client delivery/read receipts are unavailable",
+        "context_source": state.get("context_source", ""),
+        "context_stale_reason": state.get("context_stale_reason", ""),
+        "context_stale_at": state.get("context_stale_at", ""),
     }
 
 
@@ -82,6 +85,23 @@ def _is_user_message(message: dict[str, Any]) -> bool:
     """Never overwrite a usable context token from the bot's own echo."""
     message_type = message.get("message_type", message.get("messageType"))
     return message_type in (None, 1, "1")
+
+
+def mark_context_stale(reason: str) -> None:
+    """Invalidate a rejected session so it cannot keep producing false success."""
+    from r20_gateway.secrets import delete_secrets
+    from r20_backend.settings_store import remove_env
+    delete_secrets({"R20_WECHAT_CONTEXT_TOKEN"})
+    remove_env({"R20_WECHAT_CONTEXT_TOKEN"})
+    state = _load_state()
+    state.update({
+        "status": "context_stale_user_message_required",
+        "user_configured": False,
+        "context_source": "",
+        "context_stale_reason": str(reason)[:300],
+        "context_stale_at": _now_bj(),
+    })
+    _save_state(state)
 
 
 def _poll(token: str, base_url: str, cursor: str) -> dict[str, Any]:
@@ -118,7 +138,11 @@ def _run() -> None:
         token = env.get("R20_WECHAT_BOT_TOKEN", "")
         token_fingerprint = __import__("hashlib").sha256(token.encode()).hexdigest()[:12] if token else ""
         if token_fingerprint != active_token_fingerprint:
-            state.update({"cursor": "", "status": "binding_updated" if token else "waiting_for_binding", "user_configured": False, "token_fingerprint": token_fingerprint})
+            changed_binding = bool(active_token_fingerprint and token_fingerprint != active_token_fingerprint)
+            if changed_binding or not state.get("cursor"):
+                state.update({"cursor": "", "status": "binding_updated" if token else "waiting_for_binding", "user_configured": False, "token_fingerprint": token_fingerprint})
+            else:
+                state["token_fingerprint"] = token_fingerprint
             active_token_fingerprint = token_fingerprint
             _save_state(state)
         try: base_url = validate_wechat_base_url(env.get("R20_WECHAT_BASE_URL", "https://ilinkai.weixin.qq.com"))
@@ -158,6 +182,8 @@ def _run() -> None:
                     state["last_message_at"] = _now_bj()
                     state["user_configured"] = True
                     state["context_source"] = "user_message"
+                    state["context_stale_reason"] = ""
+                    state["context_stale_at"] = ""
             _save_state(state)
         except Exception as exc:
             # Timeout during long poll is expected normal network behavior

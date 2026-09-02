@@ -9,6 +9,7 @@ from r20_backend.notifications import send_channel
 class DeliveryResult:
     success: bool
     detail: str
+    status: str = "delivered"
 
 
 class NotificationChannelAdapter:
@@ -17,4 +18,5 @@ class NotificationChannelAdapter:
 
     def send(self, message: str) -> DeliveryResult:
         ok, detail = send_channel(self.channel_id, message)
-        return DeliveryResult(ok, detail)
+        status = "accepted" if ok and self.channel_id == "wechat_ilink" else "delivered"
+        return DeliveryResult(ok, detail, status)

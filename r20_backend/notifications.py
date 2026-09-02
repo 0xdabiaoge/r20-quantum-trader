@@ -120,7 +120,12 @@ def _send_wechat_ilink(env: dict[str, str], message: str) -> tuple[bool, str]:
         if code == -14:
             return False, "微信 Bot Token 已失效；请重新扫码绑定"
         if code == -2 and errmsg.lower() == "unknown error":
-            return False, "微信会话 Context Token 已失效；请向 Bot 发送一条新文字消息，系统将自动刷新会话"
+            try:
+                from r20_backend.wechat_watcher import mark_context_stale
+                mark_context_stale(f"ret={ret} errcode={errcode} errmsg={errmsg}")
+            except Exception:
+                pass
+            return False, "微信会话 Context Token 已失效并已清除；请向 Bot 发送一条新文字消息，系统将自动刷新会话"
         if code == -2:
             return False, f"微信 iLink 发送受限或会话失效 ret={ret} errcode={errcode} errmsg={errmsg or '--'}；请稍后重试，若持续失败请向 Bot 发一条新文字消息"
         return False, f"微信业务拒绝 ret={ret} errcode={errcode} errmsg={errmsg}"
