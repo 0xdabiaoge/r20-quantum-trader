@@ -64,6 +64,10 @@
 
         body {
             background-color: #080B10;
+            background-image:
+                radial-gradient(1100px 500px at 85% -8%, rgba(56, 117, 246, 0.07), transparent 62%),
+                radial-gradient(900px 460px at -10% 110%, rgba(33, 199, 217, 0.045), transparent 60%);
+            background-attachment: fixed;
             color: #EAECEF;
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
             -webkit-font-smoothing: antialiased;
@@ -78,10 +82,11 @@
         }
 
         .terminal-panel {
-            background: #0E121B;
+            background: linear-gradient(180deg, #101725, #0E121B);
             border: 1px solid #1A2232;
             border-radius: 12px;
-            transition: border-color 0.15s ease, background-color 0.15s ease;
+            box-shadow: 0 1px 2px rgba(0,0,0,.35), 0 10px 28px -14px rgba(0,0,0,.6);
+            transition: border-color 0.15s ease, background-color 0.15s ease, transform 0.15s ease;
         }
         .terminal-panel:hover {
             border-color: #26334D;
@@ -110,9 +115,10 @@
 
         /* Nav Pills (High-End Segmented) */
         .tab-btn-active {
-            background: #1C2436 !important;
+            background: linear-gradient(180deg, #23304A, #1C2436) !important;
             color: #FFFFFF !important;
             border: 1px solid #3875F6 !important;
+            box-shadow: 0 4px 14px -6px rgba(56, 117, 246, 0.55), inset 0 1px 0 rgba(255,255,255,.06) !important;
             font-weight: 700 !important;
         }
 
@@ -123,6 +129,15 @@
         @keyframes pulse-dot {
             0%, 100% { opacity: 1; transform: scale(1); }
             50% { opacity: 0.4; transform: scale(0.85); }
+        }
+
+        /* Tab enter animation */
+        main > div:not(.hidden) {
+            animation: tab-in 0.22s cubic-bezier(.4,0,.2,1);
+        }
+        @keyframes tab-in {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: none; }
         }
 
         /* Clean Terminal Tables */
@@ -1038,9 +1053,11 @@
             return '#';
         }
 
-        // Tab Switching
-        window.switchMainTab = function(tabName) {
-            const tabs = ['trading', 'factors', 'news', 'lab', 'history'];
+        // Tab Switching (hash-routed: refresh / back-forward / deep-link keep the active tab)
+        const TAB_NAMES = ['trading', 'factors', 'news', 'lab', 'history'];
+        window.switchMainTab = function(tabName, syncHash) {
+            if (TAB_NAMES.indexOf(tabName) === -1) tabName = 'trading';
+            const tabs = TAB_NAMES;
             tabs.forEach(t => {
                 const el = document.getElementById(`tab-content-${t}`);
                 const topBtn = document.getElementById(`top-nav-btn-${t}`);
@@ -1071,8 +1088,21 @@
             if (tabName === 'trading' && equityChartInstance) {
                 setTimeout(() => equityChartInstance.resize(), 50);
             }
+            if (syncHash !== false) {
+                const target = `#${tabName}`;
+                if (window.location.hash !== target) {
+                    try { history.pushState(null, '', target); } catch (e) { window.location.hash = tabName; }
+                }
+            }
+            document.title = `${{ trading: '实盘矩阵', factors: 'AI推演', news: '全网舆情', lab: '自进化', history: '交易台账' }[tabName]} · R20 Quantum Trader`;
             if (window.lucide) lucide.createIcons();
         };
+        window.handleHashRoute = function() {
+            const name = (window.location.hash || '').replace(/^#\/?/, '').split(/[?/]/)[0];
+            window.switchMainTab(TAB_NAMES.indexOf(name) !== -1 ? name : 'trading', false);
+        };
+        window.addEventListener('hashchange', window.handleHashRoute);
+        window.addEventListener('popstate', window.handleHashRoute);
 
         // Global Prompt Modal Control
         window.openPromptModal = function() {
@@ -2473,6 +2503,7 @@
             if (window.lucide) lucide.createIcons();
         });
         loadAllData();
+        window.handleHashRoute();
         setInterval(loadAllData, 4000);
     </script>
 </body>
