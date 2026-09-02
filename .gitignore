@@ -68,6 +68,7 @@ backups/
 *.pid
 *_TODO.md
 R20_V600_PREVIEW_TODO.md
+.github_device_pending.json
 
 # OS & Editor
 .DS_Store

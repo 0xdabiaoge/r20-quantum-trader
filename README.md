@@ -1,268 +1,284 @@
 <div align="center">
 
-# ⚡ R20 Quantum Trader
-### LLM-Native Self-Evolving Quantitative Trading Terminal & Execution Engine
-**全天候大模型全权决策 · 微积分动力学与定积分能量 · 概率论统计风险 · 顺势浮盈金字塔加仓 · 启发式自进化记忆 · 暗黑极客监控终端**
+# R20 Quantum Trader
 
-<br/>
+### 面向 OKX 永续合约的 LLM 原生量化交易系统
 
-[![Version](https://img.shields.io/badge/Version-v6.0.0--preview-6366F1.svg)](https://github.com/555cute/r20-quantum-trader/releases)
-[![LINUX DO](https://img.shields.io/badge/Community-LINUX%20DO-EA580C.svg)](https://linux.do/)
-[![License](https://img.shields.io/badge/License-MIT-10B981.svg)](https://opensource.org/licenses/MIT)
-[![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
-[![QwenPaw](https://img.shields.io/badge/Agent_Framework-QwenPaw-4F46E5.svg)](https://github.com/agentscope-ai/QwenPaw)
+**独立 Gateway · 多因子推演 · 交易执行 · 只读监控 · 管理控制面 · 多通道通知 · 加密灾备**
 
-<br/>
+[![Release](https://img.shields.io/badge/release-v6.0.0--preview-3875F6?style=flat-square)](https://github.com/555cute/r20-quantum-trader/releases/tag/v6.0.0-preview)
+[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
+[![OKX](https://img.shields.io/badge/Exchange-OKX-111827?style=flat-square)](https://www.okx.com/)
+[![Tests](https://img.shields.io/badge/tests-90%2F90-0ECB81?style=flat-square)](#验证与测试)
+[![License](https://img.shields.io/badge/license-MIT-10B981?style=flat-square)](LICENSE)
 
-[🔥 线上实盘监控终端](https://www.r20.cn) • [💬 交流社区](#-交流社区) • [✨ 核心交易特性](#-核心交易系统特性) • [🚀 快速开始](#-快速开始) • [📖 部署手册](RECOVERY_GUIDE.md)
+[在线只读终端](https://www.r20.cn/) · [v6.0.0 Preview](https://github.com/555cute/r20-quantum-trader/releases/tag/v6.0.0-preview) · [独立部署](STANDALONE.md) · [恢复指南](RECOVERY_GUIDE.md)
 
 </div>
 
 ---
 
-## 💬 交流社区
+![R20 v6.0.0 Preview 实盘终端](docs/images/v600_terminal_overview.png)
 
-- 👥 **QQ 交流群**: `655973677`（实盘策略与大模型调优）
-- 🐧 **作者 QQ**: `1090188816`
-- 🔥 **LINUX DO**: [linux.do](https://linux.do/)
+> [!WARNING]
+> R20 是研究型自动化交易项目，不构成投资建议，也不承诺收益。建议先使用 OKX **DEMO 模拟盘**完成配置、通知、止盈止损与故障恢复验证，再评估是否连接真实资金。
 
----
+## v6.0.0 Preview 是什么
 
-## 🌐 线上实盘终端概览
+R20 把行情、数理因子、LLM 裁决、交易执行、通知、调度和灾备收敛到一套可审计的本地运行时中。公开 Web 端始终保持**只读监控**；所有敏感配置和受保护操作都放在独立管理员控制面中。
 
-> 💡 **生产环境监控直链**: **[https://www.r20.cn](https://www.r20.cn)**  
-> 24H 全天候不间断运行，纯只读开放 6 核心加密资产（**BTC / ETH / SOL / DOGE / SUI / LINK**）的**大模型长思考链推演 (CoT Prompt)、三大数理底层基石（微积分/定积分/概率论）、顶级聪明钱资金流向、多周期量化因子矩阵、在途限价挂单实时状态及生命周期交易台账**。
+v6.0.0 Preview 的重点不是增加更多按钮，而是让关键链路更可控：
 
----
+- **R20 原生 Gateway**：事件队列、通知投递、定时任务与 Worker 生命周期不再依赖外部 Agent 调度。
+- **OKX LIVE / DEMO 隔离**：两套凭证独立保存；模拟盘请求自动携带 `x-simulated-trading: 1`。
+- **模块化提示词管线**：交易 System、交易 User、自进化 System、自进化 User 分别由有序模块编译；P0、JSON 契约和实时数据模块受保护。
+- **插件化灾备**：本地、S3、OSS、WebDAV/OpenList 与百度网盘官方 OAuth 等目标统一进入备份任务模型。
+- **通知语义纠偏**：微信 iLink 的 `HTTP 200 / ret=0` 只代表腾讯服务端受理，不再被标记成“微信客户端已送达”。
+- **Fail-Closed 执行边界**：持仓查询异常、流动性价差超限或必要保护缺失时，中止交易循环，而不是带病执行。
 
-## 📷 系统实机截图
+## 产品界面
 
-### 1. 🖥️ 暗黑极客量化监控大屏
-*涵盖官方总权益、今日已结净盈亏、在途持仓实时监控、在途限价挂单排队监控以及动态资产净值与回撤曲线。*
-![Terminal Overview](docs/images/terminal_overview.png)
+### 实盘矩阵
 
----
+官方账户权益、净收益、持仓浮盈、在途订单、云端保护和权益走势集中在一张高密度只读终端中。公开页面不提供开仓、平仓或修改配置入口。
 
-### 2. 🧠 AI 大脑全权决策与数理全维矩阵
-*单卡综合 15M/1H 多周期共振、微积分动力学（速度/动能加速度）、定积分做功能量与偏离面积、概率论多头延续胜率与 95% VaR 在险价值、Top100 聪明钱主力加权多空比与微观盘口深度比。*
-![AI Brain Matrix](docs/images/ai_brain_matrix.png)
+![实盘矩阵](docs/images/v600_terminal_overview.png)
 
----
+### AI 全维因子矩阵
 
-### 3. ⚡ 20,000+ 字符真实 Prompt 审计抽屉
-*全屏深色代码终端抽屉，100% 透明展示 System Prompt 交易铁律（含微积分/定积分/概率论核心判定准则）与 User Prompt 全周期行情、聪明钱主力及挂单持仓输入，支持一键复制与秒级时间戳审计。*
-![Realtime Prompt Modal](docs/images/realtime_prompt_modal.png)
+每个标的同时展示价格与盘口、ADX / RSI / CMF、微积分速度与加速度、定积分做功、条件延续概率、VaR，以及 Top100 聪明钱资金结构。
 
----
+![AI 全维因子矩阵](docs/images/v600_ai_matrix.png)
 
-### 4. 📜 宽屏生命周期交易台账
-*1680px 宽屏视野，标的/杠杆、策略形态、开平仓均价与时间、净盈亏（ROI）及离场归因全部单行对齐，毫秒级出场回填。*
-![Lifecycle Trades](docs/images/lifecycle_trades.png)
+### 生命周期交易台账
 
----
+统一记录方向、杠杆、策略形态、保证金、开平仓时间、净盈亏、持仓耗时和离场原因，支持在途与已平仓过滤。
 
-### 5. 🔄 启发式自进化长期记忆库
-*每日 20:00 自动穿透全天实战流水，提炼带时间戳的启发式心法与失误归因，动态注入大模型下一轮决策先验。*
-![Self Evolution Memory](docs/images/self_evolution_memory.png)
+![生命周期交易台账](docs/images/v600_trade_ledger.png)
 
----
+### 独立管理员控制面
 
-## 🌟 核心交易系统特性 (v6.0.0 Preview 升级)
+管理员页面采用账号密码与 PBKDF2-SHA256 会话认证，集中管理 Gateway、Agent、提示词、通知、灾备、OKX 环境和审计日志。敏感值仅显示配置状态，不回显原文。
 
-### 🧩 0. 独立化运行底座与自有后台
-- **v6.0.0 Preview**：Gateway 事件队列与原生通道进入预览阶段；微信 iLink 明确区分“腾讯服务端受理”与“微信客户端送达”，不再把 `HTTP 200 / ret=0` 误报为用户已收到。
-- **零 QwenPaw 运行时依赖**：交易、通知、提示词、灾备和后台控制均由 R20 原生组件完成；API Key 与云存储凭证保存到本地加密 Secret Store，公开配置只保留引用。
-- **自有 FastAPI 控制平面**：`r20_backend` 提供只读监控、简化策略编辑器、通知诊断、插件化灾备、管理员系统，以及默认关闭且需密码复核的“从 OKX 当前持仓快速平仓”。
-- **OKX 双环境隔离**：实盘 LIVE 与模拟盘 DEMO 凭证独立保存；策略、账本、监控和快速平仓共享统一环境选择器，模拟盘请求自动带 `x-simulated-trading: 1`。
-- **独立调度守护**：Gateway 接管 15 分钟交易、60 秒因子、10 分钟快讯、日报、复盘和多目标灾备调度；执行期通过本机 OKX CLI bridge 访问交易所，文件锁与 Fail-Closed 逻辑保持不变。
-- **部署说明**：见 [`STANDALONE.md`](STANDALONE.md)，迁移独立部署时必须先关闭旧 QwenPaw Cron，以避免双重执行。
+![R20 Control 登录页](docs/images/v600_control_login.png)
 
+## 核心能力
 
-### 🏛️ 1. 三重滤网大级别波段体系 (Triple Screen Swing Trading System)
-- **4H 宏观结构层（一票否决权）**: 顺大势。若 4H 处于清晰下降通道 / 空头承压结构（`4H_MACRO_BEAR`），**一票否决任何做多开仓信号**，严禁在 15M 反弹时摸左侧接飞刀；若 4H 为上升通道 / 多头主升结构（`4H_MACRO_BULL`），**一票否决盲目摸顶做空**。
-- **1H 数理动力学与波段中枢（核心裁决层）**: 基于 1H K 线与微积分动力学（速度 $v$、加速度 $a$、定积分能量做功与 VaR 延续概率）裁决真实突破与回踩动能；结合 1H ADX $\ge 22$ 趋势门禁。
-- **1.5x ~ 2.0x 1H ATR 宽止损与高赔率 ($R:R \ge 2.5$)**: 彻底废除 15M 紧止损，止损距离统一基于 **1.5x ~ 2.0x 1H ATR**，给波段充足的震荡呼吸空间，彻底免疫 15M 局部毛刺插针；单笔目标止盈空间提升至 **2.5% ~ 6.0%**，波段持仓预期 3~12 小时。
-- **15M 盘口执行层（纯只读辅助）**: 15M 仅用于判断短线超买超卖、寻找优质的买一/卖一 Maker 挂单与顺势回踩触发点，绝不以 15M 单根 K 线的噪音作为开单理由。
+| 能力 | 当前实现 |
+| --- | --- |
+| 市场范围 | 默认 BTC、ETH、SOL、DOGE、SUI、LINK；后台共享币种池最多 6 个 |
+| 时间框架 | 4H 宏观结构、1H 趋势与动力学、15M 执行辅助 |
+| 数理引擎 | 速度、加速度、Jerk、定积分做功、VWAP 偏离面积、条件概率、VaR / CVaR |
+| LLM 裁决 | OpenAI-compatible 接口；支持模型与 reasoning effort 配置 |
+| 交易执行 | OKX V5、Maker 限价单、冲突订单清理、云端止盈止损、DEMO / LIVE 隔离 |
+| 风险门禁 | 最大持仓数、单笔权益占比、单币种加仓次数、累计保证金、价差与查询 Fail-Closed |
+| 自进化 | 根据真实交易结果生成带时间戳的长期策略记忆，并注入后续推演 |
+| 通知 | QQ 官方 App Bot、微信 iLink、企业微信、Telegram、通用 Webhook |
+| 灾备 | 多任务、多目标、scrypt + AES-256-GCM、清单校验与只读恢复演练 |
+| 运维 | FastAPI 控制面、Gateway Worker、SQLite 持久队列、审计日志、systemd 示例 |
 
-### 📐 2. 三大底层数理基石 (微积分动力学 · 定积分做功 · 概率论与随机过程)
-- **因果微积分动力学 (Calculus Dynamics)**:
-  - **瞬时速度 $v$**: 准确测量对数价格位移方向与即时变动速率；
-  - **动能加速度 $a$ (防 FOMO 追单神器)**: 动能扩张 ($a > +0.10$) 允许乘胜追击；顶部失速减速 ($a < -0.20$) **物理拦截盲目追多**，彻底解决“追在最高点”痛点；底部企稳 ($a > +0.20$) **拦截恐慌追空**；
-  - **加加速度冲击 $j$ (Jerk Risk)**: 监测流动性踩踏与异常洗盘冲击，强制收缩仓位。
-- **定积分能量学 (Definite Integrals & Energy Work)**:
-  - **动能净做功定积分 $\int_{t-T}^t v(\tau) d\tau$**: 基于梯形数值积分，测量多周期主力资金做功的净能量储备（正向能量扩张 vs 负向能量耗尽）；
-  - **VWAP 偏离面积定积分 $\int_{t-T}^t \frac{P(\tau)-P_0}{P_0} d\tau$**: 测量价格偏离价值中枢的累计拉伸面积，识别动能过载与强均值回归引力。
-- **概率论与随机过程 (Probability Theory & Stochastic Risk)**:
-  - **条件延续胜率 $P(\text{continuation})\%$**: 利用正态累积分布函数 $\Phi(z)$ 结合速度与加速度推演未来顺势突破确定性；
-  - **高阶统计矩与肥尾预警**: 实时计算偏度 $S$ 与超额峰度 $K$，捕捉非对称跳跃风险；
-  - **Cornish-Fisher 在险价值 (VaR 95% & CVaR 95%)**: 经峰度偏度修正的单期最大预期回撤界限，动态指导保证金配置。
+## 系统架构
 
-### 🧠 3. LLM-Native 首席 AI 交易官与长思考链
-- **大模型最高决策主权**: 开仓、平仓、加仓与挂单生命周期管理主权 100% 交由大语言模型（默认搭载 `gemini-3.7-flash-high`，显式启用 `reasoning_effort: high` 深度思考模式，推理 Token 占比超 65%）。
-- **20,000+ 字符高维推演上下文**: 单次推演全量并发注入 6 大资产的 **15M / 1H / 4H 连续 K 线序列、微积分/定积分/概率论三维物理数据、OKX Top100 聪明钱加权成本、微观盘口买一/卖一即时深度、全网重大快讯舆情、在途持仓与盘口在途挂单**。
-- **严密盈亏比数学自洽 (R:R ≥ 2.0)**: 大模型输出入场价 (Entry)、止盈价 (TP) 与止损价 (SL) 必须严格满足 $\text{Risk/Reward} \ge 2.0$ 的空间几何自洽。
-
-### 🚀 4. 顺势浮盈金字塔加仓体系 (Pyramiding + 数理双重门禁)
-- **0 风险底仓加仓铁律**: 仅当已有持仓产生显著浮盈（$\text{ROI} \ge +0.8\%$）或系统已将止损线上移至开仓价上方（推保本锁盈）时，才允许 AI 触发顺势加仓。
-- **数理动力学硬门禁**: 顺势加多要求 **动能加速度 $a \ge -0.25$ 且多头延续胜率 $P \ge 40\%$**；若多头动能已失速衰竭，即便底仓大幅盈利也**坚决拦截加仓**，保住胜利果实。
-- **单标的仓位硬上限**: 单一标的最大顺势加仓次数限制为 1 次，累计占用保证金严格锁死在 $\le 600\text{ USDT}$ 以内。
-
-### ⚡ 5. 智能 Maker 限价挂单与自主撤单
-- **费率大幅降低 60%**: 开仓执行全面升级为基于盘口买一/卖一档的 `ordType: limit` 智能限价挂单，手续费直接从 Taker 万5 降至 Maker 万2，年化交易磨损大幅骤降。
-- **挂单生命周期自主撤单**: 在途挂单全景实时输入大模型；当行情剧烈偏离、逻辑反转或挂单过时，AI 大脑自主输出 `CANCEL` 指令动态撤单，杜绝挂单在不利位置成交。
-
-### 👑 6. OKX Top100 顶级聪明钱主力共振
-- **毫秒级主力透视**: 直连 OKX 官方顶级聪明钱（实盘胜率 $>80\%$ 的 Top100 机构与高盈利率交易员）的资金加权多空比、多空持仓成本均价及 24H 资金净流入流出。
-- **顺庄交易铁律**: 严禁逆全网顶级聪明钱主力大势盲目重仓开单，必须在聪明钱建仓成本价附近寻找高确定性共振点位。
-
-### 📊 7. 六维量化 Alpha 因子矩阵
-1. **数理与概率底座 (Pillar 6)**: 微积分瞬时速度/加速度、定积分做功能量与偏离面积、条件延续概率与 95% VaR 在险价值。
-2. **动量趋势**: 1H ADX 趋势强度硬门禁（$\text{ADX} < 20$ 垃圾震荡市坚决封锁观望；$\text{ADX} \ge 22$ 伴随放量方可捕获趋势）、RSI(14)、VWAP 价格加权均价偏离度。
-3. **波动通道**: ATR 动态真实波幅自适应计算，$1.2 \sim 1.5 \times \text{ATR}$ 缓冲止损空间。
-4. **资金流向**: CMF 柴金资金流指标、5M Taker 主动吃单净买卖量差、合约未平仓量 (OI) 增减动能。
-5. **微观盘口**: 买一/卖一档即时价差比、盘口前 5 档买卖挂单总量深度比。
-6. **衍生品筹码**: 8 小时资金费率热力图、多空借贷比与持仓多空偏置。
-
-### 🔄 8. 启发式自进化记忆体系
-- **每日 20:00 深度复盘**: 每天固定于北京时间 20:00（美盘开盘前 1 小时）自动穿透全天实战成交流水；
-- **Markdown 长效心法沉淀**: 穿透真实损益与手续费磨损，提炼带 `[YYYY-MM-DD HH:MM:SS]` 精确时间戳的实战心法沉淀至 `data/AI_TRADING_MEMORY.md`；
-- **智能时效淘汰与先验注入**: 动态淘汰被证伪的旧认知，下一轮推演自动将最新心法作为直觉约束拼入 Prompt，实现模型认知的持续自进化。
-
-### 🛡️ 9. 机构级三级熔断与 100% 云端 OCO 保护
-- **致命黑天鹅哨兵**: 双路快讯采集，正则实时监测稳定币脱锚、交易所爆雷等系统性灾难，触发全局避险；
-- **BTC 15M 暴跌熔断**: BTC 单根 15M 阴线跌幅 $> 3.0\%$ 立即封锁所有加密币开仓通道；
-- **单日最大回撤熔断**: 单日亏损达预设阈值强制休眠；
-- **100% 交易所撮合级云端 OCO 保护**: 开仓同时向 OKX 服务器提交云端止盈止损单，彻底防范网络波动或单边断崖风险。
-
-### 💻 10. 暗黑极客量化监控终端 (含标的全维穿透弹窗)
-- **深邃暗黑极客质感**: 采用 `#0B0E14` 深板岩底色搭配钛金属微边框（`#1E293B`）与玻璃磨砂质感；
-- **全维量化穿透弹窗**: 点击任意标的卡片，毫秒级调阅四格点位几何 (Entry/TP/SL/RR)、三大数理物理列阵 (微积分/定积分/概率论) 及 Top100 聪明钱主力筹码；
-- **实时提示词悬浮抽屉**: 右下角常驻悬浮胶囊，单击秒级呼出 20,000+ 字符真实 Prompt，支持一键复制；
-- **宽屏生命周期台账**: 支持全部/在途/已平仓一键筛选与多维搜索，实时回填持仓耗时与离场原因。
-
----
-
-## 🏛️ 系统全景架构图
-
-```text
-                                  ┌──────────────────────────────┐
-                                  │      全网重大快讯 & 舆情     │
-                                  │ (news_sentiment_harvester)   │
-                                  └──────────────┬───────────────┘
-                                                 │
-┌───────────────────────────┐                    ▼                    ┌──────────────────────────┐
-│  OKX V5 行情/盘口/K线 API  │ ───►  scripts/ai_brain_trader.py  ◄─── │ OKX Top100 聪明钱主力资金 │
-└─────────────┬─────────────┘       (Gemini 3.7 Flash High 推演)       └──────────────────────────┘
-              │                                  ▲
-              ▼                                  │
-┌───────────────────────────┐     ┌──────────────┴───────────────┐
-│ 微积分/定积分/概率论引擎  │ ──► │   QwenPaw 长期记忆与实战心法 │
-│ (scripts/calculus_engine) │     │   (data/AI_TRADING_MEMORY.md)│
-└───────────────────────────┘     └──────────────────────────────┘
-                                                 │
-                                                 ▼
-                                  ┌──────────────────────────────┐
-                                  │  scripts/ai_factor_trader.py │
-                                  │ (Maker 限价单 + 数理加仓门禁)│
-                                  └──────────────┬───────────────┘
-                                                 │
-                                                 ▼
-                                  ┌──────────────────────────────┐
-                                  │  Modern Dark 极客监控终端 UI │
-                                  │ (FastAPI + Tailwind WebApp)  │
-                                  └──────────────────────────────┘
+```mermaid
+flowchart LR
+    OKX[OKX V5\n行情 / 盘口 / K线 / 账户] --> FACTOR[多周期因子与数理引擎]
+    NEWS[快讯与风险情报] --> FACTOR
+    FACTOR --> BRAIN[LLM 决策层\n模块化 System + User]
+    MEMORY[自进化长期记忆] --> BRAIN
+    BRAIN --> GUARD[执行前硬约束\nFail-Closed / 仓位 / 价差 / R:R]
+    GUARD --> EXEC[OKX 执行层\nMaker / 撤单 / OCO / 平仓确认]
+    EXEC --> LEDGER[交易台账与运行快照]
+    LEDGER --> DASH[只读监控终端]
+    LEDGER --> GATEWAY[R20 Gateway\nScheduler + Event Queue]
+    GATEWAY --> CHANNELS[QQ / 微信 / 企业微信\nTelegram / Webhook]
+    GATEWAY --> BACKUP[加密灾备与恢复校验]
+    ADMIN[管理员控制面] --> BRAIN
+    ADMIN --> GATEWAY
+    ADMIN --> BACKUP
 ```
 
----
+### 进程边界
 
-## 🚀 快速开始
+```text
+r20_backend.app       FastAPI 控制面 + 只读监控 API + 管理员认证
+r20_gateway.worker    唯一调度所有者 + 持久事件投递 Worker
+scripts/*             因子、AI 主脑、执行、自进化、台账和灾备任务
+SQLite / data/*       Gateway 队列、管理员、快照与本地加密配置
+```
 
-### 1. 克隆项目与安装依赖
+> 不要同时运行旧 QwenPaw Cron、`r20_backend.scheduler` 和 `r20_gateway.worker`。v6 的调度所有者是 `r20_gateway.worker`。
+
+## 快速开始
+
+### 1. 克隆并安装
+
 ```bash
 git clone https://github.com/555cute/r20-quantum-trader.git
 cd r20-quantum-trader
 
-python3 -m venv venv
-source venv/bin/activate
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 2. 配置环境变量
+### 2. 创建本地配置
+
 ```bash
 cp env.example .env
-# 编辑 .env：填入 LLM Key，并分别配置 OKX LIVE / DEMO Key；默认选择 DEMO
-vim .env
+chmod 600 .env
 ```
 
-### 3. 一键启动 Web 监控终端
+最小启动配置：
+
+```dotenv
+LLM_BASE_URL=https://api.openai.com/v1
+LLM_API_KEY=replace_me
+LLM_MODEL=your_model
+LLM_REASONING_EFFORT=high
+
+# 安全默认值：模拟盘
+R20_OKX_ENV=demo
+OKX_DEMO_API_KEY=
+OKX_DEMO_SECRET_KEY=
+OKX_DEMO_PASSPHRASE=
+
+R20_SETUP_TOKEN=replace_with_a_long_random_setup_token
+R20_MANUAL_CLOSE_ENABLED=0
+```
+
+首次部署推荐只配置 LLM 与 OKX DEMO。通知、提示词方案、灾备位置和管理员账号可在 `/admin` 中继续完成。
+
+### 3. 启动控制面
+
 ```bash
-python3 -m uvicorn dashboard.app:app --host 0.0.0.0 --port 8080
+source .venv/bin/activate
+python3 -m uvicorn r20_backend.app:app --host 0.0.0.0 --port 8080
 ```
-在浏览器中访问：`http://localhost:8080` 即可进入暗黑量化监控终端。
 
-### 4. 启动后台守护与定时推演
+访问：
+
+- 只读终端：`http://127.0.0.1:8080/`
+- 管理后台：`http://127.0.0.1:8080/admin`
+- 健康检查：`http://127.0.0.1:8080/api/v1/health`
+
+### 4. 启动唯一 Gateway Worker
+
+另开终端：
+
 ```bash
-# 启动 60 秒量化因子库与快讯同步守护进程 (后台常驻)
-nohup python3 scripts/daemon_web_sync.py > /tmp/daemon_sync.log 2>&1 &
-
-# 手工触发一次 AI 大脑推演与限价单执行
-python3 scripts/ai_brain_trader.py
-
-# 手工触发每日自进化复盘
-python3 scripts/self_improvement_engine.py
+source .venv/bin/activate
+python3 -m r20_gateway.worker
 ```
 
----
+生产环境可使用：
 
-## 📁 核心项目结构规范
+- [`deploy/r20-quantum.service`](deploy/r20-quantum.service)
+- [`deploy/r20-gateway.service`](deploy/r20-gateway.service)
+
+完整迁移与 systemd 操作见 [`STANDALONE.md`](STANDALONE.md)。
+
+## 配置原则
+
+### OKX 环境
+
+- 默认使用 `R20_OKX_ENV=demo`。
+- LIVE 与 DEMO API Key 必须分别创建和保存。
+- Web 监控、策略执行、台账同步和管理员快速平仓共享同一环境选择器。
+- 手动快速平仓默认关闭；开启后仍需管理员密码、一次性 Token 和精确确认短语。
+
+### 提示词
+
+提示词库直接编辑四条实际消息管线：
+
+1. 交易 System
+2. 交易 User
+3. 自进化 System
+4. 自进化 User
+
+系统会锁定或 Fail-Closed 保护 P0、输出 JSON 契约与执行层硬约束。运行时模块匹配失败时，实时行情输入不能被静默丢弃。
+
+### 通知
+
+各通道独立启用、独立诊断、独立测试。测试发送需要明确确认短语；“仅诊断”不会外发消息。
+
+微信 iLink 特别说明：
+
+- 必须先由用户向 Bot 发送消息，Watcher 才能获得最新 Context Token。
+- `ret=0` 仅表示腾讯 iLink 接受请求，不代表手机端已显示或已读。
+- `ret=-14` 表示 Bot Token 失效；`-2 / unknown error` 通常要求重新刷新会话。
+- 对关键风控事件，建议同时启用 QQ、Telegram、企业微信或 Webhook 作为冗余通道。
+
+### 灾备
+
+简化模式只需要选择备份内容、保存位置、执行时间和保留份数；高级模式支持多目标、排除规则、加密、清单验证和恢复演练。密钥只保存到本地 Secret Store，不应进入 Git。
+
+## 风险控制与安全边界
+
+- 公开监控页面仅提供 GET 型只读能力，不放置交易按钮。
+- 私有账本、`.okx/`、Token、API Key、反向代理地址和本地数据库均由 `.gitignore` 隔离。
+- Secret Store 使用本机加密密钥；后台不回显完整敏感值。
+- 持仓读取异常或流动性价差大于策略阈值时立即终止交易循环。
+- 平仓流程要求撤销冲突委托、提交 reduce-only / close 请求并核验真实撮合结果。
+- 开仓后应保持交易所云端止盈止损覆盖；本地服务离线不能成为裸仓理由。
+- 所有时间调度与日报统计统一使用北京时间 `Asia/Shanghai`。
+
+## 验证与测试
+
+v6.0.0 Preview 发布候选已通过：
+
+```bash
+python3 -m compileall -q r20_backend r20_gateway scripts
+python3 -m unittest discover -s tests -v
+```
+
+当前结果：**90 / 90 tests passed**。
+
+测试覆盖管理员认证、提示词模块保护、Gateway 调度与持久队列、插件注册、灾备、OKX 控制面、微信 iLink 业务码和数理因子等关键路径。真实交易、真实通知和灾备目标仍必须在部署者自己的 DEMO 环境中逐项验收。
+
+## 项目结构
 
 ```text
 r20-quantum-trader/
-├── data/                             # 核心持久化数据 (带 .gitignore 隔离保护)
-│   ├── AI_TRADING_MEMORY.md          # QwenPaw 原生带时间戳实战心法长期记忆
-│   ├── ai_brain_last_prompt.txt      # 15,500+ 字符真实 System + User Prompt 快照
-│   ├── factor_library_snapshot.json  # 5 大量化因子库快照
-│   ├── news_sentiment.json           # 全网实时重大快讯与宏观情报
-│   └── .gitkeep
-├── scripts/                          # 核心量化算法与交易执行引擎
-│   ├── ai_brain_trader.py            # LLM-Native 首席 AI 交易官大脑 (Reasoning High 深度推演)
-│   ├── ai_factor_trader.py           # 交易执行层 (智能 Maker 限价挂单 + 顺势浮盈金字塔加仓门禁)
-│   ├── factor_library.py             # 5 大量化 Alpha 因子计算引擎 (ADX/ATR/RSI/CMF/盘口微观)
-│   ├── self_improvement_engine.py   # 启发式自进化复盘引擎 (每日 20:00 提炼 Markdown 心法)
-│   ├── news_sentiment_harvester.py   # 实时快讯情报采集与三级黑天鹅避险哨兵
-│   ├── daemon_web_sync.py            # 60 秒因子并发计算与 Web 数据同步守护进程
-│   ├── qq_notifier.py                # QQ 即时交易挂单、加仓与平仓推送通知
-│   ├── backup_runtime.py             # 多任务、多目标、加密、校验与清理策略
-│   └── okx_runtime.py                # LIVE/DEMO 环境与双凭证统一选择器
-├── dashboard/                        # Web 极客监控控制台
-│   ├── app.py                        # FastAPI 毫秒级内存缓存后端
-│   └── templates/index.html          # Modern Dark Glassmorphism 5 大 Tab 监控页面
-├── docs/images/                      # 终端高清实机截图资源
-├── requirements.txt                  # Python 依赖清单
-├── env.example                       # 环境变量模板
-├── RECOVERY_GUIDE.md                 # 完整部署与灾备恢复手册
-├── LICENSE                           # MIT 开源协议
-└── README.md                         # 本说明文档
+├── r20_backend/          # FastAPI、管理员认证、控制面、通知与 OKX 服务
+├── r20_gateway/          # Scheduler、事件队列、Worker、插件与遥测
+├── scripts/              # AI、因子、交易执行、自进化、同步与灾备任务
+├── dashboard/            # 机构级只读 Web 终端
+├── data/                 # 本地运行数据；敏感文件默认不提交
+├── deploy/               # systemd 服务示例
+├── docs/images/          # README 与发布截图
+├── tests/                # 自动化测试
+├── env.example           # 无密钥配置模板
+├── STANDALONE.md         # 独立部署说明
+└── RECOVERY_GUIDE.md     # 灾备与恢复指南
 ```
 
----
+## 版本与路线
 
-## 🛡️ 安全与隐私声明
+当前公开版本：[`v6.0.0-preview`](https://github.com/555cute/r20-quantum-trader/releases/tag/v6.0.0-preview)
 
-本项目在开源架构设计上严格执行**金融级隐私与数据解耦标准**：
-- OKX LIVE/DEMO Key、大模型 API Key、微信 Token 与灾备凭证采用环境选择器和本地加密 Secret Store 解耦，**源码、任务 JSON 与导出文件中 100% 零硬编码密钥**；
-- 实盘私有账本与资金流水已被 `.gitignore` 彻底物理隔离，绝不上云；
-- 开源代码库已经过自动化敏感特征全量静态穿透审计。
+Preview 阶段重点验证：
 
----
+- Gateway 在移除外部 Cron 后的长期调度稳定性；
+- OKX DEMO / LIVE 切换和交易操作的 Fail-Closed 行为；
+- 多通知通道在真实网络环境中的受理与最终到达差异；
+- 多目标灾备、归档校验和只读恢复演练；
+- 桌面端与移动端管理员控制面的可用性。
 
-## ⚠️ 免责声明
+## 社区
 
-本项目仅供量化交易算法研究、大模型自主 Agent 技术探索与学术交流使用，不构成任何投资建议、财务指导或实盘收益承诺。加密货币衍生品交易具备极高风险，请在充分了解风险并确保符合当地法律法规的前提下使用模拟盘（Demo）进行验证。开发者不对任何实盘资金损益承担责任。
+- QQ 交流群：`655973677`
+- 作者 QQ：`1090188816`
+- LINUX DO：[linux.do](https://linux.do/)
+- 问题与建议：[GitHub Issues](https://github.com/555cute/r20-quantum-trader/issues)
+
+## License
+
+[MIT License](LICENSE)
 
 ---
 
 <div align="center">
-Made with ❤️ by R20 Quantum Trader Team • Powered by <a href="https://github.com/agentscope-ai/QwenPaw">QwenPaw Framework</a><br/>
-🤝 本项目已链接并认可 <a href="https://linux.do/">LINUX DO</a> 社区
+
+**R20 Quantum Trader · Build observable systems before trusting autonomous systems.**
+
 </div>
