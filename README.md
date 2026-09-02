@@ -43,10 +43,10 @@
 
 ![AI 全维因子矩阵](docs/images/dashboard_factors.png)
 
-### 3. R20 Control 管理控制台
-*PBKDF2 加盐安全认证、会话隔离门禁、模块化提示词编辑器、极简灾备归档中心与多频道通知中心。*
+### 3. 模块化提示词策略工作室（核心亮点）
+*拒绝死板黑盒！后台支持稳健/激进/自定义多方案热切换；交易与自进化的 4 条消息管线（System/User）模块化自由编排、正文编辑、安全校验与右侧实发 Prompt 毫秒级拼装对照。*
 
-![后台登录页](docs/images/admin_login.png)
+![模块化提示词策略工作室](docs/images/admin_prompt_studio.png)
 
 ---
 
