@@ -33,7 +33,7 @@ v6.0.0 Preview 的重点不是增加更多按钮，而是让关键链路更可�
 - **OKX LIVE / DEMO 隔离**：两套凭证独立保存；模拟盘请求自动携带 `x-simulated-trading: 1`。
 - **模块化提示词管线**：交易 System、交易 User、自进化 System、自进化 User 分别由有序模块编译；P0、JSON 契约和实时数据模块受保护。
 - **插件化灾备**：本地、S3、OSS、WebDAV/OpenList 与百度网盘官方 OAuth 等目标统一进入备份任务模型。
-- **通知语义纠偏**：微信 iLink 的 `HTTP 200 / ret=0` 只代表腾讯服务端受理，不再被标记成“微信客户端已送达”。
+- **可靠通知通道**：QQ 官方 Bot、企业微信、Telegram 与通用 Webhook，可独立诊断、测试和启停。
 - **Fail-Closed 执行边界**：持仓查询异常、流动性价差超限或必要保护缺失时，中止交易循环，而不是带病执行。
 
 ## 产品界面
@@ -73,7 +73,7 @@ v6.0.0 Preview 的重点不是增加更多按钮，而是让关键链路更可�
 | 交易执行 | OKX V5、Maker 限价单、冲突订单清理、云端止盈止损、DEMO / LIVE 隔离 |
 | 风险门禁 | 最大持仓数、单笔权益占比、单币种加仓次数、累计保证金、价差与查询 Fail-Closed |
 | 自进化 | 根据真实交易结果生成带时间戳的长期策略记忆，并注入后续推演 |
-| 通知 | QQ 官方 App Bot、微信 iLink、企业微信、Telegram、通用 Webhook |
+| 通知 | QQ 官方 App Bot、企业微信、Telegram、通用 Webhook |
 | 灾备 | 多任务、多目标、scrypt + AES-256-GCM、清单校验与只读恢复演练 |
 | 运维 | FastAPI 控制面、Gateway Worker、SQLite 持久队列、审计日志、systemd 示例 |
 
@@ -90,7 +90,7 @@ flowchart LR
     EXEC --> LEDGER[交易台账与运行快照]
     LEDGER --> DASH[只读监控终端]
     LEDGER --> GATEWAY[R20 Gateway\nScheduler + Event Queue]
-    GATEWAY --> CHANNELS[QQ / 微信 / 企业微信\nTelegram / Webhook]
+    GATEWAY --> CHANNELS[QQ / 企业微信\nTelegram / Webhook]
     GATEWAY --> BACKUP[加密灾备与恢复校验]
     ADMIN[管理员控制面] --> BRAIN
     ADMIN --> GATEWAY
@@ -201,12 +201,7 @@ python3 -m r20_gateway.worker
 
 各通道独立启用、独立诊断、独立测试。测试发送需要明确确认短语；“仅诊断”不会外发消息。
 
-微信 iLink 特别说明：
-
-- 必须先由用户向 Bot 发送消息，Watcher 才能获得最新 Context Token。
-- `ret=0` 仅表示腾讯 iLink 接受请求，不代表手机端已显示或已读。
-- `ret=-14` 表示 Bot Token 失效；`-2 / unknown error` 通常要求重新刷新会话。
-- 对关键风控事件，建议同时启用 QQ、Telegram、企业微信或 Webhook 作为冗余通道。
+个人微信通知不属于 R20 的可用通道。请使用 QQ、Telegram、企业微信或 Webhook，并至少启用两个彼此独立的通道承接关键告警。
 
 ### 灾备
 
@@ -233,7 +228,7 @@ python3 -m unittest discover -s tests -v
 
 当前结果：**90 / 90 tests passed**。
 
-测试覆盖管理员认证、提示词模块保护、Gateway 调度与持久队列、插件注册、灾备、OKX 控制面、微信 iLink 业务码和数理因子等关键路径。真实交易、真实通知和灾备目标仍必须在部署者自己的 DEMO 环境中逐项验收。
+测试覆盖管理员认证、提示词模块保护、Gateway 调度与持久队列、插件注册、灾备、OKX 控制面、通知通道业务码和数理因子等关键路径。真实交易、真实通知和灾备目标仍必须在部署者自己的 DEMO 环境中逐项验收。
 
 ## 项目结构
 

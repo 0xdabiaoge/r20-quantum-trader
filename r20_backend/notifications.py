@@ -4,14 +4,11 @@ import base64
 import datetime
 import json
 import os
-import secrets
 import urllib.parse
 import urllib.request
-import uuid
 from pathlib import Path
 from typing import Any
-from r20_backend.wechat_protocol import base_info as wechat_base_info, common_headers as wechat_common_headers
-from r20_backend.net_security import validate_outbound_url, validate_wechat_base_url
+from r20_backend.net_security import validate_outbound_url
 
 ROOT = Path(__file__).resolve().parents[1]
 SECRET_LOADER = None
@@ -78,66 +75,10 @@ def _send_qq(env: dict[str, str], message: str) -> tuple[bool, str]:
     return True, f"accepted: id={response.get('id') or response.get('message_id') or '--'}"
 
 
-def _wechat_headers(bot_token: str) -> dict[str, str]:
-    return wechat_common_headers(bot_token)
-
-
-def _send_wechat_ilink(env: dict[str, str], message: str) -> tuple[bool, str]:
-    """Submit one iLink message and report only Tencent-side acceptance.
-
-    The iLink API offers no end-device/read receipt.  A `ret=0` response means
-    only that Tencent accepted the request, never that the recipient's WeChat
-    client displayed it.  Callers must therefore not label this as delivered.
-    """
-    token = env.get("R20_WECHAT_BOT_TOKEN", "")
-    user_id = env.get("R20_WECHAT_USER_ID", "")
-    context_token = env.get("R20_WECHAT_CONTEXT_TOKEN", "")
-    try: base_url = validate_wechat_base_url(env.get("R20_WECHAT_BASE_URL", "https://ilinkai.weixin.qq.com"))
-    except ValueError as exc: return False, f"微信 Base URL 无效：{exc}"
-    if not token or not user_id or not context_token:
-        return False, "微信 Bot Token / 用户 ID / Context Token 未完整配置"
-    client_id = f"r20-wechat-{uuid.uuid4()}"
-    payload = {
-        "msg": {
-            "from_user_id": "",
-            "to_user_id": user_id,
-            "client_id": client_id,
-            "message_type": 2,
-            "message_state": 2,
-            "context_token": context_token,
-            "item_list": [{"type": 1, "text_item": {"text": message}}],
-        },
-        "base_info": wechat_base_info(),
-    }
-    ok, detail, response = _post_json(f"{base_url}/ilink/bot/sendmessage", payload, _wechat_headers(token))
-    if not ok:
-        return False, f"{detail} {response}"
-    response = response if isinstance(response, dict) else {}
-    if "ret" not in response and "errcode" not in response:
-        return False, f"微信 iLink 返回空业务响应，无法证明服务端受理；client_id={client_id} {detail}"
-    ret, errcode = response.get("ret", 0), response.get("errcode", 0)
-    if ret not in (0, None) or errcode not in (0, None):
-        code = ret if ret not in (0, None) else errcode
-        errmsg = str(response.get("errmsg", ""))
-        if code == -14:
-            return False, "微信 Bot Token 已失效；请重新扫码绑定"
-        if code == -2 and errmsg.lower() == "unknown error":
-            try:
-                from r20_backend.wechat_watcher import mark_context_stale
-                mark_context_stale(f"ret={ret} errcode={errcode} errmsg={errmsg}")
-            except Exception:
-                pass
-            return False, "微信会话 Context Token 已失效并已清除；请向 Bot 发送一条新文字消息，系统将自动刷新会话"
-        if code == -2:
-            return False, f"微信 iLink 发送受限或会话失效 ret={ret} errcode={errcode} errmsg={errmsg or '--'}；请稍后重试，若持续失败请向 Bot 发一条新文字消息"
-        return False, f"微信业务拒绝 ret={ret} errcode={errcode} errmsg={errmsg}"
-    return True, f"腾讯 iLink 已受理（非客户端送达回执）client_id={client_id} {detail} ret={ret} errcode={errcode}"
-
-
 def enabled_channels(env: dict[str, str] | None = None) -> list[str]:
     env = env or _env()
     channels = []
-    for channel in ("webhook", "wechat", "wechat_ilink", "telegram", "qq"):
+    for channel in ("webhook", "wechat", "telegram", "qq"):
         if env.get(f"R20_NOTIFY_{channel.upper()}_ENABLED") == "1":
             channels.append(channel)
     return channels
@@ -147,14 +88,11 @@ def diagnose_channel(channel: str, env: dict[str, str] | None = None) -> dict[st
     """Configuration-only diagnosis. It never sends a user-visible message."""
     env = env or _env(); required = {
         "webhook": ("R20_NOTIFICATION_WEBHOOK",), "wechat": ("R20_WECHAT_WEBHOOK",),
-        "wechat_ilink": ("R20_WECHAT_BOT_TOKEN","R20_WECHAT_USER_ID","R20_WECHAT_CONTEXT_TOKEN"),
         "telegram": ("R20_TELEGRAM_BOT_TOKEN","R20_TELEGRAM_CHAT_ID"), "qq": ("R20_QQ_APP_ID","R20_QQ_CLIENT_SECRET","R20_QQ_OPENID"),
     }
     if channel not in required: return {"status":"failed","detail":"未知通知通道"}
     missing=[key for key in required[channel] if not env.get(key)]
     if missing: return {"status":"incomplete","missing":missing,"detail":"配置不完整"}
-    if channel == "wechat_ilink":
-        return {"status":"ready","detail":"必要配置完整；仅能确认腾讯 iLink 受理，无法确认微信客户端送达"}
     return {"status":"ready","detail":"必要配置完整；尚未发送测试消息"}
 
 
@@ -180,8 +118,6 @@ def send_channel(channel: str, message: str, env: dict[str, str] | None = None) 
         if not ok: return False, f"{detail} {response}"
         if int(response.get("errcode", -1)) != 0: return False, f"企业微信业务拒绝 errcode={response.get('errcode')} errmsg={response.get('errmsg','')}"
         return True, f"accepted: HTTP 200 errcode=0"
-    if channel == "wechat_ilink":
-        return _send_wechat_ilink(env, message)
     if channel == "telegram":
         token, chat_id = env.get("R20_TELEGRAM_BOT_TOKEN", ""), env.get("R20_TELEGRAM_CHAT_ID", "")
         if not token or not chat_id:

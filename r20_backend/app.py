@@ -1,9 +1,7 @@
 """Standalone control plane: read-only monitoring plus process health."""
 from __future__ import annotations
-import base64
 import hashlib
 import hmac
-import io
 import json
 import os
 import re
@@ -28,7 +26,6 @@ from r20_backend.config import refresh_settings, settings
 from r20_backend.okx_client import OKXClient
 from r20_backend.okx_trade_service import account_snapshot as okx_account_snapshot, fast_close_confirmed
 from r20_backend.backup_secrets import credential_status as backup_credential_status, save_credentials as save_backup_credentials
-from r20_backend.net_security import validate_wechat_base_url
 from r20_backend.prompt_views import EVOLUTION_USER_TEMPLATE, TRADING_USER_TEMPLATE, rendered_snapshots
 from r20_backend.settings_store import mask, remove_env, update_env
 from r20_backend.notifications import _env as notification_env, diagnose_channel, test_channel
@@ -40,8 +37,6 @@ from r20_backend.backup_store import (
     load_backup_methods, save_backup_methods, update_job as update_backup_job, validate_backup_job,
 )
 from r20_backend.schedule_store import load_schedule, save_schedule
-from r20_backend.wechat_login import create_qrcode, qrcode_status
-from r20_backend.wechat_watcher import public_state as wechat_watcher_state, request_session_capture, reset_watcher_state, start_watcher, stop_watcher
 from r20_gateway.agents import agent_statuses
 from r20_gateway.publisher import DB_PATH as GATEWAY_DB_PATH
 from r20_gateway.plugins import plugin_statuses
@@ -66,11 +61,9 @@ REQUEST_SESSION: ContextVar[str] = ContextVar("r20_admin_session", default="")
 async def lifespan(_: FastAPI):
     refresh_settings()
     admin_auth.initialize_from_legacy(settings.admin_token or settings.setup_token)
-    start_watcher()
     start_gateway_supervisor()
     yield
     stop_gateway_supervisor()
-    stop_watcher()
 
 
 app = FastAPI(title="R20 Quantum Trader Standalone Backend", version="6.0.0-preview", lifespan=lifespan)
@@ -253,11 +246,6 @@ class NotificationConfigUpdate(BaseModel):
     webhook_url: str = ""
     wechat_enabled: bool = False
     wechat_webhook: str = ""
-    wechat_ilink_enabled: bool = False
-    wechat_bot_token: str | None = None
-    wechat_base_url: str = "https://ilinkai.weixin.qq.com"
-    wechat_user_id: str = ""
-    wechat_context_token: str | None = None
     telegram_enabled: bool = False
     telegram_bot_token: str | None = None
     telegram_chat_id: str = ""
@@ -268,16 +256,12 @@ class NotificationConfigUpdate(BaseModel):
 
 
 class NotificationTestRequest(BaseModel):
-    channel: str = Field(pattern=r"^(webhook|wechat|wechat_ilink|telegram|qq)$")
+    channel: str = Field(pattern=r"^(webhook|wechat|telegram|qq)$")
     confirmation: str = ""
 
 
 class NotificationScheduleUpdate(BaseModel):
     briefing_times: list[str] = Field(min_length=1, max_length=6)
-
-
-class WechatQrStatusRequest(BaseModel):
-    qrcode: str = Field(min_length=1, max_length=500)
 
 
 class BackupRequest(BaseModel):
@@ -751,7 +735,6 @@ def admin_about(x_r20_admin_token: str | None = Header(default=None)) -> dict[st
         "components": [
             {"name": "FastAPI Control Plane", "version": "6.0.0-preview"},
             {"name": "Gateway Event Runtime", "version": GATEWAY_VERSION},
-            {"name": "Tencent iLink Protocol", "version": "2.4.8"},
             {"name": "SQLite", "version": __import__("sqlite3").sqlite_version},
         ],
         "repository": {"url": "https://github.com/555cute/r20-quantum-trader", "branch": git(["branch", "--show-current"]), "commit": git(["rev-parse", "--short", "HEAD"])},
@@ -971,14 +954,6 @@ def notification_config(x_r20_admin_token: str | None = Header(default=None)) ->
     return {
         "webhook": {"enabled": env.get("R20_NOTIFY_WEBHOOK_ENABLED", "0") == "1", "url": env.get("R20_NOTIFICATION_WEBHOOK", "")},
         "wechat": {"enabled": env.get("R20_NOTIFY_WECHAT_ENABLED", "0") == "1", "webhook": env.get("R20_WECHAT_WEBHOOK", "")},
-        "wechat_ilink": {
-            "enabled": env.get("R20_NOTIFY_WECHAT_ILINK_ENABLED", "0") == "1",
-            "bot_token": mask(env.get("R20_WECHAT_BOT_TOKEN", "")), "bot_configured": bool(env.get("R20_WECHAT_BOT_TOKEN", "")),
-            "base_url": env.get("R20_WECHAT_BASE_URL", "https://ilinkai.weixin.qq.com"), "user_id": env.get("R20_WECHAT_USER_ID", ""),
-            "context_token": mask(env.get("R20_WECHAT_CONTEXT_TOKEN", "")), "context_configured": bool(env.get("R20_WECHAT_CONTEXT_TOKEN", "")),
-            "ready": bool(env.get("R20_WECHAT_BOT_TOKEN") and env.get("R20_WECHAT_USER_ID") and env.get("R20_WECHAT_CONTEXT_TOKEN")),
-            "watcher": wechat_watcher_state(), "protocol": "Tencent iLink 2.4.8", "delivery_semantics": "腾讯 iLink 受理，不等于微信客户端送达或已读",
-        },
         "telegram": {"enabled": env.get("R20_NOTIFY_TELEGRAM_ENABLED", "0") == "1", "bot_token": mask(env.get("R20_TELEGRAM_BOT_TOKEN", "")), "chat_id": env.get("R20_TELEGRAM_CHAT_ID", "")},
         "qq": {"enabled": env.get("R20_NOTIFY_QQ_ENABLED", "0") == "1", "app_id": env.get("R20_QQ_APP_ID", ""), "client_secret": mask(env.get("R20_QQ_CLIENT_SECRET", "")), "openid": env.get("R20_QQ_OPENID", "")},
     }
@@ -989,7 +964,7 @@ def toggle_channel(channel: str, payload: ChannelToggleRequest, x_r20_admin_toke
     refresh_settings()
     require_admin_header(x_r20_admin_token)
     keys = {
-        "qq": "R20_NOTIFY_QQ_ENABLED", "wechat_ilink": "R20_NOTIFY_WECHAT_ILINK_ENABLED",
+        "qq": "R20_NOTIFY_QQ_ENABLED",
         "telegram": "R20_NOTIFY_TELEGRAM_ENABLED", "wechat": "R20_NOTIFY_WECHAT_ENABLED",
         "webhook": "R20_NOTIFY_WEBHOOK_ENABLED",
     }
@@ -999,7 +974,6 @@ def toggle_channel(channel: str, payload: ChannelToggleRequest, x_r20_admin_toke
         env = notification_env()
         readiness = {
             "qq": bool(env.get("R20_QQ_APP_ID") and env.get("R20_QQ_CLIENT_SECRET") and env.get("R20_QQ_OPENID")),
-            "wechat_ilink": bool(env.get("R20_WECHAT_BOT_TOKEN") and env.get("R20_WECHAT_USER_ID") and env.get("R20_WECHAT_CONTEXT_TOKEN")),
             "telegram": bool(env.get("R20_TELEGRAM_BOT_TOKEN") and env.get("R20_TELEGRAM_CHAT_ID")),
             "wechat": bool(env.get("R20_WECHAT_WEBHOOK")),
             "webhook": bool(env.get("R20_NOTIFICATION_WEBHOOK")),
@@ -1018,12 +992,9 @@ def update_notification_config(payload: NotificationConfigUpdate, x_r20_admin_to
     for value, title in ((payload.webhook_url, "通用 Webhook"), (payload.wechat_webhook, "企业微信 Webhook")):
         if value and not value.startswith(("https://", "http://")):
             raise HTTPException(status_code=400, detail=f"{title} 必须以 http:// 或 https:// 开头")
-    try: wechat_base_url = validate_wechat_base_url(payload.wechat_base_url)
-    except ValueError as exc: raise HTTPException(status_code=400, detail=f"微信 Base URL：{exc}") from exc
     existing = notification_env()
     readiness = {
         "QQ": (payload.qq_enabled, bool(payload.qq_app_id and (payload.qq_client_secret or existing.get("R20_QQ_CLIENT_SECRET")) and payload.qq_openid)),
-        "微信 iLink": (payload.wechat_ilink_enabled, bool((payload.wechat_bot_token or existing.get("R20_WECHAT_BOT_TOKEN")) and payload.wechat_user_id and (payload.wechat_context_token or existing.get("R20_WECHAT_CONTEXT_TOKEN")))),
         "Telegram": (payload.telegram_enabled, bool((payload.telegram_bot_token or existing.get("R20_TELEGRAM_BOT_TOKEN")) and payload.telegram_chat_id)),
         "企业微信": (payload.wechat_enabled, bool(payload.wechat_webhook)),
         "通用 Webhook": (payload.webhook_enabled, bool(payload.webhook_url)),
@@ -1033,7 +1004,6 @@ def update_notification_config(payload: NotificationConfigUpdate, x_r20_admin_to
         raise HTTPException(status_code=409, detail=f"以下频道配置不完整，无法启用：{'、'.join(incomplete)}")
     secret_values = {
         "R20_NOTIFICATION_WEBHOOK": payload.webhook_url, "R20_WECHAT_WEBHOOK": payload.wechat_webhook,
-        "R20_WECHAT_BOT_TOKEN": payload.wechat_bot_token, "R20_WECHAT_CONTEXT_TOKEN": payload.wechat_context_token,
         "R20_TELEGRAM_BOT_TOKEN": payload.telegram_bot_token, "R20_QQ_CLIENT_SECRET": payload.qq_client_secret,
     }
     save_secrets({key: value for key, value in secret_values.items() if value})
@@ -1041,15 +1011,12 @@ def update_notification_config(payload: NotificationConfigUpdate, x_r20_admin_to
     update_env({
         "R20_NOTIFY_WEBHOOK_ENABLED": "1" if payload.webhook_enabled else "0",
         "R20_NOTIFY_WECHAT_ENABLED": "1" if payload.wechat_enabled else "0",
-        "R20_NOTIFY_WECHAT_ILINK_ENABLED": "1" if payload.wechat_ilink_enabled else "0",
-        "R20_WECHAT_BASE_URL": wechat_base_url, "R20_WECHAT_USER_ID": payload.wechat_user_id,
         "R20_NOTIFY_TELEGRAM_ENABLED": "1" if payload.telegram_enabled else "0", "R20_TELEGRAM_CHAT_ID": payload.telegram_chat_id,
         "R20_NOTIFY_QQ_ENABLED": "1" if payload.qq_enabled else "0", "R20_QQ_APP_ID": payload.qq_app_id, "R20_QQ_OPENID": payload.qq_openid,
     })
     audit_record("notifications.update", "success", {
         "webhook": payload.webhook_enabled,
         "wechat": payload.wechat_enabled,
-        "wechat_ilink": payload.wechat_ilink_enabled,
         "telegram": payload.telegram_enabled,
         "qq": payload.qq_enabled,
     })
@@ -1105,63 +1072,6 @@ def update_notification_schedule(payload: NotificationScheduleUpdate, x_r20_admi
     save_schedule(schedule)
     audit_record("notifications.schedule", "success", {"briefing_times": normalized, "timezone": "Asia/Shanghai"})
     return {**schedule, "saved": True, "restart_note": "调度器将在 60 秒内读取新时间。"}
-
-
-@app.post("/api/v1/admin/notifications/wechat/qr")
-def create_wechat_qr(x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
-    refresh_settings()
-    require_admin_header(x_r20_admin_token)
-    base_url = os.getenv("R20_WECHAT_BASE_URL", "https://ilinkai.weixin.qq.com")
-    try:
-        result = create_qrcode(base_url)
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"获取微信登录二维码失败：{exc}") from exc
-    audit_record("wechat.qr.create", "success", {})
-    try:
-        import qrcode as qr_library
-        image = qr_library.make(result["image_content"])
-        buffer = io.BytesIO()
-        image.save(buffer, format="PNG")
-        image_data = base64.b64encode(buffer.getvalue()).decode("ascii")
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"二维码渲染失败：{exc}") from exc
-    return {"qrcode": result["qrcode"], "image_data": f"data:image/png;base64,{image_data}", "expires_hint": result["expires_hint"]}
-
-
-@app.post("/api/v1/admin/notifications/wechat/qr/status")
-def check_wechat_qr(payload: WechatQrStatusRequest, x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
-    refresh_settings()
-    require_admin_header(x_r20_admin_token)
-    try: base_url = validate_wechat_base_url(os.getenv("R20_WECHAT_BASE_URL", "https://ilinkai.weixin.qq.com"))
-    except ValueError as exc: raise HTTPException(status_code=400, detail=f"微信 Base URL：{exc}") from exc
-    try:
-        result = qrcode_status(payload.qrcode, base_url)
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"查询微信扫码状态失败：{exc}") from exc
-    if result["status"] == "confirmed" and result["bot_token"]:
-        save_secrets({"R20_WECHAT_BOT_TOKEN": result["bot_token"]})
-        delete_secrets({"R20_WECHAT_CONTEXT_TOKEN"})
-        remove_env({"R20_WECHAT_BOT_TOKEN", "R20_WECHAT_CONTEXT_TOKEN"})
-        update_env({"R20_WECHAT_BASE_URL": result["base_url"], "R20_WECHAT_USER_ID": result["user_id"] or None, "R20_NOTIFY_WECHAT_ILINK_ENABLED": "1"})
-        reset_watcher_state()
-        audit_record("wechat.qr.confirm", "success", {"bot_id": result["bot_id"], "user_id_configured": bool(result["user_id"])})
-        return {"status": "confirmed", "configured": True, "bot_id": result["bot_id"], "user_id": result["user_id"], "context_required": True}
-    return {"status": result["status"], "configured": False}
-
-
-@app.post("/api/v1/admin/notifications/wechat/session")
-def sync_wechat_session(x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
-    refresh_settings()
-    require_admin_header(x_r20_admin_token)
-    env = notification_env()
-    if not env.get("R20_WECHAT_BOT_TOKEN", ""):
-        raise HTTPException(status_code=409, detail="请先完成微信扫码绑定")
-    state = wechat_watcher_state()
-    if state.get("user_configured") and env.get("R20_WECHAT_CONTEXT_TOKEN"):
-        return {"synced": True, "user_id": env.get("R20_WECHAT_USER_ID", ""), "context_configured": True, "watcher": state}
-    state = request_session_capture()
-    audit_record("wechat.session.capture_requested", "success", {"watcher": state.get("status")})
-    return {"synced": False, "waiting": True, "instruction": "现在向微信 Bot 发送一条文字消息，后台监听器将自动捕获会话。", "watcher": state}
 
 
 @app.get("/api/v1/admin/backups/simple")

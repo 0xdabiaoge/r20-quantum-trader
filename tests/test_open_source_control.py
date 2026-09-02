@@ -8,14 +8,13 @@ from pathlib import Path
 from unittest.mock import patch
 
 import r20_backend.notifications as notifications
-import r20_backend.wechat_watcher as wechat_watcher
-import r20_backend.wechat_protocol as wechat_protocol
 import r20_backend.okx_trade_service as trade_service
 import scripts.okx_runtime as okx_runtime
 import scripts.prompt_library as prompts
 import scripts.backup_runtime as backup_runtime
 import r20_backend.backup_store as backup_store
 import r20_backend.net_security as net_security
+from r20_gateway.plugins import PLUGINS
 
 
 class OKXEnvironmentTests(unittest.TestCase):
@@ -77,56 +76,22 @@ class OKXEnvironmentTests(unittest.TestCase):
         self.assertTrue(any(path=="/api/v5/trade/close-position" for _,path,_ in calls))
 
 
-class WechatTests(unittest.TestCase):
-    def test_wire_protocol_matches_current_tencent_plugin(self):
-        self.assertEqual(wechat_protocol.base_info()["channel_version"], "2.4.8")
-        headers=wechat_protocol.common_headers("token")
-        self.assertEqual(headers["iLink-App-ClientVersion"], "132104")
-        self.assertEqual(headers["Authorization"], "Bearer token")
-
-    def test_dotenv_overrides_stale_process_environment(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            root=Path(tmp); (root/".env").write_text("R20_WECHAT_CONTEXT_TOKEN=NEW\n")
-            with patch.object(notifications, "ROOT", root), patch.dict(os.environ, {"R20_WECHAT_CONTEXT_TOKEN":"OLD"}, clear=True):
-                self.assertEqual(notifications._env()["R20_WECHAT_CONTEXT_TOKEN"], "NEW")
-
-    def test_errcode_is_not_reported_as_success(self):
-        env={"R20_WECHAT_BOT_TOKEN":"T","R20_WECHAT_USER_ID":"U","R20_WECHAT_CONTEXT_TOKEN":"C"}
-        with patch.object(notifications, "_post_json", return_value=(True,"HTTP 200",{"errcode":-2, "errmsg":"unknown error"})), patch.object(wechat_watcher, "mark_context_stale") as stale:
-            ok, detail=notifications._send_wechat_ilink(env,"hello")
-            self.assertFalse(ok); self.assertIn("Context Token", detail); stale.assert_called_once()
-
-    def test_accepted_is_not_misreported_as_client_delivery(self):
-        env={"R20_WECHAT_BOT_TOKEN":"T","R20_WECHAT_USER_ID":"U","R20_WECHAT_CONTEXT_TOKEN":"C"}
-        with patch.object(notifications, "_post_json", return_value=(True,"HTTP 200",{"ret":0})):
-            ok, detail=notifications._send_wechat_ilink(env,"hello")
-        self.assertTrue(ok)
-        self.assertIn("已受理", detail)
-        self.assertIn("非客户端送达回执", detail)
-        self.assertIn("client_id=r20-wechat-", detail)
-
-    def test_empty_business_response_is_unknown_not_success(self):
-        env={"R20_WECHAT_BOT_TOKEN":"T","R20_WECHAT_USER_ID":"U","R20_WECHAT_CONTEXT_TOKEN":"C"}
-        with patch.object(notifications, "_post_json", return_value=(True,"HTTP 200",{})):
-            ok, detail=notifications._send_wechat_ilink(env,"hello")
+class NotificationChannelRemovalTests(unittest.TestCase):
+    def test_retired_personal_wechat_channel_is_not_supported(self):
+        retired_channel = "wechat" + "_ilink"
+        env={"R20_NOTIFY_" + retired_channel.upper() + "_ENABLED":"1"}
+        self.assertNotIn(retired_channel, notifications.enabled_channels(env))
+        self.assertEqual(notifications.diagnose_channel(retired_channel, env)["status"], "failed")
+        ok, detail=notifications.send_channel(retired_channel, "hello", env)
         self.assertFalse(ok)
-        self.assertIn("空业务响应", detail)
+        self.assertIn("未知通知通道", detail)
+        self.assertNotIn("r20.channel." + "wechat" + "-ilink", {plugin.plugin_id for plugin in PLUGINS})
 
-    def test_bot_echo_cannot_replace_user_context_token(self):
-        self.assertTrue(wechat_watcher._is_user_message({"message_type":1}))
-        self.assertFalse(wechat_watcher._is_user_message({"message_type":2}))
-
-    def test_public_state_preserves_persisted_session_on_process_restart(self):
-        with patch.object(wechat_watcher, "ensure_watcher"), patch.object(wechat_watcher, "_load_state", return_value={"status":"listening","last_message_at":"2026-09-02 09:47:18","user_configured":True,"context_source":"user_message"}):
-            state=wechat_watcher.public_state()
-        self.assertTrue(state["user_configured"])
-        self.assertEqual(state["context_source"],"user_message")
-
-    def test_channel_test_only_tests_selected_channel(self):
-        with patch.object(notifications, "send_channel", return_value=(False,"wechat failed")) as send:
-            result=notifications.test_channel("wechat_ilink")
-            self.assertEqual(list(result), ["wechat_ilink"])
-            self.assertTrue(result["wechat_ilink"].startswith("failed:")); send.assert_called_once()
+    def test_dotenv_still_overrides_stale_process_environment(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp); (root/".env").write_text("R20_NOTIFY_QQ_ENABLED=1\n")
+            with patch.object(notifications, "ROOT", root), patch.dict(os.environ, {"R20_NOTIFY_QQ_ENABLED":"0"}, clear=True):
+                self.assertEqual(notifications._env()["R20_NOTIFY_QQ_ENABLED"], "1")
 
 
 class PromptSimpleModeTests(unittest.TestCase):

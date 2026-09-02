@@ -12,27 +12,25 @@
 - No runtime dependency is introduced on QwenPaw or OpenClaw for trading, scheduling, backup, or notifications.
 - The web monitoring terminal remains read-only; no new HTTP trade trigger is exposed.
 
-### WeChat iLink delivery semantics corrected
+### Notification channel simplification
 
-- `sendmessage` now returns **Tencent iLink accepted** with a traceable `client_id`; it no longer claims that a recipient's WeChat client received or read the message.
-- Admin diagnostics explicitly state that iLink exposes no end-device/read receipt.
-- `ret=-14` is reported as Bot Token expiry.
-- `ret/errcode=-2` with `unknown error` is handled as stale Context Token. The operator must message the iLink Bot again to refresh the session.
-- The watcher only refreshes the stored Context Token from `message_type=1` user messages, never from the Bot's own echoed `message_type=2` traffic.
-- Watcher timestamps are now emitted explicitly in Beijing time (UTC+8).
+- R20 now exposes four notification channels: QQ official Bot, enterprise WeChat, Telegram and generic Webhook.
+- The personal WeChat connector, QR binding routes, session watcher, plugin entry and admin configuration panel have been removed.
+- Critical alerts should use at least two independent channels.
+- Historical delivery rows for retired channels remain in the local audit database; R20 does not create new deliveries for them.
 
 ## Upgrade notes
 
-1. Do **not** interpret `HTTP 200` or `ret=0` as proof of WeChat handset delivery.
-2. If WeChat sends stop arriving, message the iLink Bot directly, wait for the watcher to record the new UTC+8 session refresh timestamp, then use one confirmation-protected test send.
-3. Keep QQ, Telegram, enterprise WeChat, or a managed webhook enabled as a redundant route for critical risk alerts. Personal WeChat iLink Context Tokens are session-bound and are not a durable push entitlement.
+1. Remove legacy personal WeChat notification values from deployment environment overrides; the bundled cleanup migration also deletes locally stored credentials.
+2. Configure at least two of QQ, Telegram, enterprise WeChat and a managed Webhook for critical risk alerts.
+3. Existing audit records for removed channels are retained but cannot be replayed.
 4. No trading controls were relaxed or changed in this preview.
 
 ## Verification
 
-- Unit coverage includes iLink stale-token rejection, accepted-vs-client-delivery labeling, and prevention of Bot-echo Context Token overwrite.
+- Unit coverage verifies that removed channels cannot be enabled, diagnosed, tested or selected for new Gateway deliveries.
 - Full test-suite results and production process restart validation should be completed by each deployment operator before promotion beyond preview.
 
-## Known protocol boundary
+## Notification boundary
 
-Tencent iLink's `sendmessage` API acknowledges request acceptance, but this protocol does not provide an authoritative receipt that the recipient's WeChat client displayed or read the message. R20 therefore reports the strongest state that the upstream API can actually prove.
+A channel is only suitable for critical trading alerts when its success state is operationally meaningful. R20 exposes only the notification integrations it can support as explicit operational channels.
