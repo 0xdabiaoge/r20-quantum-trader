@@ -2321,6 +2321,42 @@
             }
         }
 
+        // Institutional Crosshair Plugin for Chart.js
+        const crosshairPlugin = {
+            id: 'crosshairGuide',
+            afterDraw: (chart) => {
+                if (chart.tooltip?._active && chart.tooltip._active.length) {
+                    const activePoint = chart.tooltip._active[0];
+                    const ctx = chart.ctx;
+                    const x = activePoint.element.x;
+                    const y = activePoint.element.y;
+                    const { top, bottom, left, right } = chart.chartArea;
+
+                    ctx.save();
+                    ctx.setLineDash([3, 3]);
+                    ctx.lineWidth = 1;
+                    ctx.strokeStyle = 'rgba(56, 117, 246, 0.55)';
+
+                    // Vertical crosshair line
+                    ctx.beginPath();
+                    ctx.moveTo(x, top);
+                    ctx.lineTo(x, bottom);
+                    ctx.stroke();
+
+                    // Horizontal crosshair line
+                    ctx.beginPath();
+                    ctx.moveTo(left, y);
+                    ctx.lineTo(right, y);
+                    ctx.stroke();
+
+                    ctx.restore();
+                }
+            }
+        };
+        if (typeof Chart !== 'undefined' && Chart.register) {
+            Chart.register(crosshairPlugin);
+        }
+
         // Render Chart Engine (Multi-Mode Financial Charting)
         function renderChart(snapshots) {
             const ctx = document.getElementById('equityChart');
@@ -2438,9 +2474,9 @@
                                             const eq = context.parsed.y;
                                             const diff = eq - initialCapital;
                                             const diffPct = (diff / initialCapital) * 100;
-                                            return ` 💰 账户总权益: ${eq.toFixed(2)} USDT (${diff >= 0 ? '+' : ''}${diff.toFixed(2)} U / ${diffPct.toFixed(2)}%)`;
+                                            return ` 账户总权益: ${eq.toFixed(2)} USDT (${diff >= 0 ? '+' : ''}${diff.toFixed(2)} U / ${diffPct.toFixed(2)}%)`;
                                         }
-                                        return ` 📏 初始基准: ${initialCapital.toFixed(2)} USDT`;
+                                        return ` 初始基准: ${initialCapital.toFixed(2)} USDT`;
                                     }
                                 }
                             }
