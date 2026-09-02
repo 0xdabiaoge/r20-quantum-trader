@@ -41,7 +41,7 @@ def _env() -> dict[str, str]:
 
 
 def _post_json(url: str, payload: dict[str, Any], headers: dict[str, str] | None = None) -> tuple[bool, str, dict[str, Any]]:
-    request_headers = {"Content-Type": "application/json", "User-Agent": "R20-Standalone/5.4.2"}
+    request_headers = {"Content-Type": "application/json", "User-Agent": "R20-Standalone/6.0.0-preview"}
     request_headers.update(headers or {})
     request = urllib.request.Request(url, data=json.dumps(payload, ensure_ascii=False).encode("utf-8"), headers=request_headers, method="POST")
     try:
@@ -83,6 +83,12 @@ def _wechat_headers(bot_token: str) -> dict[str, str]:
 
 
 def _send_wechat_ilink(env: dict[str, str], message: str) -> tuple[bool, str]:
+    """Submit one iLink message and report only Tencent-side acceptance.
+
+    The iLink API offers no end-device/read receipt.  A `ret=0` response means
+    only that Tencent accepted the request, never that the recipient's WeChat
+    client displayed it.  Callers must therefore not label this as delivered.
+    """
     token = env.get("R20_WECHAT_BOT_TOKEN", "")
     user_id = env.get("R20_WECHAT_USER_ID", "")
     context_token = env.get("R20_WECHAT_CONTEXT_TOKEN", "")
@@ -90,11 +96,12 @@ def _send_wechat_ilink(env: dict[str, str], message: str) -> tuple[bool, str]:
     except ValueError as exc: return False, f"微信 Base URL 无效：{exc}"
     if not token or not user_id or not context_token:
         return False, "微信 Bot Token / 用户 ID / Context Token 未完整配置"
+    client_id = f"r20-wechat-{uuid.uuid4()}"
     payload = {
         "msg": {
             "from_user_id": "",
             "to_user_id": user_id,
-            "client_id": str(uuid.uuid4()),
+            "client_id": client_id,
             "message_type": 2,
             "message_state": 2,
             "context_token": context_token,
@@ -105,16 +112,19 @@ def _send_wechat_ilink(env: dict[str, str], message: str) -> tuple[bool, str]:
     ok, detail, response = _post_json(f"{base_url}/ilink/bot/sendmessage", payload, _wechat_headers(token))
     if not ok:
         return False, f"{detail} {response}"
-    ret = response.get("ret", 0) if isinstance(response, dict) else 0
-    errcode = response.get("errcode", 0) if isinstance(response, dict) else 0
+    response = response if isinstance(response, dict) else {}
+    ret, errcode = response.get("ret", 0), response.get("errcode", 0)
     if ret not in (0, None) or errcode not in (0, None):
         code = ret if ret not in (0, None) else errcode
-        if code == -2:
-            return False, "微信会话 Context Token 已失效；请向 Bot 发送一条新文字消息，系统将自动刷新会话"
+        errmsg = str(response.get("errmsg", ""))
         if code == -14:
             return False, "微信 Bot Token 已失效；请重新扫码绑定"
-        return False, f"微信业务拒绝 ret={ret} errcode={errcode} errmsg={response.get('errmsg', '')}"
-    return True, f"{detail} ret={ret} errcode={errcode}"
+        if code == -2 and errmsg.lower() == "unknown error":
+            return False, "微信会话 Context Token 已失效；请向 Bot 发送一条新文字消息，系统将自动刷新会话"
+        if code == -2:
+            return False, f"微信 iLink 发送受限或会话失效 ret={ret} errcode={errcode} errmsg={errmsg or '--'}；请稍后重试，若持续失败请向 Bot 发一条新文字消息"
+        return False, f"微信业务拒绝 ret={ret} errcode={errcode} errmsg={errmsg}"
+    return True, f"腾讯 iLink 已受理（非客户端送达回执）client_id={client_id} {detail} ret={ret} errcode={errcode}"
 
 
 def enabled_channels(env: dict[str, str] | None = None) -> list[str]:
@@ -136,6 +146,8 @@ def diagnose_channel(channel: str, env: dict[str, str] | None = None) -> dict[st
     if channel not in required: return {"status":"failed","detail":"未知通知通道"}
     missing=[key for key in required[channel] if not env.get(key)]
     if missing: return {"status":"incomplete","missing":missing,"detail":"配置不完整"}
+    if channel == "wechat_ilink":
+        return {"status":"ready","detail":"必要配置完整；仅能确认腾讯 iLink 受理，无法确认微信客户端送达"}
     return {"status":"ready","detail":"必要配置完整；尚未发送测试消息"}
 
 
@@ -195,4 +207,5 @@ def test_channel(channel: str) -> dict[str, str]:
     env = _env()
     timestamp = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d %H:%M:%S")
     ok, detail = send_channel(channel, f"【R20 Quantum Trader】{timestamp}\n🔔 {channel.upper()} 通知测试：指定通道连接正常。", env)
-    return {channel: f"accepted: {detail}" if ok else f"failed: {detail}"}
+    prefix = "accepted:" if ok else "failed:"
+    return {channel: f"{prefix} {detail}"}

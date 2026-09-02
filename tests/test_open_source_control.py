@@ -8,6 +8,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import r20_backend.notifications as notifications
+import r20_backend.wechat_watcher as wechat_watcher
 import r20_backend.okx_trade_service as trade_service
 import scripts.okx_runtime as okx_runtime
 import scripts.prompt_library as prompts
@@ -61,9 +62,22 @@ class WechatTests(unittest.TestCase):
 
     def test_errcode_is_not_reported_as_success(self):
         env={"R20_WECHAT_BOT_TOKEN":"T","R20_WECHAT_USER_ID":"U","R20_WECHAT_CONTEXT_TOKEN":"C"}
-        with patch.object(notifications, "_post_json", return_value=(True,"HTTP 200",{"errcode":-2})):
+        with patch.object(notifications, "_post_json", return_value=(True,"HTTP 200",{"errcode":-2, "errmsg":"unknown error"})):
             ok, detail=notifications._send_wechat_ilink(env,"hello")
             self.assertFalse(ok); self.assertIn("Context Token", detail)
+
+    def test_accepted_is_not_misreported_as_client_delivery(self):
+        env={"R20_WECHAT_BOT_TOKEN":"T","R20_WECHAT_USER_ID":"U","R20_WECHAT_CONTEXT_TOKEN":"C"}
+        with patch.object(notifications, "_post_json", return_value=(True,"HTTP 200",{"ret":0})):
+            ok, detail=notifications._send_wechat_ilink(env,"hello")
+        self.assertTrue(ok)
+        self.assertIn("已受理", detail)
+        self.assertIn("非客户端送达回执", detail)
+        self.assertIn("client_id=r20-wechat-", detail)
+
+    def test_bot_echo_cannot_replace_user_context_token(self):
+        self.assertTrue(wechat_watcher._is_user_message({"message_type":1}))
+        self.assertFalse(wechat_watcher._is_user_message({"message_type":2}))
 
     def test_channel_test_only_tests_selected_channel(self):
         with patch.object(notifications, "send_channel", return_value=(False,"wechat failed")) as send:

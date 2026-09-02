@@ -6,7 +6,7 @@
 
 <br/>
 
-[![Version](https://img.shields.io/badge/Version-v5.4.2-6366F1.svg)](https://github.com/555cute/r20-quantum-trader/releases)
+[![Version](https://img.shields.io/badge/Version-v6.0.0--preview-6366F1.svg)](https://github.com/555cute/r20-quantum-trader/releases)
 [![LINUX DO](https://img.shields.io/badge/Community-LINUX%20DO-EA580C.svg)](https://linux.do/)
 [![License](https://img.shields.io/badge/License-MIT-10B981.svg)](https://opensource.org/licenses/MIT)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
@@ -67,9 +67,10 @@
 
 ---
 
-## 🌟 核心交易系统特性 (v5.4.2 独立化升级)
+## 🌟 核心交易系统特性 (v6.0.0 Preview 升级)
 
 ### 🧩 0. 独立化运行底座与自有后台
+- **v6.0.0 Preview**：Gateway 事件队列与原生通道进入预览阶段；微信 iLink 明确区分“腾讯服务端受理”与“微信客户端送达”，不再把 `HTTP 200 / ret=0` 误报为用户已收到。
 - **零 QwenPaw 运行时依赖**：交易、通知、提示词、灾备和后台控制均由 R20 原生组件完成；API Key 与云存储凭证保存到本地加密 Secret Store，公开配置只保留引用。
 - **自有 FastAPI 控制平面**：`r20_backend` 提供只读监控、简化策略编辑器、通知诊断、插件化灾备、管理员系统，以及默认关闭且需密码复核的“从 OKX 当前持仓快速平仓”。
 - **OKX 双环境隔离**：实盘 LIVE 与模拟盘 DEMO 凭证独立保存；策略、账本、监控和快速平仓共享统一环境选择器，模拟盘请求自动带 `x-simulated-trading: 1`。

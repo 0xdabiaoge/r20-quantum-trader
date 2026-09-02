@@ -11,7 +11,7 @@ DEFAULT_BASE_URL = "https://ilinkai.weixin.qq.com"
 
 
 def _get_json(url: str, headers: dict[str, str] | None = None, timeout: int = 40) -> dict[str, Any]:
-    request = urllib.request.Request(url, headers={"User-Agent": "R20-Standalone/5.4.2", **(headers or {})})
+    request = urllib.request.Request(url, headers={"User-Agent": "R20-Standalone/6.0.0-preview", **(headers or {})})
     with urllib.request.urlopen(request, timeout=timeout) as response:
         payload = json.loads(response.read().decode("utf-8"))
     return payload
@@ -49,7 +49,7 @@ def latest_session(bot_token: str, base_url: str = DEFAULT_BASE_URL) -> dict[str
 
 def _post_json(url: str, payload: dict[str, Any], headers: dict[str, str]) -> dict[str, Any]:
     body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-    request = urllib.request.Request(url, data=body, headers={"User-Agent": "R20-Standalone/5.4.2", **headers}, method="POST")
+    request = urllib.request.Request(url, data=body, headers={"User-Agent": "R20-Standalone/6.0.0-preview", **headers}, method="POST")
     with urllib.request.urlopen(request, timeout=40) as response:
         raw = response.read().decode("utf-8")
     return json.loads(raw) if raw else {}

@@ -177,7 +177,7 @@ def _credentials(target: dict[str, Any]) -> dict[str, str]:
 
 def _urlencoded_json(url: str, data: dict[str, Any] | None = None, timeout: int = 60) -> dict[str, Any]:
     body = urllib.parse.urlencode(data).encode() if data is not None else None
-    request = urllib.request.Request(url, data=body, headers={"User-Agent": "R20-Backup/5.4.2"}, method="POST" if body is not None else "GET")
+    request = urllib.request.Request(url, data=body, headers={"User-Agent": "R20-Backup/6.0.0-preview"}, method="POST" if body is not None else "GET")
     with urllib.request.urlopen(request, timeout=timeout) as response: raw = response.read().decode("utf-8")
     payload = json.loads(raw or "{}")
     if payload.get("errno") not in (None, 0) or payload.get("error"):
@@ -188,7 +188,7 @@ def _urlencoded_json(url: str, data: dict[str, Any] | None = None, timeout: int 
 def _multipart_upload(url: str, field_name: str, filename: str, content: bytes, timeout: int = 180) -> dict[str, Any]:
     boundary = f"----R20{hashlib.sha256(os.urandom(16)).hexdigest()[:24]}"
     body = (f"--{boundary}\r\nContent-Disposition: form-data; name=\"{field_name}\"; filename=\"{filename}\"\r\nContent-Type: application/octet-stream\r\n\r\n").encode() + content + f"\r\n--{boundary}--\r\n".encode()
-    request = urllib.request.Request(url, data=body, headers={"Content-Type": f"multipart/form-data; boundary={boundary}", "User-Agent": "R20-Backup/5.4.2"}, method="POST")
+    request = urllib.request.Request(url, data=body, headers={"Content-Type": f"multipart/form-data; boundary={boundary}", "User-Agent": "R20-Backup/6.0.0-preview"}, method="POST")
     with urllib.request.urlopen(request, timeout=timeout) as response: payload = json.loads(response.read().decode("utf-8") or "{}")
     if payload.get("errno") not in (None, 0): raise RuntimeError(str(payload.get("errmsg") or payload))
     return payload

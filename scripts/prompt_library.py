@@ -386,7 +386,7 @@ def _variable_context(profile_name: str = "") -> dict[str, str]:
         instruments = ",".join(str(x.get("name") or x.get("instId") or "") for x in load_instrument_pool())
     except Exception:
         pass
-    return {"strategy_version": os.getenv("R20_VERSION", "5.4.2"), "timezone": "Asia/Shanghai", "active_instruments": instruments, "profile_name": profile_name}
+    return {"strategy_version": os.getenv("R20_VERSION", "6.0.0-preview"), "timezone": "Asia/Shanghai", "active_instruments": instruments, "profile_name": profile_name}
 
 
 def render_variables(text: str, context: dict[str, str] | None = None) -> str:

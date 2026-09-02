@@ -67,6 +67,7 @@ backups/
 *.zip
 *.pid
 *_TODO.md
+R20_V600_PREVIEW_TODO.md
 
 # OS & Editor
 .DS_Store

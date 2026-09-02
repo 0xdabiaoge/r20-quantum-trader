@@ -8,6 +8,7 @@ import tempfile
 import threading
 import time
 import urllib.request
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -17,6 +18,7 @@ from r20_backend.wechat_protocol import base_info, common_headers
 from r20_backend.net_security import validate_wechat_base_url
 
 STATE_FILE = ROOT / "data" / "wechat_session_state.json"
+BJ_TZ = timezone(timedelta(hours=8))
 _stop = threading.Event()
 _thread: threading.Thread | None = None
 _lock = threading.Lock()
@@ -68,7 +70,18 @@ def public_state() -> dict[str, Any]:
         "last_message_at": state.get("last_message_at", ""),
         "user_configured": bool(state.get("user_configured")),
         "running": bool(_thread and _thread.is_alive()),
+        "delivery_guarantee": "iLink accepts requests only; WeChat client delivery/read receipts are unavailable",
     }
+
+
+def _now_bj() -> str:
+    return datetime.now(BJ_TZ).strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _is_user_message(message: dict[str, Any]) -> bool:
+    """Never overwrite a usable context token from the bot's own echo."""
+    message_type = message.get("message_type", message.get("messageType"))
+    return message_type in (None, 1, "1")
 
 
 def _poll(token: str, base_url: str, cursor: str) -> dict[str, Any]:
@@ -76,7 +89,7 @@ def _poll(token: str, base_url: str, cursor: str) -> dict[str, Any]:
     request = urllib.request.Request(
         f"{base_url.rstrip('/')}/ilink/bot/getupdates",
         data=body,
-        headers={"User-Agent": "R20-Standalone/5.4.2", **common_headers(token)},
+        headers={"User-Agent": "R20-Standalone/6.0.0-preview", **common_headers(token)},
         method="POST",
     )
     with urllib.request.urlopen(request, timeout=25) as response:
@@ -88,7 +101,7 @@ def _notify_lifecycle(token: str, base_url: str, action: str) -> None:
     request = urllib.request.Request(
         f"{base_url.rstrip('/')}/ilink/bot/msg/notify{action}",
         data=body,
-        headers={"User-Agent": "R20-Standalone/5.4.2", **common_headers(token)},
+        headers={"User-Agent": "R20-Standalone/6.0.0-preview", **common_headers(token)},
         method="POST",
     )
     with urllib.request.urlopen(request, timeout=10) as response:
@@ -132,6 +145,8 @@ def _run() -> None:
             state["cursor"] = payload.get("get_updates_buf") or state.get("cursor", "")
             state["status"] = "listening"
             for message in payload.get("msgs") or payload.get("messages") or []:
+                if not isinstance(message, dict) or not _is_user_message(message):
+                    continue
                 context_token = message.get("context_token") or message.get("contextToken") or ""
                 user_id = message.get("from_user_id") or message.get("fromUserId") or ""
                 if context_token and user_id and str(user_id).endswith("@im.wechat"):
@@ -140,8 +155,9 @@ def _run() -> None:
                     save_secrets({"R20_WECHAT_CONTEXT_TOKEN": context_token})
                     remove_env({"R20_WECHAT_CONTEXT_TOKEN"})
                     update_env({"R20_WECHAT_USER_ID": user_id})
-                    state["last_message_at"] = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+                    state["last_message_at"] = _now_bj()
                     state["user_configured"] = True
+                    state["context_source"] = "user_message"
             _save_state(state)
         except Exception as exc:
             # Timeout during long poll is expected normal network behavior

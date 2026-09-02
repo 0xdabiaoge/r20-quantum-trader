@@ -1,9 +1,9 @@
-# R20 Quantum Trader v5.4.2 Standalone Deployment
+# R20 Quantum Trader v6.0.0 Preview Standalone Deployment
 
-v5.4.2 removes the runtime dependency on QwenPaw. The product is now composed of:
+v6.0.0-preview removes the runtime dependency on QwenPaw. The product is now composed of:
 
 - `r20_backend.app`: standalone FastAPI control plane and read-only monitoring API.
-- `r20_backend.scheduler`: standalone scheduler for the 15-minute trader, 60-second factor refresh, 10-minute news refresh, daily reports, evolution review, and nightly backup.
+- `r20_gateway.worker`: the R20-native, single-owner scheduler and durable notification-delivery worker for the 15-minute trader, 60-second factor refresh, 10-minute news refresh, daily reports, evolution review, and nightly backup.
 - `scripts/`: strategy and execution modules, run as isolated Python processes.
 - `.env`: only source for LLM, OKX, and optional notification credentials.
 
@@ -36,7 +36,7 @@ Terminal 2:
 
 ```sh
 . .venv/bin/activate
-python -m r20_backend.scheduler
+python -m r20_gateway.worker
 ```
 
 The backend exposes only read-only control-plane endpoints:
@@ -57,11 +57,11 @@ Add the `[program:r20-backend]` block from the container supervisor configuratio
 
 ## systemd
 
-Copy `deploy/r20-quantum.service` and `deploy/r20-scheduler.service` to `/etc/systemd/system/`, update `WorkingDirectory` and `EnvironmentFile`, then:
+Copy `deploy/r20-quantum.service` and `deploy/r20-gateway.service` to `/etc/systemd/system/`, update `WorkingDirectory` and `EnvironmentFile`, then:
 
 ```sh
 sudo systemctl daemon-reload
-sudo systemctl enable --now r20-quantum r20-scheduler
+sudo systemctl enable --now r20-quantum r20-gateway
 ```
 
-Before enabling `r20-scheduler`, disable the old QwenPaw cron jobs to prevent duplicate execution. Do not run both schedulers simultaneously.
+Before enabling `r20-gateway`, disable the old QwenPaw cron jobs to prevent duplicate execution. Do not run both schedulers simultaneously. The current Gateway worker owns the scheduler; the legacy `r20_backend.scheduler` and `deploy/r20-scheduler.service` are retained only for compatibility and must not run alongside it.

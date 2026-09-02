@@ -6,7 +6,7 @@ import secrets
 PROTOCOL_VERSION = "2.4.8"
 ILINK_APP_ID = "bot"
 ILINK_APP_CLIENT_VERSION = str((2 << 16) | (4 << 8) | 8)
-BOT_AGENT = "R20/5.4.2"
+BOT_AGENT = "R20/6.0.0-preview"
 
 
 def base_info() -> dict[str, str]:
