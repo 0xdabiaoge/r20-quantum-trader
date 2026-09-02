@@ -19,6 +19,7 @@ from r20_backend.net_security import validate_wechat_base_url
 STATE_FILE = ROOT / "data" / "wechat_session_state.json"
 _stop = threading.Event()
 _thread: threading.Thread | None = None
+_lock = threading.Lock()
 
 
 def _env() -> dict[str, str]:
@@ -55,10 +56,12 @@ def _save_state(state: dict[str, Any]) -> None:
         os.replace(temp_path, STATE_FILE)
     finally:
         if os.path.exists(temp_path):
-            os.unlink(temp_path)
+            try: os.unlink(temp_path)
+            except OSError: pass
 
 
 def public_state() -> dict[str, Any]:
+    ensure_watcher()
     state = _load_state()
     return {
         "status": state.get("status", "starting"),
@@ -76,7 +79,7 @@ def _poll(token: str, base_url: str, cursor: str) -> dict[str, Any]:
         headers={"User-Agent": "R20-Standalone/5.4.2", **common_headers(token)},
         method="POST",
     )
-    with urllib.request.urlopen(request, timeout=45) as response:
+    with urllib.request.urlopen(request, timeout=25) as response:
         return json.loads(response.read().decode("utf-8") or "{}")
 
 
@@ -141,45 +144,63 @@ def _run() -> None:
                     state["user_configured"] = True
             _save_state(state)
         except Exception as exc:
-            state["status"] = f"retrying: {type(exc).__name__}"
+            # Timeout during long poll is expected normal network behavior
+            if "timed out" in str(exc).lower() or "timeout" in type(exc).__name__.lower():
+                state["status"] = "listening"
+            else:
+                state["status"] = f"retrying: {type(exc).__name__}"
             _save_state(state)
-            _stop.wait(3)
+            _stop.wait(1)
 
 
 def reset_watcher_state() -> None:
-    _save_state({"cursor": "", "status": "binding_updated", "last_message_at": "", "user_configured": False})
-    stop_watcher(); start_watcher()
+    with _lock:
+        _save_state({"cursor": "", "status": "binding_updated", "last_message_at": "", "user_configured": False})
+        stop_watcher()
+        start_watcher()
 
 
 def request_session_capture() -> dict[str, Any]:
-    """Ask the single watcher to capture the next user message instead of competing getupdates calls."""
-    state = _load_state()
-    state["status"] = "waiting_for_user_message"
-    state["user_configured"] = False
-    _save_state(state)
-    return public_state()
+    with _lock:
+        state = _load_state()
+        state["cursor"] = ""
+        state["status"] = "waiting_for_user_message"
+        state["user_configured"] = False
+        _save_state(state)
+        ensure_watcher()
+        return public_state()
+
+
+def ensure_watcher() -> None:
+    with _lock:
+        global _thread
+        if _thread is None or not _thread.is_alive():
+            _stop.clear()
+            _thread = threading.Thread(target=_run, name="r20-wechat-session-watcher", daemon=True)
+            _thread.start()
 
 
 def start_watcher() -> None:
-    global _thread
-    if _thread and _thread.is_alive():
-        return
-    env = _env()
-    if env.get("R20_WECHAT_BOT_TOKEN"):
-        try:
-            _notify_lifecycle(env["R20_WECHAT_BOT_TOKEN"], env.get("R20_WECHAT_BASE_URL", "https://ilinkai.weixin.qq.com"), "start")
-        except Exception:
-            pass
-    _stop.clear()
-    _thread = threading.Thread(target=_run, name="r20-wechat-session-watcher", daemon=True)
-    _thread.start()
+    with _lock:
+        global _thread
+        env = _env()
+        if env.get("R20_WECHAT_BOT_TOKEN"):
+            try:
+                _notify_lifecycle(env["R20_WECHAT_BOT_TOKEN"], env.get("R20_WECHAT_BASE_URL", "https://ilinkai.weixin.qq.com"), "start")
+            except Exception:
+                pass
+        _stop.clear()
+        if _thread is None or not _thread.is_alive():
+            _thread = threading.Thread(target=_run, name="r20-wechat-session-watcher", daemon=True)
+            _thread.start()
 
 
 def stop_watcher() -> None:
     global _thread
     _stop.set()
-    if _thread and _thread.is_alive() and _thread is not threading.current_thread(): _thread.join(timeout=6)
-    if _thread and not _thread.is_alive(): _thread = None
+    if _thread and _thread.is_alive() and _thread is not threading.current_thread():
+        _thread.join(timeout=2)
+    _thread = None
     env = _env()
     if env.get("R20_WECHAT_BOT_TOKEN"):
         try:

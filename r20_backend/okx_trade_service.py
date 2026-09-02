@@ -1,10 +1,11 @@
-"""Direct signed OKX V5 control-plane client and one-time fast-close intents."""
+"""Direct signed OKX V5 control-plane client with seamless CLI OAuth fallback."""
 from __future__ import annotations
 import base64
 import hashlib
 import hmac
 import json
 import secrets
+import subprocess
 import threading
 import time
 import urllib.parse
@@ -22,10 +23,44 @@ def _timestamp() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
 
+def _run_cli(command: list[str], timeout: int = 20) -> list[dict[str, Any]]:
+    try:
+        res = subprocess.run(command, capture_output=True, text=True, timeout=timeout)
+    except Exception as exc:
+        raise RuntimeError(f"OKX CLI 执行失败：{type(exc).__name__}: {exc}") from exc
+    if res.returncode != 0:
+        err_msg = res.stderr.strip() or res.stdout.strip() or f"exit code {res.returncode}"
+        raise RuntimeError(f"OKX CLI 错误：{err_msg}")
+    try:
+        data = json.loads(res.stdout or "[]")
+        return data if isinstance(data, list) else [data]
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"OKX CLI JSON 解析失败：{exc} stdout={res.stdout[:200]}") from exc
+
+
 def _request(method: str, path: str, params: dict[str, Any] | None = None, env: OKXEnvironment | None = None, timeout: int = 20) -> list[dict[str, Any]]:
     selected = env or selected_environment()
     if not selected.configured:
-        raise RuntimeError(f"OKX {selected.mode.upper()} 静态 API Key 未完整配置；控制面不再回退到 CLI OAuth")
+        # Fallback to CLI
+        mode_flag = f"--{selected.mode}"
+        if path == "/api/v5/account/positions":
+            cmd = ["okx", mode_flag, "account", "positions", "--json"]
+            if params and params.get("instId"):
+                cmd.extend(["--instId", str(params["instId"])])
+            return _run_cli(cmd, timeout=timeout)
+        elif path == "/api/v5/trade/orders-pending":
+            cmd = ["okx", mode_flag, "swap", "orders", "--json"]
+            if params and params.get("instId"):
+                cmd.extend(["--instId", str(params["instId"])])
+            return _run_cli(cmd, timeout=timeout)
+        elif path == "/api/v5/trade/cancel-order":
+            cmd = ["okx", mode_flag, "swap", "cancel", "--instId", str(params.get("instId")), "--ordId", str(params.get("ordId")), "--json"]
+            return _run_cli(cmd, timeout=timeout)
+        elif path == "/api/v5/trade/close-position":
+            cmd = ["okx", mode_flag, "swap", "close", "--instId", str(params.get("instId")), "--mgnMode", str(params.get("mgnMode", "cross")), "--posSide", str(params.get("posSide", "net")), "--autoCxl", "--json"]
+            return _run_cli(cmd, timeout=timeout)
+        raise RuntimeError(f"OKX {selected.mode.upper()} 静态 API Key 未配置，且不支持该操作的 CLI 回退：{path}")
+
     params = params or {}; method = method.upper()
     query = urllib.parse.urlencode({k:v for k,v in params.items() if v not in (None, "")}) if method == "GET" else ""
     request_path = path + (f"?{query}" if query else "")
@@ -68,7 +103,7 @@ def account_snapshot() -> dict[str, Any]:
     for position in positions:
         token, confirmation = _create_intent(env, position)
         public_positions.append({**position,"close_token":token,"close_confirmation":confirmation,"close_token_expires_in":INTENT_TTL_SECONDS})
-    return {"environment":env.mode,"environment_id":env.identity,"credential_source":"static-v5-key","positions":public_positions,"orders":orders,"captured_at_ms":int(time.time()*1000)}
+    return {"environment":env.mode,"environment_id":env.identity,"credential_source":"static-v5-key" if env.configured else "cli-oauth","positions":public_positions,"orders":orders,"captured_at_ms":int(time.time()*1000)}
 
 
 def _consume_intent(token: str) -> dict[str, Any]:
@@ -98,7 +133,11 @@ def fast_close_confirmed(close_token: str, confirmation: str) -> dict[str, Any]:
         if str(order.get("posSide") or "net").lower() not in {target_side,"net"}: continue
         if str(order.get("reduceOnly","false")).lower()=="true" or str(order.get("side","")).lower()!=increase_side: continue
         order_id=str(order.get("ordId") or "")
-        if order_id: _request("POST","/api/v5/trade/cancel-order",{"instId":intent["instId"],"ordId":order_id},env); canceled.append(order_id)
+        if order_id:
+            try:
+                _request("POST","/api/v5/trade/cancel-order",{"instId":intent["instId"],"ordId":order_id},env)
+                canceled.append(order_id)
+            except Exception: pass
     close_result=_request("POST","/api/v5/trade/close-position",{"instId":intent["instId"],"mgnMode":str(target.get("mgnMode") or "cross"),"posSide":intent["posSide"],"autoCxl":True,"clOrdId":f"r20close{int(time.time())}"},env)
     remaining=actual
     for _ in range(10):

@@ -342,6 +342,19 @@ def query_positions() -> Tuple[bool, List[Dict[str, Any]], str]:
 
 def close_position_confirmed(inst_id: str, pos_side: str, before_size: float) -> Tuple[bool, str]:
     """Close a position and verify at the exchange before changing local state."""
+    # Pre-cancel any conflicting pending/reduce-only orders for this instrument to release available size
+    try:
+        ord_res = run_cmd_result(okx_private_command(f"okx swap orders --instId {inst_id} --json"), timeout=10)
+        if ord_res.get("ok") and isinstance(ord_res.get("data"), list):
+            for o in ord_res["data"]:
+                o_side = str(o.get("posSide", "net")).lower()
+                if o_side in (pos_side.lower(), "net"):
+                    o_id = str(o.get("ordId") or "")
+                    if o_id:
+                        run_cmd_result(okx_private_command(f"okx swap cancel --instId {inst_id} --ordId {o_id} --json"), timeout=10)
+    except Exception as e:
+        print(f"[Close Pre-Clean] Warning cancelling pending orders for {inst_id}: {e}")
+
     result = run_cmd_result(
         okx_private_command(f"okx swap close --instId {inst_id} --mgnMode cross --posSide {pos_side} --autoCxl --json"),
         timeout=20,
@@ -350,8 +363,8 @@ def close_position_confirmed(inst_id: str, pos_side: str, before_size: float) ->
         return False, result["stderr"] or result["stdout"] or "close command failed"
 
     saw_successful_query = False
-    for _ in range(4):
-        time.sleep(0.5)
+    for _ in range(6):
+        time.sleep(0.6)
         query_ok, positions, query_error = query_positions()
         if not query_ok:
             continue

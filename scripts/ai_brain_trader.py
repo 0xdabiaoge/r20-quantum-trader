@@ -127,7 +127,7 @@ def fetch_single_instrument_package(item: Dict[str, Any]) -> Dict[str, Any]:
     name = item["name"]
     ccy = item.get("ccy", "")
     headers = {"User-Agent": "Mozilla/5.0"}
-    
+
     pkg = {
         "instId": inst_id,
         "name": name,
@@ -186,7 +186,7 @@ def fetch_single_instrument_package(item: Dict[str, Any]) -> Dict[str, Any]:
             if d.get("code") == "0" and d.get("data"):
                 raw_candles = d["data"]
                 pkg["recent_15m"] = [[float(c[1]), float(c[2]), float(c[3]), float(c[4]), round(float(c[5]), 1)] for c in raw_candles[:12]]
-                
+
                 # Calculate 15M indicators
                 if len(raw_candles) >= 15:
                     closes = [float(c[4]) for c in reversed(raw_candles)]
@@ -250,7 +250,7 @@ def fetch_single_instrument_package(item: Dict[str, Any]) -> Dict[str, Any]:
                     closes_1h = [float(c[4]) for c in reversed(raw_1h)]
                     highs_1h = [float(c[2]) for c in reversed(raw_1h)]
                     lows_1h = [float(c[3]) for c in reversed(raw_1h)]
-                    
+
                     tr_list_1h = []
                     for i in range(1, len(closes_1h)):
                         tr = max(highs_1h[i] - lows_1h[i], abs(highs_1h[i] - closes_1h[i-1]), abs(lows_1h[i] - closes_1h[i-1]))
@@ -267,7 +267,7 @@ def fetch_single_instrument_package(item: Dict[str, Any]) -> Dict[str, Any]:
                         avg_l_1h = sum(losses_1h[-14:]) / 14
                         rs_1h = (avg_g_1h / avg_l_1h) if avg_l_1h > 0 else 100.0
                         pkg["rsi_1h"] = round(100.0 - (100.0 / (1.0 + rs_1h)), 1)
-                    
+
                     # 1H Swing Structure
                     if len(closes_1h) >= 10:
                         ma7_1h = sum(closes_1h[-7:]) / 7
@@ -437,7 +437,7 @@ def construct_full_market_prompt(packages: List[Dict[str, Any]], pos_summary: st
         k1h = p.get("recent_1h", [])
         k4h = p.get("recent_4h", [])
         quality = p.get("data_quality", "invalid")
-        
+
         sm = p.get("smart_money", {})
         adx_val = p.get("adx_1h", "--")
         calc = p.get("calculus", {})
@@ -492,7 +492,7 @@ def construct_full_market_prompt(packages: List[Dict[str, Any]], pos_summary: st
         market_lines.append(info)
 
     all_market_str = "\n".join(market_lines)
-    
+
     pos_lines = []
     if active_positions_detail and len(active_positions_detail) > 0:
         for p in active_positions_detail:
@@ -501,7 +501,7 @@ def construct_full_market_prompt(packages: List[Dict[str, Any]], pos_summary: st
             )
     else:
         pos_lines.append("当前无任何在途持仓敞口 (100% 现金空仓状态)")
-    
+
     active_pos_text = "\n".join(pos_lines)
 
     # Format Pending Limit Orders
@@ -511,11 +511,21 @@ def construct_full_market_prompt(packages: List[Dict[str, Any]], pos_summary: st
             c_ts = int(o.get("cTime", 0) or 0) / 1000.0
             c_time_str = datetime.datetime.fromtimestamp(c_ts, tz=tz_bj).strftime("%Y-%m-%d %H:%M:%S") if c_ts > 0 else "--"
             inst_id = o.get("instId", "")
-            side_str = "限价买多" if o.get("side") == "buy" and o.get("posSide") == "long" else ("限价卖空" if o.get("side") == "sell" and o.get("posSide") == "short" else f"{o.get('side')} {o.get('posSide')}")
-            px_val = o.get("px", "--")
-            sz_val = o.get("sz", "--")
-            ord_id = o.get("ordId", "")
-            
+            side_raw = str(o.get("side", "")).lower()
+            pos_side = str(o.get("posSide", "net")).lower()
+            reduce_only = str(o.get("reduceOnly", "false")).lower() == "true"
+            ord_type = str(o.get("ordType", "limit")).lower()
+
+            if reduce_only:
+                side_str = "市价平多" if (side_raw == "sell" and ord_type == "market") else ("限价平多" if side_raw == "sell" else ("市价平空" if ord_type == "market" else "限价平空"))
+            else:
+                side_str = "限价买多" if (side_raw == "buy" and ord_type != "market") else ("市价买多" if side_raw == "buy" else ("限价卖空" if ord_type != "market" else "市价卖空"))
+
+            raw_px = str(o.get("px") or "").strip()
+            px_val = raw_px if raw_px and raw_px != "0" else ("市价" if ord_type == "market" else "--")
+            sz_val = str(o.get("sz", "--"))
+            ord_id = str(o.get("ordId", ""))
+
             attach_list = o.get("attachAlgoOrds", [])
             tp_sl_info = ""
             if attach_list and len(attach_list) > 0:
@@ -523,13 +533,13 @@ def construct_full_market_prompt(packages: List[Dict[str, Any]], pos_summary: st
                 tp_p = att.get("tpTriggerPx", "--")
                 sl_p = att.get("slTriggerPx", "--")
                 tp_sl_info = f" | 附带云端止盈: {tp_p} / 止损: {sl_p}"
-            
+
             pending_lines.append(
                 f"- [挂单ID: {ord_id}] {inst_id} | {side_str} {sz_val}张 @ {px_val} | 挂单时间: {c_time_str}{tp_sl_info}"
             )
     else:
         pending_lines.append("当前无任何在途未成交限价挂单 (挂单池为空)")
-    
+
     pending_orders_text = "\n".join(pending_lines)
 
     memory_lessons = ""
@@ -749,7 +759,7 @@ def execute_batch_ai_brain_cycle(pos_summary: str = "当前总持仓 0/6", activ
         print(f"[AI Brain] Calculus snapshot warning: {exc}")
 
     prompt = construct_full_market_prompt(packages, pos_summary, active_positions_detail, pending_orders_detail=pending_orders_list, current_time_str=time_str, usdt_available=usdt_available)
-    
+
     profile = active_profile()
     effective_system_prompt = apply_module_layout(
         get_effective_system_prompt(), profile, "trading_system", f"{profile.get('name', '稳健')}交易系统提示词模板"
@@ -794,11 +804,11 @@ def execute_batch_ai_brain_cycle(pos_summary: str = "当前总持仓 0/6", activ
         with urllib.request.urlopen(req, timeout=30) as resp:
             res = json.loads(resp.read().decode("utf-8"))
             content = res["choices"][0]["message"]["content"].strip()
-            
+
             if content.startswith("```json"): content = content[7:]
             if content.startswith("```"): content = content[3:]
             if content.endswith("```"): content = content[:-3]
-            
+
             brain_output = json.loads(content.strip())
             if not isinstance(brain_output, dict):
                 raise ValueError("LLM response root must be an object")
@@ -970,7 +980,7 @@ def execute_batch_ai_brain_cycle(pos_summary: str = "当前总持仓 0/6", activ
 
             history_list.insert(0, history_record)
             history_list = history_list[:50] # Keep recent 50 rounds
-            
+
             atomic_write_json(AI_DECISION_HISTORY_FILE, history_list)
 
             latency = round(time.time() - t0, 2)

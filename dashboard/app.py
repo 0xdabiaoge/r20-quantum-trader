@@ -196,10 +196,38 @@ def update_cache_cycle():
             inst_id = o.get("instId", "")
             inst_clean = inst_id.replace("-USDT-SWAP", "").replace("-SWAP", "")
             side_raw = str(o.get("side", "")).lower()
-            pos_side = str(o.get("posSide", "")).lower()
-            is_long = (pos_side == "long" or side_raw == "buy")
-            side_label = "限价买多" if is_long else "限价卖空"
-            side_color = "emerald" if is_long else "rose"
+            pos_side = str(o.get("posSide", "net")).lower()
+            reduce_only = str(o.get("reduceOnly", "false")).lower() == "true"
+            ord_type = str(o.get("ordType", "limit")).lower()
+            raw_px = str(o.get("px") or "").strip()
+
+            if reduce_only:
+                if side_raw == "sell":
+                    side_label = "市价平多" if ord_type == "market" else "限价平多"
+                    is_long = False
+                    side_color = "rose"
+                else:
+                    side_label = "市价平空" if ord_type == "market" else "限价平空"
+                    is_long = True
+                    side_color = "emerald"
+            else:
+                if side_raw == "buy":
+                    side_label = "市价买多" if ord_type == "market" else "限价买多"
+                    is_long = True
+                    side_color = "emerald"
+                else:
+                    side_label = "市价卖空" if ord_type == "market" else "限价卖空"
+                    is_long = False
+                    side_color = "rose"
+
+            if not raw_px or raw_px == "0":
+                px_display = "市价" if ord_type == "market" else "--"
+            else:
+                try:
+                    px_float = float(raw_px)
+                    px_display = f"{px_float:g}"
+                except ValueError:
+                    px_display = raw_px
             
             attach_list = o.get("attachAlgoOrds", [])
             tp_px = "--"
@@ -218,8 +246,9 @@ def update_cache_cycle():
                 "posSide": pos_side,
                 "is_long": is_long,
                 "side_color": side_color,
+                "ord_type": ord_type,
                 "lever": f"{o.get('lever', '3')}x",
-                "px": str(o.get("px", "--")),
+                "px": px_display,
                 "sz": str(o.get("sz", "--")),
                 "time": c_time_str,
                 "state": str(o.get("state", "live")),
