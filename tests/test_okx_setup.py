@@ -12,6 +12,8 @@ from r20_backend.okx_setup import (
     install_okx_cli,
     check_node_npm,
     LATEST_VERSION,
+    start_oauth_device_login,
+    oauth_status,
 )
 
 
@@ -78,6 +80,42 @@ class OkxInstallTests(unittest.TestCase):
         self.assertFalse(status["ready"])
         self.assertTrue(any("上游" in item for item in status["issues"]))
         self.assertTrue(any("无需重新安装" in item for item in status["steps"]))
+
+    def test_oauth_device_login_returns_public_code_fields(self):
+        responses=[
+            {"ok":True,"returncode":0,"stdout":'{"profiles":{}}',"stderr":""},
+            {"ok":True,"returncode":0,"stdout":'{"status":"not_logged_in","site":"global"}',"stderr":""},
+            {"ok":True,"returncode":0,"stdout":'{"verificationUri":"https://www.okx.com/device","userCode":"ABCD-EFGH","expiresIn":600}',"stderr":""},
+        ]
+        with patch("r20_backend.okx_setup.shutil.which",return_value="/usr/local/bin/okx"),patch("r20_backend.okx_setup._run",side_effect=responses):
+            result=start_oauth_device_login("global")
+        self.assertEqual(result["status"],"pending")
+        self.assertEqual(result["user_code"],"ABCD-EFGH")
+        self.assertNotIn("access_token",result)
+
+    def test_oauth_login_does_not_restart_when_already_logged_in(self):
+        responses=[
+            {"ok":True,"returncode":0,"stdout":'{"profiles":{}}',"stderr":""},
+            {"ok":True,"returncode":0,"stdout":'{"status":"logged_in","site":"global","scopes":["demo:read","demo:trade"]}',"stderr":""},
+        ]
+        with patch("r20_backend.okx_setup.shutil.which",return_value="/usr/local/bin/okx"),patch("r20_backend.okx_setup._run",side_effect=responses) as run:
+            result=start_oauth_device_login("global")
+        self.assertEqual(result["status"],"already_logged_in")
+        self.assertEqual(run.call_count,2)
+
+    def test_oauth_login_rejects_api_key_precedence(self):
+        response={"ok":True,"returncode":0,"stdout":'{"profiles":{"demo":{"api_key":"configured"}}}',"stderr":""}
+        with patch("r20_backend.okx_setup.shutil.which",return_value="/usr/local/bin/okx"),patch("r20_backend.okx_setup._run",return_value=response):
+            with self.assertRaisesRegex(RuntimeError,"API Key Profile"):
+                start_oauth_device_login("global")
+
+    def test_oauth_status_only_exposes_safe_identity_fields(self):
+        response={"ok":True,"returncode":0,"stdout":'{"status":"logged_in","site":"global","scopes":["demo:read"],"accessToken":"secret"}',"stderr":""}
+        with patch("r20_backend.okx_setup.shutil.which",return_value="/usr/local/bin/okx"),patch("r20_backend.okx_setup._run",return_value=response):
+            result=oauth_status()
+        self.assertEqual(result["status"],"logged_in")
+        self.assertNotIn("accessToken",result)
+        self.assertEqual(result["account_label"],"")
 
     def test_install_fails_when_npm_returns_error(self):
         with patch("r20_backend.okx_setup.check_node_npm", return_value={

@@ -118,6 +118,69 @@ def _json_output(result: dict[str, Any]) -> Any:
         return None
 
 
+def _oauth_identity(payload: Any) -> str:
+    """Return a non-sensitive account label only when the auth binary exposes one."""
+    if not isinstance(payload, dict):
+        return ""
+    for key in ("account", "accountName", "nickname", "emailMasked", "uidMasked", "uid"):
+        value = str(payload.get(key) or "").strip()
+        if value:
+            return value
+    return ""
+
+
+def _is_upstream_unavailable(detail: str) -> bool:
+    text = detail.lower()
+    return any(token in text for token in ("http 503", "50013", "systems are busy", "service temporarily unavailable"))
+
+
+def start_oauth_device_login(site: str, *, env: Mapping[str, str] | None = None) -> dict[str, Any]:
+    """Start OKX OAuth RFC8628 device flow and return the public verification fields."""
+    if site not in {"global", "eea", "us", "tr"}:
+        raise ValueError("不支持的 OKX 站点")
+    binary = shutil.which("okx", path=(env or os.environ).get("PATH"))
+    if not binary:
+        raise RuntimeError("OKX CLI 未安装或服务 PATH 中不可见")
+    config = _json_output(_run([binary, "config", "show", "--json"], env=env))
+    profiles = _api_key_profiles(config)
+    if profiles:
+        raise RuntimeError(f"已配置 API Key Profile（{', '.join(profiles)}）；CLI 会优先使用 API Key，请先删除或切换该 Profile 后再授权 OAuth")
+    current = _json_output(_run([binary, "auth", "status", "--json"], env=env))
+    if isinstance(current, dict) and current.get("status") == "logged_in":
+        return {
+            "status": "already_logged_in",
+            "site": str(current.get("site") or site),
+            "scopes": [str(item) for item in current.get("scopes", []) if item],
+            "account_label": _oauth_identity(current),
+        }
+    result = _run([binary, "auth", "login", "--manual", "--site", site], timeout=30, env=env)
+    payload = _json_output(result)
+    if not result["ok"] or not isinstance(payload, dict):
+        raise RuntimeError(result["stderr"] or result["stdout"] or "无法启动 OKX OAuth 授权")
+    verification_uri = str(payload.get("verificationUri") or payload.get("verification_uri") or "")
+    user_code = str(payload.get("userCode") or payload.get("user_code") or "")
+    expires_in = int(payload.get("expiresIn") or payload.get("expires_in") or 0)
+    if not verification_uri or not user_code or expires_in <= 0:
+        raise RuntimeError("OKX OAuth 未返回有效授权链接或授权码")
+    return {"status": "pending", "site": site, "verification_uri": verification_uri, "user_code": user_code, "expires_in": expires_in}
+
+
+def oauth_status(*, env: Mapping[str, str] | None = None) -> dict[str, Any]:
+    binary = shutil.which("okx", path=(env or os.environ).get("PATH"))
+    if not binary:
+        return {"status": "unavailable", "site": "", "scopes": [], "account_label": ""}
+    result = _run([binary, "auth", "status", "--json"], env=env)
+    payload = _json_output(result)
+    if not isinstance(payload, dict):
+        return {"status": "unavailable", "site": "", "scopes": [], "account_label": "", "detail": result["stderr"] or "OAuth 状态不可读"}
+    return {
+        "status": str(payload.get("status") or "unknown"),
+        "site": str(payload.get("site") or ""),
+        "scopes": [str(item) for item in payload.get("scopes", []) if item],
+        "account_label": _oauth_identity(payload),
+    }
+
+
 def _version_tuple(text: str) -> tuple[int, int, int]:
     match = re.search(r"(\d+)\.(\d+)\.(\d+)", text or "")
     return tuple(int(value) for value in match.groups()) if match else (0, 0, 0)
@@ -139,7 +202,7 @@ def diagnose_okx_runtime(selected_mode: str, static_configured: bool, *, env: Ma
     status: dict[str, Any] = {
         "selected_mode": selected_mode,
         "cli": {"installed": bool(binary), "path": binary or "", "version": "", "supported": False},
-        "oauth": {"status": "unavailable", "site": "", "scopes": [], "ready_for_selected_mode": False},
+        "oauth": {"status": "unavailable", "site": "", "scopes": [], "ready_for_selected_mode": False, "account_label": ""},
         "api_key_profiles": [],
         "static_credentials_configured": bool(static_configured),
         "credential_source": "static-v5-key" if static_configured else "none",
@@ -175,6 +238,7 @@ def diagnose_okx_runtime(selected_mode: str, static_configured: bool, *, env: Ma
             "site": str(auth_payload.get("site") or ""),
             "scopes": scopes,
             "ready_for_selected_mode": oauth_ready,
+            "account_label": _oauth_identity(auth_payload),
         }
     else:
         oauth_ready = False
@@ -204,7 +268,9 @@ def diagnose_okx_runtime(selected_mode: str, static_configured: bool, *, env: Ma
             "detail": "OKX 私有只读探针通过" if probe["ok"] and isinstance(payload, list) else (probe["stderr"] or probe["stdout"] or "invalid response")[:300],
         }
 
-    status["ready"] = bool(status["cli"]["supported"] and status["read_probe"]["ok"] and status["credential_source"] != "none")
+    status["degraded"] = bool(oauth_ready and not status["read_probe"]["ok"] and _is_upstream_unavailable(status["read_probe"]["detail"]))
+    status["auth_ready"] = bool(status["cli"]["supported"] and status["credential_source"] != "none")
+    status["ready"] = bool(status["auth_ready"] and status["read_probe"]["ok"])
     if not static_configured and not oauth_ready and not status["api_key_profiles"]:
         status["issues"].append(f"未找到可用于 {selected_mode.upper()} 的 OKX 凭证或 OAuth 授权")
         status["steps"].extend([
@@ -214,7 +280,7 @@ def diagnose_okx_runtime(selected_mode: str, static_configured: bool, *, env: Ma
         ])
     elif not status["read_probe"]["ok"]:
         detail = status["read_probe"]["detail"]
-        if any(token in detail for token in ("HTTP 503", "50013", "Systems are busy", "Service temporarily unavailable")):
+        if _is_upstream_unavailable(detail):
             status["issues"].append("OKX 上游当前繁忙或暂时不可用；系统已 Fail-Closed，不会在状态不明时下单")
             status["steps"].append("等待 1-2 分钟后点击“重新诊断”；无需重新安装 CLI 或重新授权 OAuth")
         else:

@@ -78,6 +78,21 @@ class AdminApiTests(unittest.TestCase):
         self.assertEqual(response.json()["editable"]["initial_capital"],4061.04)
         self.assertEqual(response.json()["editable"]["initial_capital_reset_time"],"2026-08-31 06:57:38")
 
+    def test_okx_oauth_device_flow_endpoints_are_session_protected(self):
+        self.assertEqual(self.client.post("/api/v1/admin/okx/oauth/start",json={"site":"global"}).status_code,401)
+        root=self.login("admin","InitialAdmin123456")
+        from unittest.mock import patch
+        pending={"status":"pending","site":"global","verification_uri":"https://www.okx.com/device","user_code":"ABCD-EFGH","expires_in":600}
+        with patch.object(app_module,"start_oauth_device_login",return_value=pending):
+            response=self.client.post("/api/v1/admin/okx/oauth/start",headers=root,json={"site":"global"})
+        self.assertEqual(response.status_code,200,response.text)
+        self.assertEqual(response.json()["user_code"],"ABCD-EFGH")
+        safe={"status":"logged_in","site":"global","scopes":["demo:read","demo:trade"],"account_label":""}
+        with patch.object(app_module,"oauth_status",return_value=safe):
+            status=self.client.get("/api/v1/admin/okx/oauth/status",headers=root)
+        self.assertEqual(status.status_code,200,status.text)
+        self.assertNotIn("token",status.text.lower())
+
     def test_okx_cli_check_and_install_require_valid_session_and_confirmation(self):
         self.assertEqual(self.client.get("/api/v1/admin/okx/cli-check").status_code, 401)
         self.assertEqual(self.client.post("/api/v1/admin/okx/install-cli", json={"confirmation":"INSTALL OKX CLI"}).status_code, 401)

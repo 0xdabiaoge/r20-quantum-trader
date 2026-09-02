@@ -25,7 +25,7 @@ from pydantic import BaseModel, Field
 from r20_backend.config import refresh_settings, settings
 from r20_backend.okx_client import OKXClient
 from r20_backend.okx_trade_service import account_snapshot as okx_account_snapshot, fast_close_confirmed
-from r20_backend.okx_setup import diagnose_okx_runtime, install_okx_cli, check_node_npm
+from r20_backend.okx_setup import diagnose_okx_runtime, install_okx_cli, check_node_npm, start_oauth_device_login, oauth_status
 from r20_backend.account_baseline import load_account_baseline, update_initial_capital
 from r20_backend.backup_secrets import credential_status as backup_credential_status, save_credentials as save_backup_credentials
 from r20_backend.prompt_views import EVOLUTION_USER_TEMPLATE, TRADING_USER_TEMPLATE, rendered_snapshots
@@ -111,6 +111,10 @@ class AdminUnlockRequest(BaseModel):
 
 class OkxCliInstallRequest(BaseModel):
     confirmation: str = Field(min_length=8, max_length=80)
+
+
+class OkxOAuthStartRequest(BaseModel):
+    site: str = Field(pattern=r"^(global|eea|us|tr)$")
 
 
 class AdminConfigUpdate(BaseModel):
@@ -622,11 +626,28 @@ def admin_update_account_baseline(payload: InitialCapitalUpdate, x_r20_session: 
 
 
 @app.get("/api/v1/admin/okx/runtime")
-def admin_okx_runtime(x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
+def admin_okx_runtime(x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
     refresh_settings()
-    require_admin_header(x_r20_admin_token)
+    require_admin_header(x_r20_session=x_r20_session)
     configured = settings.okx_demo_configured if settings.okx_environment == "demo" else settings.okx_live_configured
     return diagnose_okx_runtime(settings.okx_environment, configured)
+
+
+@app.post("/api/v1/admin/okx/oauth/start")
+def admin_okx_oauth_start(payload: OkxOAuthStartRequest, x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    actor = require_superadmin(x_r20_session)
+    try:
+        result = start_oauth_device_login(payload.site)
+    except (ValueError, RuntimeError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    audit_record("okx.oauth.start", "success", {"actor": actor["username"], "site": payload.site, "status": result.get("status")})
+    return result
+
+
+@app.get("/api/v1/admin/okx/oauth/status")
+def admin_okx_oauth_status(x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    require_admin_header(x_r20_session=x_r20_session)
+    return oauth_status()
 
 
 @app.get("/api/v1/admin/okx/cli-check")
