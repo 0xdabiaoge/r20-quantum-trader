@@ -90,6 +90,9 @@ def compute_instrument_factors(item: Dict[str, Any], smart_money_pool: Dict[str,
             "funding_rate_pct": 0.0,
             "oi_usd": "--",
             "long_short_ratio": "--",
+            "avg_long_entry": "--",
+            "avg_short_entry": "--",
+            "top_win_rate": "--",
             "signal": "NEUTRAL"
         },
 
@@ -351,12 +354,28 @@ def compute_instrument_factors(item: Dict[str, Any], smart_money_pool: Dict[str,
         sm = smart_money_pool[ccy]
         ls = sm.get("longShortRatio", {})
         notional = sm.get("notional", {})
+        win = sm.get("winRate", {})
         w_long = round(safe_float(ls.get("weightedLongRatio", 0.5)) * 100, 1)
         net_usdt = safe_float(notional.get("netNotionalUsdt", 0))
         net_str = f"{round(net_usdt / 1e4, 1)}万 U" if abs(net_usdt) >= 1e4 else f"{round(net_usdt, 0)} U"
         
         factors["smart_money_derivatives"]["weighted_long_pct"] = w_long
         factors["smart_money_derivatives"]["smart_money_flow_usd"] = net_str
+        long_avg = safe_float(notional.get("smartMoneyLongAvgEntry", 0))
+        short_avg = safe_float(notional.get("smartMoneyShortAvgEntry", 0))
+        if long_avg > 0:
+            factors["smart_money_derivatives"]["avg_long_entry"] = f"{long_avg:.6g}"
+        if short_avg > 0:
+            factors["smart_money_derivatives"]["avg_short_entry"] = f"{short_avg:.6g}"
+        long_win = safe_float(win.get("avgLongWinRate", 0))
+        short_win = safe_float(win.get("avgShortWinRate", 0))
+        if long_win > 0 or short_win > 0:
+            parts = []
+            if long_win > 0:
+                parts.append(f"多胜率{round(long_win * 100, 1)}%")
+            if short_win > 0:
+                parts.append(f"空胜率{round(short_win * 100, 1)}%")
+            factors["smart_money_derivatives"]["top_win_rate"] = " / ".join(parts)
         if w_long >= 65.0 and net_usdt > 0:
             factors["smart_money_derivatives"]["signal"] = "BULL_ACCUMULATION"
         elif w_long <= 35.0 and net_usdt < 0:
