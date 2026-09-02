@@ -1072,7 +1072,11 @@ async def refresh_cache_if_needed(ttl_seconds: float = 3.0):
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    return templates.TemplateResponse(request=request, name="index.html")
+    return templates.TemplateResponse(
+        request=request,
+        name="index.html",
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+    )
 
 @app.get("/api/all")
 async def get_all_data():

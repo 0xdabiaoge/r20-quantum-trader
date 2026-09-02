@@ -411,7 +411,7 @@ def update_status() -> dict[str, Any]:
 
 @app.get("/admin", include_in_schema=False)
 def admin_page() -> FileResponse:
-    return FileResponse(ADMIN_HTML)
+    return FileResponse(ADMIN_HTML, headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
 
 
 @app.get("/api/v1/admin/auth/status")
