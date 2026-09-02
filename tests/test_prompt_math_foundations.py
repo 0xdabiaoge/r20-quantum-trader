@@ -58,6 +58,14 @@ class PromptMathFoundationsTests(unittest.TestCase):
             self.assertIn(required, prompt)
         self.assertIn("执行层拥有最终否决权", prompt)
 
+    def test_system_prompt_does_not_turn_soft_disagreement_into_permanent_wait(self):
+        prompt = ai_brain_trader.SYSTEM_PROMPT
+        self.assertIn("不得被解释成“只有完美共振才允许交易”", prompt)
+        self.assertIn("P2/P3 的轻微分歧应通过减小保证金处理", prompt)
+        self.assertIn("减速”不是永久禁令", prompt)
+        self.assertIn("存在至少一个合法顺势候选时", prompt)
+        self.assertIn("目标 R:R ≥ 2.2", prompt)
+
     def test_user_prompt_injects_real_1h_math_values(self):
         missing = "/tmp/r20-test-file-does-not-exist"
         with patch.object(ai_brain_trader, "NEWS_SENTIMENT_FILE", missing), patch.object(ai_brain_trader, "AI_MEMORY_MD_FILE", missing), patch.object(ai_brain_trader, "AI_MEMORY_FILE", missing):

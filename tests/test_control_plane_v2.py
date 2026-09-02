@@ -107,6 +107,23 @@ class PromptModuleTests(unittest.TestCase):
         self.assertLess(compiled.index("当前系统总持仓 1/6"),compiled.index("BTC (BTC-USDT-SWAP)"))
         self.assertLess(compiled.index("BTC (BTC-USDT-SWAP)"),compiled.index("完整严格 JSON Schema"))
 
+    def test_safety_trading_rules_are_live_locked_not_stale_profile_text(self):
+        base="【三重滤网裁决协议】\n新规则：ADX 18~22 小仓参与\n\n【开仓与价格几何】\n目标 R:R ≥ 2.2"
+        layout=[
+            {"id":"a","title":"三重滤网裁决协议","content":"旧规则：ADX < 20 必须 WAIT","enabled":True,"locked":False,"source":"base"},
+            {"id":"b","title":"开仓与价格几何","content":"旧规则：目标 R:R ≥ 2.5","enabled":True,"locked":False,"source":"base"},
+        ]
+        compiled=prompts.apply_module_layout(base,{"pipelines":{"trading_system":layout}},"trading_system","x")
+        self.assertIn("ADX 18~22 小仓参与",compiled)
+        self.assertIn("目标 R:R ≥ 2.2",compiled)
+        self.assertNotIn("ADX < 20 必须 WAIT",compiled)
+
+    def test_stable_preset_balances_participation_without_weakening_p0(self):
+        preset=prompts.PRESETS["stable"]
+        self.assertIn("不得把“稳健”解释为长期空仓",preset["trading_system"])
+        self.assertIn("P0 硬约束保持不变",preset["trading_system"])
+        self.assertIn("普通回抽优先作为限价入场定位",preset["trading_user"])
+
     def test_trading_decision_contract_cannot_be_replaced_by_editor_summary(self):
         base="【推演与决策任务】:\n必须输出严格 JSON，包含 position_management 与 decisions"
         layout=[{"id":"d","title":"推演与决策任务","content":"可编辑规则模块摘要","enabled":True,"locked":False,"source":"base"}]

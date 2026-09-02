@@ -24,8 +24,8 @@ _SECTION_RE = re.compile(r"(?m)(?=^={0,30}\s*【[^\n】]+】[^\n]*$)")
 PRESETS: dict[str, dict[str, Any]] = {
     "stable": {
         "id": "stable", "name": "稳健", "description": "重视信号一致性、回撤控制与等待质量，当前默认风格。", "editable": False,
-        "trading_system": """【交易风格：稳健】\n仅在 P0 硬约束允许的候选中偏好高质量证据共振。要求 4H 方向、1H 结构、1H 微积分动力学、定积分能量、概率风险与量能资金形成可解释链条；证据冲突或缺失时 WAIT。保证金优先位于允许区间中低部，不为提高频率降低置信度。""",
-        "trading_user": """【稳健裁决偏好】\n优先确认趋势延续，不猜测拐点。非 WAIT 决策必须引用具体 1H v/a/j/I、E/A、延续或击穿估计概率及 VaR/CVaR；新闻未知不是市场平稳证据，弱共振或肥尾风险扩张时 WAIT。""",
+        "trading_system": """【交易风格：稳健均衡】\n所有 P0 硬约束保持不变，但不得把“稳健”解释为长期空仓。对 4H/1H 同向、ADX≥18、价格几何与真实 R:R 合法的候选进行相对排序；P2/P3 轻微分歧以降低保证金处理。若存在可审计的最佳顺势候选，应果断给出小仓决策。""",
+        "trading_user": """【稳健均衡裁决偏好】\n优先顺应 4H/1H 同向趋势，并引用具体 1H v/a/j/I、E/A、延续或击穿概率及 VaR/CVaR。减速只有在速度趋零、结构转 CHOP 或尾部风险极端时才否决；普通回抽优先作为限价入场定位。""",
         "evolution_system": """【稳健复盘风格】\n优先识别回撤、过度交易、追价和低质量入场，但只使用真实可观测证据。小样本、数理快照缺失或因果不可辨时 NO_CHANGE；任何记忆都不得成为绕过硬风控的新阈值。""",
         "evolution_user": """【稳健进化任务】\n评估信号一致性、风险预算、手续费、入场与退出质量；只有多个独立样本支持时才沉淀新经验，否则保留旧记忆并提出需要补充的证据。""",
     },
@@ -104,6 +104,10 @@ def base_template_modules(text: str, pipeline: str) -> list[dict[str, Any]]:
     }.get(pipeline, ())
     for module in modules:
         module["locked"] = any(token in module["title"] for token in locked_patterns)
+        # Safety-critical base rules must always come from the running code so an
+        # older editable profile cannot freeze obsolete thresholds indefinitely.
+        if pipeline == "trading_system" and any(token in module["title"] for token in ("三重滤网裁决协议", "开仓与价格几何")):
+            module["locked"] = True
     return modules
 
 

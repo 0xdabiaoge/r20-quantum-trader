@@ -386,6 +386,7 @@ P1 核心方向证据：4H 宏观结构与 1H 三大数理基石。
 P2 质量确认：1H ADX、量能/OI、聪明钱与衍生品结构。
 P3 执行定位：15M K线、盘口与 Maker 挂单位置。P3 只能优化入场，不能单独改变 P1 方向。
 证据缺失、失效或相互冲突且无法解释时，开仓必须 WAIT；持仓默认 HOLD；挂单默认 KEEP。
+P0 用于阻止非法方向、坏数据和不可保护订单，不得被解释成“只有完美共振才允许交易”。市场有效且 4H/1H 同向时，P2/P3 的轻微分歧应通过减小保证金处理，而不是机械 WAIT。
 
 【三大底层数理基石：必须保留并使用真实数值】
 1. 因果微积分动力学：只使用已闭合历史 K 线，按时间因果顺序解释对数价格速度 v、一阶变化的加速度 a、加速度变化 jerk j、指数衰减累计冲量 I。
@@ -401,13 +402,16 @@ P3 执行定位：15M K线、盘口与 Maker 挂单位置。P3 只能优化入�
 
 【三重滤网裁决协议】
 1. 4H 宏观方向：4H_MACRO_BEAR 否决新做多，4H_MACRO_BULL 否决新做空；区间或不可靠状态不得强行推断趋势。
-2. 1H 核心中枢：综合结构、ADX 与三大数理基石。新开仓若 ADX < 20，必须 WAIT；持仓不得仅因 ADX 降低而平仓。顶部失速禁止追多，底部减速禁止追空；高 jerk/肥尾冲击优先降风险。
-3. 15M 执行过滤：只用于回踩、超买超卖、成交量和盘口位置；单根 15M K线、局部背离或无量突破不得单独触发开仓、平仓或反转。
+2. 1H 核心中枢：综合结构、ADX 与三大数理基石。ADX < 18 必须 WAIT；ADX 18~22 仅允许 4H/1H 同向且降低保证金；ADX ≥ 22 为正常趋势候选。持仓不得仅因 ADX 降低而平仓。
+   - “减速”不是永久禁令：仅当方向速度已经接近 0、1H 结构转为 CHOP、或 jerk/肥尾异常时禁止追单；若 4H/1H 仍同向、速度和能量未翻转，可等待 15M 回抽后以小仓顺势参与。
+   - 高 jerk/肥尾是仓位折减因子；只有与结构破坏、无效数据或极端尾部风险同时出现时才强制 WAIT。
+3. 15M 执行过滤：用于回踩、超买超卖、成交量和盘口位置；单根 15M K线不得单独触发反转，但可在 4H/1H 已同向时确认顺势回抽入场。
 
 【开仓与价格几何】
-- 非 WAIT 决策必须形成完整证据链：4H方向 → 1H结构 → 1H v/a/j/I → 定积分能量与路径偏离 → 延续/击穿概率及 VaR/CVaR → 量能/OI/聪明钱 → 15M入场位置。
+- 非 WAIT 决策必须形成可审计证据链：4H方向 → 1H结构/动力学 → 概率风险 → 15M入场位置。量能/OI/聪明钱是重要确认项，但数据中性或轻微分歧时允许减仓参与，不要求所有指标完美同向。
 - BUY_LONG 必须满足 stop_loss_price < entry_price < take_profit_price；SELL_SHORT 必须满足 take_profit_price < entry_price < stop_loss_price。
-- 目标 R:R ≥ 2.5；执行层绝对拒绝 R:R < 2.0 的报价。不得通过虚构过近止损抬高 R:R。止损通常基于 1.5~2.0x 1H ATR。
+- 目标 R:R ≥ 2.2；执行层绝对拒绝 R:R < 2.0 的报价。不得通过虚构过近止损抬高 R:R。止损通常基于 1.5~2.0x 1H ATR。
+- 处于空仓且存在至少一个合法顺势候选时，必须比较候选并选择最优项；只有全部候选都触发明确硬否决或优势不足时才全体 WAIT，且理由必须指出具体否决门禁。
 - 单笔保证金不得超过可用余额 20%，建议 5%~20%；杠杆 2x~5x。数据不足或余额未知而无法验证风险时 WAIT。
 
 【顺势浮盈金字塔加仓：模型只能申请，执行层拥有最终否决权】
@@ -781,7 +785,7 @@ def execute_batch_ai_brain_cycle(pos_summary: str = "当前总持仓 0/6", activ
             {"role": "user", "content": prompt}
         ],
         "reasoning_effort": os.environ.get("LLM_REASONING_EFFORT", "high"),
-        "temperature": 0.15,
+        "temperature": 0.2,
         "response_format": {"type": "json_object"}
     }
 
@@ -801,7 +805,7 @@ def execute_batch_ai_brain_cycle(pos_summary: str = "当前总持仓 0/6", activ
     try:
         t0 = time.time()
         print("[AI Brain Batch] 🚀 正在发起单次全市场大模型宏观决策推演 (Gemini 3.7)...")
-        with urllib.request.urlopen(req, timeout=30) as resp:
+        with urllib.request.urlopen(req, timeout=50) as resp:
             res = json.loads(resp.read().decode("utf-8"))
             content = res["choices"][0]["message"]["content"].strip()
 
