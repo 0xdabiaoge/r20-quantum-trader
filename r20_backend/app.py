@@ -1125,6 +1125,38 @@ def send_notification_test(payload: NotificationTestRequest, x_r20_session: str 
     return {"channel": payload.channel, "result": result, "sent": True, "meaning": "远端接口已受理不等于用户客户端已读"}
 
 
+@app.post("/api/v1/admin/notifications/qq/bind/start")
+def qq_bind_start(x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    refresh_settings(); require_superadmin(x_r20_session)
+    from r20_backend.qq_bind import create_bind_task
+    try:
+        task = create_bind_task()
+    except Exception as exc:
+        audit_record("qq.bind.start", "failed", {"error": str(exc)[:200]})
+        raise HTTPException(status_code=502, detail=f"QQ 绑定任务创建失败：{exc}")
+    qr_data_uri = ""
+    try:
+        import segno
+        qr_data_uri = segno.make(task["connect_url"], error="M").png_data_uri(scale=6, border=2)
+    except Exception:
+        pass
+    audit_record("qq.bind.start", "success", {"task_id": task["task_id"]})
+    return {"task_id": task["task_id"], "qr_data_uri": qr_data_uri, "connect_url": task["connect_url"], "expires_in": task["expires_in"]}
+
+
+@app.get("/api/v1/admin/notifications/qq/bind/{task_id}")
+def qq_bind_poll(task_id: str, x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    refresh_settings(); require_superadmin(x_r20_session)
+    from r20_backend.qq_bind import poll_bind_task
+    try:
+        result = poll_bind_task(task_id)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=410, detail=str(exc))
+    if result["status"] == "bound":
+        audit_record("qq.bind.complete", "success", {"app_id": result["app_id"], "openid_present": bool(result["openid"])})
+    return result
+
+
 @app.get("/api/v1/admin/notifications/schedule")
 def notification_schedule(x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
     refresh_settings()
