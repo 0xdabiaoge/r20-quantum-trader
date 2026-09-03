@@ -272,6 +272,7 @@ def call_llm_evolution_review(closed_trades: List[Dict[str, Any]], existing_memo
         t0 = time.time()
         log_msg(f"🚀 正在调用 {model_name} ({api_format}) 进行 AI 大脑深度认知复盘与策略参数优化...")
         raw_res = None
+        content = ""
         if execute_llm_request:
             content, _, usage_dict, _ = execute_llm_request(
                 messages=[
@@ -285,7 +286,7 @@ def call_llm_evolution_review(closed_trades: List[Dict[str, Any]], existing_memo
                 reasoning_effort=effort,
                 temperature=0.2,
                 response_format={"type": "json_object"},
-                timeout=30.0,
+                timeout=90.0,
             )
             raw_res = {"usage": usage_dict} if isinstance(usage_dict, dict) else {}
         else:
@@ -305,22 +306,25 @@ def call_llm_evolution_review(closed_trades: List[Dict[str, Any]], existing_memo
                 data=json.dumps(payload).encode("utf-8"),
                 headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json", "User-Agent": "Mozilla/5.0"}
             )
-            with urllib.request.urlopen(req, timeout=30) as resp:
+            with urllib.request.urlopen(req, timeout=90) as resp:
                 res = json.loads(resp.read().decode("utf-8"))
                 content = res["choices"][0]["message"]["content"].strip()
                 raw_res = res
 
+        content = (content or "").strip()
         if content.startswith("```json"):
             content = content[7:]
-            if content.startswith("```"):
-                content = content[3:]
-            if content.endswith("```"):
-                content = content[:-3]
-            
-            review_json = json.loads(content.strip())
-            telemetry.finish("success", raw_res, output_chars=len(content))
-            log_msg(f"✅ AI 大脑认知复盘完成 (耗时 {round(time.time() - t0, 2)}s)")
-            return review_json
+        if content.startswith("```"):
+            content = content[3:]
+        if content.endswith("```"):
+            content = content[:-3]
+        
+        review_json = json.loads(content.strip())
+        if not isinstance(review_json, dict):
+            review_json = {}
+        telemetry.finish("success", raw_res, output_chars=len(content))
+        log_msg(f"✅ AI 大脑认知复盘完成 (耗时 {round(time.time() - t0, 2)}s)")
+        return review_json
     except Exception as e:
         telemetry.finish("failed", error=e)
         log_msg(f"Error in LLM evolution review: {e}")
@@ -378,6 +382,8 @@ def run_self_evolution(force: bool = False):
 
     # 2. Call LLM for Cognitive Review & Memory Overwriting
     llm_review = call_llm_evolution_review(closed_trades, existing_memory_md=existing_memory_md, timestamp_str=timestamp_str)
+    if not isinstance(llm_review, dict):
+        llm_review = {}
 
     change_status, _, _ = resolve_memory_update(llm_review.get("change_status", "NO_CHANGE"), [], [])
     insights = llm_review.get("diagnosis_insights", [])
@@ -409,7 +415,7 @@ def run_self_evolution(force: bool = False):
     if not preserve_existing_memory or not os.path.exists(AI_MEMORY_FILE):
         atomic_write_json(AI_MEMORY_FILE, memory_payload)
 
-    # Save as durable R20 Markdown memory file only when evidence justifies a change.
+    # Save as durable R20 Markdown memory file: update timestamp and insights while keeping core lessons if no overwrite
     md_content = f"""# R20 AI 交易大脑长期记忆与启发式心法 (AI Trading Memory)
 
 > **最新覆盖与修订时间**: {timestamp_str} (北京时间)  
@@ -423,8 +429,9 @@ def run_self_evolution(force: bool = False):
 """
     for idx, item in enumerate(long_term_memory, 1):
         clean_item = item.strip()
-        if clean_item.startswith(f"[{timestamp_str}]"):
-            clean_item = clean_item[len(f"[{timestamp_str}]"):].strip()
+        # Strip any existing leading bracket timestamp
+        if clean_item.startswith("[") and "]" in clean_item:
+            clean_item = clean_item.split("]", 1)[1].strip()
         md_content += f"{idx}. [{timestamp_str}] {clean_item}\n"
 
     md_content += f"""
@@ -436,21 +443,18 @@ def run_self_evolution(force: bool = False):
 """
     for ins in insights:
         clean_ins = ins.strip()
-        if clean_ins.startswith(f"[{timestamp_str}]"):
-            clean_ins = clean_ins[len(f"[{timestamp_str}]"):].strip()
+        if clean_ins.startswith("[") and "]" in clean_ins:
+            clean_ins = clean_ins.split("]", 1)[1].strip()
         md_content += f"- 💡 [{timestamp_str}] {clean_ins}\n"
 
-    if not preserve_existing_memory or not os.path.exists(AI_MEMORY_MD_FILE):
-        try:
-            tmp_md = AI_MEMORY_MD_FILE + ".tmp"
-            with open(tmp_md, "w", encoding="utf-8") as f:
-                f.write(md_content)
-            os.replace(tmp_md, AI_MEMORY_MD_FILE)
-            log_msg(f"📝 长期记忆已同步更新至 Markdown 文件: {AI_MEMORY_MD_FILE}")
-        except Exception as e:
-            log_msg(f"Markdown 记忆写入异常: {e}")
-    else:
-        log_msg("🛡️ 证据不足或 NO_CHANGE：保留现有长期记忆，不执行覆盖")
+    try:
+        tmp_md = AI_MEMORY_MD_FILE + ".tmp"
+        with open(tmp_md, "w", encoding="utf-8") as f:
+            f.write(md_content)
+        os.replace(tmp_md, AI_MEMORY_MD_FILE)
+        log_msg(f"📝 长期记忆已同步更新至 Markdown 文件: {AI_MEMORY_MD_FILE}")
+    except Exception as e:
+        log_msg(f"Markdown 记忆写入异常: {e}")
 
     # 4. Save Dashboard Report
     report_payload = {
