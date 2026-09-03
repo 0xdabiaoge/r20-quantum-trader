@@ -601,12 +601,10 @@ ADMIN_LOG_SOURCES = {"trader": "ai_factor_trader.log", "backend": "r20_backend.l
 def admin_runtime(x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
     refresh_settings()
     require_admin_header(x_r20_admin_token)
-    return {
-        "decisions": decision_summary(),
-        "full_decisions": read_json("ai_brain_decisions.json", {}),
-        "trackers": read_json("position_trackers.json", {}),
-        "llm_runtime": get_active_llm_runtime(),
-    }
+    payload = runtime_overview()
+    payload["full_decisions"] = read_json("ai_brain_decisions.json", {})
+    payload["llm_runtime"] = get_active_llm_runtime()
+    return payload
 
 
 @app.get("/api/v1/admin/logs")

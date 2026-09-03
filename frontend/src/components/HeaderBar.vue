@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useDashboardStore } from '../stores/dashboard'
 import {
   LayoutGrid,
@@ -14,6 +14,10 @@ import {
 
 const store = useDashboardStore()
 const isRotating = ref(false)
+
+// Null-safe numeric accessors: /api/all only exposes cum_net_pnl for benchmark PnL.
+const totalEq = computed(() => Number(store.account?.total_eq ?? 0).toFixed(2))
+const benchmarkNetPnl = computed(() => Number(store.account?.cum_net_pnl ?? 0))
 
 const tabs = [
   { id: 'trading', label: '实盘矩阵', icon: LayoutGrid },
@@ -81,12 +85,12 @@ function handleManualRefresh() {
       <div class="flex items-center space-x-3 shrink-0 text-xs font-mono">
         <div class="hidden xl:flex items-center space-x-2 bg-[#0D121B] px-3 py-1.5 rounded-lg border border-[#1A2232]">
           <span class="text-[#707E94]">总权益:</span>
-          <span class="text-white font-bold">{{ store.account ? store.account.total_eq.toFixed(2) : '--' }}</span>
+          <span class="text-white font-bold">{{ totalEq }}</span>
           <span
             class="font-bold"
-            :class="(store.account?.benchmark_net_pnl ?? 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'"
+            :class="benchmarkNetPnl >= 0 ? 'text-emerald-400' : 'text-rose-400'"
           >
-            ({{ (store.account?.benchmark_net_pnl ?? 0) >= 0 ? '+' : '' }}{{ store.account ? store.account.benchmark_net_pnl.toFixed(2) : '--' }}U)
+            ({{ benchmarkNetPnl >= 0 ? '+' : '' }}{{ benchmarkNetPnl.toFixed(2) }}U)
           </span>
         </div>
 

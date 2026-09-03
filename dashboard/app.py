@@ -14,7 +14,7 @@ import tempfile
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -1181,6 +1181,15 @@ async def admin_spa_root(request: Request):
 
 @app.get("/admin/", response_class=HTMLResponse, include_in_schema=False)
 async def admin_spa_root_trailing(request: Request):
+    return await admin_spa_root(request)
+
+@app.get("/admin/{subpath:path}", response_class=HTMLResponse, include_in_schema=False)
+async def admin_spa_deep_link(request: Request, subpath: str):
+    """Vue Router history mode: any /admin/* deep link or refresh serves the SPA shell.
+    Real files under dist/admin (e.g. legacy.html) keep priority."""
+    candidate = os.path.normpath(os.path.join(VUE_DIST_DIR, "admin", subpath))
+    if candidate.startswith(os.path.join(VUE_DIST_DIR, "admin")) and os.path.isfile(candidate):
+        return FileResponse(candidate)
     return await admin_spa_root(request)
 
 @app.get("/api/all")

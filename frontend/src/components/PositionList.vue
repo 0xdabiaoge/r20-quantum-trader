@@ -1,8 +1,27 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useDashboardStore } from '../stores/dashboard'
 import { ShieldCheck, ArrowUpRight, ArrowDownRight, Clock, AlertCircle } from 'lucide-vue-next'
 
 const store = useDashboardStore()
+
+// Null-safe numeric formatting for exchange payloads (fields may be str/num/absent)
+function num(v: any): number {
+  const n = typeof v === 'number' ? v : parseFloat(String(v ?? ''))
+  return Number.isFinite(n) ? n : 0
+}
+function fmt2(v: any): string {
+  const n = typeof v === 'number' ? v : parseFloat(String(v ?? ''))
+  return Number.isFinite(n) ? n.toFixed(2) : '--'
+}
+function fmt4(v: any): string {
+  const n = typeof v === 'number' ? v : parseFloat(String(v ?? ''))
+  if (!Number.isFinite(n)) return '--'
+  return n >= 100 ? n.toFixed(2) : String(parseFloat(n.toFixed(4)))
+}
+const allProtected = computed(() =>
+  store.positions.length > 0 && store.positions.every((p: any) => p.protectionStatus === 'fully_protected' || Number(p.protectionCoveragePct || 0) >= 100)
+)
 </script>
 
 <template>
@@ -13,9 +32,10 @@ const store = useDashboardStore()
         <h2 class="text-sm font-bold text-white font-mono uppercase tracking-wide">当前实盘持仓与风控</h2>
         <span class="text-xs text-[#707E94] font-mono">({{ store.positions.length }}/6)</span>
       </div>
-      <div class="flex items-center space-x-1.5 text-xs text-emerald-400 font-mono bg-emerald-500/10 px-2.5 py-1 rounded border border-emerald-500/20">
+      <div class="flex items-center space-x-1.5 text-xs font-mono px-2.5 py-1 rounded border"
+        :class="allProtected ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' : 'text-rose-400 bg-rose-500/10 border-rose-500/20'">
         <ShieldCheck class="w-3.5 h-3.5" />
-        <span>100% 交易所云端 OCO 全覆盖</span>
+        <span>{{ allProtected ? '100% 交易所云端 OCO 全覆盖' : '⚠ 存在未保护仓位' }}</span>
       </div>
     </div>
 
@@ -54,16 +74,16 @@ const store = useDashboardStore()
 
             <td class="py-2.5 text-zinc-300">{{ pos.pos }} 张</td>
             <td class="py-2.5 text-zinc-300">{{ pos.lever }}x</td>
-            <td class="py-2.5 text-zinc-300">{{ pos.avgPx }}</td>
-            <td class="py-2.5 text-white font-bold">{{ pos.last }}</td>
-            <td class="py-2.5 text-zinc-300">{{ parseFloat(pos.margin).toFixed(2) }} U</td>
+            <td class="py-2.5 text-zinc-300">{{ fmt2(pos.avgPx) }}</td>
+            <td class="py-2.5 text-white font-bold">{{ fmt4(pos.markPx ?? pos.last) }}</td>
+            <td class="py-2.5 text-zinc-300">{{ fmt2(pos.margin_usdt ?? pos.margin) }} U</td>
             <td class="py-2.5 font-bold" :class="pos.side === 'long' ? 'text-rose-400' : 'text-emerald-400'">
               {{ pos.displayStop || '--' }}
             </td>
-            <!-- UPL -->
-            <td class="py-2.5 text-right font-bold" :class="parseFloat(pos.upl) >= 0 ? 'text-emerald-400' : 'text-rose-400'">
-              {{ parseFloat(pos.upl) >= 0 ? '+' : '' }}{{ pos.upl }} U
-              <span class="text-[10px]">({{ parseFloat(pos.uplRatio) >= 0 ? '+' : '' }}{{ (parseFloat(pos.uplRatio) * 100).toFixed(2) }}%)</span>
+            <!-- UPL: uplRatio already arrives as a percentage, do not rescale -->
+            <td class="py-2.5 text-right font-bold" :class="num(pos.upl) >= 0 ? 'text-emerald-400' : 'text-rose-400'">
+              {{ num(pos.upl) >= 0 ? '+' : '' }}{{ fmt2(pos.upl) }} U
+              <span class="text-[10px]">({{ num(pos.uplRatio) >= 0 ? '+' : '' }}{{ fmt2(pos.uplRatio) }}%)</span>
             </td>
           </tr>
         </tbody>

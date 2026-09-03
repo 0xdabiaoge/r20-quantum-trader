@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import {
@@ -68,12 +68,16 @@ function handleLogout() {
   router.push('/admin/login')
 }
 
-const currentView = ref<string>('overview')
-
-onMounted(() => {
-  // Extract view from route path
-  const seg = route.path.split('/').pop()
-  if (seg) currentView.value = seg
+const currentView = computed<string>(() => {
+  const seg = route.path.split('/').filter(Boolean).pop() || 'overview'
+  return seg
+})
+const currentLabel = computed<string>(() => {
+  for (const group of navGroups) {
+    const hit = (group.items as readonly { id: string; label: string }[]).find((i) => i.id === currentView.value)
+    if (hit) return hit.label
+  }
+  return currentView.value
 })
 </script>
 
@@ -127,7 +131,7 @@ onMounted(() => {
       <!-- Topbar -->
       <header class="h-14 border-b border-[#1A2232] bg-[#0A0D14]/80 backdrop-blur-md flex items-center justify-between px-5 shrink-0">
         <div>
-          <div class="text-sm font-bold text-white">{{ currentView }}</div>
+          <div class="text-sm font-bold text-white">{{ currentLabel }}</div>
           <div class="text-[11px] text-[#707E94] font-mono">R20 Quantum Trader 控制面</div>
         </div>
         <div class="flex items-center space-x-3">

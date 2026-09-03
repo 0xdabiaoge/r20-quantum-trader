@@ -140,6 +140,48 @@ async function duplicateProfile() {
   }
 }
 
+async function createProfile() {
+  const name = prompt('新方案名称：', '我的策略')
+  if (!name) return
+  try {
+    const res = await api('/api/v1/admin/prompt-profiles', {
+      method: 'POST',
+      body: JSON.stringify({ name, description: '', source_id: 'stable' }),
+    })
+    bannerMsg.value = { text: `已创建可编辑方案「${res.profile.name}」，现在可以新增模块`, type: 'ok' }
+    selectedProfileId.value = res.profile.id
+    await loadLib()
+  } catch (e: any) {
+    bannerMsg.value = { text: `创建失败：${e.message}`, type: 'err' }
+  }
+}
+
+function addModule() {
+  workingModules.value.push({
+    id: `module-${Date.now().toString(36)}`,
+    title: `自定义模块 ${workingModules.value.length + 1}`,
+    content: '',
+    enabled: true,
+    locked: false,
+    source: 'custom',
+  })
+  dirty.value = true
+}
+
+function removeModule(idx: number) {
+  const m = workingModules.value[idx]
+  if (!m || m.locked || m.source === 'base') return
+  workingModules.value.splice(idx, 1)
+  dirty.value = true
+}
+
+function duplicateModule(idx: number) {
+  const m = workingModules.value[idx]
+  if (!m) return
+  workingModules.value.splice(idx + 1, 0, { ...JSON.parse(JSON.stringify(m)), id: `module-${Date.now().toString(36)}`, title: `${m.title} 副本`, locked: false, source: 'custom' })
+  dirty.value = true
+}
+
 async function deleteProfile() {
   if (!confirm(`确定删除方案「${selectedProfile.value?.name}」？`)) return
   try {
@@ -200,7 +242,10 @@ onMounted(loadLib)
     <div v-else-if="lib" class="grid grid-cols-1 xl:grid-cols-[240px_minmax(0,1fr)_380px] gap-4">
       <!-- Left: Profile List -->
       <div class="bg-[#0D121B] border border-[#1A2232] rounded-xl p-3 space-y-2 h-fit">
-        <div class="text-[10px] font-mono font-bold text-[#556677] uppercase px-1">方案列表</div>
+        <div class="flex items-center justify-between px-1">
+          <span class="text-[10px] font-mono font-bold text-[#556677] uppercase">方案列表</span>
+          <button v-if="auth.isSuperadmin" @click="createProfile" class="flex items-center space-x-1 px-2 py-0.5 rounded bg-blue-600/80 hover:bg-blue-500 text-[10px] font-mono text-white cursor-pointer"><Plus class="w-3 h-3" /><span>新建方案</span></button>
+        </div>
         <button
           v-for="p in lib.profiles"
           :key="p.id"
@@ -247,17 +292,24 @@ onMounted(loadLib)
               <div class="flex items-center space-x-2 min-w-0">
                 <button @click="moveModule(idx, -1)" :disabled="idx === 0 || isReadonly" class="p-1 rounded hover:bg-[#151D2C] text-[#707E94] disabled:opacity-30 cursor-pointer"><ArrowUp class="w-3.5 h-3.5" /></button>
                 <button @click="moveModule(idx, 1)" :disabled="idx === workingModules.length - 1 || isReadonly" class="p-1 rounded hover:bg-[#151D2C] text-[#707E94] disabled:opacity-30 cursor-pointer"><ArrowDown class="w-3.5 h-3.5" /></button>
-                <span class="text-xs font-bold text-white font-mono truncate">【{{ m.title }}】</span>
+                <input
+                  v-if="!isReadonly && m.source !== 'base' && !m.locked"
+                  v-model="m.title"
+                  class="bg-transparent border-b border-transparent focus:border-blue-500 text-xs font-bold text-white font-mono truncate max-w-[220px] outline-none"
+                  @input="dirty = true"
+                />
+                <span v-else class="text-xs font-bold text-white font-mono truncate">【{{ m.title }}】</span>
+                <span class="text-[9px] font-mono text-[#556677] shrink-0">{{ m.locked ? '🔒 安全/实时模块' : m.source === 'base' ? '✎ 可编辑基础规则' : '✎ 自定义模块' }}</span>
               </div>
-              <div class="flex items-center space-x-2 shrink-0">
-                <span v-if="m.locked" class="flex items-center gap-1 text-[9px] font-mono text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20"><Lock class="w-2.5 h-2.5" />P0 锁定</span>
+              <div class="flex items-center space-x-1.5 shrink-0">
+                <button v-if="!isReadonly && !m.locked && m.source !== 'base'" @click="duplicateModule(idx)" class="p-1 rounded hover:bg-[#151D2C] text-[#707E94] cursor-pointer" title="复制模块"><Copy class="w-3.5 h-3.5" /></button>
+                <button v-if="!isReadonly && !m.locked && m.source !== 'base'" @click="removeModule(idx)" class="p-1 rounded hover:bg-[#4d1924] text-[#707E94] hover:text-rose-400 cursor-pointer" title="删除模块"><Trash2 class="w-3.5 h-3.5" /></button>
                 <button @click="toggleModule(m)" :disabled="m.locked || isReadonly" class="cursor-pointer disabled:opacity-40" :class="m.enabled ? 'text-emerald-400' : 'text-[#707E94]'">
                   <ToggleRight v-if="m.enabled" class="w-5 h-5" />
                   <ToggleLeft v-else class="w-5 h-5" />
                 </button>
               </div>
             </div>
-            <div v-if="m.source === 'base' && !m.locked" class="text-[9px] font-mono text-[#556677] mb-1">运行时读取代码基座（编辑内容无效，仅可停用语序）</div>
             <textarea
               v-model="m.content"
               :readonly="isReadonly || m.source === 'base' || m.locked"
@@ -266,6 +318,7 @@ onMounted(loadLib)
               @input="dirty = true"
             ></textarea>
           </div>
+          <button v-if="!isReadonly" @click="addModule" class="w-full py-2 rounded-lg border border-dashed border-[#2D3748] text-xs font-mono text-[#707E94] hover:text-white hover:border-blue-500/50 cursor-pointer flex items-center justify-center space-x-1"><Plus class="w-3.5 h-3.5" /><span>新增模块</span></button>
         </div>
 
         <!-- Actions -->

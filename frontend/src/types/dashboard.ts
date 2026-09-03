@@ -1,13 +1,18 @@
 export interface AccountSummary {
   total_eq: number
   avail_eq: number
-  upl: number
-  margin_ratio: number
-  risk_level: string
-  currency: string
-  benchmark_initial_capital: number
-  benchmark_net_pnl: number
-  benchmark_roi_pct: number
+  cash_bal?: number
+  upl?: number
+  pos_upl_total?: number
+  margin_usage_pct?: number
+  margin_ratio?: number
+  risk_level?: string
+  currency?: string
+  initial_capital?: number
+  cum_net_pnl?: number
+  cum_realized_pnl?: number
+  cum_roi_pct?: number
+  cum_total_fees?: number
 }
 
 export interface PositionItem {
