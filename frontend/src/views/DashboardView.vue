@@ -59,7 +59,7 @@ function setLayout(mode: 'dual' | 'stacked') {
     <HeaderBar />
 
     <!-- Spacer for fixed header -->
-    <div class="h-[58px] shrink-0"></div>
+    <div class="h-[46px] sm:h-[50px] shrink-0"></div>
 
     <!-- Dynamic Main Content Based on Active Tab -->
     <main class="flex-1 max-w-[2160px] w-full mx-auto px-3 sm:px-6 2xl:px-8 pt-3 pb-24 sm:pb-6 space-y-3.5">

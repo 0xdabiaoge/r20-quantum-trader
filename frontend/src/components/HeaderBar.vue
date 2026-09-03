@@ -48,56 +48,47 @@ const tabs = [
 
 <template>
   <header
-    class="fixed top-0 left-0 right-0 z-40 h-[56px] px-3 sm:px-6 flex items-center border-b transition-colors"
+    class="fixed top-0 left-0 right-0 z-40 h-[46px] sm:h-[50px] px-3 sm:px-5 flex items-center border-b transition-colors"
     style="background-color: var(--bg-header); border-color: var(--border-subtle); backdrop-filter: blur(12px);"
   >
-    <div class="max-w-[2160px] w-full mx-auto flex items-center justify-between gap-4">
-      <!-- Left: Minimal Institutional Identity (Single-row, clean & airy) -->
-      <div class="flex items-center space-x-2.5 shrink-0">
-        <div
-          class="w-8 h-8 rounded-lg flex items-center justify-center font-mono font-black text-sm tracking-wider border shadow-xs transition-colors shrink-0"
-          style="background-color: var(--bg-card); border-color: var(--border-medium); color: var(--text-main);"
+    <div class="max-w-[2160px] w-full mx-auto flex items-center justify-between gap-2.5 sm:gap-4">
+      <!-- Left: Minimal Institutional Identity (No logo icon, pure site name) -->
+      <div class="flex items-center space-x-2 shrink-0">
+        <span class="font-mono font-black text-xs sm:text-sm tracking-wide whitespace-nowrap" style="color: var(--text-main);">
+          R20 QUANTUM
+        </span>
+        <button
+          @click="store.showAboutModal = true"
+          class="px-1.5 py-0.2 rounded text-[10px] font-mono font-bold border transition-colors cursor-pointer"
+          style="background-color: var(--bg-card-subtle); color: var(--text-muted); border-color: var(--border-subtle);"
+          title="查看系统版本与开源主仓信息"
         >
-          R
-        </div>
-
-        <div class="flex items-center space-x-2">
-          <span class="font-mono font-black text-sm tracking-wide whitespace-nowrap" style="color: var(--text-main);">
-            R20 QUANTUM
-          </span>
-          <button
-            @click="store.showAboutModal = true"
-            class="px-1.5 py-0.2 rounded text-[10px] font-mono font-bold border transition-colors cursor-pointer"
-            style="background-color: var(--bg-card-subtle); color: var(--text-muted); border-color: var(--border-subtle);"
-            title="查看系统版本与开源主仓信息"
-          >
-            v6.5.1
-          </button>
-          <span
-            class="w-2 h-2 rounded-full shrink-0"
-            :class="store.isConnected ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'"
-            title="OKX V5 PROD 运行状态"
-          ></span>
-          <span
-            v-if="store.isStale"
-            class="px-1.5 py-0.2 rounded text-[10px] font-mono font-bold border animate-pulse"
-            style="background-color: var(--color-warn-bg); color: var(--color-warn); border-color: var(--color-warn-border);"
-          >
-            STALE
-          </span>
-        </div>
+          v6.5.1
+        </button>
+        <span
+          class="w-1.5 h-1.5 rounded-full shrink-0"
+          :class="store.isConnected ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'"
+          title="OKX V5 PROD 运行状态"
+        ></span>
+        <span
+          v-if="store.isStale"
+          class="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold border animate-pulse"
+          style="background-color: var(--color-warn-bg); color: var(--color-warn); border-color: var(--color-warn-border);"
+        >
+          STALE
+        </span>
       </div>
 
-      <!-- Center: High-Precision Tab Switcher with Generous Breathing Room -->
+      <!-- Center: High-Precision Tab Switcher (Desktop only) -->
       <nav
-        class="hidden md:flex items-center p-1 rounded-xl border shrink-0 transition-colors"
+        class="hidden md:flex items-center p-0.5 rounded-xl border shrink-0 transition-colors"
         style="background-color: var(--bg-badge); border-color: var(--border-subtle);"
       >
         <button
           v-for="tab in tabs"
           :key="tab.id"
           @click="store.activeTab = tab.id as any"
-          class="h-7.5 flex items-center space-x-1.5 px-3.5 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer whitespace-nowrap"
+          class="h-7 flex items-center space-x-1.5 px-3 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer whitespace-nowrap"
           :style="store.activeTab === tab.id
             ? { backgroundColor: 'var(--bg-card)', color: 'var(--text-main)', borderColor: 'var(--border-medium)', boxShadow: 'var(--shadow-card)' }
             : { color: 'var(--text-muted)' }"
@@ -108,11 +99,11 @@ const tabs = [
         </button>
       </nav>
 
-      <!-- Right: Clutter-Free Essential Tools (Strict 32px height alignment) -->
-      <div class="flex items-center space-x-2 sm:space-x-2.5 shrink-0 text-xs font-mono">
-        <!-- Realtime Clock -->
+      <!-- Right: Mobile-Compact Essential Tools -->
+      <div class="flex items-center space-x-1.5 sm:space-x-2 shrink-0 text-xs font-mono">
+        <!-- Realtime Clock (Desktop only) -->
         <div
-          class="hidden lg:flex items-center h-8 space-x-1.5 px-2.5 rounded-lg border text-[11px]"
+          class="hidden lg:flex items-center h-7.5 space-x-1.5 px-2.5 rounded-lg border text-[11px]"
           style="background-color: var(--bg-card); border-color: var(--border-subtle); color: var(--text-muted);"
           title="北京时间 (UTC+8)"
         >
@@ -121,21 +112,21 @@ const tabs = [
           <span class="text-[9px] font-bold opacity-60">UTC+8</span>
         </div>
 
-        <!-- ☀️ / 🌙 Theme Toggle Button (32x32px) -->
+        <!-- ☀️ / 🌙 Theme Toggle Button -->
         <button
           @click="toggleTheme"
-          class="flex items-center justify-center w-8 h-8 rounded-lg border transition-all cursor-pointer shadow-xs shrink-0"
+          class="flex items-center justify-center w-7.5 h-7.5 rounded-lg border transition-all cursor-pointer shadow-xs shrink-0"
           style="background-color: var(--bg-card); border-color: var(--border-subtle); color: var(--text-main);"
-          :title="theme === 'dark' ? '切换为亮色浅白主题 (Light Mode)' : '切换为暗色钛金主题 (Dark Mode)'"
+          :title="theme === 'dark' ? '切换为亮色模式' : '切换为暗色模式'"
         >
-          <Sun v-if="theme === 'dark'" class="w-4 h-4 text-amber-400 hover:rotate-45 transition-transform" />
-          <Moon v-else class="w-4 h-4 text-slate-700 hover:-rotate-12 transition-transform" />
+          <Sun v-if="theme === 'dark'" class="w-3.5 h-3.5 text-amber-400 hover:rotate-45 transition-transform" />
+          <Moon v-else class="w-3.5 h-3.5 text-slate-700 hover:-rotate-12 transition-transform" />
         </button>
 
         <!-- Documentation Link -->
         <a
           href="/docs"
-          class="flex items-center h-8 space-x-1.5 px-3 rounded-lg border transition-colors cursor-pointer shadow-xs"
+          class="flex items-center h-7.5 space-x-1 px-2.5 rounded-lg border transition-colors cursor-pointer shadow-xs"
           style="background-color: var(--bg-card); border-color: var(--border-subtle); color: var(--text-muted);"
           title="系统架构与使用文档"
         >
@@ -147,12 +138,12 @@ const tabs = [
         <a
           href="/admin"
           target="_blank"
-          class="flex items-center h-8 space-x-1.5 px-3 rounded-lg border transition-all font-medium cursor-pointer shadow-xs"
+          class="flex items-center h-7.5 space-x-1 px-2.5 sm:px-3 rounded-lg border transition-all font-medium cursor-pointer shadow-xs"
           style="background-color: var(--bg-card-subtle); border-color: var(--border-medium); color: var(--text-main);"
         >
           <ShieldCheck class="w-3.5 h-3.5" />
           <span>控制面</span>
-          <ExternalLink class="w-3 h-3 opacity-60" />
+          <ExternalLink class="w-3 h-3 opacity-60 hidden sm:inline" />
         </a>
       </div>
     </div>

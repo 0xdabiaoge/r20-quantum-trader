@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useDashboardStore } from '../stores/dashboard'
-import { Wallet, TrendingUp, Calendar, Activity, ShieldCheck, ArrowUpRight, ArrowDownRight } from 'lucide-vue-next'
+import { Wallet, TrendingUp, Calendar, Activity, ShieldCheck, ArrowDownRight } from 'lucide-vue-next'
 
 const store = useDashboardStore()
 const account = computed(() => store.data?.account || {})
@@ -47,208 +47,227 @@ const allProtected = computed(() =>
 </script>
 
 <template>
-  <div
-    class="rounded-xl border transition-all shadow-xs overflow-hidden"
-    style="background-color: var(--bg-card); border-color: var(--border-subtle);"
-  >
-    <!-- 4-Grid Master Bento Cockpit with Integrated Dividing Lines -->
-    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 divide-y md:divide-y-0 md:divide-x" style="border-color: var(--border-subtle);">
-      
-      <!-- Sector 1: 官方账户总权益 -->
-      <div class="p-4 sm:p-5 flex flex-col justify-between space-y-3">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center space-x-2">
-            <div
-              class="w-6 h-6 rounded-md flex items-center justify-center border"
-              style="background-color: var(--bg-badge); border-color: var(--border-subtle); color: var(--text-main);"
-            >
-              <Wallet class="w-3.5 h-3.5" />
-            </div>
-            <span class="text-xs font-bold font-mono" style="color: var(--text-main);">官方账户总权益</span>
-          </div>
-          <span
-            class="text-[9px] font-mono px-1.5 py-0.5 rounded border font-bold"
-            style="background-color: var(--bg-badge); color: var(--text-muted); border-color: var(--border-subtle);"
+  <!-- 4 Distinct Bento Cards with Spatial Gap Separation (Zero divide lines) -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+    
+    <!-- Card 1: 官方账户总权益 -->
+    <div
+      class="rounded-xl border p-4 sm:p-5 flex flex-col justify-between space-y-3 transition-all shadow-xs"
+      style="background-color: var(--bg-card); border-color: var(--border-subtle);"
+    >
+      <div class="flex items-center justify-between">
+        <div class="flex items-center space-x-2">
+          <div
+            class="w-6 h-6 rounded-md flex items-center justify-center border"
+            style="background-color: var(--bg-badge); border-color: var(--border-subtle); color: var(--text-main);"
           >
-            OKX V5 PROD
-          </span>
-        </div>
-
-        <div>
-          <div class="flex items-baseline space-x-1.5">
-            <span class="text-2xl sm:text-3xl font-black font-mono tracking-tight num-tabular" style="color: var(--text-main);">
-              ${{ totalEq }}
-            </span>
-            <span class="text-xs font-mono font-medium" style="color: var(--text-faint);">USDT</span>
+            <Wallet class="w-3.5 h-3.5" />
           </div>
-          
-          <!-- Bottom Info / Margin Bar -->
-          <div class="space-y-1.5 mt-3.5 pt-2 border-t" style="border-color: var(--border-subtle);">
-            <div class="flex items-center justify-between text-[11px] font-mono" style="color: var(--text-muted);">
-              <span>可用资金: <strong class="font-semibold" style="color: var(--text-main);">${{ availEq }}</strong></span>
-              <span>占用率: <strong class="num-tabular" :style="{ color: Number(marginUsage) > 50 ? 'var(--color-warn)' : 'var(--text-main)' }">{{ marginUsage }}%</strong></span>
-            </div>
-            <div class="w-full h-1 rounded-full overflow-hidden" style="background-color: var(--bg-badge);">
-              <div
-                class="h-full rounded-full transition-all duration-500"
-                :style="{
-                  width: `${Math.min(100, Math.max(0, Number(marginUsage)))}%`,
-                  backgroundColor: Number(marginUsage) > 50 ? 'var(--color-warn)' : 'rgba(16, 185, 129, 0.75)'
-                }"
-              ></div>
-            </div>
+          <span class="text-xs font-bold font-mono" style="color: var(--text-main);">官方账户总权益</span>
+        </div>
+        <span
+          class="text-[9px] font-mono px-1.5 py-0.5 rounded border font-bold"
+          style="background-color: var(--bg-badge); color: var(--text-muted); border-color: var(--border-subtle);"
+        >
+          OKX V5 PROD
+        </span>
+      </div>
+
+      <div>
+        <div class="flex items-baseline space-x-1.5">
+          <span class="text-2xl sm:text-3xl font-black font-mono tracking-tight num-tabular" style="color: var(--text-main);">
+            ${{ totalEq }}
+          </span>
+          <span class="text-xs font-mono font-medium" style="color: var(--text-faint);">USDT</span>
+        </div>
+        
+        <!-- Soft Inset Capsule (No dividing line) -->
+        <div
+          class="mt-3 p-2 rounded-lg space-y-1.5 border text-[11px] font-mono"
+          style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);"
+        >
+          <div class="flex items-center justify-between" style="color: var(--text-muted);">
+            <span>可用: <strong class="font-semibold" style="color: var(--text-main);">${{ availEq }}</strong></span>
+            <span>占用率: <strong class="num-tabular" :style="{ color: Number(marginUsage) > 50 ? 'var(--color-warn)' : 'var(--text-main)' }">{{ marginUsage }}%</strong></span>
+          </div>
+          <div class="w-full h-1 rounded-full overflow-hidden" style="background-color: var(--bg-badge);">
+            <div
+              class="h-full rounded-full transition-all duration-500"
+              :style="{
+                width: `${Math.min(100, Math.max(0, Number(marginUsage)))}%`,
+                backgroundColor: Number(marginUsage) > 50 ? 'var(--color-warn)' : 'rgba(16, 185, 129, 0.75)'
+              }"
+            ></div>
           </div>
         </div>
       </div>
+    </div>
 
-      <!-- Sector 2: 基准净盈亏水线 (vs 起步 4061.04) -->
-      <div class="p-4 sm:p-5 flex flex-col justify-between space-y-3">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center space-x-2">
-            <div
-              class="w-6 h-6 rounded-md flex items-center justify-center border"
-              :style="{
-                backgroundColor: Number(benchmarkNetPnl) >= 0 ? 'var(--color-up-bg)' : 'var(--color-down-bg)',
-                borderColor: Number(benchmarkNetPnl) >= 0 ? 'var(--color-up-border)' : 'var(--color-down-border)',
-                color: Number(benchmarkNetPnl) >= 0 ? 'var(--color-up)' : 'var(--color-down)'
-              }"
-            >
-              <TrendingUp v-if="Number(benchmarkNetPnl) >= 0" class="w-3.5 h-3.5" />
-              <ArrowDownRight v-else class="w-3.5 h-3.5" />
-            </div>
-            <span class="text-xs font-bold font-mono" style="color: var(--text-main);">基准净盈亏水线</span>
-          </div>
-          <span class="text-[10px] font-mono" style="color: var(--text-faint);">
-            基准 ${{ initialCap }}
-          </span>
-        </div>
-
-        <div>
-          <div class="flex items-baseline space-x-2">
-            <span
-              class="text-2xl sm:text-3xl font-black font-mono tracking-tight num-tabular"
-              :style="{ color: Number(benchmarkNetPnl) >= 0 ? 'var(--color-up)' : 'var(--color-down)' }"
-            >
-              {{ Number(benchmarkNetPnl) >= 0 ? '+' : '' }}{{ benchmarkNetPnl }}
-            </span>
-            <span
-              class="text-xs font-bold font-mono px-1.5 py-0.2 rounded border num-tabular"
-              :style="{
-                backgroundColor: Number(benchmarkNetPnl) >= 0 ? 'var(--color-up-bg)' : 'var(--color-down-bg)',
-                borderColor: Number(benchmarkNetPnl) >= 0 ? 'var(--color-up-border)' : 'var(--color-down-border)',
-                color: Number(benchmarkNetPnl) >= 0 ? 'var(--color-up)' : 'var(--color-down)'
-              }"
-            >
-              {{ Number(benchmarkRoi) >= 0 ? '+' : '' }}{{ benchmarkRoi }}%
-            </span>
-          </div>
-
-          <div class="flex items-center justify-between text-[11px] font-mono mt-3.5 pt-2 border-t" style="border-color: var(--border-subtle); color: var(--text-muted);">
-            <span>已结净额: <strong class="num-tabular" :style="{ color: Number(cumRealizedPnl) >= 0 ? 'var(--color-up)' : 'var(--color-down)' }">{{ Number(cumRealizedPnl) >= 0 ? '+' : '' }}{{ cumRealizedPnl }} U</strong></span>
-            <span>扣除费率: <strong class="font-semibold" style="color: var(--text-main);">100% 实盘</strong></span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Sector 3: 今日已结净盈亏 (UTC+8) -->
-      <div class="p-4 sm:p-5 flex flex-col justify-between space-y-3">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center space-x-2">
-            <div
-              class="w-6 h-6 rounded-md flex items-center justify-center border"
-              style="background-color: var(--bg-badge); border-color: var(--border-medium); color: var(--text-main);"
-            >
-              <Calendar class="w-3.5 h-3.5" />
-            </div>
-            <span class="text-xs font-bold font-mono" style="color: var(--text-main);">今日已结 (UTC+8)</span>
-          </div>
-          <span
-            class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border num-tabular"
+    <!-- Card 2: 基准净盈亏水线 -->
+    <div
+      class="rounded-xl border p-4 sm:p-5 flex flex-col justify-between space-y-3 transition-all shadow-xs"
+      style="background-color: var(--bg-card); border-color: var(--border-subtle);"
+    >
+      <div class="flex items-center justify-between">
+        <div class="flex items-center space-x-2">
+          <div
+            class="w-6 h-6 rounded-md flex items-center justify-center border"
             :style="{
-              backgroundColor: Number(todayNet) >= 0 ? 'var(--color-up-bg)' : 'var(--color-down-bg)',
-              borderColor: Number(todayNet) >= 0 ? 'var(--color-up-border)' : 'var(--color-down-border)',
-              color: Number(todayNet) >= 0 ? 'var(--color-up)' : 'var(--color-down)'
+              backgroundColor: Number(benchmarkNetPnl) >= 0 ? 'var(--color-up-bg)' : 'var(--color-down-bg)',
+              borderColor: Number(benchmarkNetPnl) >= 0 ? 'var(--color-up-border)' : 'var(--color-down-border)',
+              color: Number(benchmarkNetPnl) >= 0 ? 'var(--color-up)' : 'var(--color-down)'
             }"
           >
-            胜率 {{ todayWinrate }}%
-          </span>
-        </div>
-
-        <div>
-          <div class="flex items-baseline space-x-1.5">
-            <span
-              class="text-2xl sm:text-3xl font-black font-mono tracking-tight num-tabular"
-              :style="{ color: Number(todayNet) >= 0 ? 'var(--color-up)' : 'var(--color-down)' }"
-            >
-              {{ Number(todayNet) >= 0 ? '+' : '' }}{{ todayNet }}
-            </span>
-            <span class="text-xs font-mono font-medium" style="color: var(--text-faint);">USDT</span>
+            <TrendingUp v-if="Number(benchmarkNetPnl) >= 0" class="w-3.5 h-3.5" />
+            <ArrowDownRight v-else class="w-3.5 h-3.5" />
           </div>
-
-          <div class="flex items-center justify-between text-[11px] font-mono mt-3.5 pt-2 border-t" style="border-color: var(--border-subtle); color: var(--text-muted);">
-            <span>平仓: <strong class="font-semibold num-tabular" style="color: var(--text-main);">{{ todayTrades }} 笔 ({{ today.win_trades || 0 }}胜/{{ today.loss_trades || 0 }}负)</strong></span>
-            <span>手续费: <strong class="num-tabular" style="color: var(--text-main);">{{ today.fees_paid || 0 }} U</strong></span>
-          </div>
+          <span class="text-xs font-bold font-mono" style="color: var(--text-main);">基准净盈亏水线</span>
         </div>
+        <span class="text-[10px] font-mono" style="color: var(--text-faint);">
+          基准 ${{ initialCap }}
+        </span>
       </div>
 
-      <!-- Sector 4: 当前持仓净盈亏 -->
-      <div class="p-4 sm:p-5 flex flex-col justify-between space-y-3">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center space-x-2">
-            <div
-              class="w-6 h-6 rounded-md flex items-center justify-center border"
-              style="background-color: var(--bg-badge); border-color: var(--border-medium); color: var(--text-main);"
-            >
-              <Activity class="w-3.5 h-3.5" />
-            </div>
-            <span class="text-xs font-bold font-mono" style="color: var(--text-main);">当前持仓净盈亏</span>
-          </div>
+      <div>
+        <div class="flex items-baseline space-x-2">
           <span
-            class="text-[10px] font-mono px-1.5 py-0.5 rounded border font-bold"
-            style="background-color: var(--bg-badge); color: var(--text-muted); border-color: var(--border-subtle);"
+            class="text-2xl sm:text-3xl font-black font-mono tracking-tight num-tabular"
+            :style="{ color: Number(benchmarkNetPnl) >= 0 ? 'var(--color-up)' : 'var(--color-down)' }"
           >
-            持仓 {{ store.positions.length }}/6 (多{{ longCount }}/空{{ shortCount }})
+            {{ Number(benchmarkNetPnl) >= 0 ? '+' : '' }}{{ benchmarkNetPnl }}
+          </span>
+          <span
+            class="text-xs font-bold font-mono px-1.5 py-0.2 rounded border num-tabular"
+            :style="{
+              backgroundColor: Number(benchmarkNetPnl) >= 0 ? 'var(--color-up-bg)' : 'var(--color-down-bg)',
+              borderColor: Number(benchmarkNetPnl) >= 0 ? 'var(--color-up-border)' : 'var(--color-down-border)',
+              color: Number(benchmarkNetPnl) >= 0 ? 'var(--color-up)' : 'var(--color-down)'
+            }"
+          >
+            {{ Number(benchmarkRoi) >= 0 ? '+' : '' }}{{ benchmarkRoi }}%
           </span>
         </div>
 
-        <div>
-          <div class="flex items-baseline space-x-2">
-            <span
-              class="text-2xl sm:text-3xl font-black font-mono tracking-tight num-tabular"
-              :style="{ color: posUplNum >= 0 ? (posUplNum > 0 ? 'var(--color-up)' : 'var(--text-main)') : 'var(--color-down)' }"
-            >
-              {{ posUplNum > 0 ? '+' : '' }}{{ posUplStr }}
-            </span>
-            <span class="text-xs font-mono font-medium" style="color: var(--text-faint);">USDT</span>
-            <span
-              v-if="store.positions.length > 0"
-              class="text-xs font-bold font-mono px-1.5 py-0.2 rounded border num-tabular"
-              :style="{
-                backgroundColor: posUplNum >= 0 ? 'var(--color-up-bg)' : 'var(--color-down-bg)',
-                borderColor: posUplNum >= 0 ? 'var(--color-up-border)' : 'var(--color-down-border)',
-                color: posUplNum >= 0 ? 'var(--color-up)' : 'var(--color-down)'
-              }"
-            >
-              {{ Number(posUplRatio) > 0 ? '+' : '' }}{{ posUplRatio }}%
-            </span>
-          </div>
-
-          <div class="flex items-center justify-between text-[11px] font-mono mt-3.5 pt-2 border-t" style="border-color: var(--border-subtle); color: var(--text-muted);">
-            <span>占用保证金: <strong class="font-semibold num-tabular" style="color: var(--text-main);">${{ totalPosMargin }} U</strong></span>
-            <span v-if="store.positions.length > 0" class="flex items-center space-x-1">
-              <ShieldCheck class="w-3.5 h-3.5" :style="{ color: allProtected ? 'var(--color-up)' : 'var(--color-warn)' }" />
-              <strong :style="{ color: allProtected ? 'var(--color-up)' : 'var(--color-warn)' }">
-                {{ allProtected ? '100% OCO' : '部分保护' }}
-              </strong>
-            </span>
-            <span v-else style="color: var(--text-faint);">
-              状态: <strong>空仓待机</strong>
-            </span>
-          </div>
+        <div
+          class="mt-3 p-2 rounded-lg flex items-center justify-between border text-[11px] font-mono"
+          style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle); color: var(--text-muted);"
+        >
+          <span>已结净额: <strong class="num-tabular" :style="{ color: Number(cumRealizedPnl) >= 0 ? 'var(--color-up)' : 'var(--color-down)' }">{{ Number(cumRealizedPnl) >= 0 ? '+' : '' }}{{ cumRealizedPnl }} U</strong></span>
+          <span>扣除费率: <strong class="font-semibold" style="color: var(--text-main);">100% 实盘</strong></span>
         </div>
       </div>
-
     </div>
+
+    <!-- Card 3: 今日已结 (UTC+8) -->
+    <div
+      class="rounded-xl border p-4 sm:p-5 flex flex-col justify-between space-y-3 transition-all shadow-xs"
+      style="background-color: var(--bg-card); border-color: var(--border-subtle);"
+    >
+      <div class="flex items-center justify-between">
+        <div class="flex items-center space-x-2">
+          <div
+            class="w-6 h-6 rounded-md flex items-center justify-center border"
+            style="background-color: var(--bg-badge); border-color: var(--border-medium); color: var(--text-main);"
+          >
+            <Calendar class="w-3.5 h-3.5" />
+          </div>
+          <span class="text-xs font-bold font-mono" style="color: var(--text-main);">今日已结 (UTC+8)</span>
+        </div>
+        <span
+          class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border num-tabular"
+          :style="{
+            backgroundColor: Number(todayNet) >= 0 ? 'var(--color-up-bg)' : 'var(--color-down-bg)',
+            borderColor: Number(todayNet) >= 0 ? 'var(--color-up-border)' : 'var(--color-down-border)',
+            color: Number(todayNet) >= 0 ? 'var(--color-up)' : 'var(--color-down)'
+          }"
+        >
+          胜率 {{ todayWinrate }}%
+        </span>
+      </div>
+
+      <div>
+        <div class="flex items-baseline space-x-1.5">
+          <span
+            class="text-2xl sm:text-3xl font-black font-mono tracking-tight num-tabular"
+            :style="{ color: Number(todayNet) >= 0 ? 'var(--color-up)' : 'var(--color-down)' }"
+          >
+            {{ Number(todayNet) >= 0 ? '+' : '' }}{{ todayNet }}
+          </span>
+          <span class="text-xs font-mono font-medium" style="color: var(--text-faint);">USDT</span>
+        </div>
+
+        <div
+          class="mt-3 p-2 rounded-lg flex items-center justify-between border text-[11px] font-mono"
+          style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle); color: var(--text-muted);"
+        >
+          <span>平仓: <strong class="font-semibold num-tabular" style="color: var(--text-main);">{{ todayTrades }} 笔 ({{ today.win_trades || 0 }}胜/{{ today.loss_trades || 0 }}负)</strong></span>
+          <span>手续费: <strong class="num-tabular" style="color: var(--text-main);">{{ today.fees_paid || 0 }} U</strong></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card 4: 当前持仓净盈亏 -->
+    <div
+      class="rounded-xl border p-4 sm:p-5 flex flex-col justify-between space-y-3 transition-all shadow-xs"
+      style="background-color: var(--bg-card); border-color: var(--border-subtle);"
+    >
+      <div class="flex items-center justify-between">
+        <div class="flex items-center space-x-2">
+          <div
+            class="w-6 h-6 rounded-md flex items-center justify-center border"
+            style="background-color: var(--bg-badge); border-color: var(--border-medium); color: var(--text-main);"
+          >
+            <Activity class="w-3.5 h-3.5" />
+          </div>
+          <span class="text-xs font-bold font-mono" style="color: var(--text-main);">当前持仓净盈亏</span>
+        </div>
+        <span
+          class="text-[10px] font-mono px-1.5 py-0.5 rounded border font-bold"
+          style="background-color: var(--bg-badge); color: var(--text-muted); border-color: var(--border-subtle);"
+        >
+          持仓 {{ store.positions.length }}/6 (多{{ longCount }}/空{{ shortCount }})
+        </span>
+      </div>
+
+      <div>
+        <div class="flex items-baseline space-x-2">
+          <span
+            class="text-2xl sm:text-3xl font-black font-mono tracking-tight num-tabular"
+            :style="{ color: posUplNum >= 0 ? (posUplNum > 0 ? 'var(--color-up)' : 'var(--text-main)') : 'var(--color-down)' }"
+          >
+            {{ posUplNum > 0 ? '+' : '' }}{{ posUplStr }}
+          </span>
+          <span class="text-xs font-mono font-medium" style="color: var(--text-faint);">USDT</span>
+          <span
+            v-if="store.positions.length > 0"
+            class="text-xs font-bold font-mono px-1.5 py-0.2 rounded border num-tabular"
+            :style="{
+              backgroundColor: posUplNum >= 0 ? 'var(--color-up-bg)' : 'var(--color-down-bg)',
+              borderColor: posUplNum >= 0 ? 'var(--color-up-border)' : 'var(--color-down-border)',
+              color: posUplNum >= 0 ? 'var(--color-up)' : 'var(--color-down)'
+            }"
+          >
+            {{ Number(posUplRatio) > 0 ? '+' : '' }}{{ posUplRatio }}%
+          </span>
+        </div>
+
+        <div
+          class="mt-3 p-2 rounded-lg flex items-center justify-between border text-[11px] font-mono"
+          style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle); color: var(--text-muted);"
+        >
+          <span>占用保证金: <strong class="font-semibold num-tabular" style="color: var(--text-main);">${{ totalPosMargin }} U</strong></span>
+          <span v-if="store.positions.length > 0" class="flex items-center space-x-1">
+            <ShieldCheck class="w-3.5 h-3.5" :style="{ color: allProtected ? 'var(--color-up)' : 'var(--color-warn)' }" />
+            <strong :style="{ color: allProtected ? 'var(--color-up)' : 'var(--color-warn)' }">
+              {{ allProtected ? '100% OCO' : '部分保护' }}
+            </strong>
+          </span>
+          <span v-else style="color: var(--text-faint);">
+            状态: <strong>空仓待机</strong>
+          </span>
+        </div>
+      </div>
+    </div>
+
   </div>
 </template>
