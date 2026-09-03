@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useDashboardStore } from '../stores/dashboard'
-import { Wallet, TrendingUp, TrendingDown, Calendar, ShieldCheck, Activity } from 'lucide-vue-next'
+import { Wallet, TrendingUp, TrendingDown, Calendar, Activity, ShieldCheck } from 'lucide-vue-next'
 
 const store = useDashboardStore()
 const account = computed(() => store.data?.account || {})
@@ -11,15 +11,40 @@ const perf = computed(() => store.data?.performance || {})
 const totalEq = computed(() => Number(account.value.total_eq || 0).toFixed(2))
 const availEq = computed(() => Number(account.value.avail_eq || 0).toFixed(2))
 const marginUsage = computed(() => Number(account.value.margin_usage_pct || 0).toFixed(1))
-const posUpl = computed(() => Number(account.value.pos_upl_total || account.value.upl || 0).toFixed(2))
 
 const benchmarkNetPnl = computed(() => Number(account.value.cum_net_pnl || 0).toFixed(2))
 const benchmarkRoi = computed(() => Number(account.value.cum_roi_pct || 0).toFixed(2))
 const initialCap = computed(() => Number(account.value.initial_capital || 0).toFixed(2))
+const cumRealizedPnl = computed(() => Number(account.value.cum_realized_pnl || 0).toFixed(2))
 
 const todayNet = computed(() => Number(today.value.total_pnl ?? today.value.net_realized ?? 0).toFixed(2))
 const todayWinrate = computed(() => Number(today.value.win_rate || 0).toFixed(1))
 const todayTrades = computed(() => (today.value.win_trades || 0) + (today.value.loss_trades || 0))
+
+// 当前持仓浮动盈亏与风控统计
+const posUplNum = computed(() => Number(account.value.pos_upl_total ?? account.value.upl ?? 0))
+const posUplStr = computed(() => posUplNum.value.toFixed(2))
+
+const longCount = computed(() => store.positions.filter((p) => p.side === 'long').length)
+const shortCount = computed(() => store.positions.filter((p) => p.side === 'short').length)
+
+const totalPosMargin = computed(() => {
+  const sum = store.positions.reduce((acc, p) => acc + Number((p as any).margin_usdt ?? p.margin ?? 0), 0)
+  return sum.toFixed(2)
+})
+
+const posUplRatio = computed(() => {
+  const margin = Number(totalPosMargin.value)
+  if (margin > 0) {
+    return (posUplNum.value / margin * 100).toFixed(2)
+  }
+  return '0.00'
+})
+
+const allProtected = computed(() =>
+  store.positions.length > 0 &&
+  store.positions.every((p) => p.protectionStatus === 'fully_protected' || Number(p.protectionCoveragePct || 0) >= 100)
+)
 </script>
 
 <template>
@@ -62,7 +87,7 @@ const todayTrades = computed(() => (today.value.win_trades || 0) + (today.value.
           <span class="text-xs font-semibold">({{ Number(benchmarkRoi) >= 0 ? '+' : '' }}{{ benchmarkRoi }}%)</span>
         </div>
         <div class="flex items-center justify-between text-[11px] font-mono mt-2 pt-2 border-t border-[#1A2232]/80 text-[#707E94]">
-          <span>浮动持仓: <strong :class="Number(posUpl) >= 0 ? 'text-emerald-400' : 'text-rose-400'">{{ Number(posUpl) >= 0 ? '+' : '' }}{{ posUpl }} U</strong></span>
+          <span>已结净额: <strong :class="Number(cumRealizedPnl) >= 0 ? 'text-emerald-400' : 'text-rose-400'">{{ Number(cumRealizedPnl) >= 0 ? '+' : '' }}{{ cumRealizedPnl }} U</strong></span>
           <span>真实手续费扣除: <strong class="text-zinc-300">100%</strong></span>
         </div>
       </div>
@@ -94,23 +119,39 @@ const todayTrades = computed(() => (today.value.win_trades || 0) + (today.value.
       </div>
     </div>
 
-    <!-- Card 4: 机构级执行风控防御 -->
+    <!-- Card 4: 当前持仓净盈亏 -->
     <div class="bg-gradient-to-b from-[#111a29] to-[#0D121B] border border-[#1A2232] rounded-xl p-4 flex flex-col justify-between shadow-lg">
       <div class="flex items-center justify-between text-[#707E94] text-xs font-mono mb-2">
         <div class="flex items-center space-x-1.5">
-          <ShieldCheck class="w-4 h-4 text-emerald-400" />
-          <span>机构级风控与云端保护</span>
+          <Activity class="w-4 h-4 text-cyan-400" />
+          <span>当前持仓净盈亏</span>
         </div>
-        <span class="text-[10px] text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">FAIL-CLOSED</span>
+        <span class="text-[10px] font-mono" :class="store.positions.length > 0 ? 'text-cyan-400' : 'text-[#707E94]'">
+          持仓 {{ store.positions.length }}/6 (多{{ longCount }}/空{{ shortCount }})
+        </span>
       </div>
       <div>
-        <div class="text-base sm:text-lg font-bold text-white font-mono flex items-center space-x-2">
-          <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
-          <span>100% 交易所云端 OCO 覆盖</span>
+        <div
+          class="text-2xl sm:text-3xl font-black font-mono tracking-tight"
+          :class="posUplNum >= 0 ? (posUplNum > 0 ? 'text-emerald-400' : 'text-zinc-200') : 'text-rose-400'"
+        >
+          {{ posUplNum > 0 ? '+' : '' }}{{ posUplStr }}
+          <span class="text-xs font-normal text-[#707E94]">USDT</span>
+          <span v-if="store.positions.length > 0" class="text-xs font-semibold ml-1.5" :class="posUplNum >= 0 ? 'text-emerald-400' : 'text-rose-400'">
+            ({{ Number(posUplRatio) > 0 ? '+' : '' }}{{ posUplRatio }}%)
+          </span>
         </div>
         <div class="flex items-center justify-between text-[11px] font-mono mt-2 pt-2 border-t border-[#1A2232]/80 text-[#707E94]">
-          <span>单向最大持仓: <strong class="text-zinc-200">6 笔 (当前 {{ store.positions.length }}/6)</strong></span>
-          <span>时间止损: <strong class="text-zinc-300">8小时横盘强制平仓</strong></span>
+          <span>占用保证金: <strong class="text-zinc-200">${{ totalPosMargin }} U</strong></span>
+          <span v-if="store.positions.length > 0">
+            云端防线:
+            <strong :class="allProtected ? 'text-emerald-400' : 'text-amber-400'">
+              {{ allProtected ? '100% OCO' : '待复核' }}
+            </strong>
+          </span>
+          <span v-else>
+            状态: <strong class="text-zinc-400">空仓待机中</strong>
+          </span>
         </div>
       </div>
     </div>
