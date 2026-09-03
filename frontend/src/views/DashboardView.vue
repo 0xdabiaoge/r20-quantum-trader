@@ -73,11 +73,24 @@ onUnmounted(() => {
     <!-- Global Cyber Footer -->
     <footer class="border-t border-[#1A2232] bg-[#0A0D14] py-3 text-center text-xs font-mono text-[#707E94]">
       <div class="flex items-center justify-center space-x-2">
-        <span>R20 QUANTUM TRADER v6.3.0</span>
+        <button
+          @click="store.showAboutModal = true"
+          class="hover:text-blue-400 transition-colors cursor-pointer"
+          title="点击查看开源仓库与项目信息"
+        >
+          R20 QUANTUM TRADER v6.3.0
+        </button>
         <span>•</span>
         <span>VUE 3 + VITE + TAILWIND CSS</span>
         <span>•</span>
-        <a href="https://github.com/555cute/r20-quantum-trader" target="_blank" class="hover:text-blue-400">GitHub</a>
+        <a
+          href="https://github.com/555cute/r20-quantum-trader"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="hover:text-blue-400 transition-colors"
+        >
+          GitHub
+        </a>
       </div>
     </footer>
 

@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import AboutModal from '../components/AboutModal.vue'
 import {
   LayoutGrid,
   ShieldAlert,
@@ -81,6 +82,8 @@ const currentLabel = computed<string>(() => {
   }
   return currentView.value
 })
+
+const showAboutModal = ref(false)
 </script>
 
 <template>
@@ -94,7 +97,13 @@ const currentLabel = computed<string>(() => {
         </div>
         <div>
           <div class="text-sm font-bold text-white tracking-wide">R20 CONTROL</div>
-          <div class="text-[10px] text-[#707E94] font-mono">QUANTUM TRADER v6.3.0</div>
+          <button
+            @click="showAboutModal = true"
+            class="text-[10px] text-[#707E94] hover:text-blue-400 font-mono transition-colors cursor-pointer text-left block"
+            title="点击查看开源仓库与项目信息"
+          >
+            QUANTUM TRADER v6.3.0
+          </button>
         </div>
       </div>
 
@@ -164,5 +173,11 @@ const currentLabel = computed<string>(() => {
         <router-view />
       </main>
     </div>
+
+    <!-- About Modal (Community, GitHub Repo, QQ Groups) -->
+    <AboutModal
+      :visible="showAboutModal"
+      @close="showAboutModal = false"
+    />
   </div>
 </template>

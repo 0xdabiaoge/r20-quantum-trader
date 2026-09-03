@@ -11,6 +11,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
   const lastUpdated = ref<Date | null>(null)
   const isConnected = ref<boolean>(true)
   const pollingTimer = ref<any>(null)
+  const showAboutModal = ref<boolean>(false)
 
   // Getters
   const account = computed(() => data.value?.account || null)
@@ -129,6 +130,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
     llmRuntime,
     logs,
     isStale,
+    showAboutModal,
     fetchDashboard,
     startPolling,
     stopPolling,
