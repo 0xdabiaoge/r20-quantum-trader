@@ -11,25 +11,58 @@ const captureModal = ref(false)
 const captureStatus = ref<any>(null)
 let captureTimer: any = null
 
-async function loadConfig() {
-  loading.value = true
+const bannerMsg = ref<{ type: 'ok' | 'warn' | 'error'; text: string } | null>(null)
+let bannerTimer: any = null
+
+function showNotificationBanner(type: 'ok' | 'warn' | 'error', text: string) {
+  bannerMsg.value = { type, text }
+  if (bannerTimer) clearTimeout(bannerTimer)
+  bannerTimer = setTimeout(() => { bannerMsg.value = null }, 6000)
+}
+
+async function loadConfig(silent = false) {
+  if (!silent) loading.value = true
   try {
-    config.value = await api('/api/v1/admin/notifications')
+    const res = await api('/api/v1/admin/notifications')
+    // Preserve local un-submitted secret inputs if any
+    if (config.value) {
+      if (config.value.qq?._secret) res.qq._secret = config.value.qq._secret
+      if (config.value.telegram?._token) res.telegram._token = config.value.telegram._token
+    }
     const schedule = await api('/api/v1/admin/notifications/schedule')
-    config.value._briefingTimes = schedule.briefing_times?.join(', ') || ''
+    res._briefingTimes = schedule.briefing_times?.join(', ') || ''
+    config.value = res
   } catch (e: any) {
     console.error(e)
+    showNotificationBanner('error', '加载通知配置失败: ' + (e.message || String(e)))
   } finally {
-    loading.value = false
+    if (!silent) loading.value = false
   }
 }
 
 async function toggleChannel(channel: string, enabled: boolean) {
   try {
-    await api(`/api/v1/admin/channels/${channel}/toggle`, { method: 'PUT', body: JSON.stringify({ enabled }) })
-    await loadConfig()
+    const payload: any = { enabled }
+    if (config.value) {
+      if (channel === 'wechat' && config.value.wechat?.webhook) payload.wechat_webhook = config.value.wechat.webhook
+      if (channel === 'webhook' && config.value.webhook?.url) payload.webhook_url = config.value.webhook.url
+      if (channel === 'telegram') {
+        if (config.value.telegram?._token) payload.telegram_bot_token = config.value.telegram._token
+        if (config.value.telegram?.chat_id) payload.telegram_chat_id = config.value.telegram.chat_id
+        if (config.value.telegram?.api_base) payload.telegram_api_base = config.value.telegram.api_base
+      }
+      if (channel === 'qq') {
+        if (config.value.qq?.app_id) payload.qq_app_id = config.value.qq.app_id
+        if (config.value.qq?._secret) payload.qq_client_secret = config.value.qq._secret
+        if (config.value.qq?.openid) payload.qq_openid = config.value.qq.openid
+      }
+    }
+    const res = await api(`/api/v1/admin/channels/${channel}/toggle`, { method: 'PUT', body: JSON.stringify(payload) })
+    showNotificationBanner('ok', res.message || `${channel} 通道已成功${enabled ? '开启' : '关闭'}`)
+    await loadConfig(true)
   } catch (e: any) {
-    await loadConfig()
+    showNotificationBanner('error', e.message || '通道状态切换失败')
+    await loadConfig(true)
   }
 }
 
@@ -50,10 +83,10 @@ async function saveAll() {
       qq_openid: config.value.qq.openid,
     }
     const res = await api('/api/v1/admin/notifications', { method: 'PUT', body: JSON.stringify(body) })
-    alert(res.message || '保存成功')
-    await loadConfig()
+    showNotificationBanner('ok', res.message || '全部通知通道配置已保存')
+    await loadConfig(true)
   } catch (e: any) {
-    alert(e.message)
+    showNotificationBanner('error', e.message || '保存配置失败')
   }
 }
 
@@ -195,6 +228,19 @@ onMounted(() => {
       >
         集成保障 · 1/3
       </span>
+    </div>
+
+    <!-- Alert / Banner Message -->
+    <div
+      v-if="bannerMsg"
+      class="p-3 rounded-lg text-xs font-mono border transition-all"
+      :style="bannerMsg.type === 'ok'
+        ? { backgroundColor: 'var(--color-up-bg)', borderColor: 'var(--color-up-border)', color: 'var(--color-up)' }
+        : bannerMsg.type === 'warn'
+        ? { backgroundColor: 'var(--color-warn-bg)', borderColor: 'var(--color-warn-border)', color: 'var(--color-warn)' }
+        : { backgroundColor: 'var(--color-down-bg)', borderColor: 'var(--color-down-border)', color: 'var(--color-down)' }"
+    >
+      {{ bannerMsg.text }}
     </div>
 
     <div v-if="loading" class="py-12 text-center text-xs font-mono" style="color: var(--text-muted);">正在加载通知配置...</div>

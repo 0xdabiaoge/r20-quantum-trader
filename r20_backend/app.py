@@ -343,6 +343,14 @@ class BackupVerifyRequest(BaseModel):
 
 class ChannelToggleRequest(BaseModel):
     enabled: bool
+    webhook_url: str | None = None
+    wechat_webhook: str | None = None
+    telegram_bot_token: str | None = None
+    telegram_chat_id: str | None = None
+    telegram_api_base: str | None = None
+    qq_app_id: str | None = None
+    qq_client_secret: str | None = None
+    qq_openid: str | None = None
 
 
 class BackupMethodsUpdate(BaseModel):
@@ -1522,11 +1530,54 @@ def toggle_channel(channel: str, payload: ChannelToggleRequest, x_r20_session: s
     require_admin_header(x_r20_admin_token, x_r20_session)
     keys = {
         "qq": "R20_NOTIFY_QQ_ENABLED",
-        "telegram": "R20_NOTIFY_TELEGRAM_ENABLED", "wechat": "R20_NOTIFY_WECHAT_ENABLED",
+        "telegram": "R20_NOTIFY_TELEGRAM_ENABLED",
+        "wechat": "R20_NOTIFY_WECHAT_ENABLED",
         "webhook": "R20_NOTIFY_WEBHOOK_ENABLED",
+    }
+    channel_names = {
+        "qq": "QQ 官方 Bot",
+        "telegram": "Telegram Bot",
+        "wechat": "企业微信",
+        "webhook": "通用 Webhook",
     }
     if channel not in keys:
         raise HTTPException(status_code=404, detail="未知频道")
+
+    # If the user provided inputs while toggling, save them immediately
+    if channel == "wechat" and payload.wechat_webhook is not None:
+        val = payload.wechat_webhook.strip()
+        if val:
+            save_secrets({"R20_WECHAT_WEBHOOK": val})
+            remove_env({"R20_WECHAT_WEBHOOK"})
+    elif channel == "webhook" and payload.webhook_url is not None:
+        val = payload.webhook_url.strip()
+        if val:
+            save_secrets({"R20_NOTIFICATION_WEBHOOK": val})
+            remove_env({"R20_NOTIFICATION_WEBHOOK"})
+    elif channel == "telegram":
+        if payload.telegram_bot_token is not None and payload.telegram_bot_token.strip():
+            save_secrets({"R20_TELEGRAM_BOT_TOKEN": payload.telegram_bot_token.strip()})
+            remove_env({"R20_TELEGRAM_BOT_TOKEN"})
+        tg_env = {}
+        if payload.telegram_chat_id is not None:
+            tg_env["R20_TELEGRAM_CHAT_ID"] = payload.telegram_chat_id.strip()
+        if payload.telegram_api_base is not None:
+            tg_env["R20_TELEGRAM_API_BASE"] = payload.telegram_api_base.strip()
+        if tg_env:
+            update_env(tg_env)
+    elif channel == "qq":
+        if payload.qq_client_secret is not None and payload.qq_client_secret.strip():
+            save_secrets({"R20_QQ_CLIENT_SECRET": payload.qq_client_secret.strip()})
+            remove_env({"R20_QQ_CLIENT_SECRET"})
+        qq_env = {}
+        if payload.qq_app_id is not None:
+            qq_env["R20_QQ_APP_ID"] = payload.qq_app_id.strip()
+        if payload.qq_openid is not None:
+            qq_env["R20_QQ_OPENID"] = payload.qq_openid.strip()
+        if qq_env:
+            update_env(qq_env)
+
+    name = channel_names.get(channel, channel)
     if payload.enabled:
         env = notification_env()
         readiness = {
@@ -1536,12 +1587,21 @@ def toggle_channel(channel: str, payload: ChannelToggleRequest, x_r20_session: s
             "webhook": bool(env.get("R20_NOTIFICATION_WEBHOOK")),
         }
         if not readiness[channel]:
-            if channel == "qq" and env.get("R20_QQ_APP_ID") and env.get("R20_QQ_CLIENT_SECRET") and not env.get("R20_QQ_OPENID"):
-                raise HTTPException(status_code=409, detail="QQ 缺少目标用户 OpenID，请先点击「⚡ 自动获取 OpenID」向 Bot 发送消息完成绑定")
-            raise HTTPException(status_code=409, detail=f"{channel} 频道凭证或目标未配置完整，请先保存有效配置再启用")
+            if channel == "qq":
+                if not env.get("R20_QQ_OPENID"):
+                    raise HTTPException(status_code=400, detail="QQ 缺少目标用户 OpenID，请先点击「⚡ 自动获取 OpenID」向 Bot 发送消息完成绑定")
+                raise HTTPException(status_code=400, detail="QQ App ID 或 Client Secret 尚未配置完整")
+            elif channel == "wechat":
+                raise HTTPException(status_code=400, detail="企业微信尚未配置 Webhook URL，请先填入有效 Webhook 地址再开启")
+            elif channel == "webhook":
+                raise HTTPException(status_code=400, detail="通用 Webhook 尚未配置 URL，请先填入有效 Webhook 地址再开启")
+            elif channel == "telegram":
+                raise HTTPException(status_code=400, detail="Telegram 缺少 Bot Token 或 Chat ID，请填写完整后再开启")
+            raise HTTPException(status_code=400, detail=f"{name} 凭证或目标未配置完整，请先填写有效配置再开启")
+
     update_env({keys[channel]: "1" if payload.enabled else "0"})
     audit_record("channel.toggle", "success", {"channel": channel, "enabled": payload.enabled})
-    return {"channel": channel, "enabled": payload.enabled}
+    return {"channel": channel, "enabled": payload.enabled, "message": f"{name} 通道已成功{'开启' if payload.enabled else '关闭'}"}
 
 
 @app.put("/api/v1/admin/notifications")
