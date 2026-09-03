@@ -39,12 +39,11 @@ onUnmounted(() => {
       <div v-show="store.activeTab === 'trading'" class="space-y-4">
         <!-- 1. Top HUD 4-Card Ribbon (Equity, Benchmark PnL, Today PnL, Cloud OCO) -->
         <TopHudRibbon />
-        <!-- Dual Column: Positions & In-flight Maker Orders (full table layout) -->
-        <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
-          <PositionList />
-          <PendingOrders />
-        </div>
-        <!-- 6-Asset Grid with Calculus Dynamics & Drawer -->
+        <!-- 2. Full-Width Current Positions & Risk Management (spacious layout) -->
+        <PositionList />
+        <!-- 3. In-flight Maker Orders Monitor (responsive & clean) -->
+        <PendingOrders />
+        <!-- 4. 6-Asset Grid with Calculus Dynamics & Drawer -->
         <InstrumentMatrix />
       </div>
 
