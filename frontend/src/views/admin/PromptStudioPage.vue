@@ -5,7 +5,7 @@ import { useAuthStore } from '../../stores/auth'
 import {
   FileText, Plus, ArrowUp, ArrowDown, Eye, CheckCircle2, Save,
   ToggleLeft, ToggleRight, History, RotateCcw, Trash2, Copy,
-  Download, Upload, FileUp, Sparkles, X
+  Download, Upload, FileUp, Sparkles, X, Code, BookOpen, Layers
 } from 'lucide-vue-next'
 
 const { api } = useApi()
@@ -28,6 +28,11 @@ const importRawJson = ref('')
 const importNameOverride = ref('')
 const importFileError = ref('')
 
+// Template Variables & Guide State
+const variableGuideVisible = ref(false)
+const activeEditingIdx = ref<number>(0)
+const previewMode = ref<'rendered' | 'template'>('rendered')
+
 const pipelines = [
   { id: 'trading_system', label: '交易 System', desc: '发给交易主脑的规则与决策纪律' },
   { id: 'trading_user', label: '交易 User', desc: '每轮拼装实时行情、动力学与决策任务' },
@@ -36,7 +41,15 @@ const pipelines = [
 ] as const
 
 const selectedProfile = computed(() => (lib.value?.profiles || []).find((p: any) => p.id === selectedProfileId.value) || null)
+const templateVariables = computed(() => lib.value?.template_variables || [])
+
 const compiledPreview = computed(() => {
+  if (previewMode.value === 'template') {
+    return workingModules.value
+      .filter((m) => m.enabled && String(m.content || '').trim())
+      .map((m) => `======================= 【${m.title}】 =======================\n${String(m.content).trim()}`)
+      .join('\n\n')
+  }
   if (!selectedProfile.value?.pipeline_views) return lib.value?.effective_templates?.[activePipeline.value] || ''
   return compileLocal()
 })
@@ -89,12 +102,28 @@ function moveModule(idx: number, dir: -1 | 1) {
   if (target < 0 || target >= workingModules.value.length) return
   const arr = workingModules.value
   ;[arr[idx], arr[target]] = [arr[target], arr[idx]]
+  activeEditingIdx.value = target
   dirty.value = true
 }
 
 function toggleModule(m: any) {
   m.enabled = !m.enabled
   dirty.value = true
+}
+
+// 在当前激活模块中一键插入变量占位符
+function insertVarIntoActiveModule(key: string) {
+  if (workingModules.value.length === 0) return
+  const idx = Math.min(Math.max(0, activeEditingIdx.value), workingModules.value.length - 1)
+  const m = workingModules.value[idx]
+  const tag = `{{${key}}}`
+  if (m.content && m.content.includes(tag)) {
+    bannerMsg.value = { text: `模块「${m.title}」已包含变量 ${tag}`, type: 'warn' }
+    return
+  }
+  m.content = m.content ? `${m.content.trim()}\n\n${tag}` : tag
+  dirty.value = true
+  bannerMsg.value = { text: `✅ 已插入变量插槽 ${tag} 到模块「${m.title}」`, type: 'ok' }
 }
 
 async function saveProfile() {
@@ -174,12 +203,16 @@ function addModule() {
     locked: false,
     source: 'custom',
   })
+  activeEditingIdx.value = workingModules.value.length - 1
   dirty.value = true
 }
 
 function removeModule(idx: number) {
   if (!confirm('确定删除该模块？')) return
   workingModules.value.splice(idx, 1)
+  if (activeEditingIdx.value >= workingModules.value.length) {
+    activeEditingIdx.value = Math.max(0, workingModules.value.length - 1)
+  }
   dirty.value = true
 }
 
@@ -193,6 +226,7 @@ function duplicateModule(idx: number) {
     locked: false,
     source: 'custom'
   })
+  activeEditingIdx.value = idx + 1
   dirty.value = true
 }
 
@@ -258,7 +292,7 @@ function handleFileSelect(event: Event) {
   reader.onload = (e) => {
     try {
       const text = e.target?.result as string
-      JSON.parse(text) // Validate JSON
+      JSON.parse(text)
       importRawJson.value = text
       importFileError.value = ''
       if (!importNameOverride.value && file.name) {
@@ -313,10 +347,18 @@ onMounted(loadLib)
       <div class="flex items-center space-x-2">
         <Sparkles class="w-4 h-4 text-blue-400" />
         <p class="text-xs text-[#8A99AD] font-sans">
-          四条消息管线自由编排，所有提示词 100% 解除锁死。支持导出/导入，全面无缝对接后续「策略广场」。
+          四条消息管线自由编排，支持标准语义变量插槽注入。点击变量标签可一键插入到正在编辑的模块中。
         </p>
       </div>
       <div class="flex items-center space-x-2">
+        <button
+          @click="variableGuideVisible = true"
+          class="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-[#111c2a] hover:bg-[#1a2b42] border border-[#23354d] text-cyan-400 hover:text-cyan-300 font-bold transition-all cursor-pointer shadow-sm"
+          title="查看所有可用数据插槽与变量字典"
+        >
+          <BookOpen class="w-3.5 h-3.5" />
+          <span>变量插槽字典</span>
+        </button>
         <button
           @click="importVisible = true"
           class="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-[#111c2a] hover:bg-[#1a2b42] border border-[#23354d] text-blue-400 hover:text-blue-300 font-bold transition-all cursor-pointer shadow-sm"
@@ -333,10 +375,26 @@ onMounted(loadLib)
           <Download class="w-3.5 h-3.5" />
           <span>导出当前策略</span>
         </button>
-        <span class="text-[10px] text-blue-400 bg-blue-500/10 px-2 py-1 rounded border border-blue-500/20">
-          策略中心 · 自由编排
-        </span>
       </div>
+    </div>
+
+    <!-- Quick Variable Inserter Ribbon -->
+    <div class="bg-[#0A0E17] border border-[#1A2232] rounded-xl p-3 flex flex-wrap items-center gap-2 shadow-inner">
+      <div class="flex items-center space-x-1.5 text-[11px] text-zinc-400 font-bold mr-1">
+        <Layers class="w-3.5 h-3.5 text-blue-400" />
+        <span>快速插入数据变量:</span>
+      </div>
+      <button
+        v-for="v in templateVariables"
+        :key="v.key"
+        @click="insertVarIntoActiveModule(v.key)"
+        class="flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-[#101724] hover:bg-blue-600/20 border border-[#202C3F] hover:border-blue-500/50 text-[10px] text-zinc-300 hover:text-blue-300 transition-all cursor-pointer shadow-xs"
+        :title="`${v.description}\n点击即可插入到模块 #${activeEditingIdx + 1} (${workingModules[activeEditingIdx]?.title || '选中模块'})`"
+      >
+        <span class="text-blue-400 font-bold">+</span>
+        <span class="font-sans font-medium">{{ v.label }}</span>
+        <code class="text-[9px] text-[#63758D] font-mono">&#123;&#123;{{ v.key }}&#125;&#125;</code>
+      </button>
     </div>
 
     <!-- Alert / Banner Message -->
@@ -352,7 +410,7 @@ onMounted(loadLib)
     <div v-if="loading" class="py-12 text-center text-xs text-[#707E94]">正在加载提示词策略库...</div>
 
     <!-- Main Workspace Grid -->
-    <div v-else-if="lib" class="grid grid-cols-1 xl:grid-cols-[250px_minmax(0,1fr)_390px] gap-4">
+    <div v-else-if="lib" class="grid grid-cols-1 xl:grid-cols-[250px_minmax(0,1fr)_410px] gap-4">
       <!-- Left: Profile List -->
       <div class="bg-[#0D121B] border border-[#1A2232] rounded-xl p-3 space-y-2.5 h-fit shadow-lg">
         <div class="flex items-center justify-between px-1 pb-2 border-b border-[#1A2232]">
@@ -403,7 +461,7 @@ onMounted(loadLib)
         </div>
         <div class="flex items-center justify-between text-[11px] text-[#707E94] bg-[#0A0D14] px-3 py-2 rounded-lg border border-[#1A2232]">
           <span>{{ pipelines.find(p => p.id === activePipeline)?.desc }}</span>
-          <span class="text-zinc-300 font-bold">当前编辑方案：{{ selectedProfile?.name }}</span>
+          <span class="text-zinc-300 font-bold">当前方案：{{ selectedProfile?.name }} (聚焦模块 #{{ activeEditingIdx + 1 }})</span>
         </div>
 
         <!-- Module Cards List -->
@@ -411,25 +469,32 @@ onMounted(loadLib)
           <div
             v-for="(m, idx) in workingModules"
             :key="m.id"
+            @click="activeEditingIdx = idx"
             class="border rounded-xl p-3.5 transition-all"
-            :class="m.enabled ? 'border-[#273246] bg-[#0A0F18]' : 'border-[#1A2232] bg-[#080B10] opacity-45'"
+            :class="[
+              m.enabled ? 'border-[#273246] bg-[#0A0F18]' : 'border-[#1A2232] bg-[#080B10] opacity-45',
+              activeEditingIdx === idx ? 'ring-1 ring-blue-500/50 border-blue-500/40 shadow-sm shadow-blue-500/10' : ''
+            ]"
           >
             <div class="flex items-center justify-between mb-2 gap-2">
               <!-- Title & Ordering -->
               <div class="flex items-center space-x-2 min-w-0 flex-1">
+                <span class="w-5 h-5 rounded bg-[#151D2C] text-[#8A99AD] font-bold text-[10px] flex items-center justify-center shrink-0">
+                  #{{ idx + 1 }}
+                </span>
                 <button
-                  @click="moveModule(idx, -1)"
+                  @click.stop="moveModule(idx, -1)"
                   :disabled="idx === 0"
                   class="p-1 rounded hover:bg-[#151D2C] text-[#707E94] hover:text-white disabled:opacity-20 cursor-pointer"
-                  title="上移"
+                  title="上移模块"
                 >
                   <ArrowUp class="w-3.5 h-3.5" />
                 </button>
                 <button
-                  @click="moveModule(idx, 1)"
+                  @click.stop="moveModule(idx, 1)"
                   :disabled="idx === workingModules.length - 1"
                   class="p-1 rounded hover:bg-[#151D2C] text-[#707E94] hover:text-white disabled:opacity-20 cursor-pointer"
-                  title="下移"
+                  title="下移模块"
                 >
                   <ArrowDown class="w-3.5 h-3.5" />
                 </button>
@@ -439,30 +504,27 @@ onMounted(loadLib)
                   placeholder="模块标题"
                   @input="dirty = true"
                 />
-                <span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-[#141B26] text-blue-300 border border-blue-500/20 shrink-0">
-                  可自由定制
-                </span>
               </div>
 
               <!-- Controls: Copy, Delete, Toggle -->
               <div class="flex items-center space-x-1.5 shrink-0">
                 <button
-                  @click="duplicateModule(idx)"
+                  @click.stop="duplicateModule(idx)"
                   class="p-1.5 rounded-lg hover:bg-[#151D2C] text-[#707E94] hover:text-white cursor-pointer"
                   title="复制模块"
                 >
                   <Copy class="w-3.5 h-3.5" />
                 </button>
                 <button
-                  @click="removeModule(idx)"
+                  @click.stop="removeModule(idx)"
                   class="p-1.5 rounded-lg hover:bg-[#4d1924] text-[#707E94] hover:text-rose-400 cursor-pointer"
                   title="删除模块"
                 >
                   <Trash2 class="w-3.5 h-3.5" />
                 </button>
                 <button
-                  @click="toggleModule(m)"
-                  class="cursor-pointer transition-colors"
+                  @click.stop="toggleModule(m)"
+                  class="cursor-pointer transition-colors p-1"
                   :class="m.enabled ? 'text-emerald-400' : 'text-[#707E94]'"
                   :title="m.enabled ? '已启用该模块 (点击禁用)' : '已禁用该模块 (点击启用)'"
                 >
@@ -475,9 +537,10 @@ onMounted(loadLib)
             <!-- Content Area (100% Editable) -->
             <textarea
               v-model="m.content"
+              @focus="activeEditingIdx = idx"
               rows="3"
-              class="w-full bg-[#080B10] border border-[#1A2232] rounded-lg text-zinc-200 px-3 py-2 text-xs outline-none focus:border-blue-500 resize-y leading-relaxed transition-colors"
-              placeholder="编写该模块的提示词指令..."
+              class="w-full bg-[#080B10] border border-[#1A2232] rounded-lg text-zinc-200 px-3 py-2 text-xs outline-none focus:border-blue-500 resize-y leading-relaxed transition-colors select-text"
+              placeholder="编写该模块的提示词或插入 {{variable}} 数据插槽..."
               @input="dirty = true"
             ></textarea>
           </div>
@@ -541,25 +604,111 @@ onMounted(loadLib)
         </div>
       </div>
 
-      <!-- Right: Compiled Live Preview -->
+      <!-- Right: Compiled Live Preview with Dual-Mode Toggle -->
       <div class="bg-[#0D121B] border border-[#1A2232] rounded-xl p-4 sm:p-5 h-fit shadow-lg space-y-3">
         <div class="flex items-center justify-between pb-3 border-b border-[#1A2232]">
           <div class="flex items-center space-x-2">
             <Eye class="w-4 h-4 text-cyan-400" />
-            <h3 class="text-xs font-bold text-white uppercase tracking-wider">实发 Prompt 原文对照</h3>
+            <h3 class="text-xs font-bold text-white uppercase tracking-wider">实时渲染对照</h3>
           </div>
-          <button
-            @click="copyPreview"
-            class="px-2.5 py-1 rounded-lg bg-[#111c2a] border border-[#33445b] text-[10px] text-[#b8c4d4] hover:text-white cursor-pointer hover:bg-[#1d3050] transition-colors"
-          >
-            复制全文
-          </button>
+          <div class="flex items-center space-x-1.5">
+            <!-- Mode Switch -->
+            <div class="flex bg-[#080B10] p-0.5 rounded-lg border border-[#1A2232]">
+              <button
+                @click="previewMode = 'rendered'"
+                class="px-2 py-0.5 rounded text-[9px] font-bold cursor-pointer transition-all"
+                :class="previewMode === 'rendered' ? 'bg-blue-600 text-white shadow-xs' : 'text-[#707E94] hover:text-white'"
+              >
+                实发效果
+              </button>
+              <button
+                @click="previewMode = 'template'"
+                class="px-2 py-0.5 rounded text-[9px] font-bold cursor-pointer transition-all"
+                :class="previewMode === 'template' ? 'bg-blue-600 text-white shadow-xs' : 'text-[#707E94] hover:text-white'"
+              >
+                模板源码
+              </button>
+            </div>
+            <button
+              @click="copyPreview"
+              class="px-2 py-1 rounded-lg bg-[#111c2a] border border-[#33445b] text-[10px] text-[#b8c4d4] hover:text-white cursor-pointer hover:bg-[#1d3050] transition-colors"
+            >
+              复制
+            </button>
+          </div>
+        </div>
+        <div class="text-[10px] text-[#707E94] flex items-center justify-between">
+          <span>{{ previewMode === 'rendered' ? '已代入当前真实盘口、最新快讯与自进化心法' : '显示模块包含的原始模版语法与插槽占位符' }}</span>
+          <span class="text-blue-400 font-mono">{{ compiledPreview.length }} 字符</span>
         </div>
         <pre class="bg-[#080B10] border border-[#1A2232] rounded-xl p-3.5 text-[11px] text-zinc-300 whitespace-pre-wrap leading-relaxed max-h-[640px] overflow-y-auto select-text">{{ compiledPreview || '（空）' }}</pre>
       </div>
     </div>
 
-    <!-- Import Modal (File & Raw JSON Support for Strategy Plaza) -->
+    <!-- Template Variables Guide Modal -->
+    <div
+      v-if="variableGuideVisible"
+      class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+      @click.self="variableGuideVisible = false"
+    >
+      <div class="bg-gradient-to-b from-[#111a29] to-[#0D121B] border border-[#1A2232] rounded-2xl p-5 sm:p-6 w-full max-w-2xl max-h-[90dvh] overflow-y-auto space-y-4 shadow-2xl">
+        <div class="flex items-center justify-between pb-3 border-b border-[#1A2232]">
+          <div class="flex items-center space-x-2.5">
+            <div class="w-7 h-7 rounded-lg bg-cyan-600/20 text-cyan-400 flex items-center justify-center">
+              <BookOpen class="w-4 h-4" />
+            </div>
+            <div>
+              <h3 class="text-sm font-bold text-white">系统数据插槽与变量字典</h3>
+              <p class="text-[10px] text-[#707E94]">可以在任意提示词模块中自由引用，系统推演时将自动替换为最新真实数据</p>
+            </div>
+          </div>
+          <button @click="variableGuideVisible = false" class="text-[#707E94] hover:text-white cursor-pointer p-1">
+            <X class="w-4 h-4" />
+          </button>
+        </div>
+
+        <div class="space-y-3">
+          <div
+            v-for="v in templateVariables"
+            :key="v.key"
+            class="p-3.5 rounded-xl border border-[#1E293B] bg-[#0A0E17] space-y-2 hover:border-blue-500/40 transition-colors"
+          >
+            <div class="flex items-center justify-between">
+              <div class="flex items-center space-x-2">
+                <span class="px-2 py-0.5 rounded text-[9px] font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                  {{ v.category }}
+                </span>
+                <span class="text-xs font-bold text-white">{{ v.label }}</span>
+                <code class="px-2 py-0.5 rounded bg-[#101724] border border-[#202C3F] text-amber-300 font-mono text-[10px]">
+                  &#123;&#123;{{ v.key }}&#125;&#125;
+                </code>
+              </div>
+              <button
+                @click="insertVarIntoActiveModule(v.key); variableGuideVisible = false"
+                class="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-[10px] cursor-pointer shadow-xs"
+              >
+                插入到当前模块
+              </button>
+            </div>
+            <p class="text-[11px] text-[#8A99AD] font-sans">{{ v.description }}</p>
+            <div v-if="v.sample" class="bg-[#06090F] border border-[#161F2E] rounded-lg p-2.5 text-[10px] text-zinc-400 font-mono whitespace-pre-wrap max-h-24 overflow-y-auto">
+              {{ v.sample }}
+            </div>
+          </div>
+        </div>
+
+        <div class="flex justify-end pt-3 border-t border-[#1A2232]">
+          <button
+            @click="variableGuideVisible = false"
+            class="px-5 py-2 rounded-xl bg-[#141B26] hover:bg-[#1e2738] text-zinc-300 text-xs cursor-pointer"
+          >
+            关闭字典
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Import Modal -->
     <div
       v-if="importVisible"
       class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
@@ -585,7 +734,6 @@ onMounted(loadLib)
           {{ importFileError }}
         </div>
 
-        <!-- Mode 1: File Upload -->
         <div>
           <label class="block text-xs font-bold text-zinc-300 mb-1.5">方式一：选择本地 .json 策略文件</label>
           <div class="flex items-center space-x-3">
@@ -597,7 +745,6 @@ onMounted(loadLib)
           </div>
         </div>
 
-        <!-- Mode 2: Paste JSON -->
         <div>
           <label class="block text-xs font-bold text-zinc-300 mb-1.5">方式二：或直接粘贴策略 JSON 文本</label>
           <textarea
@@ -608,7 +755,6 @@ onMounted(loadLib)
           ></textarea>
         </div>
 
-        <!-- Optional Name Override -->
         <div>
           <label class="block text-xs font-bold text-zinc-300 mb-1.5">自定义导入方案名称（可选）</label>
           <input
@@ -619,7 +765,6 @@ onMounted(loadLib)
           />
         </div>
 
-        <!-- Modal Actions -->
         <div class="flex items-center justify-end space-x-2 pt-3 border-t border-[#1A2232]">
           <button
             @click="importVisible = false"

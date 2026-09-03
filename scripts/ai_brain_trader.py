@@ -676,8 +676,17 @@ def construct_full_market_prompt(packages: List[Dict[str, Any]], pos_summary: st
   }}
 }}
 """
+    runtime_vars = {
+        "decision_timestamp": f"【推演基准时间】: {now_bj_str}",
+        "account_balance": f"【当前账户可用资金】: {avail_balance_str}",
+        "account_positions": f"【账户持仓概况】: {pos_summary}\n【当前活动在途持仓明细】:\n{active_pos_text}",
+        "pending_orders": f"【当前在途挂单列表】:\n{pending_orders_text}",
+        "news_intelligence": f"【宏观环境基调】: {macro_env}\n【最新核心资讯要闻】:\n{news_text}",
+        "trading_memory": memory_lessons.strip(),
+        "market_matrix": all_market_str,
+    }
     profile = active_profile()
-    return apply_module_layout(prompt, profile, "trading_user", f"{profile.get('name', '稳健')}交易用户提示词模板")
+    return apply_module_layout(prompt, profile, "trading_user", f"{profile.get('name', '稳健')}交易用户提示词模板", context=runtime_vars)
 
 def validate_and_filter_decision(p: Dict[str, Any], d_item: Dict[str, Any], active_inst_ids: set, active_position_sides: Dict[str, str]) -> tuple[str, str, float]:
     """

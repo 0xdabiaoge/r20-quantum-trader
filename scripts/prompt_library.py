@@ -14,7 +14,81 @@ ROOT = Path(__file__).resolve().parents[1]
 LIBRARY_FILE = ROOT / "data" / "prompt_library.json"
 BJ_TZ = timezone(timedelta(hours=8))
 TEMPLATE_KEYS = ("trading_system", "trading_user", "evolution_system", "evolution_user")
-ALLOWED_VARIABLES = {"strategy_version", "timezone", "active_instruments", "profile_name"}
+
+TEMPLATE_VARIABLES_METADATA = [
+    {
+        "key": "news_intelligence",
+        "label": "全网实时资讯",
+        "category": "实时情报",
+        "description": "实时注入全网突发重大加密快讯、宏观经济基调与市场情绪倾向",
+        "sample": "【宏观环境基调】: 偏多倾向\n【最新核心资讯要闻】:\n- [2026-09-03 23:45] 美联储官员表态对通胀回落充满信心...",
+    },
+    {
+        "key": "trading_memory",
+        "label": "自进化实战心法",
+        "category": "自进化",
+        "description": "注入每日复盘根据历史平仓台账提炼的核心实战心法、避坑指南与痛点归因",
+        "sample": "# R20 AI 交易大脑长期记忆与启发式心法\n1. [2026-09-04] 4H主升浪中回调即是做多机会，严禁盲目摸顶开空...",
+    },
+    {
+        "key": "market_matrix",
+        "label": "标的行情数理矩阵",
+        "category": "行情数据",
+        "description": "注入6币种K线、现价、盘口买卖价、聪明钱流向、1H三大数理基石硬证据(v/a/j/I/E/A/VaR)",
+        "sample": "【BTC (BTC-USDT-SWAP)】| 现价: 77575 | 4H宏观大势=4H_MACRO_BULL\n- 1H三大数理基石硬证据: 1H:v=+0.08,a=+0.42...",
+    },
+    {
+        "key": "account_positions",
+        "label": "账户当前持仓",
+        "category": "账户敞口",
+        "description": "注入系统持仓概况、在途持仓方向、均价、标记价、持仓张数、未结浮盈ROI与动态止损线",
+        "sample": "【账户持仓概况】: 当前系统总持仓 1/6\n- 标的: SOL-USDT-SWAP | 方向: long 3x | 开仓均价: 103.55 | 未结浮盈: +9.00 U",
+    },
+    {
+        "key": "pending_orders",
+        "label": "在途未成交挂单",
+        "category": "账户敞口",
+        "description": "注入当前在途未成交的 Maker 限价挂单、买卖方向、价格、数量及附带的云端OCO止盈止损",
+        "sample": "- [挂单ID: 38790...] LINK-USDT-SWAP | 限价买多 5张 @ 10.85 | 附带云端止盈: 12.00 / 止损: 10.30",
+    },
+    {
+        "key": "account_balance",
+        "label": "账户可用资金",
+        "category": "账户敞口",
+        "description": "注入当前账户实际可用于开仓和加仓的 USDT 现金可用余额",
+        "sample": "3858.73 USDT",
+    },
+    {
+        "key": "decision_timestamp",
+        "label": "决策基准时间",
+        "category": "系统环境",
+        "description": "注入当前交易推演周期的精确北京时间戳与时效基准",
+        "sample": "2026-09-04 02:30:00 (北京时间)",
+    },
+    {
+        "key": "active_instruments",
+        "label": "监控标的列表",
+        "category": "系统环境",
+        "description": "注入当前系统跟踪并推演的加密货币标的列表",
+        "sample": "BTC,ETH,SOL,DOGE,SUI,LINK",
+    },
+    {
+        "key": "strategy_version",
+        "label": "系统版本号",
+        "category": "系统环境",
+        "description": "当前 R20 Quantum Trader 交易引擎版本",
+        "sample": "6.3.1",
+    },
+    {
+        "key": "timezone",
+        "label": "系统基准时区",
+        "category": "系统环境",
+        "description": "系统统一时间戳时区",
+        "sample": "Asia/Shanghai",
+    },
+]
+
+ALLOWED_VARIABLES = {item["key"] for item in TEMPLATE_VARIABLES_METADATA} | {"profile_name", "timestamp"}
 MAX_TEMPLATE_CHARS = 12_000
 MAX_PROFILE_CHARS = 32_000
 MAX_REVISIONS = 100
@@ -400,7 +474,44 @@ def _variable_context(profile_name: str = "") -> dict[str, str]:
         instruments = ",".join(str(x.get("name") or x.get("instId") or "") for x in load_instrument_pool())
     except Exception:
         pass
-    return {"strategy_version": os.getenv("R20_VERSION", "6.3.1"), "timezone": "Asia/Shanghai", "active_instruments": instruments, "profile_name": profile_name}
+
+    ctx = {
+        "strategy_version": os.getenv("R20_VERSION", "6.3.1"),
+        "timezone": "Asia/Shanghai",
+        "active_instruments": instruments,
+        "profile_name": profile_name,
+        "decision_timestamp": datetime.now(BJ_TZ).strftime("%Y-%m-%d %H:%M:%S (北京时间)"),
+        "account_balance": "根据系统风险自适应分配",
+        "account_positions": "当前无任何在途持仓敞口 (100% 现金空仓状态)",
+        "pending_orders": "当前无任何在途未成交限价挂单 (挂单池为空)",
+        "news_intelligence": "无可验证突发新闻；维持基准风控边界",
+        "trading_memory": "暂无自进化记忆",
+        "market_matrix": "【六币种原生行情、技术指标与筹码矩阵已就绪】",
+    }
+
+    # Load durable R20 Markdown trading memory if present
+    ai_mem_md = ROOT / "data" / "AI_TRADING_MEMORY.md"
+    if ai_mem_md.exists():
+        try:
+            txt = ai_mem_md.read_text(encoding="utf-8").strip()
+            if txt:
+                ctx["trading_memory"] = txt
+        except Exception:
+            pass
+
+    # Load news sentiment if present
+    news_file = ROOT / "data" / "news_sentiment.json"
+    if news_file.exists():
+        try:
+            ns_data = json.loads(news_file.read_text(encoding="utf-8"))
+            macro = ns_data.get("macro_sentiment", "中性平衡")
+            briefs = [f"- [{n.get('time', '')}] {n.get('title', '')} ({n.get('summary', '')[:80]}...)" for n in ns_data.get("latest_news", [])[:6]]
+            news_txt = "\n".join(briefs) if briefs else "无可验证突发新闻"
+            ctx["news_intelligence"] = f"【宏观环境基调】: {macro}\n【最新核心资讯要闻】:\n{news_txt}"
+        except Exception:
+            pass
+
+    return ctx
 
 
 def render_variables(text: str, context: dict[str, str] | None = None) -> str:
@@ -422,7 +533,7 @@ def _trading_user_parent_groups(base_modules: list[dict[str, Any]], layout_title
     return groups
 
 
-def apply_module_layout(base: str, profile: dict[str, Any], pipeline: str, label: str) -> str:
+def apply_module_layout(base: str, profile: dict[str, Any], pipeline: str, label: str, context: dict[str, Any] | None = None) -> str:
     """Build a real message from base sections plus ordered profile modules.
 
     Modules whose source is ``base`` reference the live base section by id; custom
@@ -430,12 +541,17 @@ def apply_module_layout(base: str, profile: dict[str, Any], pipeline: str, label
     Trading-user runtime sections may contain many nested ``【...】`` labels. Those
     live values are merged back into their parent editor slot instead of being
     appended out of order or replaced by static placeholder text.
+    Supports variable placeholders such as {{news_intelligence}}, {{trading_memory}},
+    {{market_matrix}}, {{account_positions}}, etc.
     """
     base_modules = base_template_modules(base, pipeline)
     layout = ((profile.get("pipelines") or {}).get(pipeline) if isinstance(profile.get("pipelines"), dict) else None)
     if not isinstance(layout, list) or not any(item.get("source") == "base" for item in layout):
         custom = text_to_modules(str(profile.get(pipeline) or ""), "custom")
-        return compile_modules(base_modules + custom)
+        return compile_modules([
+            {**m, "content": render_variables(str(m.get("content") or ""), context)}
+            for m in (base_modules + custom)
+        ])
 
     base_by_title = {item["title"]: item for item in base_modules}
     layout_titles = {str(item.get("title") or "") for item in layout if item.get("source") == "base"}
@@ -446,7 +562,8 @@ def apply_module_layout(base: str, profile: dict[str, Any], pipeline: str, label
     for item in layout:
         if item.get("source") != "base":
             if item.get("enabled", True):
-                output.append(item)
+                content = render_variables(str(item.get("content") or ""), context)
+                output.append({**item, "content": content})
             continue
 
         title = str(item.get("title") or "")
@@ -460,12 +577,21 @@ def apply_module_layout(base: str, profile: dict[str, Any], pipeline: str, label
             continue
 
         if pipeline == "trading_user":
-            content = compile_modules(group)
+            raw_content = str(item.get("content") or "")
+            if _VAR_RE.search(raw_content):
+                content = render_variables(raw_content, context)
+            else:
+                content = compile_modules(group)
         elif any(token in title for token in ("三重滤网裁决协议", "开仓与价格几何")):
             content = live["content"]
         else:
             content = str(item.get("content") if item.get("content") is not None else live["content"])
+            content = render_variables(content, context)
         output.append({**live, "content": content})
+
+    # Fail closed: preserve every live value that an older layout does not know.
+    output.extend(module for module in base_modules if module["title"] not in matched)
+    return compile_modules(output)
 
     # Fail closed: preserve every live value that an older layout does not know.
     output.extend(module for module in base_modules if module["title"] not in matched)

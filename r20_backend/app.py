@@ -1325,6 +1325,7 @@ def prompt_library(x_r20_admin_token: str | None = Header(default=None)) -> dict
             "evolution_user": apply_module_layout(EVOLUTION_USER_TEMPLATE, profile, "evolution_user", "自进化 User"),
         },
         "snapshots": rendered_snapshots(),
+        "template_variables": __import__("scripts.prompt_library", fromlist=["TEMPLATE_VARIABLES_METADATA"]).TEMPLATE_VARIABLES_METADATA,
         "transport": "python-direct",
     }
 
@@ -1349,7 +1350,13 @@ def update_prompt_library(payload: PromptLibraryUpdate, x_r20_admin_token: str |
 def prompt_profiles(x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
     require_admin_header(x_r20_admin_token)
     library = load_library()
-    return {"active_profile_id": library["active_profile_id"], "profiles": all_profiles(), "allowed_variables": sorted(__import__("scripts.prompt_library", fromlist=["ALLOWED_VARIABLES"]).ALLOWED_VARIABLES)}
+    prompts_mod = __import__("scripts.prompt_library", fromlist=["ALLOWED_VARIABLES", "TEMPLATE_VARIABLES_METADATA"])
+    return {
+        "active_profile_id": library["active_profile_id"],
+        "profiles": all_profiles(),
+        "allowed_variables": sorted(list(prompts_mod.ALLOWED_VARIABLES)),
+        "template_variables": prompts_mod.TEMPLATE_VARIABLES_METADATA,
+    }
 
 
 @app.post("/api/v1/admin/prompt-profiles")
