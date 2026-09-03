@@ -29,8 +29,8 @@ onUnmounted(() => {
     <!-- Top Nav Ribbon with 5 Tabs (fixed: never scrolls away) -->
     <HeaderBar />
 
-    <!-- Spacer for fixed header -->
-    <div class="h-[110px] sm:h-[72px] shrink-0"></div>
+    <!-- Spacer for fixed header (slim single-row bar) -->
+    <div class="h-[58px] shrink-0"></div>
 
     <!-- Dynamic Main Content Based on Active Tab -->
     <main class="flex-1 max-w-[1720px] w-full mx-auto px-3 sm:px-6 pb-24 sm:pb-6 space-y-4">
