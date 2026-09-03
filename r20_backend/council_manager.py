@@ -3,18 +3,19 @@
 Architecture:
   Market Data (Snapshot)
            │
-           ├─► Alpha Officer (进攻官)   ─┐
-           ├─► Risk Officer (风控官)    ─┼─► Concurrent Debate (asyncio.gather / threads)
-           └─► Quant Officer (数理官)   ─┘
+           ├─► Advisor 1 (e.g. 动量进攻官) ─┐
+           ├─► Advisor 2 (e.g. 保守风控官) ─┼─► Concurrent Debate (ThreadPoolExecutor)
+           ├─► Advisor N (e.g. 用户新增专家) ─┘
                          │
                          ▼
-             Chief Arbitrator (首席仲裁官)
+             Chief Arbitrator (首席终审仲裁官)
                          │
                          ▼
         1. Standard Trading JSON (for ai_brain_trader发单)
         2. Council Discussion Transcript (for 前台推演审计展示)
 
 Safety:
+  - Fully dynamic: User can freely rename, add, delete, and re-prompt advisor roles.
   - Fail-to-Fast: If council fails or times out, seamlessly falls back
     to single-model inference.
   - Zero-breakage: ai_brain_trader continues to receive the identical dict schema.
@@ -48,6 +49,8 @@ DEFAULT_PRESET_TEMPLATES: Dict[str, Dict[str, Any]] = {
             "请对输入的各币种简明扼要陈述你的进攻视角（50字内/币种），给出方向与置信度，并指出潜在获利空间。"
         ),
         "weight": 0.35,
+        "is_arbitrator": False,
+        "model_id": "",
     },
     "risk": {
         "id": "risk",
@@ -63,6 +66,8 @@ DEFAULT_PRESET_TEMPLATES: Dict[str, Dict[str, Any]] = {
             "请对输入的各币种出具风控质询意见（50字内/币种），指出致命隐患，置信度不足一律建议 WAIT。"
         ),
         "weight": 0.35,
+        "is_arbitrator": False,
+        "model_id": "",
     },
     "quant": {
         "id": "quant",
@@ -78,24 +83,102 @@ DEFAULT_PRESET_TEMPLATES: Dict[str, Dict[str, Any]] = {
             "请基于纯数据指标输出你的概率评分与数理建议（50字内/币种）。"
         ),
         "weight": 0.30,
+        "is_arbitrator": False,
+        "model_id": "",
     },
     "arbitrator": {
         "id": "arbitrator",
         "name": "首席仲裁官 (Chief Arbitrator)",
         "role_title": "综合裁决 / 契约落地",
-        "description": "权衡三位参谋的激辩，按确定性与加权逻辑出具最终决策，并强制输出标准交易 JSON。",
+        "description": "权衡各位参谋的激辩，按确定性与加权逻辑出具最终决策，并强制输出标准交易 JSON。",
         "prompt": (
             "【角色：R20 首席仲裁官兼执行官】\n"
-            "你负责听取「动量进攻官」、「保守风控官」与「量化数理官」三方的辩论意见，做出最终裁决。\n"
+            "你负责听取各位专家参谋的辩论意见，做出最终裁决。\n"
             "裁决准则：\n"
             "1. 若动量官强烈做多但风控官指出量价背离且数理官未确认，必须采纳风控官意见选择观望（WAIT）。\n"
-            "2. 只有当动量官与数理官高度共识、且风控官未提出致命一票否决时，方可批准开仓，但须根据风控官意见动态调整保证金杠杆。\n"
-            "3. 必须在 reasoning 中简明总结三方争辩核心（如「采纳进攻官方向，但遵照风控官意见缩减首仓」）。\n"
+            "2. 只有当各参谋高度共识、且未提出致命一票否决时，方可批准开仓，但须根据风控意见动态调整保证金杠杆。\n"
+            "3. 必须在 reasoning 中简明总结各方争辩核心（如「采纳进攻官方向，但遵照风控官意见缩减首仓」）。\n"
             "4. 最终必须且只能输出严格符合原有交易契约的 JSON 格式，不得包含任何其他文本！"
         ),
         "weight": 1.0,
+        "is_arbitrator": True,
+        "model_id": "",
     },
 }
+
+ADDITIONAL_PRESET_LIBRARY: Dict[str, Dict[str, Any]] = {
+    "news_scout": {
+        "id": "news_scout",
+        "name": "舆情侦察官 (News Scout)",
+        "role_title": "突发情报 / 链上异动",
+        "description": "专注全网突发新闻、监管异动、黑天鹅熔断与极端狂热/恐慌情绪识别。",
+        "prompt": (
+            "【角色：R20 舆情与链上情报侦察官】\n"
+            "你的职责是专门从全网突发资讯、市场情绪狂热度与链上大单角度进行独立研判：\n"
+            "1. 审查当前是否有突发极端监管传闻、交易所脱锚或地缘事件；\n"
+            "2. 警惕市场极度 FOMO 狂热时的诱多见顶信号，以及极度恐慌时的绝望割肉底；\n"
+            "3. 提示链上大额转账异动与潜在巨鲸抛压。\n"
+            "请对输入各标的给出情报面的支持或警示意见（50字内/币种）。"
+        ),
+        "weight": 0.25,
+        "is_arbitrator": False,
+        "model_id": "",
+    },
+    "macro": {
+        "id": "macro",
+        "name": "宏观策略官 (Macro Strategist)",
+        "role_title": "流动性周期 / 大盘贝塔",
+        "description": "研判美联储利率预期、美元指数 DXY、全球流动性潮汐与 BTC 龙头贝塔强弱。",
+        "prompt": (
+            "【角色：R20 宏观经济与流动性策略官】\n"
+            "你的职责是从宏观流动性与大盘贝塔（Beta）视角定调大周期：\n"
+            "1. 评估当前大盘处于流动性扩张还是紧缩抽水阶段；\n"
+            "2. 观察主流币（BTC/ETH）大趋势是否压制山寨币动能；\n"
+            "3. 逆大盘宏观趋势不轻易开顺势重仓。\n"
+            "请对输入标的给出宏观环境匹配度评分（50字内/币种）。"
+        ),
+        "weight": 0.25,
+        "is_arbitrator": False,
+        "model_id": "",
+    },
+    "orderbook": {
+        "id": "orderbook",
+        "name": "盘口微结构官 (Microstructure)",
+        "role_title": "订单薄深度 / 费率滑点",
+        "description": "关注买一卖一挂单厚度、Taker 成交冲击成本与多空费率拥挤度。",
+        "prompt": (
+            "【角色：R20 高频盘口与微结构官】\n"
+            "你的职责是深入微观订单薄深度（Orderbook Depth）与实时资金费率：\n"
+            "1. 检查买一卖一挂单价差（Spread）是否大于 0.05%，严禁在高滑点时刻开仓；\n"
+            "2. 观察买卖盘深度比是否倾斜支持当前发单方向；\n"
+            "3. 警惕高额持仓费率挤压。\n"
+            "请从纯盘口与执行成本角度给出准入评估（50字内/币种）。"
+        ),
+        "weight": 0.25,
+        "is_arbitrator": False,
+        "model_id": "",
+    },
+    "custom": {
+        "id": "custom",
+        "name": "自定义专家参谋 (Custom Advisor)",
+        "role_title": "专项策略 / 自定义视角",
+        "description": "由用户自由设定研判逻辑、专家背景与偏好的独立参谋角色。",
+        "prompt": (
+            "【角色：R20 自定义量化专家】\n"
+            "请严格依据你设定的专业分析逻辑，对输入的各币种数据进行研判并输出核心意见（50字内/币种）。"
+        ),
+        "weight": 0.30,
+        "is_arbitrator": False,
+        "model_id": "",
+    },
+}
+
+ALL_AVAILABLE_PRESETS = {**DEFAULT_PRESET_TEMPLATES, **ADDITIONAL_PRESET_LIBRARY}
+
+
+def get_available_presets() -> List[Dict[str, Any]]:
+    """Return all factory templates that can be used to add new roles or reset prompts."""
+    return list(ALL_AVAILABLE_PRESETS.values())
 
 
 def _atomic_write_json(path: Path, data: Any) -> None:
@@ -121,7 +204,17 @@ def load_council_config() -> Dict[str, Any]:
         try:
             with open(COUNCIL_CONFIG_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                if isinstance(data, dict) and "roles" in data:
+                if isinstance(data, dict) and "roles" in data and isinstance(data["roles"], dict):
+                    # Ensure arbitrator exists and is marked as arbitrator
+                    arb_found = False
+                    for r_id, role in data["roles"].items():
+                        if role.get("is_arbitrator") or r_id == "arbitrator":
+                            role["is_arbitrator"] = True
+                            arb_found = True
+                        else:
+                            role.setdefault("is_arbitrator", False)
+                    if not arb_found:
+                        data["roles"]["arbitrator"] = dict(DEFAULT_PRESET_TEMPLATES["arbitrator"])
                     return data
         except Exception:
             pass
@@ -129,24 +222,7 @@ def load_council_config() -> Dict[str, Any]:
     default_config: Dict[str, Any] = {
         "enabled": False,  # Off by default (speed-first)
         "timeout_seconds": 60.0,
-        "roles": {
-            "alpha": {
-                **DEFAULT_PRESET_TEMPLATES["alpha"],
-                "model_id": "",  # Empty means use active default LLM
-            },
-            "risk": {
-                **DEFAULT_PRESET_TEMPLATES["risk"],
-                "model_id": "",
-            },
-            "quant": {
-                **DEFAULT_PRESET_TEMPLATES["quant"],
-                "model_id": "",
-            },
-            "arbitrator": {
-                **DEFAULT_PRESET_TEMPLATES["arbitrator"],
-                "model_id": "",
-            },
-        },
+        "roles": {k: dict(v) for k, v in DEFAULT_PRESET_TEMPLATES.items()},
         "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
     }
     _atomic_write_json(COUNCIL_CONFIG_FILE, default_config)
@@ -157,6 +233,25 @@ def save_council_config(config: Dict[str, Any]) -> Dict[str, Any]:
     """Validate and persist council configuration."""
     if not isinstance(config, dict):
         raise ValueError("Council config must be a dict")
+    roles = config.get("roles")
+    if not isinstance(roles, dict) or not roles:
+        raise ValueError("委员会至少需要包含角色配置")
+
+    # Ensure at least one arbitrator exists
+    has_arbitrator = any(r.get("is_arbitrator") or k == "arbitrator" for k, r in roles.items())
+    if not has_arbitrator:
+        raise ValueError("委员会必须保留至少一位首席终审仲裁官以输出标准交易决策JSON！")
+
+    # Validate each role
+    for role_id, role in roles.items():
+        if not isinstance(role, dict):
+            raise ValueError(f"角色 {role_id} 配置必须为字典")
+        if not str(role.get("name", "")).strip():
+            raise ValueError(f"角色 {role_id} 名称不能为空")
+        if not str(role.get("prompt", "")).strip():
+            raise ValueError(f"角色 {role.get('name', role_id)} 的 System Prompt 不能为空")
+        role["id"] = role_id
+
     config["updated_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
     _atomic_write_json(COUNCIL_CONFIG_FILE, config)
     return config
@@ -164,13 +259,29 @@ def save_council_config(config: Dict[str, Any]) -> Dict[str, Any]:
 
 def reset_role_template(role_id: str) -> Dict[str, Any]:
     """Reset a specific role to its factory default template."""
-    if role_id not in DEFAULT_PRESET_TEMPLATES:
-        raise ValueError(f"Unknown role id: {role_id}")
     config = load_council_config()
-    target = DEFAULT_PRESET_TEMPLATES[role_id]
-    current_model = config.get("roles", {}).get(role_id, {}).get("model_id", "")
-    config.setdefault("roles", {})[role_id] = {
-        **target,
+    roles = config.get("roles", {})
+    if role_id not in roles:
+        raise ValueError(f"未找到角色 ID: {role_id}")
+
+    # Check if a preset exists for this ID or default arbitrator/alpha/risk/quant
+    preset = ALL_AVAILABLE_PRESETS.get(role_id)
+    if not preset:
+        if role_id == "arbitrator" or roles[role_id].get("is_arbitrator"):
+            preset = DEFAULT_PRESET_TEMPLATES["arbitrator"]
+        else:
+            preset = ALL_AVAILABLE_PRESETS["custom"]
+
+    current_model = roles[role_id].get("model_id", "")
+    roles[role_id] = {
+        **preset,
+        "id": role_id,
+        "name": preset["name"],
+        "role_title": preset.get("role_title", "参谋专家"),
+        "description": preset.get("description", ""),
+        "prompt": preset["prompt"],
+        "weight": preset.get("weight", 0.3),
+        "is_arbitrator": preset.get("is_arbitrator", False),
         "model_id": current_model,
     }
     return save_council_config(config)
@@ -205,14 +316,14 @@ def _call_single_role(
                 break
 
     prompt_content = role_spec.get("prompt", "")
+    role_name = role_spec.get("name", role_id)
     messages = [
         {"role": "system", "content": prompt_content},
         {
             "role": "user",
             "content": (
-                "【市场实时数据输入】\n"
-                f"{market_prompt}\n\n"
-                "请严格以你的专家角色进行研判。输出一段精炼的评估报告（包含各标的倾向：BUY_LONG / SELL_SHORT / WAIT，置信度及最核心理由）。"
+                f"【市场实时数据输入】\n{market_prompt}\n\n"
+                f"请严格以你「{role_name}」的专有视角进行研判。输出一段精炼的评估报告（包含各标的倾向：BUY_LONG / SELL_SHORT / WAIT，置信度及最核心理由）。"
             ),
         },
     ]
@@ -230,7 +341,7 @@ def _call_single_role(
         )
         return {
             "role_id": role_id,
-            "role_name": role_spec.get("name", role_id),
+            "role_name": role_name,
             "model_used": override_model or get_active_llm_runtime().get("model", "default"),
             "status": "ok",
             "content": content.strip(),
@@ -241,7 +352,7 @@ def _call_single_role(
     except Exception as e:
         return {
             "role_id": role_id,
-            "role_name": role_spec.get("name", role_id),
+            "role_name": role_name,
             "model_used": override_model or "unknown",
             "status": "error",
             "error": str(e),
@@ -256,7 +367,7 @@ def execute_council_debate(
     original_system_prompt: str,
     timeout: float = 60.0,
 ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
-    """Execute the full Council deliberation workflow.
+    """Execute the full Council deliberation workflow with dynamic roles.
 
     Returns:
       (brain_output_dict, council_transcript_dict)
@@ -267,35 +378,44 @@ def execute_council_debate(
     roles = config.get("roles", {})
     t_start = time.time()
 
-    # Step 1: Deliberate concurrently among advisors (Alpha, Risk, Quant)
-    advisor_keys = ["alpha", "risk", "quant"]
-    advisor_results: Dict[str, Dict[str, Any]] = {}
+    # Step 1: Identify Arbitrator and Advisors dynamically
+    arbitrator_key = next(
+        (k for k, r in roles.items() if r.get("is_arbitrator") or k == "arbitrator"),
+        "arbitrator",
+    )
+    arbitrator_spec = roles.get(arbitrator_key, DEFAULT_PRESET_TEMPLATES["arbitrator"])
+    advisor_keys = [
+        k for k in roles.keys()
+        if k != arbitrator_key and roles[k].get("enabled", True) is not False
+    ]
 
-    # Allocate ~55% of the total budget to the concurrent advisors stage (min 15s)
-    member_timeout = max(15.0, timeout * 0.55)
-    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
-        futures = {
-            pool.submit(
-                _call_single_role,
-                key,
-                roles.get(key, DEFAULT_PRESET_TEMPLATES.get(key, {})),
-                market_prompt,
-                member_timeout,
-            ): key
-            for key in advisor_keys
-            if key in roles or key in DEFAULT_PRESET_TEMPLATES
-        }
-        for fut in concurrent.futures.as_completed(futures):
-            key = futures[fut]
-            try:
-                advisor_results[key] = fut.result()
-            except Exception as exc:
-                advisor_results[key] = {
-                    "role_id": key,
-                    "status": "error",
-                    "content": f"Execution error: {exc}",
-                    "weight": 0.0,
-                }
+    advisor_results: Dict[str, Dict[str, Any]] = {}
+    if advisor_keys:
+        # Allocate ~55% of the total budget to the concurrent advisors stage (min 15s)
+        member_timeout = max(15.0, timeout * 0.55)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, len(advisor_keys))) as pool:
+            futures = {
+                pool.submit(
+                    _call_single_role,
+                    key,
+                    roles[key],
+                    market_prompt,
+                    member_timeout,
+                ): key
+                for key in advisor_keys
+            }
+            for fut in concurrent.futures.as_completed(futures):
+                key = futures[fut]
+                try:
+                    advisor_results[key] = fut.result()
+                except Exception as exc:
+                    advisor_results[key] = {
+                        "role_id": key,
+                        "role_name": roles[key].get("name", key),
+                        "status": "error",
+                        "content": f"Execution error: {exc}",
+                        "weight": 0.0,
+                    }
 
     # Step 2: Compile the Debate Transcript for the Arbitrator
     transcript_blocks = []
@@ -305,10 +425,9 @@ def execute_council_debate(
             f"=== 【{res.get('role_name', k)}】研判意见（模型：{res.get('model_used', 'default')}）===\n"
             f"{res.get('content', '（无发言）')}\n"
         )
-    compiled_debate = "\n".join(transcript_blocks)
+    compiled_debate = "\n".join(transcript_blocks) if transcript_blocks else "（无其他参谋发言，请独立决策）"
 
     # Step 3: Chief Arbitrator Final Verdict & Strict JSON Synthesis
-    arbitrator_spec = roles.get("arbitrator", DEFAULT_PRESET_TEMPLATES["arbitrator"])
     arb_model_id = arbitrator_spec.get("model_id") or ""
     override_model = None
     override_url = None
@@ -327,12 +446,13 @@ def execute_council_debate(
                 override_effort = item.get("reasoning_effort", "high")
                 break
 
+    advisors_list_str = "、".join([roles[k].get("name", k) for k in advisor_keys]) or "相关参谋"
     arbitrator_system_prompt = (
         f"{original_system_prompt}\n\n"
         "====================================================\n"
-        "【特别授权：你现在是 R20 多模型决策委员会的首席仲裁官】\n"
+        f"【特别授权：你现在是 R20 多模型决策委员会的{arbitrator_spec.get('name', '首席仲裁官')}】\n"
         f"{arbitrator_spec.get('prompt', '')}\n"
-        "你必须权衡下方三位专家参谋的争辩记录，去伪存真，做出最终全局决策，并严格履行输出契约！"
+        f"你必须权衡下方各专家参谋（{advisors_list_str}）的争辩记录，去伪存真，做出最终全局决策，并严格履行输出契约！"
     )
 
     arbitrator_user_prompt = (

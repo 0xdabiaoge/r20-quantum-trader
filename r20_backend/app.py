@@ -206,7 +206,7 @@ class CouncilConfigUpdateRequest(BaseModel):
 
 
 class CouncilResetRoleRequest(BaseModel):
-    role_id: str = Field(pattern=r"^(alpha|risk|quant|arbitrator)$")
+    role_id: str
 
 
 class CouncilTestRequest(BaseModel):
@@ -979,8 +979,10 @@ def admin_delete_llm_provider(provider_id: str, x_r20_session: str | None = Head
 @app.get("/api/v1/admin/council/config")
 def admin_get_council_config(x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
     require_admin_header(x_r20_session=x_r20_session)
-    from r20_backend.council_manager import load_council_config
-    return load_council_config()
+    from r20_backend.council_manager import load_council_config, get_available_presets
+    cfg = load_council_config()
+    cfg["available_presets"] = get_available_presets()
+    return cfg
 
 
 @app.put("/api/v1/admin/council/config")
