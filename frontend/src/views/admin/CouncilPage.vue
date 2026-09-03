@@ -26,7 +26,7 @@ const bannerMsg = ref<{ text: string; type: 'ok' | 'err' | 'warn' } | null>(null
 
 const councilConfig = ref<any>({
   enabled: false,
-  timeout_seconds: 22.0,
+  timeout_seconds: 60.0,
   roles: {},
 })
 
@@ -75,7 +75,7 @@ async function saveConfig() {
       method: 'PUT',
       body: JSON.stringify({
         enabled: councilConfig.value.enabled,
-        timeout_seconds: Number(councilConfig.value.timeout_seconds) || 22.0,
+        timeout_seconds: Number(councilConfig.value.timeout_seconds) || 60.0,
         roles: councilConfig.value.roles,
       }),
     })
@@ -203,18 +203,24 @@ onMounted(loadData)
       <!-- Settings Sub-bar -->
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3 pt-1">
         <div>
-          <label class="block text-[11px] text-[#8997aa] mb-1 font-mono">委员会决策硬超时熔断 (秒)</label>
+          <div class="flex items-center justify-between mb-1">
+            <label class="text-[11px] text-[#8997aa] font-mono">委员会决策硬超时熔断 (秒)</label>
+            <span class="text-[10px] font-mono text-purple-400">支持 10 ~ 300 秒</span>
+          </div>
           <input
             v-model="councilConfig.timeout_seconds"
             type="number"
-            min="8"
-            max="60"
+            min="10"
+            max="300"
+            step="5"
             class="w-full bg-[#090f18] border border-[#1A2232] rounded-lg text-white px-3 py-1.5 text-xs font-mono outline-none focus:border-purple-500"
             :disabled="!auth.isSuperadmin"
           />
-          <span class="text-[10px] text-[#556677] font-mono mt-0.5 block">超过此耗时未全部完成辩论时，自动降级为单模型决策，绝不错过交易窗口</span>
+          <span class="text-[10px] text-[#707E94] font-mono mt-1 block leading-relaxed">
+            💡 推荐配置：常规模型建议 <strong>40~60 秒</strong>；若参谋绑定了 Claude 3.7 Thinking / o 系列 / DeepSeek R1 等带深度思考的模型，建议设为 <strong>60~90 秒</strong>（15分钟K线周期有15分钟充足窗口，花1分钟深度博弈完全充裕）。超时将自动安全降级为单模型。
+          </span>
         </div>
-        <div class="flex items-end space-x-2">
+        <div class="flex items-end space-x-2 pb-1">
           <button
             @click="saveConfig"
             :disabled="saving || !auth.isSuperadmin"

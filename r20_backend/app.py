@@ -201,7 +201,7 @@ class LLMModelUpsertRequest(BaseModel):
 
 class CouncilConfigUpdateRequest(BaseModel):
     enabled: bool
-    timeout_seconds: float = Field(default=22.0, ge=5.0, le=90.0)
+    timeout_seconds: float = Field(default=60.0, ge=10.0, le=300.0)
     roles: dict[str, Any]
 
 
@@ -1012,7 +1012,8 @@ def admin_reset_council_role(payload: CouncilResetRoleRequest, x_r20_session: st
 @app.post("/api/v1/admin/council/test")
 def admin_test_council_debate(payload: CouncilTestRequest, x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
     require_admin_header(x_r20_session=x_r20_session)
-    from r20_backend.council_manager import execute_council_debate
+    from r20_backend.council_manager import execute_council_debate, load_council_config
+    c_cfg = load_council_config()
     test_market = payload.mock_market_prompt or (
         "【测试行情快照】\n"
         "BTC: $77,750, 1H v=+0.08, a=+0.42, ADX=18.5, CMF=+0.12, 聪明钱多头 74%\n"
@@ -1024,7 +1025,7 @@ def admin_test_council_debate(payload: CouncilTestRequest, x_r20_session: str | 
         brain_output, transcript = execute_council_debate(
             market_prompt=test_market,
             original_system_prompt=test_sys,
-            timeout=30.0,
+            timeout=float(c_cfg.get("timeout_seconds", 60.0)),
         )
         return {
             "status": "ok",

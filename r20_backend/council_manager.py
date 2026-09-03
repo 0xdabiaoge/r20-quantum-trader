@@ -128,7 +128,7 @@ def load_council_config() -> Dict[str, Any]:
 
     default_config: Dict[str, Any] = {
         "enabled": False,  # Off by default (speed-first)
-        "timeout_seconds": 22.0,
+        "timeout_seconds": 60.0,
         "roles": {
             "alpha": {
                 **DEFAULT_PRESET_TEMPLATES["alpha"],
@@ -180,7 +180,7 @@ def _call_single_role(
     role_id: str,
     role_spec: Dict[str, Any],
     market_prompt: str,
-    timeout: float = 18.0,
+    timeout: float = 35.0,
 ) -> Dict[str, Any]:
     """Call one council member with its dedicated system prompt and return its viewpoint."""
     from r20_backend.llm_manager import execute_llm_request, get_active_llm_runtime, load_llm_config
@@ -254,7 +254,7 @@ def _call_single_role(
 def execute_council_debate(
     market_prompt: str,
     original_system_prompt: str,
-    timeout: float = 22.0,
+    timeout: float = 60.0,
 ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     """Execute the full Council deliberation workflow.
 
@@ -271,7 +271,8 @@ def execute_council_debate(
     advisor_keys = ["alpha", "risk", "quant"]
     advisor_results: Dict[str, Dict[str, Any]] = {}
 
-    member_timeout = max(8.0, timeout - 6.0)
+    # Allocate ~55% of the total budget to the concurrent advisors stage (min 15s)
+    member_timeout = max(15.0, timeout * 0.55)
     with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
         futures = {
             pool.submit(
@@ -347,7 +348,8 @@ def execute_council_debate(
         "3. 严格输出标准 JSON 格式，顶层必须包含 decisions, position_management, macro_assessment 三个键！"
     )
 
-    rem_time = max(8.0, timeout - (time.time() - t_start))
+    # Ensure arbitrator has at least 20s or remaining budget
+    rem_time = max(20.0, timeout - (time.time() - t_start))
     content, reasoning, usage, latency = execute_llm_request(
         messages=[
             {"role": "system", "content": arbitrator_system_prompt},

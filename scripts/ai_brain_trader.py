@@ -822,7 +822,7 @@ def execute_batch_ai_brain_cycle(pos_summary: str = "当前总持仓 0/6", activ
                 brain_output, council_transcript = execute_council_debate(
                     market_prompt=prompt,
                     original_system_prompt=effective_system_prompt,
-                    timeout=float(c_cfg.get("timeout_seconds", 25.0)),
+                    timeout=float(c_cfg.get("timeout_seconds", 60.0)),
                 )
                 print(f"[AI Brain Council] ✅ 委员会辩论与终审完成，耗时: {council_transcript.get('total_duration_ms', 0)}ms")
             except Exception as e:
