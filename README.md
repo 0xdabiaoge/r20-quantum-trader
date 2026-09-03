@@ -7,7 +7,6 @@
 **独立 Gateway · 多模型委员会 · 模块化提示词 · 原生 Vue 3 SPA · QQ 官方 Bot 扫码 · 100% 云端 OCO · 加密灾备**
 
 [![Release](https://img.shields.io/badge/release-v6.3.0-3875F6?style=flat-square)](https://github.com/555cute/r20-quantum-trader/releases/tag/v6.3.0)
-[![QQ Group](https://img.shields.io/badge/QQ%E4%BA%A4%E6%B5%81%E7%BE%A4-655973677-12B7F5?style=flat-square&logo=tencent-qq&logoColor=white)](#-社区与致谢)
 [![LINUX DO](https://img.shields.io/badge/Community-LINUX%20DO-F97316?style=flat-square&logo=linux&logoColor=white)](https://linux.do/)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![Exchange](https://img.shields.io/badge/Exchange-OKX%20V5%20Direct-111827?style=flat-square)](https://www.okx.com/)
