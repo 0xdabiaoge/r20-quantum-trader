@@ -30,6 +30,14 @@ function num(v: any): number {
   return Number(v) || 0
 }
 
+function getPnl(t: any): number {
+  return Number(t.pnl ?? t.net_pnl ?? t.gross_pnl ?? 0)
+}
+
+function getRoi(t: any): number {
+  return Number(t.roi_pct ?? t.roi ?? 0)
+}
+
 function formatPx(v: any): string {
   if (v == null || v === '') return '--'
   const n = Number(v)
@@ -189,15 +197,15 @@ function clean(v: any, fallback = '--'): string {
               <td class="py-3 pr-2 text-right">
                 <span
                   class="font-bold text-sm num-tabular"
-                  :style="{ color: num(t.net_pnl) >= 0 ? 'var(--color-up)' : 'var(--color-down)' }"
+                  :style="{ color: getPnl(t) >= 0 ? 'var(--color-up)' : 'var(--color-down)' }"
                 >
-                  {{ num(t.net_pnl) >= 0 ? '+' : '' }}{{ num(t.net_pnl).toFixed(2) }} U
+                  {{ getPnl(t) >= 0 ? '+' : '' }}{{ getPnl(t).toFixed(2) }} U
                 </span>
                 <span
                   class="text-[10px] ml-1 num-tabular"
-                  :style="{ color: num(t.net_pnl) >= 0 ? 'var(--color-up)' : 'var(--color-down)' }"
+                  :style="{ color: getRoi(t) >= 0 ? 'var(--color-up)' : 'var(--color-down)' }"
                 >
-                  ({{ num(t.net_pnl) >= 0 ? '+' : '' }}{{ (num(t.roi_pct) || 0).toFixed(1) }}%)
+                  ({{ getRoi(t) >= 0 ? '+' : '' }}{{ getRoi(t).toFixed(1) }}%)
                 </span>
               </td>
               <td class="py-3 pr-2 text-center num-tabular" style="color: var(--text-muted);">
