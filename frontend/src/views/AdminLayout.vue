@@ -1,39 +1,36 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import AboutModal from '../components/AboutModal.vue'
 import {
-  LayoutGrid,
-  ShieldAlert,
-  Brain,
-  Zap,
-  MessageCircle,
-  HardDrive,
-  Package,
+  LayoutDashboard,
+  Cpu,
+  Layers,
+  Radio,
+  FileCode,
   Scroll,
   UserCog,
   Info,
-  Cpu,
+  Package,
   FileText,
   Users,
   ShieldCheck,
   RefreshCw,
   LogOut,
+  ExternalLink,
+  BookOpen,
 } from 'lucide-vue-next'
 
-const auth = useAuthStore()
 const router = useRouter()
 const route = useRoute()
+const auth = useAuthStore()
 
 const navGroups = [
   {
-    label: '日常运行',
+    label: '系统总览',
     items: [
-      { id: 'overview', label: '运行总览', icon: LayoutGrid },
-      { id: 'security', label: '账户与交易', icon: ShieldAlert },
-      { id: 'decisions', label: '决策与日志', icon: Brain },
-      { id: 'gateway', label: '任务与事件', icon: Zap },
+      { id: 'overview', label: '运行总览', icon: LayoutDashboard },
     ],
   },
   {
@@ -47,15 +44,15 @@ const navGroups = [
     ],
   },
   {
-    label: '集成与保障',
+    label: '交易管理',
     items: [
-      { id: 'notify', label: '通知渠道', icon: MessageCircle },
-      { id: 'backup', label: '备份与恢复', icon: HardDrive },
-      { id: 'plugins', label: '插件能力', icon: Package },
+      { id: 'symbols', label: '标的池', icon: Layers },
+      { id: 'manual-trade', label: '手动发单', icon: Radio },
+      { id: 'backups', label: '备份与还原', icon: FileCode },
     ],
   },
   {
-    label: '治理',
+    label: '系统管理',
     items: [
       { id: 'audit', label: '操作审计', icon: Scroll },
       { id: 'adminsys', label: '管理员与密码', icon: UserCog },
@@ -89,19 +86,19 @@ const showAboutModal = ref(false)
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#080B10] text-[#F3F4F6] flex flex-col md:flex-row">
-    <!-- Sidebar (desktop) / horizontal nav (mobile) -->
-    <aside class="w-full md:w-[210px] md:shrink-0 border-b md:border-b-0 md:border-r border-[#1A2232] bg-[#0A0D14] md:flex md:flex-col md:h-screen md:sticky md:top-0">
+  <div class="min-h-screen bg-[#030712] text-slate-100 flex flex-col md:flex-row font-sans selection:bg-blue-600/30 selection:text-white">
+    <!-- Sidebar (Desktop) / Horizontal Nav (Mobile) -->
+    <aside class="w-full md:w-[220px] md:shrink-0 border-b md:border-b-0 md:border-r border-[#162444] bg-[#060B18]/95 backdrop-blur-xl md:flex md:flex-col md:h-screen md:sticky md:top-0 shadow-2xl z-30">
       <!-- Brand -->
-      <div class="px-4 py-2.5 md:py-4 border-b border-[#1A2232] hidden md:flex items-center space-x-2.5">
-        <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-blue-600 via-indigo-600 to-cyan-400 flex items-center justify-center shadow-lg shadow-blue-500/20 ring-1 ring-white/20">
-          <span class="text-white font-black text-base tracking-wider">R</span>
+      <div class="px-4 py-3.5 md:py-4 border-b border-[#162444] hidden md:flex items-center space-x-3">
+        <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-cyan-400 flex items-center justify-center shadow-lg shadow-blue-500/20 ring-1 ring-white/20">
+          <span class="text-white font-black text-base tracking-wider font-mono">R</span>
         </div>
         <div>
-          <div class="text-sm font-bold text-white tracking-wide">R20 CONTROL</div>
+          <div class="text-sm font-black text-white tracking-wider font-mono">R20 CONTROL</div>
           <button
             @click="showAboutModal = true"
-            class="text-[10px] text-[#707E94] hover:text-blue-400 font-mono transition-colors cursor-pointer text-left block"
+            class="text-[10px] text-slate-400 hover:text-cyan-400 font-mono transition-colors cursor-pointer text-left block"
             title="点击查看开源仓库与项目信息"
           >
             QUANTUM TRADER v6.5.1
@@ -109,74 +106,94 @@ const showAboutModal = ref(false)
         </div>
       </div>
 
-      <!-- Nav Groups: horizontal scroll strip on mobile, vertical list on desktop -->
-      <nav class="overflow-x-auto md:overflow-y-auto md:overflow-x-hidden md:flex-1 py-1.5 md:py-2 px-2 md:space-y-1 flex md:block whitespace-nowrap">
-        <div v-for="group in navGroups" :key="group.label" class="mb-2 md:mb-2 inline-block md:block mr-4 md:mr-0 align-top">
-          <div class="text-[10px] font-mono font-bold text-[#556677] uppercase tracking-wider px-3 py-1.5">{{ group.label }}</div>
-          <div class="flex md:block space-x-1 md:space-x-0">
+      <!-- Nav Groups -->
+      <nav class="overflow-x-auto md:overflow-y-auto md:overflow-x-hidden md:flex-1 py-2 px-2.5 md:space-y-1.5 flex md:block whitespace-nowrap">
+        <div v-for="group in navGroups" :key="group.label" class="mb-2 md:mb-3 inline-block md:block mr-4 md:mr-0 align-top">
+          <div class="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider px-3 py-1.5">{{ group.label }}</div>
+          <div class="flex md:block space-x-1 md:space-x-0 md:space-y-0.5">
             <button
               v-for="item in group.items"
               :key="item.id"
               @click="navigateTo(item.id)"
-              class="flex items-center space-x-1.5 md:space-x-2.5 px-2.5 md:px-3 py-1.5 md:py-2 rounded-lg text-[11px] md:text-xs font-mono font-medium transition-all cursor-pointer shrink-0"
+              class="w-full text-left px-3 py-2 rounded-xl text-xs font-mono font-medium transition-all flex items-center space-x-2.5 cursor-pointer"
               :class="currentView === item.id
-                ? 'bg-gradient-to-r from-blue-600/20 to-transparent text-white border border-blue-500/40 md:border-0 md:border-l-2 md:border-l-blue-400'
-                : 'text-[#707E94] hover:text-white hover:bg-[#121824]'"
+                ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold shadow-md shadow-blue-600/30 border border-blue-400/40'
+                : 'text-slate-400 hover:text-white hover:bg-[#0E172E] border border-transparent'"
             >
-              <component :is="item.icon" class="w-3.5 h-3.5 shrink-0" />
-              <span>{{ item.label }}</span>
+              <component :is="item.icon" class="w-3.5 h-3.5 shrink-0" :class="currentView === item.id ? 'text-cyan-200' : 'text-slate-400'" />
+              <span class="truncate">{{ item.label }}</span>
             </button>
           </div>
         </div>
       </nav>
 
-      <!-- Footer (desktop only) -->
-      <div class="hidden md:block px-4 py-3 border-t border-[#1A2232] text-[10px] font-mono text-[#556677] space-y-1">
-        <div class="flex items-center space-x-1">
-          <span class="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-          <span>www.r20.cn</span>
+      <!-- Sidebar Footer User Profile -->
+      <div class="px-3 py-3 border-t border-[#162444] hidden md:flex items-center justify-between text-xs font-mono bg-[#040813]">
+        <div class="flex items-center space-x-2 min-w-0">
+          <div class="w-6 h-6 rounded-lg bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-400 font-bold text-[10px]">
+            {{ auth.user?.username?.charAt(0).toUpperCase() || 'A' }}
+          </div>
+          <div class="truncate">
+            <div class="text-white font-bold truncate text-[11px]">{{ auth.user?.username || 'admin' }}</div>
+            <div class="text-[9px] text-cyan-400 capitalize">{{ auth.user?.role || 'superadmin' }}</div>
+          </div>
         </div>
-        <div>配置落盘 .env · 0600</div>
-        <div>危险动作强制二次确认</div>
+        <button
+          @click="handleLogout"
+          class="p-1.5 rounded-lg hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 transition-colors cursor-pointer"
+          title="退出登录"
+        >
+          <LogOut class="w-3.5 h-3.5" />
+        </button>
       </div>
     </aside>
 
-    <!-- Main -->
+    <!-- Main Content Shell -->
     <div class="flex-1 flex flex-col min-w-0">
-      <!-- Topbar -->
-      <header class="min-h-14 border-b border-[#1A2232] bg-[#0A0D14]/80 backdrop-blur-md flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 px-3 sm:px-5 py-2 md:py-0 shrink-0 sticky top-0 z-30">
-        <div>
-          <div class="text-sm font-bold text-white">{{ currentLabel }}</div>
-          <div class="text-[11px] text-[#707E94] font-mono">R20 Quantum Trader 控制面</div>
+      <!-- Top Title Header Bar -->
+      <header class="h-14 border-b border-[#162444] bg-[#060B18]/90 backdrop-blur-md px-4 sm:px-6 flex items-center justify-between z-20">
+        <div class="flex items-center space-x-3">
+          <h2 class="text-sm sm:text-base font-black text-white font-mono uppercase tracking-wide">
+            {{ currentLabel }}
+          </h2>
+          <span class="text-[10px] font-mono text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded-full border border-cyan-500/20 hidden sm:inline">
+            R20 QUANTUM ENGINE
+          </span>
         </div>
-        <div class="flex items-center space-x-2 sm:space-x-3">
-          <div class="flex items-center space-x-2 bg-[#0D121B] px-2.5 sm:px-3 py-1.5 rounded-lg border border-[#1A2232]">
-            <div class="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs">
-              {{ auth.user?.username?.[0]?.toUpperCase() || 'A' }}
-            </div>
-            <div class="text-xs">
-              <div class="font-bold text-white">{{ auth.user?.username || 'admin' }}</div>
-              <div class="text-[10px] text-[#707E94]">{{ auth.user?.role || '超级管理员' }}</div>
-            </div>
-          </div>
-          <a href="/" target="_blank" class="flex items-center space-x-1 px-2.5 sm:px-3 py-1.5 rounded-lg bg-[#0D121B] hover:bg-[#141B26] border border-[#1A2232] text-xs font-mono text-[#707E94] hover:text-white transition-colors">
-            <LayoutGrid class="w-3.5 h-3.5" />
-            <span>大屏</span>
+
+        <div class="flex items-center space-x-2 sm:space-x-3 text-xs font-mono">
+          <a
+            href="/"
+            target="_blank"
+            class="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-[#0A1124] hover:bg-[#121E3E] border border-[#1E2D4A] hover:border-blue-400/50 text-slate-300 hover:text-white transition-all cursor-pointer shadow-xs"
+          >
+            <span>实盘大屏</span>
+            <ExternalLink class="w-3 h-3 text-slate-400" />
           </a>
-          <button @click="handleLogout" class="flex items-center space-x-1 px-2.5 sm:px-3 py-1.5 rounded-lg bg-[#4d1924] hover:bg-[#5d2230] border border-[#873044] text-xs font-mono text-[#ffdce1] transition-colors cursor-pointer">
+          <a
+            href="/docs"
+            target="_blank"
+            class="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-[#0A1124] hover:bg-[#121E3E] border border-[#1E2D4A] hover:border-cyan-400/50 text-cyan-400 hover:text-cyan-300 transition-all cursor-pointer shadow-xs"
+          >
+            <BookOpen class="w-3 h-3" />
+            <span class="hidden sm:inline">文档</span>
+          </a>
+          <button
+            @click="handleLogout"
+            class="md:hidden flex items-center space-x-1 px-2.5 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/25"
+          >
             <LogOut class="w-3.5 h-3.5" />
-            <span>退出</span>
           </button>
         </div>
       </header>
 
-      <!-- Content -->
-      <main class="flex-1 p-3 sm:p-5 overflow-x-hidden">
+      <!-- Router View Workspace -->
+      <main class="flex-1 p-4 sm:p-6 overflow-y-auto max-w-[2160px] w-full mx-auto">
         <router-view />
       </main>
     </div>
 
-    <!-- About Modal (Community, GitHub Repo, QQ Groups) -->
+    <!-- About Modal -->
     <AboutModal
       :visible="showAboutModal"
       @close="showAboutModal = false"

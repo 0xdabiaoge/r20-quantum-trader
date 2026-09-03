@@ -117,6 +117,7 @@ drivers/
 media/
 mem_agent/
 mem_metadata/
+RELEASE_NOTES_*.md
 mem_session/
 memory/
 sessions/

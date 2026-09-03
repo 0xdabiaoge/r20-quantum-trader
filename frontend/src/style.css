@@ -1,40 +1,130 @@
 @import "tailwindcss";
 
 :root {
-  --bg-main: #080B10;
-  --bg-card: #0D121B;
-  --bg-card-hover: #121824;
-  --border-line: #1A2232;
-  --text-dim: #707E94;
-  --accent-blue: #3B82F6;
-  --accent-green: #10B981;
-  --accent-red: #EF4444;
-  --accent-amber: #F59E0B;
-  --accent-purple: #8B5CF6;
+  /* Premium Cybernetic Obsidian Palette */
+  --bg-space: #030712;
+  --bg-main: #060B18;
+  --bg-card: #0A1124;
+  --bg-card-secondary: #0D1630;
+  --bg-card-hover: #121E3E;
+  --border-line: #162444;
+  --border-bright: #253966;
+  --border-highlight: #3875F6;
+
+  /* High-Contrast Crisp Typography */
+  --text-primary: #F8FAFC;
+  --text-secondary: #CBD5E1;
+  --text-muted: #94A3B8;
+  --text-faint: #64748B;
+
+  /* Quantum Alpha Accents */
+  --alpha-blue: #3875F6;
+  --alpha-cyan: #06B6D4;
+  --alpha-emerald: #10B981;
+  --alpha-green-bright: #00F59B;
+  --alpha-rose: #F43F5E;
+  --alpha-red-bright: #FF3366;
+  --alpha-amber: #F59E0B;
+  --alpha-purple: #8B5CF6;
+  --alpha-indigo: #6366F1;
 }
 
 body {
-  background-color: var(--bg-main);
-  color: #F3F4F6;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background-color: var(--bg-space);
+  background-image:
+    radial-gradient(circle at 50% 0%, rgba(56, 117, 246, 0.08) 0%, transparent 60%),
+    radial-gradient(circle at 85% 30%, rgba(139, 92, 246, 0.05) 0%, transparent 50%),
+    radial-gradient(circle at 15% 70%, rgba(6, 182, 212, 0.05) 0%, transparent 50%);
+  background-attachment: fixed;
+  color: var(--text-primary);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
   margin: 0;
   padding: 0;
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Custom scrollbars */
+/* Institutional Quantitative Terminal Card Styles */
+.quantum-card {
+  background: linear-gradient(180deg, rgba(14, 23, 46, 0.85) 0%, rgba(8, 14, 28, 0.95) 100%);
+  border: 1px solid rgba(34, 53, 94, 0.7);
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.03) inset;
+  backdrop-filter: blur(16px);
+  border-radius: 14px;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.quantum-card:hover {
+  border-color: rgba(56, 117, 246, 0.5);
+  box-shadow: 0 8px 30px -4px rgba(0, 0, 0, 0.7), 0 0 20px rgba(56, 117, 246, 0.12);
+}
+
+/* Glassmorphic Panel */
+.glass-panel {
+  background: rgba(10, 17, 36, 0.75);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(30, 48, 86, 0.6);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+}
+
+/* Subtle High-Tech Grid Background */
+.cyber-grid {
+  background-size: 32px 32px;
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+}
+
+/* Refined Monospace Numbers */
+.num-tabular {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+/* Glowing Neon Text & Accents */
+.text-glow-cyan {
+  text-shadow: 0 0 12px rgba(6, 182, 212, 0.5);
+}
+
+.text-glow-emerald {
+  text-shadow: 0 0 12px rgba(16, 185, 129, 0.5);
+}
+
+.text-glow-rose {
+  text-shadow: 0 0 12px rgba(244, 63, 94, 0.5);
+}
+
+.text-glow-amber {
+  text-shadow: 0 0 12px rgba(245, 158, 11, 0.5);
+}
+
+/* Custom Scrollbars */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #0A0D14;
+  background: rgba(6, 11, 24, 0.8);
 }
 ::-webkit-scrollbar-thumb {
-  background: #1A2232;
-  border-radius: 3px;
+  background: rgba(37, 57, 102, 0.8);
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #2D3748;
+  background: rgba(56, 117, 246, 0.7);
+}
+
+/* Animations */
+@keyframes pulse-subtle {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.85; transform: scale(0.98); }
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 3s ease-in-out infinite;
 }
