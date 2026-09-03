@@ -70,32 +70,47 @@ onUnmounted(() => {
 <template>
   <div class="min-h-screen font-sans transition-colors selection:bg-blue-500/30" style="background-color: var(--bg-app); color: var(--text-main);">
     <!-- Top Header Navigation (Slim & Clean) -->
-    <header class="sticky top-0 z-40 backdrop-blur-md border-b px-4 sm:px-6 h-[50px] flex items-center justify-between transition-colors" style="background-color: var(--bg-header); border-color: var(--border-subtle);">
-      <div class="flex items-center space-x-3">
+    <header class="sticky top-0 z-40 backdrop-blur-md border-b px-3 sm:px-6 h-[48px] flex items-center justify-between transition-colors" style="background-color: var(--bg-header); border-color: var(--border-subtle);">
+      <div class="flex items-center space-x-2 sm:space-x-3 min-w-0">
         <button
           @click="router.push('/')"
-          class="flex items-center space-x-1.5 px-2.5 py-1 rounded-lg border text-xs font-mono transition-colors cursor-pointer shadow-xs"
+          class="flex items-center space-x-1 px-2 py-1 rounded-lg border text-xs font-mono transition-colors cursor-pointer shadow-xs shrink-0"
           style="background-color: var(--bg-card); border-color: var(--border-subtle); color: var(--text-muted);"
+          title="返回实盘终端"
         >
           <ArrowLeft class="w-3.5 h-3.5" />
-          <span>返回实盘终端</span>
+          <span class="hidden sm:inline">返回终端</span>
         </button>
-        <div class="h-4 w-px hidden sm:block" style="background-color: var(--border-subtle);"></div>
-        <div class="flex items-center space-x-2">
-          <span class="font-mono font-black text-xs sm:text-sm tracking-wide flex items-center gap-1.5" style="color: var(--text-main);">
-            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+        <div class="h-4 w-px hidden sm:block shrink-0" style="background-color: var(--border-subtle);"></div>
+        <div class="flex items-center space-x-1.5 sm:space-x-2 min-w-0">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
+          <span class="font-mono font-black text-xs sm:text-sm tracking-wide shrink-0 whitespace-nowrap" style="color: var(--text-main);">
             R20 QUANTUM
           </span>
           <span
-            class="px-2 py-0.2 rounded text-[10px] font-mono border font-bold"
+            class="px-1.5 sm:px-2 py-0.2 rounded text-[10px] font-mono border font-bold shrink-0 whitespace-nowrap"
             style="background-color: var(--color-brand-bg); color: var(--color-brand); border-color: var(--color-brand-border);"
           >
-            v6.5.2 官方开发与使用指南
+            <span class="hidden md:inline">v6.5.2 官方开发与使用指南</span>
+            <span class="hidden sm:inline md:hidden">v6.5.2 指南</span>
+            <span class="sm:hidden">DOCS</span>
           </span>
         </div>
       </div>
 
-      <div class="flex items-center space-x-2">
+      <div class="flex items-center space-x-1.5 sm:space-x-2 shrink-0">
+        <!-- Mobile TOC Drawer Button -->
+        <button
+          @click="mobileMenuOpen = !mobileMenuOpen"
+          class="sm:hidden flex items-center justify-center w-7.5 h-7.5 rounded-lg border transition-all cursor-pointer shadow-xs"
+          style="background-color: var(--bg-card); border-color: var(--border-subtle); color: var(--text-main);"
+          title="目录索引 (TOC)"
+        >
+          <Menu v-if="!mobileMenuOpen" class="w-3.5 h-3.5" />
+          <X v-else class="w-3.5 h-3.5" />
+        </button>
+
+        <!-- Theme Toggle -->
         <button
           @click="toggleTheme"
           class="flex items-center justify-center w-7.5 h-7.5 rounded-lg border transition-all cursor-pointer shadow-xs"
@@ -105,36 +120,57 @@ onUnmounted(() => {
           <Sun v-if="theme === 'dark'" class="w-3.5 h-3.5 text-amber-400 hover:rotate-45 transition-transform" />
           <Moon v-else class="w-3.5 h-3.5 text-slate-700 hover:-rotate-12 transition-transform" />
         </button>
+
+        <!-- Admin Portal (Desktop only) -->
         <button
           @click="router.push('/admin')"
           class="hidden sm:flex items-center space-x-1 px-2.5 py-1 rounded-lg border text-xs font-mono cursor-pointer transition-colors shadow-xs"
           style="background-color: var(--bg-card); border-color: var(--border-subtle); color: var(--text-muted);"
         >
           <Lock class="w-3.5 h-3.5" />
-          <span>管理控制台</span>
+          <span>控制台</span>
         </button>
+
+        <!-- GitHub link -->
         <a
           href="https://github.com/555cute/r20-quantum-trader"
           target="_blank"
-          class="flex items-center space-x-1 px-3 py-1 rounded-lg text-xs font-mono font-bold transition-all shadow-xs"
+          class="flex items-center space-x-1 px-2 sm:px-3 py-1 rounded-lg text-xs font-mono font-bold transition-all shadow-xs"
           style="background-color: var(--text-main); color: var(--bg-card);"
         >
           <ExternalLink class="w-3.5 h-3.5" />
-          <span>GitHub</span>
+          <span class="hidden sm:inline">GitHub</span>
         </a>
       </div>
     </header>
+
+    <!-- Mobile TOC Backdrop Overlay -->
+    <div
+      v-if="mobileMenuOpen"
+      class="fixed inset-0 bg-black/60 backdrop-blur-xs z-40 sm:hidden transition-opacity"
+      @click="mobileMenuOpen = false"
+    ></div>
 
     <!-- Main Container -->
     <div class="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 flex gap-8">
       <!-- Left Sticky Sidebar (TOC) -->
       <aside
-        class="w-64 shrink-0 fixed inset-y-14 left-0 z-30 sm:bg-transparent p-4 sm:p-0 border-r sm:border-r-0 transition-transform duration-200 sm:translate-x-0 sm:sticky sm:top-16 sm:h-[calc(100vh-5rem)] overflow-y-auto"
-        :class="mobileMenuOpen ? 'translate-x-0 bg-[var(--bg-card)]' : '-translate-x-full sm:translate-x-0'"
+        class="w-64 shrink-0 fixed inset-y-12 left-0 z-50 sm:z-30 sm:bg-transparent p-4 sm:p-0 border-r sm:border-r-0 transition-transform duration-200 sm:translate-x-0 sm:sticky sm:top-16 sm:h-[calc(100vh-5rem)] overflow-y-auto"
+        :class="mobileMenuOpen ? 'translate-x-0 bg-[var(--bg-card)] shadow-2xl' : '-translate-x-full sm:translate-x-0'"
         style="border-color: var(--border-subtle);"
       >
-        <div class="text-[11px] font-mono font-bold uppercase tracking-wider mb-3 px-2" style="color: var(--text-faint);">
-          目录索引 (TOC)
+        <div class="flex items-center justify-between mb-3 px-2">
+          <div class="text-[11px] font-mono font-bold uppercase tracking-wider" style="color: var(--text-faint);">
+            目录索引 (TOC)
+          </div>
+          <button
+            @click="mobileMenuOpen = false"
+            class="sm:hidden p-1 rounded-lg border text-xs cursor-pointer transition-colors"
+            style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle); color: var(--text-muted);"
+            title="关闭目录"
+          >
+            <X class="w-3.5 h-3.5" />
+          </button>
         </div>
         <nav class="space-y-1">
           <button
@@ -210,7 +246,7 @@ onUnmounted(() => {
                 <span>语义数据插槽提示词系统</span>
               </div>
               <p class="text-xs leading-relaxed" style="color: var(--text-muted);">
-                全网快讯、自进化心法、6币种数理矩阵等动态数据抽象为标准语义变量插槽（如 <code>&#123;&#123;news_intelligence&#125;&#125;</code>），支持模块自由解耦与策略方案一键导入导出。
+                全网快讯、自进化心法、多标的数理矩阵等动态数据抽象为标准语义变量插槽（如 <code>&#123;&#123;news_intelligence&#125;&#125;</code>），支持模块自由解耦与策略方案一键导入导出。
               </p>
             </div>
 
