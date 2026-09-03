@@ -1,123 +1,220 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useDashboardStore } from '../stores/dashboard'
 import { Receipt, Search } from 'lucide-vue-next'
 
 const store = useDashboardStore()
-const allTrades = computed<any[]>(() => store.data?.trades || [])
 const filter = ref<'all' | 'active' | 'closed'>('all')
 const keyword = ref('')
 
-const trades = computed<any[]>(() => {
-  let list = allTrades.value
-  if (filter.value === 'active') list = list.filter((t) => t.status === 'holding')
-  else if (filter.value === 'closed') list = list.filter((t) => t.status !== 'holding')
-  const kw = keyword.value.trim().toLowerCase()
-  if (kw) {
-    list = list.filter((t) =>
-      [t.inst, t.strategy, t.side, t.exit_reason, t.status].join(' ').toLowerCase().includes(kw)
-    )
-  }
-  return list.slice(0, 80)
+const trades = computed(() => {
+  const all: any[] = store.data?.trades || []
+  return all.filter((t) => {
+    if (filter.value === 'active' && t.status !== 'holding') return false
+    if (filter.value === 'closed' && t.status === 'holding') return false
+    if (keyword.value) {
+      const q = keyword.value.toLowerCase()
+      const matchInst = (t.inst || '').toLowerCase().includes(q)
+      const matchStrat = (t.strategy || '').toLowerCase().includes(q)
+      const matchReason = (t.exit_reason || '').toLowerCase().includes(q)
+      if (!matchInst && !matchStrat && !matchReason) return false
+    }
+    return true
+  })
 })
 
-const holdingCount = computed(() => allTrades.value.filter((t) => t.status === 'holding').length)
-const closedCount = computed(() => allTrades.value.length - holdingCount.value)
+const holdingCount = computed(() => (store.data?.trades || []).filter((t: any) => t.status === 'holding').length)
+const closedCount = computed(() => (store.data?.trades || []).filter((t: any) => t.status !== 'holding').length)
 
 function num(v: any): number {
-  const n = typeof v === 'number' ? v : parseFloat(String(v ?? ''))
-  return Number.isFinite(n) ? n : 0
+  return Number(v) || 0
 }
-function formatPx(val: any): string {
-  if (val === undefined || val === null || val === '--' || !Number.isFinite(Number(val))) return val || '--'
-  const n = Number(val)
-  if (n >= 1000) return n.toFixed(2)
-  if (n >= 10) return n.toFixed(3)
-  return n.toFixed(4)
+
+function formatPx(v: any): string {
+  if (v == null || v === '') return '--'
+  const n = Number(v)
+  if (isNaN(n)) return String(v)
+  return n >= 100 ? n.toFixed(2) : n >= 1 ? n.toFixed(4) : n.toFixed(6)
 }
-function clean(text: string, fallback: string) {
-  const v = String(text || '').replace(/^[^\u4e00-\u9fa5a-zA-Z0-9]+/, '').trim()
+
+function clean(v: any, fallback = '--'): string {
   return v || fallback
 }
 </script>
 
 <template>
-  <div class="space-y-4">
+  <div class="space-y-3.5">
     <!-- Header -->
-    <div class="bg-[#0D121B] border border-[#1A2232] rounded-xl p-4 flex flex-wrap items-center justify-between gap-3">
+    <div
+      class="rounded-xl border p-4 sm:p-5 flex flex-wrap items-center justify-between gap-3 shadow-xs transition-colors"
+      style="background-color: var(--bg-card); border-color: var(--border-subtle);"
+    >
       <div class="flex items-center space-x-3">
-        <div class="p-2 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400">
-          <Receipt class="w-5 h-5" />
+        <div
+          class="w-9 h-9 rounded-lg flex items-center justify-center border shrink-0"
+          style="background-color: var(--bg-card-subtle); border-color: var(--border-medium); color: var(--text-main);"
+        >
+          <Receipt class="w-4 h-4" />
         </div>
         <div>
-          <h2 class="text-sm font-bold text-white font-mono uppercase tracking-wide">完整成交台账与生命周期履历</h2>
-          <p class="text-xs text-[#707E94] font-mono">真实撮合成交记录，扣除交易所手续费与资金费率净额</p>
+          <h2 class="text-xs sm:text-sm font-black font-mono uppercase tracking-wide" style="color: var(--text-main);">
+            完整成交台账与生命周期履历
+          </h2>
+          <p class="text-xs font-mono mt-0.5" style="color: var(--text-muted);">
+            真实撮合成交记录，已扣除交易所手续费与资金费率净额
+          </p>
         </div>
       </div>
-      <div class="text-xs font-mono text-zinc-400">
-        持仓 <strong class="text-blue-400">{{ holdingCount }}</strong> · 已平仓 <strong class="text-white">{{ closedCount }}</strong>
+      <div class="text-xs font-mono" style="color: var(--text-muted);">
+        持仓 <strong style="color: var(--color-brand);">{{ holdingCount }}</strong> · 已平仓 <strong style="color: var(--text-main);">{{ closedCount }}</strong>
       </div>
     </div>
 
     <!-- Filter bar -->
-    <div class="bg-[#0D121B] border border-[#1A2232] rounded-xl p-3 flex flex-wrap items-center gap-2">
-      <div class="flex rounded-lg bg-[#080B10] border border-[#1A2232] p-0.5 font-mono text-xs">
-        <button @click="filter = 'all'" class="px-3 py-1 rounded-md cursor-pointer transition" :class="filter === 'all' ? 'bg-blue-600 text-white font-bold' : 'text-[#707E94] hover:text-white'">全部</button>
-        <button @click="filter = 'active'" class="px-3 py-1 rounded-md cursor-pointer transition" :class="filter === 'active' ? 'bg-blue-600 text-white font-bold' : 'text-[#707E94] hover:text-white'">持仓中</button>
-        <button @click="filter = 'closed'" class="px-3 py-1 rounded-md cursor-pointer transition" :class="filter === 'closed' ? 'bg-blue-600 text-white font-bold' : 'text-[#707E94] hover:text-white'">已平仓</button>
+    <div
+      class="rounded-xl border p-3 flex flex-wrap items-center justify-between gap-3 shadow-xs transition-colors"
+      style="background-color: var(--bg-card); border-color: var(--border-subtle);"
+    >
+      <div class="flex rounded-lg border p-0.5 font-mono text-xs" style="background-color: var(--bg-badge); border-color: var(--border-subtle);">
+        <button
+          @click="filter = 'all'"
+          class="px-3 py-1.5 rounded-md cursor-pointer transition font-medium"
+          :style="filter === 'all'
+            ? { backgroundColor: 'var(--bg-card)', color: 'var(--text-main)', borderColor: 'var(--border-medium)', boxShadow: 'var(--shadow-card)' }
+            : { color: 'var(--text-muted)' }"
+          :class="filter === 'all' ? 'border font-bold' : ''"
+        >
+          全部
+        </button>
+        <button
+          @click="filter = 'active'"
+          class="px-3 py-1.5 rounded-md cursor-pointer transition font-medium"
+          :style="filter === 'active'
+            ? { backgroundColor: 'var(--bg-card)', color: 'var(--text-main)', borderColor: 'var(--border-medium)', boxShadow: 'var(--shadow-card)' }
+            : { color: 'var(--text-muted)' }"
+          :class="filter === 'active' ? 'border font-bold' : ''"
+        >
+          持仓中
+        </button>
+        <button
+          @click="filter = 'closed'"
+          class="px-3 py-1.5 rounded-md cursor-pointer transition font-medium"
+          :style="filter === 'closed'
+            ? { backgroundColor: 'var(--bg-card)', color: 'var(--text-main)', borderColor: 'var(--border-medium)', boxShadow: 'var(--shadow-card)' }
+            : { color: 'var(--text-muted)' }"
+          :class="filter === 'closed' ? 'border font-bold' : ''"
+        >
+          已平仓
+        </button>
       </div>
-      <div class="flex items-center space-x-1.5 flex-1 min-w-[160px] max-w-[280px] bg-[#080B10] border border-[#1A2232] rounded-lg px-2.5 py-1.5">
-        <Search class="w-3.5 h-3.5 text-[#707E94] shrink-0" />
-        <input v-model="keyword" placeholder="搜索币种 / 策略 / 平仓原因..." class="flex-1 bg-transparent text-xs font-mono text-white outline-none min-w-0" />
+
+      <div
+        class="flex items-center space-x-1.5 flex-1 min-w-[180px] max-w-[320px] rounded-lg border px-3 py-1.5"
+        style="background-color: var(--bg-input); border-color: var(--border-subtle);"
+      >
+        <Search class="w-3.5 h-3.5 shrink-0" style="color: var(--text-faint);" />
+        <input
+          v-model="keyword"
+          placeholder="搜索币种 / 策略 / 平仓原因..."
+          class="flex-1 bg-transparent text-xs font-mono outline-none min-w-0"
+          style="color: var(--text-main);"
+        />
       </div>
     </div>
 
     <!-- Trades Table -->
-    <div class="bg-[#0D121B] border border-[#1A2232] rounded-xl p-4">
-      <div v-if="trades.length === 0" class="py-12 text-center text-xs font-mono text-[#707E94]">
+    <div
+      class="rounded-xl border p-4 sm:p-5 shadow-xs transition-colors"
+      style="background-color: var(--bg-card); border-color: var(--border-subtle);"
+    >
+      <div v-if="trades.length === 0" class="py-12 text-center text-xs font-mono" style="color: var(--text-muted);">
         无匹配交易台账记录
       </div>
       <div v-else class="overflow-x-auto">
-        <table class="w-full text-left text-xs font-mono">
+        <table class="w-full text-left text-xs font-mono whitespace-nowrap">
           <thead>
-            <tr class="text-[#707E94] border-b border-[#1A2232]">
-              <th class="pb-2 pr-2">标的/方向</th>
-              <th class="pb-2 pr-2">策略</th>
-              <th class="pb-2 pr-2">保证金</th>
-              <th class="pb-2 pr-2">开仓价 / 时间</th>
-              <th class="pb-2 pr-2">平仓价 / 时间</th>
-              <th class="pb-2 pr-2 text-right">净盈亏 / ROI</th>
-              <th class="pb-2 pr-2 text-center">时长</th>
-              <th class="pb-2">状态 / 平仓原因</th>
+            <tr class="border-b text-[11px] uppercase tracking-wider" style="border-color: var(--border-subtle); color: var(--text-muted);">
+              <th class="pb-2.5 pr-2 font-bold">标的 / 方向</th>
+              <th class="pb-2.5 pr-2 font-bold">策略来源</th>
+              <th class="pb-2.5 pr-2 font-bold">保证金</th>
+              <th class="pb-2.5 pr-2 font-bold">开仓价 / 时间</th>
+              <th class="pb-2.5 pr-2 font-bold">平仓价 / 时间</th>
+              <th class="pb-2.5 pr-2 text-right font-bold">净盈亏 / ROI</th>
+              <th class="pb-2.5 pr-2 text-center font-bold">时长</th>
+              <th class="pb-2.5 font-bold">状态 / 平仓原因</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-[#1A2232]/50">
-            <tr v-for="(t, idx) in trades" :key="t.id || idx" class="hover:bg-[#121824]/50">
-              <td class="py-2.5 pr-2 whitespace-nowrap">
-                <span class="font-bold text-white">{{ t.inst }}</span>
-                <span class="ml-1 px-1.5 py-0.5 rounded text-[10px] font-bold border" :class="t.side === '多' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-rose-500/10 text-rose-400 border-rose-500/30'">{{ t.side }} {{ t.lever || '3x' }}</span>
-              </td>
-              <td class="py-2.5 pr-2">
-                <span class="px-2 py-0.5 rounded bg-[#141B26] text-[#9db0c6] border border-[#1A2232] text-[11px] whitespace-nowrap">{{ clean(t.strategy, '观望') }}</span>
-              </td>
-              <td class="py-2.5 pr-2 text-white font-bold whitespace-nowrap">{{ t.margin ? num(t.margin).toFixed(1) + ' U' : '--' }}</td>
-              <td class="py-2.5 pr-2 whitespace-nowrap">
-                <span class="text-zinc-300">{{ formatPx(t.open_px) }}</span>
-                <span class="text-[10px] text-[#707E94] ml-1">({{ (t.open_time || '--').substring(5, 19) }})</span>
-              </td>
-              <td class="py-2.5 pr-2 whitespace-nowrap">
-                <span :class="t.status === 'holding' ? 'text-blue-400 font-bold' : 'text-white'">{{ t.status === 'holding' ? '盯盘中' : formatPx(t.close_px) }}</span>
-                <span class="text-[10px] text-[#707E94] ml-1">({{ t.status === 'holding' ? '--' : (t.close_time || '--').substring(5, 19) }})</span>
-              </td>
-              <td class="py-2.5 pr-2 text-right whitespace-nowrap">
-                <span class="font-bold" :class="num(t.pnl) >= 0 ? 'text-emerald-400' : 'text-rose-400'">{{ num(t.pnl) >= 0 ? '+' : '' }}{{ num(t.pnl).toFixed(2) }} U</span>
-                <span class="text-[10px] ml-1" :class="num(t.roi_pct) >= 0 ? 'text-emerald-400' : 'text-rose-400'">({{ num(t.roi_pct) >= 0 ? '+' : '' }}{{ num(t.roi_pct).toFixed(1) }}%{{ t.status === 'holding' ? ' 浮' : '' }})</span>
-              </td>
-              <td class="py-2.5 pr-2 text-center text-[#707E94] whitespace-nowrap">{{ t.duration || '--' }}</td>
-              <td class="py-2.5">
-                <span class="px-2 py-0.5 rounded text-[10px] border whitespace-nowrap" :class="t.status === 'holding' ? 'bg-blue-500/10 text-blue-400 border-blue-500/30' : num(t.pnl) >= 0 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-rose-500/10 text-rose-400 border-rose-500/30'">
-                  {{ clean(t.exit_reason, t.status === 'holding' ? '实时监控中' : '平仓完成') }}
+          <tbody class="divide-y" style="border-color: var(--border-subtle);">
+            <tr
+              v-for="(t, idx) in trades"
+              :key="t.id || idx"
+              class="transition-colors hover:bg-[var(--bg-card-hover)]"
+            >
+              <td class="py-3 pr-2">
+                <span class="font-bold text-sm" style="color: var(--text-main);">{{ t.inst }}</span>
+                <span
+                  class="ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-bold border"
+                  :style="{
+                    backgroundColor: t.side === '多' ? 'var(--color-up-bg)' : 'var(--color-down-bg)',
+                    borderColor: t.side === '多' ? 'var(--color-up-border)' : 'var(--color-down-border)',
+                    color: t.side === '多' ? 'var(--color-up)' : 'var(--color-down)'
+                  }"
+                >
+                  {{ t.side }} {{ t.lever || '3x' }}
                 </span>
+              </td>
+              <td class="py-3 pr-2">
+                <span
+                  class="px-2 py-0.5 rounded border text-[11px]"
+                  style="background-color: var(--bg-badge); border-color: var(--border-subtle); color: var(--text-muted);"
+                >
+                  {{ clean(t.strategy, '观望') }}
+                </span>
+              </td>
+              <td class="py-3 pr-2 font-bold num-tabular" style="color: var(--text-main);">
+                {{ t.margin ? num(t.margin).toFixed(1) + ' U' : '--' }}
+              </td>
+              <td class="py-3 pr-2">
+                <span class="num-tabular" style="color: var(--text-main);">{{ formatPx(t.open_px) }}</span>
+                <span class="text-[10px] ml-1 num-tabular" style="color: var(--text-faint);">({{ (t.open_time || '--').substring(5, 19) }})</span>
+              </td>
+              <td class="py-3 pr-2">
+                <span class="num-tabular" :style="{ color: t.status === 'holding' ? 'var(--color-brand)' : 'var(--text-main)' }">
+                  {{ t.status === 'holding' ? '盯盘中' : formatPx(t.close_px) }}
+                </span>
+                <span class="text-[10px] ml-1 num-tabular" style="color: var(--text-faint);">
+                  ({{ t.status === 'holding' ? '--' : (t.close_time || '--').substring(5, 19) }})
+                </span>
+              </td>
+              <td class="py-3 pr-2 text-right">
+                <span
+                  class="font-bold text-sm num-tabular"
+                  :style="{ color: num(t.net_pnl) >= 0 ? 'var(--color-up)' : 'var(--color-down)' }"
+                >
+                  {{ num(t.net_pnl) >= 0 ? '+' : '' }}{{ num(t.net_pnl).toFixed(2) }} U
+                </span>
+                <span
+                  class="text-[10px] ml-1 num-tabular"
+                  :style="{ color: num(t.net_pnl) >= 0 ? 'var(--color-up)' : 'var(--color-down)' }"
+                >
+                  ({{ num(t.net_pnl) >= 0 ? '+' : '' }}{{ (num(t.roi_pct) || 0).toFixed(1) }}%)
+                </span>
+              </td>
+              <td class="py-3 pr-2 text-center num-tabular" style="color: var(--text-muted);">
+                {{ clean(t.hold_duration, '--') }}
+              </td>
+              <td class="py-3 text-xs" style="color: var(--text-muted);">
+                <span
+                  class="px-2 py-0.5 rounded text-[10px] font-bold border mr-1"
+                  :style="{
+                    backgroundColor: t.status === 'holding' ? 'var(--color-brand-bg)' : 'var(--bg-badge)',
+                    borderColor: t.status === 'holding' ? 'var(--color-brand-border)' : 'var(--border-subtle)',
+                    color: t.status === 'holding' ? 'var(--color-brand)' : 'var(--text-muted)'
+                  }"
+                >
+                  {{ t.status === 'holding' ? '在途' : '已平' }}
+                </span>
+                <span>{{ clean(t.exit_reason, '持仓中') }}</span>
               </td>
             </tr>
           </tbody>

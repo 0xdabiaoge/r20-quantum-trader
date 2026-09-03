@@ -60,7 +60,7 @@ const tabs = [
         <div class="flex items-center space-x-2.5">
           <!-- Geometric Monochrome/Titanium Monogram -->
           <div
-            class="w-8 h-8 rounded-lg flex items-center justify-center font-mono font-black text-sm tracking-wider border shadow-xs transition-colors"
+            class="w-8 h-8 rounded-lg flex items-center justify-center font-mono font-black text-sm tracking-wider border shadow-xs transition-colors shrink-0"
             style="background-color: var(--bg-card); border-color: var(--border-medium); color: var(--text-main);"
           >
             R
@@ -74,7 +74,7 @@ const tabs = [
               <button
                 @click="store.showAboutModal = true"
                 class="px-1.5 py-0.2 rounded text-[10px] font-mono font-bold border transition-colors cursor-pointer"
-                style="background-color: var(--color-brand-bg); color: var(--color-brand); border-color: var(--color-brand-border);"
+                style="background-color: var(--color-brand-bg); color: var(--text-main); border-color: var(--border-medium);"
                 title="查看版本与开源主仓信息"
               >
                 v6.5.1
@@ -106,7 +106,7 @@ const tabs = [
           v-for="tab in tabs"
           :key="tab.id"
           @click="store.activeTab = tab.id as any"
-          class="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer whitespace-nowrap"
+          class="h-7.5 flex items-center space-x-1.5 px-3 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer whitespace-nowrap"
           :style="store.activeTab === tab.id
             ? { backgroundColor: 'var(--bg-card)', color: 'var(--text-main)', borderColor: 'var(--border-medium)', boxShadow: 'var(--shadow-card)' }
             : { color: 'var(--text-muted)' }"
@@ -117,11 +117,11 @@ const tabs = [
         </button>
       </nav>
 
-      <!-- Right: Asset Pill, Clock, Theme Switcher & Control Links -->
-      <div class="flex items-center space-x-2 sm:space-x-3 shrink-0 text-xs font-mono">
+      <!-- Right: Asset Pill, Clock, Theme Switcher & Control Links (Strict 32px height alignment) -->
+      <div class="flex items-center space-x-2 sm:space-x-2.5 shrink-0 text-xs font-mono">
         <!-- Live Quick Equity Card -->
         <div
-          class="hidden xl:flex items-center space-x-2 px-3 py-1 rounded-lg border text-xs"
+          class="hidden xl:flex items-center h-8 space-x-2 px-3 rounded-lg border text-xs"
           style="background-color: var(--bg-card); border-color: var(--border-subtle);"
         >
           <span style="color: var(--text-muted);">净值:</span>
@@ -136,7 +136,7 @@ const tabs = [
 
         <!-- Clock -->
         <div
-          class="hidden lg:flex items-center space-x-1.5 px-2.5 py-1 rounded-lg border text-[11px]"
+          class="hidden lg:flex items-center h-8 space-x-1.5 px-2.5 rounded-lg border text-[11px]"
           style="background-color: var(--bg-card); border-color: var(--border-subtle); color: var(--text-muted);"
           title="北京时间 (UTC+8)"
         >
@@ -145,10 +145,10 @@ const tabs = [
           <span class="text-[9px] font-bold opacity-60">UTC+8</span>
         </div>
 
-        <!-- ☀️ / 🌙 Theme Toggle Button -->
+        <!-- ☀️ / 🌙 Theme Toggle Button (32x32px) -->
         <button
           @click="toggleTheme"
-          class="flex items-center justify-center w-8 h-8 rounded-lg border transition-all cursor-pointer shadow-xs"
+          class="flex items-center justify-center w-8 h-8 rounded-lg border transition-all cursor-pointer shadow-xs shrink-0"
           style="background-color: var(--bg-card); border-color: var(--border-subtle); color: var(--text-main);"
           :title="theme === 'dark' ? '切换为亮色浅白主题 (Light Mode)' : '切换为暗色钛金主题 (Dark Mode)'"
         >
@@ -159,7 +159,7 @@ const tabs = [
         <!-- Documentation Link -->
         <a
           href="/docs"
-          class="flex items-center space-x-1 px-2.5 py-1 rounded-lg border transition-colors"
+          class="flex items-center h-8 space-x-1.5 px-2.5 rounded-lg border transition-colors cursor-pointer shadow-xs"
           style="background-color: var(--bg-card); border-color: var(--border-subtle); color: var(--text-muted);"
           title="系统架构与使用文档"
         >
@@ -171,8 +171,8 @@ const tabs = [
         <a
           href="/admin"
           target="_blank"
-          class="flex items-center space-x-1 px-2.5 py-1 rounded-lg border transition-all font-medium"
-          style="background-color: var(--color-brand-bg); border-color: var(--color-brand-border); color: var(--color-brand);"
+          class="flex items-center h-8 space-x-1.5 px-3 rounded-lg border transition-all font-medium cursor-pointer shadow-xs"
+          style="background-color: var(--bg-card-subtle); border-color: var(--border-medium); color: var(--text-main);"
         >
           <ShieldCheck class="w-3.5 h-3.5" />
           <span>控制面</span>

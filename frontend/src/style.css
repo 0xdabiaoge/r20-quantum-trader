@@ -6,25 +6,26 @@
 
 :root,
 :root[data-theme="light"] {
-  --bg-app: #F6F8FA;
-  --bg-header: rgba(255, 255, 255, 0.94);
+  --bg-app: #F8F9FA;
+  --bg-header: rgba(255, 255, 255, 0.96);
   --bg-card: #FFFFFF;
-  --bg-card-subtle: #F9FAFB;
-  --bg-card-hover: #F3F4F6;
+  --bg-card-subtle: #F1F3F5;
+  --bg-card-hover: #E9ECEF;
   --bg-input: #FFFFFF;
-  --bg-badge: #F3F4F6;
+  --bg-badge: #ECEEF2;
   
-  --border-subtle: #E5E7EB;
-  --border-medium: #D1D5DB;
-  --border-strong: #9CA3AF;
+  --border-subtle: #E2E4E8;
+  --border-medium: #CBD0D8;
+  --border-strong: #94A3B8;
 
-  --text-main: #111827;
-  --text-muted: #4B5563;
-  --text-faint: #9CA3AF;
+  --text-main: #0F172A;
+  --text-muted: #475569;
+  --text-faint: #94A3B8;
 
-  --color-brand: #2563EB;
-  --color-brand-bg: #EFF6FF;
-  --color-brand-border: #BFDBFE;
+  /* Neutral Titanium / Obsidian brand styling (No cheap AI neon blue) */
+  --color-brand: #0F172A;
+  --color-brand-bg: #F1F5F9;
+  --color-brand-border: #CBD5E1;
 
   --color-up: #059669;
   --color-up-bg: #ECFDF5;
@@ -38,31 +39,32 @@
   --color-warn-bg: #FFFBEB;
   --color-warn-border: #FDE68A;
 
-  --shadow-card: 0 1px 3px 0 rgba(0, 0, 0, 0.06), 0 1px 2px -1px rgba(0, 0, 0, 0.04);
+  --shadow-card: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.04);
   --shadow-float: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
 }
 
 :root.dark,
 :root[data-theme="dark"] {
-  --bg-app: #09090B;
-  --bg-header: rgba(13, 13, 16, 0.94);
-  --bg-card: #131317;
-  --bg-card-subtle: #18181E;
-  --bg-card-hover: #1E1E26;
-  --bg-input: #101014;
-  --bg-badge: #1C1C24;
+  --bg-app: #0A0B0E;
+  --bg-header: rgba(14, 15, 18, 0.96);
+  --bg-card: #121317;
+  --bg-card-subtle: #17181E;
+  --bg-card-hover: #1E2028;
+  --bg-input: #0E0F13;
+  --bg-badge: #1C1E26;
 
-  --border-subtle: #262630;
-  --border-medium: #363644;
-  --border-strong: #505064;
+  --border-subtle: #242630;
+  --border-medium: #343746;
+  --border-strong: #4F5468;
 
-  --text-main: #F4F4F5;
-  --text-muted: #A1A1AA;
-  --text-faint: #71717A;
+  --text-main: #F3F4F6;
+  --text-muted: #9CA3AF;
+  --text-faint: #6B7280;
 
-  --color-brand: #3B82F6;
-  --color-brand-bg: rgba(59, 130, 246, 0.12);
-  --color-brand-border: rgba(59, 130, 246, 0.3);
+  /* Dark Titanium / Silver sheen */
+  --color-brand: #F3F4F6;
+  --color-brand-bg: rgba(255, 255, 255, 0.08);
+  --color-brand-border: rgba(255, 255, 255, 0.16);
 
   --color-up: #10B981;
   --color-up-bg: rgba(16, 185, 129, 0.12);
@@ -76,8 +78,8 @@
   --color-warn-bg: rgba(245, 158, 11, 0.12);
   --color-warn-border: rgba(245, 158, 11, 0.28);
 
-  --shadow-card: 0 4px 20px -2px rgba(0, 0, 0, 0.45);
-  --shadow-float: 0 20px 35px -8px rgba(0, 0, 0, 0.65);
+  --shadow-card: 0 4px 20px -2px rgba(0, 0, 0, 0.5);
+  --shadow-float: 0 20px 35px -8px rgba(0, 0, 0, 0.7);
 }
 
 /* =========================================================================
@@ -119,11 +121,11 @@ body {
 }
 
 /* =========================================================================
-   Harmonized Global Theme Overrides for Admin & Subcomponents
+   Universal Double-Mode Adapters & Contrast Normalizers
    ========================================================================= */
 
 :root[data-theme="light"] {
-  /* Dark background overrides */
+  /* Comprehensive dark backgrounds mapping */
   .bg-\[\#0D121B\],
   .bg-\[\#080B10\],
   .bg-\[\#090f18\],
@@ -138,8 +140,17 @@ body {
   .bg-\[\#0E131E\],
   .bg-\[\#0B1120\],
   .bg-\[\#0A0D14\],
+  .bg-\[\#0E121B\],
+  .bg-\[\#0B0F17\],
+  .bg-\[\#0E131F\],
+  .bg-\[\#0E1422\],
+  .bg-\[\#070D1C\],
+  .bg-\[\#0B1020\],
+  .bg-\[\#080E1E\],
   .bg-\[\#080B10\]\/95,
-  .bg-\[\#060B18\]\/90 {
+  .bg-\[\#060B18\]\/90,
+  .bg-\[\#0E121B\]\/95,
+  .bg-\[\#0D121B\]\/50 {
     background-color: var(--bg-card) !important;
   }
 
@@ -148,11 +159,14 @@ body {
   .bg-\[\#111a29\],
   .bg-\[\#101724\],
   .bg-\[\#151D2C\],
-  .bg-\[\#1A2232\] {
+  .bg-\[\#1A2232\],
+  .bg-\[\#141B28\],
+  .bg-\[\#1E2738\],
+  .bg-\[\#111723\] {
     background-color: var(--bg-card-subtle) !important;
   }
 
-  /* Borders */
+  /* Borders normalization */
   .border-\[\#1A2232\],
   .border-\[\#162444\],
   .border-\[\#1E2D4A\],
@@ -163,11 +177,24 @@ body {
   .border-\[\#161F2E\],
   .border-\[\#20293A\],
   .border-\[\#1E293B\],
+  .border-\[\#182644\],
+  .border-\[\#1A284A\],
   .divide-\[\#1A2232\]\/50 > * + * {
     border-color: var(--border-subtle) !important;
   }
 
-  /* Muted Text */
+  /* Text Contrast Normalization for Light Mode: Eliminate unreadable white text on light backgrounds */
+  .text-white,
+  .text-zinc-100,
+  .text-zinc-200,
+  .text-zinc-300,
+  .text-slate-100,
+  .text-slate-200,
+  .text-slate-300,
+  .text-\[\#EAECEF\] {
+    color: var(--text-main) !important;
+  }
+
   .text-\[\#707E94\],
   .text-\[\#8997aa\],
   .text-\[\#8A99AD\],
@@ -175,15 +202,9 @@ body {
   .text-\[\#b8c4d4\],
   .text-slate-400,
   .text-zinc-400,
-  .text-zinc-500 {
+  .text-zinc-500,
+  .text-\[\#556677\] {
     color: var(--text-muted) !important;
-  }
-
-  /* Main Headings / Text */
-  .text-white,
-  .text-zinc-200,
-  .text-zinc-300 {
-    color: var(--text-main) !important;
   }
 
   /* Form Elements */
@@ -194,15 +215,10 @@ body {
     border-color: var(--border-subtle) !important;
     color: var(--text-main) !important;
   }
-  input:focus,
-  select:focus,
-  textarea:focus {
-    border-color: var(--color-brand) !important;
-  }
 }
 
 :root[data-theme="dark"] {
-  /* Unify disparate dark shades in dark mode */
+  /* Harmonize all dark containers into titanium dark */
   .bg-\[\#0D121B\],
   .bg-\[\#080B10\],
   .bg-\[\#090f18\],
@@ -214,7 +230,14 @@ body {
   .bg-\[\#05080E\],
   .bg-\[\#0E131E\],
   .bg-\[\#0B1120\],
-  .bg-\[\#0A0D14\] {
+  .bg-\[\#0A0D14\],
+  .bg-\[\#0E121B\],
+  .bg-\[\#0B0F17\],
+  .bg-\[\#0E131F\],
+  .bg-\[\#0E1422\],
+  .bg-\[\#070D1C\],
+  .bg-\[\#0B1020\],
+  .bg-\[\#080E1E\] {
     background-color: var(--bg-card);
   }
 
@@ -227,14 +250,17 @@ body {
   .border-\[\#192333\],
   .border-\[\#161F2E\],
   .border-\[\#20293A\],
-  .border-\[\#1E293B\] {
+  .border-\[\#1E293B\],
+  .border-\[\#182644\],
+  .border-\[\#1A284A\] {
     border-color: var(--border-subtle);
   }
 
   .text-\[\#707E94\],
   .text-\[\#8997aa\],
   .text-\[\#8A99AD\],
-  .text-\[\#6f7d91\] {
+  .text-\[\#6f7d91\],
+  .text-slate-400 {
     color: var(--text-muted);
   }
 }

@@ -6,24 +6,33 @@ const store = useDashboardStore()
 </script>
 
 <template>
-  <div class="bg-[#0D121B] border border-[#1A2232] rounded-xl p-4">
+  <div
+    class="rounded-xl border p-4 sm:p-5 shadow-xs transition-colors"
+    style="background-color: var(--bg-card); border-color: var(--border-subtle);"
+  >
     <div class="flex items-center justify-between mb-3">
       <div class="flex items-center space-x-2">
-        <Terminal class="w-4 h-4 text-purple-400" />
-        <h2 class="text-sm font-bold text-white font-mono uppercase tracking-wide">系统巡检日志流 (15分钟周期)</h2>
+        <Terminal class="w-4 h-4" style="color: var(--color-brand);" />
+        <h2 class="text-xs sm:text-sm font-black font-mono uppercase tracking-wide" style="color: var(--text-main);">
+          系统巡检日志流 (15分钟周期)
+        </h2>
       </div>
-      <span class="text-xs text-[#707E94] font-mono">实时滚动</span>
+      <span class="text-xs font-mono" style="color: var(--text-faint);">实时滚动</span>
     </div>
 
-    <div class="bg-[#080B10] border border-[#1A2232]/80 rounded-lg p-3 max-h-56 overflow-y-auto font-mono text-[11px] space-y-1.5">
+    <div
+      class="rounded-lg border p-3 max-h-56 overflow-y-auto font-mono text-[11px] space-y-1.5"
+      style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);"
+    >
       <div
         v-for="(log, idx) in store.logs"
         :key="idx"
-        class="text-zinc-300 border-l-2 border-blue-500/40 pl-2 py-0.5 leading-relaxed hover:bg-[#121824]/40"
+        class="border-l-2 pl-2 py-0.5 leading-relaxed transition-colors hover:bg-[var(--bg-card-hover)]"
+        style="border-color: var(--border-medium); color: var(--text-muted);"
       >
         {{ log }}
       </div>
-      <div v-if="store.logs.length === 0" class="text-[#707E94] text-center py-4">
+      <div v-if="store.logs.length === 0" class="text-center py-4" style="color: var(--text-faint);">
         暂无巡检日志
       </div>
     </div>

@@ -6,10 +6,6 @@ import {
   ShieldAlert,
   Layers,
   Clock,
-  Search,
-  Filter,
-  ArrowUpRight,
-  TrendingUp,
   Activity,
 } from 'lucide-vue-next'
 
@@ -84,16 +80,16 @@ const allProtected = computed(() =>
   >
     <!-- Tactical Desk Header Ribbon -->
     <div
-      class="px-4 py-3 border-b flex flex-wrap items-center justify-between gap-3"
+      class="px-4 py-2.5 border-b flex flex-wrap items-center justify-between gap-2.5"
       style="border-color: var(--border-subtle); background-color: var(--bg-card-subtle);"
     >
       <!-- Left: Desk Tabs Switcher -->
-      <div class="flex items-center space-x-1.5 p-1 rounded-lg border text-xs font-mono" style="background-color: var(--bg-card); border-color: var(--border-subtle);">
+      <div class="flex items-center space-x-1 p-0.5 rounded-lg border text-xs font-mono" style="background-color: var(--bg-card); border-color: var(--border-subtle);">
         <button
           @click="activeTab = 'positions'"
-          class="flex items-center space-x-2 px-3 py-1.5 rounded-md font-bold transition-all cursor-pointer"
+          class="h-7.5 flex items-center space-x-2 px-3 rounded-md font-bold transition-all cursor-pointer"
           :style="activeTab === 'positions'
-            ? { backgroundColor: 'var(--color-brand-bg)', color: 'var(--color-brand)', borderColor: 'var(--color-brand-border)' }
+            ? { backgroundColor: 'var(--bg-card-subtle)', color: 'var(--text-main)', borderColor: 'var(--border-medium)', boxShadow: 'var(--shadow-card)' }
             : { color: 'var(--text-muted)' }"
           :class="activeTab === 'positions' ? 'border shadow-xs' : 'hover:text-[var(--text-main)]'"
         >
@@ -102,7 +98,7 @@ const allProtected = computed(() =>
           <span
             class="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold"
             :style="activeTab === 'positions'
-              ? { backgroundColor: 'var(--color-brand)', color: '#FFFFFF' }
+              ? { backgroundColor: 'var(--text-main)', color: 'var(--bg-card)' }
               : { backgroundColor: 'var(--bg-badge)', color: 'var(--text-muted)' }"
           >
             {{ store.positions.length }}
@@ -111,9 +107,9 @@ const allProtected = computed(() =>
 
         <button
           @click="activeTab = 'orders'"
-          class="flex items-center space-x-2 px-3 py-1.5 rounded-md font-bold transition-all cursor-pointer"
+          class="h-7.5 flex items-center space-x-2 px-3 rounded-md font-bold transition-all cursor-pointer"
           :style="activeTab === 'orders'
-            ? { backgroundColor: 'var(--color-brand-bg)', color: 'var(--color-brand)', borderColor: 'var(--color-brand-border)' }
+            ? { backgroundColor: 'var(--bg-card-subtle)', color: 'var(--text-main)', borderColor: 'var(--border-medium)', boxShadow: 'var(--shadow-card)' }
             : { color: 'var(--text-muted)' }"
           :class="activeTab === 'orders' ? 'border shadow-xs' : 'hover:text-[var(--text-main)]'"
         >
@@ -122,7 +118,7 @@ const allProtected = computed(() =>
           <span
             class="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold"
             :style="activeTab === 'orders'
-              ? { backgroundColor: 'var(--color-brand)', color: '#FFFFFF' }
+              ? { backgroundColor: 'var(--text-main)', color: 'var(--bg-card)' }
               : { backgroundColor: 'var(--bg-badge)', color: 'var(--text-muted)' }"
           >
             {{ store.pendingOrders.length }}
@@ -131,14 +127,14 @@ const allProtected = computed(() =>
       </div>
 
       <!-- Right: Search & Protection Indicator -->
-      <div class="flex items-center space-x-2.5">
+      <div class="flex items-center space-x-2">
         <!-- Coin Quick Filters -->
         <div class="hidden sm:flex items-center space-x-1">
           <button
             v-for="sym in availableSymbols"
             :key="sym"
             @click="selectedSymbol = sym"
-            class="px-2 py-1 rounded text-[11px] font-mono transition-all cursor-pointer border"
+            class="h-7 px-2.5 rounded-md text-[11px] font-mono transition-all cursor-pointer border"
             :style="selectedSymbol === sym
               ? { backgroundColor: 'var(--bg-badge)', borderColor: 'var(--border-medium)', color: 'var(--text-main)', fontWeight: 'bold' }
               : { borderColor: 'transparent', color: 'var(--text-muted)' }"
@@ -149,7 +145,7 @@ const allProtected = computed(() =>
 
         <!-- Cloud OCO Status Badge -->
         <div
-          class="flex items-center space-x-1.5 text-xs font-mono px-2.5 py-1 rounded-lg border font-medium"
+          class="h-7.5 flex items-center space-x-1.5 text-xs font-mono px-2.5 rounded-lg border font-medium"
           :style="{
             backgroundColor: allProtected ? 'var(--color-up-bg)' : 'var(--color-warn-bg)',
             borderColor: allProtected ? 'var(--color-up-border)' : 'var(--color-warn-border)',
@@ -210,7 +206,7 @@ const allProtected = computed(() =>
                   </span>
                   <span
                     class="px-1.5 py-0.2 rounded text-[10px] font-mono font-bold border"
-                    style="background-color: var(--bg-badge); color: var(--color-brand); border-color: var(--color-brand-border);"
+                    style="background-color: var(--bg-badge); color: var(--text-main); border-color: var(--border-subtle);"
                   >
                     {{ pos.lever }}x
                   </span>
@@ -351,9 +347,9 @@ const allProtected = computed(() =>
               <td class="py-2.5 px-3.5 num-tabular" style="color: var(--text-muted);">
                 {{ ord.cTime ? new Date(parseInt(ord.cTime)).toLocaleTimeString() : '--' }}
               </td>
-              <td class="py-2.5 px-3.5 text-right font-bold" style="color: var(--color-brand);">
+              <td class="py-2.5 px-3.5 text-right font-bold" style="color: var(--text-main);">
                 <span class="inline-flex items-center space-x-1">
-                  <span class="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                   <span>挂单中</span>
                 </span>
               </td>
