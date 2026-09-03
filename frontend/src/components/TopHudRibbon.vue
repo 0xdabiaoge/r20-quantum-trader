@@ -60,7 +60,7 @@ const allProtected = computed(() =>
           <div class="flex items-center space-x-2">
             <div
               class="w-6 h-6 rounded-md flex items-center justify-center border"
-              style="background-color: var(--color-brand-bg); border-color: var(--color-brand-border); color: var(--color-brand);"
+              style="background-color: var(--bg-badge); border-color: var(--border-subtle); color: var(--text-main);"
             >
               <Wallet class="w-3.5 h-3.5" />
             </div>
@@ -82,18 +82,18 @@ const allProtected = computed(() =>
             <span class="text-xs font-mono font-medium" style="color: var(--text-faint);">USDT</span>
           </div>
           
-          <!-- Margin Usage Mini Bar -->
-          <div class="mt-2.5 space-y-1">
+          <!-- Bottom Info / Margin Bar -->
+          <div class="space-y-1.5 mt-3.5 pt-2 border-t" style="border-color: var(--border-subtle);">
             <div class="flex items-center justify-between text-[11px] font-mono" style="color: var(--text-muted);">
               <span>可用资金: <strong class="font-semibold" style="color: var(--text-main);">${{ availEq }}</strong></span>
               <span>占用率: <strong class="num-tabular" :style="{ color: Number(marginUsage) > 50 ? 'var(--color-warn)' : 'var(--text-main)' }">{{ marginUsage }}%</strong></span>
             </div>
-            <div class="w-full h-1.5 rounded-full overflow-hidden" style="background-color: var(--bg-badge);">
+            <div class="w-full h-1 rounded-full overflow-hidden" style="background-color: var(--bg-badge);">
               <div
                 class="h-full rounded-full transition-all duration-500"
                 :style="{
                   width: `${Math.min(100, Math.max(0, Number(marginUsage)))}%`,
-                  backgroundColor: Number(marginUsage) > 50 ? 'var(--color-warn)' : 'var(--color-brand)'
+                  backgroundColor: Number(marginUsage) > 50 ? 'var(--color-warn)' : 'rgba(16, 185, 129, 0.75)'
                 }"
               ></div>
             </div>
