@@ -23,6 +23,7 @@ import {
   BookOpen,
   Sun,
   Moon,
+  ChevronRight,
 } from 'lucide-vue-next'
 
 const router = useRouter()
@@ -78,6 +79,15 @@ const currentView = computed<string>(() => {
   const seg = route.path.split('/').filter(Boolean).pop() || 'overview'
   return seg
 })
+
+const currentGroupName = computed<string>(() => {
+  for (const group of navGroups) {
+    const hit = (group.items as readonly { id: string; label: string }[]).find((i) => i.id === currentView.value)
+    if (hit) return group.label
+  }
+  return '管理控制'
+})
+
 const currentLabel = computed<string>(() => {
   for (const group of navGroups) {
     const hit = (group.items as readonly { id: string; label: string }[]).find((i) => i.id === currentView.value)
@@ -96,43 +106,47 @@ const showAboutModal = ref(false)
   >
     <!-- Sidebar (Desktop) / Horizontal Nav (Mobile) -->
     <aside
-      class="w-full md:w-[210px] md:shrink-0 border-b md:border-b-0 md:border-r md:flex md:flex-col md:h-screen md:sticky md:top-0 transition-colors z-30"
+      class="w-full md:w-[220px] md:shrink-0 border-b md:border-b-0 md:border-r md:flex md:flex-col md:h-screen md:sticky md:top-0 transition-colors z-30"
       style="background-color: var(--bg-card); border-color: var(--border-subtle);"
     >
-      <!-- Brand -->
+      <!-- Brand Header -->
       <div
-        class="px-4 py-3.5 border-b hidden md:flex items-center space-x-2.5"
+        class="px-4 py-3.5 border-b hidden md:flex items-center justify-between"
         style="border-color: var(--border-subtle);"
       >
-        <div
-          class="w-7 h-7 rounded-md flex items-center justify-center font-mono font-black text-xs border shadow-xs"
-          style="background-color: var(--bg-card-subtle); border-color: var(--border-medium); color: var(--text-main);"
-        >
-          R
-        </div>
-        <div>
-          <div class="text-xs font-black tracking-wide font-mono" style="color: var(--text-main);">
-            R20 CONTROL
-          </div>
-          <button
-            @click="showAboutModal = true"
-            class="text-[10px] font-mono transition-colors cursor-pointer text-left block"
-            style="color: var(--text-faint);"
-            title="点击查看开源主仓信息"
+        <div class="flex items-center space-x-2.5">
+          <div
+            class="w-7 h-7 rounded-md flex items-center justify-center font-mono font-black text-xs border shadow-xs"
+            style="background-color: var(--bg-card-subtle); border-color: var(--border-medium); color: var(--text-main);"
           >
-            v6.5.1
-          </button>
+            R
+          </div>
+          <div>
+            <div class="text-xs font-black tracking-wide font-mono" style="color: var(--text-main);">
+              R20 CONTROL
+            </div>
+            <button
+              @click="showAboutModal = true"
+              class="text-[10px] font-mono transition-colors cursor-pointer text-left block"
+              style="color: var(--color-brand);"
+              title="点击查看开源主仓信息"
+            >
+              v6.5.1
+            </button>
+          </div>
         </div>
+
+        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" title="控制面正常"></span>
       </div>
 
       <!-- Nav Groups -->
       <nav class="overflow-x-auto md:overflow-y-auto md:overflow-x-hidden md:flex-1 py-2 px-2.5 md:space-y-1 flex md:block whitespace-nowrap">
         <div v-for="group in navGroups" :key="group.label" class="mb-2 md:mb-2.5 inline-block md:block mr-3 md:mr-0 align-top">
           <div
-            class="text-[9px] font-mono font-bold uppercase tracking-wider px-2 py-1"
+            class="text-[9px] font-mono font-bold uppercase tracking-wider px-2 py-1 flex items-center justify-between"
             style="color: var(--text-faint);"
           >
-            {{ group.label }}
+            <span>{{ group.label }}</span>
           </div>
           <div class="flex md:block space-x-1 md:space-x-0 md:space-y-0.5">
             <button
@@ -143,7 +157,7 @@ const showAboutModal = ref(false)
               :style="currentView === item.id
                 ? { backgroundColor: 'var(--color-brand-bg)', color: 'var(--color-brand)', borderColor: 'var(--color-brand-border)' }
                 : { color: 'var(--text-muted)' }"
-              :class="currentView === item.id ? 'border font-bold' : 'border border-transparent hover:text-[var(--text-main)] hover:bg-[var(--bg-card-hover)]'"
+              :class="currentView === item.id ? 'border font-bold shadow-xs' : 'border border-transparent hover:text-[var(--text-main)] hover:bg-[var(--bg-card-hover)]'"
             >
               <component :is="item.icon" class="w-3.5 h-3.5 shrink-0" />
               <span class="truncate">{{ item.label }}</span>
@@ -171,7 +185,7 @@ const showAboutModal = ref(false)
         </div>
         <button
           @click="handleLogout"
-          class="p-1 rounded hover:bg-rose-500/10 hover:text-rose-500 transition-colors cursor-pointer"
+          class="p-1.5 rounded hover:bg-rose-500/10 hover:text-rose-500 transition-colors cursor-pointer"
           style="color: var(--text-faint);"
           title="退出登录"
         >
@@ -182,24 +196,23 @@ const showAboutModal = ref(false)
 
     <!-- Main Content Shell -->
     <div class="flex-1 flex flex-col min-w-0">
-      <!-- Top Title Header Bar -->
+      <!-- Top Title Header Bar with Breadcrumb -->
       <header
         class="h-14 border-b px-4 sm:px-6 flex items-center justify-between z-20 transition-colors"
         style="background-color: var(--bg-header); border-color: var(--border-subtle); backdrop-filter: blur(12px);"
       >
-        <div class="flex items-center space-x-2.5">
+        <!-- Breadcrumbs -->
+        <div class="flex items-center space-x-1.5 sm:space-x-2 text-xs font-mono">
+          <span style="color: var(--text-faint);" class="hidden sm:inline">控制面</span>
+          <ChevronRight class="w-3 h-3 hidden sm:inline" style="color: var(--text-faint);" />
+          <span style="color: var(--text-muted);" class="hidden sm:inline">{{ currentGroupName }}</span>
+          <ChevronRight class="w-3 h-3 hidden sm:inline" style="color: var(--text-faint);" />
           <h2 class="text-xs sm:text-sm font-black font-mono uppercase tracking-wide" style="color: var(--text-main);">
             {{ currentLabel }}
           </h2>
-          <span
-            class="text-[9px] font-mono px-1.5 py-0.2 rounded border hidden sm:inline"
-            style="background-color: var(--color-brand-bg); color: var(--color-brand); border-color: var(--color-brand-border);"
-          >
-            ADMIN CONSOLE
-          </span>
         </div>
 
-        <div class="flex items-center space-x-2 text-xs font-mono">
+        <div class="flex items-center space-x-2 sm:space-x-2.5 text-xs font-mono">
           <!-- ☀️ / 🌙 Theme Toggle Button -->
           <button
             @click="toggleTheme"
@@ -211,15 +224,18 @@ const showAboutModal = ref(false)
             <Moon v-else class="w-3.5 h-3.5 text-slate-700 hover:-rotate-12 transition-transform" />
           </button>
 
+          <!-- Back to Terminal -->
           <a
             href="/"
             target="_blank"
             class="flex items-center space-x-1 px-2.5 py-1 rounded-lg border transition-all cursor-pointer shadow-xs"
             style="background-color: var(--bg-card); border-color: var(--border-subtle); color: var(--text-muted);"
           >
-            <span>实盘终端</span>
+            <span>实盘大屏</span>
             <ExternalLink class="w-3 h-3 opacity-60" />
           </a>
+
+          <!-- Docs -->
           <a
             href="/docs"
             target="_blank"
@@ -229,6 +245,8 @@ const showAboutModal = ref(false)
             <BookOpen class="w-3 h-3" />
             <span class="hidden sm:inline">文档</span>
           </a>
+
+          <!-- Mobile Logout -->
           <button
             @click="handleLogout"
             class="md:hidden flex items-center space-x-1 px-2 py-1 rounded-lg border"

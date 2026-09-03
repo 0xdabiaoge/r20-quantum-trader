@@ -2,10 +2,13 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
-import { LogIn, AlertCircle } from 'lucide-vue-next'
+import { useTheme } from '../../composables/useTheme'
+import { LogIn, AlertCircle, RefreshCw, Sun, Moon, ArrowLeft } from 'lucide-vue-next'
 
 const auth = useAuthStore()
 const router = useRouter()
+const { theme, toggleTheme } = useTheme()
+
 const username = ref('admin')
 const password = ref('')
 const loading = ref(false)
@@ -21,62 +24,114 @@ async function handleLogin() {
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#080B10] flex items-center justify-center px-4">
-    <div class="w-full max-w-[410px]">
-      <!-- Brand -->
-      <div class="flex items-center space-x-2.5 mb-6 justify-center">
-        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-cyan-400 flex items-center justify-center shadow-lg shadow-blue-500/20 ring-1 ring-white/20">
-          <span class="text-white font-black text-lg tracking-wider">R</span>
+  <div
+    class="min-h-screen flex flex-col justify-between p-4 sm:p-6 transition-colors selection:bg-blue-500/30"
+    style="background-color: var(--bg-app); color: var(--text-main);"
+  >
+    <!-- Top Bar: Back to Terminal & Theme Toggle -->
+    <div class="max-w-md w-full mx-auto flex items-center justify-between">
+      <a
+        href="/"
+        class="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border text-xs font-mono transition-colors shadow-xs"
+        style="background-color: var(--bg-card); border-color: var(--border-subtle); color: var(--text-muted);"
+      >
+        <ArrowLeft class="w-3.5 h-3.5" />
+        <span>返回实盘终端</span>
+      </a>
+
+      <button
+        @click="toggleTheme"
+        class="flex items-center justify-center w-8 h-8 rounded-lg border transition-all cursor-pointer shadow-xs"
+        style="background-color: var(--bg-card); border-color: var(--border-subtle); color: var(--text-main);"
+        :title="theme === 'dark' ? '切换为亮色模式' : '切换为暗色模式'"
+      >
+        <Sun v-if="theme === 'dark'" class="w-4 h-4 text-amber-400 hover:rotate-45 transition-transform" />
+        <Moon v-else class="w-4 h-4 text-slate-700 hover:-rotate-12 transition-transform" />
+      </button>
+    </div>
+
+    <!-- Center: Login Card -->
+    <div class="w-full max-w-md mx-auto my-auto py-8">
+      <!-- Brand Header -->
+      <div class="flex flex-col items-center mb-6 text-center">
+        <div
+          class="w-12 h-12 rounded-xl flex items-center justify-center font-mono font-black text-xl border shadow-xs mb-3"
+          style="background-color: var(--bg-card); border-color: var(--border-medium); color: var(--text-main);"
+        >
+          R
         </div>
-        <div>
-          <div class="text-sm font-bold text-white tracking-wide">R20 CONTROL</div>
-          <div class="text-[11px] text-[#707E94] font-mono">管理员账号登录</div>
+        <div class="text-base font-black font-mono tracking-wide" style="color: var(--text-main);">
+          R20 QUANTUM CONTROL
+        </div>
+        <div class="text-xs font-mono mt-0.5" style="color: var(--text-muted);">
+          管理员身份鉴权与安全审计
         </div>
       </div>
 
-      <!-- Card -->
-      <div class="bg-gradient-to-b from-[#111a29] to-[#0D121B] border border-[#1A2232] rounded-xl p-6 shadow-2xl">
-        <div v-if="auth.error" class="mb-4 p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-mono flex items-start gap-2">
+      <!-- Main Login Panel -->
+      <div
+        class="rounded-xl border p-6 sm:p-7 shadow-xs transition-colors"
+        style="background-color: var(--bg-card); border-color: var(--border-subtle);"
+      >
+        <div
+          v-if="auth.error"
+          class="mb-4 p-3 rounded-lg border text-xs font-mono flex items-start gap-2"
+          style="background-color: var(--color-down-bg); border-color: var(--color-down-border); color: var(--color-down);"
+        >
           <AlertCircle class="w-4 h-4 shrink-0 mt-0.5" />
           <span>{{ auth.error }}</span>
         </div>
 
-        <label class="block text-[11px] text-[#8997aa] mb-1.5 font-mono">管理员账号</label>
-        <input
-          v-model="username"
-          type="text"
-          autocomplete="username"
-          class="w-full bg-[#090f18] border border-[#1A2232] rounded-lg text-white px-3 py-2.5 text-sm font-mono outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/12 mb-3"
-        />
+        <div class="space-y-4">
+          <div>
+            <label class="block text-xs font-mono font-bold mb-1.5" style="color: var(--text-muted);">
+              管理员账号
+            </label>
+            <input
+              v-model="username"
+              type="text"
+              autocomplete="username"
+              class="w-full rounded-lg px-3.5 py-2.5 text-xs font-mono outline-none border transition-colors"
+              style="background-color: var(--bg-input); border-color: var(--border-subtle); color: var(--text-main);"
+            />
+          </div>
 
-        <label class="block text-[11px] text-[#8997aa] mb-1.5 font-mono">密码</label>
-        <input
-          v-model="password"
-          type="password"
-          autocomplete="current-password"
-          placeholder="输入管理员密码"
-          class="w-full bg-[#090f18] border border-[#1A2232] rounded-lg text-white px-3 py-2.5 text-sm font-mono outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/12 mb-5"
-          @keyup.enter="handleLogin"
-        />
+          <div>
+            <label class="block text-xs font-mono font-bold mb-1.5" style="color: var(--text-muted);">
+              密码
+            </label>
+            <input
+              v-model="password"
+              type="password"
+              autocomplete="current-password"
+              placeholder="输入管理员密码"
+              class="w-full rounded-lg px-3.5 py-2.5 text-xs font-mono outline-none border transition-colors"
+              style="background-color: var(--bg-input); border-color: var(--border-subtle); color: var(--text-main);"
+              @keyup.enter="handleLogin"
+            />
+          </div>
 
-        <button
-          @click="handleLogin"
-          :disabled="loading"
-          class="w-full flex items-center justify-center space-x-2 bg-gradient-to-b from-[#1d4680] to-[#173a6a] hover:from-[#235390] hover:to-[#1a4070] text-white font-bold text-sm py-2.5 rounded-lg border border-[#35649f] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <LogIn v-if="!loading" class="w-4 h-4" />
-          <RefreshCw v-else class="w-4 h-4 animate-spin" />
-          <span>{{ loading ? '登录中...' : '登录控制台' }}</span>
-        </button>
+          <button
+            @click="handleLogin"
+            :disabled="loading"
+            class="w-full flex items-center justify-center space-x-2 font-mono font-bold text-xs py-2.5 rounded-lg border transition-all cursor-pointer shadow-xs disabled:opacity-50 disabled:cursor-not-allowed mt-2"
+            style="background-color: var(--color-brand); border-color: var(--color-brand); color: #FFFFFF;"
+          >
+            <LogIn v-if="!loading" class="w-3.5 h-3.5" />
+            <RefreshCw v-else class="w-3.5 h-3.5 animate-spin" />
+            <span>{{ loading ? '鉴权登录中...' : '登录管理控制面' }}</span>
+          </button>
+        </div>
 
-        <p class="mt-4 text-[10px] text-[#6f7d91] font-mono leading-relaxed">
-          账号为 admin；密码是管理员系统迁移时设置或后续修改后的密码。连续失败 5 次会临时锁定 15 分钟。
+        <p class="mt-4 text-[10px] font-mono leading-relaxed" style="color: var(--text-faint);">
+          默认账号为 admin；连续失败 5 次会自动临时锁定 15 分钟。所有登录动作与 IP 将持久化记录于操作审计日志中。
         </p>
       </div>
     </div>
+
+    <!-- Bottom Footer -->
+    <div class="max-w-md w-full mx-auto text-center text-[11px] font-mono" style="color: var(--text-faint);">
+      R20 QUANTUM TRADER · ENTERPRISE CONTROL PLANE
+    </div>
   </div>
 </template>
-
-<script lang="ts">
-import { RefreshCw } from 'lucide-vue-next'
-</script>

@@ -1,8 +1,24 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useApi } from '../../composables/useApi'
-import { Cpu, Database, Activity, Server, ShieldCheck } from 'lucide-vue-next'
+import {
+  Cpu,
+  Database,
+  Activity,
+  Server,
+  ShieldCheck,
+  RefreshCw,
+  ArrowRight,
+  FileText,
+  Users,
+  Layers,
+  Clock,
+  CheckCircle2,
+  AlertCircle,
+} from 'lucide-vue-next'
 
+const router = useRouter()
 const { api } = useApi()
 const runtime = ref<any>(null)
 const loading = ref(true)
@@ -29,132 +45,307 @@ function duration(s: number | null): string {
   return `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m`
 }
 
-function esc(v: any = ''): string {
-  return String(v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
-}
+const quickNav = [
+  { label: '提示词策略工作室', desc: '语义变量与预设方案', route: '/admin/promptlib', icon: FileText },
+  { label: '物理拦截插件', desc: 'Fail-Closed 风险拦截器', route: '/admin/interceptors', icon: ShieldCheck },
+  { label: '多模型决策委员会', desc: '博弈仲裁与思考链透视', route: '/admin/council', icon: Users },
+  { label: '模型连接配置', desc: '供应商与思考强度', route: '/admin/llm', icon: Cpu },
+]
 </script>
 
 <template>
-  <div class="space-y-4">
-    <!-- Guide -->
-    <div class="flex items-center justify-between">
+  <div class="space-y-4 max-w-[2160px] mx-auto">
+    <!-- Top Executive Header Strip -->
+    <div
+      class="rounded-xl border p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-xs transition-colors"
+      style="background-color: var(--bg-card); border-color: var(--border-subtle);"
+    >
       <div>
-        <p class="text-xs text-[#707E94] font-mono">从服务、数据、决策和配置状态开始；出现异常时再进入对应页面处理。</p>
+        <div class="flex items-center space-x-2">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          <h1 class="text-sm sm:text-base font-black font-mono tracking-wide" style="color: var(--text-main);">
+            R20 QUANTUM CONTROL CENTER
+          </h1>
+          <span
+            class="px-2 py-0.2 rounded text-[10px] font-mono font-bold border"
+            style="background-color: var(--color-brand-bg); color: var(--color-brand); border-color: var(--color-brand-border);"
+          >
+            v6.5.1
+          </span>
+        </div>
+        <p class="text-xs font-mono mt-1" style="color: var(--text-muted);">
+          交易引擎、微积分决策链路、数据健康与物理拦截插件全景监控。
+        </p>
       </div>
-      <span class="text-[10px] font-mono text-blue-400 bg-blue-500/10 px-2.5 py-1 rounded border border-blue-500/20">日常运行 · 1/4</span>
+
+      <div class="flex items-center space-x-2">
+        <button
+          @click="loadRuntime"
+          :disabled="loading"
+          class="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border text-xs font-mono font-bold transition-all cursor-pointer shadow-xs disabled:opacity-50"
+          style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle); color: var(--text-main);"
+        >
+          <RefreshCw class="w-3.5 h-3.5" :class="loading ? 'animate-spin' : ''" />
+          <span>刷新状态</span>
+        </button>
+      </div>
     </div>
 
-    <!-- Loading -->
-    <div v-if="loading" class="py-12 text-center text-xs font-mono text-[#707E94]">
-      <RefreshCw class="w-5 h-5 animate-spin mx-auto mb-2 text-blue-400" />
-      正在拉取运行态...
+    <!-- Loading State -->
+    <div v-if="loading" class="py-16 text-center text-xs font-mono" style="color: var(--text-muted);">
+      <RefreshCw class="w-6 h-6 animate-spin mx-auto mb-2" style="color: var(--color-brand);" />
+      <span>正在拉取最新控制面运行态...</span>
     </div>
 
-    <!-- Metrics -->
+    <!-- Runtime Data -->
     <template v-else-if="runtime">
-      <!-- 4 Metric Cards -->
+      <!-- 4 High-Density Metric Bento Cards -->
       <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <div class="bg-[#0D121B] border border-[#1A2232] rounded-xl p-4">
-          <div class="flex items-center space-x-2 mb-2">
-            <Server class="w-4 h-4 text-emerald-400" />
-            <span class="text-[11px] text-[#707E94] font-mono">服务状态</span>
+        <!-- 1. 服务状态 -->
+        <div
+          class="rounded-xl border p-4 shadow-xs transition-colors"
+          style="background-color: var(--bg-card); border-color: var(--border-subtle);"
+        >
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-[11px] font-mono" style="color: var(--text-muted);">后台服务进程</span>
+            <div
+              class="w-6 h-6 rounded-md flex items-center justify-center border"
+              style="background-color: var(--color-up-bg); border-color: var(--color-up-border); color: var(--color-up);"
+            >
+              <Server class="w-3.5 h-3.5" />
+            </div>
           </div>
-          <div class="text-xl font-bold text-emerald-400 font-mono">ONLINE</div>
-          <div class="text-[10px] text-[#707E94] font-mono mt-1">PID {{ runtime.service?.pid || '--' }}</div>
-        </div>
-
-        <div class="bg-[#0D121B] border border-[#1A2232] rounded-xl p-4">
-          <div class="flex items-center space-x-2 mb-2">
-            <Activity class="w-4 h-4 text-blue-400" />
-            <span class="text-[11px] text-[#707E94] font-mono">运行时间</span>
+          <div class="text-xl sm:text-2xl font-black font-mono tracking-tight" style="color: var(--color-up);">
+            ONLINE
           </div>
-          <div class="text-xl font-bold text-white font-mono">{{ duration(runtime.service?.uptime_seconds) }}</div>
-          <div class="text-[10px] text-[#707E94] font-mono mt-1">R20 standalone</div>
-        </div>
-
-        <div class="bg-[#0D121B] border border-[#1A2232] rounded-xl p-4">
-          <div class="flex items-center space-x-2 mb-2">
-            <Database class="w-4 h-4 text-amber-400" />
-            <span class="text-[11px] text-[#707E94] font-mono">数据异常</span>
-          </div>
-          <div class="text-xl font-bold font-mono" :class="(runtime.data_health?.filter((x: any) => !x.fresh).length || 0) === 0 ? 'text-emerald-400' : 'text-rose-400'">
-            {{ runtime.data_health?.filter((x: any) => !x.fresh).length || 0 }}
-          </div>
-          <div class="text-[10px] text-[#707E94] font-mono mt-1">
-            {{ (runtime.data_health?.filter((x: any) => !x.fresh).length || 0) === 0 ? '全部新鲜' : '存在过期链路' }}
+          <div class="text-[10px] font-mono mt-1" style="color: var(--text-faint);">
+            PID {{ runtime.service?.pid || '--' }} · FastAPI V5
           </div>
         </div>
 
-        <div class="bg-[#0D121B] border border-[#1A2232] rounded-xl p-4">
-          <div class="flex items-center space-x-2 mb-2">
-            <ShieldCheck class="w-4 h-4 text-purple-400" />
-            <span class="text-[11px] text-[#707E94] font-mono">持仓追踪器</span>
+        <!-- 2. 运行时间 -->
+        <div
+          class="rounded-xl border p-4 shadow-xs transition-colors"
+          style="background-color: var(--bg-card); border-color: var(--border-subtle);"
+        >
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-[11px] font-mono" style="color: var(--text-muted);">引擎持续运行</span>
+            <div
+              class="w-6 h-6 rounded-md flex items-center justify-center border"
+              style="background-color: var(--color-brand-bg); border-color: var(--color-brand-border); color: var(--color-brand);"
+            >
+              <Activity class="w-3.5 h-3.5" />
+            </div>
           </div>
-          <div class="text-xl font-bold text-white font-mono">{{ runtime.trackers || 0 }}</div>
-          <div class="text-[10px] text-[#707E94] font-mono mt-1">本地运行态</div>
+          <div class="text-xl sm:text-2xl font-black font-mono tracking-tight num-tabular" style="color: var(--text-main);">
+            {{ duration(runtime.service?.uptime_seconds) }}
+          </div>
+          <div class="text-[10px] font-mono mt-1" style="color: var(--text-faint);">
+            R20 Standalone · 独立高可用
+          </div>
+        </div>
+
+        <!-- 3. 数据链路健康 -->
+        <div
+          class="rounded-xl border p-4 shadow-xs transition-colors"
+          style="background-color: var(--bg-card); border-color: var(--border-subtle);"
+        >
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-[11px] font-mono" style="color: var(--text-muted);">行情数据链路</span>
+            <div
+              class="w-6 h-6 rounded-md flex items-center justify-center border"
+              :style="{
+                backgroundColor: (runtime.data_health?.filter((x: any) => !x.fresh).length || 0) === 0 ? 'var(--color-up-bg)' : 'var(--color-down-bg)',
+                borderColor: (runtime.data_health?.filter((x: any) => !x.fresh).length || 0) === 0 ? 'var(--color-up-border)' : 'var(--color-down-border)',
+                color: (runtime.data_health?.filter((x: any) => !x.fresh).length || 0) === 0 ? 'var(--color-up)' : 'var(--color-down)'
+              }"
+            >
+              <Database class="w-3.5 h-3.5" />
+            </div>
+          </div>
+          <div
+            class="text-xl sm:text-2xl font-black font-mono tracking-tight"
+            :style="{ color: (runtime.data_health?.filter((x: any) => !x.fresh).length || 0) === 0 ? 'var(--color-up)' : 'var(--color-down)' }"
+          >
+            {{ (runtime.data_health?.filter((x: any) => !x.fresh).length || 0) === 0 ? '100% FRESH' : 'EXPIRED' }}
+          </div>
+          <div class="text-[10px] font-mono mt-1" style="color: var(--text-faint);">
+            {{ (runtime.data_health?.filter((x: any) => !x.fresh).length || 0) === 0 ? '全链路低时延新鲜' : '存在异常延迟' }}
+          </div>
+        </div>
+
+        <!-- 4. 持仓追踪与拦截 -->
+        <div
+          class="rounded-xl border p-4 shadow-xs transition-colors"
+          style="background-color: var(--bg-card); border-color: var(--border-subtle);"
+        >
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-[11px] font-mono" style="color: var(--text-muted);">活跃追踪器</span>
+            <div
+              class="w-6 h-6 rounded-md flex items-center justify-center border"
+              style="background-color: var(--bg-badge); border-color: var(--border-medium); color: var(--text-main);"
+            >
+              <ShieldCheck class="w-3.5 h-3.5" />
+            </div>
+          </div>
+          <div class="text-xl sm:text-2xl font-black font-mono tracking-tight num-tabular" style="color: var(--text-main);">
+            {{ runtime.trackers || 0 }} 个
+          </div>
+          <div class="text-[10px] font-mono mt-1" style="color: var(--text-faint);">
+            Fail-Closed 物理防护激活
+          </div>
         </div>
       </div>
 
-      <!-- Dual Column: Latest AI Decisions + Data Health -->
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
-        <!-- AI Decisions -->
-        <div class="bg-[#0D121B] border border-[#1A2232] rounded-xl p-4">
-          <div class="flex items-center justify-between pb-3 mb-3 border-b border-[#1A2232]">
-            <div class="flex items-center space-x-2">
-              <Cpu class="w-4 h-4 text-blue-400" />
-              <h2 class="text-xs font-bold text-white font-mono uppercase">最新 AI 决策</h2>
+      <!-- Quick Navigation Action Bar -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div
+          v-for="item in quickNav"
+          :key="item.route"
+          @click="router.push(item.route)"
+          class="rounded-xl border p-3.5 transition-all duration-150 flex items-center justify-between cursor-pointer group shadow-xs hover:border-[var(--border-medium)]"
+          style="background-color: var(--bg-card); border-color: var(--border-subtle);"
+        >
+          <div class="flex items-center space-x-3">
+            <div
+              class="w-8 h-8 rounded-lg flex items-center justify-center border"
+              style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle); color: var(--color-brand);"
+            >
+              <component :is="item.icon" class="w-4 h-4" />
             </div>
-            <span class="text-[10px] font-mono text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20">{{ runtime.decisions?.length || 0 }} ASSETS</span>
+            <div>
+              <div class="text-xs font-bold font-mono" style="color: var(--text-main);">{{ item.label }}</div>
+              <div class="text-[10px] font-mono mt-0.5" style="color: var(--text-faint);">{{ item.desc }}</div>
+            </div>
           </div>
+          <ArrowRight class="w-3.5 h-3.5 opacity-40 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" style="color: var(--text-muted);" />
+        </div>
+      </div>
+
+      <!-- Dual Column: AI Decisions & Data Health -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
+        <!-- AI Decisions Table -->
+        <div
+          class="rounded-xl border p-4 sm:p-5 shadow-xs transition-colors"
+          style="background-color: var(--bg-card); border-color: var(--border-subtle);"
+        >
+          <div class="flex items-center justify-between pb-3 mb-3 border-b" style="border-color: var(--border-subtle);">
+            <div class="flex items-center space-x-2">
+              <Cpu class="w-4 h-4" style="color: var(--color-brand);" />
+              <h2 class="text-xs font-black font-mono uppercase tracking-wider" style="color: var(--text-main);">
+                最新 AI 多币种决策
+              </h2>
+            </div>
+            <span
+              class="text-[10px] font-mono px-2 py-0.5 rounded border font-bold"
+              style="background-color: var(--bg-badge); color: var(--color-brand); border-color: var(--border-subtle);"
+            >
+              {{ runtime.decisions?.length || 0 }} 标的
+            </span>
+          </div>
+
           <div class="overflow-x-auto">
-            <table class="w-full text-left text-xs font-mono">
+            <table class="w-full text-left text-xs font-mono whitespace-nowrap">
               <thead>
-                <tr class="text-[#707E94] border-b border-[#1A2232]">
-                  <th class="pb-2">标的</th>
-                  <th class="pb-2">动作</th>
-                  <th class="pb-2">置信度</th>
-                  <th class="pb-2">更新时间</th>
+                <tr class="border-b text-[11px] uppercase tracking-wider" style="border-color: var(--border-subtle); color: var(--text-muted);">
+                  <th class="pb-2 font-bold">标的</th>
+                  <th class="pb-2 font-bold">建议操作</th>
+                  <th class="pb-2 font-bold">置信度</th>
+                  <th class="pb-2 text-right font-bold">决策时间</th>
                 </tr>
               </thead>
-              <tbody class="divide-y divide-[#1A2232]/50">
-                <tr v-for="(d, i) in runtime.decisions" :key="i" class="hover:bg-[#121824]/50">
-                  <td class="py-2 text-white font-bold">{{ d.instId?.replace('-USDT-SWAP', '') }}</td>
-                  <td class="py-2" :class="d.action === 'WAIT' ? 'text-[#707E94]' : d.action?.includes('LONG') ? 'text-emerald-400' : 'text-rose-400'">
-                    {{ d.action }}
+              <tbody class="divide-y" style="border-color: var(--border-subtle);">
+                <tr
+                  v-for="(d, i) in runtime.decisions"
+                  :key="i"
+                  class="transition-colors hover:bg-[var(--bg-card-hover)]"
+                >
+                  <td class="py-2.5 font-bold font-mono" style="color: var(--text-main);">
+                    {{ d.instId?.replace('-USDT-SWAP', '') }}
                   </td>
-                  <td class="py-2 text-zinc-300">{{ d.confidence }}%</td>
-                  <td class="py-2 text-[#707E94]">{{ d.updated_at }}</td>
+                  <td class="py-2.5">
+                    <span
+                      class="px-2 py-0.5 rounded text-[10px] font-bold border"
+                      :style="{
+                        backgroundColor: d.action === 'WAIT' ? 'var(--bg-badge)' : d.action?.includes('LONG') ? 'var(--color-up-bg)' : 'var(--color-down-bg)',
+                        borderColor: d.action === 'WAIT' ? 'var(--border-subtle)' : d.action?.includes('LONG') ? 'var(--color-up-border)' : 'var(--color-down-border)',
+                        color: d.action === 'WAIT' ? 'var(--text-muted)' : d.action?.includes('LONG') ? 'var(--color-up)' : 'var(--color-down)'
+                      }"
+                    >
+                      {{ d.action }}
+                    </span>
+                  </td>
+                  <td class="py-2.5 font-bold num-tabular" style="color: var(--text-main);">
+                    {{ d.confidence }}%
+                  </td>
+                  <td class="py-2.5 text-right num-tabular" style="color: var(--text-muted);">
+                    {{ d.updated_at || '--' }}
+                  </td>
                 </tr>
               </tbody>
             </table>
           </div>
         </div>
 
-        <!-- Data Health -->
-        <div class="bg-[#0D121B] border border-[#1A2232] rounded-xl p-4">
-          <div class="flex items-center justify-between pb-3 mb-3 border-b border-[#1A2232]">
+        <!-- Data Health Table -->
+        <div
+          class="rounded-xl border p-4 sm:p-5 shadow-xs transition-colors"
+          style="background-color: var(--bg-card); border-color: var(--border-subtle);"
+        >
+          <div class="flex items-center justify-between pb-3 mb-3 border-b" style="border-color: var(--border-subtle);">
             <div class="flex items-center space-x-2">
-              <Database class="w-4 h-4 text-emerald-400" />
-              <h2 class="text-xs font-bold text-white font-mono uppercase">数据链路健康</h2>
+              <Database class="w-4 h-4" style="color: var(--color-up);" />
+              <h2 class="text-xs font-black font-mono uppercase tracking-wider" style="color: var(--text-main);">
+                数据链路健康度
+              </h2>
             </div>
-            <span class="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">REALTIME</span>
+            <span
+              class="text-[10px] font-mono px-2 py-0.5 rounded border font-bold"
+              style="background-color: var(--color-up-bg); color: var(--color-up); border-color: var(--color-up-border);"
+            >
+              REALTIME
+            </span>
           </div>
+
           <div class="overflow-x-auto">
-            <table class="w-full text-left text-xs font-mono">
+            <table class="w-full text-left text-xs font-mono whitespace-nowrap">
               <thead>
-                <tr class="text-[#707E94] border-b border-[#1A2232]">
-                  <th class="pb-2">数据源</th>
-                  <th class="pb-2">状态</th>
-                  <th class="pb-2">更新时间差</th>
-                  <th class="pb-2">大小</th>
+                <tr class="border-b text-[11px] uppercase tracking-wider" style="border-color: var(--border-subtle); color: var(--text-muted);">
+                  <th class="pb-2 font-bold">数据源</th>
+                  <th class="pb-2 font-bold">状态</th>
+                  <th class="pb-2 font-bold">更新时延</th>
+                  <th class="pb-2 text-right font-bold">文件体积</th>
                 </tr>
               </thead>
-              <tbody class="divide-y divide-[#1A2232]/50">
-                <tr v-for="(x, i) in runtime.data_health" :key="i" class="hover:bg-[#121824]/50">
-                  <td class="py-2 text-white">{{ x.name }}</td>
-                  <td class="py-2" :class="x.fresh ? 'text-emerald-400' : 'text-rose-400'">{{ x.fresh ? '正常' : '过期/缺失' }}</td>
-                  <td class="py-2 text-[#707E94]">{{ duration(x.age_seconds) }}</td>
-                  <td class="py-2 text-[#707E94]">{{ x.bytes ? Math.round(x.bytes / 1024) + ' KB' : '--' }}</td>
+              <tbody class="divide-y" style="border-color: var(--border-subtle);">
+                <tr
+                  v-for="(x, i) in runtime.data_health"
+                  :key="i"
+                  class="transition-colors hover:bg-[var(--bg-card-hover)]"
+                >
+                  <td class="py-2.5 font-mono font-medium" style="color: var(--text-main);">
+                    {{ x.name }}
+                  </td>
+                  <td class="py-2.5">
+                    <span
+                      class="px-2 py-0.5 rounded text-[10px] font-bold border inline-flex items-center space-x-1"
+                      :style="{
+                        backgroundColor: x.fresh ? 'var(--color-up-bg)' : 'var(--color-down-bg)',
+                        borderColor: x.fresh ? 'var(--color-up-border)' : 'var(--color-down-border)',
+                        color: x.fresh ? 'var(--color-up)' : 'var(--color-down)'
+                      }"
+                    >
+                      <CheckCircle2 v-if="x.fresh" class="w-2.5 h-2.5" />
+                      <AlertCircle v-else class="w-2.5 h-2.5" />
+                      <span>{{ x.fresh ? '正常新鲜' : '延迟过期' }}</span>
+                    </span>
+                  </td>
+                  <td class="py-2.5 num-tabular" style="color: var(--text-muted);">
+                    {{ duration(x.age_seconds) }}
+                  </td>
+                  <td class="py-2.5 text-right font-mono num-tabular" style="color: var(--text-muted);">
+                    {{ x.bytes ? Math.round(x.bytes / 1024) + ' KB' : '--' }}
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -162,26 +353,33 @@ function esc(v: any = ''): string {
         </div>
       </div>
 
-      <!-- Security Config Cards -->
-      <div class="bg-[#0D121B] border border-[#1A2232] rounded-xl p-4">
-        <div class="flex items-center justify-between pb-3 mb-3 border-b border-[#1A2232]">
+      <!-- Security & Config Cards -->
+      <div
+        class="rounded-xl border p-4 sm:p-5 shadow-xs transition-colors"
+        style="background-color: var(--bg-card); border-color: var(--border-subtle);"
+      >
+        <div class="flex items-center justify-between pb-3 mb-3 border-b" style="border-color: var(--border-subtle);">
           <div class="flex items-center space-x-2">
-            <ShieldCheck class="w-4 h-4 text-purple-400" />
-            <h2 class="text-xs font-bold text-white font-mono uppercase">安全配置状态</h2>
+            <ShieldCheck class="w-4 h-4" style="color: var(--color-brand);" />
+            <h2 class="text-xs font-black font-mono uppercase tracking-wider" style="color: var(--text-main);">
+              生产环境核心安全配置
+            </h2>
           </div>
-          <span class="text-[10px] font-mono text-[#707E94]">敏感值只显示配置状态，不回显原文</span>
+          <span class="text-[10px] font-mono" style="color: var(--text-faint);">敏感 Key 已脱敏防泄露保护</span>
         </div>
-        <div class="grid grid-cols-2 lg:grid-cols-3 gap-3">
-          <div v-for="(v, k) in runtime.configuration" :key="k" class="bg-[#080B10] border border-[#1A2232] rounded-lg p-3">
-            <div class="text-[11px] text-[#707E94] font-mono">{{ k }}</div>
-            <div class="text-sm text-white font-mono mt-1">{{ v || '未配置' }}</div>
+
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div
+            v-for="(v, k) in runtime.configuration"
+            :key="k"
+            class="rounded-lg border p-3 font-mono"
+            style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);"
+          >
+            <div class="text-[10px] uppercase truncate" style="color: var(--text-faint);">{{ k }}</div>
+            <div class="text-xs font-bold truncate mt-1" style="color: var(--text-main);">{{ v || '未配置' }}</div>
           </div>
         </div>
       </div>
     </template>
   </div>
 </template>
-
-<script lang="ts">
-import { RefreshCw } from 'lucide-vue-next'
-</script>
