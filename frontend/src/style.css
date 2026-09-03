@@ -1,130 +1,132 @@
 @import "tailwindcss";
 
-:root {
-  /* Premium Cybernetic Obsidian Palette */
-  --bg-space: #030712;
-  --bg-main: #060B18;
-  --bg-card: #0A1124;
-  --bg-card-secondary: #0D1630;
-  --bg-card-hover: #121E3E;
-  --border-line: #162444;
-  --border-bright: #253966;
-  --border-highlight: #3875F6;
+/* =========================================================================
+   R20 Institutional Terminal Theme Variables (Dual-Mode: Light & Dark)
+   ========================================================================= */
 
-  /* High-Contrast Crisp Typography */
-  --text-primary: #F8FAFC;
-  --text-secondary: #CBD5E1;
-  --text-muted: #94A3B8;
-  --text-faint: #64748B;
+:root,
+:root[data-theme="light"] {
+  --bg-app: #F4F6F9;
+  --bg-header: rgba(255, 255, 255, 0.92);
+  --bg-card: #FFFFFF;
+  --bg-card-subtle: #F8FAFC;
+  --bg-card-hover: #F1F5F9;
+  --bg-input: #FFFFFF;
+  --bg-badge: #F1F5F9;
+  
+  --border-subtle: #E2E8F0;
+  --border-medium: #CBD5E1;
+  --border-strong: #94A3B8;
 
-  /* Quantum Alpha Accents */
-  --alpha-blue: #3875F6;
-  --alpha-cyan: #06B6D4;
-  --alpha-emerald: #10B981;
-  --alpha-green-bright: #00F59B;
-  --alpha-rose: #F43F5E;
-  --alpha-red-bright: #FF3366;
-  --alpha-amber: #F59E0B;
-  --alpha-purple: #8B5CF6;
-  --alpha-indigo: #6366F1;
+  --text-main: #0F172A;
+  --text-muted: #475569;
+  --text-faint: #94A3B8;
+
+  --color-brand: #2563EB;
+  --color-brand-bg: #EFF6FF;
+  --color-brand-border: #BFDBFE;
+
+  --color-up: #059669;
+  --color-up-bg: #ECFDF5;
+  --color-up-border: #A7F3D0;
+
+  --color-down: #DC2626;
+  --color-down-bg: #FEF2F2;
+  --color-down-border: #FECACA;
+
+  --color-warn: #D97706;
+  --color-warn-bg: #FFFBEB;
+  --color-warn-border: #FDE68A;
+
+  --shadow-card: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
+  --shadow-float: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
 }
 
+:root.dark,
+:root[data-theme="dark"] {
+  --bg-app: #09090B;
+  --bg-header: rgba(13, 13, 16, 0.92);
+  --bg-card: #121215;
+  --bg-card-subtle: #17171B;
+  --bg-card-hover: #1C1C22;
+  --bg-input: #0E0E11;
+  --bg-badge: #1A1A20;
+
+  --border-subtle: #24242A;
+  --border-medium: #32323A;
+  --border-strong: #484854;
+
+  --text-main: #F4F4F5;
+  --text-muted: #A1A1AA;
+  --text-faint: #71717A;
+
+  --color-brand: #3B82F6;
+  --color-brand-bg: rgba(59, 130, 246, 0.12);
+  --color-brand-border: rgba(59, 130, 246, 0.3);
+
+  --color-up: #10B981;
+  --color-up-bg: rgba(16, 185, 129, 0.12);
+  --color-up-border: rgba(16, 185, 129, 0.28);
+
+  --color-down: #F43F5E;
+  --color-down-bg: rgba(244, 63, 94, 0.12);
+  --color-down-border: rgba(244, 63, 94, 0.28);
+
+  --color-warn: #F59E0B;
+  --color-warn-bg: rgba(245, 158, 11, 0.12);
+  --color-warn-border: rgba(245, 158, 11, 0.28);
+
+  --shadow-card: 0 4px 20px -2px rgba(0, 0, 0, 0.45);
+  --shadow-float: 0 20px 35px -8px rgba(0, 0, 0, 0.65);
+}
+
+/* =========================================================================
+   Base Typography & Styles
+   ========================================================================= */
+
 body {
-  background-color: var(--bg-space);
-  background-image:
-    radial-gradient(circle at 50% 0%, rgba(56, 117, 246, 0.08) 0%, transparent 60%),
-    radial-gradient(circle at 85% 30%, rgba(139, 92, 246, 0.05) 0%, transparent 50%),
-    radial-gradient(circle at 15% 70%, rgba(6, 182, 212, 0.05) 0%, transparent 50%);
-  background-attachment: fixed;
-  color: var(--text-primary);
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  background-color: var(--bg-app);
+  color: var(--text-main);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
   margin: 0;
   padding: 0;
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
-/* Institutional Quantitative Terminal Card Styles */
-.quantum-card {
-  background: linear-gradient(180deg, rgba(14, 23, 46, 0.85) 0%, rgba(8, 14, 28, 0.95) 100%);
-  border: 1px solid rgba(34, 53, 94, 0.7);
-  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.03) inset;
-  backdrop-filter: blur(16px);
-  border-radius: 14px;
-  position: relative;
-  overflow: hidden;
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.quantum-card:hover {
-  border-color: rgba(56, 117, 246, 0.5);
-  box-shadow: 0 8px 30px -4px rgba(0, 0, 0, 0.7), 0 0 20px rgba(56, 117, 246, 0.12);
-}
-
-/* Glassmorphic Panel */
-.glass-panel {
-  background: rgba(10, 17, 36, 0.75);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(30, 48, 86, 0.6);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
-}
-
-/* Subtle High-Tech Grid Background */
-.cyber-grid {
-  background-size: 32px 32px;
-  background-image:
-    linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
-}
-
-/* Refined Monospace Numbers */
+/* Financial Monospace Numbers */
 .num-tabular {
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.015em;
 }
 
-/* Glowing Neon Text & Accents */
-.text-glow-cyan {
-  text-shadow: 0 0 12px rgba(6, 182, 212, 0.5);
+/* Clean Institutional Card Component */
+.terminal-card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  box-shadow: var(--shadow-card);
+  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.text-glow-emerald {
-  text-shadow: 0 0 12px rgba(16, 185, 129, 0.5);
-}
-
-.text-glow-rose {
-  text-shadow: 0 0 12px rgba(244, 63, 94, 0.5);
-}
-
-.text-glow-amber {
-  text-shadow: 0 0 12px rgba(245, 158, 11, 0.5);
+.terminal-card:hover {
+  border-color: var(--border-medium);
 }
 
 /* Custom Scrollbars */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 ::-webkit-scrollbar-track {
-  background: rgba(6, 11, 24, 0.8);
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(37, 57, 102, 0.8);
+  background: var(--border-medium);
   border-radius: 4px;
-  border: 1px solid rgba(255, 255, 255, 0.05);
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(56, 117, 246, 0.7);
-}
-
-/* Animations */
-@keyframes pulse-subtle {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.85; transform: scale(0.98); }
-}
-
-.animate-pulse-subtle {
-  animation: pulse-subtle 3s ease-in-out infinite;
+  background: var(--border-strong);
 }

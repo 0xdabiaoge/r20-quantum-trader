@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useDashboardStore } from '../stores/dashboard'
+import { useTheme } from '../composables/useTheme'
 import AboutModal from './AboutModal.vue'
 import {
   LayoutGrid,
@@ -11,12 +12,33 @@ import {
   ShieldCheck,
   ExternalLink,
   BookOpen,
+  Sun,
+  Moon,
+  Clock,
 } from 'lucide-vue-next'
 
 const store = useDashboardStore()
+const { theme, toggleTheme } = useTheme()
 
 const totalEq = computed(() => Number(store.account?.total_eq ?? 0).toFixed(2))
 const benchmarkNetPnl = computed(() => Number(store.account?.cum_net_pnl ?? 0))
+
+const currentTime = ref('')
+let timer: any = null
+
+function updateClock() {
+  const d = new Date()
+  currentTime.value = d.toLocaleTimeString('zh-CN', { hour12: false, timeZone: 'Asia/Shanghai' })
+}
+
+onMounted(() => {
+  updateClock()
+  timer = setInterval(updateClock, 1000)
+})
+
+onUnmounted(() => {
+  if (timer) clearInterval(timer)
+})
 
 const tabs = [
   { id: 'trading', label: '实盘矩阵', icon: LayoutGrid },
@@ -28,90 +50,133 @@ const tabs = [
 </script>
 
 <template>
-  <header class="fixed top-0 left-0 right-0 z-40 bg-[#060B18]/90 backdrop-blur-xl border-b border-[#162444] px-4 sm:px-6 h-[62px] flex items-center shadow-lg shadow-black/40">
-    <div class="max-w-[2160px] w-full mx-auto flex items-center justify-between gap-3 sm:gap-6">
-      <!-- Left: Brand Logo & System Live Status -->
+  <header
+    class="fixed top-0 left-0 right-0 z-40 h-[58px] px-3 sm:px-5 flex items-center border-b transition-colors"
+    style="background-color: var(--bg-header); border-color: var(--border-subtle); backdrop-filter: blur(12px);"
+  >
+    <div class="max-w-[2160px] w-full mx-auto flex items-center justify-between gap-3 sm:gap-4">
+      <!-- Left: Institutional Identity -->
       <div class="flex items-center space-x-3 shrink-0">
-        <div class="relative flex items-center justify-center">
-          <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-cyan-400 flex items-center justify-center shadow-lg shadow-blue-500/25 ring-1 ring-white/20">
-            <span class="text-white font-black text-base sm:text-lg tracking-wider font-mono">R</span>
+        <div class="flex items-center space-x-2.5">
+          <!-- Geometric Monochrome/Titanium Monogram -->
+          <div
+            class="w-8 h-8 rounded-lg flex items-center justify-center font-mono font-black text-sm tracking-wider border shadow-xs transition-colors"
+            style="background-color: var(--bg-card); border-color: var(--border-medium); color: var(--text-main);"
+          >
+            R
           </div>
-          <span class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ring-2 ring-[#060B18]" :class="store.isConnected ? 'bg-emerald-400 animate-pulse' : 'bg-rose-500'"></span>
-        </div>
 
-        <div>
-          <div class="flex items-center space-x-2">
-            <h1 class="font-black text-sm sm:text-base tracking-wider text-white font-mono bg-gradient-to-r from-white via-slate-200 to-blue-200 bg-clip-text text-transparent">
-              R20 QUANTUM
-            </h1>
-            <button
-              @click="store.showAboutModal = true"
-              class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-blue-500/15 text-blue-400 border border-blue-500/30 hover:bg-blue-500/25 hover:border-blue-400 transition-all cursor-pointer shadow-xs"
-              title="点击查看项目架构、交流群与开源信息"
-            >
-              v6.5.1
-            </button>
-            <span v-if="store.isStale" class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30 animate-pulse">
-              DEGRADED
-            </span>
+          <div>
+            <div class="flex items-center space-x-2">
+              <span class="font-mono font-black text-sm tracking-wide" style="color: var(--text-main);">
+                R20 QUANTUM
+              </span>
+              <button
+                @click="store.showAboutModal = true"
+                class="px-1.5 py-0.2 rounded text-[10px] font-mono font-bold border transition-colors cursor-pointer"
+                style="background-color: var(--color-brand-bg); color: var(--color-brand); border-color: var(--color-brand-border);"
+                title="查看版本与开源主仓信息"
+              >
+                v6.5.1
+              </button>
+              <span
+                v-if="store.isStale"
+                class="px-1.5 py-0.2 rounded text-[10px] font-mono font-bold border animate-pulse"
+                style="background-color: var(--color-warn-bg); color: var(--color-warn); border-color: var(--color-warn-border);"
+              >
+                STALE
+              </span>
+            </div>
+            <div class="hidden sm:flex items-center space-x-1.5 text-[10px] font-mono leading-none mt-0.5" style="color: var(--text-faint);">
+              <span class="w-1.5 h-1.5 rounded-full" :class="store.isConnected ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'"></span>
+              <span>OKX V5 PROD</span>
+              <span>•</span>
+              <span>100% 云端 OCO 覆盖</span>
+            </div>
           </div>
-          <p class="hidden sm:flex text-[11px] text-slate-400 font-mono items-center gap-1.5 leading-none mt-0.5">
-            <span class="text-cyan-400 font-bold">高频因果动力学</span>
-            <span class="text-slate-600">•</span>
-            <span>100% 交易所云端 OCO 全覆盖</span>
-          </p>
         </div>
       </div>
 
-      <!-- Center: 5-Tab Segmented Navigation (Desktop) -->
-      <nav class="hidden md:flex items-center bg-[#0A1124] p-1.5 rounded-2xl border border-[#1B2A4A] shadow-inner shrink-0">
+      <!-- Center: High-Precision Tab Switcher (Desktop) -->
+      <nav
+        class="hidden md:flex items-center p-1 rounded-xl border shrink-0 transition-colors"
+        style="background-color: var(--bg-badge); border-color: var(--border-subtle);"
+      >
         <button
           v-for="tab in tabs"
           :key="tab.id"
           @click="store.activeTab = tab.id as any"
-          class="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl text-xs font-mono font-bold transition-all duration-200 cursor-pointer whitespace-nowrap relative"
-          :class="store.activeTab === tab.id
-            ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-600/30 border border-blue-400/40'
-            : 'text-slate-400 hover:text-white hover:bg-white/5 border border-transparent'"
+          class="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer whitespace-nowrap"
+          :style="store.activeTab === tab.id
+            ? { backgroundColor: 'var(--bg-card)', color: 'var(--text-main)', borderColor: 'var(--border-medium)', boxShadow: 'var(--shadow-card)' }
+            : { color: 'var(--text-muted)' }"
+          :class="store.activeTab === tab.id ? 'border' : 'hover:text-[var(--text-main)]'"
         >
-          <component :is="tab.icon" class="w-3.5 h-3.5" :class="store.activeTab === tab.id ? 'text-cyan-200' : 'text-slate-400'" />
+          <component :is="tab.icon" class="w-3.5 h-3.5" />
           <span>{{ tab.label }}</span>
         </button>
       </nav>
 
-      <!-- Right: Asset Pill & Links -->
-      <div class="flex items-center space-x-2.5 sm:space-x-3 shrink-0 text-xs font-mono">
-        <!-- Live Equity Pill -->
-        <div class="hidden xl:flex items-center space-x-2 bg-[#0A1124] px-3.5 py-1.5 rounded-xl border border-[#1E2D4A] shadow-sm">
-          <span class="text-slate-400 font-medium">总权益:</span>
-          <span class="text-white font-bold text-sm tracking-tight font-mono">${{ totalEq }}</span>
+      <!-- Right: Asset Pill, Clock, Theme Switcher & Control Links -->
+      <div class="flex items-center space-x-2 sm:space-x-3 shrink-0 text-xs font-mono">
+        <!-- Live Quick Equity Card -->
+        <div
+          class="hidden xl:flex items-center space-x-2 px-3 py-1 rounded-lg border text-xs"
+          style="background-color: var(--bg-card); border-color: var(--border-subtle);"
+        >
+          <span style="color: var(--text-muted);">净值:</span>
+          <span class="font-bold font-mono num-tabular" style="color: var(--text-main);">${{ totalEq }}</span>
           <span
-            class="font-bold text-xs"
-            :class="benchmarkNetPnl >= 0 ? 'text-emerald-400' : 'text-rose-400'"
+            class="font-bold font-mono num-tabular"
+            :style="{ color: benchmarkNetPnl >= 0 ? 'var(--color-up)' : 'var(--color-down)' }"
           >
-            {{ benchmarkNetPnl >= 0 ? '+' : '' }}{{ benchmarkNetPnl.toFixed(2) }}U
+            ({{ benchmarkNetPnl >= 0 ? '+' : '' }}{{ benchmarkNetPnl.toFixed(2) }}U)
           </span>
         </div>
+
+        <!-- Clock -->
+        <div
+          class="hidden lg:flex items-center space-x-1.5 px-2.5 py-1 rounded-lg border text-[11px]"
+          style="background-color: var(--bg-card); border-color: var(--border-subtle); color: var(--text-muted);"
+          title="北京时间 (UTC+8)"
+        >
+          <Clock class="w-3.5 h-3.5" style="color: var(--text-faint);" />
+          <span class="num-tabular font-medium">{{ currentTime }}</span>
+          <span class="text-[9px] font-bold opacity-60">UTC+8</span>
+        </div>
+
+        <!-- ☀️ / 🌙 Theme Toggle Button -->
+        <button
+          @click="toggleTheme"
+          class="flex items-center justify-center w-8 h-8 rounded-lg border transition-all cursor-pointer shadow-xs"
+          style="background-color: var(--bg-card); border-color: var(--border-subtle); color: var(--text-main);"
+          :title="theme === 'dark' ? '切换为亮色浅白主题 (Light Mode)' : '切换为暗色钛金主题 (Dark Mode)'"
+        >
+          <Sun v-if="theme === 'dark'" class="w-4 h-4 text-amber-400 hover:rotate-45 transition-transform" />
+          <Moon v-else class="w-4 h-4 text-slate-700 hover:-rotate-12 transition-transform" />
+        </button>
 
         <!-- Documentation Link -->
         <a
           href="/docs"
-          class="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-[#0A1124] hover:bg-[#121E3E] border border-[#1E2D4A] hover:border-cyan-500/50 text-slate-300 hover:text-white transition-all shadow-xs"
+          class="flex items-center space-x-1 px-2.5 py-1 rounded-lg border transition-colors"
+          style="background-color: var(--bg-card); border-color: var(--border-subtle); color: var(--text-muted);"
           title="系统架构与使用文档"
         >
-          <BookOpen class="w-3.5 h-3.5 text-cyan-400" />
-          <span class="hidden sm:inline font-bold">文档</span>
+          <BookOpen class="w-3.5 h-3.5" />
+          <span class="hidden sm:inline font-medium">文档</span>
         </a>
 
-        <!-- Admin Control Plane Link -->
+        <!-- Control Plane Button -->
         <a
           href="/admin"
           target="_blank"
-          class="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-[#0E172E] to-[#121E3E] hover:from-[#142244] hover:to-[#1A2C5A] border border-[#233860] hover:border-blue-400/60 text-white font-bold transition-all shadow-sm group"
+          class="flex items-center space-x-1 px-2.5 py-1 rounded-lg border transition-all font-medium"
+          style="background-color: var(--color-brand-bg); border-color: var(--color-brand-border); color: var(--color-brand);"
         >
-          <ShieldCheck class="w-3.5 h-3.5 text-blue-400 group-hover:text-blue-300 transition-colors" />
+          <ShieldCheck class="w-3.5 h-3.5" />
           <span>控制面</span>
-          <ExternalLink class="w-3 h-3 text-slate-400 group-hover:text-white transition-colors" />
+          <ExternalLink class="w-3 h-3 opacity-60" />
         </a>
       </div>
     </div>

@@ -1,13 +1,16 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useTheme } from '../composables/useTheme'
 import {
   BookOpen, ShieldCheck, Cpu, FileText, Sparkles, ArrowLeft,
   ExternalLink, Copy, Check, Terminal, Users, Brain, TrendingUp,
-  Layers, Lock, ShieldAlert, ChevronRight, Menu, X, Play, RefreshCw
+  Layers, Lock, ShieldAlert, ChevronRight, Menu, X, Play, RefreshCw,
+  Sun, Moon
 } from 'lucide-vue-next'
 
 const router = useRouter()
+const { theme, toggleTheme } = useTheme()
 
 const activeSection = ref('overview')
 const mobileMenuOpen = ref(false)
@@ -64,24 +67,28 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#06090F] text-zinc-200 font-sans selection:bg-blue-600/30 selection:text-white">
+  <div class="min-h-screen font-sans transition-colors selection:bg-blue-500/30" style="background-color: var(--bg-app); color: var(--text-main);">
     <!-- Top Header Navigation -->
-    <header class="sticky top-0 z-40 bg-[#0A0E17]/90 backdrop-blur-md border-b border-[#1A2232] px-4 sm:px-6 py-3 flex items-center justify-between">
+    <header class="sticky top-0 z-40 backdrop-blur-md border-b px-4 sm:px-6 py-3 flex items-center justify-between" style="background-color: var(--bg-header); border-color: var(--border-subtle);">
       <div class="flex items-center space-x-3">
         <button
           @click="router.push('/')"
-          class="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg bg-[#141B26] hover:bg-[#1E2738] border border-[#233147] text-xs font-mono text-zinc-300 hover:text-white transition-colors cursor-pointer"
+          class="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-mono transition-colors cursor-pointer"
+          style="background-color: var(--bg-card); border-color: var(--border-subtle); color: var(--text-muted);"
         >
           <ArrowLeft class="w-3.5 h-3.5" />
           <span>返回实盘终端</span>
         </button>
-        <div class="h-4 w-px bg-[#1A2232] hidden sm:block"></div>
+        <div class="h-4 w-px hidden sm:block" style="background-color: var(--border-subtle);"></div>
         <div class="flex items-center space-x-2">
-          <span class="font-mono font-black text-sm text-white tracking-wider flex items-center gap-1.5">
+          <span class="font-mono font-black text-sm tracking-wider flex items-center gap-1.5" style="color: var(--text-main);">
             <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
             R20 QUANTUM
           </span>
-          <span class="px-2 py-0.5 rounded text-[10px] font-mono text-blue-400 bg-blue-500/10 border border-blue-500/20 font-bold">
+          <span
+            class="px-2 py-0.5 rounded text-[10px] font-mono border font-bold"
+            style="background-color: var(--color-brand-bg); color: var(--color-brand); border-color: var(--color-brand-border);"
+          >
             v6.5.1 官方开发与使用文档
           </span>
         </div>
@@ -89,10 +96,20 @@ onUnmounted(() => {
 
       <div class="flex items-center space-x-2.5">
         <button
-          @click="router.push('/admin')"
-          class="hidden sm:flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-[#101724] hover:bg-[#1A2536] border border-[#23354D] text-xs font-mono text-zinc-300 hover:text-white cursor-pointer transition-colors"
+          @click="toggleTheme"
+          class="flex items-center justify-center w-8 h-8 rounded-lg border transition-all cursor-pointer shadow-xs"
+          style="background-color: var(--bg-card); border-color: var(--border-subtle); color: var(--text-main);"
+          :title="theme === 'dark' ? '切换为亮色浅白主题' : '切换为暗色钛金主题'"
         >
-          <Lock class="w-3.5 h-3.5 text-blue-400" />
+          <Sun v-if="theme === 'dark'" class="w-4 h-4 text-amber-400 hover:rotate-45 transition-transform" />
+          <Moon v-else class="w-4 h-4 text-slate-700 hover:-rotate-12 transition-transform" />
+        </button>
+        <button
+          @click="router.push('/admin')"
+          class="hidden sm:flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border text-xs font-mono cursor-pointer transition-colors"
+          style="background-color: var(--bg-card); border-color: var(--border-subtle); color: var(--text-muted);"
+        >
+          <Lock class="w-3.5 h-3.5 text-blue-500" />
           <span>管理控制台</span>
         </button>
         <a

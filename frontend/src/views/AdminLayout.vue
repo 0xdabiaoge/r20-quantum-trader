@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import { useTheme } from '../composables/useTheme'
 import AboutModal from '../components/AboutModal.vue'
 import {
   LayoutDashboard,
@@ -20,11 +21,14 @@ import {
   LogOut,
   ExternalLink,
   BookOpen,
+  Sun,
+  Moon,
 } from 'lucide-vue-next'
 
 const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
+const { theme, toggleTheme } = useTheme()
 
 const navGroups = [
   {
@@ -86,41 +90,62 @@ const showAboutModal = ref(false)
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#030712] text-slate-100 flex flex-col md:flex-row font-sans selection:bg-blue-600/30 selection:text-white">
+  <div
+    class="min-h-screen flex flex-col md:flex-row font-sans transition-colors selection:bg-blue-500/30"
+    style="background-color: var(--bg-app); color: var(--text-main);"
+  >
     <!-- Sidebar (Desktop) / Horizontal Nav (Mobile) -->
-    <aside class="w-full md:w-[220px] md:shrink-0 border-b md:border-b-0 md:border-r border-[#162444] bg-[#060B18]/95 backdrop-blur-xl md:flex md:flex-col md:h-screen md:sticky md:top-0 shadow-2xl z-30">
+    <aside
+      class="w-full md:w-[210px] md:shrink-0 border-b md:border-b-0 md:border-r md:flex md:flex-col md:h-screen md:sticky md:top-0 transition-colors z-30"
+      style="background-color: var(--bg-card); border-color: var(--border-subtle);"
+    >
       <!-- Brand -->
-      <div class="px-4 py-3.5 md:py-4 border-b border-[#162444] hidden md:flex items-center space-x-3">
-        <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-cyan-400 flex items-center justify-center shadow-lg shadow-blue-500/20 ring-1 ring-white/20">
-          <span class="text-white font-black text-base tracking-wider font-mono">R</span>
+      <div
+        class="px-4 py-3.5 border-b hidden md:flex items-center space-x-2.5"
+        style="border-color: var(--border-subtle);"
+      >
+        <div
+          class="w-7 h-7 rounded-md flex items-center justify-center font-mono font-black text-xs border shadow-xs"
+          style="background-color: var(--bg-card-subtle); border-color: var(--border-medium); color: var(--text-main);"
+        >
+          R
         </div>
         <div>
-          <div class="text-sm font-black text-white tracking-wider font-mono">R20 CONTROL</div>
+          <div class="text-xs font-black tracking-wide font-mono" style="color: var(--text-main);">
+            R20 CONTROL
+          </div>
           <button
             @click="showAboutModal = true"
-            class="text-[10px] text-slate-400 hover:text-cyan-400 font-mono transition-colors cursor-pointer text-left block"
-            title="点击查看开源仓库与项目信息"
+            class="text-[10px] font-mono transition-colors cursor-pointer text-left block"
+            style="color: var(--text-faint);"
+            title="点击查看开源主仓信息"
           >
-            QUANTUM TRADER v6.5.1
+            v6.5.1
           </button>
         </div>
       </div>
 
       <!-- Nav Groups -->
-      <nav class="overflow-x-auto md:overflow-y-auto md:overflow-x-hidden md:flex-1 py-2 px-2.5 md:space-y-1.5 flex md:block whitespace-nowrap">
-        <div v-for="group in navGroups" :key="group.label" class="mb-2 md:mb-3 inline-block md:block mr-4 md:mr-0 align-top">
-          <div class="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider px-3 py-1.5">{{ group.label }}</div>
+      <nav class="overflow-x-auto md:overflow-y-auto md:overflow-x-hidden md:flex-1 py-2 px-2.5 md:space-y-1 flex md:block whitespace-nowrap">
+        <div v-for="group in navGroups" :key="group.label" class="mb-2 md:mb-2.5 inline-block md:block mr-3 md:mr-0 align-top">
+          <div
+            class="text-[9px] font-mono font-bold uppercase tracking-wider px-2 py-1"
+            style="color: var(--text-faint);"
+          >
+            {{ group.label }}
+          </div>
           <div class="flex md:block space-x-1 md:space-x-0 md:space-y-0.5">
             <button
               v-for="item in group.items"
               :key="item.id"
               @click="navigateTo(item.id)"
-              class="w-full text-left px-3 py-2 rounded-xl text-xs font-mono font-medium transition-all flex items-center space-x-2.5 cursor-pointer"
-              :class="currentView === item.id
-                ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold shadow-md shadow-blue-600/30 border border-blue-400/40'
-                : 'text-slate-400 hover:text-white hover:bg-[#0E172E] border border-transparent'"
+              class="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-mono font-medium transition-all flex items-center space-x-2 cursor-pointer"
+              :style="currentView === item.id
+                ? { backgroundColor: 'var(--color-brand-bg)', color: 'var(--color-brand)', borderColor: 'var(--color-brand-border)' }
+                : { color: 'var(--text-muted)' }"
+              :class="currentView === item.id ? 'border font-bold' : 'border border-transparent hover:text-[var(--text-main)] hover:bg-[var(--bg-card-hover)]'"
             >
-              <component :is="item.icon" class="w-3.5 h-3.5 shrink-0" :class="currentView === item.id ? 'text-cyan-200' : 'text-slate-400'" />
+              <component :is="item.icon" class="w-3.5 h-3.5 shrink-0" />
               <span class="truncate">{{ item.label }}</span>
             </button>
           </div>
@@ -128,19 +153,26 @@ const showAboutModal = ref(false)
       </nav>
 
       <!-- Sidebar Footer User Profile -->
-      <div class="px-3 py-3 border-t border-[#162444] hidden md:flex items-center justify-between text-xs font-mono bg-[#040813]">
+      <div
+        class="px-3 py-2.5 border-t hidden md:flex items-center justify-between text-xs font-mono"
+        style="border-color: var(--border-subtle); background-color: var(--bg-card-subtle);"
+      >
         <div class="flex items-center space-x-2 min-w-0">
-          <div class="w-6 h-6 rounded-lg bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-400 font-bold text-[10px]">
+          <div
+            class="w-6 h-6 rounded-md border flex items-center justify-center font-bold text-[10px]"
+            style="background-color: var(--bg-badge); border-color: var(--border-medium); color: var(--color-brand);"
+          >
             {{ auth.user?.username?.charAt(0).toUpperCase() || 'A' }}
           </div>
           <div class="truncate">
-            <div class="text-white font-bold truncate text-[11px]">{{ auth.user?.username || 'admin' }}</div>
-            <div class="text-[9px] text-cyan-400 capitalize">{{ auth.user?.role || 'superadmin' }}</div>
+            <div class="font-bold truncate text-[11px]" style="color: var(--text-main);">{{ auth.user?.username || 'admin' }}</div>
+            <div class="text-[9px] capitalize" style="color: var(--text-faint);">{{ auth.user?.role || 'superadmin' }}</div>
           </div>
         </div>
         <button
           @click="handleLogout"
-          class="p-1.5 rounded-lg hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 transition-colors cursor-pointer"
+          class="p-1 rounded hover:bg-rose-500/10 hover:text-rose-500 transition-colors cursor-pointer"
+          style="color: var(--text-faint);"
           title="退出登录"
         >
           <LogOut class="w-3.5 h-3.5" />
@@ -151,36 +183,56 @@ const showAboutModal = ref(false)
     <!-- Main Content Shell -->
     <div class="flex-1 flex flex-col min-w-0">
       <!-- Top Title Header Bar -->
-      <header class="h-14 border-b border-[#162444] bg-[#060B18]/90 backdrop-blur-md px-4 sm:px-6 flex items-center justify-between z-20">
-        <div class="flex items-center space-x-3">
-          <h2 class="text-sm sm:text-base font-black text-white font-mono uppercase tracking-wide">
+      <header
+        class="h-14 border-b px-4 sm:px-6 flex items-center justify-between z-20 transition-colors"
+        style="background-color: var(--bg-header); border-color: var(--border-subtle); backdrop-filter: blur(12px);"
+      >
+        <div class="flex items-center space-x-2.5">
+          <h2 class="text-xs sm:text-sm font-black font-mono uppercase tracking-wide" style="color: var(--text-main);">
             {{ currentLabel }}
           </h2>
-          <span class="text-[10px] font-mono text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded-full border border-cyan-500/20 hidden sm:inline">
-            R20 QUANTUM ENGINE
+          <span
+            class="text-[9px] font-mono px-1.5 py-0.2 rounded border hidden sm:inline"
+            style="background-color: var(--color-brand-bg); color: var(--color-brand); border-color: var(--color-brand-border);"
+          >
+            ADMIN CONSOLE
           </span>
         </div>
 
-        <div class="flex items-center space-x-2 sm:space-x-3 text-xs font-mono">
+        <div class="flex items-center space-x-2 text-xs font-mono">
+          <!-- ☀️ / 🌙 Theme Toggle Button -->
+          <button
+            @click="toggleTheme"
+            class="flex items-center justify-center w-7 h-7 rounded-lg border transition-all cursor-pointer shadow-xs"
+            style="background-color: var(--bg-card); border-color: var(--border-subtle); color: var(--text-main);"
+            :title="theme === 'dark' ? '切换为亮色模式' : '切换为暗色模式'"
+          >
+            <Sun v-if="theme === 'dark'" class="w-3.5 h-3.5 text-amber-400 hover:rotate-45 transition-transform" />
+            <Moon v-else class="w-3.5 h-3.5 text-slate-700 hover:-rotate-12 transition-transform" />
+          </button>
+
           <a
             href="/"
             target="_blank"
-            class="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-[#0A1124] hover:bg-[#121E3E] border border-[#1E2D4A] hover:border-blue-400/50 text-slate-300 hover:text-white transition-all cursor-pointer shadow-xs"
+            class="flex items-center space-x-1 px-2.5 py-1 rounded-lg border transition-all cursor-pointer shadow-xs"
+            style="background-color: var(--bg-card); border-color: var(--border-subtle); color: var(--text-muted);"
           >
-            <span>实盘大屏</span>
-            <ExternalLink class="w-3 h-3 text-slate-400" />
+            <span>实盘终端</span>
+            <ExternalLink class="w-3 h-3 opacity-60" />
           </a>
           <a
             href="/docs"
             target="_blank"
-            class="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-[#0A1124] hover:bg-[#121E3E] border border-[#1E2D4A] hover:border-cyan-400/50 text-cyan-400 hover:text-cyan-300 transition-all cursor-pointer shadow-xs"
+            class="flex items-center space-x-1 px-2.5 py-1 rounded-lg border transition-all cursor-pointer shadow-xs"
+            style="background-color: var(--bg-card); border-color: var(--border-subtle); color: var(--text-muted);"
           >
             <BookOpen class="w-3 h-3" />
             <span class="hidden sm:inline">文档</span>
           </a>
           <button
             @click="handleLogout"
-            class="md:hidden flex items-center space-x-1 px-2.5 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/25"
+            class="md:hidden flex items-center space-x-1 px-2 py-1 rounded-lg border"
+            style="background-color: var(--color-down-bg); color: var(--color-down); border-color: var(--color-down-border);"
           >
             <LogOut class="w-3.5 h-3.5" />
           </button>
@@ -188,7 +240,7 @@ const showAboutModal = ref(false)
       </header>
 
       <!-- Router View Workspace -->
-      <main class="flex-1 p-4 sm:p-6 overflow-y-auto max-w-[2160px] w-full mx-auto">
+      <main class="flex-1 p-3.5 sm:p-5 overflow-y-auto max-w-[2160px] w-full mx-auto">
         <router-view />
       </main>
     </div>
