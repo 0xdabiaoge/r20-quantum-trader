@@ -1143,8 +1143,22 @@ async def refresh_cache_if_needed(ttl_seconds: float = 3.0):
 # Auto-start background worker to keep in-memory cache pre-warmed
 start_dashboard_background_worker()
 
+VUE_DIST_DIR = os.path.join(WORKSPACE_DIR, "frontend", "dist")
+VUE_ASSETS_DIR = os.path.join(VUE_DIST_DIR, "assets")
+
+if os.path.isdir(VUE_ASSETS_DIR):
+    app.mount("/assets", StaticFiles(directory=VUE_ASSETS_DIR), name="vue_assets")
+
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
+    vue_index_file = os.path.join(VUE_DIST_DIR, "index.html")
+    if os.path.isfile(vue_index_file):
+        with open(vue_index_file, "r", encoding="utf-8") as f:
+            content = f.read()
+        return HTMLResponse(
+            content=content,
+            headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+        )
     return templates.TemplateResponse(
         request=request,
         name="index.html",
