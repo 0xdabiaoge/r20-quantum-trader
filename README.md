@@ -6,12 +6,12 @@
 
 **独立 Gateway · 多因子推演 · 极速内存直出 · 管理控制面 · QQ 官方 Bot 扫码绑定 · 模块化提示词 · 加密灾备**
 
-[![Release](https://img.shields.io/badge/release-v6.2.1-3875F6?style=flat-square)](https://github.com/555cute/r20-quantum-trader/releases/tag/v6.2.1)
+[![Release](https://img.shields.io/badge/release-v6.3.0-3875F6?style=flat-square)](https://github.com/555cute/r20-quantum-trader/releases/tag/v6.3.0)
 [![QQ Group](https://img.shields.io/badge/QQ%E4%BA%A4%E6%B5%81%E7%BE%A4-655973677-12B7F5?style=flat-square&logo=tencent-qq&logoColor=white)](#-社区与致谢)
 [![LINUX DO](https://img.shields.io/badge/Community-LINUX%20DO-F97316?style=flat-square&logo=linux&logoColor=white)](https://linux.do/)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![Exchange](https://img.shields.io/badge/Exchange-OKX%20V5%20Direct-111827?style=flat-square)](https://www.okx.com/)
-[![Tests](https://img.shields.io/badge/tests-135%2F135%20passed-0ECB81?style=flat-square)](#-验证与测试)
+[![Tests](https://img.shields.io/badge/tests-154%2F154%20passed-0ECB81?style=flat-square)](#-验证与测试)
 [![License](https://img.shields.io/badge/license-MIT-10B981?style=flat-square)](LICENSE)
 
 [🌐 在线实盘大屏](https://www.r20.cn/) · [🚀 独立部署指南](STANDALONE.md) · [📦 灾备恢复](RECOVERY_GUIDE.md) · [🐧 LINUX DO 社区](https://linux.do/)
@@ -24,7 +24,7 @@
 
 ---
 
-![R20 v6.2.1 机构级量化终端](docs/images/dashboard_trading.png)
+![R20 v6.3.0 机构级量化终端](docs/images/dashboard_trading.png)
 
 > [!WARNING]
 > R20 是研究型自动化量化交易开源项目，不构成任何投资建议，亦不承诺任何收益。强烈建议在 OKX **DEMO 模拟盘** 环境下完成策略验证、风控测试、QQ 扫码通知与灾备演练后，再评估是否接入实盘。

@@ -94,7 +94,7 @@ const currentLabel = computed<string>(() => {
         </div>
         <div>
           <div class="text-sm font-bold text-white tracking-wide">R20 CONTROL</div>
-          <div class="text-[10px] text-[#707E94] font-mono">QUANTUM TRADER v6.2.1</div>
+          <div class="text-[10px] text-[#707E94] font-mono">QUANTUM TRADER v6.3.0</div>
         </div>
       </div>
 

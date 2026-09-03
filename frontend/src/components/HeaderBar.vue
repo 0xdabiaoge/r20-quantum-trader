@@ -40,7 +40,7 @@ const tabs = [
               R20 QUANTUM TRADER
             </h1>
             <span class="px-1.5 py-0.2 rounded text-[10px] font-mono font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20">
-              v6.2.1
+              v6.3.0
             </span>
             <span v-if="store.isStale" class="px-1.5 py-0.2 rounded text-[10px] font-mono font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse">
               DEGRADED
