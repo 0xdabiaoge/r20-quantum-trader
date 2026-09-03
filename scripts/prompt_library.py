@@ -97,18 +97,11 @@ _SECTION_RE = re.compile(r"(?m)(?=^={0,30}\s*【[^\n】]+】[^\n]*$)")
 
 PRESETS: dict[str, dict[str, Any]] = {
     "stable": {
-        "id": "stable", "name": "稳健", "description": "重视信号一致性、回撤控制与等待质量，当前默认风格。", "editable": True,
-        "trading_system": """【交易风格：稳健均衡】\n所有 P0 硬约束保持不变，但不得把“稳健”解释为长期空仓。对 4H/1H 同向、ADX≥18、价格几何与真实 R:R 合法的候选进行相对排序；P2/P3 轻微分歧以降低保证金处理。若存在可审计的最佳顺势候选，应果断给出小仓决策。""",
-        "trading_user": """【稳健均衡裁决偏好】\n优先顺应 4H/1H 同向趋势，并引用具体 1H v/a/j/I、E/A、延续或击穿概率及 VaR/CVaR。减速只有在速度趋零、结构转 CHOP 或尾部风险极端时才否决；普通回抽优先作为限价入场定位。""",
-        "evolution_system": """【稳健复盘风格】\n优先识别回撤、过度交易、追价和低质量入场，但只使用真实可观测证据。小样本、数理快照缺失或因果不可辨时 NO_CHANGE；任何记忆都不得成为绕过硬风控的新阈值。""",
-        "evolution_user": """【稳健进化任务】\n评估信号一致性、风险预算、手续费、入场与退出质量；只有多个独立样本支持时才沉淀新经验，否则保留旧记忆并提出需要补充的证据。""",
-    },
-    "aggressive": {
-        "id": "aggressive", "name": "激进", "description": "提高高质量趋势与突破机会的参与度，但不放宽任何硬风控。", "editable": True,
-        "trading_system": """【交易风格：激进】\n所有 P0 硬约束、OCO 与 JSON 契约保持不变。仅对 4H/1H 同向、1H 动力学与积分能量扩张、概率风险可接受且量能共振的机会提高参与度；可使用允许区间较高的保证金和杠杆，但不得逆势补仓、追逐失速行情或牺牲 R:R。""",
-        "trading_user": """【激进裁决偏好】\n对证据链完整的强趋势果断决策，必须引用具体 1H v/a/j/I、E/A、方向估计概率及 VaR/CVaR。15M 只优化执行；高 jerk、肥尾或证据不一致时仍必须 WAIT。""",
-        "evolution_system": """【激进复盘风格】\n复盘时同时识别错失强趋势、过早止盈和仓位利用不足，也必须审查追价、过度杠杆和假突破损失；任何进化建议不得削弱硬风控。""",
-        "evolution_user": """【激进进化任务】\n重点比较高动能机会的参与率、趋势利润捕获、加仓时机与错失成本，同时检查激进参与是否造成尾部亏损扩大。""",
+        "id": "stable", "name": "全维度波段强化版", "description": "基于 1H~4H 宏观多空趋势、因果微积分、定积分能量、概率风险与智能加仓的量化决策方案（系统唯一主策略）。", "editable": True,
+        "trading_system": """【交易风格：全维度波段强化】\n所有 P0 硬约束保持不变，但不得把“稳健”解释为长期空仓。对 4H/1H 同向、ADX≥18、价格几何与真实 R:R 合法的候选进行相对排序；P2/P3 轻微分歧以降低保证金处理。若存在可审计的最佳顺势候选，应果断给出小仓决策。""",
+        "trading_user": """【全维度波段强化裁决偏好】\n优先顺应 4H/1H 同向趋势，并引用具体 1H v/a/j/I、E/A、延续或击穿概率及 VaR/CVaR。减速只有在速度趋零、结构转 CHOP 或尾部风险极端时才否决；普通回抽优先作为限价入场定位。""",
+        "evolution_system": """【全维度波段复盘风格】\n优先识别回撤、过度交易、追价和低质量入场，但只使用真实可观测证据。小样本、数理快照缺失或因果不可辨时 NO_CHANGE；任何记忆都不得成为绕过硬风控的新阈值。""",
+        "evolution_user": """【全维度波段进化任务】\n评估信号一致性、风险预算、手续费、入场与退出质量；只有多个独立样本支持时才沉淀新经验，否则保留旧记忆并提出需要补充的证据。""",
     },
 }
 
@@ -456,10 +449,10 @@ def all_profiles() -> list[dict[str, Any]]:
     library = load_library()
     profiles_map = copy.deepcopy(library["profiles"])
     result = []
-    for pid in ("stable", "aggressive"):
+    for pid in ("stable",):
         if pid in profiles_map:
             result.append(profiles_map.pop(pid))
-        else:
+        elif pid in PRESETS:
             preset = copy.deepcopy(PRESETS[pid])
             preset["editable"] = True
             result.append(preset)
