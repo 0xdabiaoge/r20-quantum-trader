@@ -23,7 +23,7 @@ const todayTrades = computed(() => (today.value.win_trades || 0) + (today.value.
 </script>
 
 <template>
-  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
     <!-- Card 1: 官方账户总权益 -->
     <div class="bg-gradient-to-b from-[#111a29] to-[#0D121B] border border-[#1A2232] rounded-xl p-4 flex flex-col justify-between shadow-lg">
       <div class="flex items-center justify-between text-[#707E94] text-xs font-mono mb-2">

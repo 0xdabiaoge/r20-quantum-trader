@@ -34,21 +34,22 @@ onUnmounted(() => {
     <div class="h-[58px] shrink-0"></div>
 
     <!-- Dynamic Main Content Based on Active Tab -->
-    <main class="flex-1 max-w-[1720px] w-full mx-auto px-3 sm:px-6 pb-24 sm:pb-6 space-y-4">
-      <!-- TAB 1: 实盘矩阵 (TRADING) — home: HUD cards + positions + maker orders -->
+    <main class="flex-1 max-w-[2160px] w-full mx-auto px-3 sm:px-6 2xl:px-8 pb-24 sm:pb-6 space-y-4">
+      <!-- TAB 1: 实盘矩阵 (TRADING) — home: HUD cards + positions + maker orders + 6-asset matrix -->
       <div v-show="store.activeTab === 'trading'" class="space-y-4">
         <!-- 1. Top HUD 4-Card Ribbon (Equity, Benchmark PnL, Today PnL, Cloud OCO) -->
         <TopHudRibbon />
-        <!-- Dual Column: Positions & In-flight Maker Orders -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <!-- Dual Column: Positions & In-flight Maker Orders (full table layout) -->
+        <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
           <PositionList />
           <PendingOrders />
         </div>
+        <!-- 6-Asset Grid with Calculus Dynamics & Drawer -->
+        <InstrumentMatrix />
       </div>
 
-      <!-- TAB 2: AI全景推演 (FACTORS) — 6-asset matrix + LLM history timeline -->
+      <!-- TAB 2: AI全景推演 (FACTORS) — Dedicated AI Decision & Evolution Workspace -->
       <div v-show="store.activeTab === 'factors'" class="space-y-4">
-        <InstrumentMatrix />
         <AiBrainHistory />
       </div>
 

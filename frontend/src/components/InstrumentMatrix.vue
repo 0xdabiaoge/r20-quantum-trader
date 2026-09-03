@@ -44,8 +44,8 @@ function getActionLabel(action?: string) {
       </div>
     </div>
 
-    <!-- 6-Asset Cards Grid -->
-    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+    <!-- 6-Asset Cards Grid: 1 on mobile, 2/3 on desktop, full 6 across on ultra-wide screens -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6 gap-3">
       <div
         v-for="item in store.factors"
         :key="item.instId"
