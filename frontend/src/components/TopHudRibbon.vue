@@ -31,7 +31,6 @@ const todayTrades = computed(() => (today.value.win_trades || 0) + (today.value.
           <Wallet class="w-4 h-4 text-blue-400" />
           <span>官方账户总权益</span>
         </div>
-        <span class="text-[10px] text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">LIVE/DEMO</span>
       </div>
       <div>
         <div class="text-2xl sm:text-3xl font-black text-white font-mono tracking-tight">
