@@ -281,6 +281,22 @@ class PromptRollbackRequest(BaseModel):
     revision_id: str = Field(min_length=1, max_length=80)
 
 
+class InterceptorToggleRequest(BaseModel):
+    enabled: bool
+
+class InterceptorCodeRequest(BaseModel):
+    code: str
+
+class InterceptorCreateRequest(BaseModel):
+    filename: str = Field(min_length=3, max_length=100)
+    code: str
+
+class InterceptorReorderRequest(BaseModel):
+    pipeline_order: list[str]
+
+class InterceptorTestRequest(BaseModel):
+    scenario: dict[str, Any] | None = None
+
 class BackupJobCreateRequest(BaseModel):
     name: str = Field(min_length=1, max_length=80)
     source_id: str = Field(default="nightly-default", max_length=80)
@@ -1039,6 +1055,89 @@ def admin_test_council_debate(payload: CouncilTestRequest, x_r20_session: str | 
             "status": "error",
             "error": str(exc),
         }
+
+
+# =========================================================================
+# Physical Risk Interceptor Plugins API (Python Strategy/Risk Plugins)
+# =========================================================================
+
+@app.get("/api/v1/admin/interceptors")
+def admin_list_interceptors(x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    require_admin_header(x_r20_session=x_r20_session)
+    from r20_backend.interceptor_manager import list_plugins
+    return {"plugins": list_plugins()}
+
+
+@app.get("/api/v1/admin/interceptors/{filename}")
+def admin_get_interceptor(filename: str, x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    require_admin_header(x_r20_session=x_r20_session)
+    from r20_backend.interceptor_manager import get_plugin_detail
+    try:
+        return get_plugin_detail(filename)
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@app.put("/api/v1/admin/interceptors/{filename}/toggle")
+def admin_toggle_interceptor(filename: str, payload: InterceptorToggleRequest, x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    actor = require_superadmin(x_r20_session)
+    from r20_backend.interceptor_manager import toggle_plugin
+    res = toggle_plugin(filename, payload.enabled)
+    audit_record("interceptor.toggle", "success", {"actor": actor["username"], "filename": filename, "enabled": payload.enabled})
+    return res
+
+
+@app.put("/api/v1/admin/interceptors/{filename}/code")
+def admin_save_interceptor_code(filename: str, payload: InterceptorCodeRequest, x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    actor = require_superadmin(x_r20_session)
+    from r20_backend.interceptor_manager import save_plugin_code
+    try:
+        res = save_plugin_code(filename, payload.code)
+        audit_record("interceptor.code.update", "success", {"actor": actor["username"], "filename": filename})
+        return res
+    except ValueError as err:
+        raise HTTPException(status_code=400, detail=str(err))
+
+
+@app.post("/api/v1/admin/interceptors")
+def admin_create_interceptor(payload: InterceptorCreateRequest, x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    actor = require_superadmin(x_r20_session)
+    from r20_backend.interceptor_manager import create_plugin
+    try:
+        res = create_plugin(payload.filename, payload.code)
+        audit_record("interceptor.create", "success", {"actor": actor["username"], "filename": payload.filename})
+        return res
+    except Exception as err:
+        raise HTTPException(status_code=400, detail=str(err))
+
+
+@app.delete("/api/v1/admin/interceptors/{filename}")
+def admin_delete_interceptor(filename: str, x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    actor = require_superadmin(x_r20_session)
+    from r20_backend.interceptor_manager import delete_plugin
+    try:
+        delete_plugin(filename)
+        audit_record("interceptor.delete", "success", {"actor": actor["username"], "filename": filename})
+        return {"deleted": True, "filename": filename}
+    except Exception as err:
+        raise HTTPException(status_code=400, detail=str(err))
+
+
+@app.post("/api/v1/admin/interceptors/reorder")
+def admin_reorder_interceptors(payload: InterceptorReorderRequest, x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    actor = require_superadmin(x_r20_session)
+    from r20_backend.interceptor_manager import reorder_plugins
+    res = reorder_plugins(payload.pipeline_order)
+    audit_record("interceptor.reorder", "success", {"actor": actor["username"]})
+    return {"plugins": res}
+
+
+@app.post("/api/v1/admin/interceptors/test")
+def admin_test_interceptors(payload: InterceptorTestRequest, x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    require_admin_header(x_r20_session=x_r20_session)
+    from r20_backend.interceptor_manager import run_sandbox_test
+    return run_sandbox_test(payload.scenario)
+
     audit_record("llm.model.delete", "success", {"actor": actor["username"], "provider_id": provider_id, "model_id": model_id})
     return {"deleted": True, "provider_id": provider_id, "model_id": model_id}
 

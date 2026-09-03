@@ -23,14 +23,14 @@ _SECTION_RE = re.compile(r"(?m)(?=^={0,30}\s*【[^\n】]+】[^\n]*$)")
 
 PRESETS: dict[str, dict[str, Any]] = {
     "stable": {
-        "id": "stable", "name": "稳健", "description": "重视信号一致性、回撤控制与等待质量，当前默认风格。", "editable": False,
+        "id": "stable", "name": "稳健", "description": "重视信号一致性、回撤控制与等待质量，当前默认风格。", "editable": True,
         "trading_system": """【交易风格：稳健均衡】\n所有 P0 硬约束保持不变，但不得把“稳健”解释为长期空仓。对 4H/1H 同向、ADX≥18、价格几何与真实 R:R 合法的候选进行相对排序；P2/P3 轻微分歧以降低保证金处理。若存在可审计的最佳顺势候选，应果断给出小仓决策。""",
         "trading_user": """【稳健均衡裁决偏好】\n优先顺应 4H/1H 同向趋势，并引用具体 1H v/a/j/I、E/A、延续或击穿概率及 VaR/CVaR。减速只有在速度趋零、结构转 CHOP 或尾部风险极端时才否决；普通回抽优先作为限价入场定位。""",
         "evolution_system": """【稳健复盘风格】\n优先识别回撤、过度交易、追价和低质量入场，但只使用真实可观测证据。小样本、数理快照缺失或因果不可辨时 NO_CHANGE；任何记忆都不得成为绕过硬风控的新阈值。""",
         "evolution_user": """【稳健进化任务】\n评估信号一致性、风险预算、手续费、入场与退出质量；只有多个独立样本支持时才沉淀新经验，否则保留旧记忆并提出需要补充的证据。""",
     },
     "aggressive": {
-        "id": "aggressive", "name": "激进", "description": "提高高质量趋势与突破机会的参与度，但不放宽任何硬风控。", "editable": False,
+        "id": "aggressive", "name": "激进", "description": "提高高质量趋势与突破机会的参与度，但不放宽任何硬风控。", "editable": True,
         "trading_system": """【交易风格：激进】\n所有 P0 硬约束、OCO 与 JSON 契约保持不变。仅对 4H/1H 同向、1H 动力学与积分能量扩张、概率风险可接受且量能共振的机会提高参与度；可使用允许区间较高的保证金和杠杆，但不得逆势补仓、追逐失速行情或牺牲 R:R。""",
         "trading_user": """【激进裁决偏好】\n对证据链完整的强趋势果断决策，必须引用具体 1H v/a/j/I、E/A、方向估计概率及 VaR/CVaR。15M 只优化执行；高 jerk、肥尾或证据不一致时仍必须 WAIT。""",
         "evolution_system": """【激进复盘风格】\n复盘时同时识别错失强趋势、过早止盈和仓位利用不足，也必须审查追价、过度杠杆和假突破损失；任何进化建议不得削弱硬风控。""",
@@ -95,19 +95,9 @@ def compile_modules(modules: list[dict[str, Any]]) -> str:
 
 
 def base_template_modules(text: str, pipeline: str) -> list[dict[str, Any]]:
-    modules=text_to_modules(text,"base",locked=False)
-    locked_patterns = {
-        "trading_system": ("决策优先级", "输出与审计纪律"),
-        "trading_user": ("当前决策时间戳", "全网实时重大快讯", "账户当前持仓", "在途未成交", "长期记忆", "行情、技术指标", "六币种原生行情", "推演与决策任务"),
-        "evolution_system": ("不可覆盖", "输出", "JSON"),
-        "evolution_user": ("当前认知复盘基准时间", "历史长期记忆库", "实盘战绩与历史交易台账"),
-    }.get(pipeline, ())
+    modules = text_to_modules(text, "base", locked=False)
     for module in modules:
-        module["locked"] = any(token in module["title"] for token in locked_patterns)
-        # Safety-critical base rules must always come from the running code so an
-        # older editable profile cannot freeze obsolete thresholds indefinitely.
-        if pipeline == "trading_system" and any(token in module["title"] for token in ("三重滤网裁决协议", "开仓与价格几何")):
-            module["locked"] = True
+        module["locked"] = False
     return modules
 
 
@@ -291,10 +281,14 @@ def create_profile(name: str, description: str = "", source_id: str = "stable", 
 
 
 def update_profile(profile_id: str, changes: dict[str, Any], note: str = "更新方案") -> dict[str, Any]:
-    if profile_id in PRESETS: raise ValueError("内置预设不可编辑，请先复制为自定义方案")
     library = load_library()
-    if profile_id not in library["profiles"]: raise ValueError("提示词方案不存在")
-    current = library["profiles"][profile_id]
+    if profile_id in PRESETS and profile_id not in library["profiles"]:
+        current = copy.deepcopy(PRESETS[profile_id])
+        current["editable"] = True
+    elif profile_id in library["profiles"]:
+        current = library["profiles"][profile_id]
+    else:
+        raise ValueError("提示词方案不存在")
     accepted = {k: v for k, v in changes.items() if k in {"name", "description", "enabled", "editor_mode", "simple_policy", "pipelines", *TEMPLATE_KEYS}}
     flat_updates = [key for key in TEMPLATE_KEYS if key in accepted]
     if "pipelines" not in accepted and flat_updates:
@@ -313,12 +307,14 @@ def update_profile(profile_id: str, changes: dict[str, Any], note: str = "更新
 
 
 def delete_profile(profile_id: str) -> None:
-    if profile_id in PRESETS: raise ValueError("内置预设不可删除")
+    if profile_id in PRESETS and profile_id not in load_library()["profiles"]: raise ValueError("内置预设不可删除")
     library = load_library()
     if profile_id == library["active_profile_id"]: raise ValueError("当前启用方案不能删除，请先切换方案")
-    if profile_id not in library["profiles"]: raise ValueError("提示词方案不存在")
-    del library["profiles"][profile_id]
-    save_library(library)
+    if profile_id in library["profiles"]:
+        del library["profiles"][profile_id]
+        save_library(library)
+    else:
+        raise ValueError("提示词方案不存在")
 
 
 def activate_profile(profile_id: str) -> dict[str, Any]:
@@ -331,10 +327,14 @@ def activate_profile(profile_id: str) -> dict[str, Any]:
 
 
 def get_profile(profile_id: str) -> dict[str, Any]:
-    if profile_id in PRESETS: return copy.deepcopy(PRESETS[profile_id])
-    profile = load_library()["profiles"].get(profile_id)
-    if not profile: raise ValueError("提示词方案不存在")
-    return copy.deepcopy(profile)
+    library = load_library()
+    if profile_id in library["profiles"]:
+        return copy.deepcopy(library["profiles"][profile_id])
+    if profile_id in PRESETS:
+        preset = copy.deepcopy(PRESETS[profile_id])
+        preset["editable"] = True
+        return preset
+    raise ValueError("提示词方案不存在")
 
 
 def profile_history(profile_id: str) -> list[dict[str, Any]]:
@@ -380,7 +380,17 @@ def active_profile() -> dict[str, Any]:
 
 def all_profiles() -> list[dict[str, Any]]:
     library = load_library()
-    return [copy.deepcopy(PRESETS["stable"]), copy.deepcopy(PRESETS["aggressive"]), *[copy.deepcopy(x) for x in library["profiles"].values()]]
+    profiles_map = copy.deepcopy(library["profiles"])
+    result = []
+    for pid in ("stable", "aggressive"):
+        if pid in profiles_map:
+            result.append(profiles_map.pop(pid))
+        else:
+            preset = copy.deepcopy(PRESETS[pid])
+            preset["editable"] = True
+            result.append(preset)
+    result.extend(profiles_map.values())
+    return result
 
 
 def _variable_context(profile_name: str = "") -> dict[str, str]:
@@ -446,13 +456,15 @@ def apply_module_layout(base: str, profile: dict[str, Any], pipeline: str, label
 
         group = runtime_groups.get(title, [live])
         matched.update(module["title"] for module in group)
-        if not (live.get("locked") or item.get("enabled", True)):
+        if not item.get("enabled", True):
             continue
 
-        if pipeline == "trading_user" and live.get("locked"):
+        if pipeline == "trading_user":
             content = compile_modules(group)
+        elif any(token in title for token in ("三重滤网裁决协议", "开仓与价格几何")):
+            content = live["content"]
         else:
-            content = live["content"] if live.get("locked") else str(item.get("content") or live["content"])
+            content = str(item.get("content") if item.get("content") is not None else live["content"])
         output.append({**live, "content": content})
 
     # Fail closed: preserve every live value that an older layout does not know.
@@ -461,10 +473,14 @@ def apply_module_layout(base: str, profile: dict[str, Any], pipeline: str, label
 
 
 def pipeline_view(base: str, profile: dict[str, Any], pipeline: str) -> list[dict[str, Any]]:
-    base_modules=base_template_modules(base,pipeline)
-    current=((profile.get("pipelines") or {}).get(pipeline) if isinstance(profile.get("pipelines"),dict) else [])
-    if isinstance(current,list) and any(item.get("source")=="base" for item in current): return copy.deepcopy(current)
-    return base_modules + text_to_modules(str(profile.get(pipeline) or ""),"custom")
+    base_modules = base_template_modules(base, pipeline)
+    current = ((profile.get("pipelines") or {}).get(pipeline) if isinstance(profile.get("pipelines"), dict) else [])
+    if isinstance(current, list) and any(item.get("source") == "base" for item in current):
+        view = copy.deepcopy(current)
+        for m in view:
+            m["locked"] = False
+        return view
+    return base_modules + text_to_modules(str(profile.get(pipeline) or ""), "custom")
 
 
 def append_layer(base: str, layer: str, label: str) -> str:

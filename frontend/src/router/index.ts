@@ -23,6 +23,7 @@ const routes: RouteRecordRaw[] = [
       { path: 'decisions', name: 'admin-decisions', component: () => import('../views/admin/DecisionsPage.vue') },
       { path: 'gateway', name: 'admin-gateway', component: () => import('../views/admin/GatewayPage.vue') },
       { path: 'promptlib', name: 'admin-promptlib', component: () => import('../views/admin/PromptStudioPage.vue') },
+      { path: 'interceptors', name: 'admin-interceptors', component: () => import('../views/admin/InterceptorsPage.vue') },
       { path: 'agents', name: 'admin-agents', component: () => import('../views/admin/AgentsPage.vue') },
       { path: 'backup', name: 'admin-backup', component: () => import('../views/admin/BackupPage.vue') },
       { path: 'plugins', name: 'admin-plugins', component: () => import('../views/admin/PluginsPage.vue') },

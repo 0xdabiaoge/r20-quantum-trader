@@ -165,6 +165,28 @@ class AdminApiTests(unittest.TestCase):
         self.assertNotIn("passphrase", text)
         self.assertEqual(response.json()["credential_source"], "cli-oauth")
 
+    def test_interceptor_endpoints_and_sandbox_execution(self):
+        self.assertEqual(self.client.get("/api/v1/admin/interceptors").status_code, 401)
+        headers = self.login("admin", "InitialAdmin123456")
+        res = self.client.get("/api/v1/admin/interceptors", headers=headers)
+        self.assertEqual(res.status_code, 200)
+        plugins = res.json()["plugins"]
+        self.assertGreaterEqual(len(plugins), 4)
+        names = [p["filename"] for p in plugins]
+        self.assertIn("01_macro_trend_filter.py", names)
+        self.assertIn("02_confidence_gatekeeper.py", names)
+
+        # Test single detail
+        detail = self.client.get("/api/v1/admin/interceptors/01_macro_trend_filter.py", headers=headers)
+        self.assertEqual(detail.status_code, 200)
+        self.assertIn("check_risk", detail.json()["code"])
+
+        # Test sandbox test execution
+        test_res = self.client.post("/api/v1/admin/interceptors/test", headers=headers, json={})
+        self.assertEqual(test_res.status_code, 200)
+        self.assertEqual(test_res.json()["status"], "success")
+        self.assertGreaterEqual(len(test_res.json()["results"]), 4)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -17,6 +17,7 @@ import {
   Cpu,
   FileText,
   Users,
+  ShieldCheck,
   RefreshCw,
   LogOut,
 } from 'lucide-vue-next'
@@ -39,6 +40,7 @@ const navGroups = [
     label: '策略配置',
     items: [
       { id: 'promptlib', label: '提示词策略', icon: FileText },
+      { id: 'interceptors', label: '物理拦截插件', icon: ShieldCheck },
       { id: 'council', label: '模型委员会', icon: Users },
       { id: 'llm', label: '模型连接', icon: Cpu },
       { id: 'agents', label: '运行单元', icon: Package },

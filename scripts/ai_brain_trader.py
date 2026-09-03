@@ -681,59 +681,32 @@ def construct_full_market_prompt(packages: List[Dict[str, Any]], pos_summary: st
 
 def validate_and_filter_decision(p: Dict[str, Any], d_item: Dict[str, Any], active_inst_ids: set, active_position_sides: Dict[str, str]) -> tuple[str, str, float]:
     """
-    Fail-closed execution layer gatekeeper.
-    Returns: (final_action, rejection_reason, risk_reward_ratio)
-    Enforces:
-    1. Data quality completeness
-    2. Incompatible position direction check
-    3. Minimum 2.0R risk-reward ratio
-    4. Minimum 80.0% confidence threshold (win-rate first, quality over quantity)
-    5. Macro 4H trend alignment (no counter-trend shorts in bull market, no counter-trend longs in bear market)
-    6. 1H ADX trend strength >= 18 (eliminate flat chop noise)
-    7. Meme/high-noise asset threshold (DOGE requires >= 85.0% confidence)
+    Fail-closed execution layer gatekeeper powered by pluggable interceptors.
+    1. Base pre-checks: data completeness & opposing position collision
+    2. Dynamic interceptor pipeline: runs all enabled Python interceptor plugins
     """
-    if not isinstance(d_item, dict):
-        d_item = {}
-    inst_id = p.get("instId", "")
-    raw_action = str(d_item.get("action", "WAIT")).upper()
-    if raw_action not in {"BUY_LONG", "SELL_SHORT", "WAIT"}:
-        raw_action = "WAIT"
-    entry = safe_float(d_item.get("entry_price"))
-    take_profit = safe_float(d_item.get("take_profit_price"))
-    stop_loss = safe_float(d_item.get("stop_loss_price"))
-    confidence = max(0.0, min(100.0, safe_float(d_item.get("confidence"))))
-    rr = 0.0
-    if raw_action == "BUY_LONG" and entry > stop_loss > 0 and take_profit > entry:
-        rr = (take_profit - entry) / (entry - stop_loss)
-    elif raw_action == "SELL_SHORT" and stop_loss > entry > take_profit > 0:
-        rr = (entry - take_profit) / (stop_loss - entry)
-
-    macro_4h_val = str(p.get("macro_4h", "") or "")
-    adx_val = safe_float(p.get("adx_1h", 0))
-
-    rejection_reason = ""
-    if p.get("data_quality") != "valid":
-        rejection_reason = "关键原始行情不完整，安全降级为 WAIT。"
-    elif inst_id in active_inst_ids and raw_action != "WAIT":
-        position_side = active_position_sides.get(inst_id, "")
-        same_direction_scale_request = is_same_direction_scale_request(position_side, raw_action)
-        if not same_direction_scale_request:
-            rejection_reason = "已有反向或不兼容持仓，禁止借决策通道反向开仓，安全降级为 WAIT。"
-    elif not rejection_reason and raw_action in {"BUY_LONG", "SELL_SHORT"} and rr < 2.0:
-        rejection_reason = f"模型报价盈亏比 {rr:.2f}R 未满足真实 2R 门禁，执行层降级为 WAIT。"
-    elif not rejection_reason and raw_action in {"BUY_LONG", "SELL_SHORT"} and confidence < 80.0:
-        rejection_reason = f"置信度 {confidence:.1f}% 低于 80% 胜率质量硬门禁（宁缺毋滥），安全降级为 WAIT。"
-    elif not rejection_reason and raw_action == "SELL_SHORT" and "4H_MACRO_BULL" in macro_4h_val:
-        rejection_reason = "4H大级别处于多头主升通道，严禁逆势摸顶开空，执行层强制降级为 WAIT。"
-    elif not rejection_reason and raw_action == "BUY_LONG" and "4H_MACRO_BEAR" in macro_4h_val:
-        rejection_reason = "4H大级别处于空头承压通道，严禁逆势接飞刀做多，执行层强制降级为 WAIT。"
-    elif not rejection_reason and raw_action in {"BUY_LONG", "SELL_SHORT"} and 0 < adx_val < 18.0:
-        rejection_reason = f"1H ADX 趋势强度仅 {adx_val:.1f}，处于无序震荡杂波市，安全降级为 WAIT。"
-    elif not rejection_reason and p.get("name") == "DOGE" and raw_action in {"BUY_LONG", "SELL_SHORT"} and confidence < 85.0:
-        rejection_reason = f"DOGE高杂波标的置信度 {confidence:.1f}% 未达 85% 防破位门禁，安全降级为 WAIT。"
-
-    final_action = "WAIT" if rejection_reason else raw_action
-    return final_action, rejection_reason, rr
+    context = {
+        "active_inst_ids": active_inst_ids,
+        "active_position_sides": active_position_sides,
+    }
+    try:
+        from r20_backend.interceptor_manager import run_interceptor_pipeline
+        return run_interceptor_pipeline(p, d_item, context)
+    except Exception as exc:
+        # Fail-closed fallback in case interceptor manager cannot be reached
+        inst_id = p.get("instId", "")
+        raw_action = str((d_item or {}).get("action", "WAIT")).upper()
+        if raw_action not in {"BUY_LONG", "SELL_SHORT", "WAIT"}:
+            raw_action = "WAIT"
+        entry = safe_float((d_item or {}).get("entry_price"))
+        take_profit = safe_float((d_item or {}).get("take_profit_price"))
+        stop_loss = safe_float((d_item or {}).get("stop_loss_price"))
+        rr = 0.0
+        if raw_action == "BUY_LONG" and entry > stop_loss > 0 and take_profit > entry:
+            rr = (take_profit - entry) / (entry - stop_loss)
+        elif raw_action == "SELL_SHORT" and stop_loss > entry > take_profit > 0:
+            rr = (entry - take_profit) / (stop_loss - entry)
+        return "WAIT", f"拦截插件管线调用异常: {exc}，安全降级为 WAIT", rr
 
 @single_brain_cycle
 def execute_batch_ai_brain_cycle(pos_summary: str = "当前总持仓 0/6", active_positions_detail: List[Dict[str, Any]] = None, usdt_available: float = 0.0) -> Optional[Dict[str, Any]]:
