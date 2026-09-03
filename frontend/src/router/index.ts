@@ -9,6 +9,16 @@ const routes: RouteRecordRaw[] = [
     meta: { isPublic: true },
   },
   {
+    path: '/docs',
+    name: 'docs',
+    component: () => import('../views/DocsView.vue'),
+    meta: { isPublic: true },
+  },
+  {
+    path: '/doc',
+    redirect: '/docs',
+  },
+  {
     path: '/admin',
     component: () => import('../views/AdminLayout.vue'),
     meta: { requiresAuth: true, isPublic: false },

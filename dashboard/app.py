@@ -48,7 +48,7 @@ TARGET_INSTRUMENTS = [
     {"instId": "LINK-USDT-SWAP", "name": "LINK", "type": "crypto", "sz": "64", "ctVal": 1.0},
 ]
 
-app = FastAPI(title="R20 AI Quantitative Matrix")
+app = FastAPI(title="R20 AI Quantitative Matrix", docs_url=None, redoc_url=None)
 templates = Jinja2Templates(directory=os.path.join(DASHBOARD_DIR, "templates"))
 app.mount("/static", StaticFiles(directory=os.path.join(DASHBOARD_DIR, "static")), name="static")
 
@@ -1145,9 +1145,14 @@ start_dashboard_background_worker()
 
 VUE_DIST_DIR = os.path.join(WORKSPACE_DIR, "frontend", "dist")
 VUE_ASSETS_DIR = os.path.join(VUE_DIST_DIR, "assets")
+DOCS_IMAGES_DIR = os.path.join(WORKSPACE_DIR, "docs", "images")
 
 if os.path.isdir(VUE_ASSETS_DIR):
     app.mount("/assets", StaticFiles(directory=VUE_ASSETS_DIR), name="vue_assets")
+
+if os.path.isdir(DOCS_IMAGES_DIR):
+    app.mount("/docs/images", StaticFiles(directory=DOCS_IMAGES_DIR), name="docs_images")
+    app.mount("/images", StaticFiles(directory=DOCS_IMAGES_DIR), name="images")
 
 VUE_ADMIN_DIST_DIR = VUE_DIST_DIR  # Same SPA build handles both / and /admin/*
 VUE_ADMIN_LEGACY_FILE = os.path.join(VUE_DIST_DIR, "admin", "legacy.html")
@@ -1191,6 +1196,17 @@ async def admin_spa_deep_link(request: Request, subpath: str):
     if candidate.startswith(os.path.join(VUE_DIST_DIR, "admin")) and os.path.isfile(candidate):
         return FileResponse(candidate)
     return await admin_spa_root(request)
+
+@app.get("/docs", response_class=HTMLResponse, include_in_schema=False)
+@app.get("/docs/", response_class=HTMLResponse, include_in_schema=False)
+@app.get("/docs/{subpath:path}", response_class=HTMLResponse, include_in_schema=False)
+@app.get("/doc", response_class=HTMLResponse, include_in_schema=False)
+async def docs_spa_root(request: Request, subpath: str = ""):
+    """Serve the public system documentation page in Vue SPA."""
+    vue_index_file = os.path.join(VUE_DIST_DIR, "index.html")
+    if os.path.isfile(vue_index_file):
+        return _serve_vue_spa(vue_index_file)
+    return HTMLResponse("Vue build not found. Run `npm run build` in frontend/.", status_code=503)
 
 @app.get("/api/all")
 async def get_all_data():

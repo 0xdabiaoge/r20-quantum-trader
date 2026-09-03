@@ -92,7 +92,7 @@ async def lifespan(_: FastAPI):
     stop_gateway_supervisor()
 
 
-app = FastAPI(title="R20 Quantum Trader Standalone Backend", version="6.3.1", lifespan=lifespan)
+app = FastAPI(title="R20 Quantum Trader Standalone Backend", version="6.3.1", lifespan=lifespan, docs_url="/api/docs", redoc_url="/api/redoc")
 
 
 @app.middleware("http")

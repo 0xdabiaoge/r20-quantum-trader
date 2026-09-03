@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { X, ExternalLink, Check, Copy, Code, Github, MessageCircle } from 'lucide-vue-next'
+import { X, ExternalLink, Check, Copy, Code, Github, MessageCircle, BookOpen } from 'lucide-vue-next'
 
 defineProps<{
   visible: boolean
@@ -77,6 +77,31 @@ async function copyText(text: string, targetKey: string) {
 
       <!-- Links Grid -->
       <div class="space-y-2.5">
+        <!-- System Documentation Link -->
+        <a
+          href="/docs"
+          class="p-3 rounded-xl bg-[#0B0F17] border border-[#1A2232] hover:border-cyan-500/80 hover:bg-[#111723] flex items-center justify-between transition-all group cursor-pointer"
+          @click="emit('close')"
+        >
+          <div class="flex items-center space-x-2.5 min-w-0">
+            <div class="w-6 h-6 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400 shrink-0">
+              <BookOpen class="w-3.5 h-3.5" />
+            </div>
+            <div class="truncate">
+              <span class="text-white font-bold block group-hover:text-cyan-400 transition-colors">
+                系统开发与使用文档 (Docs)
+              </span>
+              <span class="text-[10px] text-[#707E94] truncate block">
+                架构说明 · 提示词变量插槽 · 物理拦截插件规范
+              </span>
+            </div>
+          </div>
+          <div class="flex items-center space-x-1 text-cyan-400 group-hover:translate-x-0.5 transition-transform shrink-0">
+            <span class="text-[11px]">查看文档</span>
+            <ExternalLink class="w-3.5 h-3.5" />
+          </div>
+        </a>
+
         <!-- GitHub Official Repo -->
         <a
           href="https://github.com/555cute/r20-quantum-trader"

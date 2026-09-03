@@ -10,6 +10,7 @@ import {
   Receipt,
   ShieldCheck,
   ExternalLink,
+  BookOpen,
 } from 'lucide-vue-next'
 
 const store = useDashboardStore()
@@ -86,6 +87,15 @@ const tabs = [
             ({{ benchmarkNetPnl >= 0 ? '+' : '' }}{{ benchmarkNetPnl.toFixed(2) }}U)
           </span>
         </div>
+
+        <a
+          href="/docs"
+          class="flex items-center space-x-1 px-2.5 sm:px-3 py-1 rounded-lg bg-[#0D121B] hover:bg-[#141B26] border border-[#1A2232] text-xs font-mono text-[#707E94] hover:text-white transition-colors"
+          title="系统架构与使用文档"
+        >
+          <BookOpen class="w-3.5 h-3.5 text-cyan-400" />
+          <span class="hidden sm:inline">文档</span>
+        </a>
 
         <a
           href="/admin"
