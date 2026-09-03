@@ -282,10 +282,23 @@ onMounted(loadAll)
 </script>
 
 <template>
-  <div class="space-y-4">
-    <div class="flex items-center justify-between">
-      <p class="text-xs text-[#707E94] font-mono">按 账号授权 → 环境 → 本金 → 标的池 → 持仓处置 的顺序操作。</p>
-      <span class="text-[10px] font-mono text-blue-400 bg-blue-500/10 px-2 py-1 rounded border border-blue-500/20">日常运行 · 2/4</span>
+  <div class="space-y-4 font-mono text-xs">
+    <!-- Header & Action Bar -->
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center space-x-2.5">
+        <div class="w-8 h-8 rounded-lg flex items-center justify-center border shadow-xs" style="background-color: var(--color-brand-bg); border-color: var(--color-brand-border); color: var(--color-brand);">
+          <Wallet class="w-4 h-4" />
+        </div>
+        <div>
+          <h1 class="text-sm font-bold uppercase tracking-wide" style="color: var(--text-main);">OKX 账户连接与交易标的池</h1>
+          <p class="text-[11px] font-sans" style="color: var(--text-muted);">
+            OKX 官方账户授权连接、实盘/模拟盘环境切换、初始本金基准、资产标的池管理与应急持仓处置。
+          </p>
+        </div>
+      </div>
+      <span class="text-[10px] px-2 py-1 rounded border font-bold" style="background-color: var(--color-brand-bg); color: var(--color-brand); border-color: var(--color-brand-border);">
+        交易核心底座 · 2/4
+      </span>
     </div>
 
     <div v-if="bannerMsg" class="sticky top-[76px] z-40 p-3 rounded-lg text-xs font-mono flex items-center gap-2 border shadow-lg" :class="bannerMsg.type === 'ok' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : bannerMsg.type === 'warn' ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'">
@@ -351,8 +364,25 @@ onMounted(loadAll)
               <option value="tr">TR · tr.okx.com</option>
             </select>
             <div class="flex gap-2">
-              <button v-if="auth.isSuperadmin" @click="startOauth" :disabled="startingOauth" class="flex-1 px-3 py-1.5 rounded-lg text-xs font-mono font-bold cursor-pointer disabled:opacity-50 transition-all shadow-xs" style="background-color: var(--color-brand); color: #fff;">{{ startingOauth ? '申请中…' : '使用授权码连接 OKX' }}</button>
-              <button v-if="auth.isSuperadmin" @click="installCli" :disabled="installingCli" class="px-2 py-1.5 rounded-lg border text-[11px] font-mono cursor-pointer disabled:opacity-50 transition-all shadow-xs" style="background-color: var(--bg-card); border-color: var(--border-medium); color: var(--text-main);">{{ installingCli ? '安装中…' : '安装/升级 CLI' }}</button>
+              <button
+                v-if="auth.isSuperadmin"
+                @click="startOauth"
+                :disabled="startingOauth"
+                class="flex-1 flex items-center justify-center space-x-1.5 px-3 py-2 rounded-lg text-xs font-mono font-bold cursor-pointer disabled:opacity-50 transition-all shadow-xs bg-blue-600 hover:bg-blue-500 text-white"
+                style="background-color: #2563EB; color: #FFFFFF;"
+              >
+                <KeyRound class="w-3.5 h-3.5" />
+                <span>{{ startingOauth ? '申请授权码中…' : '使用授权码连接 OKX' }}</span>
+              </button>
+              <button
+                v-if="auth.isSuperadmin"
+                @click="installCli"
+                :disabled="installingCli"
+                class="px-2.5 py-2 rounded-lg border text-[11px] font-mono cursor-pointer disabled:opacity-50 transition-all shadow-xs"
+                style="background-color: var(--bg-card); border-color: var(--border-medium); color: var(--text-main);"
+              >
+                {{ installingCli ? '安装中…' : '安装/升级 CLI' }}
+              </button>
             </div>
 
             <div v-if="oauthState" class="mt-2 text-[11px] font-mono text-amber-500">{{ oauthState }}</div>
