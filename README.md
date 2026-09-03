@@ -6,11 +6,11 @@
 
 **多模型决策委员会 · 语义插槽提示词引擎 · Python 物理拦截插件 · 策略广场底座 · 原生 Vue 3 SPA · 100% 云端 OCO**
 
-[![Release](https://img.shields.io/badge/release-v6.5.1%20(Council%20Pro)-3875F6?style=flat-square)](https://github.com/555cute/r20-quantum-trader/releases/tag/v6.5.1)
+[![Release](https://img.shields.io/badge/release-v6.5.2%20(Dynamic%20Universe)-3875F6?style=flat-square)](https://github.com/555cute/r20-quantum-trader/releases/tag/v6.5.2)
 [![LINUX DO](https://img.shields.io/badge/Community-LINUX%20DO-F97316?style=flat-square&logo=linux&logoColor=white)](https://linux.do/)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![Exchange](https://img.shields.io/badge/Exchange-OKX%20V5%20Direct-111827?style=flat-square)](https://www.okx.com/)
-[![Tests](https://img.shields.io/badge/tests-161%2F161%20passed-0ECB81?style=flat-square)](#-测试与质量保障)
+[![Tests](https://img.shields.io/badge/tests-162%2F162%20passed-0ECB81?style=flat-square)](#-测试与质量保障)
 [![License](https://img.shields.io/badge/license-MIT-10B981?style=flat-square)](LICENSE)
 
 [🌐 在线实盘大屏](https://www.r20.cn/) · [📖 官方图文文档](/docs) · [🚀 极速部署指南](#-极速部署指南) · [🐧 LINUX DO 社区](https://linux.do/)
@@ -23,29 +23,29 @@
 
 ---
 
-![R20 v6.5.1 机构级量化终端](docs/images/dashboard_trading.png)
+![R20 v6.5.2 机构级量化终端](docs/images/dashboard_trading.png)
 
 > [!WARNING]
 > R20 是面向加密货币市场的开源量化交易系统，致力于为个人与专业交易员提供高透明度、自进化与工业级的波段交易底座，**不构成任何投资建议**。强烈建议先在 OKX **DEMO 模拟盘** 环境下完成全流程验证与沙箱演练，再评估实盘接入。
 
 ---
 
-## 🌟 v6.5.1 模型委员会全新升级特性
+## 🌟 v6.5.2 全新升级特性（动态标的池与全景双模自适应）
 
-R20 Quantum Trader v6.5.1 围绕**「多模型决策委员会（Council Pro）」**进行了全方位进化：
+R20 Quantum Trader v6.5.2 聚焦**「动态资产池自由组合」**与**「全端机构级双模体验」**深度重构：
 
-1. **⚖️ 辩论裁决共识机制（Consensus Modes）**：
-   - **一票否决制 (Paranoid Veto)**：胜率至上，风控官或数理官提出量价背离或假突破时坚决一票否决为 WAIT；
-   - **加权共识制 (Weighted Majority)**：综合各专家权重，多空顺势支持度达标且无致命风险时批准入场；
-   - **动能突破优先 (Alpha Hunter)**：顺势爆发优先，动量官与巨鲸大单共振时允许小仓位试探开单。
-2. **🎚️ 席位独立启停与微调参数**：
-   - 支持单个参谋席位一键静音/激活，无需繁琐删除；
-   - 每个席位独立配置**思考强度（Reasoning Effort：Low / Medium / High）**与**采样温度（Temperature）**；
-3. **🏛️ 预设参谋库与一键套件扩充**：
-   - 扩充**资金费率与基差套利官**、**OKX Top 100 巨鲸筹码追踪官**等高阶量化席位；
-   - 提供**经典三权分立套件**、**六维全景参谋套件**、**极速突破猎手套件**一键应用。
-4. **🧠 思考链审计与多模型耗时透视**：
-   - 辩论测试支持展开/折叠各参谋深度思考链（Reasoning Content），透视决策心路历程与多模型协同耗时。
+1. **🪙 动态标的池全链路即时同步（Dynamic Trading Universe）**：
+   - **原子同步中枢 (`sync_instruments_state`)**：在后台增删标的（如添加 ASTER、移除 LINK）即时触发全链刷新，彻底告别轮询滞后；
+   - **因果动力学与微结构雷达动态化**：自动解耦硬编码 6 币限制，多因子矩阵根据配置标的数量自适应流式排版；
+   - **全网舆情引擎动态多标的探测**：实时拉取最新资产池的多币种情感偏好与热度，下架币种即刻清理，新币种毫秒就绪；
+2. **🌓 全站亮暗双模深度标准化与防爆表格**：
+   - **无死角双模自适应**：彻底消除亮色模式浅底白字与旧暗黑类样式残留，表单控件与各类弹窗自然过渡；
+   - **机构级极细横向滑动条 (`table-scroll-container`)**：全后台 13 个模块全量包装防爆容器，杜绝宽内容撑破卡片；
+   - **去白线与 Bento 卡片解耦**：彻底消除 `divide-x` / `divide-y` 违和白线，升级为柔和钛板岩暗边与独立 Bento 实体；
+3. **🔔 消息通知与控制中心移动端体验加固**：
+   - **静默后台加载机制 (Silent Reload)**：彻底根除切换开关时整页白屏卸载闪烁的体验缺陷；
+   - **开关即时持久化联动**：填写 Webhook 或 Token 即可一键直接开启，无需二次点击底部保存；
+   - **响应式控制中心与弹窗优化**：12 项核心安全配置卡片响应式网格排布，物理拦截源码编辑器自适应移动端触控。
 
 ---
 

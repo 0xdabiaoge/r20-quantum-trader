@@ -75,7 +75,7 @@ function getActionLabel(action?: string) {
       <div class="flex items-center space-x-2">
         <Activity class="w-3.5 h-3.5" style="color: var(--color-brand);" />
         <h2 class="text-xs font-mono font-black uppercase tracking-wider" style="color: var(--text-main);">
-          六币因果动力学与微结构雷达
+          {{ store.factors.length ? `${store.factors.length} 标的因果动力学与微结构雷达` : '动态资产池因果动力学与微结构雷达' }}
         </h2>
       </div>
       <span class="text-[10px] font-mono" style="color: var(--text-faint);">

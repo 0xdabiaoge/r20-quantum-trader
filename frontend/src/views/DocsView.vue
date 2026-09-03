@@ -90,7 +90,7 @@ onUnmounted(() => {
             class="px-2 py-0.2 rounded text-[10px] font-mono border font-bold"
             style="background-color: var(--color-brand-bg); color: var(--color-brand); border-color: var(--color-brand-border);"
           >
-            v6.5.1 官方开发与使用指南
+            v6.5.2 官方开发与使用指南
           </span>
         </div>
       </div>

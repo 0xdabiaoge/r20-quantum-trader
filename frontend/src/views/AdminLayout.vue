@@ -134,7 +134,7 @@ const showAboutModal = ref(false)
               style="color: var(--color-brand);"
               title="点击查看开源主仓信息"
             >
-              v6.5.1
+              v6.5.2
             </button>
           </div>
         </div>

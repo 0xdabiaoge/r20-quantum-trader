@@ -209,8 +209,8 @@ async function addInstrument() {
   const instId = newInstId.value.trim().toUpperCase()
   if (!/^[A-Z0-9]{2,15}-USDT-SWAP$/.test(instId)) { bannerMsg.value = { text: '格式示例：XRP-USDT-SWAP（仅 USDT 永续）', type: 'err' }; return }
   try {
-    await api('/api/v1/admin/instruments', { method: 'POST', body: JSON.stringify({ inst_id: instId }) })
-    bannerMsg.value = { text: `${instId} 已加入交易池，下一进程周期生效`, type: 'ok' }
+    const res = await api('/api/v1/admin/instruments', { method: 'POST', body: JSON.stringify({ inst_id: instId }) })
+    bannerMsg.value = { text: res.message || `${instId} 已成功加入交易池并实时同步全网大屏与因果雷达`, type: 'ok' }
     newInstId.value = ''
     const inst = await api('/api/v1/admin/instruments')
     instruments.value = inst.instruments || []
@@ -225,7 +225,8 @@ async function removeInstrument(item: any) {
   const phrase = prompt(`删除交易池标的 ${item.instId}\n输入确认短语：REMOVE ${item.instId}`)
   if (!phrase) return
   try {
-    await api(`/api/v1/admin/instruments/${encodeURIComponent(item.instId)}`, { method: 'DELETE', body: JSON.stringify({ confirmation: phrase.trim().toUpperCase() }) })
+    const res = await api(`/api/v1/admin/instruments/${encodeURIComponent(item.instId)}`, { method: 'DELETE', body: JSON.stringify({ confirmation: phrase.trim().toUpperCase() }) })
+    bannerMsg.value = { text: res.message || `${item.instId} 已从交易池移除并实时同步全网大屏与因果雷达`, type: 'ok' }
     const inst = await api('/api/v1/admin/instruments')
     instruments.value = inst.instruments || []
   } catch (e: any) {

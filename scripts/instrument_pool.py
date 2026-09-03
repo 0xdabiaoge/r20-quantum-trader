@@ -67,3 +67,125 @@ def save_instruments(instruments: list[dict[str, Any]]) -> None:
     finally:
         if os.path.exists(temp_path):
             os.unlink(temp_path)
+    try:
+        sync_instruments_state()
+    except Exception:
+        pass
+
+
+def sync_instruments_state() -> None:
+    """Synchronize trading_state.json, factor_library_snapshot.json, news_sentiment.json,
+    and dashboard cache when the trading instrument pool changes."""
+    active_pool = load_instruments()
+    active_ids = {item["instId"] for item in active_pool}
+    active_names = {item["name"] for item in active_pool}
+
+    # 1. Update data/trading_state.json
+    state_file = ROOT / "data" / "trading_state.json"
+    state_data: dict[str, Any] = {}
+    if state_file.exists():
+        try:
+            state_data = json.loads(state_file.read_text(encoding="utf-8"))
+        except Exception:
+            state_data = {}
+
+    current_insts = state_data.get("instruments", [])
+    existing_by_id = {ins.get("instId"): ins for ins in current_insts if isinstance(ins, dict) and ins.get("instId")}
+
+    new_insts = []
+    for target in active_pool:
+        inst_id = target["instId"]
+        if inst_id in existing_by_id:
+            new_insts.append(existing_by_id[inst_id])
+        else:
+            # New coin baseline
+            new_insts.append({
+                "name": target.get("name"),
+                "instId": inst_id,
+                "type": target.get("type", "crypto"),
+                "price": "--",
+                "rsi": 50.0,
+                "rsi_7": 50.0,
+                "vwap_bias": 0.0,
+                "macd_hist": 0.0,
+                "macd_accel": 0.0,
+                "obv_flow": "NEUTRAL",
+                "bb_bandwidth": 0.0,
+                "vol_ratio": 1.0,
+                "market_regime": "CHOP",
+                "structure_1h": "CHOP",
+                "trend_1h": "震荡",
+                "trend_4h": "震荡",
+                "score": 0.0,
+                "action": "WAIT",
+                "strategy": "⚪ 观望",
+                "desc": "新配置资产，微结构与特征雷达已初始化",
+                "position": None,
+            })
+    state_data["instruments"] = new_insts
+    state_data["max_positions"] = len(active_pool)
+    try:
+        state_file.write_text(json.dumps(state_data, ensure_ascii=False, indent=2), encoding="utf-8")
+    except Exception:
+        pass
+
+    # 2. Update data/factor_library_snapshot.json to prune deleted coins
+    factor_file = ROOT / "data" / "factor_library_snapshot.json"
+    if factor_file.exists():
+        try:
+            factor_data = json.loads(factor_file.read_text(encoding="utf-8"))
+            if isinstance(factor_data, dict) and "instruments" in factor_data:
+                factor_data["instruments"] = [
+                    item for item in factor_data["instruments"]
+                    if isinstance(item, dict) and item.get("instId") in active_ids
+                ]
+                factor_file.write_text(json.dumps(factor_data, ensure_ascii=False, indent=2), encoding="utf-8")
+        except Exception:
+            pass
+
+    # 3. Update data/news_sentiment.json to prune deleted coins and ensure active coins
+    news_file = ROOT / "data" / "news_sentiment.json"
+    if news_file.exists():
+        try:
+            news_data = json.loads(news_file.read_text(encoding="utf-8"))
+            if isinstance(news_data, dict) and "coins_sentiment" in news_data:
+                coins_dict = news_data["coins_sentiment"]
+                cleaned_coins = {c: s for c, s in coins_dict.items() if c in active_names}
+                for name in active_names:
+                    if name not in cleaned_coins:
+                        cleaned_coins[name] = {
+                            "ccy": name,
+                            "label": "neutral",
+                            "bullish_ratio": "50.0%",
+                            "bearish_ratio": "50.0%",
+                            "mentions": 0,
+                            "sentiment_factor_score": 0.0,
+                        }
+                news_data["coins_sentiment"] = cleaned_coins
+                news_file.write_text(json.dumps(news_data, ensure_ascii=False, indent=2), encoding="utf-8")
+        except Exception:
+            pass
+
+    # 4. Invalidate dashboard cache file so next fetch generates fresh state
+    dashboard_cache = ROOT / "data" / "dashboard_last_good.json"
+    if dashboard_cache.exists():
+        try:
+            dashboard_cache.unlink(missing_ok=True)
+        except Exception:
+            pass
+
+    # 5. Run factor_library and news_sentiment in a non-blocking background thread
+    import subprocess
+    import threading
+    def _run_bg() -> None:
+        try:
+            fl_script = ROOT / "scripts" / "factor_library.py"
+            if fl_script.exists():
+                subprocess.run(f"python3 {fl_script}", shell=True, capture_output=True, timeout=45)
+            nh_script = ROOT / "scripts" / "news_sentiment_harvester.py"
+            if nh_script.exists():
+                subprocess.run(f"python3 {nh_script}", shell=True, capture_output=True, timeout=45)
+        except Exception:
+            pass
+    threading.Thread(target=_run_bg, daemon=True).start()
+

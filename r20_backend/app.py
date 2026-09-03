@@ -92,7 +92,7 @@ async def lifespan(_: FastAPI):
     stop_gateway_supervisor()
 
 
-app = FastAPI(title="R20 Quantum Trader Standalone Backend", version="6.5.1", lifespan=lifespan, docs_url="/api/docs", redoc_url="/api/redoc")
+app = FastAPI(title="R20 Quantum Trader Standalone Backend", version="6.5.2", lifespan=lifespan, docs_url="/api/docs", redoc_url="/api/redoc")
 
 
 @app.middleware("http")
@@ -506,7 +506,7 @@ def runtime_overview() -> dict[str, Any]:
     ]
     positions_payload = read_json("position_trackers.json", {})
     return {
-        "service": {"version": "6.5.1", "pid": os.getpid(), "uptime_seconds": int(time.time() - STARTED_AT)},
+        "service": {"version": "6.5.2", "pid": os.getpid(), "uptime_seconds": int(time.time() - STARTED_AT)},
         "credentials": {"okx": bool(settings.okx_api_key and settings.okx_secret_key and settings.okx_passphrase), "llm": bool(settings.llm_api_key)},
         "configuration": get_admin_configuration(),
         "data_health": health_files,
@@ -1255,7 +1255,7 @@ def add_admin_instrument(payload: InstrumentAddRequest, x_r20_admin_token: str |
     item = from_okx_instrument(raw)
     save_instruments([*current, item])
     audit_record("instrument.add", "success", {"instId": inst_id})
-    return {"added": item, "count": len(current) + 1, "effective": "next_process_cycle"}
+    return {"added": item, "count": len(current) + 1, "effective": "immediate", "message": f"{item['name']} 已成功加入交易池并实时同步全网大屏与因果雷达"}
 
 
 @app.delete("/api/v1/admin/instruments/{inst_id}")
@@ -1279,7 +1279,7 @@ def delete_admin_instrument(inst_id: str, payload: InstrumentDeleteRequest, x_r2
     updated = [item for item in current if item["instId"] != inst_id]
     save_instruments(updated)
     audit_record("instrument.remove", "success", {"instId": inst_id})
-    return {"removed": inst_id, "count": len(updated), "effective": "next_process_cycle"}
+    return {"removed": inst_id, "count": len(updated), "effective": "immediate", "message": f"{inst_id} 已从交易池移除并实时同步全网大屏与因果雷达"}
 
 
 @app.get("/api/v1/admin/about")
@@ -1288,10 +1288,10 @@ def admin_about(x_r20_admin_token: str | None = Header(default=None)) -> dict[st
     import platform
     store = GatewayStore(GATEWAY_DB_PATH)
     return {
-        "product": {"name": "R20 Quantum Trader", "version": "6.5.1", "control_plane": "R20 Gateway Runtime", "gateway_version": GATEWAY_VERSION},
+        "product": {"name": "R20 Quantum Trader", "version": "6.5.2", "control_plane": "R20 Gateway Runtime", "gateway_version": GATEWAY_VERSION},
         "runtime": {"python": platform.python_version(), "platform": platform.platform(), "backend_pid": os.getpid(), "gateway": gateway_status(x_r20_admin_token)},
         "components": [
-            {"name": "FastAPI Control Plane", "version": "6.5.1"},
+            {"name": "FastAPI Control Plane", "version": "6.5.2"},
             {"name": "Gateway Event Runtime", "version": GATEWAY_VERSION},
             {"name": "SQLite", "version": __import__("sqlite3").sqlite_version},
         ],
@@ -2031,7 +2031,7 @@ def run_backup(payload: BackupRequest, x_r20_admin_token: str | None = Header(de
 def health() -> dict[str, Any]:
     return {
         "service": "r20-standalone-backend",
-        "version": "6.5.1",
+        "version": "6.5.2",
         "status": "ok",
         "timestamp": int(time.time()),
         "credentials": {
@@ -2045,7 +2045,7 @@ def health() -> dict[str, Any]:
 @app.get("/api/v1/status")
 def status() -> dict[str, Any]:
     return {
-        "version": "6.5.1",
+        "version": "6.5.2",
         "mode": "read_only_control_plane",
         "scripts": [
             script_state("ai_factor_trader.py"),

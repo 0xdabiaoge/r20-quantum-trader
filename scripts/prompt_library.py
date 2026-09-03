@@ -77,7 +77,7 @@ TEMPLATE_VARIABLES_METADATA = [
         "label": "系统版本号",
         "category": "系统环境",
         "description": "当前 R20 Quantum Trader 交易引擎版本",
-        "sample": "6.5.1",
+        "sample": "6.5.2",
     },
     {
         "key": "timezone",
@@ -476,7 +476,7 @@ def _variable_context(profile_name: str = "") -> dict[str, str]:
         pass
 
     ctx = {
-        "strategy_version": os.getenv("R20_VERSION", "6.5.1"),
+        "strategy_version": os.getenv("R20_VERSION", "6.5.2"),
         "timezone": "Asia/Shanghai",
         "active_instruments": instruments,
         "profile_name": profile_name,

@@ -147,13 +147,17 @@ def fetch_and_analyze_news_sentiment():
                 pass
 
     # 2. Fetch Multi-Coin Sentiment Snapshot
-    coins_str = ",".join(TARGET_COINS)
+    active_instruments = load_instruments()
+    target_coins = [item["name"] for item in active_instruments]
+    coins_str = ",".join(target_coins)
     sent_res = run_json_cmd(f"okx news coin-sentiment --coins {coins_str} --json") or []
     coin_sentiments = {}
 
     if isinstance(sent_res, list) and sent_res and "details" in sent_res[0]:
         for d in sent_res[0]["details"]:
             ccy = d.get("ccy", "")
+            if ccy not in target_coins:
+                continue
             sent = d.get("sentiment", {})
             bull_ratio = float(sent.get("bullishRatio", 0.5) or 0.5)
             bear_ratio = float(sent.get("bearishRatio", 0.1) or 0.1)
@@ -170,6 +174,18 @@ def fetch_and_analyze_news_sentiment():
                 "bearish_ratio": f"{bear_ratio*100:.1f}%",
                 "mentions": total_mentions,
                 "sentiment_factor_score": sentiment_score
+            }
+
+    # Ensure all active coins are represented in the map
+    for ccy in target_coins:
+        if ccy not in coin_sentiments:
+            coin_sentiments[ccy] = {
+                "ccy": ccy,
+                "label": "neutral",
+                "bullish_ratio": "50.0%",
+                "bearish_ratio": "50.0%",
+                "mentions": 0,
+                "sentiment_factor_score": 0.0
             }
 
     # 3. Overall Macro Sentiment Synthesis
@@ -200,9 +216,9 @@ def fetch_and_analyze_news_sentiment():
                     if not payload["latest_news"] and previous.get("latest_news"):
                         payload["latest_news"] = previous["latest_news"]
                     if not payload["coins_sentiment"] and previous.get("coins_sentiment"):
-                        payload["coins_sentiment"] = previous["coins_sentiment"]
-                        bull_count = sum(1 for s in previous["coins_sentiment"].values() if float(s.get("sentiment_factor_score", 0)) > 0.25)
-                        bear_count = sum(1 for s in previous["coins_sentiment"].values() if float(s.get("sentiment_factor_score", 0)) < -0.1)
+                        payload["coins_sentiment"] = {k: v for k, v in previous["coins_sentiment"].items() if k in target_coins}
+                        bull_count = sum(1 for s in payload["coins_sentiment"].values() if float(s.get("sentiment_factor_score", 0)) > 0.25)
+                        bear_count = sum(1 for s in payload["coins_sentiment"].values() if float(s.get("sentiment_factor_score", 0)) < -0.1)
                         if not cb_active:
                             payload["macro_sentiment"] = "偏多震荡" if bull_count > bear_count else ("偏空承压" if bear_count > bull_count else "中性平衡")
                     payload["stale_sections"] = True
