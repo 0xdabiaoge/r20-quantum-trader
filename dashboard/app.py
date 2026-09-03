@@ -1149,21 +1149,39 @@ VUE_ASSETS_DIR = os.path.join(VUE_DIST_DIR, "assets")
 if os.path.isdir(VUE_ASSETS_DIR):
     app.mount("/assets", StaticFiles(directory=VUE_ASSETS_DIR), name="vue_assets")
 
+VUE_ADMIN_DIST_DIR = VUE_DIST_DIR  # Same SPA build handles both / and /admin/*
+VUE_ADMIN_LEGACY_FILE = os.path.join(VUE_DIST_DIR, "admin", "legacy.html")
+
+def _serve_vue_spa(html_path: str) -> HTMLResponse:
+    with open(html_path, "r", encoding="utf-8") as f:
+        content = f.read()
+    return HTMLResponse(
+        content=content,
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+    )
+
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     vue_index_file = os.path.join(VUE_DIST_DIR, "index.html")
     if os.path.isfile(vue_index_file):
-        with open(vue_index_file, "r", encoding="utf-8") as f:
-            content = f.read()
-        return HTMLResponse(
-            content=content,
-            headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
-        )
+        return _serve_vue_spa(vue_index_file)
     return templates.TemplateResponse(
         request=request,
         name="index.html",
         headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
     )
+
+@app.get("/admin", response_class=HTMLResponse, include_in_schema=False)
+async def admin_spa_root(request: Request):
+    """Serve the Vue SPA at /admin — the router handles sub-routes client-side."""
+    vue_index_file = os.path.join(VUE_DIST_DIR, "index.html")
+    if os.path.isfile(vue_index_file):
+        return _serve_vue_spa(vue_index_file)
+    return HTMLResponse("Vue build not found. Run `npm run build` in frontend/.", status_code=503)
+
+@app.get("/admin/", response_class=HTMLResponse, include_in_schema=False)
+async def admin_spa_root_trailing(request: Request):
+    return await admin_spa_root(request)
 
 @app.get("/api/all")
 async def get_all_data():

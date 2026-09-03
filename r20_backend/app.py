@@ -479,6 +479,10 @@ def update_status() -> dict[str, Any]:
 
 @app.get("/admin", include_in_schema=False)
 def admin_page() -> FileResponse:
+    # Check for Vue SPA build first; fall back to legacy admin.html
+    vue_index = ROOT / "frontend" / "dist" / "index.html"
+    if vue_index.is_file():
+        return FileResponse(str(vue_index), headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
     return FileResponse(ADMIN_HTML, headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
 
 
