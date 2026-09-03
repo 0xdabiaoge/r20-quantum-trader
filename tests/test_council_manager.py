@@ -35,6 +35,27 @@ class TestCouncilManager(unittest.TestCase):
             DEFAULT_PRESET_TEMPLATES["alpha"]["prompt"]
         )
 
+    def test_consensus_mode_and_suites(self):
+        from r20_backend.council_manager import get_preset_suites, apply_preset_suite
+        suites = get_preset_suites()
+        self.assertGreaterEqual(len(suites), 3)
+        suite_ids = [s["id"] for s in suites]
+        self.assertIn("classic_trio", suite_ids)
+        self.assertIn("full_spectrum", suite_ids)
+        self.assertIn("trend_hunter", suite_ids)
+
+        # Apply trend hunter suite
+        updated = apply_preset_suite("trend_hunter")
+        self.assertEqual(updated["consensus_mode"], "aggressive")
+        self.assertIn("whale_tracker", updated["roles"])
+        self.assertIn("arbitrator", updated["roles"])
+
+        # Restore classic trio
+        restored = apply_preset_suite("classic_trio")
+        self.assertEqual(restored["consensus_mode"], "strict")
+        self.assertIn("alpha", restored["roles"])
+        self.assertIn("risk", restored["roles"])
+
     def test_council_debate_execution_mocked(self):
         # Mock execute_llm_request to avoid making external HTTP calls
         mock_advisor_return = ("BUY_LONG 80% 置信度，动能良好", "", {}, 120)

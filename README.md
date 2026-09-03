@@ -6,7 +6,7 @@
 
 **多模型决策委员会 · 语义插槽提示词引擎 · Python 物理拦截插件 · 策略广场底座 · 原生 Vue 3 SPA · 100% 云端 OCO**
 
-[![Release](https://img.shields.io/badge/release-v6.5.0%20(Milestone)-3875F6?style=flat-square)](https://github.com/555cute/r20-quantum-trader/releases/tag/v6.5.0)
+[![Release](https://img.shields.io/badge/release-v6.5.1%20(Council%20Pro)-3875F6?style=flat-square)](https://github.com/555cute/r20-quantum-trader/releases/tag/v6.5.1)
 [![LINUX DO](https://img.shields.io/badge/Community-LINUX%20DO-F97316?style=flat-square&logo=linux&logoColor=white)](https://linux.do/)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![Exchange](https://img.shields.io/badge/Exchange-OKX%20V5%20Direct-111827?style=flat-square)](https://www.okx.com/)
@@ -23,32 +23,29 @@
 
 ---
 
-![R20 v6.5.0 机构级量化终端](docs/images/dashboard_trading.png)
+![R20 v6.5.1 机构级量化终端](docs/images/dashboard_trading.png)
 
 > [!WARNING]
 > R20 是面向加密货币市场的开源量化交易系统，致力于为个人与专业交易员提供高透明度、自进化与工业级的波段交易底座，**不构成任何投资建议**。强烈建议先在 OKX **DEMO 模拟盘** 环境下完成全流程验证与沙箱演练，再评估实盘接入。
 
 ---
 
-## 🌟 v6.5.0 里程碑全新升级特性
+## 🌟 v6.5.1 模型委员会全新升级特性
 
-R20 Quantum Trader v6.5.0 是一次里程碑式的系统重构，全面开启了**「策略广场生态底座」**，将提示词工程、物理风控与策略共享推进到了全新高度：
+R20 Quantum Trader v6.5.1 围绕**「多模型决策委员会（Council Pro）」**进行了全方位进化：
 
-1. **🧩 策略方案导入/导出与提示词 100% 解锁**：
-   - 彻底解除所有内置提示词与模块的写死锁定，支持四大管线自由定制；
-   - 支持将完整策略方案一键导出为轻量标准 `.json` 策略包，支持本地文件与文本代码一键导入；
-   - 为后续「策略广场」生态奠定了即插即用的共享底座。
-2. **🪄 语义变量插槽提示词引擎 (Semantic Variable Slot Engine)**：
-   - 将全网快讯、自进化记忆、行情数理矩阵、持仓与挂单等 10 项核心数据解耦为标准语义占位符（如 `{{news_intelligence}}`, `{{trading_memory}}`, `{{market_matrix}}` 等）；
-   - 前台提供**一键插入变量工具条**、**交互式变量字典**与**实发效果/模板源码双模式实时对照**。
-3. **🛡️ 可插拔 Python 物理拦截插件配置中心 (Pluggable Interceptors)**：
-   - 将交易执行层风控重构为 Fail-Closed Python 插件管线，杜绝单纯依赖大模型口头风控的隐患；
-   - 后台新增可视化配置中心，支持**在线 Python 源码编辑、AST 语法自检与毫秒级热加载**；
-   - 官方交付 5 个标准拦截插件（4H大周期顺势铁律、80%置信度门禁、1H ADX震荡过滤、真实2.0R盈亏比、动能背离广场示例模板）；
-   - 内置 **⚡ 现场沙箱回归测试**，毫秒级出具场景判定链路与审计日志。
-4. **📖 独立官方开发与使用文档系统 (`/docs`)**：
-   - 新增独立公开文档页，涵盖系统架构哲学、实盘终端口径、委员会辩论、插件编写规范与部署指南；
-   - 内置高清实机截图与悬浮放大（Zoom Modal），全面提升开源体验。
+1. **⚖️ 辩论裁决共识机制（Consensus Modes）**：
+   - **一票否决制 (Paranoid Veto)**：胜率至上，风控官或数理官提出量价背离或假突破时坚决一票否决为 WAIT；
+   - **加权共识制 (Weighted Majority)**：综合各专家权重，多空顺势支持度达标且无致命风险时批准入场；
+   - **动能突破优先 (Alpha Hunter)**：顺势爆发优先，动量官与巨鲸大单共振时允许小仓位试探开单。
+2. **🎚️ 席位独立启停与微调参数**：
+   - 支持单个参谋席位一键静音/激活，无需繁琐删除；
+   - 每个席位独立配置**思考强度（Reasoning Effort：Low / Medium / High）**与**采样温度（Temperature）**；
+3. **🏛️ 预设参谋库与一键套件扩充**：
+   - 扩充**资金费率与基差套利官**、**OKX Top 100 巨鲸筹码追踪官**等高阶量化席位；
+   - 提供**经典三权分立套件**、**六维全景参谋套件**、**极速突破猎手套件**一键应用。
+4. **🧠 思考链审计与多模型耗时透视**：
+   - 辩论测试支持展开/折叠各参谋深度思考链（Reasoning Content），透视决策心路历程与多模型协同耗时。
 
 ---
 

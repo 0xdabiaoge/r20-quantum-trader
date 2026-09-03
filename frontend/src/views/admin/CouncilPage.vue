@@ -18,6 +18,14 @@ import {
   ChevronUp,
   Sliders,
   Sparkles,
+  ToggleLeft,
+  ToggleRight,
+  Gauge,
+  Coins,
+  Eye,
+  SlidersHorizontal,
+  Layers,
+  HelpCircle,
 } from 'lucide-vue-next'
 
 const { api } = useApi()
@@ -30,14 +38,38 @@ const bannerMsg = ref<{ text: string; type: 'ok' | 'err' | 'warn' } | null>(null
 
 const councilConfig = ref<any>({
   enabled: false,
+  consensus_mode: 'strict',
   timeout_seconds: 60.0,
   roles: {},
 })
 
 const availablePresets = ref<any[]>([])
+const availableSuites = ref<any[]>([])
 const availableModels = ref<any[]>([])
 const expandedRole = ref<string>('alpha')
 const testResult = ref<any>(null)
+const expandedReasoning = ref<Record<string, boolean>>({})
+
+const consensusModes = [
+  {
+    id: 'strict',
+    name: '一票否决制 (Paranoid Veto)',
+    tag: '稳健首选 · 胜率优先',
+    desc: '胜率高于一切。只要有任何参谋（特别是风控官或数理官）提出量价背离或假突破，强制一票否决观望 WAIT。',
+  },
+  {
+    id: 'weighted',
+    name: '加权共识制 (Weighted Majority)',
+    tag: '平衡周密 · 概率驱动',
+    desc: '综合参谋权重。顺势方向加权支持度超过 60% 且无极端黑天鹅时批准入场，按风控建议缩减保证金。',
+  },
+  {
+    id: 'aggressive',
+    name: '动能突破优先 (Alpha Hunter)',
+    tag: '顺势进攻 · 猎手风格',
+    desc: '重点关注一阶速度与二阶加速度爆发，动量官或巨鲸流向确认时，允许小仓位试探开单（配合云端止损）。',
+  },
+]
 
 const roleIcons: Record<string, any> = {
   alpha: Zap,
@@ -47,6 +79,8 @@ const roleIcons: Record<string, any> = {
   news_scout: Sparkles,
   macro: Sliders,
   orderbook: Cpu,
+  funding_arb: Coins,
+  whale_tracker: Eye,
   custom: Users,
 }
 
@@ -58,6 +92,8 @@ const roleColors: Record<string, string> = {
   news_scout: 'text-blue-400 border-blue-500/30 bg-blue-500/10',
   macro: 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10',
   orderbook: 'text-orange-400 border-orange-500/30 bg-orange-500/10',
+  funding_arb: 'text-yellow-400 border-yellow-500/30 bg-yellow-500/10',
+  whale_tracker: 'text-teal-400 border-teal-500/30 bg-teal-500/10',
   custom: 'text-indigo-400 border-indigo-500/30 bg-indigo-500/10',
 }
 
@@ -70,6 +106,7 @@ async function loadData() {
     ])
     councilConfig.value = cRes
     availablePresets.value = cRes.available_presets || []
+    availableSuites.value = cRes.available_suites || []
     availableModels.value = mRes.models || []
   } catch (e: any) {
     bannerMsg.value = { text: `加载配置失败: ${e.message}`, type: 'err' }
@@ -89,6 +126,7 @@ async function saveConfig() {
       method: 'PUT',
       body: JSON.stringify({
         enabled: councilConfig.value.enabled,
+        consensus_mode: councilConfig.value.consensus_mode || 'strict',
         timeout_seconds: Number(councilConfig.value.timeout_seconds) || 60.0,
         roles: councilConfig.value.roles,
       }),
@@ -96,7 +134,7 @@ async function saveConfig() {
     councilConfig.value = res.config
     bannerMsg.value = {
       text: councilConfig.value.enabled
-        ? '✅ 多模型协作委员会已保存并开启！15分钟交易决策将由多模型辩论与终审仲裁执行。'
+        ? `✅ 多模型协作委员会已保存并开启！裁决共识机制：【${consensusModes.find((m) => m.id === councilConfig.value.consensus_mode)?.name}】。`
         : '✅ 委员会配置已保存（当前处于单模型极速模式）。',
       type: 'ok',
     }
@@ -104,6 +142,22 @@ async function saveConfig() {
     bannerMsg.value = { text: `保存失败: ${e.message}`, type: 'err' }
   } finally {
     saving.value = false
+  }
+}
+
+async function applySuite(suiteId: string) {
+  if (!auth.isSuperadmin) return
+  const suite = availableSuites.value.find((s) => s.id === suiteId)
+  if (!confirm(`确定一键载入【${suite?.name || suiteId}】吗？\n这将重置当前委员会席位配置为该推荐套件。`)) return
+  try {
+    const res = await api('/api/v1/admin/council/apply-suite', {
+      method: 'POST',
+      body: JSON.stringify({ suite_id: suiteId }),
+    })
+    councilConfig.value = res.config
+    bannerMsg.value = { text: `🎉 已成功载入【${suite?.name || suiteId}】！`, type: 'ok' }
+  } catch (e: any) {
+    bannerMsg.value = { text: `载入套件失败: ${e.message}`, type: 'err' }
   }
 }
 
@@ -115,6 +169,9 @@ function addNewRole(presetKey: string = 'custom') {
     description: '由用户自定义的独立专家角色',
     prompt: '【角色：R20 自定义量化专家】\n请严格依据你设定的专业分析逻辑，对输入的各币种数据进行研判并输出核心意见（50字内/币种）。',
     weight: 0.3,
+    enabled: true,
+    reasoning_effort: 'medium',
+    temperature: 0.3,
     is_arbitrator: false,
     model_id: '',
   }
@@ -127,11 +184,14 @@ function addNewRole(presetKey: string = 'custom') {
     description: preset.description || '',
     prompt: preset.prompt,
     weight: preset.weight || 0.3,
+    enabled: true,
+    reasoning_effort: preset.reasoning_effort || 'medium',
+    temperature: preset.temperature || 0.3,
     is_arbitrator: false,
     model_id: '',
   }
   expandedRole.value = roleId
-  bannerMsg.value = { text: `已添加【${preset.name}】，可直接在卡片上修改名称、职责及提示词`, type: 'ok' }
+  bannerMsg.value = { text: `已添加【${preset.name}】，可直接在卡片上微调参数、权重及提示词`, type: 'ok' }
 }
 
 function removeRole(roleId: string) {
@@ -163,6 +223,7 @@ async function resetRole(roleId: string) {
 async function runDebateTest() {
   testing.value = true
   testResult.value = null
+  expandedReasoning.value = {}
   bannerMsg.value = { text: '正在并发调度各专家参谋并由首席仲裁官终审，请稍候（预计 8~25 秒）...', type: 'warn' }
   try {
     const res = await api('/api/v1/admin/council/test', {
@@ -188,12 +249,15 @@ onMounted(loadData)
 <template>
   <div class="space-y-4">
     <!-- Header info -->
-    <div class="flex items-center justify-between">
-      <p class="text-xs text-[#707E94] font-mono">
-        多模型委员会决策系统：可完全自由修改角色名称、增删辩论参谋、定制 Prompt 与绑定不同模型。
-      </p>
+    <div class="flex flex-wrap items-center justify-between gap-2">
+      <div class="flex items-center space-x-2">
+        <Sparkles class="w-4 h-4 text-purple-400" />
+        <p class="text-xs text-[#8A99AD] font-mono">
+          多模型委员会决策系统：支持席位启停、共识模式切换、独立长思考链配置、预设套件一键载入与现场辩论审计。
+        </p>
+      </div>
       <span class="text-[10px] font-mono text-purple-400 bg-purple-500/10 px-2 py-1 rounded border border-purple-500/20">
-        策略配置 · 进阶智脑
+        多模型协作 · v6.5.1 升级版
       </span>
     </div>
 
@@ -207,7 +271,7 @@ onMounted(loadData)
     </div>
 
     <!-- Master Switch & Performance Mode Card -->
-    <div class="bg-[#0D121B] border border-[#1A2232] rounded-xl p-4">
+    <div class="bg-[#0D121B] border border-[#1A2232] rounded-xl p-4 shadow-lg space-y-4">
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#1A2232]">
         <div class="flex items-center space-x-3">
           <div class="p-2.5 rounded-xl bg-gradient-to-tr from-purple-600/30 to-blue-600/20 border border-purple-500/30 text-purple-400">
@@ -224,7 +288,7 @@ onMounted(loadData)
               </span>
             </div>
             <p class="text-xs text-[#707E94] font-mono mt-0.5">
-              关闭时以当前激活大模型直接推理 (~2s)；开启时多角色各司其职并发对辩并由仲裁官收口 (~15-40s)，超时自动熔断降级。
+              关闭时以当前主脑单模型直接推理 (~2s)；开启时多模型参谋多线程辩论博弈并由首席仲裁官收口 (~15-40s)。
             </p>
           </div>
         </div>
@@ -253,11 +317,61 @@ onMounted(loadData)
         </div>
       </div>
 
+      <!-- Consensus Mode Selection Grid -->
+      <div>
+        <div class="flex items-center space-x-2 mb-2">
+          <SlidersHorizontal class="w-3.5 h-3.5 text-purple-400" />
+          <span class="text-xs font-bold text-white font-mono">辩论裁决共识机制 (Consensus Mode)</span>
+          <span class="text-[10px] text-[#707E94] font-mono">指导首席仲裁官权衡各方争辩的裁量原则</span>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+          <div
+            v-for="mode in consensusModes"
+            :key="mode.id"
+            @click="auth.isSuperadmin && (councilConfig.consensus_mode = mode.id)"
+            class="p-3 rounded-xl border transition-all cursor-pointer"
+            :class="councilConfig.consensus_mode === mode.id ? 'border-purple-500 bg-purple-500/10 shadow-sm shadow-purple-500/10' : 'border-[#1A2232] bg-[#090F18] hover:border-zinc-700'"
+          >
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs font-bold text-white font-mono">{{ mode.name }}</span>
+              <span class="text-[9px] px-1.5 py-0.2 rounded font-mono border" :class="councilConfig.consensus_mode === mode.id ? 'bg-purple-500/20 text-purple-300 border-purple-500/30' : 'bg-zinc-800 text-zinc-400 border-zinc-700'">
+                {{ mode.tag }}
+              </span>
+            </div>
+            <p class="text-[11px] text-[#8A99AD] font-sans leading-relaxed">
+              {{ mode.desc }}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- One-Click Preset Suites Bar -->
+      <div v-if="availableSuites.length > 0" class="pt-2 border-t border-[#1A2232]">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div class="flex items-center space-x-1.5 text-xs text-[#8A99AD] font-mono">
+            <Layers class="w-3.5 h-3.5 text-blue-400" />
+            <span>推荐参谋套件一键载入:</span>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <button
+              v-for="s in availableSuites"
+              :key="s.id"
+              @click="applySuite(s.id)"
+              :disabled="!auth.isSuperadmin"
+              class="px-2.5 py-1 rounded-lg bg-[#111C2A] hover:bg-[#1A2B42] border border-[#23354D] text-xs font-mono text-zinc-200 hover:text-white transition-all cursor-pointer"
+              :title="s.description"
+            >
+              {{ s.name }}
+            </button>
+          </div>
+        </div>
+      </div>
+
       <!-- Settings Sub-bar -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3 pt-1">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-[#1A2232]">
         <div>
           <div class="flex items-center justify-between mb-1">
-            <label class="text-[11px] text-[#8997aa] font-mono">委员会决策硬超时熔断 (秒)</label>
+            <label class="text-[11px] text-[#8997aa] font-mono">委员会硬超时熔断 (秒)</label>
             <span class="text-[10px] font-mono text-purple-400">支持 10 ~ 300 秒</span>
           </div>
           <input
@@ -270,14 +384,14 @@ onMounted(loadData)
             :disabled="!auth.isSuperadmin"
           />
           <span class="text-[10px] text-[#707E94] font-mono mt-1 block leading-relaxed">
-            💡 推荐配置：常规模型建议 <strong>40~60 秒</strong>；若参谋绑定了 Claude 3.7 Thinking / o 系列 / DeepSeek R1 等带深度思考的模型，建议设为 <strong>60~90 秒</strong>。超时将自动安全降级为单模型。
+            💡 推荐配置：若参谋绑定了带深度思考链（Reasoning Effort: High）的模型，建议设为 <strong>60~90 秒</strong>。
           </span>
         </div>
         <div class="flex items-end space-x-2 pb-1">
           <button
             @click="saveConfig"
             :disabled="saving || !auth.isSuperadmin"
-            class="flex-1 flex items-center justify-center space-x-1.5 px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-mono font-bold cursor-pointer disabled:opacity-40"
+            class="flex-1 flex items-center justify-center space-x-1.5 px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-mono font-bold cursor-pointer disabled:opacity-40 shadow-md shadow-purple-600/20"
           >
             <Save class="w-3.5 h-3.5" />
             <span>{{ saving ? '保存中...' : '保存委员会配置' }}</span>
@@ -288,7 +402,7 @@ onMounted(loadData)
             class="flex items-center space-x-1.5 px-4 py-2 rounded-lg bg-[#111c2a] hover:bg-[#1d3050] border border-[#33445b] text-xs font-mono text-purple-300 cursor-pointer disabled:opacity-40"
           >
             <Play class="w-3.5 h-3.5" :class="{ 'animate-spin': testing }" />
-            <span>{{ testing ? '辩论进行中...' : '现场辩论测试' }}</span>
+            <span>{{ testing ? '辩论测试中...' : '⚡ 现场辩论测试' }}</span>
           </button>
         </div>
       </div>
@@ -298,13 +412,13 @@ onMounted(loadData)
     <div class="flex flex-wrap items-center justify-between gap-2 pt-1">
       <div class="flex items-center space-x-2">
         <h3 class="text-xs font-bold text-white font-mono uppercase">
-          参谋与仲裁席位 ({{ Object.keys(councilConfig.roles || {}).length }} 个角色)
+          参谋与仲裁席位 ({{ Object.keys(councilConfig.roles || {}).length }} 个角色 · {{ Object.values(councilConfig.roles || {}).filter((r: any) => r.enabled !== false).length }} 活跃)
         </h3>
-        <span class="text-[10px] text-[#707E94] font-mono">点击卡片标题可直接更名</span>
+        <span class="text-[10px] text-[#707E94] font-mono">支持自由启闭与参数定制</span>
       </div>
 
       <!-- Add Role Preset Dropdown Buttons -->
-      <div class="flex items-center space-x-1.5 overflow-x-auto">
+      <div class="flex items-center space-x-1.5 overflow-x-auto pb-0.5">
         <span class="text-[11px] font-mono text-[#707E94] shrink-0">添加参谋:</span>
         <button
           @click="addNewRole('custom')"
@@ -315,9 +429,27 @@ onMounted(loadData)
           <span>自定义参谋</span>
         </button>
         <button
+          @click="addNewRole('funding_arb')"
+          :disabled="!auth.isSuperadmin"
+          class="flex items-center space-x-1 px-2.5 py-1 rounded bg-[#111c2a] hover:bg-[#1d3050] border border-dashed border-[#33445b] text-[11px] font-mono text-yellow-300 cursor-pointer"
+          title="资金费率与合约溢价套利官"
+        >
+          <Plus class="w-3 h-3" />
+          <span>费率套利官</span>
+        </button>
+        <button
+          @click="addNewRole('whale_tracker')"
+          :disabled="!auth.isSuperadmin"
+          class="flex items-center space-x-1 px-2.5 py-1 rounded bg-[#111c2a] hover:bg-[#1d3050] border border-dashed border-[#33445b] text-[11px] font-mono text-teal-300 cursor-pointer"
+          title="OKX Top100 巨鲸筹码追踪官"
+        >
+          <Plus class="w-3 h-3" />
+          <span>巨鲸追踪官</span>
+        </button>
+        <button
           @click="addNewRole('news_scout')"
           :disabled="!auth.isSuperadmin"
-          class="flex items-center space-x-1 px-2.5 py-1 rounded bg-[#111c2a] hover:bg-[#1d3050] border border-[#33445b] text-[11px] font-mono text-blue-300 cursor-pointer"
+          class="flex items-center space-x-1 px-2.5 py-1 rounded bg-[#111c2a] hover:bg-[#1d3050] border border-dashed border-[#33445b] text-[11px] font-mono text-blue-300 cursor-pointer"
           title="全网突发资讯与链上异动"
         >
           <Plus class="w-3 h-3" />
@@ -326,20 +458,11 @@ onMounted(loadData)
         <button
           @click="addNewRole('macro')"
           :disabled="!auth.isSuperadmin"
-          class="flex items-center space-x-1 px-2.5 py-1 rounded bg-[#111c2a] hover:bg-[#1d3050] border border-[#33445b] text-[11px] font-mono text-emerald-300 cursor-pointer"
+          class="flex items-center space-x-1 px-2.5 py-1 rounded bg-[#111c2a] hover:bg-[#1d3050] border border-dashed border-[#33445b] text-[11px] font-mono text-emerald-300 cursor-pointer"
           title="宏观经济流动性与大盘贝塔"
         >
           <Plus class="w-3 h-3" />
           <span>宏观策略官</span>
-        </button>
-        <button
-          @click="addNewRole('orderbook')"
-          :disabled="!auth.isSuperadmin"
-          class="flex items-center space-x-1 px-2.5 py-1 rounded bg-[#111c2a] hover:bg-[#1d3050] border border-[#33445b] text-[11px] font-mono text-orange-300 cursor-pointer"
-          title="订单薄深度与费率滑点"
-        >
-          <Plus class="w-3 h-3" />
-          <span>盘口微结构官</span>
         </button>
       </div>
     </div>
@@ -350,9 +473,13 @@ onMounted(loadData)
         v-for="(role, roleId) in councilConfig.roles"
         :key="roleId"
         class="bg-[#0D121B] border rounded-xl p-4 transition-all"
-        :class="expandedRole === roleId ? 'border-purple-500/40 bg-[#0E131E]' : 'border-[#1A2232]'"
+        :class="[
+          expandedRole === roleId ? 'border-purple-500/40 bg-[#0E131E]' : 'border-[#1A2232]',
+          role.enabled === false ? 'opacity-50' : ''
+        ]"
       >
-        <div class="flex items-center justify-between gap-3">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <!-- Role Main Info -->
           <div class="flex items-center space-x-3 min-w-0 flex-1">
             <span
               class="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs border shrink-0"
@@ -365,14 +492,14 @@ onMounted(loadData)
                 <!-- Editable Role Name -->
                 <input
                   v-model="role.name"
-                  class="bg-transparent border-b border-dashed border-zinc-700 hover:border-purple-400 focus:border-purple-500 text-sm font-bold text-white font-mono outline-none max-w-[280px]"
+                  class="bg-transparent border-b border-dashed border-zinc-700 hover:border-purple-400 focus:border-purple-500 text-sm font-bold text-white font-mono outline-none max-w-[260px]"
                   :readonly="!auth.isSuperadmin"
                   placeholder="角色名称"
                 />
                 <!-- Editable Role Subtitle -->
                 <input
                   v-model="role.role_title"
-                  class="bg-[#090f18] border border-[#1A2232] rounded px-1.5 py-0.2 text-[10px] font-mono text-zinc-400 outline-none max-w-[180px]"
+                  class="bg-[#090f18] border border-[#1A2232] rounded px-1.5 py-0.2 text-[10px] font-mono text-zinc-400 outline-none max-w-[160px]"
                   :readonly="!auth.isSuperadmin"
                   placeholder="职责标签"
                 />
@@ -381,6 +508,13 @@ onMounted(loadData)
                   class="text-[9px] font-mono font-bold text-purple-400 bg-purple-500/10 px-1.5 py-0.2 rounded border border-purple-500/25 shrink-0"
                 >
                   ⚖️ 首席终审席位
+                </span>
+                <span
+                  v-else
+                  class="text-[9px] font-mono px-1.5 py-0.2 rounded border shrink-0"
+                  :class="role.enabled !== false ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-zinc-800 text-zinc-500 border-zinc-700'"
+                >
+                  {{ role.enabled !== false ? '活跃席位' : '已静音' }}
                 </span>
               </div>
               <input
@@ -392,21 +526,49 @@ onMounted(loadData)
             </div>
           </div>
 
-          <div class="flex items-center space-x-2 shrink-0">
+          <!-- Controls & Parameters -->
+          <div class="flex flex-wrap items-center justify-end gap-2 shrink-0">
             <!-- Model Binding Select -->
-            <div class="flex items-center space-x-1.5">
-              <span class="text-[10px] font-mono text-[#707E94] hidden sm:inline">绑定模型:</span>
+            <div class="flex items-center space-x-1">
+              <span class="text-[10px] font-mono text-[#707E94] hidden lg:inline">模型:</span>
               <select
                 v-model="role.model_id"
-                class="bg-[#090f18] border border-[#1A2232] rounded-lg text-white px-2.5 py-1 text-xs font-mono outline-none focus:border-purple-500 max-w-[150px] sm:max-w-[200px]"
+                class="bg-[#090f18] border border-[#1A2232] rounded-lg text-white px-2 py-1 text-xs font-mono outline-none focus:border-purple-500 max-w-[140px]"
                 :disabled="!auth.isSuperadmin"
               >
-                <option value="">(系统默认模型)</option>
+                <option value="">(默认模型)</option>
                 <option v-for="m in availableModels" :key="m.id" :value="m.id">
                   {{ m.name || m.id }}
                 </option>
               </select>
             </div>
+
+            <!-- Weight Input -->
+            <div v-if="!role.is_arbitrator && roleId !== 'arbitrator'" class="flex items-center space-x-1">
+              <span class="text-[10px] font-mono text-[#707E94]">权重:</span>
+              <input
+                v-model="role.weight"
+                type="number"
+                step="0.05"
+                min="0.1"
+                max="1.0"
+                class="w-14 bg-[#090f18] border border-[#1A2232] rounded-lg text-white px-1.5 py-1 text-xs font-mono outline-none text-center"
+                :disabled="!auth.isSuperadmin"
+              />
+            </div>
+
+            <!-- Enable/Mute Toggle (Non-arbitrators) -->
+            <button
+              v-if="!role.is_arbitrator && roleId !== 'arbitrator'"
+              @click="role.enabled = role.enabled === false ? true : false"
+              :disabled="!auth.isSuperadmin"
+              class="cursor-pointer transition-colors p-1"
+              :class="role.enabled !== false ? 'text-emerald-400' : 'text-zinc-600'"
+              :title="role.enabled !== false ? '点击静音此参谋' : '点击激活此参谋'"
+            >
+              <ToggleRight v-if="role.enabled !== false" class="w-5 h-5" />
+              <ToggleLeft v-else class="w-5 h-5" />
+            </button>
 
             <!-- Delete Role (Disabled for arbitrator) -->
             <button
@@ -423,7 +585,7 @@ onMounted(loadData)
             <button
               @click="expandedRole = expandedRole === roleId ? '' : String(roleId)"
               class="p-1.5 rounded hover:bg-[#151D2C] text-[#707E94] hover:text-white cursor-pointer"
-              title="展开/折叠提示词"
+              title="展开/折叠角色微调与提示词"
             >
               <ChevronUp v-if="expandedRole === roleId" class="w-4 h-4" />
               <ChevronDown v-else class="w-4 h-4" />
@@ -431,44 +593,83 @@ onMounted(loadData)
           </div>
         </div>
 
-        <!-- Collapsible System Prompt Editor -->
-        <div v-if="expandedRole === roleId" class="mt-3 pt-3 border-t border-[#1A2232] space-y-2">
-          <div class="flex items-center justify-between">
-            <span class="text-[10px] font-mono text-[#8997aa] font-bold">角色专有 System Prompt（自由定制核心研判逻辑）：</span>
+        <!-- Collapsible Detailed Settings & System Prompt Editor -->
+        <div v-if="expandedRole === roleId" class="mt-3 pt-3 border-t border-[#1A2232] space-y-3">
+          <!-- Fine-tuning Parameters Ribbon -->
+          <div class="flex flex-wrap items-center gap-4 bg-[#080B10] p-2.5 rounded-lg border border-[#161F2E] text-xs font-mono">
+            <!-- Reasoning Effort -->
+            <div class="flex items-center space-x-2">
+              <span class="text-[#8997aa]">思考强度:</span>
+              <select
+                v-model="role.reasoning_effort"
+                class="bg-[#0E1420] border border-[#23354D] rounded px-2 py-0.5 text-xs text-purple-300 outline-none"
+                :disabled="!auth.isSuperadmin"
+              >
+                <option value="low">低强度 (快速响应)</option>
+                <option value="medium">中强度 (均衡分析)</option>
+                <option value="high">长思考 (深度推演)</option>
+              </select>
+            </div>
+
+            <!-- Temperature -->
+            <div class="flex items-center space-x-2">
+              <span class="text-[#8997aa]">采样温度:</span>
+              <input
+                v-model="role.temperature"
+                type="number"
+                step="0.05"
+                min="0.0"
+                max="1.0"
+                class="w-16 bg-[#0E1420] border border-[#23354D] rounded px-1.5 py-0.5 text-xs text-cyan-300 outline-none text-center"
+                :disabled="!auth.isSuperadmin"
+              />
+              <span class="text-[10px] text-[#707E94]">(0.0~0.2 严谨 / 0.3~0.5 活跃)</span>
+            </div>
+
+            <div class="flex-1"></div>
+
             <button
               @click="resetRole(String(roleId))"
               :disabled="!auth.isSuperadmin"
-              class="flex items-center space-x-1 text-[10px] font-mono text-purple-400 hover:text-purple-300 cursor-pointer"
+              class="flex items-center space-x-1 text-[10px] text-purple-400 hover:text-purple-300 cursor-pointer"
             >
               <RotateCcw class="w-3 h-3" />
-              <span>恢复初始预设</span>
+              <span>恢复此角色初始预设</span>
             </button>
           </div>
-          <textarea
-            v-model="role.prompt"
-            rows="5"
-            class="w-full bg-[#080B10] border border-[#1A2232] rounded-lg text-zinc-300 px-3 py-2 text-xs font-mono outline-none focus:border-purple-500 leading-relaxed resize-y"
-            :readonly="!auth.isSuperadmin"
-          ></textarea>
+
+          <!-- Prompt Textarea -->
+          <div class="space-y-1">
+            <span class="text-[10px] font-mono text-[#8997aa] font-bold">角色专有 System Prompt（自由定制核心研判逻辑）：</span>
+            <textarea
+              v-model="role.prompt"
+              rows="5"
+              class="w-full bg-[#080B10] border border-[#1A2232] rounded-lg text-zinc-300 px-3 py-2 text-xs font-mono outline-none focus:border-purple-500 leading-relaxed resize-y select-text"
+              :readonly="!auth.isSuperadmin"
+            ></textarea>
+          </div>
         </div>
       </div>
     </div>
 
     <!-- Live Debate Test Result Modal / Inspection Panel -->
-    <div v-if="testResult" class="bg-[#0D121B] border border-purple-500/30 rounded-xl p-4 space-y-3">
-      <div class="flex items-center justify-between pb-2 border-b border-[#1A2232]">
-        <div class="flex items-center space-x-2">
+    <div v-if="testResult" class="bg-[#0D121B] border border-purple-500/30 rounded-xl p-4 space-y-3.5 shadow-2xl">
+      <div class="flex items-center justify-between pb-2.5 border-b border-[#1A2232]">
+        <div class="flex flex-wrap items-center gap-2">
           <CheckCircle2 class="w-4 h-4 text-emerald-400" />
           <h3 class="text-sm font-bold text-white font-mono">委员会现场辩论与终审实录</h3>
-          <span class="text-[10px] font-mono text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded border border-purple-500/20">
+          <span class="text-[10px] font-mono text-purple-300 bg-purple-500/10 px-2 py-0.5 rounded border border-purple-500/20">
+            共识机制: {{ testResult.transcript?.consensus_mode }}
+          </span>
+          <span class="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
             总耗时 {{ testResult.transcript?.total_duration_ms }}ms
           </span>
         </div>
         <button
           @click="testResult = null"
-          class="text-xs font-mono text-[#707E94] hover:text-white cursor-pointer"
+          class="text-xs font-mono text-[#707E94] hover:text-white cursor-pointer px-2 py-1 rounded bg-[#141B26]"
         >
-          收起
+          收起报告
         </button>
       </div>
 
@@ -477,33 +678,54 @@ onMounted(loadData)
         <div
           v-for="(adv, key) in testResult.transcript?.advisors || {}"
           :key="key"
-          class="bg-[#080B10] border border-[#1A2232] rounded-lg p-3 space-y-1.5"
+          class="bg-[#080B10] border border-[#1A2232] rounded-xl p-3.5 space-y-2 flex flex-col justify-between"
         >
-          <div class="flex items-center justify-between text-xs font-mono font-bold">
-            <span class="text-white">{{ adv.role_name }}</span>
-            <span class="text-[10px] text-purple-400">{{ adv.model_used }}</span>
+          <div class="space-y-1">
+            <div class="flex items-center justify-between text-xs font-mono font-bold">
+              <span class="text-white">{{ adv.role_name }}</span>
+              <span class="text-[10px] text-purple-400 truncate max-w-[120px]">{{ adv.model_used }}</span>
+            </div>
+            <div class="flex items-center justify-between text-[10px] text-[#707E94] font-mono">
+              <span>耗时 {{ adv.latency_ms }}ms</span>
+              <span v-if="adv.weight !== undefined">权重: {{ adv.weight }}</span>
+            </div>
+            <p class="text-xs text-zinc-300 font-mono whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto pr-1 select-text">
+              {{ adv.content }}
+            </p>
           </div>
-          <div class="text-[10px] text-[#707E94] font-mono">耗时 {{ adv.latency_ms }}ms</div>
-          <p class="text-xs text-zinc-300 font-mono whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto pr-1">
-            {{ adv.content }}
-          </p>
+
+          <!-- Optional Reasoning Chain Toggle -->
+          <div v-if="adv.reasoning" class="pt-2 border-t border-[#141B26]">
+            <button
+              @click="expandedReasoning[String(key)] = !expandedReasoning[String(key)]"
+              class="text-[10px] font-mono text-purple-400 hover:text-purple-300 flex items-center space-x-1 cursor-pointer"
+            >
+              <span>{{ expandedReasoning[String(key)] ? '收起思考链' : '展开思考链 (Reasoning)' }}</span>
+            </button>
+            <div
+              v-if="expandedReasoning[String(key)]"
+              class="mt-1.5 p-2 rounded bg-[#05080E] text-[10px] font-mono text-zinc-400 whitespace-pre-wrap max-h-36 overflow-y-auto select-text border border-[#1E293B]"
+            >
+              {{ adv.reasoning }}
+            </div>
+          </div>
         </div>
       </div>
 
       <!-- Arbitrator Verdict -->
-      <div class="bg-[#080B10] border border-purple-500/25 rounded-lg p-3 space-y-2">
+      <div class="bg-[#080B10] border border-purple-500/25 rounded-xl p-3.5 space-y-2">
         <div class="flex items-center justify-between">
           <div class="flex items-center space-x-2">
-            <span class="text-xs font-bold text-purple-400 font-mono">【首席仲裁官 裁决输出】</span>
-            <span class="text-[10px] font-mono text-[#707E94]">{{ testResult.transcript?.arbitrator?.model_used }} · {{ testResult.transcript?.arbitrator?.latency_ms }}ms</span>
+            <span class="text-xs font-bold text-purple-400 font-mono">【首席仲裁官 裁决指令】</span>
+            <span class="text-[10px] font-mono text-[#707E94]">{{ testResult.transcript?.arbitrator?.model_used }} · 终审耗时 {{ testResult.transcript?.arbitrator?.latency_ms }}ms</span>
           </div>
         </div>
-        <div class="text-xs font-mono text-emerald-400 font-bold">
-          宏观基调: {{ testResult.brain_output?.macro_assessment }}
+        <div class="text-xs font-mono text-emerald-400 font-bold leading-relaxed">
+          宏观基调与仲裁论证: {{ testResult.brain_output?.macro_assessment }}
         </div>
         <div class="text-[11px] font-mono text-zinc-300">
-          决策明细 (仅展示部分):
-          <pre class="mt-1 p-2 rounded bg-[#05080E] border border-[#1A2232] text-[10px] text-zinc-400 overflow-x-auto max-h-40">{{ JSON.stringify(testResult.brain_output?.decisions, null, 2) }}</pre>
+          发单决策明细 (Decisions):
+          <pre class="mt-1 p-2.5 rounded bg-[#05080E] border border-[#1A2232] text-[10px] text-zinc-300 overflow-x-auto max-h-48 select-text">{{ JSON.stringify(testResult.brain_output?.decisions, null, 2) }}</pre>
         </div>
       </div>
     </div>

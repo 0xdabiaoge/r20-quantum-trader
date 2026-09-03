@@ -5,20 +5,22 @@ Architecture:
            │
            ├─► Advisor 1 (e.g. 动量进攻官) ─┐
            ├─► Advisor 2 (e.g. 保守风控官) ─┼─► Concurrent Debate (ThreadPoolExecutor)
-           ├─► Advisor N (e.g. 用户新增专家) ─┘
+           ├─► Advisor N (e.g. 动态增减参谋) ─┘
                          │
                          ▼
              Chief Arbitrator (首席终审仲裁官)
-                         │
+                         │ (根据 consensus_mode 执行：一票否决 / 加权共识 / 动能优先)
                          ▼
         1. Standard Trading JSON (for ai_brain_trader发单)
         2. Council Discussion Transcript (for 前台推演审计展示)
 
-Safety:
-  - Fully dynamic: User can freely rename, add, delete, and re-prompt advisor roles.
-  - Fail-to-Fast: If council fails or times out, seamlessly falls back
-    to single-model inference.
-  - Zero-breakage: ai_brain_trader continues to receive the identical dict schema.
+Upgrades in v6.5.1:
+  - Consensus Modes: strict (一票否决) / weighted (加权共识) / aggressive (突破优先)
+  - Per-Role Enabled/Disabled Switch (灵活启闭，无需删除席位)
+  - Per-Role Reasoning Effort & Temperature (独立长思考深度与采样温度)
+  - Extended Advisor Library (+费率与基差套利官, +巨鲸与筹码穿透官)
+  - One-Click Recommended Preset Suites (经典三权分立 / 六维全景 / 动量猎手)
+  - Fail-to-Fast: If council fails or times out, seamlessly falls back to single-model.
 """
 from __future__ import annotations
 import concurrent.futures
@@ -49,6 +51,9 @@ DEFAULT_PRESET_TEMPLATES: Dict[str, Dict[str, Any]] = {
             "请对输入的各币种简明扼要陈述你的进攻视角（50字内/币种），给出方向与置信度，并指出潜在获利空间。"
         ),
         "weight": 0.35,
+        "enabled": True,
+        "reasoning_effort": "medium",
+        "temperature": 0.3,
         "is_arbitrator": False,
         "model_id": "",
     },
@@ -66,6 +71,9 @@ DEFAULT_PRESET_TEMPLATES: Dict[str, Dict[str, Any]] = {
             "请对输入的各币种出具风控质询意见（50字内/币种），指出致命隐患，置信度不足一律建议 WAIT。"
         ),
         "weight": 0.35,
+        "enabled": True,
+        "reasoning_effort": "high",
+        "temperature": 0.2,
         "is_arbitrator": False,
         "model_id": "",
     },
@@ -83,6 +91,9 @@ DEFAULT_PRESET_TEMPLATES: Dict[str, Dict[str, Any]] = {
             "请基于纯数据指标输出你的概率评分与数理建议（50字内/币种）。"
         ),
         "weight": 0.30,
+        "enabled": True,
+        "reasoning_effort": "medium",
+        "temperature": 0.1,
         "is_arbitrator": False,
         "model_id": "",
     },
@@ -90,17 +101,20 @@ DEFAULT_PRESET_TEMPLATES: Dict[str, Dict[str, Any]] = {
         "id": "arbitrator",
         "name": "首席仲裁官 (Chief Arbitrator)",
         "role_title": "综合裁决 / 契约落地",
-        "description": "权衡各位参谋的激辩，按确定性与加权逻辑出具最终决策，并强制输出标准交易 JSON。",
+        "description": "权衡各位参谋的激辩，按共识策略出具最终决策，并强制输出标准交易 JSON。",
         "prompt": (
             "【角色：R20 首席仲裁官兼执行官】\n"
             "你负责听取各位专家参谋的辩论意见，做出最终裁决。\n"
             "裁决准则：\n"
-            "1. 若动量官强烈做多但风控官指出量价背离且数理官未确认，必须采纳风控官意见选择观望（WAIT）。\n"
-            "2. 只有当各参谋高度共识、且未提出致命一票否决时，方可批准开仓，但须根据风控意见动态调整保证金杠杆。\n"
-            "3. 必须在 reasoning 中简明总结各方争辩核心（如「采纳进攻官方向，但遵照风控官意见缩减首仓」）。\n"
+            "1. 严格遵照设定的委员会共识策略（一票否决/加权共识/动能优先）进行裁决。\n"
+            "2. 只有当共识达标、且符合风控边界时，方可批准开仓，并根据风控意见动态设定合理的保证金与杠杆。\n"
+            "3. 必须在 reasoning 中简明总结各方争辩核心与仲裁取舍依据。\n"
             "4. 最终必须且只能输出严格符合原有交易契约的 JSON 格式，不得包含任何其他文本！"
         ),
         "weight": 1.0,
+        "enabled": True,
+        "reasoning_effort": "high",
+        "temperature": 0.2,
         "is_arbitrator": True,
         "model_id": "",
     },
@@ -121,6 +135,9 @@ ADDITIONAL_PRESET_LIBRARY: Dict[str, Dict[str, Any]] = {
             "请对输入各标的给出情报面的支持或警示意见（50字内/币种）。"
         ),
         "weight": 0.25,
+        "enabled": True,
+        "reasoning_effort": "medium",
+        "temperature": 0.3,
         "is_arbitrator": False,
         "model_id": "",
     },
@@ -138,6 +155,9 @@ ADDITIONAL_PRESET_LIBRARY: Dict[str, Dict[str, Any]] = {
             "请对输入标的给出宏观环境匹配度评分（50字内/币种）。"
         ),
         "weight": 0.25,
+        "enabled": True,
+        "reasoning_effort": "medium",
+        "temperature": 0.3,
         "is_arbitrator": False,
         "model_id": "",
     },
@@ -155,6 +175,49 @@ ADDITIONAL_PRESET_LIBRARY: Dict[str, Dict[str, Any]] = {
             "请从纯盘口与执行成本角度给出准入评估（50字内/币种）。"
         ),
         "weight": 0.25,
+        "enabled": True,
+        "reasoning_effort": "low",
+        "temperature": 0.2,
+        "is_arbitrator": False,
+        "model_id": "",
+    },
+    "funding_arb": {
+        "id": "funding_arb",
+        "name": "资金费率与对冲官 (Funding Arbitrageur)",
+        "role_title": "多空拥挤 / 费率收割",
+        "description": "深度量化当前各标的年化资金费率与未平仓量 OI 异动，防范费率反噬与逼仓踩踏。",
+        "prompt": (
+            "【角色：R20 资金费率与基差量化官】\n"
+            "你的职责是专注衍生品费率与未平仓合约结构：\n"
+            "1. 监测资金费率年化是否异常高企（多头过度拥挤容易发生长下影洗盘，空头过度拥挤容易发生扎针逼空）；\n"
+            "2. 结合 OI 异动识别真实主力建仓还是散户追涨杀跌；\n"
+            "3. 在费率极端倒挂时提示多空潜在变盘点。\n"
+            "请出具费率拥挤度评估与准入建议（50字内/币种）。"
+        ),
+        "weight": 0.25,
+        "enabled": True,
+        "reasoning_effort": "medium",
+        "temperature": 0.2,
+        "is_arbitrator": False,
+        "model_id": "",
+    },
+    "whale_tracker": {
+        "id": "whale_tracker",
+        "name": "巨鲸筹码追踪官 (Whale Tracker)",
+        "role_title": "大户持仓 / 筹码沉淀",
+        "description": "穿透 OKX Top 100 实盘大户加权多空持仓均价、净敞口变化与现货大单流向。",
+        "prompt": (
+            "【角色：R20 巨鲸与大户筹码量化官】\n"
+            "你的职责是监控顶级聪明钱与主力大户筹码动向：\n"
+            "1. 对比大户多空比与散户多空比的背离度（聪明钱与散户往往对立）；\n"
+            "2. 估算主力持仓成本线与安全垫；\n"
+            "3. 严禁与巨鲸主力大单反向博弈。\n"
+            "请从筹码博弈角度给出明确站队或警示建议（50字内/币种）。"
+        ),
+        "weight": 0.30,
+        "enabled": True,
+        "reasoning_effort": "medium",
+        "temperature": 0.2,
         "is_arbitrator": False,
         "model_id": "",
     },
@@ -168,6 +231,9 @@ ADDITIONAL_PRESET_LIBRARY: Dict[str, Dict[str, Any]] = {
             "请严格依据你设定的专业分析逻辑，对输入的各币种数据进行研判并输出核心意见（50字内/币种）。"
         ),
         "weight": 0.30,
+        "enabled": True,
+        "reasoning_effort": "medium",
+        "temperature": 0.3,
         "is_arbitrator": False,
         "model_id": "",
     },
@@ -175,10 +241,39 @@ ADDITIONAL_PRESET_LIBRARY: Dict[str, Dict[str, Any]] = {
 
 ALL_AVAILABLE_PRESETS = {**DEFAULT_PRESET_TEMPLATES, **ADDITIONAL_PRESET_LIBRARY}
 
+COUNCIL_PRESET_SUITES: Dict[str, Dict[str, Any]] = {
+    "classic_trio": {
+        "id": "classic_trio",
+        "name": "经典三权分立套件 (推荐)",
+        "consensus_mode": "strict",
+        "description": "动量进攻官 + 保守风控官 + 量化数理官 + 首席仲裁官。一票否决制，攻守兼备，适合稳健波段交易。",
+        "roles": ["alpha", "risk", "quant", "arbitrator"],
+    },
+    "full_spectrum": {
+        "id": "full_spectrum",
+        "name": "六维全景参谋套件",
+        "consensus_mode": "weighted",
+        "description": "涵盖动量、风控、数理、舆情快讯、宏观周期与微观盘口。加权共识制，适合大资金全方位严密研判。",
+        "roles": ["alpha", "risk", "quant", "news_scout", "macro", "orderbook", "arbitrator"],
+    },
+    "trend_hunter": {
+        "id": "trend_hunter",
+        "name": "极速突破猎手套件",
+        "consensus_mode": "aggressive",
+        "description": "动量进攻官 + 舆情侦察官 + 巨鲸筹码追踪官 + 首席仲裁官。突破优先制，适合牛市单边行情捕捉高动能机会。",
+        "roles": ["alpha", "news_scout", "whale_tracker", "arbitrator"],
+    },
+}
+
 
 def get_available_presets() -> List[Dict[str, Any]]:
     """Return all factory templates that can be used to add new roles or reset prompts."""
     return list(ALL_AVAILABLE_PRESETS.values())
+
+
+def get_preset_suites() -> List[Dict[str, Any]]:
+    """Return list of quick-apply recommendation suites."""
+    return list(COUNCIL_PRESET_SUITES.values())
 
 
 def _atomic_write_json(path: Path, data: Any) -> None:
@@ -208,6 +303,9 @@ def load_council_config() -> Dict[str, Any]:
                     # Ensure arbitrator exists and is marked as arbitrator
                     arb_found = False
                     for r_id, role in data["roles"].items():
+                        role.setdefault("enabled", True)
+                        role.setdefault("reasoning_effort", "medium")
+                        role.setdefault("temperature", 0.3)
                         if role.get("is_arbitrator") or r_id == "arbitrator":
                             role["is_arbitrator"] = True
                             arb_found = True
@@ -215,12 +313,14 @@ def load_council_config() -> Dict[str, Any]:
                             role.setdefault("is_arbitrator", False)
                     if not arb_found:
                         data["roles"]["arbitrator"] = dict(DEFAULT_PRESET_TEMPLATES["arbitrator"])
+                    data.setdefault("consensus_mode", "strict")
                     return data
         except Exception:
             pass
 
     default_config: Dict[str, Any] = {
         "enabled": False,  # Off by default (speed-first)
+        "consensus_mode": "strict",  # strict (一票否决) | weighted (加权共识) | aggressive (动能突破优先)
         "timeout_seconds": 60.0,
         "roles": {k: dict(v) for k, v in DEFAULT_PRESET_TEMPLATES.items()},
         "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -251,10 +351,39 @@ def save_council_config(config: Dict[str, Any]) -> Dict[str, Any]:
         if not str(role.get("prompt", "")).strip():
             raise ValueError(f"角色 {role.get('name', role_id)} 的 System Prompt 不能为空")
         role["id"] = role_id
+        role.setdefault("enabled", True)
+        role.setdefault("weight", 0.3)
+        role.setdefault("reasoning_effort", "medium")
+        role.setdefault("temperature", 0.3)
+
+    config["consensus_mode"] = str(config.get("consensus_mode", "strict")).lower()
+    if config["consensus_mode"] not in {"strict", "weighted", "aggressive"}:
+        config["consensus_mode"] = "strict"
 
     config["updated_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
     _atomic_write_json(COUNCIL_CONFIG_FILE, config)
     return config
+
+
+def apply_preset_suite(suite_id: str) -> Dict[str, Any]:
+    """One-click apply a recommended preset suite."""
+    suite = COUNCIL_PRESET_SUITES.get(suite_id)
+    if not suite:
+        raise ValueError(f"未知的预设套件 ID: {suite_id}")
+
+    config = load_council_config()
+    new_roles: Dict[str, Any] = {}
+    for r_id in suite["roles"]:
+        if r_id in ALL_AVAILABLE_PRESETS:
+            preset = dict(ALL_AVAILABLE_PRESETS[r_id])
+            # Preserve existing model_id if previously configured
+            old_model = config.get("roles", {}).get(r_id, {}).get("model_id", "")
+            preset["model_id"] = old_model
+            new_roles[r_id] = preset
+
+    config["consensus_mode"] = suite.get("consensus_mode", "strict")
+    config["roles"] = new_roles
+    return save_council_config(config)
 
 
 def reset_role_template(role_id: str) -> Dict[str, Any]:
@@ -264,7 +393,6 @@ def reset_role_template(role_id: str) -> Dict[str, Any]:
     if role_id not in roles:
         raise ValueError(f"未找到角色 ID: {role_id}")
 
-    # Check if a preset exists for this ID or default arbitrator/alpha/risk/quant
     preset = ALL_AVAILABLE_PRESETS.get(role_id)
     if not preset:
         if role_id == "arbitrator" or roles[role_id].get("is_arbitrator"):
@@ -281,6 +409,9 @@ def reset_role_template(role_id: str) -> Dict[str, Any]:
         "description": preset.get("description", ""),
         "prompt": preset["prompt"],
         "weight": preset.get("weight", 0.3),
+        "enabled": True,
+        "reasoning_effort": preset.get("reasoning_effort", "medium"),
+        "temperature": preset.get("temperature", 0.3),
         "is_arbitrator": preset.get("is_arbitrator", False),
         "model_id": current_model,
     }
@@ -302,7 +433,8 @@ def _call_single_role(
     override_url = None
     override_key = None
     override_format = None
-    override_effort = "medium"
+    override_effort = role_spec.get("reasoning_effort") or "medium"
+    temperature = float(role_spec.get("temperature", 0.3))
 
     if model_id:
         cfg = load_llm_config(mask_keys=False)
@@ -312,7 +444,8 @@ def _call_single_role(
                 override_url = item.get("base_url")
                 override_key = item.get("api_key")
                 override_format = item.get("api_format")
-                override_effort = item.get("reasoning_effort", "medium")
+                if not role_spec.get("reasoning_effort"):
+                    override_effort = item.get("reasoning_effort", "medium")
                 break
 
     prompt_content = role_spec.get("prompt", "")
@@ -336,7 +469,7 @@ def _call_single_role(
             api_key=override_key,
             api_format=override_format,
             reasoning_effort=override_effort,
-            temperature=0.3,
+            temperature=temperature,
             timeout=timeout,
         )
         return {
@@ -367,7 +500,7 @@ def execute_council_debate(
     original_system_prompt: str,
     timeout: float = 60.0,
 ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
-    """Execute the full Council deliberation workflow with dynamic roles.
+    """Execute the full Council deliberation workflow with dynamic roles and consensus modes.
 
     Returns:
       (brain_output_dict, council_transcript_dict)
@@ -376,6 +509,7 @@ def execute_council_debate(
 
     config = load_council_config()
     roles = config.get("roles", {})
+    consensus_mode = config.get("consensus_mode", "strict")
     t_start = time.time()
 
     # Step 1: Identify Arbitrator and Advisors dynamically
@@ -391,7 +525,7 @@ def execute_council_debate(
 
     advisor_results: Dict[str, Dict[str, Any]] = {}
     if advisor_keys:
-        # Allocate ~55% of the total budget to the concurrent advisors stage (min 15s)
+        # Allocate ~55% of the total budget to concurrent advisors (min 15s)
         member_timeout = max(15.0, timeout * 0.55)
         with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, len(advisor_keys))) as pool:
             futures = {
@@ -421,19 +555,21 @@ def execute_council_debate(
     transcript_blocks = []
     for k in advisor_keys:
         res = advisor_results.get(k, {})
+        weight_str = f" [权重: {res.get('weight', 1.0)}]" if res.get('weight') is not None else ""
         transcript_blocks.append(
-            f"=== 【{res.get('role_name', k)}】研判意见（模型：{res.get('model_used', 'default')}）===\n"
+            f"=== 【{res.get('role_name', k)}】研判意见（模型：{res.get('model_used', 'default')}{weight_str}）===\n"
             f"{res.get('content', '（无发言）')}\n"
         )
     compiled_debate = "\n".join(transcript_blocks) if transcript_blocks else "（无其他参谋发言，请独立决策）"
 
-    # Step 3: Chief Arbitrator Final Verdict & Strict JSON Synthesis
+    # Step 3: Chief Arbitrator Final Verdict based on consensus protocol
     arb_model_id = arbitrator_spec.get("model_id") or ""
     override_model = None
     override_url = None
     override_key = None
     override_format = None
-    override_effort = "high"
+    override_effort = arbitrator_spec.get("reasoning_effort") or "high"
+    arb_temperature = float(arbitrator_spec.get("temperature", 0.2))
 
     if arb_model_id:
         cfg = load_llm_config(mask_keys=False)
@@ -443,16 +579,38 @@ def execute_council_debate(
                 override_url = item.get("base_url")
                 override_key = item.get("api_key")
                 override_format = item.get("api_format")
-                override_effort = item.get("reasoning_effort", "high")
+                if not arbitrator_spec.get("reasoning_effort"):
+                    override_effort = item.get("reasoning_effort", "high")
                 break
+
+    consensus_instructions = {
+        "strict": (
+            "【当前委员会裁决准则：一票否决制 (VETO_PROTECTION)】\n"
+            "- 胜率与本金安全高于一切！\n"
+            "- 只要任何参谋（特别是风控官或数理官）提出量价背离、盘口脆弱、大级别逆势或潜在陷阱，必须坚决执行一票否决，判定为 WAIT 观望！\n"
+            "- 只有在各参谋无反对意见且具备高度顺势共识时，方可批准小仓位顺势入场。"
+        ),
+        "weighted": (
+            "【当前委员会裁决准则：加权共识制 (WEIGHTED_MAJORITY)】\n"
+            "- 综合参考各位参谋发言附带的权重数值。\n"
+            "- 只有当顺势方向的加权支持度超过 60% 且未发生严重致命逻辑硬伤时，方可批准开仓。\n"
+            "- 若分歧较大或双方势均力敌，应保守选择 WAIT 观望；若开单，须遵照风控建议缩减保证金与杠杆。"
+        ),
+        "aggressive": (
+            "【当前委员会裁决准则：动能突破优先制 (ALPHA_HUNTER)】\n"
+            "- 重点关注动量进攻官、舆情与巨鲸大单流向。\n"
+            "- 若一阶速度 v 与二阶加速度 a 确认强突破，即使存在局部小幅分歧，也允许批准小仓顺势试探发单，但必须严格配置云端 OCO 止损。"
+        ),
+    }.get(consensus_mode, "strict")
 
     advisors_list_str = "、".join([roles[k].get("name", k) for k in advisor_keys]) or "相关参谋"
     arbitrator_system_prompt = (
         f"{original_system_prompt}\n\n"
         "====================================================\n"
         f"【特别授权：你现在是 R20 多模型决策委员会的{arbitrator_spec.get('name', '首席仲裁官')}】\n"
-        f"{arbitrator_spec.get('prompt', '')}\n"
-        f"你必须权衡下方各专家参谋（{advisors_list_str}）的争辩记录，去伪存真，做出最终全局决策，并严格履行输出契约！"
+        f"{arbitrator_spec.get('prompt', '')}\n\n"
+        f"{consensus_instructions}\n"
+        f"你必须权衡各专家参谋（{advisors_list_str}）的争辩记录，去伪存真，做出最终全局决策，并严格履行输出契约！"
     )
 
     arbitrator_user_prompt = (
@@ -463,7 +621,7 @@ def execute_council_debate(
         "====================================================\n"
         "请作为首席仲裁官做出最终决策！\n"
         "要求：\n"
-        "1. 在 macro_assessment 中提炼宏观大势并点明委员会共识/分歧。\n"
+        f"1. 在 macro_assessment 中明确说明共识模式（{consensus_mode}）下的裁决考量。\n"
         "2. 在各标的的 reasoning 中写出仲裁理由（采纳了谁的观点，驳回了谁）。\n"
         "3. 严格输出标准 JSON 格式，顶层必须包含 decisions, position_management, macro_assessment 三个键！"
     )
@@ -480,7 +638,7 @@ def execute_council_debate(
         api_key=override_key,
         api_format=override_format,
         reasoning_effort=override_effort,
-        temperature=0.2,
+        temperature=arb_temperature,
         response_format={"type": "json_object"},
         timeout=rem_time,
     )
@@ -500,6 +658,7 @@ def execute_council_debate(
 
     council_transcript = {
         "council_mode": True,
+        "consensus_mode": consensus_mode,
         "total_duration_ms": int((time.time() - t_start) * 1000),
         "arbitrator": {
             "role_name": arbitrator_spec.get("name", "首席仲裁官"),
@@ -510,6 +669,6 @@ def execute_council_debate(
         "advisors": advisor_results,
     }
 
-    # Inject the discussion transcript alongside the decision for frontend audit
+    # Inject discussion transcript alongside the decision for frontend audit
     brain_output["council_transcript"] = council_transcript
     return brain_output, council_transcript

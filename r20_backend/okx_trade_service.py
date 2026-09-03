@@ -74,7 +74,7 @@ def _request(method: str, path: str, params: dict[str, Any] | None = None, env: 
     timestamp = _timestamp(); prehash = timestamp + method + request_path + body_text
     signature = base64.b64encode(hmac.new(selected.secret_key.encode(), prehash.encode(), hashlib.sha256).digest()).decode()
     headers = {
-        "Content-Type":"application/json", "User-Agent":"R20-OKX-V5/6.5.0", "OK-ACCESS-KEY":selected.api_key,
+        "Content-Type":"application/json", "User-Agent":"R20-OKX-V5/6.5.1", "OK-ACCESS-KEY":selected.api_key,
         "OK-ACCESS-SIGN":signature, "OK-ACCESS-TIMESTAMP":timestamp, "OK-ACCESS-PASSPHRASE":selected.passphrase,
     }
     if selected.simulated: headers["x-simulated-trading"] = "1"

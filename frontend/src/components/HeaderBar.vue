@@ -46,7 +46,7 @@ const tabs = [
               class="px-1.5 py-0.2 rounded text-[10px] font-mono font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:border-blue-400 hover:bg-blue-500/20 transition-all cursor-pointer flex items-center space-x-1 group"
               title="点击查看开源仓库、交流群与项目信息"
             >
-              <span class="group-hover:text-blue-300">v6.5.0</span>
+              <span class="group-hover:text-blue-300">v6.5.1</span>
             </button>
             <span v-if="store.isStale" class="px-1.5 py-0.2 rounded text-[10px] font-mono font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse">
               DEGRADED

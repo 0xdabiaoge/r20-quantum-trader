@@ -92,7 +92,7 @@ async def lifespan(_: FastAPI):
     stop_gateway_supervisor()
 
 
-app = FastAPI(title="R20 Quantum Trader Standalone Backend", version="6.5.0", lifespan=lifespan, docs_url="/api/docs", redoc_url="/api/redoc")
+app = FastAPI(title="R20 Quantum Trader Standalone Backend", version="6.5.1", lifespan=lifespan, docs_url="/api/docs", redoc_url="/api/redoc")
 
 
 @app.middleware("http")
@@ -201,8 +201,13 @@ class LLMModelUpsertRequest(BaseModel):
 
 class CouncilConfigUpdateRequest(BaseModel):
     enabled: bool
+    consensus_mode: str = Field(default="strict")
     timeout_seconds: float = Field(default=60.0, ge=10.0, le=300.0)
     roles: dict[str, Any]
+
+
+class CouncilApplySuiteRequest(BaseModel):
+    suite_id: str
 
 
 class CouncilResetRoleRequest(BaseModel):
@@ -465,7 +470,7 @@ def runtime_overview() -> dict[str, Any]:
     ]
     positions_payload = read_json("position_trackers.json", {})
     return {
-        "service": {"version": "6.5.0", "pid": os.getpid(), "uptime_seconds": int(time.time() - STARTED_AT)},
+        "service": {"version": "6.5.1", "pid": os.getpid(), "uptime_seconds": int(time.time() - STARTED_AT)},
         "credentials": {"okx": bool(settings.okx_api_key and settings.okx_secret_key and settings.okx_passphrase), "llm": bool(settings.llm_api_key)},
         "data_health": health_files,
         "decisions": decision_summary(),
@@ -995,9 +1000,10 @@ def admin_delete_llm_provider(provider_id: str, x_r20_session: str | None = Head
 @app.get("/api/v1/admin/council/config")
 def admin_get_council_config(x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
     require_admin_header(x_r20_session=x_r20_session)
-    from r20_backend.council_manager import load_council_config, get_available_presets
+    from r20_backend.council_manager import load_council_config, get_available_presets, get_preset_suites
     cfg = load_council_config()
     cfg["available_presets"] = get_available_presets()
+    cfg["available_suites"] = get_preset_suites()
     return cfg
 
 
@@ -1007,15 +1013,29 @@ def admin_update_council_config(payload: CouncilConfigUpdateRequest, x_r20_sessi
     from r20_backend.council_manager import save_council_config
     saved = save_council_config({
         "enabled": payload.enabled,
+        "consensus_mode": payload.consensus_mode,
         "timeout_seconds": payload.timeout_seconds,
         "roles": payload.roles,
     })
     audit_record("council.config.update", "success", {
         "actor": actor["username"],
         "enabled": payload.enabled,
+        "consensus_mode": payload.consensus_mode,
         "timeout_seconds": payload.timeout_seconds,
     })
     return {"status": "ok", "config": saved}
+
+
+@app.post("/api/v1/admin/council/apply-suite")
+def admin_apply_council_suite(payload: CouncilApplySuiteRequest, x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    actor = require_superadmin(x_r20_session)
+    from r20_backend.council_manager import apply_preset_suite
+    try:
+        saved = apply_preset_suite(payload.suite_id)
+        audit_record("council.suite.apply", "success", {"actor": actor["username"], "suite_id": payload.suite_id})
+        return {"status": "ok", "suite_id": payload.suite_id, "config": saved}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @app.post("/api/v1/admin/council/reset-role")
@@ -1240,10 +1260,10 @@ def admin_about(x_r20_admin_token: str | None = Header(default=None)) -> dict[st
     import platform
     store = GatewayStore(GATEWAY_DB_PATH)
     return {
-        "product": {"name": "R20 Quantum Trader", "version": "6.5.0", "control_plane": "R20 Gateway Runtime", "gateway_version": GATEWAY_VERSION},
+        "product": {"name": "R20 Quantum Trader", "version": "6.5.1", "control_plane": "R20 Gateway Runtime", "gateway_version": GATEWAY_VERSION},
         "runtime": {"python": platform.python_version(), "platform": platform.platform(), "backend_pid": os.getpid(), "gateway": gateway_status(x_r20_admin_token)},
         "components": [
-            {"name": "FastAPI Control Plane", "version": "6.5.0"},
+            {"name": "FastAPI Control Plane", "version": "6.5.1"},
             {"name": "Gateway Event Runtime", "version": GATEWAY_VERSION},
             {"name": "SQLite", "version": __import__("sqlite3").sqlite_version},
         ],
@@ -1931,7 +1951,7 @@ def run_backup(payload: BackupRequest, x_r20_admin_token: str | None = Header(de
 def health() -> dict[str, Any]:
     return {
         "service": "r20-standalone-backend",
-        "version": "6.5.0",
+        "version": "6.5.1",
         "status": "ok",
         "timestamp": int(time.time()),
         "credentials": {
@@ -1945,7 +1965,7 @@ def health() -> dict[str, Any]:
 @app.get("/api/v1/status")
 def status() -> dict[str, Any]:
     return {
-        "version": "6.5.0",
+        "version": "6.5.1",
         "mode": "read_only_control_plane",
         "scripts": [
             script_state("ai_factor_trader.py"),
