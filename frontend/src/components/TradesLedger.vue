@@ -80,7 +80,7 @@ function clean(v: any, fallback = '--'): string {
 
     <!-- Filter bar -->
     <div
-      class="rounded-xl border p-3 flex flex-wrap items-center justify-between gap-3 shadow-xs transition-colors"
+      class="rounded-xl border p-2.5 sm:p-3 flex flex-wrap items-center justify-between gap-3 shadow-xs transition-colors"
       style="background-color: var(--bg-card); border-color: var(--border-subtle);"
     >
       <div class="flex rounded-lg border p-0.5 font-mono text-xs" style="background-color: var(--bg-badge); border-color: var(--border-subtle);">
@@ -130,35 +130,36 @@ function clean(v: any, fallback = '--'): string {
       </div>
     </div>
 
-    <!-- Trades Table -->
+    <!-- Trades Table with Fixed Max-Height (No infinite page stretching) -->
     <div
-      class="rounded-xl border p-4 sm:p-5 shadow-xs transition-colors"
+      class="rounded-xl border shadow-xs transition-colors overflow-hidden flex flex-col"
       style="background-color: var(--bg-card); border-color: var(--border-subtle);"
     >
       <div v-if="trades.length === 0" class="py-12 text-center text-xs font-mono" style="color: var(--text-muted);">
         无匹配交易台账记录
       </div>
-      <div v-else class="overflow-x-auto">
+      <div v-else class="overflow-x-auto overflow-y-auto max-h-[580px]">
         <table class="w-full text-left text-xs font-mono whitespace-nowrap">
-          <thead>
+          <thead class="sticky top-0 z-10" style="background-color: var(--bg-card);">
             <tr class="border-b text-[11px] uppercase tracking-wider" style="border-color: var(--border-subtle); color: var(--text-muted);">
-              <th class="pb-2.5 pr-2 font-bold">标的 / 方向</th>
-              <th class="pb-2.5 pr-2 font-bold">策略来源</th>
-              <th class="pb-2.5 pr-2 font-bold">保证金</th>
-              <th class="pb-2.5 pr-2 font-bold">开仓价 / 时间</th>
-              <th class="pb-2.5 pr-2 font-bold">平仓价 / 时间</th>
-              <th class="pb-2.5 pr-2 text-right font-bold">净盈亏 / ROI</th>
-              <th class="pb-2.5 pr-2 text-center font-bold">时长</th>
-              <th class="pb-2.5 font-bold">状态 / 平仓原因</th>
+              <th class="py-3 px-4 font-bold">标的 / 方向</th>
+              <th class="py-3 px-3 font-bold">策略来源</th>
+              <th class="py-3 px-3 font-bold">保证金</th>
+              <th class="py-3 px-3 font-bold">开仓价 / 时间</th>
+              <th class="py-3 px-3 font-bold">平仓价 / 时间</th>
+              <th class="py-3 px-3 text-right font-bold">净盈亏 / ROI</th>
+              <th class="py-3 px-3 text-center font-bold">时长</th>
+              <th class="py-3 px-4 font-bold">状态 / 平仓原因</th>
             </tr>
           </thead>
-          <tbody class="divide-y" style="border-color: var(--border-subtle);">
+          <tbody>
             <tr
               v-for="(t, idx) in trades"
               :key="t.id || idx"
-              class="transition-colors hover:bg-[var(--bg-card-hover)]"
+              class="border-b last:border-b-0 transition-colors hover:bg-[var(--bg-card-hover)]"
+              style="border-color: var(--border-subtle);"
             >
-              <td class="py-3 pr-2">
+              <td class="py-3 px-4">
                 <span class="font-bold text-sm" style="color: var(--text-main);">{{ t.inst }}</span>
                 <span
                   class="ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-bold border"
@@ -171,7 +172,7 @@ function clean(v: any, fallback = '--'): string {
                   {{ t.side }} {{ t.lever || '3x' }}
                 </span>
               </td>
-              <td class="py-3 pr-2">
+              <td class="py-3 px-3">
                 <span
                   class="px-2 py-0.5 rounded border text-[11px]"
                   style="background-color: var(--bg-badge); border-color: var(--border-subtle); color: var(--text-muted);"
@@ -179,14 +180,14 @@ function clean(v: any, fallback = '--'): string {
                   {{ clean(t.strategy, '观望') }}
                 </span>
               </td>
-              <td class="py-3 pr-2 font-bold num-tabular" style="color: var(--text-main);">
+              <td class="py-3 px-3 font-bold num-tabular" style="color: var(--text-main);">
                 {{ t.margin ? num(t.margin).toFixed(1) + ' U' : '--' }}
               </td>
-              <td class="py-3 pr-2">
+              <td class="py-3 px-3">
                 <span class="num-tabular" style="color: var(--text-main);">{{ formatPx(t.open_px) }}</span>
                 <span class="text-[10px] ml-1 num-tabular" style="color: var(--text-faint);">({{ (t.open_time || '--').substring(5, 19) }})</span>
               </td>
-              <td class="py-3 pr-2">
+              <td class="py-3 px-3">
                 <span class="num-tabular" :style="{ color: t.status === 'holding' ? 'var(--color-brand)' : 'var(--text-main)' }">
                   {{ t.status === 'holding' ? '盯盘中' : formatPx(t.close_px) }}
                 </span>
@@ -194,7 +195,7 @@ function clean(v: any, fallback = '--'): string {
                   ({{ t.status === 'holding' ? '--' : (t.close_time || '--').substring(5, 19) }})
                 </span>
               </td>
-              <td class="py-3 pr-2 text-right">
+              <td class="py-3 px-3 text-right">
                 <span
                   class="font-bold text-sm num-tabular"
                   :style="{ color: getPnl(t) >= 0 ? 'var(--color-up)' : 'var(--color-down)' }"
@@ -208,10 +209,10 @@ function clean(v: any, fallback = '--'): string {
                   ({{ getRoi(t) >= 0 ? '+' : '' }}{{ getRoi(t).toFixed(1) }}%)
                 </span>
               </td>
-              <td class="py-3 pr-2 text-center num-tabular" style="color: var(--text-muted);">
+              <td class="py-3 px-3 text-center num-tabular" style="color: var(--text-muted);">
                 {{ clean(t.hold_duration, '--') }}
               </td>
-              <td class="py-3 text-xs" style="color: var(--text-muted);">
+              <td class="py-3 px-4 text-xs" style="color: var(--text-muted);">
                 <span
                   class="px-2 py-0.5 rounded text-[10px] font-bold border mr-1"
                   :style="{
@@ -227,6 +228,15 @@ function clean(v: any, fallback = '--'): string {
             </tr>
           </tbody>
         </table>
+      </div>
+
+      <!-- Table Footer Summary -->
+      <div
+        class="px-4 py-2.5 border-t flex items-center justify-between text-[11px] font-mono shrink-0"
+        style="border-color: var(--border-subtle); background-color: var(--bg-card-subtle); color: var(--text-faint);"
+      >
+        <span>已载入 {{ trades.length }} 笔真实撮合成交记录</span>
+        <span class="hidden sm:inline">OKX 交易所实盘历史履历</span>
       </div>
     </div>
   </div>

@@ -191,11 +191,11 @@ const allProtected = computed(() =>
               <th class="py-2.5 px-3.5 text-right font-bold">未结盈亏 / ROI</th>
             </tr>
           </thead>
-          <tbody class="divide-y" style="border-color: var(--border-subtle);">
+          <tbody>
             <tr
               v-for="pos in filteredPositions"
               :key="pos.instId"
-              class="transition-colors hover:bg-[var(--bg-card-hover)]"
+              class="border-b last:border-b-0 transition-colors hover:bg-[var(--bg-card-hover)]"
               style="border-color: var(--border-subtle);"
             >
               <!-- 标的 / 杠杆 -->
@@ -313,11 +313,11 @@ const allProtected = computed(() =>
               <th class="py-2.5 px-3.5 text-right font-bold">状态</th>
             </tr>
           </thead>
-          <tbody class="divide-y" style="border-color: var(--border-subtle);">
+          <tbody>
             <tr
               v-for="ord in filteredOrders"
               :key="ord.ordId"
-              class="transition-colors hover:bg-[var(--bg-card-hover)]"
+              class="border-b last:border-b-0 transition-colors hover:bg-[var(--bg-card-hover)]"
               style="border-color: var(--border-subtle);"
             >
               <td class="py-2.5 px-3.5 font-mono text-xs" style="color: var(--text-faint);">
