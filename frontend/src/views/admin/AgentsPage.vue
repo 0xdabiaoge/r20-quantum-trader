@@ -52,7 +52,7 @@ onMounted(load)
             <span>刷新</span>
           </button>
         </div>
-        <div class="overflow-x-auto">
+        <div class="table-scroll-container">
           <table class="w-full text-left text-xs font-mono whitespace-nowrap">
             <thead>
               <tr class="border-b text-[11px] uppercase tracking-wider font-bold" style="border-color: var(--border-subtle); background-color: var(--bg-card-subtle); color: var(--text-muted);">
@@ -85,10 +85,10 @@ onMounted(load)
           <div class="text-[11px] font-mono mb-3 p-2.5 rounded-lg border leading-relaxed" style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle); color: var(--text-muted);">{{ data.prompt_policy }}</div>
           <div class="grid grid-cols-3 gap-2.5 mb-3 text-center">
             <div class="rounded-lg border p-2" style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);"><div class="text-[10px] font-mono" style="color: var(--text-faint);">总调用量</div><div class="text-sm font-bold font-mono num-tabular mt-0.5" style="color: var(--text-main);">{{ data.model_stats?.total_calls ?? '--' }}</div></div>
-            <div class="rounded-lg border p-2" style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);"><div class="text-[10px] font-mono" style="color: var(--text-faint);">调用成功率</div><div class="text-sm font-bold num-tabular mt-0.5" :class="(data.model_stats?.total_calls ?? 0) > 0 && (data.model_stats?.successful_calls ?? 0) < (data.model_stats?.total_calls ?? 0) ? 'text-amber-400' : 'text-emerald-400'">{{ (data.model_stats?.total_calls ?? 0) > 0 ? Math.round(100 * (data.model_stats?.successful_calls ?? 0) / data.model_stats.total_calls) + '%' : '--' }}</div></div>
+            <div class="rounded-lg border p-2" style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);"><div class="text-[10px] font-mono" style="color: var(--text-faint);">调用成功率</div><div class="text-sm font-bold num-tabular mt-0.5" :class="(data.model_stats?.total_calls ?? 0) > 0 && (data.model_stats?.successful_calls ?? 0) < (data.model_stats?.total_calls ?? 0) ? 'text-amber-500' : 'text-emerald-500'">{{ (data.model_stats?.total_calls ?? 0) > 0 ? Math.round(100 * (data.model_stats?.successful_calls ?? 0) / data.model_stats.total_calls) + '%' : '--' }}</div></div>
             <div class="rounded-lg border p-2" style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);"><div class="text-[10px] font-mono" style="color: var(--text-faint);">平均时延</div><div class="text-sm font-bold font-mono num-tabular mt-0.5" style="color: var(--text-main);">{{ data.model_stats?.avg_duration_ms ? Math.round(data.model_stats.avg_duration_ms) + 'ms' : '--' }}</div></div>
           </div>
-          <div class="max-h-60 overflow-y-auto rounded-lg border" style="border-color: var(--border-subtle);">
+          <div class="table-scroll-container max-h-60 overflow-y-auto rounded-lg border" style="border-color: var(--border-subtle);">
             <table class="w-full text-left text-xs font-mono whitespace-nowrap">
               <thead class="sticky top-0 z-10">
                 <tr class="border-b text-[11px] uppercase tracking-wider font-bold" style="border-color: var(--border-subtle); background-color: var(--bg-card-subtle); color: var(--text-muted);">
@@ -113,19 +113,19 @@ onMounted(load)
         </div>
 
         <!-- Secret Store -->
-        <div class="bg-[#0D121B] border border-[#1A2232] rounded-xl p-4">
-          <div class="flex items-center space-x-2 mb-3"><KeyRound class="w-4 h-4 text-amber-400" /><h2 class="text-xs font-bold text-white font-mono uppercase">本机加密密文库</h2></div>
+        <div class="rounded-xl border p-4 shadow-xs transition-colors" style="background-color: var(--bg-card); border-color: var(--border-subtle);">
+          <div class="flex items-center space-x-2 mb-3"><KeyRound class="w-4 h-4 text-amber-500" /><h2 class="text-xs font-black font-mono uppercase tracking-wide" style="color: var(--text-main);">本机加密密文库</h2></div>
           <div class="space-y-1.5 text-xs font-mono">
-            <div class="flex items-center justify-between bg-[#080B10] border border-[#1A2232] rounded-lg px-3 py-2">
-              <span class="text-[#707E94]">加密库状态</span>
-              <span :class="data.secret_store?.initialized ? 'text-emerald-400' : 'text-rose-400'">{{ data.secret_store?.initialized ? '已初始化 ✓' : '未初始化' }} · {{ data.secret_store?.count ?? 0 }} 项密文 · 文件权限 {{ data.secret_store?.store_mode || '--' }}</span>
+            <div class="flex items-center justify-between border rounded-lg px-3 py-2" style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);">
+              <span style="color: var(--text-muted);">加密库状态</span>
+              <span :class="data.secret_store?.initialized ? 'text-emerald-500 font-bold' : 'text-rose-500 font-bold'">{{ data.secret_store?.initialized ? '已初始化 ✓' : '未初始化' }} · {{ data.secret_store?.count ?? 0 }} 项密文 · 文件权限 {{ data.secret_store?.store_mode || '--' }}</span>
             </div>
-            <div class="flex items-center justify-between bg-[#080B10] border border-[#1A2232] rounded-lg px-3 py-2">
-              <span class="text-[#707E94]">读取优先级</span><span class="text-white">{{ data.secret_store?.source_priority || 'encrypted-store-over-env' }}</span>
+            <div class="flex items-center justify-between border rounded-lg px-3 py-2" style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);">
+              <span style="color: var(--text-muted);">读取优先级</span><span style="color: var(--text-main);">{{ data.secret_store?.source_priority || 'encrypted-store-over-env' }}</span>
             </div>
-            <div v-for="k in (data.secret_store?.keys || [])" :key="k" class="flex items-center justify-between bg-[#080B10] border border-[#1A2232] rounded-lg px-3 py-2">
-              <span class="text-zinc-300">{{ k }}</span>
-              <span class="text-emerald-400">已配置 ✓</span>
+            <div v-for="k in (data.secret_store?.keys || [])" :key="k" class="flex items-center justify-between border rounded-lg px-3 py-2" style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);">
+              <span style="color: var(--text-muted);">{{ k }}</span>
+              <span class="text-emerald-500 font-bold">已配置 ✓</span>
             </div>
           </div>
         </div>

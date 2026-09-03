@@ -24,50 +24,69 @@ onMounted(load)
 </script>
 
 <template>
-  <div class="space-y-4">
+  <div class="space-y-4 max-w-[2160px] mx-auto">
     <div class="flex items-center justify-between">
-      <p class="text-xs text-[#707E94] font-mono">内置插件健康状态；实盘控制面仅允许随仓库审计过的内置插件。</p>
-      <span class="text-[10px] font-mono text-blue-400 bg-blue-500/10 px-2 py-1 rounded border border-blue-500/20">策略配置 · 2/3</span>
+      <p class="text-xs font-mono" style="color: var(--text-muted);">内置插件健康状态；实盘控制面仅允许随仓库审计过的内置插件。</p>
+      <span
+        class="text-[10px] font-mono px-2 py-1 rounded border font-bold"
+        style="background-color: var(--color-brand-bg); color: var(--color-brand); border-color: var(--color-brand-border);"
+      >
+        策略配置 · 2/3
+      </span>
     </div>
 
-    <div v-if="errText" class="p-3 rounded-lg text-xs font-mono bg-rose-500/10 border border-rose-500/20 text-rose-400">{{ errText }}</div>
-    <div v-if="loading" class="py-12 text-center text-xs font-mono text-[#707E94]"><RefreshCw class="w-5 h-5 animate-spin inline mr-1.5 text-blue-400" />正在加载插件状态...</div>
+    <div v-if="errText" class="p-3 rounded-lg text-xs font-mono border" style="background-color: var(--color-down-bg); border-color: var(--color-down-border); color: var(--color-down);">{{ errText }}</div>
+    <div v-if="loading" class="py-12 text-center text-xs font-mono" style="color: var(--text-muted);"><RefreshCw class="w-5 h-5 animate-spin inline mr-1.5" style="color: var(--color-brand);" />正在加载插件状态...</div>
 
     <template v-else-if="data">
-      <div class="bg-[#0D121B] border border-[#1A2232] rounded-xl p-4">
+      <div class="rounded-xl border p-4 sm:p-5 shadow-xs transition-colors" style="background-color: var(--bg-card); border-color: var(--border-subtle);">
         <div class="flex items-center justify-between mb-3">
-          <div class="flex items-center space-x-2"><Blocks class="w-4 h-4 text-blue-400" /><h2 class="text-xs font-bold text-white font-mono uppercase">插件清单</h2></div>
-          <button @click="load" class="px-2.5 py-1 rounded bg-[#111c2a] border border-[#33445b] text-[10px] font-mono text-[#b8c4d4] cursor-pointer hover:bg-[#1d3050]">刷新</button>
+          <div class="flex items-center space-x-2">
+            <Blocks class="w-4 h-4" style="color: var(--color-brand);" />
+            <h2 class="text-xs font-black font-mono uppercase tracking-wide" style="color: var(--text-main);">插件清单</h2>
+          </div>
+          <button @click="load" class="flex items-center space-x-1 px-2.5 py-1 rounded-lg border text-[11px] font-mono cursor-pointer transition-all shadow-xs" style="background-color: var(--bg-card-subtle); border-color: var(--border-medium); color: var(--text-main);">
+            <RefreshCw class="w-3 h-3" />
+            <span>刷新</span>
+          </button>
         </div>
-        <table class="w-full text-left text-xs font-mono whitespace-nowrap">
-          <thead>
-            <tr class="border-b text-[11px] uppercase tracking-wider" style="border-color: var(--border-subtle); background-color: var(--bg-card-subtle); color: var(--text-muted);">
-              <th class="py-2.5 px-3 font-bold">插件</th>
-              <th class="py-2.5 px-3 font-bold">类型</th>
-              <th class="py-2.5 px-3 font-bold">版本</th>
-              <th class="py-2.5 px-3 font-bold">权限声明</th>
-              <th class="py-2.5 px-3 font-bold">启用开关</th>
-              <th class="py-2.5 px-3 font-bold">健康状态</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="p in data.plugins" :key="p.plugin_id" class="border-b last:border-b-0 hover:bg-[var(--bg-card-hover)] transition-colors" style="border-color: var(--border-subtle);">
-              <td class="py-2.5 px-3 text-white font-bold">{{ p.name }}<div class="text-[9px] text-[#556677]">{{ p.plugin_id }}</div></td>
-              <td class="py-2.5 px-3 text-zinc-300">{{ p.plugin_type }}</td>
-              <td class="py-2.5 px-3 text-[#707E94]">{{ p.version }}</td>
-              <td class="py-2.5 px-3 text-[#707E94] text-[10px]">{{ (p.permissions || []).join(', ') }}</td>
-              <td class="py-2.5 px-3 text-[#707E94]">{{ p.enabled_key || '默认启用' }}</td>
-              <td class="py-2.5 px-3 font-bold" :class="p.health === 'healthy' ? 'text-emerald-400' : 'text-amber-400'">{{ p.health === 'healthy' ? '正常' : p.health === 'disabled' ? '已禁用' : p.health }}</td>
-            </tr>
-          </tbody>
-        </table>
+
+        <div class="table-scroll-container rounded-lg border my-2" style="border-color: var(--border-subtle);">
+          <table class="w-full text-left text-xs font-mono whitespace-nowrap">
+            <thead>
+              <tr class="border-b text-[11px] uppercase tracking-wider font-bold" style="border-color: var(--border-subtle); background-color: var(--bg-card-subtle); color: var(--text-muted);">
+                <th class="py-2.5 px-3">插件</th>
+                <th class="py-2.5 px-3">类型</th>
+                <th class="py-2.5 px-3">版本</th>
+                <th class="py-2.5 px-3">权限声明</th>
+                <th class="py-2.5 px-3">启用开关</th>
+                <th class="py-2.5 px-3">健康状态</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="p in data.plugins" :key="p.plugin_id" class="border-b last:border-b-0 hover:bg-[var(--bg-card-hover)] transition-colors" style="border-color: var(--border-subtle);">
+                <td class="py-2.5 px-3 font-bold" style="color: var(--text-main);">
+                  {{ p.name }}
+                  <div class="text-[9px] font-normal" style="color: var(--text-faint);">{{ p.plugin_id }}</div>
+                </td>
+                <td class="py-2.5 px-3" style="color: var(--text-muted);">{{ p.plugin_type }}</td>
+                <td class="py-2.5 px-3 num-tabular" style="color: var(--text-faint);">{{ p.version }}</td>
+                <td class="py-2.5 px-3 text-[10px]" style="color: var(--text-muted);">{{ (p.permissions || []).join(', ') }}</td>
+                <td class="py-2.5 px-3" style="color: var(--text-faint);">{{ p.enabled_key || '默认启用' }}</td>
+                <td class="py-2.5 px-3 font-bold" :class="p.health === 'healthy' ? 'text-emerald-500' : 'text-amber-500'">
+                  {{ p.health === 'healthy' ? '正常' : p.health === 'disabled' ? '已禁用' : p.health }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      <div class="bg-[#0D121B] border border-amber-500/20 rounded-xl p-4 flex items-start gap-3">
-        <ShieldAlert class="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+      <div class="rounded-xl border p-4 flex items-start gap-3 shadow-xs" style="background-color: var(--bg-card); border-color: var(--border-subtle);">
+        <ShieldAlert class="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
         <div>
-          <h3 class="text-xs font-bold text-amber-400 font-mono mb-1">安装策略：{{ data.installation_policy === 'builtin-only' ? '仅内置插件' : data.installation_policy }}</h3>
-          <p class="text-[11px] text-[#707E94] font-mono leading-relaxed">{{ data.reason }}</p>
+          <h3 class="text-xs font-bold text-amber-500 font-mono mb-1">安装策略：{{ data.installation_policy === 'builtin-only' ? '仅内置插件' : data.installation_policy }}</h3>
+          <p class="text-[11px] font-mono leading-relaxed" style="color: var(--text-muted);">{{ data.reason }}</p>
         </div>
       </div>
     </template>

@@ -132,34 +132,34 @@ onMounted(load)
       <div class="flex items-start gap-2"><AlertCircle v-if="bannerMsg.type !== 'ok'" class="w-4 h-4 shrink-0 mt-0.5" /><span>{{ bannerMsg.text }}</span></div>
     </div>
 
-    <div v-if="loading" class="py-12 text-center text-xs font-mono text-[#707E94]"><RefreshCw class="w-5 h-5 animate-spin inline mr-1.5 text-blue-400" />正在加载灾备配置...</div>
+    <div v-if="loading" class="py-12 text-center text-xs font-mono" style="color: var(--text-muted);"><RefreshCw class="w-5 h-5 animate-spin inline mr-1.5" style="color: var(--color-brand);" />正在加载灾备配置...</div>
 
     <template v-else-if="simple">
       <!-- Simple Config -->
-      <div class="bg-[#0D121B] border border-[#1A2232] rounded-xl p-4">
-        <div class="flex items-center justify-between mb-4">
+      <div class="rounded-xl border p-4 sm:p-5 shadow-xs transition-colors space-y-4" style="background-color: var(--bg-card); border-color: var(--border-subtle);">
+        <div class="flex items-center justify-between mb-2">
           <div class="flex items-center space-x-2">
-            <HardDrive class="w-4 h-4 text-blue-400" />
-            <h2 class="text-sm font-bold text-white font-mono">自动灾备</h2>
+            <HardDrive class="w-4 h-4" style="color: var(--color-brand);" />
+            <h2 class="text-sm font-bold font-mono" style="color: var(--text-main);">自动灾备</h2>
           </div>
           <label class="flex items-center space-x-2 text-xs font-mono cursor-pointer">
             <input v-model="enabled" type="checkbox" class="accent-blue-500 w-4 h-4" :disabled="!auth.isSuperadmin" />
-            <span :class="enabled ? 'text-emerald-400' : 'text-[#707E94]'">{{ enabled ? '每日自动灾备已启用' : '已停用' }}</span>
+            <span :class="enabled ? 'text-emerald-500 font-bold' : 'text-zinc-500'">{{ enabled ? '每日自动灾备已启用' : '已停用' }}</span>
           </label>
         </div>
 
-        <div v-if="simple.legacy_bypy" class="mb-4 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/25 text-amber-400 text-[11px] font-mono">⚠ {{ simple.migration_note }}</div>
+        <div v-if="simple.legacy_bypy" class="p-2.5 rounded-lg border text-[11px] font-mono" style="background-color: var(--color-warn-bg); border-color: var(--color-warn-border); color: var(--color-warn);">⚠ {{ simple.migration_note }}</div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <div>
-            <label class="block text-[11px] text-[#8997aa] mb-1 font-mono">1. 备份内容</label>
-            <select disabled class="w-full bg-[#090f18] border border-[#1A2232] rounded-lg text-white px-3 py-2 text-xs font-mono opacity-70">
+            <label class="block text-[11px] mb-1 font-mono" style="color: var(--text-muted);">1. 备份内容</label>
+            <select disabled class="w-full rounded-lg px-3 py-2 text-xs font-mono opacity-70 border" style="background-color: var(--bg-input); border-color: var(--border-subtle); color: var(--text-main);">
               <option>R20 系统、策略、配置与运行数据</option>
             </select>
           </div>
           <div>
-            <label class="block text-[11px] text-[#8997aa] mb-1 font-mono">2. 保存位置</label>
-            <select v-model="destination" :disabled="!auth.isSuperadmin" class="w-full bg-[#090f18] border border-[#1A2232] rounded-lg text-white px-3 py-2 text-xs font-mono outline-none focus:border-blue-500">
+            <label class="block text-[11px] mb-1 font-mono" style="color: var(--text-muted);">2. 保存位置</label>
+            <select v-model="destination" :disabled="!auth.isSuperadmin" class="w-full rounded-lg px-3 py-2 text-xs font-mono outline-none border cursor-pointer" style="background-color: var(--bg-input); border-color: var(--border-subtle); color: var(--text-main);">
               <option value="local">本地滚动归档</option>
               <option value="s3">S3 兼容存储</option>
               <option value="oss">阿里云 OSS</option>
@@ -168,55 +168,55 @@ onMounted(load)
             </select>
           </div>
           <div>
-            <label class="block text-[11px] text-[#8997aa] mb-1 font-mono">3. 每天执行时间（北京时间）</label>
-            <input v-model="scheduleTime" type="time" :disabled="!auth.isSuperadmin" class="w-full bg-[#090f18] border border-[#1A2232] rounded-lg text-white px-3 py-2 text-xs font-mono outline-none focus:border-blue-500" />
+            <label class="block text-[11px] mb-1 font-mono" style="color: var(--text-muted);">3. 每天执行时间（北京时间）</label>
+            <input v-model="scheduleTime" type="time" :disabled="!auth.isSuperadmin" class="w-full rounded-lg px-3 py-2 text-xs font-mono outline-none border" style="background-color: var(--bg-input); border-color: var(--border-subtle); color: var(--text-main);" />
           </div>
           <div>
-            <label class="block text-[11px] text-[#8997aa] mb-1 font-mono">4. 保留最近几份{{ destination === 'local' ? '（本地）' : '' }}</label>
-            <input v-model="retention" type="number" min="1" max="365" :disabled="!auth.isSuperadmin" class="w-full bg-[#090f18] border border-[#1A2232] rounded-lg text-white px-3 py-2 text-xs font-mono outline-none focus:border-blue-500" />
+            <label class="block text-[11px] mb-1 font-mono" style="color: var(--text-muted);">4. 保留最近几份{{ destination === 'local' ? '（本地）' : '' }}</label>
+            <input v-model="retention" type="number" min="1" max="365" :disabled="!auth.isSuperadmin" class="w-full rounded-lg px-3 py-2 text-xs font-mono outline-none border num-tabular" style="background-color: var(--bg-input); border-color: var(--border-subtle); color: var(--text-main);" />
           </div>
         </div>
 
         <!-- Remote Credentials -->
-        <div v-if="remoteDest" class="mt-4 p-3 rounded-lg bg-[#080B10] border border-[#1A2232]">
-          <div class="text-[11px] text-[#8997aa] font-mono mb-2">连接信息（保存进本机加密密文库，不回显明文）</div>
+        <div v-if="remoteDest" class="mt-4 p-3.5 rounded-lg border" style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);">
+          <div class="text-[11px] font-mono mb-2" style="color: var(--text-muted);">连接信息（保存进本机加密密文库，不回显明文）</div>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div v-if="destination !== 'baidu_oauth'">
-              <label class="block text-[11px] text-[#8997aa] mb-1 font-mono">Endpoint</label>
-              <input v-model="endpoint" :disabled="!auth.isSuperadmin" placeholder="https://s3.us-west-004.backblazeb2.com" class="w-full bg-[#090f18] border border-[#1A2232] rounded-lg text-white px-3 py-2 text-xs font-mono outline-none focus:border-blue-500" />
+              <label class="block text-[11px] mb-1 font-mono" style="color: var(--text-muted);">Endpoint</label>
+              <input v-model="endpoint" :disabled="!auth.isSuperadmin" placeholder="https://s3.us-west-004.backblazeb2.com" class="w-full rounded-lg px-3 py-2 text-xs font-mono outline-none border" style="background-color: var(--bg-input); border-color: var(--border-subtle); color: var(--text-main);" />
             </div>
             <div v-if="needsBucket">
-              <label class="block text-[11px] text-[#8997aa] mb-1 font-mono">Bucket</label>
-              <input v-model="bucket" :disabled="!auth.isSuperadmin" class="w-full bg-[#090f18] border border-[#1A2232] rounded-lg text-white px-3 py-2 text-xs font-mono outline-none focus:border-blue-500" />
+              <label class="block text-[11px] mb-1 font-mono" style="color: var(--text-muted);">Bucket</label>
+              <input v-model="bucket" :disabled="!auth.isSuperadmin" class="w-full rounded-lg px-3 py-2 text-xs font-mono outline-none border" style="background-color: var(--bg-input); border-color: var(--border-subtle); color: var(--text-main);" />
             </div>
             <div v-for="f in credentialFields" :key="f">
-              <label class="block text-[11px] text-[#8997aa] mb-1 font-mono">{{ f }}</label>
-              <input v-model="credentials[f]" type="password" :disabled="!auth.isSuperadmin" :placeholder="simple.configured ? '留空保持现有值' : ''" class="w-full bg-[#090f18] border border-[#1A2232] rounded-lg text-white px-3 py-2 text-xs font-mono outline-none focus:border-blue-500" />
+              <label class="block text-[11px] mb-1 font-mono" style="color: var(--text-muted);">{{ f }}</label>
+              <input v-model="credentials[f]" type="password" :disabled="!auth.isSuperadmin" :placeholder="simple.configured ? '留空保持现有值' : ''" class="w-full rounded-lg px-3 py-2 text-xs font-mono outline-none border" style="background-color: var(--bg-input); border-color: var(--border-subtle); color: var(--text-main);" />
             </div>
           </div>
         </div>
 
         <div class="flex flex-wrap items-center gap-2 mt-4">
           <template v-if="auth.isSuperadmin">
-            <button @click="testConnection" :disabled="busy !== ''" class="flex items-center space-x-1 px-3 py-2 rounded-lg bg-[#111c2a] hover:bg-[#1d3050] border border-[#33445b] text-xs font-mono text-[#b8c4d4] cursor-pointer disabled:opacity-40"><PlugZap class="w-3.5 h-3.5" /><span>{{ busy === 'test' ? '测试中...' : '测试连接' }}</span></button>
-            <button @click="save" :disabled="busy !== ''" class="flex items-center space-x-1 px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-mono font-bold cursor-pointer disabled:opacity-40"><Save class="w-3.5 h-3.5" /><span>{{ busy === 'save' ? '保存中...' : '保存灾备' }}</span></button>
-            <button @click="runNow" :disabled="busy !== ''" class="flex items-center space-x-1 px-3 py-2 rounded-lg bg-[#4d1924] hover:bg-[#5d2230] border border-[#873044] text-xs font-mono text-[#ffdce1] cursor-pointer disabled:opacity-40"><PlayCircle class="w-3.5 h-3.5" /><span>{{ busy === 'run' ? '执行中（最长10分钟）...' : '立即备份' }}</span></button>
+            <button @click="testConnection" :disabled="busy !== ''" class="flex items-center space-x-1 px-3 py-2 rounded-lg border text-xs font-mono cursor-pointer disabled:opacity-40 transition-all shadow-xs" style="background-color: var(--bg-card-subtle); border-color: var(--border-medium); color: var(--text-main);"><PlugZap class="w-3.5 h-3.5" /><span>{{ busy === 'test' ? '测试中...' : '测试连接' }}</span></button>
+            <button @click="save" :disabled="busy !== ''" class="flex items-center space-x-1 px-3 py-2 rounded-lg text-xs font-mono font-bold cursor-pointer disabled:opacity-40 transition-all shadow-xs" style="background-color: var(--text-main); color: var(--bg-card);"><Save class="w-3.5 h-3.5" /><span>{{ busy === 'save' ? '保存中...' : '保存灾备' }}</span></button>
+            <button @click="runNow" :disabled="busy !== ''" class="flex items-center space-x-1 px-3 py-2 rounded-lg text-xs font-mono font-bold cursor-pointer disabled:opacity-40 transition-all shadow-xs" style="background-color: var(--color-down-bg); border-color: var(--color-down-border); color: var(--color-down);"><PlayCircle class="w-3.5 h-3.5" /><span>{{ busy === 'run' ? '执行中（最长10分钟）...' : '立即备份' }}</span></button>
           </template>
-          <span v-else class="text-[10px] font-mono text-[#707E94]">只读视图 · 修改需超级管理员登录</span>
-          <span class="ml-auto text-[10px] font-mono" :class="simple.configured ? 'text-emerald-400' : 'text-amber-400'">{{ simple.configured ? '● 目标已配置' : '● 目标未配置' }}</span>
+          <span v-else class="text-[10px] font-mono" style="color: var(--text-faint);">只读视图 · 修改需超级管理员登录</span>
+          <span class="ml-auto text-[10px] font-mono font-bold" :class="simple.configured ? 'text-emerald-500' : 'text-amber-500'">{{ simple.configured ? '● 目标已配置' : '● 目标未配置' }}</span>
         </div>
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <!-- Latest -->
-        <div class="bg-[#0D121B] border border-[#1A2232] rounded-xl p-4">
-          <h2 class="text-xs font-bold text-white font-mono uppercase mb-3">最近一次灾备</h2>
+        <div class="rounded-xl border p-4 sm:p-5 shadow-xs transition-colors" style="background-color: var(--bg-card); border-color: var(--border-subtle);">
+          <h2 class="text-xs font-bold font-mono uppercase mb-3" style="color: var(--text-main);">最近一次灾备</h2>
           <div v-if="simple.latest" class="space-y-1.5 text-xs font-mono">
-            <div class="flex justify-between bg-[#080B10] border border-[#1A2232] rounded-lg px-3 py-2"><span class="text-[#707E94]">时间</span><span class="text-white">{{ simple.latest.created_at || simple.latest.time || JSON.stringify(simple.latest).slice(0, 60) }}</span></div>
-            <div class="flex justify-between bg-[#080B10] border border-[#1A2232] rounded-lg px-3 py-2"><span class="text-[#707E94]">状态</span><span class="text-emerald-400">{{ simple.latest.status || 'success' }}</span></div>
+            <div class="flex justify-between border rounded-lg px-3 py-2" style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);"><span style="color: var(--text-muted);">时间</span><span style="color: var(--text-main);">{{ simple.latest.created_at || simple.latest.time || JSON.stringify(simple.latest).slice(0, 60) }}</span></div>
+            <div class="flex justify-between border rounded-lg px-3 py-2" style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);"><span style="color: var(--text-muted);">状态</span><span class="text-emerald-500 font-bold">{{ simple.latest.status || 'success' }}</span></div>
           </div>
-          <div v-else class="py-6 text-center text-xs text-[#707E94] font-mono">尚无匹配的灾备清单记录</div>
-          <div class="text-[10px] text-[#6f7d91] font-mono mt-3 leading-relaxed">{{ status?.schedule }}</div>
+          <div v-else class="py-6 text-center text-xs font-mono" style="color: var(--text-faint);">尚无匹配的灾备清单记录</div>
+          <div class="text-[10px] font-mono mt-3 leading-relaxed" style="color: var(--text-faint);">{{ status?.schedule }}</div>
         </div>
 
         <!-- Local archives -->
@@ -228,23 +228,25 @@ onMounted(load)
             </div>
             <span class="text-[10px] font-mono" style="color: var(--text-faint);">异地备份后自动瘦身</span>
           </div>
-          <table v-if="status?.local_archives?.length" class="w-full text-left text-xs font-mono whitespace-nowrap">
-            <thead>
-              <tr class="border-b text-[11px] uppercase tracking-wider font-bold" style="border-color: var(--border-subtle); background-color: var(--bg-card-subtle); color: var(--text-muted);">
-                <th class="py-2.5 px-4">归档文件</th>
-                <th class="py-2.5 px-3 text-right">大小</th>
-                <th class="py-2.5 px-4 text-right">创建时间</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="a in status.local_archives.slice(0, 8)" :key="a.name" class="border-b last:border-b-0 hover:bg-[var(--bg-card-hover)] transition-colors" style="border-color: var(--border-subtle);">
-                <td class="py-2.5 px-4 font-mono font-medium truncate max-w-[220px]" style="color: var(--text-main);">{{ a.name }}</td>
-                <td class="py-2.5 px-3 text-right num-tabular" style="color: var(--text-muted);">{{ fmtBytes(a.bytes) }}</td>
-                <td class="py-2.5 px-4 text-right num-tabular" style="color: var(--text-faint);">{{ fmtTime(a.mtime) }}</td>
-              </tr>
-            </tbody>
-          </table>
-          <div v-else class="py-8 text-center text-xs font-mono" style="color: var(--color-up);">✓ 本地 0 冗余占用（加密上传成功后已物理瘦身清理）</div>
+          <div class="table-scroll-container">
+            <table v-if="status?.local_archives?.length" class="w-full text-left text-xs font-mono whitespace-nowrap">
+              <thead>
+                <tr class="border-b text-[11px] uppercase tracking-wider font-bold" style="border-color: var(--border-subtle); background-color: var(--bg-card-subtle); color: var(--text-muted);">
+                  <th class="py-2.5 px-4">归档文件</th>
+                  <th class="py-2.5 px-3 text-right">大小</th>
+                  <th class="py-2.5 px-4 text-right">创建时间</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="a in status.local_archives.slice(0, 8)" :key="a.name" class="border-b last:border-b-0 hover:bg-[var(--bg-card-hover)] transition-colors" style="border-color: var(--border-subtle);">
+                  <td class="py-2.5 px-4 font-mono font-medium truncate max-w-[220px]" style="color: var(--text-main);">{{ a.name }}</td>
+                  <td class="py-2.5 px-3 text-right num-tabular" style="color: var(--text-muted);">{{ fmtBytes(a.bytes) }}</td>
+                  <td class="py-2.5 px-4 text-right num-tabular" style="color: var(--text-faint);">{{ fmtTime(a.mtime) }}</td>
+                </tr>
+              </tbody>
+            </table>
+            <div v-else class="py-8 text-center text-xs font-mono" style="color: var(--color-up);">✓ 本地 0 冗余占用（加密上传成功后已物理瘦身清理）</div>
+          </div>
         </div>
       </div>
     </template>

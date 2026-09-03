@@ -42,39 +42,44 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="space-y-4">
+  <div class="space-y-4 max-w-[2160px] mx-auto">
     <div class="flex items-center justify-between">
-      <p class="text-xs text-[#707E94] font-mono">核对 AI 宏观基调与逐币动作，并审查多路实时日志流。</p>
-      <span class="text-[10px] font-mono text-blue-400 bg-blue-500/10 px-2 py-1 rounded border border-blue-500/20">日常运行 · 3/4</span>
+      <p class="text-xs font-mono" style="color: var(--text-muted);">核对 AI 宏观基调与逐币动作，并审查多路实时日志流。</p>
+      <span
+        class="text-[10px] font-mono px-2 py-1 rounded border font-bold"
+        style="background-color: var(--color-brand-bg); color: var(--color-brand); border-color: var(--color-brand-border);"
+      >
+        日常运行 · 3/4
+      </span>
     </div>
 
     <!-- 3-Way Log Streams -->
-    <div class="bg-[#0D121B] border border-[#1A2232] rounded-xl p-4">
-      <div class="flex items-center justify-between pb-3 mb-3 border-b border-[#1A2232]">
+    <div class="rounded-xl border p-4 sm:p-5 shadow-xs transition-colors" style="background-color: var(--bg-card); border-color: var(--border-subtle);">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 mb-3 border-b" style="border-color: var(--border-subtle);">
         <div class="flex items-center space-x-2">
           <Terminal class="w-4 h-4 text-purple-400" />
-          <h2 class="text-xs font-bold text-white font-mono uppercase">系统实时日志流</h2>
+          <h2 class="text-xs font-black font-mono uppercase tracking-wide" style="color: var(--text-main);">系统实时日志流</h2>
         </div>
         <!-- Log Selector Tabs -->
-        <div class="flex space-x-1 bg-[#080B10] p-1 rounded-lg border border-[#1A2232]">
+        <div class="flex flex-wrap gap-1 p-1 rounded-lg border" style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);">
           <button
             @click="fetchLogStream('trader')"
             class="px-2.5 py-1 rounded text-xs font-mono font-bold cursor-pointer transition-colors"
-            :class="activeLogTab === 'trader' ? 'bg-blue-600 text-white' : 'text-[#707E94] hover:text-white'"
+            :style="activeLogTab === 'trader' ? { backgroundColor: 'var(--text-main)', color: 'var(--bg-card)' } : { color: 'var(--text-muted)' }"
           >
             交易巡检 (Trader)
           </button>
           <button
             @click="fetchLogStream('backend')"
             class="px-2.5 py-1 rounded text-xs font-mono font-bold cursor-pointer transition-colors"
-            :class="activeLogTab === 'backend' ? 'bg-blue-600 text-white' : 'text-[#707E94] hover:text-white'"
+            :style="activeLogTab === 'backend' ? { backgroundColor: 'var(--text-main)', color: 'var(--bg-card)' } : { color: 'var(--text-muted)' }"
           >
             控制面服务 (Backend)
           </button>
           <button
             @click="fetchLogStream('scheduler')"
             class="px-2.5 py-1 rounded text-xs font-mono font-bold cursor-pointer transition-colors"
-            :class="activeLogTab === 'scheduler' ? 'bg-blue-600 text-white' : 'text-[#707E94] hover:text-white'"
+            :style="activeLogTab === 'scheduler' ? { backgroundColor: 'var(--text-main)', color: 'var(--bg-card)' } : { color: 'var(--text-muted)' }"
           >
             任务调度器 (Scheduler)
           </button>
@@ -82,11 +87,11 @@ onMounted(() => {
       </div>
 
       <div class="relative">
-        <div v-if="logLoading" class="absolute inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center text-xs font-mono text-blue-400">
+        <div v-if="logLoading" class="absolute inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center text-xs font-mono" style="color: var(--color-brand);">
           <RefreshCw class="w-4 h-4 animate-spin mr-1.5" />
           <span>正在拉取最新日志流...</span>
         </div>
-        <pre class="bg-[#080B10] border border-[#1A2232]/80 rounded-lg p-3 text-xs font-mono text-zinc-300 max-h-[500px] overflow-y-auto whitespace-pre-wrap leading-relaxed">{{ logContent }}</pre>
+        <pre class="border rounded-lg p-3 text-xs font-mono max-h-[520px] overflow-y-auto whitespace-pre-wrap leading-relaxed select-text" style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle); color: var(--text-main);">{{ logContent }}</pre>
       </div>
     </div>
   </div>

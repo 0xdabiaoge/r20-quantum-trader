@@ -146,14 +146,56 @@ td {
 .border-\[\#233147\],
 .border-\[\#2D3748\],
 .border-\[\#2E3C52\],
+.border-\[\#273246\],
+.border-\[\#23354D\],
 .border-\[\#33445b\] {
   border-color: var(--border-subtle) !important;
 }
 
-/* Custom Scrollbars */
+/* =========================================================================
+   Custom Table Scrollbar Container (Eliminate Table Layout Explosion)
+   ========================================================================= */
+
+.table-scroll-container,
+.table-scroll,
+.overflow-x-auto {
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-medium) var(--bg-card-subtle);
+}
+
+.table-scroll-container::-webkit-scrollbar,
+.table-scroll::-webkit-scrollbar,
+.overflow-x-auto::-webkit-scrollbar {
+  height: 7px;
+  width: 7px;
+}
+
+.table-scroll-container::-webkit-scrollbar-track,
+.table-scroll::-webkit-scrollbar-track,
+.overflow-x-auto::-webkit-scrollbar-track {
+  background: var(--bg-card-subtle);
+  border-radius: 4px;
+}
+
+.table-scroll-container::-webkit-scrollbar-thumb,
+.table-scroll::-webkit-scrollbar-thumb,
+.overflow-x-auto::-webkit-scrollbar-thumb {
+  background: var(--border-medium);
+  border-radius: 4px;
+}
+
+.table-scroll-container::-webkit-scrollbar-thumb:hover,
+.table-scroll::-webkit-scrollbar-thumb:hover,
+.overflow-x-auto::-webkit-scrollbar-thumb:hover {
+  background: var(--border-strong);
+}
+
+/* Custom Scrollbars for all elements */
 ::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
@@ -176,6 +218,7 @@ td {
   .bg-\[\#080B10\],
   .bg-\[\#090f18\],
   .bg-\[\#090F18\],
+  .bg-\[\#0A0F18\],
   .bg-\[\#040813\],
   .bg-\[\#0A1124\],
   .bg-\[\#060B18\],
@@ -186,6 +229,7 @@ td {
   .bg-\[\#0E131E\],
   .bg-\[\#0B1120\],
   .bg-\[\#0A0D14\],
+  .bg-\[\#0A0D14\]\/40,
   .bg-\[\#0E121B\],
   .bg-\[\#0B0F17\],
   .bg-\[\#0E131F\],
@@ -201,6 +245,7 @@ td {
   }
 
   .bg-\[\#111c2a\],
+  .bg-\[\#111C2A\],
   .bg-\[\#141B26\],
   .bg-\[\#111a29\],
   .bg-\[\#101724\],
@@ -208,13 +253,22 @@ td {
   .bg-\[\#1A2232\],
   .bg-\[\#141B28\],
   .bg-\[\#1E2738\],
-  .bg-\[\#111723\] {
+  .bg-\[\#1A2B42\],
+  .bg-\[\#111723\],
+  .bg-zinc-800,
+  .bg-zinc-800\/30,
+  .bg-zinc-800\/50 {
     background-color: var(--bg-card-subtle) !important;
   }
 
+  /* Modal background gradient override in light mode */
+  .from-\[\#111a29\].to-\[\#0D121B\] {
+    --tw-gradient-from: var(--bg-card) var(--tw-gradient-from-position) !important;
+    --tw-gradient-to: var(--bg-card) var(--tw-gradient-to-position) !important;
+    background-color: var(--bg-card) !important;
+  }
+
   /* Dividers & Borders normalization */
-  .divide-x > :not([hidden]) ~ :not([hidden]),
-  .divide-y > :not([hidden]) ~ :not([hidden]),
   .divide-x > :not([hidden]) ~ :not([hidden]),
   .divide-y > :not([hidden]) ~ :not([hidden]),
   .border-\[\#1A2232\],
@@ -223,18 +277,22 @@ td {
   .border-\[\#33445b\],
   .border-\[\#23354D\],
   .border-\[\#233147\],
+  .border-\[\#273246\],
+  .border-\[\#2D3748\],
   .border-\[\#192333\],
   .border-\[\#161F2E\],
   .border-\[\#20293A\],
   .border-\[\#1E293B\],
   .border-\[\#182644\],
   .border-\[\#1A284A\],
+  .border-zinc-700,
+  .border-zinc-700\/30,
   .divide-\[\#1A2232\]\/50 > * + * {
     border-color: var(--border-subtle) !important;
   }
 
   /* Text Contrast Normalization for Light Mode: Eliminate unreadable white text on light backgrounds */
-  .text-white,
+  .text-white:not(.btn-primary-text):not(.badge-filled),
   .text-zinc-100,
   .text-zinc-200,
   .text-zinc-300,

@@ -116,28 +116,28 @@ onMounted(load)
     </div>
 
     <!-- Change Password -->
-    <div class="bg-[#0D121B] border border-[#1A2232] rounded-xl p-4">
-      <div class="flex items-center space-x-2 mb-4 pb-3 border-b border-[#1A2232]">
-        <KeyRound class="w-4 h-4 text-amber-400" />
-        <h2 class="text-sm font-bold text-white font-mono">修改密码</h2>
-        <span class="text-[10px] font-mono text-[#707E94] ml-2">当前账号：{{ auth.user?.username }}（修改后需重新登录）</span>
+    <div class="rounded-xl border p-4 sm:p-5 shadow-xs transition-colors" style="background-color: var(--bg-card); border-color: var(--border-subtle);">
+      <div class="flex items-center space-x-2 mb-4 pb-3 border-b" style="border-color: var(--border-subtle);">
+        <KeyRound class="w-4 h-4 text-amber-500" />
+        <h2 class="text-sm font-bold font-mono" style="color: var(--text-main);">修改密码</h2>
+        <span class="text-[10px] font-mono ml-2" style="color: var(--text-faint);">当前账号：{{ auth.user?.username }}（修改后需重新登录）</span>
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div>
-          <label class="block text-[11px] text-[#8997aa] mb-1 font-mono">当前密码</label>
-          <input v-model="currentPassword" type="password" class="w-full bg-[#090f18] border border-[#1A2232] rounded-lg text-white px-3 py-2 text-xs font-mono outline-none focus:border-blue-500" />
+          <label class="block text-[11px] mb-1 font-mono" style="color: var(--text-muted);">当前密码</label>
+          <input v-model="currentPassword" type="password" class="w-full rounded-lg px-3 py-2 text-xs font-mono outline-none border" style="background-color: var(--bg-input); border-color: var(--border-subtle); color: var(--text-main);" />
         </div>
         <div>
-          <label class="block text-[11px] text-[#8997aa] mb-1 font-mono">新密码 (≥12 位)</label>
-          <input v-model="newPassword" type="password" class="w-full bg-[#090f18] border border-[#1A2232] rounded-lg text-white px-3 py-2 text-xs font-mono outline-none focus:border-blue-500" />
+          <label class="block text-[11px] mb-1 font-mono" style="color: var(--text-muted);">新密码 (≥12 位)</label>
+          <input v-model="newPassword" type="password" class="w-full rounded-lg px-3 py-2 text-xs font-mono outline-none border" style="background-color: var(--bg-input); border-color: var(--border-subtle); color: var(--text-main);" />
         </div>
         <div class="flex items-end">
-          <button @click="changePassword" :disabled="changingPwd" class="w-full flex items-center justify-center space-x-1.5 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-mono font-bold cursor-pointer disabled:opacity-50">
+          <button @click="changePassword" :disabled="changingPwd" class="w-full flex items-center justify-center space-x-1.5 px-4 py-2 rounded-lg text-xs font-mono font-bold cursor-pointer disabled:opacity-50 transition-all shadow-xs" style="background-color: var(--text-main); color: var(--bg-card);">
             <ShieldCheck class="w-3.5 h-3.5" /><span>{{ changingPwd ? '修改中...' : '确认修改' }}</span>
           </button>
         </div>
       </div>
-      <p class="mt-2 text-[10px] text-[#6f7d91] font-mono">超级管理员可在下方用户列表为其他账号重置密码（无需旧密码）。</p>
+      <p class="mt-2 text-[10px] font-mono" style="color: var(--text-faint);">超级管理员可在下方用户列表为其他账号重置密码（无需旧密码）。</p>
     </div>
 
     <!-- Users List -->
@@ -157,7 +157,7 @@ onMounted(load)
         仅超级管理员可查看与管理团队账号。
       </div>
 
-      <div v-else class="overflow-x-auto">
+      <div v-else class="table-scroll-container">
         <table class="w-full text-left text-xs font-mono whitespace-nowrap">
           <thead>
             <tr class="border-b text-[11px] uppercase tracking-wider font-bold" style="border-color: var(--border-subtle); background-color: var(--bg-card-subtle); color: var(--text-muted);">
@@ -181,7 +181,7 @@ onMounted(load)
                   {{ u.role === 'superadmin' ? '超级管理员' : '普通管理员' }}
                 </span>
               </td>
-              <td class="py-2.5 px-3 font-bold" :class="u.enabled ? (u.locked_until ? 'text-amber-400' : 'text-emerald-400') : 'text-rose-400'">
+              <td class="py-2.5 px-3 font-bold" :class="u.enabled ? (u.locked_until ? 'text-amber-500' : 'text-emerald-500') : 'text-rose-500'">
                 {{ !u.enabled ? '已停用' : (u.locked_until && new Date(u.locked_until) > new Date() ? '已锁定' : '正常启用') }}
               </td>
               <td class="py-2.5 px-3 num-tabular" style="color: var(--text-faint);">{{ u.last_login_at || '从未登录' }}</td>
@@ -198,21 +198,21 @@ onMounted(load)
     </div>
 
     <!-- Create Modal -->
-    <div v-if="createVisible" class="fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-4" @click.self="createVisible = false">
-      <div class="bg-gradient-to-b from-[#111a29] to-[#0D121B] border border-[#1A2232] rounded-xl p-5 w-full max-w-[420px] max-h-[88dvh] overflow-y-auto">
-        <h3 class="text-sm font-bold text-white mb-4">新建管理员</h3>
-        <label class="block text-[11px] text-[#8997aa] mb-1 font-mono">账号 (3-32 位)</label>
-        <input v-model="newUsername" class="w-full bg-[#090f18] border border-[#1A2232] rounded-lg text-white px-3 py-2 text-xs font-mono outline-none focus:border-blue-500 mb-3" />
-        <label class="block text-[11px] text-[#8997aa] mb-1 font-mono">角色</label>
-        <select v-model="newRole" class="w-full bg-[#090f18] border border-[#1A2232] rounded-lg text-white px-3 py-2 text-xs font-mono outline-none focus:border-blue-500 mb-3">
+    <div v-if="createVisible" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4" @click.self="createVisible = false">
+      <div class="rounded-xl border p-5 sm:p-6 w-full max-w-[420px] max-h-[88dvh] overflow-y-auto shadow-2xl transition-colors" style="background-color: var(--bg-card); border-color: var(--border-subtle);">
+        <h3 class="text-sm font-bold mb-4 font-mono" style="color: var(--text-main);">新建管理员</h3>
+        <label class="block text-[11px] mb-1 font-mono" style="color: var(--text-muted);">账号 (3-32 位)</label>
+        <input v-model="newUsername" class="w-full rounded-lg px-3 py-2 text-xs font-mono outline-none border mb-3" style="background-color: var(--bg-input); border-color: var(--border-subtle); color: var(--text-main);" />
+        <label class="block text-[11px] mb-1 font-mono" style="color: var(--text-muted);">角色</label>
+        <select v-model="newRole" class="w-full rounded-lg px-3 py-2 text-xs font-mono outline-none border mb-3 cursor-pointer" style="background-color: var(--bg-input); border-color: var(--border-subtle); color: var(--text-main);">
           <option value="admin">管理员（日常运维）</option>
           <option value="superadmin">超级管理员（全部权限）</option>
         </select>
-        <label class="block text-[11px] text-[#8997aa] mb-1 font-mono">初始密码 (≥12 位)</label>
-        <input v-model="newPasswordForCreate" type="password" class="w-full bg-[#090f18] border border-[#1A2232] rounded-lg text-white px-3 py-2 text-xs font-mono outline-none focus:border-blue-500 mb-4" />
+        <label class="block text-[11px] mb-1 font-mono" style="color: var(--text-muted);">初始密码 (≥12 位)</label>
+        <input v-model="newPasswordForCreate" type="password" class="w-full rounded-lg px-3 py-2 text-xs font-mono outline-none border mb-4" style="background-color: var(--bg-input); border-color: var(--border-subtle); color: var(--text-main);" />
         <div class="flex justify-end space-x-2">
-          <button @click="createVisible = false" class="px-3 py-2 rounded-lg bg-[#111c2a] border border-[#33445b] text-xs font-mono text-[#b8c4d4] cursor-pointer">取消</button>
-          <button @click="createUser" class="px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-mono font-bold cursor-pointer">创建</button>
+          <button @click="createVisible = false" class="px-3 py-2 rounded-lg border text-xs font-mono cursor-pointer transition-all shadow-xs" style="background-color: var(--bg-card-subtle); border-color: var(--border-medium); color: var(--text-main);">取消</button>
+          <button @click="createUser" class="px-3 py-2 rounded-lg text-xs font-mono font-bold cursor-pointer transition-all shadow-xs" style="background-color: var(--text-main); color: var(--bg-card);">创建</button>
         </div>
       </div>
     </div>

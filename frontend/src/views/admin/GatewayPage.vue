@@ -62,25 +62,25 @@ onMounted(load)
     <template v-else-if="gw">
       <!-- Worker & Stats Cards -->
       <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <div class="bg-[#0D121B] border border-[#1A2232] rounded-xl p-4">
-          <div class="flex items-center space-x-2 text-[11px] text-[#707E94] font-mono mb-2"><Server class="w-4 h-4 text-emerald-400" /><span>Gateway 进程</span></div>
-          <div class="text-lg font-black font-mono" :class="gw.running ? 'text-emerald-400' : 'text-rose-400'">{{ gw.running ? 'ONLINE' : 'OFFLINE' }}</div>
-          <div class="text-[10px] text-[#707E94] font-mono mt-1">PID {{ gw.pid || '--' }} · v{{ gw.version }}</div>
+        <div class="rounded-xl border p-4 shadow-xs transition-colors" style="background-color: var(--bg-card); border-color: var(--border-subtle);">
+          <div class="flex items-center space-x-2 text-[11px] font-mono mb-2" style="color: var(--text-muted);"><Server class="w-4 h-4 text-emerald-500" /><span>Gateway 进程</span></div>
+          <div class="text-lg font-black font-mono" :class="gw.running ? 'text-emerald-500' : 'text-rose-500'">{{ gw.running ? 'ONLINE' : 'OFFLINE' }}</div>
+          <div class="text-[10px] font-mono mt-1" style="color: var(--text-faint);">PID {{ gw.pid || '--' }} · v{{ gw.version }}</div>
         </div>
-        <div class="bg-[#0D121B] border border-[#1A2232] rounded-xl p-4">
-          <div class="flex items-center space-x-2 text-[11px] text-[#707E94] font-mono mb-2"><Zap class="w-4 h-4 text-blue-400" /><span>投递队列</span></div>
-          <div class="text-lg font-black font-mono text-white">{{ deliveredCount }}<span class="text-xs text-[#707E94]"> / {{ deliveryTotal }}</span></div>
-          <div class="text-[10px] text-[#707E94] font-mono mt-1">待处理 {{ gw.stats?.pending ?? 0 }} · 重试 {{ gw.stats?.retry ?? 0 }}</div>
+        <div class="rounded-xl border p-4 shadow-xs transition-colors" style="background-color: var(--bg-card); border-color: var(--border-subtle);">
+          <div class="flex items-center space-x-2 text-[11px] font-mono mb-2" style="color: var(--text-muted);"><Zap class="w-4 h-4 text-blue-500" /><span>投递队列</span></div>
+          <div class="text-lg font-black font-mono num-tabular" style="color: var(--text-main);">{{ deliveredCount }}<span class="text-xs" style="color: var(--text-muted);"> / {{ deliveryTotal }}</span></div>
+          <div class="text-[10px] font-mono mt-1" style="color: var(--text-faint);">待处理 {{ gw.stats?.pending ?? 0 }} · 重试 {{ gw.stats?.retry ?? 0 }}</div>
         </div>
-        <div class="bg-[#0D121B] border border-[#1A2232] rounded-xl p-4">
-          <div class="flex items-center space-x-2 text-[11px] text-[#707E94] font-mono mb-2"><AlertTriangle class="w-4 h-4 text-amber-400" /><span>死信 / 关键事件</span></div>
-          <div class="text-lg font-black font-mono" :class="(gw.stats?.dead ?? 0) > 0 ? 'text-rose-400' : 'text-emerald-400'">{{ gw.stats?.dead ?? 0 }}<span class="text-xs text-[#707E94]"> / {{ gw.event_health?.critical_total ?? 0 }}</span></div>
-          <div class="text-[10px] text-[#707E94] font-mono mt-1">关键未达 {{ gw.event_health?.critical_unmet ?? 0 }} · 失败 {{ gw.event_health?.critical_failed ?? 0 }}</div>
+        <div class="rounded-xl border p-4 shadow-xs transition-colors" style="background-color: var(--bg-card); border-color: var(--border-subtle);">
+          <div class="flex items-center space-x-2 text-[11px] font-mono mb-2" style="color: var(--text-muted);"><AlertTriangle class="w-4 h-4 text-amber-500" /><span>死信 / 关键事件</span></div>
+          <div class="text-lg font-black font-mono num-tabular" :class="(gw.stats?.dead ?? 0) > 0 ? 'text-rose-500' : 'text-emerald-500'">{{ gw.stats?.dead ?? 0 }}<span class="text-xs" style="color: var(--text-muted);"> / {{ gw.event_health?.critical_total ?? 0 }}</span></div>
+          <div class="text-[10px] font-mono mt-1" style="color: var(--text-faint);">关键未达 {{ gw.event_health?.critical_unmet ?? 0 }} · 失败 {{ gw.event_health?.critical_failed ?? 0 }}</div>
         </div>
-        <div class="bg-[#0D121B] border border-[#1A2232] rounded-xl p-4">
-          <div class="flex items-center space-x-2 text-[11px] text-[#707E94] font-mono mb-2"><Clock class="w-4 h-4 text-purple-400" /><span>调度任务</span></div>
-          <div class="text-lg font-black font-mono text-white">{{ gw.scheduler?.jobs?.length ?? 0 }}</div>
-          <div class="text-[10px] font-mono mt-1" :class="overdueCount > 0 ? 'text-rose-400' : 'text-emerald-400'">{{ overdueCount > 0 ? overdueCount + ' 个任务逾期!' : '无逾期任务' }}</div>
+        <div class="rounded-xl border p-4 shadow-xs transition-colors" style="background-color: var(--bg-card); border-color: var(--border-subtle);">
+          <div class="flex items-center space-x-2 text-[11px] font-mono mb-2" style="color: var(--text-muted);"><Clock class="w-4 h-4 text-purple-500" /><span>调度任务</span></div>
+          <div class="text-lg font-black font-mono num-tabular" style="color: var(--text-main);">{{ gw.scheduler?.jobs?.length ?? 0 }}</div>
+          <div class="text-[10px] font-mono mt-1" :class="overdueCount > 0 ? 'text-rose-500' : 'text-emerald-500'">{{ overdueCount > 0 ? overdueCount + ' 个任务逾期!' : '无逾期任务' }}</div>
         </div>
       </div>
 
@@ -90,7 +90,7 @@ onMounted(load)
           <h2 class="text-xs font-black font-mono uppercase tracking-wide" style="color: var(--text-main);">本地调度计划（北京时间）</h2>
           <span class="text-[11px] font-mono" style="color: var(--text-faint);">{{ gw.scheduler.jobs.length }} 个受管定时作业</span>
         </div>
-        <div class="overflow-x-auto">
+        <div class="table-scroll-container">
           <table class="w-full text-left text-xs font-mono whitespace-nowrap">
             <thead>
               <tr class="border-b text-[11px] uppercase tracking-wider font-bold" style="border-color: var(--border-subtle); background-color: var(--bg-card-subtle); color: var(--text-muted);">
@@ -130,7 +130,7 @@ onMounted(load)
             <span>刷新队列</span>
           </button>
         </div>
-        <div class="overflow-x-auto max-h-[420px] overflow-y-auto">
+        <div class="table-scroll-container max-h-[420px] overflow-y-auto">
           <table class="w-full text-left text-xs font-mono whitespace-nowrap">
             <thead class="sticky top-0 z-10">
               <tr class="border-b text-[11px] uppercase tracking-wider font-bold" style="border-color: var(--border-subtle); background-color: var(--bg-card-subtle); color: var(--text-muted);">

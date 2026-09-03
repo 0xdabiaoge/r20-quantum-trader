@@ -271,23 +271,26 @@ onMounted(loadData)
     </div>
 
     <!-- Master Switch & Performance Mode Card -->
-    <div class="bg-[#0D121B] border border-[#1A2232] rounded-xl p-4 shadow-lg space-y-4">
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#1A2232]">
+    <div class="rounded-xl border p-4 sm:p-5 shadow-xs space-y-4 transition-colors" style="background-color: var(--bg-card); border-color: var(--border-subtle);">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b" style="border-color: var(--border-subtle);">
         <div class="flex items-center space-x-3">
-          <div class="p-2.5 rounded-xl bg-gradient-to-tr from-purple-600/30 to-blue-600/20 border border-purple-500/30 text-purple-400">
+          <div
+            class="p-2.5 rounded-xl border"
+            style="background-color: var(--color-brand-bg); border-color: var(--color-brand-border); color: var(--color-brand);"
+          >
             <Users class="w-6 h-6" />
           </div>
           <div>
             <div class="flex items-center space-x-2">
-              <h2 class="text-sm font-bold text-white font-mono">多角色模型委员会决策机制</h2>
+              <h2 class="text-sm font-bold font-mono" style="color: var(--text-main);">多角色模型委员会决策机制</h2>
               <span
                 class="text-[10px] font-mono font-bold px-2 py-0.5 rounded border"
-                :class="councilConfig.enabled ? 'text-purple-400 bg-purple-500/10 border-purple-500/30' : 'text-zinc-400 bg-zinc-800/30 border-zinc-700/30'"
+                :style="councilConfig.enabled ? { backgroundColor: 'var(--color-brand-bg)', color: 'var(--color-brand)', borderColor: 'var(--color-brand-border)' } : { backgroundColor: 'var(--bg-badge)', color: 'var(--text-faint)', borderColor: 'var(--border-subtle)' }"
               >
                 {{ councilConfig.enabled ? '● 委员会辩论模式 (胜率与风控优先)' : '○ 单模型极速模式 (时延优先)' }}
               </span>
             </div>
-            <p class="text-xs text-[#707E94] font-mono mt-0.5">
+            <p class="text-xs font-mono mt-0.5" style="color: var(--text-muted);">
               关闭时以当前主脑单模型直接推理 (~2s)；开启时多模型参谋多线程辩论博弈并由首席仲裁官收口 (~15-40s)。
             </p>
           </div>
@@ -303,15 +306,16 @@ onMounted(loadData)
           >
             <div
               class="w-14 h-7 rounded-full transition-colors relative"
-              :class="councilConfig.enabled ? 'bg-purple-600' : 'bg-zinc-800'"
+              :style="{ backgroundColor: councilConfig.enabled ? 'var(--text-main)' : 'var(--border-medium)' }"
             >
               <div
-                class="absolute top-[2px] left-[2px] bg-white rounded-full h-6 w-6 transition-transform shadow-md"
+                class="absolute top-[2px] left-[2px] rounded-full h-6 w-6 transition-transform shadow-md"
+                :style="{ backgroundColor: 'var(--bg-card)' }"
                 :class="councilConfig.enabled ? 'translate-x-7' : 'translate-x-0'"
               ></div>
             </div>
           </button>
-          <span class="text-xs font-mono font-bold text-white">
+          <span class="text-xs font-mono font-bold" style="color: var(--text-main);">
             {{ councilConfig.enabled ? '已开启' : '已停用' }}
           </span>
         </div>
@@ -320,25 +324,32 @@ onMounted(loadData)
       <!-- Consensus Mode Selection Grid -->
       <div>
         <div class="flex items-center space-x-2 mb-2">
-          <SlidersHorizontal class="w-3.5 h-3.5 text-purple-400" />
-          <span class="text-xs font-bold text-white font-mono">辩论裁决共识机制 (Consensus Mode)</span>
-          <span class="text-[10px] text-[#707E94] font-mono">指导首席仲裁官权衡各方争辩的裁量原则</span>
+          <SlidersHorizontal class="w-3.5 h-3.5" style="color: var(--color-brand);" />
+          <span class="text-xs font-bold font-mono" style="color: var(--text-main);">辩论裁决共识机制 (Consensus Mode)</span>
+          <span class="text-[10px] font-mono" style="color: var(--text-faint);">指导首席仲裁官权衡各方争辩的裁量原则</span>
         </div>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-2.5">
           <div
             v-for="mode in consensusModes"
             :key="mode.id"
             @click="auth.isSuperadmin && (councilConfig.consensus_mode = mode.id)"
-            class="p-3 rounded-xl border transition-all cursor-pointer"
-            :class="councilConfig.consensus_mode === mode.id ? 'border-purple-500 bg-purple-500/10 shadow-sm shadow-purple-500/10' : 'border-[#1A2232] bg-[#090F18] hover:border-zinc-700'"
+            class="p-3 rounded-xl border transition-all cursor-pointer shadow-xs"
+            :style="councilConfig.consensus_mode === mode.id
+              ? { borderColor: 'var(--color-brand-border)', backgroundColor: 'var(--color-brand-bg)' }
+              : { borderColor: 'var(--border-subtle)', backgroundColor: 'var(--bg-card-subtle)' }"
           >
             <div class="flex items-center justify-between mb-1">
-              <span class="text-xs font-bold text-white font-mono">{{ mode.name }}</span>
-              <span class="text-[9px] px-1.5 py-0.2 rounded font-mono border" :class="councilConfig.consensus_mode === mode.id ? 'bg-purple-500/20 text-purple-300 border-purple-500/30' : 'bg-zinc-800 text-zinc-400 border-zinc-700'">
+              <span class="text-xs font-bold font-mono" style="color: var(--text-main);">{{ mode.name }}</span>
+              <span
+                class="text-[9px] px-1.5 py-0.2 rounded font-mono border font-bold"
+                :style="councilConfig.consensus_mode === mode.id
+                  ? { backgroundColor: 'var(--bg-card)', color: 'var(--text-main)', borderColor: 'var(--border-medium)' }
+                  : { backgroundColor: 'var(--bg-card)', color: 'var(--text-muted)', borderColor: 'var(--border-subtle)' }"
+              >
                 {{ mode.tag }}
               </span>
             </div>
-            <p class="text-[11px] text-[#8A99AD] font-sans leading-relaxed">
+            <p class="text-[11px] font-sans leading-relaxed" style="color: var(--text-muted);">
               {{ mode.desc }}
             </p>
           </div>
@@ -346,10 +357,10 @@ onMounted(loadData)
       </div>
 
       <!-- One-Click Preset Suites Bar -->
-      <div v-if="availableSuites.length > 0" class="pt-2 border-t border-[#1A2232]">
+      <div v-if="availableSuites.length > 0" class="pt-2 border-t" style="border-color: var(--border-subtle);">
         <div class="flex flex-wrap items-center justify-between gap-2">
-          <div class="flex items-center space-x-1.5 text-xs text-[#8A99AD] font-mono">
-            <Layers class="w-3.5 h-3.5 text-blue-400" />
+          <div class="flex items-center space-x-1.5 text-xs font-mono" style="color: var(--text-muted);">
+            <Layers class="w-3.5 h-3.5" style="color: var(--color-brand);" />
             <span>推荐参谋套件一键载入:</span>
           </div>
           <div class="flex flex-wrap gap-2">
@@ -358,7 +369,8 @@ onMounted(loadData)
               :key="s.id"
               @click="applySuite(s.id)"
               :disabled="!auth.isSuperadmin"
-              class="px-2.5 py-1 rounded-lg bg-[#111C2A] hover:bg-[#1A2B42] border border-[#23354D] text-xs font-mono text-zinc-200 hover:text-white transition-all cursor-pointer"
+              class="px-2.5 py-1 rounded-lg border text-xs font-mono font-medium transition-all cursor-pointer shadow-xs"
+              style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle); color: var(--text-main);"
               :title="s.description"
             >
               {{ s.name }}
@@ -368,11 +380,11 @@ onMounted(loadData)
       </div>
 
       <!-- Settings Sub-bar -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-[#1A2232]">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t" style="border-color: var(--border-subtle);">
         <div>
           <div class="flex items-center justify-between mb-1">
-            <label class="text-[11px] text-[#8997aa] font-mono">委员会硬超时熔断 (秒)</label>
-            <span class="text-[10px] font-mono text-purple-400">支持 10 ~ 300 秒</span>
+            <label class="text-[11px] font-mono font-bold" style="color: var(--text-muted);">委员会硬超时熔断 (秒)</label>
+            <span class="text-[10px] font-mono" style="color: var(--text-faint);">支持 10 ~ 300 秒</span>
           </div>
           <input
             v-model="councilConfig.timeout_seconds"
@@ -380,10 +392,11 @@ onMounted(loadData)
             min="10"
             max="300"
             step="5"
-            class="w-full bg-[#090f18] border border-[#1A2232] rounded-lg text-white px-3 py-1.5 text-xs font-mono outline-none focus:border-purple-500"
+            class="w-full rounded-lg px-3 py-1.5 text-xs font-mono outline-none border transition-colors"
+            style="background-color: var(--bg-input); border-color: var(--border-subtle); color: var(--text-main);"
             :disabled="!auth.isSuperadmin"
           />
-          <span class="text-[10px] text-[#707E94] font-mono mt-1 block leading-relaxed">
+          <span class="text-[10px] font-mono mt-1 block leading-relaxed" style="color: var(--text-faint);">
             💡 推荐配置：若参谋绑定了带深度思考链（Reasoning Effort: High）的模型，建议设为 <strong>60~90 秒</strong>。
           </span>
         </div>
@@ -391,7 +404,8 @@ onMounted(loadData)
           <button
             @click="saveConfig"
             :disabled="saving || !auth.isSuperadmin"
-            class="flex-1 flex items-center justify-center space-x-1.5 px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-mono font-bold cursor-pointer disabled:opacity-40 shadow-md shadow-purple-600/20"
+            class="flex-1 flex items-center justify-center space-x-1.5 px-4 py-2 rounded-lg text-xs font-mono font-bold cursor-pointer disabled:opacity-40 shadow-xs transition-all"
+            style="background-color: var(--text-main); color: var(--bg-card);"
           >
             <Save class="w-3.5 h-3.5" />
             <span>{{ saving ? '保存中...' : '保存委员会配置' }}</span>
@@ -399,7 +413,8 @@ onMounted(loadData)
           <button
             @click="runDebateTest"
             :disabled="testing"
-            class="flex items-center space-x-1.5 px-4 py-2 rounded-lg bg-[#111c2a] hover:bg-[#1d3050] border border-[#33445b] text-xs font-mono text-purple-300 cursor-pointer disabled:opacity-40"
+            class="flex items-center space-x-1.5 px-4 py-2 rounded-lg border text-xs font-mono font-bold cursor-pointer disabled:opacity-40 transition-all shadow-xs"
+            style="background-color: var(--bg-card-subtle); border-color: var(--border-medium); color: var(--text-main);"
           >
             <Play class="w-3.5 h-3.5" :class="{ 'animate-spin': testing }" />
             <span>{{ testing ? '辩论测试中...' : '⚡ 现场辩论测试' }}</span>
@@ -472,11 +487,12 @@ onMounted(loadData)
       <div
         v-for="(role, roleId) in councilConfig.roles"
         :key="roleId"
-        class="bg-[#0D121B] border rounded-xl p-4 transition-all"
-        :class="[
-          expandedRole === roleId ? 'border-purple-500/40 bg-[#0E131E]' : 'border-[#1A2232]',
-          role.enabled === false ? 'opacity-50' : ''
-        ]"
+        class="rounded-xl border p-4 sm:p-5 transition-all shadow-xs"
+        :style="{
+          backgroundColor: expandedRole === roleId ? 'var(--bg-card-subtle)' : 'var(--bg-card)',
+          borderColor: expandedRole === roleId ? 'var(--color-brand-border)' : 'var(--border-subtle)',
+          opacity: role.enabled === false ? '0.6' : '1'
+        }"
       >
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
           <!-- Role Main Info -->
@@ -492,34 +508,38 @@ onMounted(loadData)
                 <!-- Editable Role Name -->
                 <input
                   v-model="role.name"
-                  class="bg-transparent border-b border-dashed border-zinc-700 hover:border-purple-400 focus:border-purple-500 text-sm font-bold text-white font-mono outline-none max-w-[260px]"
+                  class="bg-transparent border-b border-dashed text-sm font-bold font-mono outline-none max-w-[260px] transition-colors"
+                  style="border-color: var(--border-medium); color: var(--text-main);"
                   :readonly="!auth.isSuperadmin"
                   placeholder="角色名称"
                 />
                 <!-- Editable Role Subtitle -->
                 <input
                   v-model="role.role_title"
-                  class="bg-[#090f18] border border-[#1A2232] rounded px-1.5 py-0.2 text-[10px] font-mono text-zinc-400 outline-none max-w-[160px]"
+                  class="rounded px-2 py-0.5 text-[10px] font-mono outline-none max-w-[160px] border"
+                  style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle); color: var(--text-muted);"
                   :readonly="!auth.isSuperadmin"
                   placeholder="职责标签"
                 />
                 <span
                   v-if="role.is_arbitrator || roleId === 'arbitrator'"
-                  class="text-[9px] font-mono font-bold text-purple-400 bg-purple-500/10 px-1.5 py-0.2 rounded border border-purple-500/25 shrink-0"
+                  class="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded border shrink-0"
+                  style="background-color: var(--color-brand-bg); color: var(--color-brand); border-color: var(--color-brand-border);"
                 >
                   ⚖️ 首席终审席位
                 </span>
                 <span
                   v-else
                   class="text-[9px] font-mono px-1.5 py-0.2 rounded border shrink-0"
-                  :class="role.enabled !== false ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-zinc-800 text-zinc-500 border-zinc-700'"
+                  :style="role.enabled !== false ? { backgroundColor: 'var(--color-up-bg)', color: 'var(--color-up)', borderColor: 'var(--color-up-border)' } : { backgroundColor: 'var(--bg-badge)', color: 'var(--text-faint)', borderColor: 'var(--border-subtle)' }"
                 >
                   {{ role.enabled !== false ? '活跃席位' : '已静音' }}
                 </span>
               </div>
               <input
                 v-model="role.description"
-                class="w-full bg-transparent border-0 text-[11px] text-[#707E94] font-mono mt-0.5 outline-none"
+                class="w-full bg-transparent border-0 text-[11px] font-mono mt-0.5 outline-none"
+                style="color: var(--text-muted);"
                 :readonly="!auth.isSuperadmin"
                 placeholder="简明描述此角色的研判视角..."
               />
@@ -530,10 +550,11 @@ onMounted(loadData)
           <div class="flex flex-wrap items-center justify-end gap-2 shrink-0">
             <!-- Model Binding Select -->
             <div class="flex items-center space-x-1">
-              <span class="text-[10px] font-mono text-[#707E94] hidden lg:inline">模型:</span>
+              <span class="text-[10px] font-mono hidden lg:inline" style="color: var(--text-muted);">模型:</span>
               <select
                 v-model="role.model_id"
-                class="bg-[#090f18] border border-[#1A2232] rounded-lg text-white px-2 py-1 text-xs font-mono outline-none focus:border-purple-500 max-w-[140px]"
+                class="rounded-lg px-2 py-1 text-xs font-mono outline-none border max-w-[140px] cursor-pointer"
+                style="background-color: var(--bg-input); border-color: var(--border-subtle); color: var(--text-main);"
                 :disabled="!auth.isSuperadmin"
               >
                 <option value="">(默认模型)</option>
@@ -545,14 +566,15 @@ onMounted(loadData)
 
             <!-- Weight Input -->
             <div v-if="!role.is_arbitrator && roleId !== 'arbitrator'" class="flex items-center space-x-1">
-              <span class="text-[10px] font-mono text-[#707E94]">权重:</span>
+              <span class="text-[10px] font-mono" style="color: var(--text-muted);">权重:</span>
               <input
                 v-model="role.weight"
                 type="number"
                 step="0.05"
                 min="0.1"
                 max="1.0"
-                class="w-14 bg-[#090f18] border border-[#1A2232] rounded-lg text-white px-1.5 py-1 text-xs font-mono outline-none text-center"
+                class="w-14 rounded-lg px-1.5 py-1 text-xs font-mono outline-none text-center border num-tabular"
+                style="background-color: var(--bg-input); border-color: var(--border-subtle); color: var(--text-main);"
                 :disabled="!auth.isSuperadmin"
               />
             </div>
@@ -563,7 +585,7 @@ onMounted(loadData)
               @click="role.enabled = role.enabled === false ? true : false"
               :disabled="!auth.isSuperadmin"
               class="cursor-pointer transition-colors p-1"
-              :class="role.enabled !== false ? 'text-emerald-400' : 'text-zinc-600'"
+              :class="role.enabled !== false ? 'text-emerald-500' : 'text-zinc-500'"
               :title="role.enabled !== false ? '点击静音此参谋' : '点击激活此参谋'"
             >
               <ToggleRight v-if="role.enabled !== false" class="w-5 h-5" />
@@ -575,7 +597,7 @@ onMounted(loadData)
               v-if="!role.is_arbitrator && roleId !== 'arbitrator'"
               @click="removeRole(String(roleId))"
               :disabled="!auth.isSuperadmin"
-              class="p-1.5 rounded hover:bg-[#4d1924] text-[#707E94] hover:text-rose-400 cursor-pointer disabled:opacity-30"
+              class="p-1.5 rounded text-rose-400 hover:opacity-80 cursor-pointer disabled:opacity-30 transition-opacity"
               title="删除此角色"
             >
               <Trash2 class="w-3.5 h-3.5" />
@@ -584,7 +606,8 @@ onMounted(loadData)
             <!-- Expand prompt toggle -->
             <button
               @click="expandedRole = expandedRole === roleId ? '' : String(roleId)"
-              class="p-1.5 rounded hover:bg-[#151D2C] text-[#707E94] hover:text-white cursor-pointer"
+              class="p-1.5 rounded transition-colors cursor-pointer"
+              style="color: var(--text-muted);"
               title="展开/折叠角色微调与提示词"
             >
               <ChevronUp v-if="expandedRole === roleId" class="w-4 h-4" />
@@ -594,15 +617,16 @@ onMounted(loadData)
         </div>
 
         <!-- Collapsible Detailed Settings & System Prompt Editor -->
-        <div v-if="expandedRole === roleId" class="mt-3 pt-3 border-t border-[#1A2232] space-y-3">
+        <div v-if="expandedRole === roleId" class="mt-3 pt-3 border-t space-y-3" style="border-color: var(--border-subtle);">
           <!-- Fine-tuning Parameters Ribbon -->
-          <div class="flex flex-wrap items-center gap-4 bg-[#080B10] p-2.5 rounded-lg border border-[#161F2E] text-xs font-mono">
+          <div class="flex flex-wrap items-center gap-4 p-2.5 rounded-lg border text-xs font-mono" style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);">
             <!-- Reasoning Effort -->
             <div class="flex items-center space-x-2">
-              <span class="text-[#8997aa]">思考强度:</span>
+              <span style="color: var(--text-muted);">思考强度:</span>
               <select
                 v-model="role.reasoning_effort"
-                class="bg-[#0E1420] border border-[#23354D] rounded px-2 py-0.5 text-xs text-purple-300 outline-none"
+                class="rounded px-2 py-0.5 text-xs outline-none border cursor-pointer"
+                style="background-color: var(--bg-input); border-color: var(--border-subtle); color: var(--text-main);"
                 :disabled="!auth.isSuperadmin"
               >
                 <option value="low">低强度 (快速响应)</option>
@@ -613,17 +637,18 @@ onMounted(loadData)
 
             <!-- Temperature -->
             <div class="flex items-center space-x-2">
-              <span class="text-[#8997aa]">采样温度:</span>
+              <span style="color: var(--text-muted);">采样温度:</span>
               <input
                 v-model="role.temperature"
                 type="number"
                 step="0.05"
                 min="0.0"
                 max="1.0"
-                class="w-16 bg-[#0E1420] border border-[#23354D] rounded px-1.5 py-0.5 text-xs text-cyan-300 outline-none text-center"
+                class="w-16 rounded px-1.5 py-0.5 text-xs outline-none text-center border num-tabular"
+                style="background-color: var(--bg-input); border-color: var(--border-subtle); color: var(--text-main);"
                 :disabled="!auth.isSuperadmin"
               />
-              <span class="text-[10px] text-[#707E94]">(0.0~0.2 严谨 / 0.3~0.5 活跃)</span>
+              <span class="text-[10px]" style="color: var(--text-faint);">(0.0~0.2 严谨 / 0.3~0.5 活跃)</span>
             </div>
 
             <div class="flex-1"></div>
@@ -631,7 +656,8 @@ onMounted(loadData)
             <button
               @click="resetRole(String(roleId))"
               :disabled="!auth.isSuperadmin"
-              class="flex items-center space-x-1 text-[10px] text-purple-400 hover:text-purple-300 cursor-pointer"
+              class="flex items-center space-x-1 text-[10px] hover:underline cursor-pointer"
+              style="color: var(--color-brand);"
             >
               <RotateCcw class="w-3 h-3" />
               <span>恢复此角色初始预设</span>
@@ -640,12 +666,14 @@ onMounted(loadData)
 
           <!-- Prompt Textarea -->
           <div class="space-y-1">
-            <span class="text-[10px] font-mono text-[#8997aa] font-bold">角色专有 System Prompt（自由定制核心研判逻辑）：</span>
+            <span class="text-[10px] font-mono font-bold" style="color: var(--text-muted);">角色专有 System Prompt（自由定制核心研判逻辑）：</span>
             <textarea
               v-model="role.prompt"
-              rows="5"
-              class="w-full bg-[#080B10] border border-[#1A2232] rounded-lg text-zinc-300 px-3 py-2 text-xs font-mono outline-none focus:border-purple-500 leading-relaxed resize-y select-text"
-              :readonly="!auth.isSuperadmin"
+              rows="6"
+              class="w-full rounded-lg px-3 py-2 text-xs font-mono outline-none border leading-relaxed resize-y select-text transition-colors"
+              style="background-color: var(--bg-input); border-color: var(--border-subtle); color: var(--text-main);"
+              :disabled="!auth.isSuperadmin"
+              placeholder="在此编写该角色的 System Prompt 专有研判指引..."
             ></textarea>
           </div>
         </div>
@@ -653,21 +681,22 @@ onMounted(loadData)
     </div>
 
     <!-- Live Debate Test Result Modal / Inspection Panel -->
-    <div v-if="testResult" class="bg-[#0D121B] border border-purple-500/30 rounded-xl p-4 space-y-3.5 shadow-2xl">
-      <div class="flex items-center justify-between pb-2.5 border-b border-[#1A2232]">
+    <div v-if="testResult" class="rounded-xl border p-4 sm:p-5 space-y-3.5 shadow-lg transition-colors" style="background-color: var(--bg-card); border-color: var(--color-brand-border);">
+      <div class="flex items-center justify-between pb-2.5 border-b" style="border-color: var(--border-subtle);">
         <div class="flex flex-wrap items-center gap-2">
-          <CheckCircle2 class="w-4 h-4 text-emerald-400" />
-          <h3 class="text-sm font-bold text-white font-mono">委员会现场辩论与终审实录</h3>
-          <span class="text-[10px] font-mono text-purple-300 bg-purple-500/10 px-2 py-0.5 rounded border border-purple-500/20">
+          <CheckCircle2 class="w-4 h-4 text-emerald-500" />
+          <h3 class="text-sm font-bold font-mono" style="color: var(--text-main);">委员会现场辩论与终审实录</h3>
+          <span class="text-[10px] font-mono px-2 py-0.5 rounded border" style="background-color: var(--color-brand-bg); color: var(--color-brand); border-color: var(--color-brand-border);">
             共识机制: {{ testResult.transcript?.consensus_mode }}
           </span>
-          <span class="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+          <span class="text-[10px] font-mono px-2 py-0.5 rounded border" style="background-color: var(--color-up-bg); color: var(--color-up); border-color: var(--color-up-border);">
             总耗时 {{ testResult.transcript?.total_duration_ms }}ms
           </span>
         </div>
         <button
           @click="testResult = null"
-          class="text-xs font-mono text-[#707E94] hover:text-white cursor-pointer px-2 py-1 rounded bg-[#141B26]"
+          class="text-xs font-mono cursor-pointer px-2.5 py-1 rounded-lg border shadow-xs"
+          style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle); color: var(--text-muted);"
         >
           收起报告
         </button>
@@ -678,33 +707,36 @@ onMounted(loadData)
         <div
           v-for="(adv, key) in testResult.transcript?.advisors || {}"
           :key="key"
-          class="bg-[#080B10] border border-[#1A2232] rounded-xl p-3.5 space-y-2 flex flex-col justify-between"
+          class="rounded-xl border p-3.5 space-y-2 flex flex-col justify-between shadow-xs"
+          style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);"
         >
           <div class="space-y-1">
             <div class="flex items-center justify-between text-xs font-mono font-bold">
-              <span class="text-white">{{ adv.role_name }}</span>
-              <span class="text-[10px] text-purple-400 truncate max-w-[120px]">{{ adv.model_used }}</span>
+              <span style="color: var(--text-main);">{{ adv.role_name }}</span>
+              <span class="text-[10px] truncate max-w-[120px]" style="color: var(--color-brand);">{{ adv.model_used }}</span>
             </div>
-            <div class="flex items-center justify-between text-[10px] text-[#707E94] font-mono">
+            <div class="flex items-center justify-between text-[10px] font-mono" style="color: var(--text-faint);">
               <span>耗时 {{ adv.latency_ms }}ms</span>
               <span v-if="adv.weight !== undefined">权重: {{ adv.weight }}</span>
             </div>
-            <p class="text-xs text-zinc-300 font-mono whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto pr-1 select-text">
+            <p class="text-xs font-mono whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto pr-1 select-text" style="color: var(--text-muted);">
               {{ adv.content }}
             </p>
           </div>
 
           <!-- Optional Reasoning Chain Toggle -->
-          <div v-if="adv.reasoning" class="pt-2 border-t border-[#141B26]">
+          <div v-if="adv.reasoning" class="pt-2 border-t" style="border-color: var(--border-subtle);">
             <button
               @click="expandedReasoning[String(key)] = !expandedReasoning[String(key)]"
-              class="text-[10px] font-mono text-purple-400 hover:text-purple-300 flex items-center space-x-1 cursor-pointer"
+              class="text-[10px] font-mono flex items-center space-x-1 cursor-pointer"
+              style="color: var(--color-brand);"
             >
               <span>{{ expandedReasoning[String(key)] ? '收起思考链' : '展开思考链 (Reasoning)' }}</span>
             </button>
             <div
               v-if="expandedReasoning[String(key)]"
-              class="mt-1.5 p-2 rounded bg-[#05080E] text-[10px] font-mono text-zinc-400 whitespace-pre-wrap max-h-36 overflow-y-auto select-text border border-[#1E293B]"
+              class="mt-1.5 p-2 rounded text-[10px] font-mono whitespace-pre-wrap max-h-36 overflow-y-auto select-text border"
+              style="background-color: var(--bg-card); border-color: var(--border-subtle); color: var(--text-muted);"
             >
               {{ adv.reasoning }}
             </div>
@@ -713,19 +745,19 @@ onMounted(loadData)
       </div>
 
       <!-- Arbitrator Verdict -->
-      <div class="bg-[#080B10] border border-purple-500/25 rounded-xl p-3.5 space-y-2">
+      <div class="rounded-xl border p-3.5 space-y-2" style="background-color: var(--bg-card-subtle); border-color: var(--color-brand-border);">
         <div class="flex items-center justify-between">
           <div class="flex items-center space-x-2">
-            <span class="text-xs font-bold text-purple-400 font-mono">【首席仲裁官 裁决指令】</span>
-            <span class="text-[10px] font-mono text-[#707E94]">{{ testResult.transcript?.arbitrator?.model_used }} · 终审耗时 {{ testResult.transcript?.arbitrator?.latency_ms }}ms</span>
+            <span class="text-xs font-bold font-mono" style="color: var(--color-brand);">【首席仲裁官 裁决指令】</span>
+            <span class="text-[10px] font-mono" style="color: var(--text-faint);">{{ testResult.transcript?.arbitrator?.model_used }} · 终审耗时 {{ testResult.transcript?.arbitrator?.latency_ms }}ms</span>
           </div>
         </div>
-        <div class="text-xs font-mono text-emerald-400 font-bold leading-relaxed">
+        <div class="text-xs font-mono font-bold leading-relaxed" style="color: var(--color-up);">
           宏观基调与仲裁论证: {{ testResult.brain_output?.macro_assessment }}
         </div>
-        <div class="text-[11px] font-mono text-zinc-300">
+        <div class="text-[11px] font-mono" style="color: var(--text-muted);">
           发单决策明细 (Decisions):
-          <pre class="mt-1 p-2.5 rounded bg-[#05080E] border border-[#1A2232] text-[10px] text-zinc-300 overflow-x-auto max-h-48 select-text">{{ JSON.stringify(testResult.brain_output?.decisions, null, 2) }}</pre>
+          <pre class="mt-1 p-2.5 rounded border text-[10px] overflow-x-auto max-h-48 select-text" style="background-color: var(--bg-card); border-color: var(--border-subtle); color: var(--text-main);">{{ JSON.stringify(testResult.brain_output?.decisions, null, 2) }}</pre>
         </div>
       </div>
     </div>
