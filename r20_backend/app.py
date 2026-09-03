@@ -491,6 +491,7 @@ def admin_auth_status() -> dict[str, Any]:
     return {"initialized": admin_auth.has_users(), "mode": "account-password", "session_hours": 12}
 
 
+@app.post("/api/v1/admin/login", include_in_schema=False)
 @app.post("/api/v1/admin/auth/login")
 def admin_login(payload: AdminLoginRequest) -> dict[str, Any]:
     try:
@@ -502,6 +503,7 @@ def admin_login(payload: AdminLoginRequest) -> dict[str, Any]:
     return result
 
 
+@app.post("/api/v1/admin/logout", include_in_schema=False)
 @app.post("/api/v1/admin/auth/logout")
 def admin_logout(x_r20_session: str | None = Header(default=None)) -> dict[str, Any]:
     user = admin_auth.validate_session(x_r20_session or "")
@@ -590,6 +592,31 @@ def admin_audit(x_r20_admin_token: str | None = Header(default=None), limit: int
     refresh_settings()
     require_admin_header(x_r20_admin_token)
     return {"records": recent_audit(limit)}
+
+
+ADMIN_LOG_SOURCES = {"trader": "ai_factor_trader.log", "backend": "r20_backend.log", "scheduler": "r20_scheduler.log"}
+
+
+@app.get("/api/v1/admin/runtime")
+def admin_runtime(x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
+    refresh_settings()
+    require_admin_header(x_r20_admin_token)
+    return {
+        "decisions": decision_summary(),
+        "full_decisions": read_json("ai_brain_decisions.json", {}),
+        "trackers": read_json("position_trackers.json", {}),
+        "llm_runtime": get_active_llm_runtime(),
+    }
+
+
+@app.get("/api/v1/admin/logs")
+def admin_logs(source: str = "trader", lines: int = 100, x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
+    refresh_settings()
+    require_admin_header(x_r20_admin_token)
+    filename = ADMIN_LOG_SOURCES.get(source)
+    if not filename:
+        raise HTTPException(status_code=400, detail=f"日志来源仅支持：{', '.join(ADMIN_LOG_SOURCES)}")
+    return {"source": source, "file": filename, "content": log_tail(filename, lines)}
 
 
 @app.get("/api/v1/admin/gateway")

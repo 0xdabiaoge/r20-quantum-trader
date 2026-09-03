@@ -55,6 +55,39 @@ class AdminApiTests(unittest.TestCase):
         response = self.client.get("/api/v1/admin/overview", headers={"X-R20-Admin-Token": "InitialAdmin123456"})
         self.assertEqual(response.status_code, 401)
 
+    def test_vue_console_endpoints_require_session_and_return_data(self):
+        headers = self.login("admin", "InitialAdmin123456")
+        anonymous = {
+            "/api/v1/admin/runtime": "get",
+            "/api/v1/admin/logs?source=trader": "get",
+            "/api/v1/admin/prompt-library": "get",
+            "/api/v1/admin/agents": "get",
+            "/api/v1/admin/plugins": "get",
+            "/api/v1/admin/audit": "get",
+            "/api/v1/admin/gateway": "get",
+        }
+        for path in anonymous:
+            self.assertEqual(self.client.get(path).status_code, 401, path)
+        runtime = self.client.get("/api/v1/admin/runtime", headers=headers)
+        self.assertEqual(runtime.status_code, 200)
+        self.assertIn("decisions", runtime.json())
+        logs = self.client.get("/api/v1/admin/logs?source=backend&lines=30", headers=headers)
+        self.assertEqual(logs.status_code, 200)
+        self.assertEqual(logs.json()["file"], "r20_backend.log")
+        self.assertEqual(self.client.get("/api/v1/admin/logs?source=../../etc/passwd", headers=headers).status_code, 400)
+        library = self.client.get("/api/v1/admin/prompt-library", headers=headers)
+        self.assertEqual(library.status_code, 200)
+        self.assertEqual(set(library.json()["pipelines"]), {"trading_system", "trading_user", "evolution_system", "evolution_user"})
+        plugins = self.client.get("/api/v1/admin/plugins", headers=headers)
+        self.assertEqual(plugins.status_code, 200)
+        self.assertEqual(plugins.json()["installation_policy"], "builtin-only")
+        agents = self.client.get("/api/v1/admin/agents", headers=headers)
+        self.assertEqual(agents.status_code, 200)
+        self.assertIn("secret_store", agents.json())
+        gateway = self.client.get("/api/v1/admin/gateway", headers=headers)
+        self.assertEqual(gateway.status_code, 200)
+        self.assertIn("scheduler", gateway.json())
+
     def test_initial_capital_update_requires_superadmin_and_confirmation(self):
         self.assertEqual(self.client.put("/api/v1/admin/account-baseline",json={"initial_capital":5000,"confirmation":"UPDATE CAPITAL"}).status_code,401)
         root=self.login("admin","InitialAdmin123456")

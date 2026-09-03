@@ -35,7 +35,7 @@ function handleManualRefresh() {
 </script>
 
 <template>
-  <header class="sticky top-0 z-40 bg-[#0A0D14]/90 backdrop-blur-md border-b border-[#1A2232] px-4 py-2.5">
+  <header class="fixed top-0 left-0 right-0 z-40 bg-[#0A0D14]/95 backdrop-blur-md border-b border-[#1A2232] px-4 py-2.5">
     <div class="max-w-[1720px] mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-3">
       <!-- Left: Brand & Network -->
       <div class="flex items-center space-x-3 shrink-0">

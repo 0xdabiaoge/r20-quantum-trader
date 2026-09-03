@@ -1,9 +1,17 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import { useDashboardStore } from '../stores/dashboard'
-import { TrendingUp, TrendingDown, Minus, Zap, Shield, HelpCircle } from 'lucide-vue-next'
-import type { InstrumentFactor } from '../types/dashboard'
+import { TrendingUp, TrendingDown, Minus, Zap, Shield, HelpCircle, ArrowUpRight } from 'lucide-vue-next'
+import FactorDetailModal from './FactorDetailModal.vue'
 
 const store = useDashboardStore()
+const selectedInstrument = ref<any | null>(null)
+const drawerVisible = ref(false)
+
+function openDetail(item: any) {
+  selectedInstrument.value = item
+  drawerVisible.value = true
+}
 
 function getActionColor(action?: string) {
   if (action === 'BUY_LONG') return 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10'
@@ -41,13 +49,16 @@ function getActionLabel(action?: string) {
       <div
         v-for="item in store.factors"
         :key="item.instId"
-        class="bg-[#0D121B] border border-[#1A2232] hover:border-blue-500/30 rounded-xl p-4 transition-all duration-200 flex flex-col justify-between"
+        @click="openDetail(item)"
+        class="bg-[#0D121B] border border-[#1A2232] hover:border-blue-500/50 hover:bg-[#111724] rounded-xl p-4 transition-all duration-200 flex flex-col justify-between cursor-pointer group shadow-sm hover:shadow-blue-500/10"
       >
         <!-- Top: Symbol Header -->
         <div>
           <div class="flex items-center justify-between">
             <div class="flex items-center space-x-2">
-              <span class="font-black text-base tracking-wide text-white font-mono">{{ item.name }}</span>
+              <span class="font-black text-base tracking-wide text-white font-mono group-hover:text-blue-400 transition-colors">
+                {{ item.name }}
+              </span>
               <span class="text-[11px] font-mono text-[#707E94]">{{ item.instId }}</span>
             </div>
             <div class="text-right font-mono">
@@ -97,39 +108,48 @@ function getActionLabel(action?: string) {
           <div class="flex items-center justify-between mb-1.5">
             <span
               class="px-2 py-0.5 rounded text-[11px] font-bold font-mono border"
-              :class="getActionColor(item.decision?.action)"
+              :class="getActionColor(item.decision?.action || item.action)"
             >
-              {{ getActionLabel(item.decision?.action) }}
+              {{ getActionLabel(item.decision?.action || item.action) }}
             </span>
-            <span v-if="item.decision?.confidence" class="text-xs font-mono font-bold text-zinc-300">
-              置信度: {{ item.decision.confidence }}%
-            </span>
+            <div class="flex items-center space-x-1.5 text-xs font-mono font-bold text-zinc-300">
+              <span>置信度: {{ item.decision?.confidence || item.confidence || 0 }}%</span>
+              <ArrowUpRight class="w-3.5 h-3.5 text-[#707E94] group-hover:text-blue-400 transition-colors" />
+            </div>
           </div>
 
           <p class="text-xs text-zinc-300 line-clamp-2 leading-relaxed font-sans min-h-[32px]">
-            {{ item.decision?.summary_reason || '模型多周期数据评估中，等待共振结构确认...' }}
+            {{ item.decision?.summary_reason || item.reason || '模型多周期数据评估中，等待共振结构确认...' }}
           </p>
 
           <!-- Trade Parameter Setup (When not WAIT) -->
           <div
-            v-if="item.decision && item.decision.action !== 'WAIT' && item.decision.entry_price"
+            v-if="(item.decision?.action || item.action) !== 'WAIT' && (item.decision?.entry_price || item.entry_price)"
             class="mt-2.5 p-2 rounded bg-blue-500/5 border border-blue-500/20 text-[11px] font-mono grid grid-cols-3 gap-1 text-center"
           >
             <div>
               <div class="text-[#707E94] text-[10px]">入场限价</div>
-              <div class="text-white font-bold">{{ item.decision.entry_price }}</div>
+              <div class="text-white font-bold">{{ item.decision?.entry_price || item.entry_price }}</div>
             </div>
             <div>
               <div class="text-emerald-400/80 text-[10px]">止盈目标</div>
-              <div class="text-emerald-400 font-bold">{{ item.decision.take_profit_price }}</div>
+              <div class="text-emerald-400 font-bold">{{ item.decision?.take_profit_price || item.take_profit_price }}</div>
             </div>
             <div>
               <div class="text-rose-400/80 text-[10px]">止损防线</div>
-              <div class="text-rose-400 font-bold">{{ item.decision.stop_loss_price }}</div>
+              <div class="text-rose-400 font-bold">{{ item.decision?.stop_loss_price || item.stop_loss_price }}</div>
             </div>
           </div>
         </div>
       </div>
     </div>
+
+    <!-- Slide-in Drawer -->
+    <FactorDetailModal
+      :visible="drawerVisible"
+      :instrument="selectedInstrument"
+      :full-prompt-text="store.data?.ai_last_prompt || ''"
+      @close="drawerVisible = false"
+    />
   </div>
 </template>

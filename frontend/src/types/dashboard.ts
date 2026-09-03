@@ -112,4 +112,11 @@ export interface DashboardResponse {
   llm_runtime?: LLMRuntime
   logs: string[]
   trades: any[]
+  ai_last_prompt?: string
+  today_stats?: any
+  performance?: any
+  news_intelligence?: any[]
+  review?: any
+  ai_trading_memory_md?: string
+  factor_library?: any
 }
