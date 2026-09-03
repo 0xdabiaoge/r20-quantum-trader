@@ -97,6 +97,59 @@ class PromptMathFoundationsTests(unittest.TestCase):
         self.assertEqual(lessons, ["new lesson"])
         self.assertFalse(preserved)
 
+    def test_counter_trend_short_rejected_in_bull_trend(self):
+        p = self.package()
+        p["macro_4h"] = "4H_MACRO_BULL (大级别多头通道)"
+        d = {"action": "SELL_SHORT", "confidence": 85.0, "entry_price": 60000, "stop_loss_price": 61000, "take_profit_price": 57000}
+        act, reason, rr = ai_brain_trader.validate_and_filter_decision(p, d, set(), {})
+        self.assertEqual(act, "WAIT")
+        self.assertIn("多头主升通道", reason)
+
+    def test_counter_trend_long_rejected_in_bear_trend(self):
+        p = self.package()
+        p["macro_4h"] = "4H_MACRO_BEAR (大级别空头承压)"
+        d = {"action": "BUY_LONG", "confidence": 85.0, "entry_price": 60000, "stop_loss_price": 59000, "take_profit_price": 63000}
+        act, reason, rr = ai_brain_trader.validate_and_filter_decision(p, d, set(), {})
+        self.assertEqual(act, "WAIT")
+        self.assertIn("空头承压通道", reason)
+
+    def test_low_confidence_rejected(self):
+        p = self.package()
+        p["macro_4h"] = "4H_MACRO_BULL (大级别多头通道)"
+        d = {"action": "BUY_LONG", "confidence": 75.0, "entry_price": 60000, "stop_loss_price": 59000, "take_profit_price": 63000}
+        act, reason, rr = ai_brain_trader.validate_and_filter_decision(p, d, set(), {})
+        self.assertEqual(act, "WAIT")
+        self.assertIn("低于 80% 胜率质量硬门禁", reason)
+
+    def test_adx_chop_rejected(self):
+        p = self.package()
+        p["macro_4h"] = "4H_MACRO_BULL (大级别多头通道)"
+        p["adx_1h"] = 15.0
+        d = {"action": "BUY_LONG", "confidence": 85.0, "entry_price": 60000, "stop_loss_price": 59000, "take_profit_price": 63000}
+        act, reason, rr = ai_brain_trader.validate_and_filter_decision(p, d, set(), {})
+        self.assertEqual(act, "WAIT")
+        self.assertIn("无序震荡杂波市", reason)
+
+    def test_doge_high_noise_threshold(self):
+        p = self.package()
+        p["name"] = "DOGE"
+        p["instId"] = "DOGE-USDT-SWAP"
+        p["macro_4h"] = "4H_MACRO_BULL (大级别多头通道)"
+        d = {"action": "BUY_LONG", "confidence": 82.0, "entry_price": 0.10, "stop_loss_price": 0.09, "take_profit_price": 0.13}
+        act, reason, rr = ai_brain_trader.validate_and_filter_decision(p, d, set(), {})
+        self.assertEqual(act, "WAIT")
+        self.assertIn("DOGE高杂波标的置信度", reason)
+
+    def test_valid_trend_aligned_order_accepted(self):
+        p = self.package()
+        p["macro_4h"] = "4H_MACRO_BULL (大级别多头通道)"
+        p["adx_1h"] = 28.0
+        d = {"action": "BUY_LONG", "confidence": 85.0, "entry_price": 60000, "stop_loss_price": 59000, "take_profit_price": 63000}
+        act, reason, rr = ai_brain_trader.validate_and_filter_decision(p, d, set(), {})
+        self.assertEqual(act, "BUY_LONG")
+        self.assertEqual(reason, "")
+        self.assertGreaterEqual(rr, 2.0)
+
 
 if __name__ == "__main__":
     unittest.main()

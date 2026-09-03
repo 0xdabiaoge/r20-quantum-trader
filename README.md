@@ -10,7 +10,7 @@
 [![LINUX DO](https://img.shields.io/badge/Community-LINUX%20DO-F97316?style=flat-square&logo=linux&logoColor=white)](https://linux.do/)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![Exchange](https://img.shields.io/badge/Exchange-OKX%20V5%20Direct-111827?style=flat-square)](https://www.okx.com/)
-[![Tests](https://img.shields.io/badge/tests-154%2F154%20passed-0ECB81?style=flat-square)](#-验证与测试)
+[![Tests](https://img.shields.io/badge/tests-160%2F160%20passed-0ECB81?style=flat-square)](#-验证与测试)
 [![License](https://img.shields.io/badge/license-MIT-10B981?style=flat-square)](LICENSE)
 
 [🌐 在线实盘大屏](https://www.r20.cn/) · [🚀 独立部署指南](STANDALONE.md) · [📦 灾备恢复](RECOVERY_GUIDE.md) · [🐧 LINUX DO 社区](https://linux.do/)
@@ -138,13 +138,13 @@ python3 -m uvicorn r20_backend.app:app --host 0.0.0.0 --port 8080
 系统内置完善的单元测试与回归测试套件，全面覆盖数理微积分、OKX 签名与交易服务、QQ 网关长连接与扫码加密解密、提示词管线、模型委员会多线程调度与后台 API 鉴权：
 
 ```bash
-# 运行全量 154 项自动化测试
+# 运行全量 160 项自动化测试
 python3 -m unittest discover -s tests
 ```
 
 ```text
 ----------------------------------------------------------------------
-Ran 154 tests in 30.41s
+Ran 160 tests in 28.86s
 
 OK
 ```

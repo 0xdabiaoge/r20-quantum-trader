@@ -1042,17 +1042,17 @@ def manage_position_tp_and_trailing(f, curr_pos, trackers, timestamp_full, execu
     # Tier 2: 50% Profit Lock-In at +1.8x ATR profit (Lock in at least +0.9x ATR solid profit)
     # Tier 3: Kinetic Reversal Exit from Peak (Protect accumulated big wins)
     
-    tier1_breakeven_trigger = 1.0 * atr
-    tier2_lock_trigger = 1.8 * atr
+    tier1_breakeven_trigger = 1.5 * atr
+    tier2_lock_trigger = 2.2 * atr
     
     if is_long:
         # Dynamic Ratchet Stop Calculation
         dynamic_floor_sl = t["trailingStopPx"]
         if peak_profit_px >= tier2_lock_trigger:
-            dynamic_floor_sl = max(dynamic_floor_sl, entry_px + 0.9 * atr)
+            dynamic_floor_sl = max(dynamic_floor_sl, entry_px + 1.0 * atr)
             t["stage_desc"] = f"锁定大波段利润 (保底止损 {dynamic_floor_sl})"
         elif peak_profit_px >= tier1_breakeven_trigger:
-            dynamic_floor_sl = max(dynamic_floor_sl, entry_px + 0.0015 * entry_px)
+            dynamic_floor_sl = max(dynamic_floor_sl, entry_px + 0.0020 * entry_px)
             t["stage_desc"] = f"已推保本无风险 (保底止损 {dynamic_floor_sl})"
         t["trailingStopPx"] = dynamic_floor_sl
 
@@ -1086,8 +1086,8 @@ def manage_position_tp_and_trailing(f, curr_pos, trackers, timestamp_full, execu
             if pos_key in trackers: del trackers[pos_key]
             return True, "已阶梯锁利"
 
-        # B. Kinetic Momentum Pullback Exit from Peak (Pullback >= 0.5x ATR when profit >= 1.5x ATR)
-        if peak_profit_px >= 1.5 * atr and cur_px <= (t["highWaterMark"] - 0.5 * atr):
+        # B. Kinetic Momentum Pullback Exit from Peak (Pullback >= 0.75x ATR when profit >= 2.0x ATR)
+        if peak_profit_px >= 2.0 * atr and cur_px <= (t["highWaterMark"] - 0.75 * atr):
             closed, close_detail = close_position_confirmed(inst_id, "long", pos_sz)
             if not closed:
                 executed_actions.append(f"[{name}] 动能见顶移动止盈失败，仓位仍保留: {close_detail}")
@@ -1120,10 +1120,10 @@ def manage_position_tp_and_trailing(f, curr_pos, trackers, timestamp_full, execu
         # Dynamic Ratchet Stop Calculation for Short
         dynamic_floor_sl = t["trailingStopPx"]
         if peak_profit_px >= tier2_lock_trigger:
-            dynamic_floor_sl = min(dynamic_floor_sl, entry_px - 0.9 * atr)
+            dynamic_floor_sl = min(dynamic_floor_sl, entry_px - 1.0 * atr)
             t["stage_desc"] = f"锁定大波段利润 (保底止损 {dynamic_floor_sl})"
         elif peak_profit_px >= tier1_breakeven_trigger:
-            dynamic_floor_sl = min(dynamic_floor_sl, entry_px - 0.0015 * entry_px)
+            dynamic_floor_sl = min(dynamic_floor_sl, entry_px - 0.0020 * entry_px)
             t["stage_desc"] = f"已推保本无风险 (保底止损 {dynamic_floor_sl})"
         t["trailingStopPx"] = dynamic_floor_sl
 
@@ -1727,7 +1727,10 @@ def execute_portfolio():
 
                 # Case A: Standard Initial Entry (No existing position & slot available)
                 if not curr_pos and inst_id not in pending_inst_ids and reserved_slot_count < MAX_CONCURRENT_POSITIONS and reserved_long_count < MAX_SAME_DIRECTION_POSITIONS:
-                    allow_entry = True
+                    if ai_conf >= 80.0:
+                        allow_entry = True
+                    else:
+                        print(f"[首发开多拦截] {f['name']} AI置信度 {ai_conf:.1f}% 未达 80% 门禁，宁缺毋滥，拦截入场")
 
                 # Case B: Strict Pyramiding Scale-In (Existing long position in profit/breakeven)
                 elif curr_pos and str(curr_pos.get("side", "")).lower() == "long" and inst_id not in pending_inst_ids:
@@ -1802,7 +1805,10 @@ def execute_portfolio():
 
                 # Case A: Standard Initial Entry
                 if not curr_pos and inst_id not in pending_inst_ids and reserved_slot_count < MAX_CONCURRENT_POSITIONS and reserved_short_count < MAX_SAME_DIRECTION_POSITIONS:
-                    allow_entry = True
+                    if ai_conf >= 80.0:
+                        allow_entry = True
+                    else:
+                        print(f"[首发开空拦截] {f['name']} AI置信度 {ai_conf:.1f}% 未达 80% 门禁，宁缺毋滥，拦截入场")
 
                 # Case B: Strict Pyramiding Scale-In (Existing short position in profit/breakeven)
                 elif curr_pos and str(curr_pos.get("side", "")).lower() == "short" and inst_id not in pending_inst_ids:
