@@ -199,6 +199,20 @@ class LLMModelUpsertRequest(BaseModel):
     description: str | None = ""
 
 
+class CouncilConfigUpdateRequest(BaseModel):
+    enabled: bool
+    timeout_seconds: float = Field(default=22.0, ge=5.0, le=90.0)
+    roles: dict[str, Any]
+
+
+class CouncilResetRoleRequest(BaseModel):
+    role_id: str = Field(pattern=r"^(alpha|risk|quant|arbitrator)$")
+
+
+class CouncilTestRequest(BaseModel):
+    mock_market_prompt: str | None = None
+
+
 class InitialCapitalUpdate(BaseModel):
     initial_capital: float = Field(gt=0, le=1_000_000_000)
     confirmation: str = Field(min_length=1, max_length=80)
@@ -956,6 +970,72 @@ def admin_delete_llm_provider(provider_id: str, x_r20_session: str | None = Head
         raise HTTPException(status_code=404, detail="未找到该模型供应商")
     audit_record("llm.provider.delete", "success", {"actor": actor["username"], "provider_id": provider_id})
     return {"deleted": True, "provider_id": provider_id}
+
+
+# ============================================================================
+# MULTI-AGENT COUNCIL (多模型协作决策系统) ENDPOINTS
+# ============================================================================
+
+@app.get("/api/v1/admin/council/config")
+def admin_get_council_config(x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    require_admin_header(x_r20_session=x_r20_session)
+    from r20_backend.council_manager import load_council_config
+    return load_council_config()
+
+
+@app.put("/api/v1/admin/council/config")
+def admin_update_council_config(payload: CouncilConfigUpdateRequest, x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    actor = require_superadmin(x_r20_session)
+    from r20_backend.council_manager import save_council_config
+    saved = save_council_config({
+        "enabled": payload.enabled,
+        "timeout_seconds": payload.timeout_seconds,
+        "roles": payload.roles,
+    })
+    audit_record("council.config.update", "success", {
+        "actor": actor["username"],
+        "enabled": payload.enabled,
+        "timeout_seconds": payload.timeout_seconds,
+    })
+    return {"status": "ok", "config": saved}
+
+
+@app.post("/api/v1/admin/council/reset-role")
+def admin_reset_council_role(payload: CouncilResetRoleRequest, x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    actor = require_superadmin(x_r20_session)
+    from r20_backend.council_manager import reset_role_template
+    saved = reset_role_template(payload.role_id)
+    audit_record("council.role.reset", "success", {"actor": actor["username"], "role_id": payload.role_id})
+    return {"status": "ok", "role_id": payload.role_id, "config": saved}
+
+
+@app.post("/api/v1/admin/council/test")
+def admin_test_council_debate(payload: CouncilTestRequest, x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    require_admin_header(x_r20_session=x_r20_session)
+    from r20_backend.council_manager import execute_council_debate
+    test_market = payload.mock_market_prompt or (
+        "【测试行情快照】\n"
+        "BTC: $77,750, 1H v=+0.08, a=+0.42, ADX=18.5, CMF=+0.12, 聪明钱多头 74%\n"
+        "ETH: $2,408, 1H v=-0.12, a=-0.38, ADX=26.2, CMF=-0.08, 聪明钱空头 65%\n"
+        "SOL: $100.8, 1H v=+0.02, a=+0.15, ADX=20.1, CMF=+0.05, 聪明钱中性\n"
+    )
+    test_sys = "你是一个遵循极严风控的量化交易系统。"
+    try:
+        brain_output, transcript = execute_council_debate(
+            market_prompt=test_market,
+            original_system_prompt=test_sys,
+            timeout=30.0,
+        )
+        return {
+            "status": "ok",
+            "brain_output": brain_output,
+            "transcript": transcript,
+        }
+    except Exception as exc:
+        return {
+            "status": "error",
+            "error": str(exc),
+        }
     audit_record("llm.model.delete", "success", {"actor": actor["username"], "provider_id": provider_id, "model_id": model_id})
     return {"deleted": True, "provider_id": provider_id, "model_id": model_id}
 

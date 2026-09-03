@@ -16,6 +16,7 @@ const routes: RouteRecordRaw[] = [
       { path: '', redirect: '/admin/overview' },
       { path: 'overview', name: 'admin-overview', component: () => import('../views/admin/OverviewPage.vue') },
       { path: 'security', name: 'admin-security', component: () => import('../views/admin/SecurityPage.vue') },
+      { path: 'council', name: 'admin-council', component: () => import('../views/admin/CouncilPage.vue') },
       { path: 'llm', name: 'admin-llm', component: () => import('../views/admin/LlmPage.vue') },
       { path: 'notify', name: 'admin-notify', component: () => import('../views/admin/NotifyPage.vue') },
       { path: 'about', name: 'admin-about', component: () => import('../views/admin/AboutPage.vue') },
