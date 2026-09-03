@@ -26,7 +26,14 @@ const loading = ref(true)
 async function loadRuntime() {
   loading.value = true
   try {
-    runtime.value = await api('/api/v1/admin/runtime')
+    const [rt, cfg] = await Promise.all([
+      api('/api/v1/admin/runtime'),
+      api('/api/v1/admin/config').catch(() => null),
+    ])
+    if (cfg?.configuration) {
+      rt.configuration = { ...cfg.configuration, ...(rt?.configuration || {}) }
+    }
+    runtime.value = rt
   } catch (e: any) {
     console.error('Failed to load runtime:', e)
   } finally {
@@ -362,7 +369,7 @@ const quickNav = [
       >
         <div class="flex items-center justify-between pb-3 mb-3 border-b" style="border-color: var(--border-subtle);">
           <div class="flex items-center space-x-2">
-            <ShieldCheck class="w-4 h-4" style="color: var(--color-brand);" />
+            <ShieldCheck class="w-4 h-4 text-emerald-500" />
             <h2 class="text-xs font-black font-mono uppercase tracking-wider" style="color: var(--text-main);">
               生产环境核心安全配置
             </h2>
@@ -370,16 +377,19 @@ const quickNav = [
           <span class="text-[10px] font-mono" style="color: var(--text-faint);">敏感 Key 已脱敏防泄露保护</span>
         </div>
 
-        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div v-if="runtime.configuration && Object.keys(runtime.configuration).length" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
           <div
             v-for="(v, k) in runtime.configuration"
             :key="k"
-            class="rounded-lg border p-3 font-mono"
+            class="rounded-lg border p-3 font-mono transition-colors"
             style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);"
           >
-            <div class="text-[10px] uppercase truncate" style="color: var(--text-faint);">{{ k }}</div>
-            <div class="text-xs font-bold truncate mt-1" style="color: var(--text-main);">{{ v || '未配置' }}</div>
+            <div class="text-[10px] uppercase truncate font-medium" style="color: var(--text-faint);">{{ k }}</div>
+            <div class="text-xs font-bold truncate mt-1.5" style="color: var(--text-main);" :title="String(v)">{{ v || '未配置' }}</div>
           </div>
+        </div>
+        <div v-else class="py-6 text-center text-xs font-mono" style="color: var(--text-muted);">
+          正在拉取核心安全配置...
         </div>
       </div>
     </template>

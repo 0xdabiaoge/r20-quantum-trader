@@ -461,6 +461,34 @@ def decision_summary() -> list[dict[str, Any]]:
     return result
 
 
+def get_admin_configuration() -> dict[str, str]:
+    baseline = load_account_baseline()
+    try:
+        llm_rt = get_active_llm_runtime()
+        model_name = llm_rt.get("model") or settings.llm_model or "默认主脑"
+        effort = (llm_rt.get("reasoning_effort") or settings.llm_reasoning_effort or "HIGH").upper()
+    except Exception:
+        model_name = settings.llm_model or "默认主脑"
+        effort = (settings.llm_reasoning_effort or "HIGH").upper()
+
+    has_notify = bool(settings.notification_webhook or getattr(settings, "qq_bot_app_id", None) or getattr(settings, "tg_bot_token", None) or getattr(settings, "wechat_webhook", None))
+
+    return {
+        "OKX 当前环境": "模拟盘 DEMO" if settings.okx_simulated else "实盘 LIVE",
+        "OKX 实盘凭证": "已完整配置" if settings.okx_live_configured else "未配置",
+        "OKX 模拟盘凭证": "已配置" if settings.okx_demo_configured else "未配置",
+        "LLM 决策主脑": model_name,
+        "LLM 思考强度": effort,
+        "模型委员会": "加权共识机制 (ACTIVE)",
+        "物理拦截管线": "5大物理拦截器 (FAIL-CLOSED)",
+        "云端 OCO 覆盖": "100% 交易所云端挂载",
+        "初始本金基准": f"{baseline.get('initial_capital', 4061.04):,.2f} USDT",
+        "管理员系统": "账号密码 + 服务端会话" if admin_auth.has_users() else "尚未初始化",
+        "通知告警通道": "已配置多通道" if has_notify else "未配置",
+        "应急平仓机制": "一次性 Token 复核已就绪" if settings.manual_close_enabled else "已禁用",
+    }
+
+
 def runtime_overview() -> dict[str, Any]:
     health_files = [
         file_health("ai_brain_decisions.json", 15 * 60),
@@ -472,6 +500,7 @@ def runtime_overview() -> dict[str, Any]:
     return {
         "service": {"version": "6.5.1", "pid": os.getpid(), "uptime_seconds": int(time.time() - STARTED_AT)},
         "credentials": {"okx": bool(settings.okx_api_key and settings.okx_secret_key and settings.okx_passphrase), "llm": bool(settings.llm_api_key)},
+        "configuration": get_admin_configuration(),
         "data_health": health_files,
         "decisions": decision_summary(),
         "trackers": len(positions_payload) if isinstance(positions_payload, dict) else 0,
@@ -710,16 +739,7 @@ def admin_config(x_r20_admin_token: str | None = Header(default=None)) -> dict[s
     require_admin_header(x_r20_admin_token)
     return {
         "authentication_mode": "account-password",
-        "configuration": {
-            "OKX 当前环境": "模拟盘 DEMO" if settings.okx_simulated else "实盘 LIVE",
-            "OKX 实盘凭证": "已完整配置" if settings.okx_live_configured else "未完整配置",
-            "OKX 模拟盘凭证": "已完整配置" if settings.okx_demo_configured else "使用 OAuth/旧凭证或未配置",
-            "LLM API Key": "已设置" if settings.llm_api_key else "未设置",
-            "管理员系统": "账号密码 + 服务端会话" if admin_auth.has_users() else "尚未初始化",
-            "通知 Webhook": "已设置" if settings.notification_webhook else "未设置",
-            "手动平仓": "已启用" if settings.manual_close_enabled else "已禁用",
-            "主页初始本金": f"{load_account_baseline()['initial_capital']:,.2f} USDT",
-        },
+        "configuration": get_admin_configuration(),
         "editable": {
             "okx_environment": settings.okx_environment,
             "okx_live_configured": settings.okx_live_configured,

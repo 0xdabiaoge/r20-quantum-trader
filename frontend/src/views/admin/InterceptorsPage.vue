@@ -382,58 +382,67 @@ onMounted(loadPlugins)
     <!-- Code Editor Modal -->
     <div
       v-if="editorVisible"
-      class="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4"
+      class="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-2.5 sm:p-4"
       @click.self="editorVisible = false"
     >
-      <div class="border rounded-2xl p-5 sm:p-6 w-full max-w-4xl max-h-[92dvh] flex flex-col shadow-2xl space-y-4 transition-colors" style="background-color: var(--bg-card); border-color: var(--border-subtle);">
-        <div class="flex items-center justify-between pb-3 border-b" style="border-color: var(--border-subtle);">
-          <div class="flex items-center space-x-2.5">
-            <div class="w-7 h-7 rounded-lg flex items-center justify-center border" style="background-color: var(--color-brand-bg); border-color: var(--color-brand-border); color: var(--color-brand);">
+      <div class="border rounded-2xl p-4 sm:p-6 w-full max-w-4xl max-h-[94dvh] flex flex-col shadow-2xl space-y-3 sm:space-y-4 transition-colors" style="background-color: var(--bg-card); border-color: var(--border-subtle);">
+        <!-- Modal Header -->
+        <div class="flex items-start justify-between gap-2.5 pb-3 border-b" style="border-color: var(--border-subtle);">
+          <div class="flex items-center space-x-2.5 min-w-0 flex-1">
+            <div class="w-8 h-8 rounded-lg shrink-0 flex items-center justify-center border shadow-xs" style="background-color: var(--color-brand-bg); border-color: var(--color-brand-border); color: var(--color-brand);">
               <FileCode class="w-4 h-4" />
             </div>
-            <div>
-              <h3 class="text-sm font-bold flex items-center space-x-2" style="color: var(--text-main);">
-                <span>{{ editingName }}</span>
-                <span class="text-xs font-normal" style="color: var(--text-faint);">({{ editingFilename }})</span>
+            <div class="min-w-0 flex-1">
+              <h3 class="text-xs sm:text-sm font-bold flex flex-wrap items-center gap-1.5" style="color: var(--text-main);">
+                <span class="truncate max-w-[180px] sm:max-w-[320px]">{{ editingName }}</span>
+                <span class="text-[10px] sm:text-xs font-normal font-mono truncate max-w-[140px] sm:max-w-[200px]" style="color: var(--text-faint);">({{ editingFilename }})</span>
               </h3>
-              <p class="text-[10px]" style="color: var(--text-muted);">Python 源码热更新，保存后下一轮决策实时执行</p>
+              <p class="text-[10px] hidden sm:block truncate mt-0.5" style="color: var(--text-muted);">Python 源码热更新，保存后下一轮决策实时执行</p>
             </div>
           </div>
-          <div class="flex items-center space-x-2">
+          <div class="flex items-center space-x-1.5 shrink-0">
             <button
               @click="exportPluginCode(editingFilename, editingCode)"
-              class="flex items-center space-x-1 px-2.5 py-1 rounded-lg border text-xs cursor-pointer shadow-xs"
+              class="flex items-center space-x-1 px-2 sm:px-2.5 py-1 rounded-lg border text-[11px] sm:text-xs cursor-pointer shadow-xs transition-colors"
               style="background-color: var(--bg-card-subtle); border-color: var(--border-medium); color: var(--text-main);"
               title="导出当前 .py 脚本文件"
             >
               <Download class="w-3.5 h-3.5" />
-              <span>导出 .py</span>
+              <span class="hidden sm:inline">导出 .py</span>
             </button>
-            <button @click="editorVisible = false" class="cursor-pointer p-1" style="color: var(--text-muted);">
+            <button
+              @click="editorVisible = false"
+              class="p-1 rounded-lg hover:bg-zinc-500/10 cursor-pointer transition-colors"
+              style="color: var(--text-muted);"
+            >
               <X class="w-4 h-4" />
             </button>
           </div>
         </div>
 
-        <div v-if="codeError" class="p-3 rounded-lg text-xs border font-mono" style="background-color: var(--color-down-bg); border-color: var(--color-down-border); color: var(--color-down);">
+        <div v-if="codeError" class="p-2.5 rounded-lg text-xs border font-mono break-all" style="background-color: var(--color-down-bg); border-color: var(--color-down-border); color: var(--color-down);">
           {{ codeError }}
         </div>
 
-        <div class="flex-1 min-h-[360px] flex flex-col">
+        <!-- Code Textarea -->
+        <div class="flex-1 min-h-[220px] sm:min-h-[380px] h-[50dvh] flex flex-col">
           <textarea
             v-model="editingCode"
-            class="flex-1 w-full border rounded-xl p-4 font-mono text-xs leading-relaxed outline-none resize-none select-text transition-colors"
+            class="flex-1 w-full border rounded-xl p-3 sm:p-4 font-mono text-[11px] sm:text-xs leading-relaxed outline-none resize-none select-text transition-colors"
             style="background-color: var(--bg-input); border-color: var(--border-subtle); color: var(--text-main);"
             spellcheck="false"
           ></textarea>
         </div>
 
-        <div class="flex items-center justify-between pt-3 border-t" style="border-color: var(--border-subtle);">
-          <span class="text-[11px]" style="color: var(--text-faint);">标准接口: def check_risk(package, decision, context) -> tuple[bool, str]</span>
-          <div class="flex items-center space-x-2">
+        <!-- Modal Footer -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-3 border-t" style="border-color: var(--border-subtle);">
+          <div class="text-[10px] sm:text-[11px] font-mono truncate" style="color: var(--text-faint);" title="def check_risk(package, decision, context) -> tuple[bool, str]">
+            <span class="font-bold">接口契约:</span> <code class="opacity-80">check_risk(package, decision, ctx)</code>
+          </div>
+          <div class="flex items-center justify-end space-x-2 shrink-0">
             <button
               @click="editorVisible = false"
-              class="px-4 py-2 rounded-xl border text-xs cursor-pointer shadow-xs"
+              class="px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-xl border text-xs cursor-pointer shadow-xs transition-colors"
               style="background-color: var(--bg-card-subtle); border-color: var(--border-medium); color: var(--text-muted);"
             >
               取消
@@ -441,11 +450,11 @@ onMounted(loadPlugins)
             <button
               @click="saveCode"
               :disabled="savingCode"
-              class="flex items-center space-x-1.5 px-5 py-2 rounded-xl font-bold text-xs cursor-pointer transition-all shadow-xs disabled:opacity-50"
+              class="flex items-center space-x-1.5 px-4 sm:px-5 py-1.5 sm:py-2 rounded-xl font-bold text-xs cursor-pointer transition-all shadow-xs disabled:opacity-50"
               style="background-color: var(--text-main); color: var(--bg-card);"
             >
               <Save class="w-4 h-4" />
-              <span>{{ savingCode ? '正在校验并保存...' : '保存代码并热加载' }}</span>
+              <span>{{ savingCode ? '正在保存...' : '保存代码并热加载' }}</span>
             </button>
           </div>
         </div>
@@ -455,18 +464,18 @@ onMounted(loadPlugins)
     <!-- Create Modal -->
     <div
       v-if="createModalVisible"
-      class="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4"
+      class="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-2.5 sm:p-4"
       @click.self="createModalVisible = false"
     >
-      <div class="border rounded-2xl p-5 sm:p-6 w-full max-w-2xl max-h-[92dvh] flex flex-col shadow-2xl space-y-4 transition-colors" style="background-color: var(--bg-card); border-color: var(--border-subtle);">
+      <div class="border rounded-2xl p-4 sm:p-6 w-full max-w-2xl max-h-[94dvh] overflow-y-auto flex flex-col shadow-2xl space-y-3 sm:space-y-4 transition-colors" style="background-color: var(--bg-card); border-color: var(--border-subtle);">
         <div class="flex items-center justify-between pb-3 border-b" style="border-color: var(--border-subtle);">
           <div class="flex items-center space-x-2.5">
-            <div class="w-7 h-7 rounded-lg flex items-center justify-center border" style="background-color: var(--color-brand-bg); border-color: var(--color-brand-border); color: var(--color-brand);">
+            <div class="w-7 h-7 rounded-lg flex items-center justify-center border shadow-xs" style="background-color: var(--color-brand-bg); border-color: var(--color-brand-border); color: var(--color-brand);">
               <Sparkles class="w-4 h-4" />
             </div>
             <div>
-              <h3 class="text-sm font-bold" style="color: var(--text-main);">新建物理拦截插件</h3>
-              <p class="text-[10px]" style="color: var(--text-muted);">编写自定义 Python 拦截规则，适配策略广场规范</p>
+              <h3 class="text-xs sm:text-sm font-bold" style="color: var(--text-main);">新建物理拦截插件</h3>
+              <p class="text-[10px] hidden sm:block" style="color: var(--text-muted);">编写自定义 Python 拦截规则，适配策略广场规范</p>
             </div>
           </div>
           <button @click="createModalVisible = false" class="cursor-pointer p-1" style="color: var(--text-muted);">
@@ -474,7 +483,7 @@ onMounted(loadPlugins)
           </button>
         </div>
 
-        <div v-if="createError" class="p-3 rounded-lg text-xs border" style="background-color: var(--color-down-bg); border-color: var(--color-down-border); color: var(--color-down);">
+        <div v-if="createError" class="p-2.5 rounded-lg text-xs border font-mono break-all" style="background-color: var(--color-down-bg); border-color: var(--color-down-border); color: var(--color-down);">
           {{ createError }}
         </div>
 
@@ -483,17 +492,17 @@ onMounted(loadPlugins)
           <input
             v-model="newFilename"
             type="text"
-            class="w-full border rounded-xl px-3 py-2 text-xs outline-none transition-colors"
+            class="w-full border rounded-xl px-3 py-2 text-xs outline-none transition-colors font-mono"
             style="background-color: var(--bg-input); border-color: var(--border-subtle); color: var(--text-main);"
             placeholder="如: my_volatility_filter.py"
           />
         </div>
 
-        <div class="flex-1 min-h-[280px] flex flex-col">
+        <div class="flex-1 min-h-[200px] sm:min-h-[280px] flex flex-col">
           <label class="block text-xs font-bold mb-1.5" style="color: var(--text-main);">插件 Python 源码</label>
           <textarea
             v-model="newCode"
-            class="flex-1 w-full border rounded-xl p-3.5 font-mono text-xs leading-relaxed outline-none resize-y transition-colors"
+            class="flex-1 w-full border rounded-xl p-3 sm:p-3.5 font-mono text-[11px] sm:text-xs leading-relaxed outline-none resize-y transition-colors min-h-[160px]"
             style="background-color: var(--bg-input); border-color: var(--border-subtle); color: var(--text-main);"
             spellcheck="false"
           ></textarea>
@@ -502,14 +511,14 @@ onMounted(loadPlugins)
         <div class="flex items-center justify-end space-x-2 pt-3 border-t" style="border-color: var(--border-subtle);">
           <button
             @click="createModalVisible = false"
-            class="px-4 py-2 rounded-xl border text-xs cursor-pointer shadow-xs"
+            class="px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-xl border text-xs cursor-pointer shadow-xs"
             style="background-color: var(--bg-card-subtle); border-color: var(--border-medium); color: var(--text-muted);"
           >
             取消
           </button>
           <button
             @click="submitCreate"
-            class="px-5 py-2 rounded-xl font-bold text-xs cursor-pointer transition-all shadow-xs"
+            class="px-4 sm:px-5 py-1.5 sm:py-2 rounded-xl font-bold text-xs cursor-pointer transition-all shadow-xs"
             style="background-color: var(--text-main); color: var(--bg-card);"
           >
             创建并加入管线
@@ -521,17 +530,17 @@ onMounted(loadPlugins)
     <!-- Sandbox Test Results Modal -->
     <div
       v-if="testModalVisible && testResults"
-      class="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4"
+      class="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-2.5 sm:p-4"
       @click.self="testModalVisible = false"
     >
-      <div class="border rounded-2xl p-5 sm:p-6 w-full max-w-3xl max-h-[90dvh] overflow-y-auto shadow-2xl space-y-4 transition-colors" style="background-color: var(--bg-card); border-color: var(--border-subtle);">
+      <div class="border rounded-2xl p-4 sm:p-6 w-full max-w-3xl max-h-[92dvh] overflow-y-auto shadow-2xl space-y-3 sm:space-y-4 transition-colors" style="background-color: var(--bg-card); border-color: var(--border-subtle);">
         <div class="flex items-center justify-between pb-3 border-b" style="border-color: var(--border-subtle);">
           <div class="flex items-center space-x-2.5">
-            <div class="w-7 h-7 rounded-lg flex items-center justify-center border" style="background-color: var(--color-up-bg); border-color: var(--color-up-border); color: var(--color-up);">
+            <div class="w-7 h-7 rounded-lg flex items-center justify-center border shadow-xs" style="background-color: var(--color-up-bg); border-color: var(--color-up-border); color: var(--color-up);">
               <Play class="w-4 h-4" />
             </div>
             <div>
-              <h3 class="text-sm font-bold" style="color: var(--text-main);">沙箱拦截回归测试报告</h3>
+              <h3 class="text-xs sm:text-sm font-bold" style="color: var(--text-main);">沙箱拦截回归测试报告</h3>
               <p class="text-[10px]" style="color: var(--text-muted);">
                 已激活 {{ testResults.enabled_plugins_count }}/{{ testResults.total_plugins_count }} 个拦截插件 · 总执行耗时 {{ testResults.duration_total_ms }}ms
               </p>
@@ -546,12 +555,12 @@ onMounted(loadPlugins)
           <div
             v-for="(r, i) in testResults.results"
             :key="i"
-            class="p-3.5 rounded-xl border transition-all"
+            class="p-3 sm:p-3.5 rounded-xl border transition-all"
             :style="r.intercepted
               ? { backgroundColor: 'var(--color-warn-bg)', borderColor: 'var(--color-warn-border)' }
               : { backgroundColor: 'var(--color-up-bg)', borderColor: 'var(--color-up-border)' }"
           >
-            <div class="flex items-center justify-between mb-1.5">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 mb-1.5">
               <span class="text-xs font-bold" style="color: var(--text-main);">{{ r.scenario }}</span>
               <div class="flex items-center space-x-2">
                 <span class="text-[10px] font-mono" style="color: var(--text-faint);">{{ r.duration_ms }}ms</span>
@@ -565,12 +574,12 @@ onMounted(loadPlugins)
                 </span>
               </div>
             </div>
-            <div class="text-[11px] font-mono flex items-center space-x-3" style="color: var(--text-muted);">
+            <div class="text-[11px] font-mono flex flex-wrap items-center gap-x-3 gap-y-1" style="color: var(--text-muted);">
               <span>原始意向: <strong style="color: var(--text-main);">{{ r.raw_action }}</strong></span>
               <span>最终指令: <strong :style="{ color: r.final_action === 'WAIT' ? 'var(--color-warn)' : 'var(--color-up)' }">{{ r.final_action }}</strong></span>
               <span v-if="r.risk_reward !== '--'">盈亏比: {{ r.risk_reward }}</span>
             </div>
-            <div v-if="r.reason" class="text-[11px] mt-1 font-sans" style="color: var(--color-warn);">
+            <div v-if="r.reason" class="text-[11px] mt-1 font-sans break-words" style="color: var(--color-warn);">
               拦截审计：{{ r.reason }}
             </div>
           </div>
@@ -579,7 +588,7 @@ onMounted(loadPlugins)
         <div class="flex justify-end pt-3 border-t" style="border-color: var(--border-subtle);">
           <button
             @click="testModalVisible = false"
-            class="px-5 py-2 rounded-xl text-xs font-bold cursor-pointer transition-all shadow-xs"
+            class="px-4 sm:px-5 py-1.5 sm:py-2 rounded-xl text-xs font-bold cursor-pointer transition-all shadow-xs"
             style="background-color: var(--text-main); color: var(--bg-card);"
           >
             关闭测试报告
