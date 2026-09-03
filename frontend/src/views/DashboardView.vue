@@ -34,11 +34,10 @@ onUnmounted(() => {
 
     <!-- Dynamic Main Content Based on Active Tab -->
     <main class="flex-1 max-w-[1720px] w-full mx-auto px-3 sm:px-6 pb-24 sm:pb-6 space-y-4">
-      <!-- 1. Top HUD 4-Card Ribbon (Equity, Benchmark PnL, Today PnL, Cloud OCO) -->
-      <TopHudRibbon />
-
-      <!-- TAB 1: 实盘矩阵 (TRADING) -->
+      <!-- TAB 1: 实盘矩阵 (TRADING) — home only shows HUD 4-card ribbon -->
       <div v-show="store.activeTab === 'trading'" class="space-y-4">
+        <!-- 1. Top HUD 4-Card Ribbon (Equity, Benchmark PnL, Today PnL, Cloud OCO) -->
+        <TopHudRibbon />
         <!-- Dual Column: Positions & In-flight Maker Orders -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <PositionList />
@@ -46,14 +45,11 @@ onUnmounted(() => {
         </div>
         <!-- 6-Asset Grid with Calculus Dynamics & Drawer -->
         <InstrumentMatrix />
-        <!-- System Logs -->
-        <LedgerLogs />
       </div>
 
       <!-- TAB 2: AI全景推演 (FACTORS) -->
       <div v-show="store.activeTab === 'factors'" class="space-y-4">
         <InstrumentMatrix />
-        <LedgerLogs />
       </div>
 
       <!-- TAB 3: 全网舆情 (NEWS) -->
@@ -66,7 +62,7 @@ onUnmounted(() => {
         <SelfEvolutionLab />
       </div>
 
-      <!-- TAB 5: 交易台账与生命周期 (HISTORY) -->
+      <!-- TAB 5: 交易台账与生命周期 (HISTORY) — the only home of the patrol log stream -->
       <div v-show="store.activeTab === 'history'" class="space-y-4">
         <TradesLedger />
         <LedgerLogs />

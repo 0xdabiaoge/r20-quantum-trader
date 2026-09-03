@@ -53,8 +53,8 @@ const tabs = [
         </div>
       </div>
 
-      <!-- Center: 5-Tab Segmented Switcher -->
-      <nav class="flex items-center bg-[#0D121B] p-0.5 sm:p-1 rounded-lg sm:rounded-xl border border-[#1A2232] overflow-x-auto min-w-0 shrink">
+      <!-- Center: 5-Tab Segmented Switcher (desktop only; Android has the bottom nav) -->
+      <nav class="hidden md:flex items-center bg-[#0D121B] p-1 rounded-xl border border-[#1A2232] overflow-x-auto min-w-0 shrink">
         <button
           v-for="tab in tabs"
           :key="tab.id"
