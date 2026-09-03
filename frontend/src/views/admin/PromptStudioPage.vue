@@ -346,7 +346,7 @@ onMounted(loadLib)
 
     <!-- History Modal -->
     <div v-if="historyVisible" class="fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-4" @click.self="historyVisible = false">
-      <div class="bg-gradient-to-b from-[#111a29] to-[#0D121B] border border-[#1A2232] rounded-xl p-5 w-full max-w-[560px] max-h-[80vh] overflow-y-auto">
+      <div class="bg-gradient-to-b from-[#111a29] to-[#0D121B] border border-[#1A2232] rounded-xl p-5 w-full max-w-[560px] max-h-[85dvh] overflow-y-auto">
         <div class="flex items-center justify-between mb-4">
           <h3 class="text-sm font-bold text-white font-mono">版本历史 · {{ selectedProfile?.name }}</h3>
           <button @click="historyVisible = false" class="text-[#707E94] hover:text-white cursor-pointer text-xs font-mono">关闭</button>

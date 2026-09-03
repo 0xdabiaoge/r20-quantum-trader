@@ -185,7 +185,7 @@ onMounted(() => {
 
     <!-- Model Add/Edit Modal -->
     <div v-if="modalVisible" class="fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-4" @click.self="modalVisible = false">
-      <div class="bg-gradient-to-b from-[#111a29] to-[#0D121B] border border-[#1A2232] rounded-xl p-6 w-full max-w-[620px] max-h-[90vh] overflow-y-auto">
+      <div class="bg-gradient-to-b from-[#111a29] to-[#0D121B] border border-[#1A2232] rounded-xl p-6 w-full max-w-[620px] max-h-[88dvh] overflow-y-auto">
         <h3 class="text-sm font-bold text-white mb-4">{{ editingModel ? '编辑模型' : '添加自定义模型' }}</h3>
         <div class="space-y-3">
           <div>

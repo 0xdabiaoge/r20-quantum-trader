@@ -286,7 +286,7 @@ onMounted(() => {
 
     <!-- Capture Modal -->
     <div v-if="captureModal" class="fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-4" @click.self="captureModal = false">
-      <div class="bg-gradient-to-b from-[#111a29] to-[#0D121B] border border-[#1A2232] rounded-xl p-6 w-full max-w-[520px] text-center">
+      <div class="bg-gradient-to-b from-[#111a29] to-[#0D121B] border border-[#1A2232] rounded-xl p-6 w-full max-w-[520px] max-h-[88dvh] overflow-y-auto text-center">
         <h3 class="text-sm font-bold text-white mb-3">⚡ 自动捕获目标用户 OpenID</h3>
         <div class="text-4xl mb-3">📱 💬 🤖</div>
         <p class="text-sm font-bold text-white mb-2">{{ captureStatus?.bot_name || '连接中...' }}</p>
@@ -304,7 +304,7 @@ onMounted(() => {
 
     <!-- QQ Bind QR Modal -->
     <div v-if="bindModal" class="fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-4" @click.self="closeBindModal">
-      <div class="bg-gradient-to-b from-[#111a29] to-[#0D121B] border border-[#1A2232] rounded-xl p-5 w-full max-w-[380px] text-center">
+      <div class="bg-gradient-to-b from-[#111a29] to-[#0D121B] border border-[#1A2232] rounded-xl p-5 w-full max-w-[380px] max-h-[88dvh] overflow-y-auto text-center">
         <h3 class="text-sm font-bold text-white mb-2 font-mono">绑定 QQ 机器人</h3>
         <p class="text-[11px] text-[#707E94] font-mono mb-3">使用手机 QQ 扫一扫，或长按复制链接在 QQ 内打开。确认授权后本页自动完成绑定。</p>
         <img v-if="bindStatus?.qr" :src="bindStatus.qr" alt="QQ 绑定二维码" class="w-[220px] h-[220px] rounded-lg bg-white p-2.5 mx-auto mb-3" />

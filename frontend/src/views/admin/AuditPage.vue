@@ -75,7 +75,7 @@ onMounted(load)
 
     <!-- Detail Modal -->
     <div v-if="detailRec" class="fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-4" @click.self="detailRec = null">
-      <div class="bg-gradient-to-b from-[#111a29] to-[#0D121B] border border-[#1A2232] rounded-xl p-5 w-full max-w-[640px]">
+      <div class="bg-gradient-to-b from-[#111a29] to-[#0D121B] border border-[#1A2232] rounded-xl p-5 w-full max-w-[640px] max-h-[88dvh] overflow-y-auto">
         <h3 class="text-sm font-bold text-white mb-3 font-mono">审计详情 · {{ detailRec.action }}</h3>
         <pre class="bg-[#080B10] border border-[#1A2232] rounded-lg p-3 text-xs font-mono text-zinc-300 whitespace-pre-wrap max-h-[400px] overflow-y-auto">{{ JSON.stringify(detailRec, null, 2) }}</pre>
         <div class="flex justify-end mt-4"><button @click="detailRec = null" class="px-4 py-2 rounded-lg bg-[#111c2a] border border-[#33445b] text-xs font-mono text-[#b8c4d4] cursor-pointer hover:bg-[#1d3050]">关闭</button></div>

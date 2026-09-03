@@ -190,6 +190,25 @@ def fetch_and_analyze_news_sentiment():
         "latest_news": parsed_news[:10]
     }
 
+    # Fail-closed: an upstream hiccup must not wipe a good cache into an empty page.
+    if not payload["latest_news"] or not payload["coins_sentiment"]:
+        try:
+            if os.path.exists(NEWS_CACHE_FILE):
+                with open(NEWS_CACHE_FILE, "r", encoding="utf-8") as f:
+                    previous = json.load(f)
+                if previous.get("latest_news") or previous.get("coins_sentiment"):
+                    if not payload["latest_news"] and previous.get("latest_news"):
+                        payload["latest_news"] = previous["latest_news"]
+                    if not payload["coins_sentiment"] and previous.get("coins_sentiment"):
+                        payload["coins_sentiment"] = previous["coins_sentiment"]
+                        bull_count = sum(1 for s in previous["coins_sentiment"].values() if float(s.get("sentiment_factor_score", 0)) > 0.25)
+                        bear_count = sum(1 for s in previous["coins_sentiment"].values() if float(s.get("sentiment_factor_score", 0)) < -0.1)
+                        if not cb_active:
+                            payload["macro_sentiment"] = "偏多震荡" if bull_count > bear_count else ("偏空承压" if bear_count > bull_count else "中性平衡")
+                    payload["stale_sections"] = True
+        except Exception:
+            pass
+
     try:
         os.makedirs(DATA_DIR, exist_ok=True)
         with open(NEWS_CACHE_FILE, "w", encoding="utf-8") as f:

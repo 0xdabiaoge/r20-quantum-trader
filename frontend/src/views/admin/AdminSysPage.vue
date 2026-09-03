@@ -173,7 +173,7 @@ onMounted(load)
 
     <!-- Create Modal -->
     <div v-if="createVisible" class="fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-4" @click.self="createVisible = false">
-      <div class="bg-gradient-to-b from-[#111a29] to-[#0D121B] border border-[#1A2232] rounded-xl p-5 w-full max-w-[420px]">
+      <div class="bg-gradient-to-b from-[#111a29] to-[#0D121B] border border-[#1A2232] rounded-xl p-5 w-full max-w-[420px] max-h-[88dvh] overflow-y-auto">
         <h3 class="text-sm font-bold text-white mb-4">新建管理员</h3>
         <label class="block text-[11px] text-[#8997aa] mb-1 font-mono">账号 (3-32 位)</label>
         <input v-model="newUsername" class="w-full bg-[#090f18] border border-[#1A2232] rounded-lg text-white px-3 py-2 text-xs font-mono outline-none focus:border-blue-500 mb-3" />

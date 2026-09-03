@@ -82,11 +82,11 @@ const currentLabel = computed<string>(() => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#080B10] text-[#F3F4F6] flex">
-    <!-- Sidebar -->
-    <aside class="w-[210px] shrink-0 border-r border-[#1A2232] bg-[#0A0D14] flex flex-col">
+  <div class="min-h-screen bg-[#080B10] text-[#F3F4F6] flex flex-col md:flex-row">
+    <!-- Sidebar (desktop) / horizontal nav (mobile) -->
+    <aside class="w-full md:w-[210px] md:shrink-0 border-b md:border-b-0 md:border-r border-[#1A2232] bg-[#0A0D14] md:flex md:flex-col md:h-screen md:sticky md:top-0">
       <!-- Brand -->
-      <div class="px-4 py-4 border-b border-[#1A2232] flex items-center space-x-2.5">
+      <div class="px-4 py-2.5 md:py-4 border-b border-[#1A2232] hidden md:flex items-center space-x-2.5">
         <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-blue-600 via-indigo-600 to-cyan-400 flex items-center justify-center shadow-lg shadow-blue-500/20 ring-1 ring-white/20">
           <span class="text-white font-black text-base tracking-wider">R</span>
         </div>
@@ -96,27 +96,29 @@ const currentLabel = computed<string>(() => {
         </div>
       </div>
 
-      <!-- Nav Groups -->
-      <nav class="flex-1 overflow-y-auto py-2 px-2 space-y-1">
-        <div v-for="group in navGroups" :key="group.label" class="mb-2">
+      <!-- Nav Groups: horizontal scroll strip on mobile, vertical list on desktop -->
+      <nav class="overflow-x-auto md:overflow-y-auto md:overflow-x-hidden md:flex-1 py-1.5 md:py-2 px-2 md:space-y-1 flex md:block whitespace-nowrap">
+        <div v-for="group in navGroups" :key="group.label" class="mb-2 md:mb-2 inline-block md:block mr-4 md:mr-0 align-top">
           <div class="text-[10px] font-mono font-bold text-[#556677] uppercase tracking-wider px-3 py-1.5">{{ group.label }}</div>
-          <button
-            v-for="item in group.items"
-            :key="item.id"
-            @click="navigateTo(item.id)"
-            class="w-full flex items-center space-x-2.5 px-3 py-2 rounded-lg text-xs font-mono font-medium transition-all cursor-pointer"
-            :class="currentView === item.id
-              ? 'bg-gradient-to-r from-blue-600/20 to-transparent text-white border-l-2 border-blue-400'
-              : 'text-[#707E94] hover:text-white hover:bg-[#121824]'"
-          >
-            <component :is="item.icon" class="w-3.5 h-3.5 shrink-0" />
-            <span>{{ item.label }}</span>
-          </button>
+          <div class="flex md:block space-x-1 md:space-x-0">
+            <button
+              v-for="item in group.items"
+              :key="item.id"
+              @click="navigateTo(item.id)"
+              class="flex items-center space-x-1.5 md:space-x-2.5 px-2.5 md:px-3 py-1.5 md:py-2 rounded-lg text-[11px] md:text-xs font-mono font-medium transition-all cursor-pointer shrink-0"
+              :class="currentView === item.id
+                ? 'bg-gradient-to-r from-blue-600/20 to-transparent text-white border border-blue-500/40 md:border-0 md:border-l-2 md:border-l-blue-400'
+                : 'text-[#707E94] hover:text-white hover:bg-[#121824]'"
+            >
+              <component :is="item.icon" class="w-3.5 h-3.5 shrink-0" />
+              <span>{{ item.label }}</span>
+            </button>
+          </div>
         </div>
       </nav>
 
-      <!-- Footer -->
-      <div class="px-4 py-3 border-t border-[#1A2232] text-[10px] font-mono text-[#556677] space-y-1">
+      <!-- Footer (desktop only) -->
+      <div class="hidden md:block px-4 py-3 border-t border-[#1A2232] text-[10px] font-mono text-[#556677] space-y-1">
         <div class="flex items-center space-x-1">
           <span class="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
           <span>www.r20.cn</span>
@@ -129,13 +131,13 @@ const currentLabel = computed<string>(() => {
     <!-- Main -->
     <div class="flex-1 flex flex-col min-w-0">
       <!-- Topbar -->
-      <header class="h-14 border-b border-[#1A2232] bg-[#0A0D14]/80 backdrop-blur-md flex items-center justify-between px-5 shrink-0">
+      <header class="min-h-14 border-b border-[#1A2232] bg-[#0A0D14]/80 backdrop-blur-md flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 px-3 sm:px-5 py-2 md:py-0 shrink-0 sticky top-0 z-30">
         <div>
           <div class="text-sm font-bold text-white">{{ currentLabel }}</div>
           <div class="text-[11px] text-[#707E94] font-mono">R20 Quantum Trader 控制面</div>
         </div>
-        <div class="flex items-center space-x-3">
-          <div class="flex items-center space-x-2 bg-[#0D121B] px-3 py-1.5 rounded-lg border border-[#1A2232]">
+        <div class="flex items-center space-x-2 sm:space-x-3">
+          <div class="flex items-center space-x-2 bg-[#0D121B] px-2.5 sm:px-3 py-1.5 rounded-lg border border-[#1A2232]">
             <div class="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs">
               {{ auth.user?.username?.[0]?.toUpperCase() || 'A' }}
             </div>
@@ -144,11 +146,11 @@ const currentLabel = computed<string>(() => {
               <div class="text-[10px] text-[#707E94]">{{ auth.user?.role || '超级管理员' }}</div>
             </div>
           </div>
-          <a href="/" target="_blank" class="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-[#0D121B] hover:bg-[#141B26] border border-[#1A2232] text-xs font-mono text-[#707E94] hover:text-white transition-colors">
+          <a href="/" target="_blank" class="flex items-center space-x-1 px-2.5 sm:px-3 py-1.5 rounded-lg bg-[#0D121B] hover:bg-[#141B26] border border-[#1A2232] text-xs font-mono text-[#707E94] hover:text-white transition-colors">
             <LayoutGrid class="w-3.5 h-3.5" />
             <span>大屏</span>
           </a>
-          <button @click="handleLogout" class="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-[#4d1924] hover:bg-[#5d2230] border border-[#873044] text-xs font-mono text-[#ffdce1] transition-colors cursor-pointer">
+          <button @click="handleLogout" class="flex items-center space-x-1 px-2.5 sm:px-3 py-1.5 rounded-lg bg-[#4d1924] hover:bg-[#5d2230] border border-[#873044] text-xs font-mono text-[#ffdce1] transition-colors cursor-pointer">
             <LogOut class="w-3.5 h-3.5" />
             <span>退出</span>
           </button>
@@ -156,7 +158,7 @@ const currentLabel = computed<string>(() => {
       </header>
 
       <!-- Content -->
-      <main class="flex-1 overflow-y-auto p-5">
+      <main class="flex-1 p-3 sm:p-5 overflow-x-hidden">
         <router-view />
       </main>
     </div>

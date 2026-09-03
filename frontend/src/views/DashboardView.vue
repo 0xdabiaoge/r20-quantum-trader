@@ -10,6 +10,7 @@ import LedgerLogs from '../components/LedgerLogs.vue'
 import NewsIntelligence from '../components/NewsIntelligence.vue'
 import SelfEvolutionLab from '../components/SelfEvolutionLab.vue'
 import TradesLedger from '../components/TradesLedger.vue'
+import AiBrainHistory from '../components/AiBrainHistory.vue'
 import FloatingActions from '../components/FloatingActions.vue'
 import { LayoutGrid, Cpu, Newspaper, Sparkles, Receipt } from 'lucide-vue-next'
 
@@ -34,7 +35,7 @@ onUnmounted(() => {
 
     <!-- Dynamic Main Content Based on Active Tab -->
     <main class="flex-1 max-w-[1720px] w-full mx-auto px-3 sm:px-6 pb-24 sm:pb-6 space-y-4">
-      <!-- TAB 1: 实盘矩阵 (TRADING) — home only shows HUD 4-card ribbon -->
+      <!-- TAB 1: 实盘矩阵 (TRADING) — home: HUD cards + positions + maker orders -->
       <div v-show="store.activeTab === 'trading'" class="space-y-4">
         <!-- 1. Top HUD 4-Card Ribbon (Equity, Benchmark PnL, Today PnL, Cloud OCO) -->
         <TopHudRibbon />
@@ -43,13 +44,12 @@ onUnmounted(() => {
           <PositionList />
           <PendingOrders />
         </div>
-        <!-- 6-Asset Grid with Calculus Dynamics & Drawer -->
-        <InstrumentMatrix />
       </div>
 
-      <!-- TAB 2: AI全景推演 (FACTORS) -->
+      <!-- TAB 2: AI全景推演 (FACTORS) — 6-asset matrix + LLM history timeline -->
       <div v-show="store.activeTab === 'factors'" class="space-y-4">
         <InstrumentMatrix />
+        <AiBrainHistory />
       </div>
 
       <!-- TAB 3: 全网舆情 (NEWS) -->

@@ -77,7 +77,7 @@ function applyRuntime(rt: any) {
 async function rediagnose() {
   bannerMsg.value = { text: '正在检查 OKX CLI、OAuth 与私有读取…', type: 'warn' }
   try {
-    applyRuntime(await api('/api/v1/admin/okx/runtime'))
+    applyRuntime(await api('/api/v1/admin/okx/runtime?refresh=1'))
     bannerMsg.value = null
   } catch (e: any) {
     bannerMsg.value = { text: `诊断失败：${e.message}`, type: 'err' }
@@ -497,7 +497,7 @@ onMounted(loadAll)
 
     <!-- Close confirm modal -->
     <div v-if="closeModal?.show" class="fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-4" @click.self="closeModal = null">
-      <div class="bg-gradient-to-b from-[#111a29] to-[#0D121B] border border-[#1A2232] rounded-xl p-5 w-full max-w-[460px]">
+      <div class="bg-gradient-to-b from-[#111a29] to-[#0D121B] border border-[#1A2232] rounded-xl p-5 w-full max-w-[460px] max-h-[88dvh] overflow-y-auto">
         <h3 class="text-sm font-bold text-rose-400 mb-2 font-mono">快速安全平仓</h3>
         <p class="text-[11px] text-zinc-300 font-mono leading-relaxed mb-3">
           将从 {{ (snapshot?.environment || 'demo').toUpperCase() }} 环境重新核对并平掉

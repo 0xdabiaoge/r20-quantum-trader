@@ -1,5 +1,6 @@
 """Standalone control plane: read-only monitoring plus process health."""
 from __future__ import annotations
+import copy
 import hashlib
 import hmac
 import json
@@ -722,12 +723,22 @@ def admin_update_account_baseline(payload: InitialCapitalUpdate, x_r20_session: 
     }
 
 
+_OKX_RUNTIME_CACHE: dict[str, Any] = {"at": 0.0, "mode": "", "payload": None}
+
+
 @app.get("/api/v1/admin/okx/runtime")
-def admin_okx_runtime(x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+def admin_okx_runtime(x_r20_session: str | None = Header(default=None, alias="X-R20-Session"), refresh: int = 0) -> dict[str, Any]:
     refresh_settings()
     require_admin_header(x_r20_session=x_r20_session)
     configured = settings.okx_demo_configured if settings.okx_environment == "demo" else settings.okx_live_configured
-    return diagnose_okx_runtime(settings.okx_environment, configured)
+    now = time.time()
+    # Each CLI probe spawns 4-6 subprocesses (~1.5s). Serve a 15s cache so page
+    # navigation feels instant; the UI's "重新诊断" passes refresh=1 to bypass.
+    if not refresh and _OKX_RUNTIME_CACHE["payload"] and _OKX_RUNTIME_CACHE["mode"] == settings.okx_environment and now - _OKX_RUNTIME_CACHE["at"] < 15:
+        return dict(_OKX_RUNTIME_CACHE["payload"])
+    payload = diagnose_okx_runtime(settings.okx_environment, configured)
+    _OKX_RUNTIME_CACHE.update({"at": now, "mode": settings.okx_environment, "payload": copy.deepcopy(payload)})
+    return payload
 
 
 @app.post("/api/v1/admin/okx/oauth/start")
