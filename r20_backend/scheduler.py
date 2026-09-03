@@ -69,7 +69,7 @@ def main() -> None:
 
         tz = timezone(timedelta(hours=8))
         last: dict[str, datetime | None] = {key: None for key in JOBS}
-        logging.info("R20 standalone scheduler v6.3.0 started")
+        logging.info("R20 standalone scheduler v6.3.1 started")
         while True:
             now = datetime.now(tz).replace(second=0, microsecond=0)
             current = datetime.now(tz)

@@ -6,7 +6,7 @@
 
 **独立 Gateway · 多模型委员会 · 模块化提示词 · 原生 Vue 3 SPA · QQ 官方 Bot 扫码 · 100% 云端 OCO · 加密灾备**
 
-[![Release](https://img.shields.io/badge/release-v6.3.0-3875F6?style=flat-square)](https://github.com/555cute/r20-quantum-trader/releases/tag/v6.3.0)
+[![Release](https://img.shields.io/badge/release-v6.3.1-3875F6?style=flat-square)](https://github.com/555cute/r20-quantum-trader/releases/tag/v6.3.1)
 [![LINUX DO](https://img.shields.io/badge/Community-LINUX%20DO-F97316?style=flat-square&logo=linux&logoColor=white)](https://linux.do/)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![Exchange](https://img.shields.io/badge/Exchange-OKX%20V5%20Direct-111827?style=flat-square)](https://www.okx.com/)
@@ -23,7 +23,7 @@
 
 ---
 
-![R20 v6.3.0 机构级量化终端](docs/images/dashboard_trading.png)
+![R20 v6.3.1 机构级量化终端](docs/images/dashboard_trading.png)
 
 > [!WARNING]
 > R20 是研究型自动化量化交易开源项目，不构成任何投资建议，亦不承诺任何收益。强烈建议在 OKX **DEMO 模拟盘** 环境下完成策略验证、风控测试、QQ 扫码通知与灾备演练后，再评估是否接入实盘。
