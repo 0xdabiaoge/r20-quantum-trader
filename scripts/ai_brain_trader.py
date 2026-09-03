@@ -103,6 +103,13 @@ def is_same_direction_scale_request(position_side: str, action: str) -> bool:
 
 def get_cpa_client_config() -> Tuple[str, str]:
     """Resolve LLM credentials only from process environment or local .env."""
+    try:
+        from r20_backend.llm_manager import get_active_llm_runtime
+        active_llm = get_active_llm_runtime()
+        if active_llm.get("base_url"):
+            return active_llm["base_url"], active_llm.get("api_key", "")
+    except Exception:
+        pass
     if standalone_settings:
         return standalone_settings.llm_base_url, standalone_settings.llm_api_key
     return (
@@ -778,219 +785,248 @@ def execute_batch_ai_brain_cycle(pos_summary: str = "当前总持仓 0/6", activ
     except Exception:
         pass
 
-    payload = {
-        "model": "gemini-3.7-flash-high",
-        "messages": [
-            {"role": "system", "content": effective_system_prompt},
-            {"role": "user", "content": prompt}
-        ],
-        "reasoning_effort": os.environ.get("LLM_REASONING_EFFORT", "high"),
-        "temperature": 0.2,
-        "response_format": {"type": "json_object"}
-    }
-
-    req = urllib.request.Request(
-        f"{base_url}/chat/completions",
-        data=json.dumps(payload).encode("utf-8"),
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-            "User-Agent": "Mozilla/5.0"
-        }
-    )
+    model_name = os.environ.get("LLM_MODEL") or "gemini-3.8-flash-high"
+    effort = os.environ.get("LLM_REASONING_EFFORT") or "high"
+    api_format = "openai_chat"
+    try:
+        from r20_backend.llm_manager import get_active_llm_runtime, execute_llm_request
+        active_llm = get_active_llm_runtime()
+        model_name = os.environ.get("LLM_MODEL") or active_llm.get("model") or model_name
+        effort = os.environ.get("LLM_REASONING_EFFORT") or active_llm.get("reasoning_effort") or effort
+        api_format = active_llm.get("api_format", "openai_chat")
+        base_url = active_llm.get("base_url") or base_url
+        api_key = active_llm.get("api_key") or api_key
+    except Exception:
+        execute_llm_request = None
 
     telemetry = ModelCallTelemetry(
-        "trading_brain", payload["model"], payload["reasoning_effort"], effective_system_prompt, prompt
+        "trading_brain", model_name, str(effort), effective_system_prompt, prompt
     )
     try:
         t0 = time.time()
-        print("[AI Brain Batch] 🚀 正在发起单次全市场大模型宏观决策推演 (Gemini 3.7)...")
-        with urllib.request.urlopen(req, timeout=50) as resp:
-            res = json.loads(resp.read().decode("utf-8"))
-            content = res["choices"][0]["message"]["content"].strip()
+        print(f"[AI Brain Batch] 🚀 正在发起单次全市场大模型宏观决策推演 ({model_name} / {api_format})...")
+        raw_res = None
+        if execute_llm_request:
+            content, _, usage_dict, _ = execute_llm_request(
+                messages=[
+                    {"role": "system", "content": effective_system_prompt},
+                    {"role": "user", "content": prompt}
+                ],
+                model=model_name,
+                base_url=base_url,
+                api_key=api_key,
+                api_format=api_format,
+                reasoning_effort=effort,
+                temperature=0.2,
+                response_format={"type": "json_object"},
+                timeout=50.0,
+            )
+            raw_res = {"usage": usage_dict} if isinstance(usage_dict, dict) else {}
+        else:
+            payload = {
+                "model": model_name,
+                "messages": [
+                    {"role": "system", "content": effective_system_prompt},
+                    {"role": "user", "content": prompt}
+                ],
+                "temperature": 0.2,
+                "response_format": {"type": "json_object"}
+            }
+            if effort not in ("none", "auto"):
+                payload["reasoning_effort"] = effort
+            req = urllib.request.Request(
+                f"{base_url}/chat/completions",
+                data=json.dumps(payload).encode("utf-8"),
+                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json", "User-Agent": "Mozilla/5.0"}
+            )
+            with urllib.request.urlopen(req, timeout=50) as resp:
+                res = json.loads(resp.read().decode("utf-8"))
+                content = res["choices"][0]["message"]["content"].strip()
+                raw_res = res
 
-            if content.startswith("```json"): content = content[7:]
-            if content.startswith("```"): content = content[3:]
-            if content.endswith("```"): content = content[:-3]
+        if content.startswith("```json"): content = content[7:]
+        if content.startswith("```"): content = content[3:]
+        if content.endswith("```"): content = content[:-3]
 
-            brain_output = json.loads(content.strip())
-            if not isinstance(brain_output, dict):
-                raise ValueError("LLM response root must be an object")
-            decisions_dict = brain_output.get("decisions", {})
-            pos_mgmt_list = brain_output.get("position_management", [])
-            macro_summary = str(brain_output.get("macro_assessment", "宏观中性震荡"))[:120]
-            if not isinstance(decisions_dict, dict):
-                decisions_dict = {}
-            if not isinstance(pos_mgmt_list, list):
-                pos_mgmt_list = []
+        brain_output = json.loads(content.strip())
+        if not isinstance(brain_output, dict):
+            raise ValueError("LLM response root must be an object")
+        decisions_dict = brain_output.get("decisions", {})
+        pos_mgmt_list = brain_output.get("position_management", [])
+        macro_summary = str(brain_output.get("macro_assessment", "宏观中性震荡"))[:120]
+        if not isinstance(decisions_dict, dict):
+            decisions_dict = {}
+        if not isinstance(pos_mgmt_list, list):
+            pos_mgmt_list = []
 
-            validated_pos_mgmt = []
-            seen_positions = set()
-            for item in pos_mgmt_list:
-                if not isinstance(item, dict):
-                    continue
-                inst_id = str(item.get("instId", ""))
-                if inst_id not in active_inst_ids or inst_id in seen_positions:
-                    continue
-                seen_positions.add(inst_id)
-                action = str(item.get("action", "HOLD")).upper()
-                if action not in {"HOLD", "CLOSE_MARKET", "UPDATE_SL"}:
-                    action = "HOLD"
-                confidence = max(0.0, min(100.0, safe_float(item.get("confidence"))))
-                suggested_sl = safe_float(item.get("suggested_sl_price"))
-                if action != "UPDATE_SL":
-                    suggested_sl = 0.0
-                validated_pos_mgmt.append({
-                    "instId": inst_id,
-                    "action": action,
-                    "suggested_sl_price": suggested_sl,
-                    "confidence": confidence,
-                    "reason": str(item.get("reason", "模型未提供持仓理由"))[:120]
-                })
-            for inst_id in sorted(active_inst_ids - seen_positions):
-                validated_pos_mgmt.append({
-                    "instId": inst_id,
-                    "action": "HOLD",
-                    "suggested_sl_price": 0.0,
-                    "confidence": 0.0,
-                    "reason": "模型遗漏该持仓，安全降级为 HOLD"
-                })
-            pos_mgmt_list = validated_pos_mgmt
-
-            # Execute Pending Orders Cancellation if AI Brain decides CANCEL
-            pending_mgmt_list = brain_output.get("pending_orders_management", [])
-            if isinstance(pending_mgmt_list, list):
-                for p_order in pending_mgmt_list:
-                    if not isinstance(p_order, dict):
-                        continue
-                    p_act = str(p_order.get("action", "")).upper()
-                    p_ord_id = str(p_order.get("ordId", ""))
-                    p_inst_id = str(p_order.get("instId", ""))
-                    p_reason = str(p_order.get("reason", "模型指示撤销该挂单"))
-                    if p_act == "CANCEL" and p_ord_id and p_inst_id:
-                        cxl_cmd = okx_private_command(f"okx swap cancel {p_inst_id} --ordId {p_ord_id} --json")
-                        cxl_res = subprocess.run(cxl_cmd, shell=True, capture_output=True, text=True, timeout=10)
-                        print(f"[AI Brain Batch] 🛑 AI自主撤回失效/过时限价单: {p_inst_id} (ordId={p_ord_id}, 原因={p_reason})")
-
-            standard_cache = {}
-            for p in packages:
-                inst_id = p["instId"]
-                d_item = decisions_dict.get(inst_id, {})
-                if not isinstance(d_item, dict):
-                    d_item = {}
-                raw_action = str(d_item.get("action", "WAIT")).upper()
-                if raw_action not in {"BUY_LONG", "SELL_SHORT", "WAIT"}:
-                    raw_action = "WAIT"
-                entry = safe_float(d_item.get("entry_price"))
-                take_profit = safe_float(d_item.get("take_profit_price"))
-                stop_loss = safe_float(d_item.get("stop_loss_price"))
-                confidence = max(0.0, min(100.0, safe_float(d_item.get("confidence"))))
-                ai_leverage = int(max(2, min(5, round(safe_float(d_item.get("leverage", 3))))))
-                ai_margin = round(safe_float(d_item.get("margin_usdt", 0.0)), 2)
-                rr = 0.0
-                if raw_action == "BUY_LONG" and entry > stop_loss > 0 and take_profit > entry:
-                    rr = (take_profit - entry) / (entry - stop_loss)
-                elif raw_action == "SELL_SHORT" and stop_loss > entry > take_profit > 0:
-                    rr = (entry - take_profit) / (stop_loss - entry)
-
-                rejection_reason = ""
-                if p.get("data_quality") != "valid":
-                    rejection_reason = "关键原始行情不完整，安全降级为 WAIT。"
-                elif inst_id in active_inst_ids and raw_action != "WAIT":
-                    position_side = active_position_sides.get(inst_id, "")
-                    same_direction_scale_request = is_same_direction_scale_request(position_side, raw_action)
-                    if not same_direction_scale_request:
-                        rejection_reason = "已有反向或不兼容持仓，禁止借决策通道反向开仓，安全降级为 WAIT。"
-                if not rejection_reason and raw_action in {"BUY_LONG", "SELL_SHORT"} and rr < 2.0:
-                    rejection_reason = "模型报价未满足真实 2R，执行层降级为 WAIT。"
-                if rejection_reason:
-                    raw_action = "WAIT"
-
-                standard_cache[inst_id] = {
-                    "instId": inst_id,
-                    "name": p["name"],
-                    "timestamp": int(time.time()),
-                    "time_str": time_str,
-                    "macro_assessment": macro_summary,
-                    "thought_process": {
-                        "market_structure": d_item.get("market_structure", "多周期结构中性"),
-                        "calculus_dynamics": d_item.get("calculus_dynamics", "模型未提供具体微积分证据"),
-                        "math_prob_rationale": d_item.get("math_prob_rationale", "模型未提供具体定积分与概率证据"),
-                        "volume_and_oi": d_item.get("volume_and_oi", f"OI: {p['oiUsd']}, Taker: {p['takerNetUsd']}"),
-                        "risk_reward_evaluation": "目标 R:R ≥ 2.5；执行底线 2.0"
-                    },
-                    "smart_money": p.get("smart_money", {}),
-                    "adx_1h": p.get("adx_1h", "--"),
-                    "decision": {
-                        "action": raw_action,
-                        "confidence": confidence,
-                        "leverage": ai_leverage,
-                        "margin_usdt": ai_margin,
-                        "entry_price": entry,
-                        "take_profit_price": take_profit,
-                        "stop_loss_price": stop_loss,
-                        "risk_reward_ratio": f"{rr:.2f} : 1" if rr > 0 else "--",
-                        "summary_reason": rejection_reason or str(d_item.get("summary_reason", "全市场矩阵综合评估中"))[:120]
-                    },
-                    "data_quality": p.get("data_quality", "invalid"),
-                    "raw_ticker": {
-                        "last": p["price"],
-                        "bidPx": p["bidPx"],
-                        "askPx": p["askPx"],
-                        "chg24h": p["chg24h"]
-                    },
-                    "raw_funding_rate": f"{p['fundingRate']}%" if p.get('fundingRate') else "--",
-                    "raw_oi": p.get('oiUsd') or "--",
-                    "raw_taker_vol": p.get('takerNetUsd') or "--",
-                    "raw_ls_ratio": str(p.get('lsRatio')) if p.get('lsRatio') is not None else "--"
-                }
-
-            atomic_write_json(AI_DECISION_CACHE_FILE, standard_cache)
-            atomic_write_json(AI_POSITION_MANAGEMENT_FILE, {
-                "timestamp": int(time.time()),
-                "time_str": time_str,
-                "instructions": pos_mgmt_list
+        validated_pos_mgmt = []
+        seen_positions = set()
+        for item in pos_mgmt_list:
+            if not isinstance(item, dict):
+                continue
+            inst_id = str(item.get("instId", ""))
+            if inst_id not in active_inst_ids or inst_id in seen_positions:
+                continue
+            seen_positions.add(inst_id)
+            action = str(item.get("action", "HOLD")).upper()
+            if action not in {"HOLD", "CLOSE_MARKET", "UPDATE_SL"}:
+                action = "HOLD"
+            confidence = max(0.0, min(100.0, safe_float(item.get("confidence"))))
+            suggested_sl = safe_float(item.get("suggested_sl_price"))
+            if action != "UPDATE_SL":
+                suggested_sl = 0.0
+            validated_pos_mgmt.append({
+                "instId": inst_id,
+                "action": action,
+                "suggested_sl_price": suggested_sl,
+                "confidence": confidence,
+                "reason": str(item.get("reason", "模型未提供持仓理由"))[:120]
             })
 
-            # Record durable history for Web Audit
-            full_prompt_text = f"【SYSTEM PROMPT】：\n{effective_system_prompt.strip()}\n\n{'='*70}\n【USER PROMPT ({time_str})】：\n{prompt.strip()}"
-            history_record = {
-                "time": time_str,
+        for inst_id in sorted(active_inst_ids - seen_positions):
+            validated_pos_mgmt.append({
+                "instId": inst_id,
+                "action": "HOLD",
+                "suggested_sl_price": 0.0,
+                "confidence": 0.0,
+                "reason": "模型遗漏该持仓，安全降级为 HOLD"
+            })
+        pos_mgmt_list = validated_pos_mgmt
+
+        # Execute Pending Orders Cancellation if AI Brain decides CANCEL
+        pending_mgmt_list = brain_output.get("pending_orders_management", [])
+        if isinstance(pending_mgmt_list, list):
+            for p_order in pending_mgmt_list:
+                if not isinstance(p_order, dict):
+                    continue
+                p_act = str(p_order.get("action", "")).upper()
+                p_ord_id = str(p_order.get("ordId", ""))
+                p_inst_id = str(p_order.get("instId", ""))
+                p_reason = str(p_order.get("reason", "模型指示撤销该挂单"))
+                if p_act == "CANCEL" and p_ord_id and p_inst_id:
+                    cxl_cmd = okx_private_command(f"okx swap cancel {p_inst_id} --ordId {p_ord_id} --json")
+                    cxl_res = subprocess.run(cxl_cmd, shell=True, capture_output=True, text=True, timeout=10)
+                    print(f"[AI Brain Batch] 🛑 AI自主撤回失效/过时限价单: {p_inst_id} (ordId={p_ord_id}, 原因={p_reason})")
+
+        standard_cache = {}
+        for p in packages:
+            inst_id = p["instId"]
+            d_item = decisions_dict.get(inst_id, {})
+            if not isinstance(d_item, dict):
+                d_item = {}
+            raw_action = str(d_item.get("action", "WAIT")).upper()
+            if raw_action not in {"BUY_LONG", "SELL_SHORT", "WAIT"}:
+                raw_action = "WAIT"
+            entry = safe_float(d_item.get("entry_price"))
+            take_profit = safe_float(d_item.get("take_profit_price"))
+            stop_loss = safe_float(d_item.get("stop_loss_price"))
+            confidence = max(0.0, min(100.0, safe_float(d_item.get("confidence"))))
+            ai_leverage = int(max(2, min(5, round(safe_float(d_item.get("leverage", 3))))))
+            ai_margin = round(safe_float(d_item.get("margin_usdt", 0.0)), 2)
+            rr = 0.0
+            if raw_action == "BUY_LONG" and entry > stop_loss > 0 and take_profit > entry:
+                rr = (take_profit - entry) / (entry - stop_loss)
+            elif raw_action == "SELL_SHORT" and stop_loss > entry > take_profit > 0:
+                rr = (entry - take_profit) / (stop_loss - entry)
+
+            rejection_reason = ""
+            if p.get("data_quality") != "valid":
+                rejection_reason = "关键原始行情不完整，安全降级为 WAIT。"
+            elif inst_id in active_inst_ids and raw_action != "WAIT":
+                position_side = active_position_sides.get(inst_id, "")
+                same_direction_scale_request = is_same_direction_scale_request(position_side, raw_action)
+                if not same_direction_scale_request:
+                    rejection_reason = "已有反向或不兼容持仓，禁止借决策通道反向开仓，安全降级为 WAIT。"
+            if not rejection_reason and raw_action in {"BUY_LONG", "SELL_SHORT"} and rr < 2.0:
+                rejection_reason = "模型报价未满足真实 2R，执行层降级为 WAIT。"
+            if rejection_reason:
+                raw_action = "WAIT"
+
+            standard_cache[inst_id] = {
+                "instId": inst_id,
+                "name": p["name"],
+                "timestamp": int(time.time()),
+                "time_str": time_str,
                 "macro_assessment": macro_summary,
-                "ai_last_prompt": full_prompt_text,
-                "position_management": pos_mgmt_list,
-                "top_opportunities": [
-                    {
-                        "inst": p["name"],
-                        "action": standard_cache[p["instId"]]["decision"]["action"],
-                        "confidence": standard_cache[p["instId"]]["decision"]["confidence"],
-                        "leverage": standard_cache[p["instId"]]["decision"].get("leverage", 3),
-                        "margin_usdt": standard_cache[p["instId"]]["decision"].get("margin_usdt", 0.0),
-                        "risk_reward_ratio": standard_cache[p["instId"]]["decision"]["risk_reward_ratio"],
-                        "data_quality": standard_cache[p["instId"]]["data_quality"],
-                        "reason": standard_cache[p["instId"]]["decision"]["summary_reason"]
-                    }
-                    for p in packages
-                ]
+                "thought_process": {
+                    "market_structure": d_item.get("market_structure", "多周期结构中性"),
+                    "calculus_dynamics": d_item.get("calculus_dynamics", "模型未提供具体微积分证据"),
+                    "math_prob_rationale": d_item.get("math_prob_rationale", "模型未提供具体定积分与概率证据"),
+                    "volume_and_oi": d_item.get("volume_and_oi", f"OI: {p['oiUsd']}, Taker: {p['takerNetUsd']}"),
+                    "risk_reward_evaluation": "目标 R:R ≥ 2.5；执行底线 2.0"
+                },
+                "smart_money": p.get("smart_money", {}),
+                "adx_1h": p.get("adx_1h", "--"),
+                "decision": {
+                    "action": raw_action,
+                    "confidence": confidence,
+                    "leverage": ai_leverage,
+                    "margin_usdt": ai_margin,
+                    "entry_price": entry,
+                    "take_profit_price": take_profit,
+                    "stop_loss_price": stop_loss,
+                    "risk_reward_ratio": f"{rr:.2f} : 1" if rr > 0 else "--",
+                    "summary_reason": rejection_reason or str(d_item.get("summary_reason", "全市场矩阵综合评估中"))[:120]
+                },
+                "data_quality": p.get("data_quality", "invalid"),
+                "raw_ticker": {
+                    "last": p["price"],
+                    "bidPx": p["bidPx"],
+                    "askPx": p["askPx"],
+                    "chg24h": p["chg24h"]
+                },
+                "raw_funding_rate": f"{p['fundingRate']}%" if p.get('fundingRate') else "--",
+                "raw_oi": p.get('oiUsd') or "--",
+                "raw_taker_vol": p.get('takerNetUsd') or "--",
+                "raw_ls_ratio": str(p.get('lsRatio')) if p.get('lsRatio') is not None else "--"
             }
 
-            history_list = []
-            if os.path.exists(AI_DECISION_HISTORY_FILE):
-                try:
-                    with open(AI_DECISION_HISTORY_FILE, "r", encoding="utf-8") as f:
-                        history_list = json.load(f)
-                except Exception:
-                    pass
+        atomic_write_json(AI_DECISION_CACHE_FILE, standard_cache)
+        atomic_write_json(AI_POSITION_MANAGEMENT_FILE, {
+            "timestamp": int(time.time()),
+            "time_str": time_str,
+            "instructions": pos_mgmt_list
+        })
 
-            history_list.insert(0, history_record)
-            history_list = history_list[:50] # Keep recent 50 rounds
+        # Record durable history for Web Audit
+        full_prompt_text = f"【SYSTEM PROMPT】：\n{effective_system_prompt.strip()}\n\n{'='*70}\n【USER PROMPT ({time_str})】：\n{prompt.strip()}"
+        history_record = {
+            "time": time_str,
+            "macro_assessment": macro_summary,
+            "ai_last_prompt": full_prompt_text,
+            "position_management": pos_mgmt_list,
+            "top_opportunities": [
+                {
+                    "inst": p["name"],
+                    "action": standard_cache[p["instId"]]["decision"]["action"],
+                    "confidence": standard_cache[p["instId"]]["decision"]["confidence"],
+                    "leverage": standard_cache[p["instId"]]["decision"].get("leverage", 3),
+                    "margin_usdt": standard_cache[p["instId"]]["decision"].get("margin_usdt", 0.0),
+                    "risk_reward_ratio": standard_cache[p["instId"]]["decision"]["risk_reward_ratio"],
+                    "data_quality": standard_cache[p["instId"]]["data_quality"],
+                    "reason": standard_cache[p["instId"]]["decision"]["summary_reason"]
+                }
+                for p in packages
+            ]
+        }
 
-            atomic_write_json(AI_DECISION_HISTORY_FILE, history_list)
+        history_list = []
+        if os.path.exists(AI_DECISION_HISTORY_FILE):
+            try:
+                with open(AI_DECISION_HISTORY_FILE, "r", encoding="utf-8") as f:
+                    history_list = json.load(f)
+            except Exception:
+                pass
 
-            latency = round(time.time() - t0, 2)
-            telemetry.finish("success", res, output_chars=len(content))
-            print(f"[AI Brain Batch] ✅ 6 币种全景决策完成 (耗时 {latency}s, 宏观基调: {macro_summary})")
-            return standard_cache
+        history_list.insert(0, history_record)
+        history_list = history_list[:50] # Keep recent 50 rounds
+
+        atomic_write_json(AI_DECISION_HISTORY_FILE, history_list)
+
+        latency = round(time.time() - t0, 2)
+        telemetry.finish("success", raw_res, output_chars=len(content))
+        print(f"[AI Brain Batch] ✅ 6 币种全景决策完成 (耗时 {latency}s, 宏观基调: {macro_summary})")
+        return standard_cache
 
     except Exception as e:
         telemetry.finish("failed", error=e)

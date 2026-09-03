@@ -48,6 +48,19 @@ from r20_gateway.secrets import delete_secrets, save_secrets, status as secret_s
 from r20_gateway.store import GatewayStore
 from r20_gateway.supervisor import start_supervisor as start_gateway_supervisor, stop_supervisor as stop_gateway_supervisor
 from scripts.instrument_pool import from_okx_instrument, load_instruments, save_instruments
+from r20_backend.llm_manager import (
+    load_llm_config,
+    get_active_llm_runtime,
+    activate_provider_model,
+    upsert_provider,
+    delete_provider,
+    upsert_model,
+    delete_model,
+    test_llm_connection,
+    init_llm_providers,
+    _atomic_write_json,
+    LLM_PROVIDERS_FILE,
+)
 from scripts.prompt_library import (
     PRESETS, TEMPLATE_KEYS, active_profile, activate_profile, all_profiles, apply_module_layout,
     create_profile, delete_profile, export_profile, get_profile, import_profile,
@@ -78,7 +91,7 @@ async def lifespan(_: FastAPI):
     stop_gateway_supervisor()
 
 
-app = FastAPI(title="R20 Quantum Trader Standalone Backend", version="6.2.0", lifespan=lifespan)
+app = FastAPI(title="R20 Quantum Trader Standalone Backend", version="6.2.1", lifespan=lifespan)
 
 
 @app.middleware("http")
@@ -142,9 +155,47 @@ class AdminConfigUpdate(BaseModel):
     llm_base_url: str | None = None
     llm_api_key: str | None = None
     llm_model: str | None = None
-    llm_reasoning_effort: str | None = Field(default=None, pattern=r"^(low|medium|high)$")
+    llm_reasoning_effort: str | None = Field(default=None, pattern=r"^(low|medium|high|minimal|none|auto)$")
     notification_webhook: str | None = None
     manual_close_enabled: bool | None = None
+
+
+class LLMActivateRequest(BaseModel):
+    model_id: str
+    provider_id: str | None = None
+    reasoning_effort: str | None = Field(default=None, pattern=r"^(low|medium|high|minimal|none|auto)$")
+
+
+class LLMTestRequest(BaseModel):
+    model: str
+    provider_id: str | None = None
+    base_url: str | None = None
+    api_key: str | None = None
+    api_format: str = "openai_chat"
+    reasoning_effort: str = Field(default="auto", pattern=r"^(low|medium|high|minimal|none|auto)$")
+    reasoning_type: str = "auto"
+
+
+class LLMProviderUpsertRequest(BaseModel):
+    id: str | None = None
+    name: str
+    base_url: str
+    api_key: str | None = None
+    description: str | None = ""
+    models: list[dict[str, Any]] | None = None
+
+
+class LLMModelUpsertRequest(BaseModel):
+    id: str
+    name: str | None = None
+    provider_name: str | None = None
+    base_url: str | None = None
+    api_key: str | None = None
+    api_format: str = "openai_chat"
+    reasoning_type: str = "auto"
+    default_effort: str = "high"
+    reasoning_effort: str | None = None
+    description: str | None = ""
 
 
 class InitialCapitalUpdate(BaseModel):
@@ -274,10 +325,17 @@ class NotificationConfigUpdate(BaseModel):
     telegram_enabled: bool = False
     telegram_bot_token: str | None = None
     telegram_chat_id: str = ""
+    telegram_api_base: str | None = None
     qq_enabled: bool = False
     qq_app_id: str = ""
     qq_client_secret: str | None = None
     qq_openid: str = ""
+
+
+class QQOpenIDCaptureStartRequest(BaseModel):
+    app_id: str | None = None
+    client_secret: str | None = None
+    timeout: int = 60
 
 
 class NotificationTestRequest(BaseModel):
@@ -376,7 +434,7 @@ def runtime_overview() -> dict[str, Any]:
     ]
     positions_payload = read_json("position_trackers.json", {})
     return {
-        "service": {"version": "6.2.0", "pid": os.getpid(), "uptime_seconds": int(time.time() - STARTED_AT)},
+        "service": {"version": "6.2.1", "pid": os.getpid(), "uptime_seconds": int(time.time() - STARTED_AT)},
         "credentials": {"okx": bool(settings.okx_api_key and settings.okx_secret_key and settings.okx_passphrase), "llm": bool(settings.llm_api_key)},
         "data_health": health_files,
         "decisions": decision_summary(),
@@ -719,12 +777,147 @@ def update_admin_config(payload: AdminConfigUpdate, x_r20_admin_token: str | Non
     }
     update_env(env_values)
     refresh_settings()
+    if any(k.startswith("llm_") for k in data):
+        try:
+            cfg = init_llm_providers()
+            active_p = next((p for p in cfg.get("providers", []) if p["id"] == cfg.get("active_provider_id")), None)
+            if active_p:
+                if "llm_base_url" in data and data["llm_base_url"]:
+                    active_p["base_url"] = data["llm_base_url"].rstrip("/")
+                if "llm_api_key" in data and data["llm_api_key"]:
+                    active_p["api_key"] = data["llm_api_key"]
+                if "llm_model" in data and data["llm_model"]:
+                    cfg["active_model_id"] = data["llm_model"]
+                if "llm_reasoning_effort" in data and data["llm_reasoning_effort"]:
+                    cfg["active_reasoning_effort"] = data["llm_reasoning_effort"]
+                _atomic_write_json(LLM_PROVIDERS_FILE, cfg)
+        except Exception:
+            pass
     audit_record("config.update", "success", {"fields": sorted(data.keys())})
     return {
         "updated": True,
         "restart_note": "Long-running strategy processes read updated .env on their next execution cycle.",
         "manual_close_enabled": settings.manual_close_enabled,
     }
+
+
+@app.get("/api/v1/admin/llm/providers")
+@app.get("/api/v1/admin/llm/models")
+def admin_get_llm_models(x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    require_admin_header(x_r20_session=x_r20_session)
+    return load_llm_config(mask_keys=True)
+
+
+@app.post("/api/v1/admin/llm/activate")
+def admin_activate_llm_model(payload: LLMActivateRequest, x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    actor = require_superadmin(x_r20_session)
+    try:
+        result = activate_provider_model(payload.provider_id or "custom", payload.model_id, payload.reasoning_effort)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    audit_record("llm.model.activate", "success", {
+        "actor": actor["username"],
+        "model_id": payload.model_id,
+        "reasoning_effort": result.get("active_reasoning_effort"),
+    })
+    return result
+
+
+@app.post("/api/v1/admin/llm/test")
+def admin_test_llm(payload: LLMTestRequest, x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    require_admin_header(x_r20_session=x_r20_session)
+    base_url = payload.base_url
+    api_key = payload.api_key
+    api_format = payload.api_format or "openai_chat"
+
+    raw_config = load_llm_config(mask_keys=False)
+    m_entry = next((m for m in raw_config.get("models", []) if m["id"] == payload.model), None)
+    if m_entry:
+        if not base_url:
+            base_url = m_entry.get("base_url")
+        if not api_key:
+            api_key = m_entry.get("api_key")
+        if not payload.api_format or payload.api_format == "openai_chat":
+            api_format = m_entry.get("api_format", "openai_chat")
+
+    if not base_url:
+        active_runtime = get_active_llm_runtime()
+        base_url = active_runtime.get("base_url")
+        if not api_key:
+            api_key = active_runtime.get("api_key")
+        if not payload.api_format:
+            api_format = active_runtime.get("api_format", "openai_chat")
+
+    result = test_llm_connection(
+        base_url=base_url or "",
+        api_key=api_key or "",
+        model=payload.model,
+        api_format=api_format,
+        reasoning_effort=payload.reasoning_effort,
+        reasoning_type=payload.reasoning_type,
+        timeout=25.0,
+    )
+    audit_record("llm.connection.test", "success" if result.get("ok") else "failed", {
+        "model": payload.model,
+        "api_format": api_format,
+        "latency_ms": result.get("latency_ms"),
+        "status_code": result.get("status_code"),
+        "reasoning_detected": result.get("reasoning_detected"),
+        "endpoint": result.get("endpoint"),
+    })
+    return result
+
+
+@app.post("/api/v1/admin/llm/models")
+@app.post("/api/v1/admin/llm/providers/{provider_id}/models")
+def admin_upsert_llm_model(payload: LLMModelUpsertRequest, provider_id: str = "custom", x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    actor = require_superadmin(x_r20_session)
+    try:
+        res = upsert_model(provider_id, payload.model_dump(exclude_none=True))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    audit_record("llm.model.upsert", "success", {"actor": actor["username"], "model_id": payload.id, "api_format": res.get("api_format")})
+    return res
+
+
+@app.delete("/api/v1/admin/llm/models/{model_id}")
+@app.delete("/api/v1/admin/llm/providers/{provider_id}/models/{model_id}")
+def admin_delete_llm_model(model_id: str, provider_id: str = "custom", x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    actor = require_superadmin(x_r20_session)
+    try:
+        deleted = delete_model(provider_id, model_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if not deleted:
+        raise HTTPException(status_code=404, detail="未找到该模型")
+    audit_record("llm.model.delete", "success", {"actor": actor["username"], "model_id": model_id})
+    return {"deleted": True, "model_id": model_id}
+
+
+@app.post("/api/v1/admin/llm/providers")
+def admin_upsert_llm_provider(payload: LLMProviderUpsertRequest, x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    actor = require_superadmin(x_r20_session)
+    try:
+        res = upsert_provider(payload.model_dump(exclude_none=True))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    audit_record("llm.provider.upsert", "success", {"actor": actor["username"], "provider_id": res.get("id")})
+    return res
+
+
+@app.delete("/api/v1/admin/llm/providers/{provider_id}")
+def admin_delete_llm_provider(provider_id: str, x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    actor = require_superadmin(x_r20_session)
+    try:
+        deleted = delete_provider(provider_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if not deleted:
+        raise HTTPException(status_code=404, detail="未找到该模型供应商")
+    audit_record("llm.provider.delete", "success", {"actor": actor["username"], "provider_id": provider_id})
+    return {"deleted": True, "provider_id": provider_id}
+    audit_record("llm.model.delete", "success", {"actor": actor["username"], "provider_id": provider_id, "model_id": model_id})
+    return {"deleted": True, "provider_id": provider_id, "model_id": model_id}
 
 
 @app.get("/api/v1/admin/okx/account-snapshot")
@@ -825,10 +1018,10 @@ def admin_about(x_r20_admin_token: str | None = Header(default=None)) -> dict[st
     import platform
     store = GatewayStore(GATEWAY_DB_PATH)
     return {
-        "product": {"name": "R20 Quantum Trader", "version": "6.2.0", "control_plane": "R20 Gateway Runtime", "gateway_version": GATEWAY_VERSION},
+        "product": {"name": "R20 Quantum Trader", "version": "6.2.1", "control_plane": "R20 Gateway Runtime", "gateway_version": GATEWAY_VERSION},
         "runtime": {"python": platform.python_version(), "platform": platform.platform(), "backend_pid": os.getpid(), "gateway": gateway_status(x_r20_admin_token)},
         "components": [
-            {"name": "FastAPI Control Plane", "version": "6.2.0"},
+            {"name": "FastAPI Control Plane", "version": "6.2.1"},
             {"name": "Gateway Event Runtime", "version": GATEWAY_VERSION},
             {"name": "SQLite", "version": __import__("sqlite3").sqlite_version},
         ],
@@ -1042,22 +1235,22 @@ def update_prompt_override(payload: PromptOverrideRequest, x_r20_admin_token: st
 
 
 @app.get("/api/v1/admin/notifications")
-def notification_config(x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
+def notification_config(x_r20_session: str | None = Header(default=None, alias="X-R20-Session"), x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
     refresh_settings()
-    require_admin_header(x_r20_admin_token)
+    require_admin_header(x_r20_admin_token, x_r20_session)
     env = notification_env()
     return {
         "webhook": {"enabled": env.get("R20_NOTIFY_WEBHOOK_ENABLED", "0") == "1", "url": env.get("R20_NOTIFICATION_WEBHOOK", "")},
         "wechat": {"enabled": env.get("R20_NOTIFY_WECHAT_ENABLED", "0") == "1", "webhook": env.get("R20_WECHAT_WEBHOOK", "")},
-        "telegram": {"enabled": env.get("R20_NOTIFY_TELEGRAM_ENABLED", "0") == "1", "bot_token": mask(env.get("R20_TELEGRAM_BOT_TOKEN", "")), "chat_id": env.get("R20_TELEGRAM_CHAT_ID", "")},
+        "telegram": {"enabled": env.get("R20_NOTIFY_TELEGRAM_ENABLED", "0") == "1", "bot_token": mask(env.get("R20_TELEGRAM_BOT_TOKEN", "")), "chat_id": env.get("R20_TELEGRAM_CHAT_ID", ""), "api_base": env.get("R20_TELEGRAM_API_BASE", "")},
         "qq": {"enabled": env.get("R20_NOTIFY_QQ_ENABLED", "0") == "1", "app_id": env.get("R20_QQ_APP_ID", ""), "client_secret": mask(env.get("R20_QQ_CLIENT_SECRET", "")), "openid": env.get("R20_QQ_OPENID", "")},
     }
 
 
 @app.put("/api/v1/admin/channels/{channel}/toggle")
-def toggle_channel(channel: str, payload: ChannelToggleRequest, x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
+def toggle_channel(channel: str, payload: ChannelToggleRequest, x_r20_session: str | None = Header(default=None, alias="X-R20-Session"), x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
     refresh_settings()
-    require_admin_header(x_r20_admin_token)
+    require_admin_header(x_r20_admin_token, x_r20_session)
     keys = {
         "qq": "R20_NOTIFY_QQ_ENABLED",
         "telegram": "R20_NOTIFY_TELEGRAM_ENABLED", "wechat": "R20_NOTIFY_WECHAT_ENABLED",
@@ -1074,7 +1267,9 @@ def toggle_channel(channel: str, payload: ChannelToggleRequest, x_r20_admin_toke
             "webhook": bool(env.get("R20_NOTIFICATION_WEBHOOK")),
         }
         if not readiness[channel]:
-            raise HTTPException(status_code=409, detail="频道凭证或目标未配置完整，请先保存配置再启用")
+            if channel == "qq" and env.get("R20_QQ_APP_ID") and env.get("R20_QQ_CLIENT_SECRET") and not env.get("R20_QQ_OPENID"):
+                raise HTTPException(status_code=409, detail="QQ 缺少目标用户 OpenID，请先点击「⚡ 自动获取 OpenID」向 Bot 发送消息完成绑定")
+            raise HTTPException(status_code=409, detail=f"{channel} 频道凭证或目标未配置完整，请先保存有效配置再启用")
     update_env({keys[channel]: "1" if payload.enabled else "0"})
     audit_record("channel.toggle", "success", {"channel": channel, "enabled": payload.enabled})
     return {"channel": channel, "enabled": payload.enabled}
@@ -1084,43 +1279,87 @@ def toggle_channel(channel: str, payload: ChannelToggleRequest, x_r20_admin_toke
 def update_notification_config(payload: NotificationConfigUpdate, x_r20_admin_token: str | None = Header(default=None), x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
     refresh_settings()
     require_superadmin(x_r20_session)
-    for value, title in ((payload.webhook_url, "通用 Webhook"), (payload.wechat_webhook, "企业微信 Webhook")):
-        if value and not value.startswith(("https://", "http://")):
-            raise HTTPException(status_code=400, detail=f"{title} 必须以 http:// 或 https:// 开头")
-    existing = notification_env()
+
+    # Save credentials unconditionally to preserve user configurations
+    secret_values = {}
+    if payload.webhook_url:
+        secret_values["R20_NOTIFICATION_WEBHOOK"] = payload.webhook_url.strip()
+    if payload.wechat_webhook:
+        secret_values["R20_WECHAT_WEBHOOK"] = payload.wechat_webhook.strip()
+    if payload.telegram_bot_token:
+        secret_values["R20_TELEGRAM_BOT_TOKEN"] = payload.telegram_bot_token.strip()
+    if payload.qq_client_secret:
+        secret_values["R20_QQ_CLIENT_SECRET"] = payload.qq_client_secret.strip()
+
+    if secret_values:
+        save_secrets(secret_values)
+        remove_env(set(secret_values))
+
+    env_update = {
+        "R20_TELEGRAM_CHAT_ID": payload.telegram_chat_id.strip(),
+        "R20_QQ_APP_ID": payload.qq_app_id.strip(),
+        "R20_QQ_OPENID": payload.qq_openid.strip(),
+    }
+    if payload.telegram_api_base is not None:
+        env_update["R20_TELEGRAM_API_BASE"] = payload.telegram_api_base.strip()
+
+    # Determine readiness
+    current_env = notification_env()
     readiness = {
-        "QQ": (payload.qq_enabled, bool(payload.qq_app_id and (payload.qq_client_secret or existing.get("R20_QQ_CLIENT_SECRET")) and payload.qq_openid)),
-        "Telegram": (payload.telegram_enabled, bool((payload.telegram_bot_token or existing.get("R20_TELEGRAM_BOT_TOKEN")) and payload.telegram_chat_id)),
-        "企业微信": (payload.wechat_enabled, bool(payload.wechat_webhook)),
-        "通用 Webhook": (payload.webhook_enabled, bool(payload.webhook_url)),
+        "qq": bool(payload.qq_app_id and (payload.qq_client_secret or current_env.get("R20_QQ_CLIENT_SECRET")) and payload.qq_openid),
+        "telegram": bool((payload.telegram_bot_token or current_env.get("R20_TELEGRAM_BOT_TOKEN")) and payload.telegram_chat_id),
+        "wechat": bool(payload.wechat_webhook or current_env.get("R20_WECHAT_WEBHOOK")),
+        "webhook": bool(payload.webhook_url or current_env.get("R20_NOTIFICATION_WEBHOOK")),
     }
-    incomplete = [name for name, (enabled, ready) in readiness.items() if enabled and not ready]
-    if incomplete:
-        raise HTTPException(status_code=409, detail=f"以下频道配置不完整，无法启用：{'、'.join(incomplete)}")
-    secret_values = {
-        "R20_NOTIFICATION_WEBHOOK": payload.webhook_url, "R20_WECHAT_WEBHOOK": payload.wechat_webhook,
-        "R20_TELEGRAM_BOT_TOKEN": payload.telegram_bot_token, "R20_QQ_CLIENT_SECRET": payload.qq_client_secret,
-    }
-    save_secrets({key: value for key, value in secret_values.items() if value})
-    remove_env(set(secret_values))
-    update_env({
-        "R20_NOTIFY_WEBHOOK_ENABLED": "1" if payload.webhook_enabled else "0",
-        "R20_NOTIFY_WECHAT_ENABLED": "1" if payload.wechat_enabled else "0",
-        "R20_NOTIFY_TELEGRAM_ENABLED": "1" if payload.telegram_enabled else "0", "R20_TELEGRAM_CHAT_ID": payload.telegram_chat_id,
-        "R20_NOTIFY_QQ_ENABLED": "1" if payload.qq_enabled else "0", "R20_QQ_APP_ID": payload.qq_app_id, "R20_QQ_OPENID": payload.qq_openid,
+
+    warnings = []
+    # If user checked enabled for an incomplete channel, auto-turn off that specific channel with a helpful warning instead of crashing entire save with 409
+    eff_qq = payload.qq_enabled
+    if payload.qq_enabled and not readiness["qq"]:
+        eff_qq = False
+        warnings.append("QQ 频道因缺少 OpenID 暂未开启（请点击「⚡ 自动获取 OpenID」绑定）")
+
+    eff_tg = payload.telegram_enabled
+    if payload.telegram_enabled and not readiness["telegram"]:
+        eff_tg = False
+        warnings.append("Telegram 频道因缺少 Token 或 Chat ID 暂未开启")
+
+    eff_wx = payload.wechat_enabled
+    if payload.wechat_enabled and not readiness["wechat"]:
+        eff_wx = False
+        warnings.append("企业微信频道因缺少 Webhook 暂未开启")
+
+    eff_wh = payload.webhook_enabled
+    if payload.webhook_enabled and not readiness["webhook"]:
+        eff_wh = False
+        warnings.append("通用 Webhook 因缺少 URL 暂未开启")
+
+    env_update.update({
+        "R20_NOTIFY_WEBHOOK_ENABLED": "1" if eff_wh else "0",
+        "R20_NOTIFY_WECHAT_ENABLED": "1" if eff_wx else "0",
+        "R20_NOTIFY_TELEGRAM_ENABLED": "1" if eff_tg else "0",
+        "R20_NOTIFY_QQ_ENABLED": "1" if eff_qq else "0",
     })
+
+    update_env(env_update)
+    refresh_settings()
+
     audit_record("notifications.update", "success", {
-        "webhook": payload.webhook_enabled,
-        "wechat": payload.wechat_enabled,
-        "telegram": payload.telegram_enabled,
-        "qq": payload.qq_enabled,
+        "webhook": eff_wh,
+        "wechat": eff_wx,
+        "telegram": eff_tg,
+        "qq": eff_qq,
+        "warnings": warnings,
     })
-    return {"saved": True, "restart_note": "通知配置已写入 .env；下一轮脚本执行会读取新通道。"}
+    msg = "全部通知配置已成功保存"
+    if warnings:
+        msg += f"（提示：{'；'.join(warnings)}）"
+    return {"saved": True, "message": msg, "warnings": warnings}
 
 
 @app.post("/api/v1/admin/notifications/diagnose")
-def diagnose_notification(payload: NotificationTestRequest, x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
-    refresh_settings(); require_admin_header(x_r20_admin_token)
+def diagnose_notification(payload: NotificationTestRequest, x_r20_session: str | None = Header(default=None, alias="X-R20-Session"), x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
+    refresh_settings(); require_admin_header(x_r20_admin_token, x_r20_session)
     result = diagnose_channel(payload.channel)
     audit_record("notifications.diagnose", "completed", {"channel": payload.channel, "status": result.get("status")})
     return {"channel": payload.channel, "result": result, "sent": False}
@@ -1129,10 +1368,38 @@ def diagnose_notification(payload: NotificationTestRequest, x_r20_admin_token: s
 @app.post("/api/v1/admin/notifications/test")
 def send_notification_test(payload: NotificationTestRequest, x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
     refresh_settings(); require_superadmin(x_r20_session)
-    if payload.confirmation != f"SEND TEST {payload.channel.upper()}": raise HTTPException(status_code=400, detail=f"确认短语必须为：SEND TEST {payload.channel.upper()}")
+    if payload.confirmation.strip().upper() != f"SEND TEST {payload.channel.upper()}":
+        raise HTTPException(status_code=400, detail=f"确认短语必须为：SEND TEST {payload.channel.upper()}")
     result = test_channel(payload.channel)
     audit_record("notifications.test", "completed", {"channel": payload.channel, "result": result})
     return {"channel": payload.channel, "result": result, "sent": True, "meaning": "远端接口已受理不等于用户客户端已读"}
+
+
+@app.post("/api/v1/admin/notifications/qq/capture-openid/start")
+def qq_capture_openid_start(payload: QQOpenIDCaptureStartRequest | None = None, x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    refresh_settings(); require_superadmin(x_r20_session)
+    from r20_backend.qq_bind import start_openid_capture
+    app_id = payload.app_id if payload else None
+    secret = payload.client_secret if payload else None
+    timeout = payload.timeout if payload else 60
+    try:
+        res = start_openid_capture(app_id=app_id, client_secret=secret, timeout=timeout)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"启动 QQ OpenID 监听网关失败：{exc}") from exc
+    audit_record("qq.capture_openid.start", "success", {"capture_id": res.get("capture_id"), "app_id": res.get("app_id")})
+    return res
+
+
+@app.get("/api/v1/admin/notifications/qq/capture-openid/{capture_id}")
+def qq_capture_openid_poll(capture_id: str, x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    refresh_settings(); require_superadmin(x_r20_session)
+    from r20_backend.qq_bind import poll_openid_capture
+    res = poll_openid_capture(capture_id)
+    if res.get("status") == "captured":
+        audit_record("qq.capture_openid.complete", "success", {"capture_id": capture_id, "openid": res.get("openid")})
+    return res
 
 
 @app.post("/api/v1/admin/notifications/qq/bind/start")
@@ -1162,9 +1429,10 @@ def qq_bind_poll(task_id: str, x_r20_session: str | None = Header(default=None, 
         result = poll_bind_task(task_id)
     except RuntimeError as exc:
         raise HTTPException(status_code=410, detail=str(exc))
-    if result["status"] == "bound":
-        audit_record("qq.bind.complete", "success", {"app_id": result["app_id"], "openid_present": bool(result["openid"])})
+    if result["status"] == "bound" or result["status"] == "awaiting_message":
+        audit_record("qq.bind.complete", "success", {"app_id": result["app_id"], "status": result["status"], "openid_present": bool(result.get("openid"))})
     return result
+
 
 
 @app.get("/api/v1/admin/notifications/schedule")
@@ -1434,7 +1702,7 @@ def run_backup(payload: BackupRequest, x_r20_admin_token: str | None = Header(de
 def health() -> dict[str, Any]:
     return {
         "service": "r20-standalone-backend",
-        "version": "6.2.0",
+        "version": "6.2.1",
         "status": "ok",
         "timestamp": int(time.time()),
         "credentials": {
@@ -1448,7 +1716,7 @@ def health() -> dict[str, Any]:
 @app.get("/api/v1/status")
 def status() -> dict[str, Any]:
     return {
-        "version": "6.2.0",
+        "version": "6.2.1",
         "mode": "read_only_control_plane",
         "scripts": [
             script_state("ai_factor_trader.py"),

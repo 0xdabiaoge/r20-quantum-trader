@@ -249,7 +249,7 @@
                         <path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/>
                     </svg>
                     <span class="text-xs font-mono font-bold tracking-wide">开源与交流</span>
-                    <span class="px-1.5 py-0.2 rounded text-[10px] font-mono font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20">v6.2.0</span>
+                    <span class="px-1.5 py-0.2 rounded text-[10px] font-mono font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20">v6.2.1</span>
                 </button>
             </div>
         </div>
@@ -461,7 +461,7 @@
                         <div class="hidden sm:flex items-center space-x-1.5 px-2 py-0.5 rounded bg-[#0A0D14] border border-[#1A2232] text-xs font-mono">
                             <span class="w-1.5 h-1.5 rounded-full bg-blue-400"></span>
                             <span class="text-[#707E94]">主脑:</span>
-                            <span class="text-blue-300 font-bold">Gemini 3.7 Flash High</span>
+                            <span id="brain-model-name" class="text-blue-300 font-bold">--</span>
                         </div>
                         <div class="text-xs font-mono text-[#707E94] hidden sm:flex items-center space-x-1.5">
                             <span>基准:</span>
@@ -544,7 +544,7 @@
                         <div class="hidden sm:flex items-center space-x-1.5 px-2 py-0.5 rounded bg-[#0A0D14] border border-[#1A2232] text-xs font-mono">
                             <span class="w-1.5 h-1.5 rounded-full bg-purple-400"></span>
                             <span class="text-[#707E94]">复盘主脑:</span>
-                            <span class="text-purple-300 font-bold">Gemini 3.7 Flash High</span>
+                            <span id="evolution-model-name" class="text-purple-300 font-bold">--</span>
                         </div>
                         <div class="text-xs font-mono text-purple-400 font-bold hidden sm:flex items-center space-x-1">
                             <span id="lab-memory-time">实时生效中</span>
@@ -755,7 +755,7 @@
                     <div class="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold">
                         <i data-lucide="code" class="w-4 h-4"></i>
                     </div>
-                    <h3 class="text-sm font-bold text-white uppercase">R20 Quantum Trader <span class="text-blue-400">v6.2.0</span></h3>
+                    <h3 class="text-sm font-bold text-white uppercase">R20 Quantum Trader <span class="text-blue-400">v6.2.1</span></h3>
                 </div>
                 <button onclick="closeAboutModal()" class="w-7 h-7 rounded-lg bg-[#141B26] text-[#707E94] hover:text-white flex items-center justify-center border border-[#1A2232]">
                     <i data-lucide="x" class="w-4 h-4"></i>
@@ -764,7 +764,7 @@
 
             <!-- Description -->
             <p class="text-xs text-[#707E94] font-sans leading-relaxed">
-                基于 QwenPaw 智能代理框架与 Gemini 3.7 Flash High 深度长思考链打造，覆盖 BTC/ETH/SOL/DOGE/SUI/LINK 6 大资产的自主推演、智能 Maker 挂单与每日 20:00 启发式复盘。
+                基于 QwenPaw 智能代理框架与当前激活大模型深度长思考链打造，覆盖 BTC/ETH/SOL/DOGE/SUI/LINK 6 大资产的自主推演、智能 Maker 挂单与每日 20:00 启发式复盘。
             </p>
 
             <!-- Links Grid -->
@@ -1381,6 +1381,13 @@
                 if (brainMatrixTimeEl && data.timestamp) {
                     brainMatrixTimeEl.innerText = data.timestamp.replace(' (北京时间)', '');
                 }
+
+                // Update Active Brain & Evolution Model Names dynamically
+                const activeModelName = (data.llm_runtime && data.llm_runtime.model) || (data.adaptive_config && data.adaptive_config.llm_model) || 'Gemini 3.8 Flash High';
+                const brainModelEl = document.getElementById('brain-model-name');
+                if (brainModelEl) brainModelEl.innerText = activeModelName;
+                const evolutionModelEl = document.getElementById('evolution-model-name');
+                if (evolutionModelEl) evolutionModelEl.innerText = activeModelName;
 
                 // Assign data stores first
                 allTrades = data.trades || data.trades_history || [];

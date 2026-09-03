@@ -68,8 +68,11 @@ data/*.csv
 data/*.lock
 data/*.tmp
 data/*.enc
+data/*.txt
+data/*.md
 data/.*secret_key
 data/credentials/
+trading.html
 OPEN_SOURCE_CONTROL_TODO.md
 CONTROL_PLANE_V2_TODO.md
 !data/.gitkeep
@@ -121,3 +124,4 @@ skills/
 tool_results/
 linux_do_post_draft.html
 linux_do_promo_card*.html
+*_TODO.md

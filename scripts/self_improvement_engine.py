@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-R20 AI LLM-Native Self-Improvement & Strategy Evolution Engine v6.2.0 (self_improvement_engine.py)
+R20 AI LLM-Native Self-Improvement & Strategy Evolution Engine v6.2.1 (self_improvement_engine.py)
 Focuses purely on Crypto Alpha generation & dynamic quantitative risk adaptation.
 Eliminates rigid cooldown bans in favor of dynamic volatility-adjusted thresholds,
 asymmetric Kelly bet-sizing, and LLM cognitive post-mortem lessons.
@@ -96,6 +96,13 @@ def log_msg(msg: str):
 
 def get_cpa_client_config() -> Tuple[str, str]:
     """Resolve LLM credentials only from process environment or local .env."""
+    try:
+        from r20_backend.llm_manager import get_active_llm_runtime
+        active_llm = get_active_llm_runtime()
+        if active_llm.get("base_url"):
+            return active_llm["base_url"], active_llm.get("api_key", "")
+    except Exception:
+        pass
     if standalone_settings:
         return standalone_settings.llm_base_url, standalone_settings.llm_api_key
     return (
@@ -244,45 +251,74 @@ def call_llm_evolution_review(closed_trades: List[Dict[str, Any]], existing_memo
     except OSError:
         pass
 
-    payload = {
-        "model": "gemini-3.7-flash-high",
-        "messages": [
-            {"role": "system", "content": effective_evolution_system},
-            {"role": "user", "content": effective_evolution_user}
-        ],
-        "reasoning_effort": os.environ.get("LLM_REASONING_EFFORT", "high"),
-        "temperature": 0.2,
-        "response_format": {"type": "json_object"}
-    }
-
-    req = urllib.request.Request(
-        f"{base_url}/chat/completions",
-        data=json.dumps(payload).encode("utf-8"),
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-            "User-Agent": "Mozilla/5.0"
-        }
-    )
+    model_name = os.environ.get("LLM_MODEL") or "gemini-3.8-flash-high"
+    effort = os.environ.get("LLM_REASONING_EFFORT") or "high"
+    api_format = "openai_chat"
+    try:
+        from r20_backend.llm_manager import get_active_llm_runtime, execute_llm_request
+        active_llm = get_active_llm_runtime()
+        model_name = os.environ.get("LLM_MODEL") or active_llm.get("model") or model_name
+        effort = os.environ.get("LLM_REASONING_EFFORT") or active_llm.get("reasoning_effort") or effort
+        api_format = active_llm.get("api_format", "openai_chat")
+        base_url = active_llm.get("base_url") or base_url
+        api_key = active_llm.get("api_key") or api_key
+    except Exception:
+        execute_llm_request = None
 
     telemetry = ModelCallTelemetry(
-        "self_improvement", payload["model"], payload["reasoning_effort"], effective_evolution_system, effective_evolution_user
+        "self_improvement", model_name, str(effort), effective_evolution_system, effective_evolution_user
     )
     try:
         t0 = time.time()
-        log_msg("🚀 正在调用 Gemini 3.7 进行 AI 大脑深度认知复盘与策略参数优化...")
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            res = json.loads(resp.read().decode("utf-8"))
-            content = res["choices"][0]["message"]["content"].strip()
-            if content.startswith("```json"):
-                content = content[7:]
+        log_msg(f"🚀 正在调用 {model_name} ({api_format}) 进行 AI 大脑深度认知复盘与策略参数优化...")
+        raw_res = None
+        if execute_llm_request:
+            content, _, usage_dict, _ = execute_llm_request(
+                messages=[
+                    {"role": "system", "content": effective_evolution_system},
+                    {"role": "user", "content": effective_evolution_user}
+                ],
+                model=model_name,
+                base_url=base_url,
+                api_key=api_key,
+                api_format=api_format,
+                reasoning_effort=effort,
+                temperature=0.2,
+                response_format={"type": "json_object"},
+                timeout=30.0,
+            )
+            raw_res = {"usage": usage_dict} if isinstance(usage_dict, dict) else {}
+        else:
+            payload = {
+                "model": model_name,
+                "messages": [
+                    {"role": "system", "content": effective_evolution_system},
+                    {"role": "user", "content": effective_evolution_user}
+                ],
+                "temperature": 0.2,
+                "response_format": {"type": "json_object"}
+            }
+            if effort not in ("none", "auto"):
+                payload["reasoning_effort"] = effort
+            req = urllib.request.Request(
+                f"{base_url}/chat/completions",
+                data=json.dumps(payload).encode("utf-8"),
+                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json", "User-Agent": "Mozilla/5.0"}
+            )
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                res = json.loads(resp.read().decode("utf-8"))
+                content = res["choices"][0]["message"]["content"].strip()
+                raw_res = res
+
+        if content.startswith("```json"):
+            content = content[7:]
             if content.startswith("```"):
                 content = content[3:]
             if content.endswith("```"):
                 content = content[:-3]
             
             review_json = json.loads(content.strip())
-            telemetry.finish("success", res, output_chars=len(content))
+            telemetry.finish("success", raw_res, output_chars=len(content))
             log_msg(f"✅ AI 大脑认知复盘完成 (耗时 {round(time.time() - t0, 2)}s)")
             return review_json
     except Exception as e:
@@ -295,7 +331,7 @@ def run_self_evolution(force: bool = False):
     tz_bj = datetime.timezone(datetime.timedelta(hours=8))
     now_bj = datetime.datetime.now(tz_bj)
     timestamp_str = now_bj.strftime("%Y-%m-%d %H:%M:%S")
-    log_msg("🧬 启动 R20 AI 大脑自进化认知复盘与实战心法提炼 (v6.2.0 Crypto Focus)...")
+    log_msg("🧬 启动 R20 AI 大脑自进化认知复盘与实战心法提炼 (v6.2.1 Crypto Focus)...")
 
     closed_trades = load_closed_trades()
     total_trades = len(closed_trades)

@@ -19,6 +19,7 @@ def _encrypt_secret(key_b64: str, secret: str) -> str:
 class QqBindTests(unittest.TestCase):
     def setUp(self):
         qq_bind._TASKS.clear()
+        qq_bind._CAPTURE_SESSIONS.clear()
 
     def test_decrypt_roundtrip_matches_connector_layout(self):
         key = base64.b64encode(os.urandom(32)).decode()
@@ -67,6 +68,46 @@ class QqBindTests(unittest.TestCase):
         self.assertNotIn("topsecret-value", json.dumps(second))
         self.assertNotIn("bot_encrypt_secret", json.dumps(second))
 
+    def test_poll_bound_without_openid_transitions_to_awaiting_message(self):
+        with patch("r20_backend.qq_bind._post_qq", return_value={"task_id": "t-await"}):
+            qq_bind.create_bind_task()
+        task = qq_bind._TASKS["t-await"]
+        encrypted = _encrypt_secret(task.key_b64, "my-secret")
+        responses = iter([
+            {"status": 2, "bot_appid": "1905549905", "bot_encrypt_secret": encrypted, "user_openid": ""},
+        ])
+        with patch("r20_backend.qq_bind._post_qq", side_effect=lambda path, payload, timeout=12: next(responses)), \
+             patch("r20_backend.qq_bind._persist") as persist, \
+             patch("r20_backend.qq_bind.start_openid_capture", return_value={"capture_id": "cap-auto-1"}) as start_cap:
+            res = qq_bind.poll_bind_task("t-await")
+        self.assertEqual(res["status"], "awaiting_message")
+        self.assertEqual(res["capture_id"], "cap-auto-1")
+        persist.assert_called_once_with("1905549905", "my-secret", "")
+        start_cap.assert_called_once_with("1905549905", "my-secret", timeout=90)
+
+    def test_start_and_poll_openid_capture(self):
+        with patch("threading.Thread.start") as mock_thread_start:
+            cap = qq_bind.start_openid_capture("1905549905", "test-secret", timeout=45)
+            self.assertEqual(cap["status"], "listening")
+            self.assertEqual(cap["app_id"], "1905549905")
+            self.assertTrue(cap["capture_id"].startswith("cap_"))
+            mock_thread_start.assert_called_once()
+
+            # Poll listening state
+            polled = qq_bind.poll_openid_capture(cap["capture_id"])
+            self.assertEqual(polled["status"], "listening")
+
+            # Simulate capture
+            session = qq_bind._CAPTURE_SESSIONS[cap["capture_id"]]
+            with session.lock:
+                session.status = "captured"
+                session.openid = "USER_OPENID_9999"
+                session.message_preview = "你好机器人"
+
+            polled_after = qq_bind.poll_openid_capture(cap["capture_id"])
+            self.assertEqual(polled_after["status"], "captured")
+            self.assertEqual(polled_after["openid"], "USER_OPENID_9999")
+
     def test_poll_expired_task_marks_expired(self):
         with patch("r20_backend.qq_bind._post_qq", return_value={"task_id": "t-e"}):
             qq_bind.create_bind_task()
@@ -85,7 +126,7 @@ class QqBindTests(unittest.TestCase):
         with patch("r20_gateway.secrets.save_secrets") as save, patch("r20_backend.settings_store.update_env") as env:
             qq_bind._persist("100", "sekret", "OPEN")
         save.assert_called_once_with({"R20_QQ_CLIENT_SECRET": "sekret", "R20_QQ_OPENID": "OPEN"})
-        env.assert_called_once_with({"R20_QQ_APP_ID": "100"})
+        env.assert_called_once_with({"R20_QQ_APP_ID": "100", "R20_QQ_OPENID": "OPEN"})
 
     def test_active_task_cap(self):
         counter = iter(f"task-{i}" for i in range(10))
