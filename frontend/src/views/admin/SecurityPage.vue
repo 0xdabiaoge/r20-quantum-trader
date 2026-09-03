@@ -441,57 +441,101 @@ onMounted(loadAll)
       </div>
 
       <!-- 3. instruments -->
-      <div class="bg-[#0D121B] border border-[#1A2232] rounded-xl p-4">
-        <div class="flex items-center justify-between mb-3 pb-3 border-b border-[#1A2232]">
-          <div class="flex items-center space-x-2"><Layers class="w-4 h-4 text-cyan-400" /><h2 class="text-sm font-bold text-white font-mono">3. 交易标的池 ({{ instruments.length }}/{{ instLimits.maximum }})</h2></div>
+      <div class="rounded-xl border overflow-hidden shadow-xs" style="background-color: var(--bg-card); border-color: var(--border-subtle);">
+        <div class="px-4 py-3 border-b flex items-center justify-between" style="border-color: var(--border-subtle); background-color: var(--bg-card-subtle);">
+          <div class="flex items-center space-x-2">
+            <Layers class="w-4 h-4" style="color: var(--color-brand);" />
+            <h2 class="text-xs font-black font-mono uppercase tracking-wide" style="color: var(--text-main);">
+              3. 交易标的池 ({{ instruments.length }}/{{ instLimits.maximum }})
+            </h2>
+          </div>
           <div class="flex gap-2">
-            <input v-model="newInstId" placeholder="XRP-USDT-SWAP" class="w-40 bg-[#090f18] border border-[#1A2232] rounded-lg text-white px-2.5 py-1.5 text-xs font-mono outline-none focus:border-blue-500" @keyup.enter="addInstrument" />
-            <button @click="addInstrument" class="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-mono cursor-pointer">添加</button>
+            <input v-model="newInstId" placeholder="例如: XRP-USDT-SWAP" class="w-44 rounded-lg px-2.5 py-1.5 text-xs font-mono outline-none border transition-colors" style="background-color: var(--bg-input); border-color: var(--border-subtle); color: var(--text-main);" @keyup.enter="addInstrument" />
+            <button @click="addInstrument" class="px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer shadow-xs" style="background-color: var(--text-main); color: var(--bg-card);">添加标的</button>
           </div>
         </div>
-        <table class="w-full text-left text-xs font-mono">
-          <thead><tr class="text-[#707E94] border-b border-[#1A2232]"><th class="pb-2">标的</th><th class="pb-2">名称</th><th class="pb-2">合约类型</th><th class="pb-2">状态</th><th class="pb-2 text-right">操作</th></tr></thead>
-          <tbody class="divide-y divide-[#1A2232]/50">
-            <tr v-for="item in instruments" :key="item.instId">
-              <td class="py-2 text-white font-bold">{{ item.instId }}</td>
-              <td class="py-2 text-zinc-300">{{ item.name }}</td>
-              <td class="py-2 text-[#707E94]">{{ item.ctType || 'SWAP' }}</td>
-              <td class="py-2"><span v-if="item.protected" class="text-amber-400">🔒 保底</span><span v-else-if="item.has_tracker" class="text-blue-400">持仓中</span><span v-else class="text-[#707E94]">可移除</span></td>
-              <td class="py-2 text-right">
-                <button @click="removeInstrument(item)" :disabled="item.protected || item.has_tracker" class="p-1.5 rounded hover:bg-[#4d1924] text-[#707E94] hover:text-rose-400 disabled:opacity-30 cursor-pointer"><Trash2 class="w-3.5 h-3.5" /></button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-        <p class="mt-2 text-[10px] text-[#6f7d91] font-mono">BTC 为保底标的不可删除；有持仓追踪器的标的禁止移除；最多 {{ instLimits.maximum }} 个。</p>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs font-mono whitespace-nowrap">
+            <thead>
+              <tr class="border-b text-[11px] uppercase tracking-wider font-bold" style="border-color: var(--border-subtle); background-color: var(--bg-card-subtle); color: var(--text-muted);">
+                <th class="py-2.5 px-4">合约代码</th>
+                <th class="py-2.5 px-3">名称</th>
+                <th class="py-2.5 px-3">类型</th>
+                <th class="py-2.5 px-3">风控状态</th>
+                <th class="py-2.5 px-4 text-right">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="item in instruments" :key="item.instId" class="border-b last:border-b-0 hover:bg-[var(--bg-card-hover)] transition-colors" style="border-color: var(--border-subtle);">
+                <td class="py-2.5 px-4 font-bold" style="color: var(--text-main);">{{ item.instId }}</td>
+                <td class="py-2.5 px-3" style="color: var(--text-muted);">{{ item.name }}</td>
+                <td class="py-2.5 px-3 num-tabular" style="color: var(--text-faint);">{{ item.ctType || 'SWAP' }}</td>
+                <td class="py-2.5 px-3">
+                  <span v-if="item.protected" class="px-1.5 py-0.2 rounded text-[10px] font-bold border" style="background-color: var(--color-warn-bg); border-color: var(--color-warn-border); color: var(--color-warn);">🔒 保底必选</span>
+                  <span v-else-if="item.has_tracker" class="px-1.5 py-0.2 rounded text-[10px] font-bold border" style="background-color: var(--color-brand-bg); border-color: var(--color-brand-border); color: var(--color-brand);">持仓中</span>
+                  <span v-else class="text-[11px]" style="color: var(--text-faint);">可移除</span>
+                </td>
+                <td class="py-2.5 px-4 text-right">
+                  <button @click="removeInstrument(item)" :disabled="item.protected || item.has_tracker" class="p-1 rounded hover:opacity-80 text-rose-400 disabled:opacity-20 cursor-pointer transition-opacity" title="从标的池移除">
+                    <Trash2 class="w-3.5 h-3.5" />
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="px-4 py-2 border-t text-[10px] font-mono" style="border-color: var(--border-subtle); color: var(--text-faint);">BTC 为系统保底标的不可删除；有在途追踪器的标的禁止移除；最多 {{ instLimits.maximum }} 个。</p>
       </div>
 
       <!-- 4. positions & emergency close -->
-      <div class="bg-[#0D121B] border border-[#1A2232] rounded-xl p-4">
-        <div class="flex items-center justify-between mb-3 pb-3 border-b border-[#1A2232]">
-          <div class="flex items-center space-x-2"><KeyRound class="w-4 h-4 text-rose-400" /><h2 class="text-sm font-bold text-white font-mono">4. 当前持仓与应急平仓</h2></div>
-          <button @click="loadPositions" class="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-[#111c2a] hover:bg-[#1d3050] border border-[#33445b] text-xs font-mono text-[#b8c4d4] cursor-pointer"><RefreshCw class="w-3.5 h-3.5" /><span>刷新持仓与订单</span></button>
+      <div class="rounded-xl border overflow-hidden shadow-xs" style="background-color: var(--bg-card); border-color: var(--border-subtle);">
+        <div class="px-4 py-3 border-b flex items-center justify-between" style="border-color: var(--border-subtle); background-color: var(--bg-card-subtle);">
+          <div class="flex items-center space-x-2">
+            <KeyRound class="w-4 h-4 text-rose-500" />
+            <h2 class="text-xs font-black font-mono uppercase tracking-wide" style="color: var(--text-main);">4. 当前持仓与应急平仓</h2>
+          </div>
+          <button @click="loadPositions" class="flex items-center space-x-1.5 px-2.5 py-1 rounded-lg border text-xs font-mono cursor-pointer transition-all shadow-xs" style="background-color: var(--bg-card); border-color: var(--border-medium); color: var(--text-main);">
+            <RefreshCw class="w-3.5 h-3.5" />
+            <span>刷新持仓与挂单</span>
+          </button>
         </div>
-        <div v-if="snapshotState" class="text-[11px] font-mono text-amber-400 mb-2">{{ snapshotState }}</div>
-        <div v-if="snapshot" class="text-[11px] font-mono text-zinc-300 mb-2">
-          环境：<strong :class="snapshot.environment === 'live' ? 'text-rose-400' : 'text-emerald-400'">{{ (snapshot.environment || '').toUpperCase() }}</strong>
+        <div v-if="snapshotState" class="px-4 pt-2 text-[11px] font-mono text-amber-500">{{ snapshotState }}</div>
+        <div v-if="snapshot" class="px-4 pt-2 text-[11px] font-mono" style="color: var(--text-muted);">
+          环境：<strong :class="snapshot.environment === 'live' ? 'text-rose-500' : 'text-emerald-500'">{{ (snapshot.environment || '').toUpperCase() }}</strong>
           · 持仓 {{ snapshot.positions?.length ?? 0 }} · 当前挂单 {{ snapshot.orders?.length ?? 0 }} · {{ new Date(snapshot.captured_at_ms).toLocaleString() }}
         </div>
-        <table v-if="snapshot?.positions?.length" class="w-full text-left text-xs font-mono">
-          <thead><tr class="text-[#707E94] border-b border-[#1A2232]"><th class="pb-2">仓位</th><th class="pb-2">数量</th><th class="pb-2">模式</th><th class="pb-2">未实现盈亏</th><th class="pb-2 text-right">操作</th></tr></thead>
-          <tbody class="divide-y divide-[#1A2232]/50">
-            <tr v-for="p in snapshot.positions" :key="p.instId + p.posSide">
-              <td class="py-2"><strong class="text-white">{{ p.instId }}</strong><br><span :class="p.posSide === 'long' ? 'text-emerald-400' : 'text-rose-400'">{{ (p.posSide || 'net').toUpperCase() }}</span></td>
-              <td class="py-2 text-zinc-300">{{ p.pos || '0' }}</td>
-              <td class="py-2 text-zinc-300">{{ p.mgnMode || '--' }}</td>
-              <td class="py-2 font-bold" :class="Number(p.upl || 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'">{{ Number(p.upl || 0).toFixed(4) }}</td>
-              <td class="py-2 text-right"><button @click="openClose(p)" class="px-2.5 py-1 rounded bg-[#4d1924] hover:bg-[#5d2230] border border-[#873044] text-[10px] font-mono text-[#ffdce1] cursor-pointer">快速平仓</button></td>
-            </tr>
-          </tbody>
-        </table>
-        <div v-else-if="snapshot" class="py-4 text-center text-xs font-mono text-emerald-400">当前环境无持仓</div>
-        <div v-else class="py-4 text-center text-xs font-mono text-[#707E94]">点击"刷新持仓与订单"从 OKX 读取实时状态</div>
-        <p class="mt-2 text-[10px] text-[#6f7d91] font-mono">平仓流程：复核环境与仓位 → 撤销同标的冲突委托 → autoCxl 市价平仓 → 轮询确认仓位归零。需先启用上方手动平仓开关。</p>
+        <div class="overflow-x-auto mt-2">
+          <table v-if="snapshot?.positions?.length" class="w-full text-left text-xs font-mono whitespace-nowrap">
+            <thead>
+              <tr class="border-b text-[11px] uppercase tracking-wider font-bold" style="border-color: var(--border-subtle); background-color: var(--bg-card-subtle); color: var(--text-muted);">
+                <th class="py-2.5 px-4">仓位标的</th>
+                <th class="py-2.5 px-3">张数</th>
+                <th class="py-2.5 px-3">模式</th>
+                <th class="py-2.5 px-3">未实现盈亏</th>
+                <th class="py-2.5 px-4 text-right">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="p in snapshot.positions" :key="p.instId + p.posSide" class="border-b last:border-b-0 hover:bg-[var(--bg-card-hover)] transition-colors" style="border-color: var(--border-subtle);">
+                <td class="py-2.5 px-4">
+                  <strong style="color: var(--text-main);">{{ p.instId }}</strong>
+                  <span class="ml-1.5 px-1.5 py-0.2 rounded text-[9px] font-bold border" :style="p.posSide === 'long' ? { backgroundColor: 'var(--color-up-bg)', borderColor: 'var(--color-up-border)', color: 'var(--color-up)' } : { backgroundColor: 'var(--color-down-bg)', borderColor: 'var(--color-down-border)', color: 'var(--color-down)' }">
+                    {{ (p.posSide || 'net').toUpperCase() }}
+                  </span>
+                </td>
+                <td class="py-2.5 px-3 num-tabular" style="color: var(--text-muted);">{{ p.pos || '0' }}</td>
+                <td class="py-2.5 px-3 text-[11px]" style="color: var(--text-faint);">{{ p.mgnMode || '--' }}</td>
+                <td class="py-2.5 px-3 font-bold num-tabular" :class="Number(p.upl || 0) >= 0 ? 'text-emerald-500' : 'text-rose-500'">{{ Number(p.upl || 0).toFixed(4) }}</td>
+                <td class="py-2.5 px-4 text-right">
+                  <button @click="openClose(p)" class="px-2.5 py-1 rounded-md text-[10px] font-mono font-bold border transition-all cursor-pointer shadow-xs" style="background-color: var(--color-down-bg); border-color: var(--color-down-border); color: var(--color-down);">快速平仓</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <div v-else-if="snapshot" class="py-6 text-center text-xs font-mono text-emerald-500">✓ 当前环境 0 活跃持仓</div>
+          <div v-else class="py-6 text-center text-xs font-mono" style="color: var(--text-faint);">点击"刷新持仓与挂单"从 OKX 读取最新实时状态</div>
+        </div>
+        <p class="px-4 py-2 border-t text-[10px] font-mono" style="border-color: var(--border-subtle); color: var(--text-faint);">平仓流程：复核环境与仓位 → 撤销同标的冲突委托 → autoCxl 市价平仓 → 轮询确认仓位归零。需先启用上方手动平仓开关。</p>
       </div>
     </template>
 

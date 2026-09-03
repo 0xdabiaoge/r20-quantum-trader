@@ -41,46 +41,71 @@ onMounted(load)
 
     <template v-else-if="data">
       <!-- Agents -->
-      <div class="bg-[#0D121B] border border-[#1A2232] rounded-xl p-4">
-        <div class="flex items-center justify-between mb-3">
-          <div class="flex items-center space-x-2"><Package class="w-4 h-4 text-blue-400" /><h2 class="text-xs font-bold text-white font-mono uppercase">受管 Worker</h2></div>
-          <button @click="load" class="px-2.5 py-1 rounded bg-[#111c2a] border border-[#33445b] text-[10px] font-mono text-[#b8c4d4] cursor-pointer hover:bg-[#1d3050]">刷新</button>
+      <div class="rounded-xl border overflow-hidden shadow-xs" style="background-color: var(--bg-card); border-color: var(--border-subtle);">
+        <div class="px-4 py-3 border-b flex items-center justify-between" style="border-color: var(--border-subtle); background-color: var(--bg-card-subtle);">
+          <div class="flex items-center space-x-2">
+            <Package class="w-4 h-4 text-blue-400" />
+            <h2 class="text-xs font-black font-mono uppercase tracking-wide" style="color: var(--text-main);">受管 Worker 单元清单</h2>
+          </div>
+          <button @click="load" class="flex items-center space-x-1 px-2.5 py-1 rounded-lg border text-[11px] font-mono cursor-pointer transition-all shadow-xs" style="background-color: var(--bg-card); border-color: var(--border-medium); color: var(--text-main);">
+            <RefreshCw class="w-3 h-3" />
+            <span>刷新</span>
+          </button>
         </div>
-        <table class="w-full text-left text-xs font-mono">
-          <thead><tr class="text-[#707E94] border-b border-[#1A2232]"><th class="pb-2">Worker</th><th class="pb-2">职责</th><th class="pb-2">健康</th><th class="pb-2">最近运行</th><th class="pb-2">结果</th><th class="pb-2">产物时效</th></tr></thead>
-          <tbody class="divide-y divide-[#1A2232]/50">
-            <tr v-for="a in data.agents" :key="a.id">
-              <td class="py-2 text-white font-bold">{{ a.name }}</td>
-              <td class="py-2 text-zinc-300">{{ a.role }}</td>
-              <td class="py-2 font-bold" :class="statusColor(a.health)">{{ a.health }}</td>
-              <td class="py-2 text-[#707E94]">{{ a.last_run_at || '--' }}</td>
-              <td class="py-2" :class="statusColor(a.last_run_status)">{{ a.last_run_status }}</td>
-              <td class="py-2 text-zinc-300">{{ a.output_age_seconds != null ? Math.round(a.output_age_seconds / 60) + ' 分钟前' : (a.output ? '冷启动' : '无产物') }}</td>
-            </tr>
-          </tbody>
-        </table>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs font-mono whitespace-nowrap">
+            <thead>
+              <tr class="border-b text-[11px] uppercase tracking-wider font-bold" style="border-color: var(--border-subtle); background-color: var(--bg-card-subtle); color: var(--text-muted);">
+                <th class="py-2.5 px-4">Worker 单元</th>
+                <th class="py-2.5 px-3">核心职责</th>
+                <th class="py-2.5 px-3">健康状态</th>
+                <th class="py-2.5 px-3">最近执行时间</th>
+                <th class="py-2.5 px-3">运行结果</th>
+                <th class="py-2.5 px-4 text-right">产物时效</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="a in data.agents" :key="a.id" class="border-b last:border-b-0 hover:bg-[var(--bg-card-hover)] transition-colors" style="border-color: var(--border-subtle);">
+                <td class="py-2.5 px-4 font-bold" style="color: var(--text-main);">{{ a.name }}</td>
+                <td class="py-2.5 px-3" style="color: var(--text-muted);">{{ a.role }}</td>
+                <td class="py-2.5 px-3 font-bold" :class="statusColor(a.health)">{{ a.health }}</td>
+                <td class="py-2.5 px-3 num-tabular" style="color: var(--text-faint);">{{ a.last_run_at || '尚未调度' }}</td>
+                <td class="py-2.5 px-3 font-bold" :class="statusColor(a.last_run_status)">{{ a.last_run_status }}</td>
+                <td class="py-2.5 px-4 text-right" style="color: var(--text-muted);">{{ a.output_age_seconds != null ? Math.round(a.output_age_seconds / 60) + ' 分钟前' : (a.output ? '冷启动' : '无产物') }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <!-- Model Telemetry -->
-        <div class="bg-[#0D121B] border border-[#1A2232] rounded-xl p-4">
-          <div class="flex items-center space-x-2 mb-3"><Cpu class="w-4 h-4 text-purple-400" /><h2 class="text-xs font-bold text-white font-mono uppercase">模型调用遥测 (最近 50)</h2></div>
-          <div class="text-[10px] text-[#707E94] font-mono mb-2 p-2 rounded bg-[#080B10] border border-[#1A2232]">{{ data.prompt_policy }}</div>
-          <div class="grid grid-cols-3 gap-2 mb-3 text-center">
-            <div class="bg-[#080B10] border border-[#1A2232] rounded-lg p-2"><div class="text-[10px] text-[#707E94] font-mono">总调用</div><div class="text-sm font-bold text-white font-mono">{{ data.model_stats?.total_calls ?? '--' }}</div></div>
-            <div class="bg-[#080B10] border border-[#1A2232] rounded-lg p-2"><div class="text-[10px] text-[#707E94] font-mono">成功率</div><div class="text-sm font-bold" :class="(data.model_stats?.total_calls ?? 0) > 0 && (data.model_stats?.successful_calls ?? 0) < (data.model_stats?.total_calls ?? 0) ? 'text-amber-400' : 'text-emerald-400'">{{ (data.model_stats?.total_calls ?? 0) > 0 ? Math.round(100 * (data.model_stats?.successful_calls ?? 0) / data.model_stats.total_calls) + '%' : '--' }}</div></div>
-            <div class="bg-[#080B10] border border-[#1A2232] rounded-lg p-2"><div class="text-[10px] text-[#707E94] font-mono">平均时延</div><div class="text-sm font-bold text-white font-mono">{{ data.model_stats?.avg_duration_ms ? Math.round(data.model_stats.avg_duration_ms) + 'ms' : '--' }}</div></div>
+        <div class="rounded-xl border overflow-hidden shadow-xs p-4" style="background-color: var(--bg-card); border-color: var(--border-subtle);">
+          <div class="flex items-center space-x-2 mb-3"><Cpu class="w-4 h-4 text-purple-400" /><h2 class="text-xs font-black font-mono uppercase tracking-wide" style="color: var(--text-main);">模型调用遥测 (最近 50 次)</h2></div>
+          <div class="text-[11px] font-mono mb-3 p-2.5 rounded-lg border leading-relaxed" style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle); color: var(--text-muted);">{{ data.prompt_policy }}</div>
+          <div class="grid grid-cols-3 gap-2.5 mb-3 text-center">
+            <div class="rounded-lg border p-2" style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);"><div class="text-[10px] font-mono" style="color: var(--text-faint);">总调用量</div><div class="text-sm font-bold font-mono num-tabular mt-0.5" style="color: var(--text-main);">{{ data.model_stats?.total_calls ?? '--' }}</div></div>
+            <div class="rounded-lg border p-2" style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);"><div class="text-[10px] font-mono" style="color: var(--text-faint);">调用成功率</div><div class="text-sm font-bold num-tabular mt-0.5" :class="(data.model_stats?.total_calls ?? 0) > 0 && (data.model_stats?.successful_calls ?? 0) < (data.model_stats?.total_calls ?? 0) ? 'text-amber-400' : 'text-emerald-400'">{{ (data.model_stats?.total_calls ?? 0) > 0 ? Math.round(100 * (data.model_stats?.successful_calls ?? 0) / data.model_stats.total_calls) + '%' : '--' }}</div></div>
+            <div class="rounded-lg border p-2" style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);"><div class="text-[10px] font-mono" style="color: var(--text-faint);">平均时延</div><div class="text-sm font-bold font-mono num-tabular mt-0.5" style="color: var(--text-main);">{{ data.model_stats?.avg_duration_ms ? Math.round(data.model_stats.avg_duration_ms) + 'ms' : '--' }}</div></div>
           </div>
-          <div class="max-h-60 overflow-y-auto">
-            <table class="w-full text-left text-xs font-mono">
-              <thead><tr class="text-[#707E94] border-b border-[#1A2232]"><th class="pb-1.5">调用方</th><th class="pb-1.5">模型</th><th class="pb-1.5">状态</th><th class="pb-1.5">Tokens</th><th class="pb-1.5 text-right">耗时</th></tr></thead>
-              <tbody class="divide-y divide-[#1A2232]/50">
-                <tr v-for="c in (data.model_calls || []).slice(0, 30)" :key="c.id">
-                  <td class="py-1.5 text-zinc-300">{{ c.caller || '--' }}</td>
-                  <td class="py-1.5 text-[#707E94]">{{ c.model || '--' }}</td>
-                  <td class="py-1.5 font-bold" :class="statusColor(c.status)">{{ c.status }}</td>
-                  <td class="py-1.5 text-zinc-300">{{ c.total_tokens ?? '--' }}</td>
-                  <td class="py-1.5 text-right text-zinc-300">{{ c.duration_ms ? Math.round(c.duration_ms) + 'ms' : '--' }}</td>
+          <div class="max-h-60 overflow-y-auto rounded-lg border" style="border-color: var(--border-subtle);">
+            <table class="w-full text-left text-xs font-mono whitespace-nowrap">
+              <thead class="sticky top-0 z-10">
+                <tr class="border-b text-[11px] uppercase tracking-wider font-bold" style="border-color: var(--border-subtle); background-color: var(--bg-card-subtle); color: var(--text-muted);">
+                  <th class="py-2 px-3">调用方</th>
+                  <th class="py-2 px-2">模型</th>
+                  <th class="py-2 px-2">状态</th>
+                  <th class="py-2 px-2">Tokens</th>
+                  <th class="py-2 px-3 text-right">耗时</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="c in (data.model_calls || []).slice(0, 30)" :key="c.id" class="border-b last:border-b-0 hover:bg-[var(--bg-card-hover)] transition-colors" style="border-color: var(--border-subtle);">
+                  <td class="py-1.5 px-3" style="color: var(--text-muted);">{{ c.caller || '--' }}</td>
+                  <td class="py-1.5 px-2 num-tabular" style="color: var(--text-faint);">{{ c.model || '--' }}</td>
+                  <td class="py-1.5 px-2 font-bold" :class="statusColor(c.status)">{{ c.status }}</td>
+                  <td class="py-1.5 px-2 num-tabular" style="color: var(--text-muted);">{{ c.total_tokens ?? '--' }}</td>
+                  <td class="py-1.5 px-3 text-right num-tabular" style="color: var(--text-muted);">{{ c.duration_ms ? Math.round(c.duration_ms) + 'ms' : '--' }}</td>
                 </tr>
               </tbody>
             </table>

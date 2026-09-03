@@ -55,21 +55,48 @@ onMounted(load)
     </div>
 
     <!-- Audit Rows -->
-    <div class="bg-[#0D121B] border border-[#1A2232] rounded-xl p-4">
-      <div class="flex items-center space-x-2 mb-3"><Scroll class="w-4 h-4 text-purple-400" /><h2 class="text-xs font-bold text-white font-mono uppercase">操作流水 ({{ filtered().length }})</h2></div>
-      <div class="max-h-[560px] overflow-y-auto">
-        <div
-          v-for="(r, i) in filtered()"
-          :key="i"
-          @click="detailRec = r"
-          class="grid grid-cols-[145px_155px_80px_1fr] gap-2.5 py-2.5 border-b border-[#192333] text-xs font-mono hover:bg-[#111a2a] cursor-pointer items-center max-md:grid-cols-1 max-md:gap-0.5"
-        >
-          <span class="text-[#707E94]">{{ r.timestamp }}</span>
-          <span class="text-blue-300">{{ r.action }}</span>
-          <span class="font-bold" :class="statusColor(r.status)">{{ r.status }}</span>
-          <span class="text-zinc-300 truncate">{{ r.detail?.actor || r.detail?.username || '' }} · {{ JSON.stringify(r.detail || {}) }}</span>
+    <div class="rounded-xl border overflow-hidden shadow-xs" style="background-color: var(--bg-card); border-color: var(--border-subtle);">
+      <div class="px-4 py-3 border-b flex items-center justify-between" style="border-color: var(--border-subtle); background-color: var(--bg-card-subtle);">
+        <div class="flex items-center space-x-2">
+          <Scroll class="w-4 h-4 text-purple-400" />
+          <h2 class="text-xs font-black font-mono uppercase tracking-wide" style="color: var(--text-main);">
+            安全与操作审计流水 ({{ filtered().length }} 条)
+          </h2>
         </div>
-        <div v-if="filtered().length === 0" class="py-8 text-center text-xs text-[#707E94] font-mono">暂无审计记录</div>
+        <span class="text-[11px] font-mono" style="color: var(--text-faint);">点击任意行穿透查看原始参数 JSON</span>
+      </div>
+
+      <div class="overflow-x-auto max-h-[580px] overflow-y-auto">
+        <table class="w-full text-left text-xs font-mono whitespace-nowrap">
+          <thead class="sticky top-0 z-10">
+            <tr class="border-b text-[11px] uppercase tracking-wider font-bold" style="border-color: var(--border-subtle); background-color: var(--bg-card-subtle); color: var(--text-muted);">
+              <th class="py-2.5 px-4">时间戳</th>
+              <th class="py-2.5 px-3">动作类型</th>
+              <th class="py-2.5 px-3">执行结果</th>
+              <th class="py-2.5 px-4">操作者与审计详情</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="(r, i) in filtered()"
+              :key="i"
+              @click="detailRec = r"
+              class="border-b last:border-b-0 hover:bg-[var(--bg-card-hover)] transition-colors cursor-pointer"
+              style="border-color: var(--border-subtle);"
+            >
+              <td class="py-2.5 px-4 num-tabular" style="color: var(--text-faint);">{{ r.timestamp }}</td>
+              <td class="py-2.5 px-3 font-bold" style="color: var(--color-brand);">{{ r.action }}</td>
+              <td class="py-2.5 px-3 font-bold" :class="statusColor(r.status)">{{ r.status }}</td>
+              <td class="py-2.5 px-4 max-w-[480px] truncate" style="color: var(--text-muted);">
+                <strong style="color: var(--text-main);">{{ r.detail?.actor || r.detail?.username || 'system' }}</strong>
+                <span class="ml-1 opacity-70">· {{ JSON.stringify(r.detail || {}) }}</span>
+              </td>
+            </tr>
+            <tr v-if="filtered().length === 0">
+              <td colspan="4" class="py-8 text-center" style="color: var(--text-faint);">暂无符合条件的审计记录</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
 

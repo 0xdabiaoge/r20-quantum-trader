@@ -5,44 +5,6 @@
    ========================================================================= */
 
 :root,
-:root[data-theme="light"] {
-  --bg-app: #F8F9FA;
-  --bg-header: rgba(255, 255, 255, 0.96);
-  --bg-card: #FFFFFF;
-  --bg-card-subtle: #F1F3F5;
-  --bg-card-hover: #E9ECEF;
-  --bg-input: #FFFFFF;
-  --bg-badge: #ECEEF2;
-  
-  --border-subtle: #E2E4E8;
-  --border-medium: #CBD0D8;
-  --border-strong: #94A3B8;
-
-  --text-main: #0F172A;
-  --text-muted: #475569;
-  --text-faint: #94A3B8;
-
-  /* Neutral Titanium / Obsidian brand styling (No cheap AI neon blue) */
-  --color-brand: #0F172A;
-  --color-brand-bg: #F1F5F9;
-  --color-brand-border: #CBD5E1;
-
-  --color-up: #059669;
-  --color-up-bg: #ECFDF5;
-  --color-up-border: #A7F3D0;
-
-  --color-down: #DC2626;
-  --color-down-bg: #FEF2F2;
-  --color-down-border: #FECACA;
-
-  --color-warn: #D97706;
-  --color-warn-bg: #FFFBEB;
-  --color-warn-border: #FDE68A;
-
-  --shadow-card: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.04);
-  --shadow-float: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
-}
-
 :root.dark,
 :root[data-theme="dark"] {
   --bg-app: #0A0B0E;
@@ -82,6 +44,44 @@
   --shadow-float: 0 20px 35px -8px rgba(0, 0, 0, 0.7);
 }
 
+:root[data-theme="light"] {
+  --bg-app: #F8F9FA;
+  --bg-header: rgba(255, 255, 255, 0.96);
+  --bg-card: #FFFFFF;
+  --bg-card-subtle: #F1F3F5;
+  --bg-card-hover: #E9ECEF;
+  --bg-input: #FFFFFF;
+  --bg-badge: #ECEEF2;
+  
+  --border-subtle: #E2E4E8;
+  --border-medium: #CBD0D8;
+  --border-strong: #94A3B8;
+
+  --text-main: #0F172A;
+  --text-muted: #475569;
+  --text-faint: #94A3B8;
+
+  /* Neutral Titanium / Obsidian brand styling */
+  --color-brand: #0F172A;
+  --color-brand-bg: #F1F5F9;
+  --color-brand-border: #CBD5E1;
+
+  --color-up: #059669;
+  --color-up-bg: #ECFDF5;
+  --color-up-border: #A7F3D0;
+
+  --color-down: #DC2626;
+  --color-down-bg: #FEF2F2;
+  --color-down-border: #FECACA;
+
+  --color-warn: #D97706;
+  --color-warn-bg: #FFFBEB;
+  --color-warn-border: #FDE68A;
+
+  --shadow-card: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.04);
+  --shadow-float: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
+}
+
 /* =========================================================================
    Base Typography & Styles
    ========================================================================= */
@@ -102,6 +102,52 @@ body {
 .num-tabular {
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.015em;
+}
+
+/* =========================================================================
+   Universal Border & Table Normalization (Eliminate Any Stray White Lines)
+   ========================================================================= */
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+*,
+::before,
+::after {
+  border-color: var(--border-subtle);
+}
+
+table,
+thead,
+tbody,
+tfoot,
+tr,
+th,
+td {
+  border-color: var(--border-subtle) !important;
+}
+
+.divide-x > *,
+.divide-y > *,
+.divide-x > :not([hidden]) ~ :not([hidden]),
+.divide-y > :not([hidden]) ~ :not([hidden]) {
+  border-color: var(--border-subtle) !important;
+}
+
+/* Map legacy hardcoded dark borders universally */
+.border-\[\#1A2232\],
+.border-\[\#1A2232\]\/50,
+.border-\[\#1A2232\]\/60,
+.border-\[\#1E293B\],
+.border-\[\#192333\],
+.border-\[\#202C3F\],
+.border-\[\#233147\],
+.border-\[\#2D3748\],
+.border-\[\#2E3C52\],
+.border-\[\#33445b\] {
+  border-color: var(--border-subtle) !important;
 }
 
 /* Custom Scrollbars */

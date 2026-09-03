@@ -36,6 +36,7 @@ const navGroups = [
     label: '系统总览',
     items: [
       { id: 'overview', label: '运行总览', icon: LayoutDashboard },
+      { id: 'decisions', label: '决策日志', icon: Radio },
     ],
   },
   {
@@ -46,14 +47,16 @@ const navGroups = [
       { id: 'council', label: '模型委员会', icon: Users },
       { id: 'llm', label: '模型连接', icon: Cpu },
       { id: 'agents', label: '运行单元', icon: Package },
+      { id: 'plugins', label: '系统插件', icon: FileCode },
     ],
   },
   {
-    label: '交易管理',
+    label: '交易与网关',
     items: [
-      { id: 'symbols', label: '标的池', icon: Layers },
-      { id: 'manual-trade', label: '手动发单', icon: Radio },
-      { id: 'backups', label: '备份与还原', icon: FileCode },
+      { id: 'security', label: '标的与风控', icon: Layers },
+      { id: 'gateway', label: '任务网关', icon: RefreshCw },
+      { id: 'notify', label: '消息通知', icon: Radio },
+      { id: 'backup', label: '备份与还原', icon: FileCode },
     ],
   },
   {

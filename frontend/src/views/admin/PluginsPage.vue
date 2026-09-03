@@ -39,16 +39,25 @@ onMounted(load)
           <div class="flex items-center space-x-2"><Blocks class="w-4 h-4 text-blue-400" /><h2 class="text-xs font-bold text-white font-mono uppercase">插件清单</h2></div>
           <button @click="load" class="px-2.5 py-1 rounded bg-[#111c2a] border border-[#33445b] text-[10px] font-mono text-[#b8c4d4] cursor-pointer hover:bg-[#1d3050]">刷新</button>
         </div>
-        <table class="w-full text-left text-xs font-mono">
-          <thead><tr class="text-[#707E94] border-b border-[#1A2232]"><th class="pb-2">插件</th><th class="pb-2">类型</th><th class="pb-2">版本</th><th class="pb-2">权限声明</th><th class="pb-2">启用开关</th><th class="pb-2">健康</th></tr></thead>
-          <tbody class="divide-y divide-[#1A2232]/50">
-            <tr v-for="p in data.plugins" :key="p.plugin_id">
-              <td class="py-2.5 text-white font-bold">{{ p.name }}<div class="text-[9px] text-[#556677]">{{ p.plugin_id }}</div></td>
-              <td class="py-2.5 text-zinc-300">{{ p.plugin_type }}</td>
-              <td class="py-2.5 text-[#707E94]">{{ p.version }}</td>
-              <td class="py-2.5 text-[#707E94] text-[10px]">{{ (p.permissions || []).join(', ') }}</td>
-              <td class="py-2.5 text-[#707E94]">{{ p.enabled_key || '默认启用' }}</td>
-              <td class="py-2.5 font-bold" :class="p.health === 'healthy' ? 'text-emerald-400' : 'text-amber-400'">{{ p.health === 'healthy' ? '正常' : p.health === 'disabled' ? '已禁用' : p.health }}</td>
+        <table class="w-full text-left text-xs font-mono whitespace-nowrap">
+          <thead>
+            <tr class="border-b text-[11px] uppercase tracking-wider" style="border-color: var(--border-subtle); background-color: var(--bg-card-subtle); color: var(--text-muted);">
+              <th class="py-2.5 px-3 font-bold">插件</th>
+              <th class="py-2.5 px-3 font-bold">类型</th>
+              <th class="py-2.5 px-3 font-bold">版本</th>
+              <th class="py-2.5 px-3 font-bold">权限声明</th>
+              <th class="py-2.5 px-3 font-bold">启用开关</th>
+              <th class="py-2.5 px-3 font-bold">健康状态</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="p in data.plugins" :key="p.plugin_id" class="border-b last:border-b-0 hover:bg-[var(--bg-card-hover)] transition-colors" style="border-color: var(--border-subtle);">
+              <td class="py-2.5 px-3 text-white font-bold">{{ p.name }}<div class="text-[9px] text-[#556677]">{{ p.plugin_id }}</div></td>
+              <td class="py-2.5 px-3 text-zinc-300">{{ p.plugin_type }}</td>
+              <td class="py-2.5 px-3 text-[#707E94]">{{ p.version }}</td>
+              <td class="py-2.5 px-3 text-[#707E94] text-[10px]">{{ (p.permissions || []).join(', ') }}</td>
+              <td class="py-2.5 px-3 text-[#707E94]">{{ p.enabled_key || '默认启用' }}</td>
+              <td class="py-2.5 px-3 font-bold" :class="p.health === 'healthy' ? 'text-emerald-400' : 'text-amber-400'">{{ p.health === 'healthy' ? '正常' : p.health === 'disabled' ? '已禁用' : p.health }}</td>
             </tr>
           </tbody>
         </table>

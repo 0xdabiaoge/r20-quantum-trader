@@ -254,11 +254,12 @@ const quickNav = [
                   <th class="pb-2 text-right font-bold">决策时间</th>
                 </tr>
               </thead>
-              <tbody class="divide-y" style="border-color: var(--border-subtle);">
+              <tbody>
                 <tr
                   v-for="(d, i) in runtime.decisions"
                   :key="i"
-                  class="transition-colors hover:bg-[var(--bg-card-hover)]"
+                  class="border-b last:border-b-0 transition-colors hover:bg-[var(--bg-card-hover)]"
+                  style="border-color: var(--border-subtle);"
                 >
                   <td class="py-2.5 font-bold font-mono" style="color: var(--text-main);">
                     {{ d.instId?.replace('-USDT-SWAP', '') }}
@@ -317,11 +318,12 @@ const quickNav = [
                   <th class="pb-2 text-right font-bold">文件体积</th>
                 </tr>
               </thead>
-              <tbody class="divide-y" style="border-color: var(--border-subtle);">
+              <tbody>
                 <tr
                   v-for="(x, i) in runtime.data_health"
                   :key="i"
-                  class="transition-colors hover:bg-[var(--bg-card-hover)]"
+                  class="border-b last:border-b-0 transition-colors hover:bg-[var(--bg-card-hover)]"
+                  style="border-color: var(--border-subtle);"
                 >
                   <td class="py-2.5 font-mono font-medium" style="color: var(--text-main);">
                     {{ x.name }}

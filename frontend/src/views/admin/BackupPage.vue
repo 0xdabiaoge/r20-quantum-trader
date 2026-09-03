@@ -220,19 +220,31 @@ onMounted(load)
         </div>
 
         <!-- Local archives -->
-        <div class="bg-[#0D121B] border border-[#1A2232] rounded-xl p-4">
-          <div class="flex items-center space-x-2 mb-3"><Archive class="w-4 h-4 text-cyan-400" /><h2 class="text-xs font-bold text-white font-mono uppercase">本地待清归档 ({{ status?.local_archives?.length ?? 0 }})</h2></div>
-          <table v-if="status?.local_archives?.length" class="w-full text-left text-xs font-mono">
-            <thead><tr class="text-[#707E94] border-b border-[#1A2232]"><th class="pb-1.5">文件</th><th class="pb-1.5 text-right">大小</th><th class="pb-1.5 text-right">时间</th></tr></thead>
-            <tbody class="divide-y divide-[#1A2232]/50">
-              <tr v-for="a in status.local_archives.slice(0, 8)" :key="a.name">
-                <td class="py-1.5 text-zinc-300 truncate max-w-[220px]">{{ a.name }}</td>
-                <td class="py-1.5 text-right text-zinc-300">{{ fmtBytes(a.bytes) }}</td>
-                <td class="py-1.5 text-right text-[#707E94]">{{ fmtTime(a.mtime) }}</td>
+        <div class="rounded-xl border overflow-hidden shadow-xs" style="background-color: var(--bg-card); border-color: var(--border-subtle);">
+          <div class="px-4 py-3 border-b flex items-center justify-between" style="border-color: var(--border-subtle); background-color: var(--bg-card-subtle);">
+            <div class="flex items-center space-x-2">
+              <Archive class="w-4 h-4 text-cyan-400" />
+              <h2 class="text-xs font-black font-mono uppercase tracking-wide" style="color: var(--text-main);">本地待清归档 ({{ status?.local_archives?.length ?? 0 }})</h2>
+            </div>
+            <span class="text-[10px] font-mono" style="color: var(--text-faint);">异地备份后自动瘦身</span>
+          </div>
+          <table v-if="status?.local_archives?.length" class="w-full text-left text-xs font-mono whitespace-nowrap">
+            <thead>
+              <tr class="border-b text-[11px] uppercase tracking-wider font-bold" style="border-color: var(--border-subtle); background-color: var(--bg-card-subtle); color: var(--text-muted);">
+                <th class="py-2.5 px-4">归档文件</th>
+                <th class="py-2.5 px-3 text-right">大小</th>
+                <th class="py-2.5 px-4 text-right">创建时间</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="a in status.local_archives.slice(0, 8)" :key="a.name" class="border-b last:border-b-0 hover:bg-[var(--bg-card-hover)] transition-colors" style="border-color: var(--border-subtle);">
+                <td class="py-2.5 px-4 font-mono font-medium truncate max-w-[220px]" style="color: var(--text-main);">{{ a.name }}</td>
+                <td class="py-2.5 px-3 text-right num-tabular" style="color: var(--text-muted);">{{ fmtBytes(a.bytes) }}</td>
+                <td class="py-2.5 px-4 text-right num-tabular" style="color: var(--text-faint);">{{ fmtTime(a.mtime) }}</td>
               </tr>
             </tbody>
           </table>
-          <div v-else class="py-6 text-center text-xs text-emerald-400 font-mono">✓ 本地 0 归档占用（上传成功后已物理清理）</div>
+          <div v-else class="py-8 text-center text-xs font-mono" style="color: var(--color-up);">✓ 本地 0 冗余占用（加密上传成功后已物理瘦身清理）</div>
         </div>
       </div>
     </template>

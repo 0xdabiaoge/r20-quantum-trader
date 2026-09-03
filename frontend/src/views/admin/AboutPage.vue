@@ -73,8 +73,8 @@ onMounted(() => {
             <span class="text-[10px] font-mono text-[#707E94]">生产运行栈</span>
           </div>
           <table class="w-full text-left text-xs font-mono">
-            <tbody class="divide-y divide-[#1A2232]/50">
-              <tr v-for="c in about.components" :key="c.name" class="hover:bg-[#121824]/50">
+            <tbody>
+              <tr v-for="c in about.components" :key="c.name" class="border-b last:border-b-0 hover:bg-[var(--bg-card-hover)] transition-colors" style="border-color: var(--border-subtle);">
                 <td class="py-2 text-zinc-300">{{ c.name }}</td>
                 <td class="py-2 text-white font-bold">{{ c.version }}</td>
               </tr>

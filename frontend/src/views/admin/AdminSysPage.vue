@@ -141,34 +141,60 @@ onMounted(load)
     </div>
 
     <!-- Users List -->
-    <div class="bg-[#0D121B] border border-[#1A2232] rounded-xl p-4">
-      <div class="flex items-center justify-between mb-3">
-        <div class="flex items-center space-x-2"><UserCog class="w-4 h-4 text-blue-400" /><h2 class="text-sm font-bold text-white font-mono">管理员账号</h2></div>
-        <button v-if="auth.isSuperadmin" @click="createVisible = true" class="flex items-center space-x-1 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-mono cursor-pointer"><Plus class="w-3.5 h-3.5" /><span>新建管理员</span></button>
+    <div class="rounded-xl border overflow-hidden shadow-xs" style="background-color: var(--bg-card); border-color: var(--border-subtle);">
+      <div class="px-4 py-3 border-b flex items-center justify-between" style="border-color: var(--border-subtle); background-color: var(--bg-card-subtle);">
+        <div class="flex items-center space-x-2">
+          <UserCog class="w-4 h-4 text-blue-400" />
+          <h2 class="text-xs font-black font-mono uppercase tracking-wide" style="color: var(--text-main);">管理员账号与权限</h2>
+        </div>
+        <button v-if="auth.isSuperadmin" @click="createVisible = true" class="flex items-center space-x-1 px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer shadow-xs" style="background-color: var(--text-main); color: var(--bg-card);">
+          <Plus class="w-3.5 h-3.5" />
+          <span>新建管理员</span>
+        </button>
       </div>
 
-      <div v-if="!auth.isSuperadmin" class="py-6 text-center text-xs font-mono text-[#707E94] border border-dashed border-[#1A2232] rounded-lg">仅超级管理员可查看与管理部门账号。</div>
+      <div v-if="!auth.isSuperadmin" class="py-8 text-center text-xs font-mono border border-dashed rounded-lg m-4" style="color: var(--text-muted); border-color: var(--border-subtle);">
+        仅超级管理员可查看与管理团队账号。
+      </div>
 
-      <table v-else class="w-full text-left text-xs font-mono">
-        <thead><tr class="text-[#707E94] border-b border-[#1A2232]"><th class="pb-2">ID</th><th class="pb-2">账号</th><th class="pb-2">角色</th><th class="pb-2">状态</th><th class="pb-2">最近登录</th><th class="pb-2 text-right">操作</th></tr></thead>
-        <tbody class="divide-y divide-[#1A2232]/50">
-          <tr v-for="u in users" :key="u.id">
-            <td class="py-2.5 text-[#707E94]">{{ u.id }}</td>
-            <td class="py-2.5 text-white font-bold">{{ u.username }}<span v-if="u.id === currentUserId" class="text-blue-400 text-[10px]"> (我)</span></td>
-            <td class="py-2.5"><span class="px-1.5 py-0.5 rounded text-[10px] font-bold" :class="u.role === 'superadmin' ? 'bg-purple-500/15 text-purple-400' : 'bg-blue-500/15 text-blue-400'">{{ u.role === 'superadmin' ? '超级管理员' : '管理员' }}</span></td>
-            <td class="py-2.5 font-bold" :class="u.enabled ? (u.locked_until ? 'text-amber-400' : 'text-emerald-400') : 'text-rose-400'">
-              {{ !u.enabled ? '已停用' : (u.locked_until && new Date(u.locked_until) > new Date() ? '已锁定' : '正常') }}
-            </td>
-            <td class="py-2.5 text-[#707E94]">{{ u.last_login_at || '--' }}</td>
-            <td class="py-2.5 text-right whitespace-nowrap space-x-1">
-              <button v-if="u.id !== currentUserId" @click="toggleEnabled(u)" class="px-2 py-1 rounded bg-[#111c2a] border border-[#33445b] text-[10px] text-white cursor-pointer hover:bg-[#1d3050]">
-                <component :is="u.enabled ? Lock : Unlock" class="w-3 h-3 inline" /> {{ u.enabled ? '停用' : '启用' }}
-              </button>
-              <button v-if="u.locked_until" @click="unlockUser(u)" class="px-2 py-1 rounded bg-amber-600/20 border border-amber-500/30 text-[10px] text-amber-400 cursor-pointer hover:bg-amber-600/30">解锁</button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <div v-else class="overflow-x-auto">
+        <table class="w-full text-left text-xs font-mono whitespace-nowrap">
+          <thead>
+            <tr class="border-b text-[11px] uppercase tracking-wider font-bold" style="border-color: var(--border-subtle); background-color: var(--bg-card-subtle); color: var(--text-muted);">
+              <th class="py-2.5 px-4">UID</th>
+              <th class="py-2.5 px-3">账号名</th>
+              <th class="py-2.5 px-3">授权角色</th>
+              <th class="py-2.5 px-3">账号状态</th>
+              <th class="py-2.5 px-3">最近登录时间</th>
+              <th class="py-2.5 px-4 text-right">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="u in users" :key="u.id" class="border-b last:border-b-0 hover:bg-[var(--bg-card-hover)] transition-colors" style="border-color: var(--border-subtle);">
+              <td class="py-2.5 px-4 num-tabular" style="color: var(--text-faint);">{{ u.id }}</td>
+              <td class="py-2.5 px-3 font-bold" style="color: var(--text-main);">
+                {{ u.username }}
+                <span v-if="u.id === currentUserId" class="px-1 py-0.2 rounded text-[9px] font-bold border ml-1" style="background-color: var(--color-brand-bg); border-color: var(--color-brand-border); color: var(--color-brand);">(当前会话)</span>
+              </td>
+              <td class="py-2.5 px-3">
+                <span class="px-2 py-0.5 rounded text-[10px] font-bold border" :style="u.role === 'superadmin' ? { backgroundColor: 'var(--color-brand-bg)', borderColor: 'var(--color-brand-border)', color: 'var(--color-brand)' } : { backgroundColor: 'var(--bg-badge)', borderColor: 'var(--border-subtle)', color: 'var(--text-muted)' }">
+                  {{ u.role === 'superadmin' ? '超级管理员' : '普通管理员' }}
+                </span>
+              </td>
+              <td class="py-2.5 px-3 font-bold" :class="u.enabled ? (u.locked_until ? 'text-amber-400' : 'text-emerald-400') : 'text-rose-400'">
+                {{ !u.enabled ? '已停用' : (u.locked_until && new Date(u.locked_until) > new Date() ? '已锁定' : '正常启用') }}
+              </td>
+              <td class="py-2.5 px-3 num-tabular" style="color: var(--text-faint);">{{ u.last_login_at || '从未登录' }}</td>
+              <td class="py-2.5 px-4 text-right whitespace-nowrap space-x-1.5">
+                <button v-if="u.id !== currentUserId" @click="toggleEnabled(u)" class="px-2.5 py-1 rounded-md border text-[11px] font-mono transition-all cursor-pointer shadow-xs" style="background-color: var(--bg-card-subtle); border-color: var(--border-medium); color: var(--text-main);">
+                  <component :is="u.enabled ? Lock : Unlock" class="w-3 h-3 inline" /> {{ u.enabled ? '停用' : '启用' }}
+                </button>
+                <button v-if="u.locked_until" @click="unlockUser(u)" class="px-2.5 py-1 rounded-md border text-[11px] font-mono cursor-pointer transition-colors" style="background-color: var(--color-warn-bg); border-color: var(--color-warn-border); color: var(--color-warn);">解锁</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
     <!-- Create Modal -->

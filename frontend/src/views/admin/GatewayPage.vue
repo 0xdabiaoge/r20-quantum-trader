@@ -85,46 +85,82 @@ onMounted(load)
       </div>
 
       <!-- Scheduler Jobs -->
-      <div v-if="gw.scheduler?.jobs?.length" class="bg-[#0D121B] border border-[#1A2232] rounded-xl p-4">
-        <h2 class="text-xs font-bold text-white font-mono uppercase mb-3">本地调度计划（北京时间）</h2>
-        <table class="w-full text-left text-xs font-mono">
-          <thead><tr class="text-[#707E94] border-b border-[#1A2232]"><th class="pb-2">任务</th><th class="pb-2">脚本</th><th class="pb-2">触发</th><th class="pb-2">最近调度</th><th class="pb-2">状态</th></tr></thead>
-          <tbody class="divide-y divide-[#1A2232]/50">
-            <tr v-for="j in gw.scheduler.jobs" :key="j.name">
-              <td class="py-2 text-white font-bold">{{ j.name }}</td>
-              <td class="py-2 text-zinc-300 text-[10px]">{{ j.script }}</td>
-              <td class="py-2 text-zinc-300">{{ j.schedule }}</td>
-              <td class="py-2 text-[#707E94]">{{ j.last_scheduled_at || '尚未调度' }}</td>
-              <td class="py-2 font-bold" :class="j.overdue ? 'text-rose-400' : 'text-emerald-400'">{{ j.overdue ? '⚠ 逾期' : '正常' }}</td>
-            </tr>
-          </tbody>
-        </table>
+      <div v-if="gw.scheduler?.jobs?.length" class="rounded-xl border overflow-hidden shadow-xs" style="background-color: var(--bg-card); border-color: var(--border-subtle);">
+        <div class="px-4 py-3 border-b flex items-center justify-between" style="border-color: var(--border-subtle); background-color: var(--bg-card-subtle);">
+          <h2 class="text-xs font-black font-mono uppercase tracking-wide" style="color: var(--text-main);">本地调度计划（北京时间）</h2>
+          <span class="text-[11px] font-mono" style="color: var(--text-faint);">{{ gw.scheduler.jobs.length }} 个受管定时作业</span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs font-mono whitespace-nowrap">
+            <thead>
+              <tr class="border-b text-[11px] uppercase tracking-wider font-bold" style="border-color: var(--border-subtle); background-color: var(--bg-card-subtle); color: var(--text-muted);">
+                <th class="py-2.5 px-4">任务</th>
+                <th class="py-2.5 px-3">脚本</th>
+                <th class="py-2.5 px-3">触发</th>
+                <th class="py-2.5 px-3">最近调度</th>
+                <th class="py-2.5 px-4 text-right">状态</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="j in gw.scheduler.jobs" :key="j.name" class="border-b last:border-b-0 hover:bg-[var(--bg-card-hover)] transition-colors" style="border-color: var(--border-subtle);">
+                <td class="py-2.5 px-4 font-bold" style="color: var(--text-main);">{{ j.name }}</td>
+                <td class="py-2.5 px-3 text-[11px]" style="color: var(--text-muted);">{{ j.script }}</td>
+                <td class="py-2.5 px-3 font-medium" style="color: var(--text-main);">{{ j.schedule }}</td>
+                <td class="py-2.5 px-3 num-tabular" style="color: var(--text-faint);">{{ j.last_scheduled_at || '尚未调度' }}</td>
+                <td class="py-2.5 px-4 text-right font-bold" :class="j.overdue ? 'text-rose-400' : 'text-emerald-400'">
+                  {{ j.overdue ? '⚠ 逾期' : '正常' }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <!-- Deliveries -->
-      <div class="bg-[#0D121B] border border-[#1A2232] rounded-xl p-4">
-        <div class="flex items-center justify-between mb-3">
-          <h2 class="text-xs font-bold text-white font-mono uppercase">事件投递队列 (最近 50 条)</h2>
-          <button @click="load" class="flex items-center space-x-1 px-2.5 py-1 rounded bg-[#111c2a] border border-[#33445b] text-[10px] font-mono text-[#b8c4d4] cursor-pointer hover:bg-[#1d3050]"><RefreshCw class="w-3 h-3" /><span>刷新</span></button>
+      <div class="rounded-xl border overflow-hidden shadow-xs" style="background-color: var(--bg-card); border-color: var(--border-subtle);">
+        <div class="px-4 py-3 border-b flex items-center justify-between" style="border-color: var(--border-subtle); background-color: var(--bg-card-subtle);">
+          <div class="flex items-center space-x-2">
+            <h2 class="text-xs font-black font-mono uppercase tracking-wide" style="color: var(--text-main);">事件投递队列 (最近 50 条)</h2>
+            <span class="text-[10px] font-mono px-2 py-0.2 rounded border font-bold" style="background-color: var(--color-brand-bg); color: var(--color-brand); border-color: var(--color-brand-border);">
+              {{ gw.deliveries?.length || 0 }} 记录
+            </span>
+          </div>
+          <button @click="load" class="flex items-center space-x-1 px-2.5 py-1 rounded-lg border text-[11px] font-mono cursor-pointer transition-all shadow-xs" style="background-color: var(--bg-card); border-color: var(--border-medium); color: var(--text-main);">
+            <RefreshCw class="w-3 h-3" />
+            <span>刷新队列</span>
+          </button>
         </div>
         <div class="overflow-x-auto max-h-[420px] overflow-y-auto">
-          <table class="w-full text-left text-xs font-mono">
-            <thead class="sticky top-0 bg-[#0D121B]"><tr class="text-[#707E94] border-b border-[#1A2232]"><th class="pb-2">#</th><th class="pb-2">事件</th><th class="pb-2">通道</th><th class="pb-2">状态</th><th class="pb-2">尝试</th><th class="pb-2">时间</th><th class="pb-2 text-right">操作</th></tr></thead>
-            <tbody class="divide-y divide-[#1A2232]/50">
-              <tr v-for="d in gw.deliveries" :key="d.id">
-                <td class="py-2 text-[#707E94]">{{ d.id }}</td>
-                <td class="py-2 text-white">{{ d.event_type || d.topic || '--' }}</td>
-                <td class="py-2 text-zinc-300">{{ d.channel || '--' }}</td>
-                <td class="py-2 font-bold" :class="statusColor(d.status)">{{ d.status }}</td>
-                <td class="py-2 text-zinc-300">{{ d.attempts ?? d.attempt_count ?? 1 }}</td>
-                <td class="py-2 text-[#707E94]">{{ d.created_at || d.time || '--' }}</td>
-                <td class="py-2 text-right">
-                  <button v-if="d.status === 'dead'" @click="replayDelivery(d.id)" class="flex items-center space-x-1 ml-auto px-2 py-1 rounded bg-amber-600/20 border border-amber-500/30 text-[10px] font-mono text-amber-400 cursor-pointer hover:bg-amber-600/30">
+          <table class="w-full text-left text-xs font-mono whitespace-nowrap">
+            <thead class="sticky top-0 z-10">
+              <tr class="border-b text-[11px] uppercase tracking-wider font-bold" style="border-color: var(--border-subtle); background-color: var(--bg-card-subtle); color: var(--text-muted);">
+                <th class="py-2.5 px-4">#</th>
+                <th class="py-2.5 px-3">事件类型</th>
+                <th class="py-2.5 px-3">投递通道</th>
+                <th class="py-2.5 px-3">状态</th>
+                <th class="py-2.5 px-3">尝试</th>
+                <th class="py-2.5 px-3">时间</th>
+                <th class="py-2.5 px-4 text-right">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="d in gw.deliveries" :key="d.id" class="border-b last:border-b-0 hover:bg-[var(--bg-card-hover)] transition-colors" style="border-color: var(--border-subtle);">
+                <td class="py-2.5 px-4 num-tabular" style="color: var(--text-faint);">{{ d.id }}</td>
+                <td class="py-2.5 px-3 font-bold" style="color: var(--text-main);">{{ d.event_type || d.topic || '--' }}</td>
+                <td class="py-2.5 px-3" style="color: var(--text-muted);">{{ d.channel || '--' }}</td>
+                <td class="py-2.5 px-3 font-bold" :class="statusColor(d.status)">{{ d.status }}</td>
+                <td class="py-2.5 px-3 num-tabular" style="color: var(--text-muted);">{{ d.attempts ?? d.attempt_count ?? 1 }}</td>
+                <td class="py-2.5 px-3 num-tabular" style="color: var(--text-faint);">{{ d.created_at || d.time || '--' }}</td>
+                <td class="py-2.5 px-4 text-right">
+                  <button v-if="d.status === 'dead'" @click="replayDelivery(d.id)" class="flex items-center space-x-1 ml-auto px-2 py-1 rounded-md border text-[10px] font-mono cursor-pointer transition-colors" style="background-color: var(--color-warn-bg); border-color: var(--color-warn-border); color: var(--color-warn);">
                     <RotateCcw class="w-3 h-3" /><span>重放</span>
                   </button>
+                  <span v-else class="text-[10px]" style="color: var(--text-faint);">--</span>
                 </td>
               </tr>
-              <tr v-if="!gw.deliveries || gw.deliveries.length === 0"><td colspan="7" class="py-6 text-center text-[#707E94]">暂无投递记录</td></tr>
+              <tr v-if="!gw.deliveries || gw.deliveries.length === 0">
+                <td colspan="7" class="py-8 text-center" style="color: var(--text-faint);">暂无投递记录</td>
+              </tr>
             </tbody>
           </table>
         </div>
