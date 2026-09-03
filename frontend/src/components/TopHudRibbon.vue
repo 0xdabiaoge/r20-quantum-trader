@@ -17,7 +17,7 @@ const benchmarkRoi = computed(() => Number(account.value.cum_roi_pct || 0).toFix
 const initialCap = computed(() => Number(account.value.initial_capital || 0).toFixed(2))
 const cumRealizedPnl = computed(() => Number(account.value.cum_realized_pnl || 0).toFixed(2))
 
-const todayNet = computed(() => Number(today.value.total_pnl ?? today.value.net_realized ?? 0).toFixed(2))
+const todayNet = computed(() => Number(today.value.net_realized ?? today.value.total_pnl ?? 0).toFixed(2))
 const todayWinrate = computed(() => Number(today.value.win_rate || 0).toFixed(1))
 const todayTrades = computed(() => (today.value.win_trades || 0) + (today.value.loss_trades || 0))
 
@@ -93,12 +93,12 @@ const allProtected = computed(() =>
       </div>
     </div>
 
-    <!-- Card 3: 今日净盈亏与战报 (UTC+8) -->
+    <!-- Card 3: 今日已结净盈亏 (UTC+8) -->
     <div class="bg-gradient-to-b from-[#111a29] to-[#0D121B] border border-[#1A2232] rounded-xl p-4 flex flex-col justify-between shadow-lg">
       <div class="flex items-center justify-between text-[#707E94] text-xs font-mono mb-2">
         <div class="flex items-center space-x-1.5">
           <Calendar class="w-4 h-4 text-purple-400" />
-          <span>今日战报 (UTC+8)</span>
+          <span>今日已结净盈亏 (UTC+8)</span>
         </div>
         <span class="text-[10px] font-mono" :class="Number(todayNet) >= 0 ? 'text-emerald-400' : 'text-rose-400'">
           胜率 {{ todayWinrate }}%
