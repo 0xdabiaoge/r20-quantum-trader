@@ -104,7 +104,7 @@ const showAboutModal = ref(false)
             class="text-[10px] text-[#707E94] hover:text-blue-400 font-mono transition-colors cursor-pointer text-left block"
             title="点击查看开源仓库与项目信息"
           >
-            QUANTUM TRADER v6.3.1
+            QUANTUM TRADER v6.5.0
           </button>
         </div>
       </div>

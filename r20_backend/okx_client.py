@@ -23,7 +23,7 @@ class OKXClient:
         request_path = path + (f"?{query}" if query else "")
         url = f"{self.base_url}{request_path}"
         body = json.dumps(params, separators=(",", ":")).encode("utf-8") if method != "GET" else None
-        headers = {"User-Agent": "R20-Standalone/6.3.1"}
+        headers = {"User-Agent": "R20-Standalone/6.5.0"}
         if body:
             headers["Content-Type"] = "application/json"
         if settings.okx_api_key and settings.okx_secret_key and settings.okx_passphrase:

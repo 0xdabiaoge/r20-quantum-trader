@@ -82,7 +82,7 @@ onUnmounted(() => {
             R20 QUANTUM
           </span>
           <span class="px-2 py-0.5 rounded text-[10px] font-mono text-blue-400 bg-blue-500/10 border border-blue-500/20 font-bold">
-            v6.3.1 官方开发与使用文档
+            v6.5.0 官方开发与使用文档
           </span>
         </div>
       </div>
@@ -244,7 +244,7 @@ onUnmounted(() => {
           </div>
 
           <p class="text-sm text-zinc-300 leading-relaxed font-sans">
-            为了避免单一模型的主观盲区，R20 v6.3.1 引入了<strong>多模型参谋并发辩论与首席仲裁机制</strong>。在进入交易决策前，系统将全市场行情与数理快照同时分发给各专业参谋席位（支持 Claude 3.7、Gemini 2.5/3.8、DeepSeek-R1、OpenAI o3 等异构模型）：
+            为了避免单一模型的主观盲区，R20 v6.5.0 引入了<strong>多模型参谋并发辩论与首席仲裁机制</strong>。在进入交易决策前，系统将全市场行情与数理快照同时分发给各专业参谋席位（支持 Claude 3.7、Gemini 2.5/3.8、DeepSeek-R1、OpenAI o3 等异构模型）：
           </p>
 
           <div class="rounded-xl bg-[#0B101A] border border-[#1A2232] p-4 text-xs font-mono space-y-2">

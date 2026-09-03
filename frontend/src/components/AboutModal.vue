@@ -56,7 +56,7 @@ async function copyText(text: string, targetKey: string) {
             <h3 class="text-sm font-bold text-white uppercase tracking-wide flex items-center gap-2">
               <span>R20 Quantum Trader</span>
               <span class="px-1.5 py-0.2 rounded text-[10px] font-mono font-bold bg-blue-500/15 text-blue-400 border border-blue-500/30">
-                v6.3.1
+                v6.5.0
               </span>
             </h3>
           </div>
