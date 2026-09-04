@@ -125,6 +125,7 @@ function openAddProviderModal() {
     enabled: true,
     multi_key_enabled: false,
     response_api_enabled: false,
+    api_format: 'openai_chat',
     base_url: '',
     api_key: '',
     api_path: '/chat/completions',
@@ -138,6 +139,7 @@ function openAddProviderModal() {
 
 function selectProvider(p: any) {
   selectedProvider.value = p
+  const format = p.api_format || (p.id === 'claude' ? 'claude_messages' : 'openai_chat')
   providerForm.value = {
     id: p.id,
     name: p.name,
@@ -146,15 +148,36 @@ function selectProvider(p: any) {
     enabled: !!p.enabled,
     multi_key_enabled: !!p.multi_key_enabled,
     response_api_enabled: !!p.response_api_enabled,
+    api_format: format,
     base_url: p.base_url || '',
     api_key: '',
-    api_path: p.api_path || '/chat/completions',
+    api_path: p.api_path || (format === 'claude_messages' ? '/messages' : (format === 'openai_responses' ? '/responses' : '/chat/completions')),
     description: p.description || '',
   }
   detailTab.value = 'config'
   currentView.value = 'detail'
   testResult.value = null
   showApiKey.value = false
+}
+
+function onApiFormatChange() {
+  const fmt = providerForm.value.api_format
+  if (fmt === 'claude_messages') {
+    if (!providerForm.value.api_path || providerForm.value.api_path === '/chat/completions' || providerForm.value.api_path === '/responses') {
+      providerForm.value.api_path = '/messages'
+    }
+    providerForm.value.response_api_enabled = false
+  } else if (fmt === 'openai_responses') {
+    if (!providerForm.value.api_path || providerForm.value.api_path === '/chat/completions' || providerForm.value.api_path === '/messages') {
+      providerForm.value.api_path = '/responses'
+    }
+    providerForm.value.response_api_enabled = true
+  } else {
+    if (!providerForm.value.api_path || providerForm.value.api_path === '/messages' || providerForm.value.api_path === '/responses') {
+      providerForm.value.api_path = '/chat/completions'
+    }
+    providerForm.value.response_api_enabled = false
+  }
 }
 
 function goBackToList() {
@@ -643,6 +666,24 @@ onMounted(() => {
               </div>
             </div>
 
+            <!-- API 交互协议类型 (下拉选择) -->
+            <div class="p-3.5 flex items-center justify-between">
+              <div>
+                <span class="font-medium" style="color: var(--text-main);">API 交互协议</span>
+                <div class="text-[10px]" style="color: var(--text-faint);">选择该端点底层支持的通信协议标准</div>
+              </div>
+              <select
+                v-model="providerForm.api_format"
+                @change="onApiFormatChange"
+                class="rounded-lg px-2.5 py-1.5 text-xs font-mono outline-none border cursor-pointer max-w-[200px]"
+                style="background-color: var(--bg-card); border-color: var(--border-subtle); color: var(--text-main);"
+              >
+                <option value="openai_chat">OpenAI Chat (/chat/completions)</option>
+                <option value="claude_messages">Claude Messages (/messages)</option>
+                <option value="openai_responses">OpenAI Responses (/responses)</option>
+              </select>
+            </div>
+
             <!-- 分组 -->
             <div class="p-3.5 flex items-center justify-between">
               <span class="font-medium" style="color: var(--text-main);">分组</span>
@@ -677,24 +718,9 @@ onMounted(() => {
                 <div class="w-11 h-6 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
               </label>
             </div>
-
-            <!-- Response API (/responses) 开关 -->
-            <div class="p-3.5 flex items-center justify-between">
-              <div>
-                <div class="font-medium" style="color: var(--text-main);">Response API (/responses)</div>
-                <div class="text-[10px]" style="color: var(--text-faint);">针对 OpenAI 新一代结构化 Responses API 协议</div>
-              </div>
-              <label class="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  v-model="providerForm.response_api_enabled"
-                  class="sr-only peer"
-                />
-                <div class="w-11 h-6 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
-              </label>
-            </div>
           </div>
         </div>
+
 
         <!-- Section 2: 凭据与输入表单区 (对应截图 2 底部字段) -->
         <div class="space-y-3 pt-2">
@@ -771,7 +797,7 @@ onMounted(() => {
         </div>
 
         <!-- Save Button -->
-        <div class="pt-3 flex justify-end">
+        <div class="pt-3 pb-16 flex justify-end">
           <button
             @click="saveProviderConfig"
             class="px-6 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs btn-primary-text"
@@ -941,7 +967,7 @@ onMounted(() => {
         </div>
 
         <!-- Floating Bottom Operation Bar (对齐截图 3 悬浮底栏: [获取] [+ 添加新模型] [垃圾桶]) -->
-        <div class="flex items-center justify-center pt-2">
+        <div class="flex items-center justify-center pt-2 pb-16">
           <div
             class="flex items-center space-x-3 px-4 py-2 rounded-full border shadow-xl backdrop-blur-md"
             style="background-color: var(--bg-card); border-color: var(--border-subtle);"
@@ -981,17 +1007,20 @@ onMounted(() => {
 
       <!-- Detail Bottom Tab Bar (对齐截图 2 & 截图 3 的底部「配置」与「模型」双Tab) -->
       <div
-        class="fixed bottom-3 left-1/2 -translate-x-1/2 z-40 flex items-center rounded-2xl border p-1 shadow-2xl backdrop-blur-lg"
+        class="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 flex items-center rounded-2xl border p-1 shadow-2xl backdrop-blur-md"
         style="background-color: var(--bg-card); border-color: var(--border-subtle);"
       >
         <button
           @click="detailTab = 'config'"
-          class="flex items-center space-x-2 px-6 py-2.5 rounded-xl font-bold text-xs cursor-pointer transition-all"
+          class="flex items-center space-x-2 px-6 py-2.5 rounded-xl font-bold text-xs cursor-pointer transition-all border"
           :style="detailTab === 'config' ? {
-            backgroundColor: 'var(--color-brand)',
+            backgroundColor: '#2563EB',
+            borderColor: '#1D4ED8',
             color: '#FFFFFF',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+            boxShadow: '0 2px 10px rgba(37,99,235,0.35)',
           } : {
+            backgroundColor: 'transparent',
+            borderColor: 'transparent',
             color: 'var(--text-muted)',
           }"
         >
@@ -1001,12 +1030,15 @@ onMounted(() => {
 
         <button
           @click="detailTab = 'models'"
-          class="flex items-center space-x-2 px-6 py-2.5 rounded-xl font-bold text-xs cursor-pointer transition-all"
+          class="flex items-center space-x-2 px-6 py-2.5 rounded-xl font-bold text-xs cursor-pointer transition-all border"
           :style="detailTab === 'models' ? {
-            backgroundColor: 'var(--color-brand)',
+            backgroundColor: '#2563EB',
+            borderColor: '#1D4ED8',
             color: '#FFFFFF',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+            boxShadow: '0 2px 10px rgba(37,99,235,0.35)',
           } : {
+            backgroundColor: 'transparent',
+            borderColor: 'transparent',
             color: 'var(--text-muted)',
           }"
         >

@@ -22,9 +22,9 @@ LLM_CONFIG_FILE = DATA_DIR / "llm_models.json"
 LEGACY_PROVIDERS_FILE = DATA_DIR / "llm_providers.json"
 
 SUPPORTED_API_FORMATS = [
-    {"id": "openai_chat", "name": "OpenAI Chat (/chat/completions)", "desc": "标准 ChatML 对话格式，兼容 OpenAI/Gemini/DeepSeek/中继"},
-    {"id": "openai_responses", "name": "OpenAI Responses (/responses)", "desc": "OpenAI 最新 Complete Responses API 结构化接口"},
-    {"id": "claude_messages", "name": "Claude Messages (/messages)", "desc": "Anthropic Claude 原生 Messages API，支持原生 CoT 思考"},
+    {"id": "openai_chat", "name": "OpenAI Chat (/chat/completions)", "desc": "标准 ChatML 对话格式，兼容 OpenAI/Gemini/DeepSeek/主流中继"},
+    {"id": "openai_responses", "name": "OpenAI Responses (/responses)", "desc": "OpenAI 专属 Responses API 结构化接口"},
+    {"id": "claude_messages", "name": "Claude Messages (/messages)", "desc": "Anthropic Claude 原生 Messages API，支持原生长思维链"},
 ]
 
 STANDARD_REASONING_EFFORTS = ["high", "medium", "low", "minimal", "none", "auto"]
@@ -661,6 +661,20 @@ def upsert_provider(provider_data: Dict[str, Any]) -> Dict[str, Any]:
     api_format = str(provider_data.get("api_format", "openai_chat")).strip()
     api_path = str(provider_data.get("api_path", "/chat/completions")).strip()
     desc = str(provider_data.get("description", "")).strip()
+
+    if not api_format:
+        api_format = "claude_messages" if "claude" in pid or "anthropic" in base_url.lower() else "openai_chat"
+
+    # Automatically synchronize api_path with selected api_format if default was provided
+    if api_path in ["/chat/completions", "/messages", "/responses", ""]:
+        if api_format == "claude_messages":
+            api_path = "/messages"
+        elif api_format == "openai_responses":
+            api_path = "/responses"
+        else:
+            api_path = "/chat/completions"
+
+    response_api_enabled = (api_format == "openai_responses")
 
     if not pid:
         pid = re.sub(r"[^a-zA-Z0-9_\-]", "", name.lower()) or f"prov-{int(time.time())}"
