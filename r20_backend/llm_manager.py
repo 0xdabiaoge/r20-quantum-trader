@@ -100,7 +100,7 @@ DEFAULT_PROVIDERS = [
         "id": "openai",
         "name": "OpenAI",
         "type": "OpenAI",
-        "group": "其他",
+        "group": "基础供应",
         "enabled": True,
         "multi_key_enabled": False,
         "response_api_enabled": False,
@@ -110,15 +110,6 @@ DEFAULT_PROVIDERS = [
         "api_path": "/chat/completions",
         "description": "OpenAI 兼容协议端点，支持中继网关与官方直连",
         "models": [
-            {
-                "id": "gemini-3.8-flash-high",
-                "name": "gemini-3.8-flash-high",
-                "capabilities": ["chat", "vision", "tools", "reasoning"],
-                "reasoning_type": "standard_effort",
-                "reasoning_effort": "high",
-                "context_length": 1048576,
-                "description": "当前全局生产主力主脑，支持高思考深度长思维链与百万上下文",
-            },
             {
                 "id": "gemini-3.7-flash-high",
                 "name": "gemini-3.7-flash-high",
@@ -137,366 +128,13 @@ DEFAULT_PROVIDERS = [
                 "context_length": 131072,
                 "description": "Gemini 多模态盘口图表视觉感知模型",
             },
-            {
-                "id": "gpt-5.6-luna",
-                "name": "gpt-5.6-luna",
-                "capabilities": ["chat", "vision", "tools", "reasoning"],
-                "reasoning_type": "standard_effort",
-                "reasoning_effort": "high",
-                "context_length": 1050000,
-                "description": "2026 最新一代旗舰全模态智能体大模型",
-            },
-            {
-                "id": "gpt-5.4-pro",
-                "name": "gpt-5.4-pro",
-                "capabilities": ["chat", "vision", "tools", "reasoning"],
-                "reasoning_type": "standard_effort",
-                "reasoning_effort": "high",
-                "context_length": 1050000,
-                "description": "GPT-5.4 顶级数理分析与自动化量化建模推理",
-            },
-            {
-                "id": "o3-pro",
-                "name": "o3-pro",
-                "capabilities": ["chat", "tools", "reasoning"],
-                "reasoning_type": "standard_effort",
-                "reasoning_effort": "high",
-                "context_length": 200000,
-                "description": "OpenAI o3 Pro 顶级长思维链数学与因果逻辑推理",
-            },
-            {
-                "id": "o3-mini",
-                "name": "o3-mini",
-                "capabilities": ["chat", "tools", "reasoning"],
-                "reasoning_type": "standard_effort",
-                "reasoning_effort": "high",
-                "context_length": 200000,
-                "description": "OpenAI o3-mini 高性价比快速推演",
-            },
-            {
-                "id": "gpt-4.5-preview",
-                "name": "gpt-4.5-preview",
-                "capabilities": ["chat", "vision", "tools"],
-                "reasoning_type": "none",
-                "reasoning_effort": "none",
-                "context_length": 128000,
-                "description": "OpenAI 知识广度旗舰模型",
-            },
-        ],
-    },
-    {
-        "id": "siliconflow",
-        "name": "SiliconFlow",
-        "type": "SiliconFlow",
-        "group": "国内平台",
-        "enabled": False,
-        "multi_key_enabled": False,
-        "response_api_enabled": False,
-        "base_url": "https://api.siliconflow.cn/v1",
-        "api_key": "",
-        "api_format": "openai_chat",
-        "api_path": "/chat/completions",
-        "description": "硅基流动国内开源大模型高并发托管平台",
-        "models": [
-            {
-                "id": "deepseek-ai/DeepSeek-R1",
-                "name": "DeepSeek R1 满血 (671B)",
-                "capabilities": ["chat", "reasoning"],
-                "reasoning_type": "deepseek_reasoner",
-                "reasoning_effort": "high",
-                "context_length": 65536,
-                "description": "纯血开源强化学习推理架构",
-            },
-            {
-                "id": "deepseek-ai/DeepSeek-V3",
-                "name": "DeepSeek V3 旗舰",
-                "capabilities": ["chat", "tools"],
-                "reasoning_type": "none",
-                "reasoning_effort": "none",
-                "context_length": 65536,
-                "description": "高吞吐通用大语言模型",
-            },
-            {
-                "id": "Qwen/Qwen2.5-72B-Instruct",
-                "name": "Qwen 2.5 72B Instruct",
-                "capabilities": ["chat", "tools"],
-                "reasoning_type": "none",
-                "reasoning_effort": "medium",
-                "context_length": 131072,
-                "description": "通义千问开源 72B 旗舰模型",
-            },
-            {
-                "id": "Pro/deepseek-ai/DeepSeek-R1",
-                "name": "DeepSeek R1 (企业专线)",
-                "capabilities": ["chat", "reasoning"],
-                "reasoning_type": "deepseek_reasoner",
-                "reasoning_effort": "high",
-                "context_length": 65536,
-                "description": "硅基流动专线保障高并发推理",
-            },
-        ],
-    },
-    {
-        "id": "gemini",
-        "name": "Gemini",
-        "type": "Gemini",
-        "group": "官方直连",
-        "enabled": False,
-        "multi_key_enabled": False,
-        "response_api_enabled": False,
-        "base_url": "https://generativelanguage.googleapis.com/v1beta/openai",
-        "api_key": "",
-        "api_format": "openai_chat",
-        "api_path": "/chat/completions",
-        "description": "Google AI Studio 官方原生/OpenAI 兼容端点",
-        "models": [
-            {
-                "id": "gemini-3.8-flash",
-                "name": "Gemini 3.8 Flash (百万上下文)",
-                "capabilities": ["chat", "vision", "tools", "reasoning"],
-                "reasoning_type": "standard_effort",
-                "reasoning_effort": "high",
-                "context_length": 1048576,
-                "description": "最新 3.8 代长思维链极速模型",
-            },
-            {
-                "id": "gemini-3.7-flash",
-                "name": "Gemini 3.7 Flash",
-                "capabilities": ["chat", "vision", "tools", "reasoning"],
-                "reasoning_type": "standard_effort",
-                "reasoning_effort": "high",
-                "context_length": 1048576,
-                "description": "Gemini 3.7 代旗舰思考模型",
-            },
-            {
-                "id": "gemini-2.5-pro",
-                "name": "Gemini 2.5 Pro",
-                "capabilities": ["chat", "vision", "tools", "reasoning"],
-                "reasoning_type": "standard_effort",
-                "reasoning_effort": "high",
-                "context_length": 1048576,
-                "description": "复杂任务综合逻辑推理旗舰",
-            },
-            {
-                "id": "gemini-2.5-flash",
-                "name": "Gemini 2.5 Flash",
-                "capabilities": ["chat", "vision", "tools", "reasoning"],
-                "reasoning_type": "standard_effort",
-                "reasoning_effort": "high",
-                "context_length": 1048576,
-                "description": "高性价比快速多模态模型",
-            },
-        ],
-    },
-    {
-        "id": "openrouter",
-        "name": "OpenRouter",
-        "type": "OpenRouter",
-        "group": "聚合中继",
-        "enabled": False,
-        "multi_key_enabled": False,
-        "response_api_enabled": False,
-        "base_url": "https://openrouter.ai/api/v1",
-        "api_key": "",
-        "api_format": "openai_chat",
-        "api_path": "/chat/completions",
-        "description": "全球模型路由聚合中继，汇集 400+ 最新旗舰模型",
-        "models": [
-            {
-                "id": "google/gemini-3.8-flash",
-                "name": "OpenRouter: Gemini 3.8 Flash",
-                "capabilities": ["chat", "vision", "tools", "reasoning"],
-                "reasoning_type": "standard_effort",
-                "reasoning_effort": "high",
-                "context_length": 1048576,
-                "description": "通过 OpenRouter 路由，自动故障转移",
-            },
-            {
-                "id": "openai/gpt-5.6-luna",
-                "name": "OpenRouter: GPT-5.6 Luna",
-                "capabilities": ["chat", "vision", "tools", "reasoning"],
-                "reasoning_type": "standard_effort",
-                "reasoning_effort": "high",
-                "context_length": 1050000,
-                "description": "2026 前沿旗舰智能体多模态模型",
-            },
-            {
-                "id": "anthropic/claude-3.7-sonnet",
-                "name": "OpenRouter: Claude 3.7 Sonnet",
-                "capabilities": ["chat", "vision", "tools", "reasoning"],
-                "reasoning_type": "standard_effort",
-                "reasoning_effort": "high",
-                "context_length": 200000,
-                "description": "Claude 3.7 原生长思维链推演",
-            },
-            {
-                "id": "deepseek/deepseek-r1-0528",
-                "name": "OpenRouter: DeepSeek R1 0528",
-                "capabilities": ["chat", "reasoning"],
-                "reasoning_type": "deepseek_reasoner",
-                "reasoning_effort": "high",
-                "context_length": 163840,
-                "description": "DeepSeek R1 强化更新版",
-            },
-            {
-                "id": "z-ai/glm-5.3-flash",
-                "name": "OpenRouter: GLM 5.3 Flash",
-                "capabilities": ["chat", "tools", "reasoning"],
-                "reasoning_type": "standard_effort",
-                "reasoning_effort": "high",
-                "context_length": 1310720,
-                "description": "智谱最新百万级超长上下文极速模型",
-            },
-            {
-                "id": "qwen/qwen3.8-flash",
-                "name": "OpenRouter: Qwen 3.8 Flash",
-                "capabilities": ["chat", "tools", "reasoning"],
-                "reasoning_type": "standard_effort",
-                "reasoning_effort": "high",
-                "context_length": 1000000,
-                "description": "通义千问最新一代极速模型",
-            },
-        ],
-    },
-    {
-        "id": "kelivoin",
-        "name": "KelivoIN",
-        "type": "中转服务",
-        "group": "聚合中继",
-        "enabled": False,
-        "multi_key_enabled": False,
-        "response_api_enabled": False,
-        "base_url": "https://api.kelivoin.com/v1",
-        "api_key": "",
-        "api_format": "openai_chat",
-        "api_path": "/chat/completions",
-        "description": "第三方高可用 AI 聚合路由中继",
-        "models": [
-            {"id": "gpt-5-turbo", "name": "GPT-5 Turbo", "capabilities": ["chat", "vision", "tools"], "reasoning_type": "none", "reasoning_effort": "none"},
-            {"id": "claude-3-7-sonnet", "name": "Claude 3.7 Sonnet", "capabilities": ["chat", "vision", "tools", "reasoning"], "reasoning_type": "standard_effort", "reasoning_effort": "high"},
-            {"id": "gemini-3.8-flash", "name": "Gemini 3.8 Flash", "capabilities": ["chat", "vision", "tools", "reasoning"], "reasoning_type": "standard_effort", "reasoning_effort": "high"},
-        ],
-    },
-    {
-        "id": "tensdaq",
-        "name": "Tensdaq",
-        "type": "中转服务",
-        "group": "聚合中继",
-        "enabled": False,
-        "multi_key_enabled": False,
-        "response_api_enabled": False,
-        "base_url": "https://api.tensdaq.com/v1",
-        "api_key": "",
-        "api_format": "openai_chat",
-        "api_path": "/chat/completions",
-        "description": "Tensdaq AI 接口聚合平台",
-        "models": [
-            {"id": "deepseek-r1", "name": "DeepSeek R1", "capabilities": ["chat", "reasoning"], "reasoning_type": "deepseek_reasoner", "reasoning_effort": "high"},
-            {"id": "claude-3-7-sonnet", "name": "Claude 3.7 Sonnet", "capabilities": ["chat", "vision", "tools", "reasoning"], "reasoning_type": "standard_effort", "reasoning_effort": "high"},
-            {"id": "o3-pro", "name": "OpenAI o3 Pro", "capabilities": ["chat", "tools", "reasoning"], "reasoning_type": "standard_effort", "reasoning_effort": "high"},
-        ],
-    },
-    {
-        "id": "deepseek",
-        "name": "DeepSeek",
-        "type": "DeepSeek",
-        "group": "官方直连",
-        "enabled": False,
-        "multi_key_enabled": False,
-        "response_api_enabled": False,
-        "base_url": "https://api.deepseek.com/v1",
-        "api_key": "",
-        "api_format": "openai_chat",
-        "api_path": "/chat/completions",
-        "description": "DeepSeek 官方低延时直连端点",
-        "models": [
-            {"id": "deepseek-chat", "name": "DeepSeek V3.1", "capabilities": ["chat", "tools"], "reasoning_type": "none", "reasoning_effort": "none", "description": "官方通用对话与函数调用模型"},
-            {"id": "deepseek-reasoner", "name": "DeepSeek R1 (满血 671B)", "capabilities": ["chat", "reasoning"], "reasoning_type": "deepseek_reasoner", "reasoning_effort": "high", "description": "官方推理旗舰，深度思考链"},
-            {"id": "deepseek-r1-0528", "name": "DeepSeek R1 0528", "capabilities": ["chat", "reasoning"], "reasoning_type": "deepseek_reasoner", "reasoning_effort": "high", "description": "最新权重增强强化学习版"},
-            {"id": "deepseek-v4-flash-vision-exp", "name": "DeepSeek V4 Flash Vision Exp", "capabilities": ["chat", "vision", "reasoning"], "reasoning_type": "deepseek_reasoner", "reasoning_effort": "high", "description": "下一代多模态推理实验模型"},
-        ],
-    },
-    {
-        "id": "alhubmix",
-        "name": "Alhubmix",
-        "type": "中转服务",
-        "group": "聚合中继",
-        "enabled": False,
-        "multi_key_enabled": False,
-        "response_api_enabled": False,
-        "base_url": "https://api.alhubmix.com/v1",
-        "api_key": "",
-        "api_format": "openai_chat",
-        "api_path": "/chat/completions",
-        "description": "Alhubmix 聚合中转服务",
-        "models": [
-            {"id": "gemini-3.8-flash", "name": "Gemini 3.8 Flash", "capabilities": ["chat", "vision", "tools", "reasoning"], "reasoning_type": "standard_effort", "reasoning_effort": "high"},
-            {"id": "gpt-5.4-pro", "name": "GPT-5.4 Pro", "capabilities": ["chat", "vision", "tools", "reasoning"], "reasoning_type": "standard_effort", "reasoning_effort": "high"},
-        ],
-    },
-    {
-        "id": "suixiang",
-        "name": "随想AI中转站",
-        "type": "中转服务",
-        "group": "聚合中继",
-        "enabled": False,
-        "multi_key_enabled": False,
-        "response_api_enabled": False,
-        "base_url": "https://api.suixiang.ai/v1",
-        "api_key": "",
-        "api_format": "openai_chat",
-        "api_path": "/chat/completions",
-        "description": "随想 AI 聚合中转平台",
-        "models": [
-            {"id": "claude-3-7-sonnet", "name": "Claude 3.7 Sonnet", "capabilities": ["chat", "vision", "tools", "reasoning"], "reasoning_type": "standard_effort", "reasoning_effort": "high"},
-            {"id": "deepseek-r1", "name": "DeepSeek R1", "capabilities": ["chat", "reasoning"], "reasoning_type": "deepseek_reasoner", "reasoning_effort": "high"},
-            {"id": "gemini-3.8-flash", "name": "Gemini 3.8 Flash", "capabilities": ["chat", "vision", "tools", "reasoning"], "reasoning_type": "standard_effort", "reasoning_effort": "high"},
-        ],
-    },
-    {
-        "id": "dashscope",
-        "name": "阿里云千问",
-        "type": "通义千问",
-        "group": "国内平台",
-        "enabled": False,
-        "multi_key_enabled": False,
-        "response_api_enabled": False,
-        "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
-        "api_key": "",
-        "api_format": "openai_chat",
-        "api_path": "/chat/completions",
-        "description": "阿里云百炼大模型服务平台",
-        "models": [
-            {"id": "qwen-max-latest", "name": "Qwen Max Latest", "capabilities": ["chat", "vision", "tools"], "reasoning_type": "none", "reasoning_effort": "none", "description": "阿里百炼最高性能旗舰"},
-            {"id": "qwen-plus-latest", "name": "Qwen Plus Latest", "capabilities": ["chat", "tools"], "reasoning_type": "none", "reasoning_effort": "none", "description": "高性价比均衡版本"},
-            {"id": "qwq-32b-preview", "name": "QwQ 32B 推理预览", "capabilities": ["chat", "reasoning"], "reasoning_type": "standard_effort", "reasoning_effort": "high", "description": "阿里首款开源深度推演模型"},
-            {"id": "qwen3.8-flash", "name": "Qwen 3.8 Flash", "capabilities": ["chat", "tools"], "reasoning_type": "none", "reasoning_effort": "none", "description": "2026 最新极速千问"},
-        ],
-    },
-    {
-        "id": "zhipu",
-        "name": "智谱",
-        "type": "GLM",
-        "group": "国内平台",
-        "enabled": False,
-        "multi_key_enabled": False,
-        "response_api_enabled": False,
-        "base_url": "https://open.bigmodel.cn/api/paas/v4",
-        "api_key": "",
-        "api_format": "openai_chat",
-        "api_path": "/chat/completions",
-        "description": "智谱 AI BigModel 开放平台",
-        "models": [
-            {"id": "glm-5.3-flash", "name": "GLM 5.3 Flash", "capabilities": ["chat", "tools", "reasoning"], "reasoning_type": "standard_effort", "reasoning_effort": "high", "description": "最新 1.3M 上下文超高速推理"},
-            {"id": "glm-5", "name": "GLM 5 旗舰", "capabilities": ["chat", "vision", "tools", "reasoning"], "reasoning_type": "standard_effort", "reasoning_effort": "high", "description": "智谱第五代通用大模型"},
-            {"id": "glm-4-plus", "name": "GLM 4 Plus", "capabilities": ["chat", "tools"], "reasoning_type": "none", "reasoning_effort": "none", "description": "高泛化综合能力模型"},
         ],
     },
     {
         "id": "claude",
         "name": "Claude",
         "type": "Anthropic",
-        "group": "官方直连",
+        "group": "基础供应",
         "enabled": False,
         "multi_key_enabled": False,
         "response_api_enabled": False,
@@ -505,50 +143,25 @@ DEFAULT_PROVIDERS = [
         "api_format": "claude_messages",
         "api_path": "/messages",
         "description": "Anthropic 官方原生 Messages API 直连",
-        "models": [
-            {"id": "claude-3-7-sonnet-20250219", "name": "Claude 3.7 Sonnet (Thinking)", "capabilities": ["chat", "vision", "tools", "reasoning"], "reasoning_type": "standard_effort", "reasoning_effort": "high", "description": "Anthropic 首款混合思维链模型"},
-            {"id": "claude-fable-5.1", "name": "Claude Fable 5.1", "capabilities": ["chat", "vision", "tools", "reasoning"], "reasoning_type": "standard_effort", "reasoning_effort": "high", "description": "百万上下文长篇综合推演旗舰"},
-            {"id": "claude-3-5-sonnet-20241022", "name": "Claude 3.5 Sonnet v2", "capabilities": ["chat", "vision", "tools"], "reasoning_type": "none", "reasoning_effort": "none", "description": "极强代码与逻辑感知"},
-        ],
+        "models": [],
     },
     {
-        "id": "grok",
-        "name": "Grok",
-        "type": "xAI",
-        "group": "官方直连",
+        "id": "gemini",
+        "name": "Gemini",
+        "type": "Gemini",
+        "group": "基础供应",
         "enabled": False,
         "multi_key_enabled": False,
         "response_api_enabled": False,
-        "base_url": "https://api.x.ai/v1",
+        "base_url": "https://generativelanguage.googleapis.com/v1beta/openai",
         "api_key": "",
         "api_format": "openai_chat",
         "api_path": "/chat/completions",
-        "description": "xAI 官方 Grok 大模型接口",
-        "models": [
-            {"id": "grok-3", "name": "Grok 3 (最新多模态旗舰)", "capabilities": ["chat", "vision", "tools", "reasoning"], "reasoning_type": "standard_effort", "reasoning_effort": "high", "description": "xAI 顶级算力训练基座"},
-            {"id": "grok-2-1212", "name": "Grok 2", "capabilities": ["chat", "vision", "tools"], "reasoning_type": "none", "reasoning_effort": "none", "description": "高速前沿大模型"},
-        ],
-    },
-    {
-        "id": "volcengine",
-        "name": "火山引擎",
-        "type": "火山引擎",
-        "group": "国内平台",
-        "enabled": False,
-        "multi_key_enabled": False,
-        "response_api_enabled": False,
-        "base_url": "https://ark.cn-beijing.volces.com/api/v3",
-        "api_key": "",
-        "api_format": "openai_chat",
-        "api_path": "/chat/completions",
-        "description": "字节跳动火山方舟大模型服务平台",
-        "models": [
-            {"id": "doubao-1.5-pro-32k", "name": "豆包 1.5 Pro 32K", "capabilities": ["chat", "tools"], "reasoning_type": "none", "reasoning_effort": "none", "description": "高并发低成本主力模型"},
-            {"id": "doubao-1.5-thinking", "name": "豆包 1.5 深度推演版", "capabilities": ["chat", "reasoning"], "reasoning_type": "standard_effort", "reasoning_effort": "high", "description": "长链推演与复杂规划"},
-            {"id": "seed-2-1-turbo", "name": "Seed 2.1 Turbo", "capabilities": ["chat", "tools"], "reasoning_type": "none", "reasoning_effort": "none", "description": "ByteDance 最新代码与推理加速"},
-        ],
+        "description": "Google AI Studio 官方原生/OpenAI 兼容端点",
+        "models": [],
     },
 ]
+
 
 
 def init_llm_config() -> Dict[str, Any]:
@@ -580,8 +193,9 @@ def init_llm_config() -> Dict[str, Any]:
         if found:
             p_obj = dict(dp)
             p_obj.update(found)
-            if not p_obj.get("models"):
-                p_obj["models"] = copy.deepcopy(dp.get("models", []))
+            # Never overwrite models with global defaults if provider was already configured
+            if "models" in found:
+                p_obj["models"] = list(found.get("models", []))
             if pid == "openai":
                 if not p_obj.get("api_key") and cur_key:
                     p_obj["api_key"] = cur_key
@@ -599,9 +213,16 @@ def init_llm_config() -> Dict[str, Any]:
                 p_obj["enabled"] = True
             merged_providers.append(p_obj)
 
-    # Any custom provider added by user
+    # Any custom provider added by user (ignore legacy hardcoded providers from older versions)
+    legacy_ids = {
+        "siliconflow", "openrouter", "kelivoin", "tensdaq", "deepseek",
+        "alhubmix", "suixiang", "dashscope", "zhipu", "grok", "volcengine"
+    }
     for ep in existing_providers:
-        if not any(dp["id"] == ep.get("id") for dp in DEFAULT_PROVIDERS):
+        epid = ep.get("id")
+        if epid in legacy_ids:
+            continue
+        if not any(dp["id"] == epid for dp in DEFAULT_PROVIDERS):
             merged_providers.append(ep)
 
     active_m_id = data.get("active_model_id") or cur_model or "gemini-3.8-flash-high"
@@ -682,7 +303,8 @@ def load_llm_config(mask_keys: bool = True) -> Dict[str, Any]:
 
     for p in providers_list:
         pid = p.get("id", "")
-        models_in_p = p.get("models", [])
+        # ONLY return models that are explicitly registered under this specific provider
+        models_in_p = list(p.get("models", []))
         formatted_p_models = []
         for m in models_in_p:
             m_id = m.get("id", "")
@@ -748,6 +370,7 @@ def load_llm_config(mask_keys: bool = True) -> Dict[str, Any]:
         res["models"].append(m_copy)
 
     return res
+
 
 
 def get_active_llm_runtime() -> Dict[str, Any]:
@@ -1151,6 +774,11 @@ def fetch_remote_models(
             "error": "Base URL 格式无效，必须以 http:// 或 https:// 开头",
             "recommendation": "请填写有效的供应商 Base URL",
         }
+
+    if not api_key and provider_id:
+        prov = next((p for p in config.get("providers", []) if p["id"] == provider_id), None)
+        if prov and prov.get("api_key"):
+            api_key = prov.get("api_key")
 
     if not api_key:
         prov = next((p for p in config.get("providers", []) if p.get("base_url", "").rstrip("/") == cleaned_url and p.get("api_key")), None)

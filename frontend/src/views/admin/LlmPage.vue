@@ -115,6 +115,27 @@ const filteredProviders = computed(() => {
 })
 
 // ----------------- Provider Actions -----------------
+function openAddProviderModal() {
+  selectedProvider.value = { id: '', name: '新建自定义供应商', is_new: true }
+  providerForm.value = {
+    id: '',
+    name: '',
+    type: 'OpenAI 兼容',
+    group: '自定义',
+    enabled: true,
+    multi_key_enabled: false,
+    response_api_enabled: false,
+    base_url: '',
+    api_key: '',
+    api_path: '/chat/completions',
+    description: '',
+  }
+  detailTab.value = 'config'
+  currentView.value = 'detail'
+  testResult.value = null
+  showApiKey.value = false
+}
+
 function selectProvider(p: any) {
   selectedProvider.value = p
   providerForm.value = {
@@ -159,6 +180,9 @@ async function toggleProviderQuick(p: any, e: Event) {
 async function saveProviderConfig() {
   try {
     const payload = { ...providerForm.value }
+    if (!payload.id) {
+      payload.id = payload.name.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_')
+    }
     if (!payload.api_key) delete payload.api_key
     await api('/api/v1/admin/llm/providers', {
       method: 'POST',
@@ -166,6 +190,12 @@ async function saveProviderConfig() {
     })
     alert('供应商配置已成功保存！')
     await loadConfig()
+    if (selectedProvider.value?.is_new) {
+      const created = cfg.value.providers?.find((p: any) => p.id === payload.id)
+      if (created) {
+        selectedProvider.value = created
+      }
+    }
   } catch (err: any) {
     alert(err.message)
   }
@@ -193,6 +223,8 @@ function openFetchDialog() {
   remoteFetchResult.value = null
   remoteSearch.value = ''
   fetchModalVisible.value = true
+  // 优化：若当前供应商已配置好 Base URL，弹窗打开时自动发起探测拉取，免除重复输入与多次点击
+  executeRemoteFetch()
 }
 
 async function executeRemoteFetch() {
@@ -260,6 +292,38 @@ async function importRemoteModel(m: any, autoActivate = false) {
   } catch (err: any) {
     alert(err.message)
   }
+}
+
+async function importAllFilteredRemoteModels() {
+  if (!selectedProvider.value || !filteredRemoteModels.value.length) return
+  const list = filteredRemoteModels.value
+  let successCount = 0
+  for (const m of list) {
+    try {
+      const payload = {
+        id: m.id,
+        name: m.name || m.id,
+        provider_id: selectedProvider.value.id,
+        provider_name: selectedProvider.value.name,
+        base_url: selectedProvider.value.base_url,
+        api_format: m.api_format || selectedProvider.value.api_format || 'openai_chat',
+        reasoning_type: m.reasoning_type || 'auto',
+        reasoning_effort: m.default_effort || 'high',
+        capabilities: m.capabilities || ['chat'],
+        context_length: m.context_length,
+        description: m.description ? m.description.slice(0, 100) : '从远端一键自动收录',
+      }
+      await api('/api/v1/admin/llm/models', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      })
+      successCount++
+    } catch (e) {
+      console.warn('Import model failed:', m.id, e)
+    }
+  }
+  await loadConfig()
+  alert(`成功批量收录 ${successCount} 个模型到 ${selectedProvider.value.name}！`)
 }
 
 // ----------------- Model Management -----------------
@@ -415,6 +479,16 @@ onMounted(() => {
 
         <!-- Right Quick Actions -->
         <div class="flex items-center space-x-2">
+          <button
+            @click="openAddProviderModal"
+            class="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold cursor-pointer transition-all hover:opacity-90 btn-primary-text"
+            style="background-color: #2563EB; color: #FFFFFF;"
+            title="添加自定义供应商"
+          >
+            <Plus class="w-4 h-4" />
+            <span>添加供应商</span>
+          </button>
+
           <button
             @click="loadConfig"
             class="p-2 rounded-xl border text-xs cursor-pointer transition-all hover:opacity-80"
@@ -624,6 +698,17 @@ onMounted(() => {
 
         <!-- Section 2: 凭据与输入表单区 (对应截图 2 底部字段) -->
         <div class="space-y-3 pt-2">
+          <!-- 供应商唯一标识 ID (仅新建自定义供应商时展示) -->
+          <div v-if="selectedProvider.is_new">
+            <label class="block text-xs font-bold mb-1.5" style="color: var(--text-muted);">供应商唯一标识 (ID)</label>
+            <input
+              v-model="providerForm.id"
+              placeholder="例如: openrouter 或 my-proxy"
+              class="w-full rounded-xl px-4 py-2.5 text-xs outline-none border transition-colors font-mono"
+              style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle); color: var(--text-main);"
+            />
+          </div>
+
           <!-- 名称 -->
           <div>
             <label class="block text-xs font-bold mb-1.5" style="color: var(--text-muted);">名称</label>
@@ -951,42 +1036,30 @@ onMounted(() => {
           <span class="text-[10px]" style="color: var(--text-faint);">探测 /models 兼容端点</span>
         </div>
 
-        <!-- Probe Configuration -->
-        <div class="p-3.5 rounded-xl border space-y-2.5 shrink-0" style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);">
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <div>
-              <label class="block text-[11px] font-bold mb-1" style="color: var(--text-muted);">Base URL</label>
-              <input
-                v-model="customFetchUrl"
-                placeholder="https://openrouter.ai/api/v1"
-                class="w-full rounded-lg px-3 py-1.5 text-xs outline-none border font-mono"
-                style="background-color: var(--bg-card); border-color: var(--border-subtle); color: var(--text-main);"
-              />
+        <!-- Probe Configuration (仅当需要微调或端点无预存 Key 时作为高级选项展开) -->
+        <div class="p-3 rounded-xl border space-y-2 shrink-0 text-xs" style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-2">
+              <span class="font-bold text-[11px]" style="color: var(--text-main);">探测端点:</span>
+              <span class="font-mono text-[11px] text-blue-400">{{ customFetchUrl || selectedProvider?.base_url }}</span>
             </div>
-            <div>
-              <label class="block text-[11px] font-bold mb-1" style="color: var(--text-muted);">临时覆盖 Key (留空保持已存凭证)</label>
-              <input
-                v-model="customFetchKey"
-                type="password"
-                placeholder="sk-..."
-                class="w-full rounded-lg px-3 py-1.5 text-xs outline-none border font-mono"
-                style="background-color: var(--bg-card); border-color: var(--border-subtle); color: var(--text-main);"
-              />
+            <div class="flex items-center space-x-1.5">
+              <span v-if="selectedProvider?.has_key" class="text-[10px] text-emerald-400 font-bold">
+                ✓ 使用已存凭证
+              </span>
+              <button
+                @click="executeRemoteFetch"
+                :disabled="fetchingRemote"
+                class="flex items-center space-x-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-xs btn-primary-text"
+                style="background-color: #2563EB; color: #FFFFFF;"
+              >
+                <RefreshCw class="w-3.5 h-3.5" :class="fetchingRemote ? 'animate-spin' : ''" />
+                <span>{{ fetchingRemote ? '正在探测...' : '重新探测' }}</span>
+              </button>
             </div>
-          </div>
-
-          <div class="flex justify-end pt-1">
-            <button
-              @click="executeRemoteFetch"
-              :disabled="fetchingRemote"
-              class="flex items-center space-x-1.5 px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-xs btn-primary-text"
-              style="background-color: #2563EB; color: #FFFFFF;"
-            >
-              <RefreshCw class="w-3.5 h-3.5" :class="fetchingRemote ? 'animate-spin' : ''" />
-              <span>{{ fetchingRemote ? '正在探测...' : '开始自动获取' }}</span>
-            </button>
           </div>
         </div>
+
 
         <!-- Status Banner -->
         <div v-if="remoteFetchResult" class="shrink-0">
@@ -1050,14 +1123,27 @@ onMounted(() => {
           </div>
         </div>
 
-        <div class="flex justify-end pt-3 border-t shrink-0" style="border-color: var(--border-subtle);">
-          <button
-            @click="fetchModalVisible = false"
-            class="px-4 py-1.5 rounded-xl border text-xs cursor-pointer"
-            style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle); color: var(--text-main);"
-          >
-            完成
-          </button>
+        <div class="flex items-center justify-between pt-3 border-t shrink-0" style="border-color: var(--border-subtle);">
+          <div class="text-[11px]" style="color: var(--text-muted);">
+            <span v-if="filteredRemoteModels.length">当前显示 {{ filteredRemoteModels.length }} 个模型</span>
+          </div>
+          <div class="flex items-center space-x-2">
+            <button
+              v-if="filteredRemoteModels.length"
+              @click="importAllFilteredRemoteModels"
+              class="px-3 py-1.5 rounded-xl border text-xs font-bold cursor-pointer transition-all hover:opacity-90"
+              style="background-color: rgba(99, 102, 241, 0.1); border-color: rgba(99, 102, 241, 0.25); color: #818CF8;"
+            >
+              一键添加当前全部 ({{ filteredRemoteModels.length }})
+            </button>
+            <button
+              @click="fetchModalVisible = false"
+              class="px-4 py-1.5 rounded-xl border text-xs cursor-pointer"
+              style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle); color: var(--text-main);"
+            >
+              完成
+            </button>
+          </div>
         </div>
       </div>
     </div>

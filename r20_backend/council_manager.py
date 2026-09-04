@@ -440,7 +440,7 @@ def _call_single_role(
         cfg = load_llm_config(mask_keys=False)
         for item in cfg.get("models", []):
             if item.get("id") == model_id:
-                override_model = item.get("model")
+                override_model = item.get("id")
                 override_url = item.get("base_url")
                 override_key = item.get("api_key")
                 override_format = item.get("api_format")
@@ -575,7 +575,7 @@ def execute_council_debate(
         cfg = load_llm_config(mask_keys=False)
         for item in cfg.get("models", []):
             if item.get("id") == arb_model_id:
-                override_model = item.get("model")
+                override_model = item.get("id")
                 override_url = item.get("base_url")
                 override_key = item.get("api_key")
                 override_format = item.get("api_format")
