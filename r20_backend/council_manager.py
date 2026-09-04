@@ -14,7 +14,7 @@ Architecture:
         1. Standard Trading JSON (for ai_brain_trader发单)
         2. Council Discussion Transcript (for 前台推演审计展示)
 
-Upgrades in v6.6.0:
+Upgrades in v6.6.1:
   - Consensus Modes: strict (一票否决) / weighted (加权共识) / aggressive (突破优先)
   - Per-Role Enabled/Disabled Switch (灵活启闭，无需删除席位)
   - Per-Role Reasoning Effort & Temperature (独立长思考深度与采样温度)
