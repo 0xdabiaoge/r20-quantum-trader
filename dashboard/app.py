@@ -1230,10 +1230,10 @@ VUE_ADMIN_LEGACY_FILE = os.path.join(VUE_DIST_DIR, "admin", "legacy.html")
 def _serve_vue_spa(html_path: str, is_public: bool = True) -> HTMLResponse:
     with open(html_path, "r", encoding="utf-8") as f:
         content = f.read()
-    # Cloudflare Edge micro-cache: public pages cached at edge for 60s, stale-while-revalidate for 300s.
-    # Browser validates immediately (max-age=0) so release updates are instantly visible.
-    # Private / admin pages are never cached.
-    cache_header = "public, max-age=0, s-maxage=60, stale-while-revalidate=300" if is_public else "private, no-cache, no-store, must-revalidate"
+    # Cloudflare Edge cache: HTML shell cached at edge for 300s (5min), stale-while-revalidate for 600s.
+    # Browser validates immediately (max-age=0) so new releases and script bundles take effect seamlessly.
+    # Private / admin pages are strictly never cached.
+    cache_header = "public, max-age=0, s-maxage=300, stale-while-revalidate=600" if is_public else "private, no-cache, no-store, must-revalidate"
     return HTMLResponse(
         content=content,
         headers={"Cache-Control": cache_header},
@@ -1329,6 +1329,19 @@ async def docs_spa_root(request: Request, subpath: str = ""):
     return HTMLResponse("Vue build not found. Run `npm run build` in frontend/.", status_code=503)
 
 
+@app.get("/trading", response_class=HTMLResponse, include_in_schema=False)
+@app.get("/factors", response_class=HTMLResponse, include_in_schema=False)
+@app.get("/news", response_class=HTMLResponse, include_in_schema=False)
+@app.get("/lab", response_class=HTMLResponse, include_in_schema=False)
+@app.get("/history", response_class=HTMLResponse, include_in_schema=False)
+async def public_tab_spa_routes(request: Request):
+    """Serve the public Vue SPA shell for dedicated tab routes with Cloudflare edge caching."""
+    vue_index_file = os.path.join(VUE_DIST_DIR, "index.html")
+    if os.path.isfile(vue_index_file):
+        return _serve_vue_spa(vue_index_file, is_public=True)
+    return await index(request)
+
+
 # --- Realtime Public Polling APIs (with Cloudflare Edge Micro-Caching) ---
 
 @app.get("/api/all")
@@ -1339,10 +1352,10 @@ async def get_all_data():
         data = await refresh_cache_if_needed(2.5)
     else:
         data = CACHE_DATA
-    # Micro-cache: edge cache for 3s collapses 100 concurrent users into 1 origin poll every 3s.
+    # Micro-cache: edge cache for 5s collapses concurrent user polls into 1 origin hit every 5s.
     return JSONResponse(
         data,
-        headers={"Cache-Control": "public, max-age=1, s-maxage=3, stale-while-revalidate=5"},
+        headers={"Cache-Control": "public, max-age=2, s-maxage=5, stale-while-revalidate=10"},
     )
 
 

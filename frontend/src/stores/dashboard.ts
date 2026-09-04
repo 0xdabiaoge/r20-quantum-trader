@@ -76,7 +76,11 @@ export const useDashboardStore = defineStore('dashboard', () => {
       isRefreshing.value = true
     }
     try {
-      const resp = await fetch('/api/all')
+      const resp = await fetch('/api/all', {
+        headers: {
+          'Accept-Encoding': 'gzip, deflate, br',
+        },
+      })
       if (!resp.ok) {
         throw new Error(`HTTP ${resp.status}: ${resp.statusText}`)
       }
@@ -94,7 +98,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
       if (!silent) {
         setTimeout(() => {
           isRefreshing.value = false
-        }, 500)
+        }, 300)
       }
     }
   }
