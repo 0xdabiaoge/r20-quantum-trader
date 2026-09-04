@@ -2013,7 +2013,7 @@ def execute_portfolio():
     except Exception as e:
         print(f"[Ledger Sync Warning] {e}")
 
-    log_entry = f"[{timestamp_full}] ⚡ R20 Quantum Trader v7.1.0 巡检完成 | 持仓 {active_pos_count}/{MAX_CONCURRENT_POSITIONS} (多{long_count}/空{short_count}) | 动作: {', '.join(executed_actions) if executed_actions else '无开平仓操作'}\n"
+    log_entry = f"[{timestamp_full}] ⚡ R20 Quantum Trader v7.2.0 巡检完成 | 持仓 {active_pos_count}/{MAX_CONCURRENT_POSITIONS} (多{long_count}/空{short_count}) | 动作: {', '.join(executed_actions) if executed_actions else '无开平仓操作'}\n"
     with open(LOG_FILE, "a", encoding="utf-8") as f:
         f.write(log_entry)
     print(log_entry.strip())
