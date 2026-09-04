@@ -236,36 +236,36 @@ onMounted(loadData)
     <!-- TAB 1: Settings & Heuristic Memory -->
     <div v-if="activeTab === 'settings'" class="space-y-4">
       <!-- Strategy & Schedule Overview -->
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-        <div class="rounded-xl border p-4 shadow-xs" style="background-color: var(--bg-card); border-color: var(--border-subtle);">
-          <div class="flex items-center space-x-2 mb-2 text-xs font-mono font-bold" style="color: var(--text-main);">
-            <Clock class="w-4 h-4 text-cyan-400" />
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div class="rounded-xl border p-3.5 shadow-xs" style="background-color: var(--bg-card); border-color: var(--border-subtle);">
+          <div class="flex items-center space-x-1.5 mb-1 text-[11px] font-mono font-bold" style="color: var(--text-muted);">
+            <Clock class="w-3.5 h-3.5 text-cyan-400" />
             <span>自动复盘频次</span>
           </div>
-          <div class="text-xl font-bold font-mono text-emerald-400">每 6 小时 (4次/天)</div>
-          <div class="text-[11px] font-mono mt-1" style="color: var(--text-muted);">
+          <div class="text-sm font-bold font-mono text-emerald-400">每 6 小时 (4次/天)</div>
+          <div class="text-[10px] font-mono mt-1" style="color: var(--text-faint);">
             调度时间：02:00, 08:00, 14:00, 20:00 (UTC+8)
           </div>
         </div>
 
-        <div class="rounded-xl border p-4 shadow-xs" style="background-color: var(--bg-card); border-color: var(--border-subtle);">
-          <div class="flex items-center space-x-2 mb-2 text-xs font-mono font-bold" style="color: var(--text-main);">
-            <Sliders class="w-4 h-4 text-purple-400" />
+        <div class="rounded-xl border p-3.5 shadow-xs" style="background-color: var(--bg-card); border-color: var(--border-subtle);">
+          <div class="flex items-center space-x-1.5 mb-1 text-[11px] font-mono font-bold" style="color: var(--text-muted);">
+            <Sliders class="w-3.5 h-3.5 text-purple-400" />
             <span>复盘策略基准</span>
           </div>
-          <div class="text-xl font-bold font-mono" style="color: var(--text-main);">全维度波段强化版</div>
-          <div class="text-[11px] font-mono mt-1" style="color: var(--text-muted);">
+          <div class="text-sm font-bold font-mono" style="color: var(--text-main);">全维度波段强化版</div>
+          <div class="text-[10px] font-mono mt-1" style="color: var(--text-faint);">
             顺势多空对称 · 宽止损抗噪 · 浮盈0.8R保本移损
           </div>
         </div>
 
-        <div class="rounded-xl border p-4 shadow-xs" style="background-color: var(--bg-card); border-color: var(--border-subtle);">
-          <div class="flex items-center space-x-2 mb-2 text-xs font-mono font-bold" style="color: var(--text-main);">
-            <Sparkles class="w-4 h-4 text-amber-400" />
+        <div class="rounded-xl border p-3.5 shadow-xs" style="background-color: var(--bg-card); border-color: var(--border-subtle);">
+          <div class="flex items-center space-x-1.5 mb-1 text-[11px] font-mono font-bold" style="color: var(--text-muted);">
+            <Sparkles class="w-3.5 h-3.5 text-amber-400" />
             <span>有效心法储备</span>
           </div>
-          <div class="text-xl font-bold font-mono text-amber-400">{{ memoryItems.length }} 条实战准则</div>
-          <div class="text-[11px] font-mono mt-1" style="color: var(--text-muted);">
+          <div class="text-sm font-bold font-mono text-amber-400">{{ memoryItems.length }} 条实战准则</div>
+          <div class="text-[10px] font-mono mt-1" style="color: var(--text-faint);">
             每轮实时注入 AI 交易主脑 System Prompt
           </div>
         </div>
