@@ -46,6 +46,7 @@ const navGroups = [
     label: '策略配置',
     items: [
       { id: 'promptlib', label: '提示词策略', icon: FileText },
+      { id: 'evolution', label: '自进化配置', icon: Sparkles },
       { id: 'interceptors', label: '物理拦截插件', icon: ShieldCheck },
       { id: 'council', label: '模型委员会', icon: Users },
       { id: 'llm', label: '模型连接', icon: Cpu },
@@ -131,6 +132,7 @@ const prefetchViews = () => {
     () => import('../views/admin/LlmPage.vue'),
     () => import('../views/admin/NotifyPage.vue'),
     () => import('../views/admin/PromptStudioPage.vue'),
+    () => import('../views/admin/EvolutionPage.vue'),
     () => import('../views/admin/InterceptorsPage.vue'),
     () => import('../views/admin/DecisionsPage.vue'),
     () => import('../views/admin/GatewayPage.vue'),

@@ -16,7 +16,7 @@ const loading = ref(true)
 const bannerMsg = ref<{ text: string; type: 'ok' | 'err' | 'warn' } | null>(null)
 
 const selectedProfileId = ref<string>('')
-const activePipeline = ref<'trading_system' | 'trading_user' | 'evolution_system' | 'evolution_user'>('trading_system')
+const activePipeline = ref<'trading_system' | 'trading_user'>('trading_system')
 const workingModules = ref<any[]>([])
 const dirty = ref(false)
 const historyVisible = ref(false)
@@ -36,8 +36,6 @@ const previewMode = ref<'rendered' | 'template'>('rendered')
 const pipelines = [
   { id: 'trading_system', label: '交易 System', desc: '发给交易主脑的规则与决策纪律' },
   { id: 'trading_user', label: '交易 User', desc: '每轮拼装实时行情、动力学与决策任务' },
-  { id: 'evolution_system', label: '自进化 System', desc: '复盘官规则与心法提炼' },
-  { id: 'evolution_user', label: '自进化 User', desc: '每夜注入战绩与实战流水证据' },
 ] as const
 
 const selectedProfile = computed(() => (lib.value?.profiles || []).find((p: any) => p.id === selectedProfileId.value) || null)
