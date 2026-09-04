@@ -620,21 +620,6 @@ onMounted(loadData)
         <div v-if="expandedRole === roleId" class="mt-3 pt-3 border-t space-y-3" style="border-color: var(--border-subtle);">
           <!-- Fine-tuning Parameters Ribbon -->
           <div class="flex flex-wrap items-center gap-4 p-2.5 rounded-lg border text-xs font-mono" style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);">
-            <!-- Reasoning Effort -->
-            <div class="flex items-center space-x-2">
-              <span style="color: var(--text-muted);">思考强度:</span>
-              <select
-                v-model="role.reasoning_effort"
-                class="rounded px-2 py-0.5 text-xs outline-none border cursor-pointer"
-                style="background-color: var(--bg-input); border-color: var(--border-subtle); color: var(--text-main);"
-                :disabled="!auth.isSuperadmin"
-              >
-                <option value="low">低强度 (快速响应)</option>
-                <option value="medium">中强度 (均衡分析)</option>
-                <option value="high">长思考 (深度推演)</option>
-              </select>
-            </div>
-
             <!-- Temperature -->
             <div class="flex items-center space-x-2">
               <span style="color: var(--text-muted);">采样温度:</span>
@@ -649,6 +634,12 @@ onMounted(loadData)
                 :disabled="!auth.isSuperadmin"
               />
               <span class="text-[10px]" style="color: var(--text-faint);">(0.0~0.2 严谨 / 0.3~0.5 活跃)</span>
+            </div>
+
+            <!-- Model Reasoning Notice -->
+            <div class="flex items-center space-x-1.5 text-[11px]" style="color: var(--text-muted);">
+              <span>思考强度:</span>
+              <span class="text-blue-400 font-medium">统一由绑定的模型配置决定</span>
             </div>
 
             <div class="flex-1"></div>

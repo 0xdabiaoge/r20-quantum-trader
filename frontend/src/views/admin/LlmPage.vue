@@ -1258,6 +1258,24 @@ onMounted(() => {
             </div>
           </div>
 
+          <!-- 思考强度配置 (统一部署在模型层面) -->
+          <div>
+            <label class="block text-[11px] font-bold mb-1" style="color: var(--text-muted);">思考推演强度 (Reasoning Effort)</label>
+            <select
+              v-model="modelForm.reasoning_effort"
+              class="w-full rounded-xl px-3.5 py-2 text-xs outline-none border cursor-pointer"
+              style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle); color: var(--text-main);"
+            >
+              <option value="high">长思考 (high / 深度逻辑推演)</option>
+              <option value="medium">中强度 (medium / 均衡分析)</option>
+              <option value="low">低强度 (low / 快速响应)</option>
+              <option value="none">关闭思考链 (none / 纯文本极速输出)</option>
+            </select>
+            <div class="text-[10px] mt-1" style="color: var(--text-faint);">
+              模型委员会与实盘决策调用此模型时，将自动继承此推演强度设置
+            </div>
+          </div>
+
           <div>
             <label class="block text-[11px] font-bold mb-1" style="color: var(--text-muted);">上下文上限长度 (Tokens)</label>
             <input
@@ -1268,6 +1286,7 @@ onMounted(() => {
               style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle); color: var(--text-main);"
             />
           </div>
+
         </div>
 
         <div class="flex justify-end space-x-2 pt-3 border-t" style="border-color: var(--border-subtle);">

@@ -433,20 +433,21 @@ def _call_single_role(
     override_url = None
     override_key = None
     override_format = None
-    override_effort = role_spec.get("reasoning_effort") or "medium"
+    override_effort = "medium"
     temperature = float(role_spec.get("temperature", 0.3))
 
+    cfg = load_llm_config(mask_keys=False)
     if model_id:
-        cfg = load_llm_config(mask_keys=False)
         for item in cfg.get("models", []):
             if item.get("id") == model_id:
                 override_model = item.get("id")
                 override_url = item.get("base_url")
                 override_key = item.get("api_key")
                 override_format = item.get("api_format")
-                if not role_spec.get("reasoning_effort"):
-                    override_effort = item.get("reasoning_effort", "medium")
+                override_effort = item.get("reasoning_effort") or "medium"
                 break
+    else:
+        override_effort = cfg.get("active_reasoning_effort", "high")
 
     prompt_content = role_spec.get("prompt", "")
     role_name = role_spec.get("name", role_id)
@@ -568,20 +569,21 @@ def execute_council_debate(
     override_url = None
     override_key = None
     override_format = None
-    override_effort = arbitrator_spec.get("reasoning_effort") or "high"
+    override_effort = "high"
     arb_temperature = float(arbitrator_spec.get("temperature", 0.2))
 
+    cfg = load_llm_config(mask_keys=False)
     if arb_model_id:
-        cfg = load_llm_config(mask_keys=False)
         for item in cfg.get("models", []):
             if item.get("id") == arb_model_id:
                 override_model = item.get("id")
                 override_url = item.get("base_url")
                 override_key = item.get("api_key")
                 override_format = item.get("api_format")
-                if not arbitrator_spec.get("reasoning_effort"):
-                    override_effort = item.get("reasoning_effort", "high")
+                override_effort = item.get("reasoning_effort") or "high"
                 break
+    else:
+        override_effort = cfg.get("active_reasoning_effort", "high")
 
     consensus_instructions = {
         "strict": (
