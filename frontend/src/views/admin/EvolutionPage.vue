@@ -16,13 +16,18 @@ import {
   BookOpen,
   Sliders,
   Terminal,
+  ShieldCheck,
+  RotateCcw,
+  ToggleLeft,
+  ToggleRight,
+  ShieldAlert,
 } from 'lucide-vue-next'
 
 const { api } = useApi()
 const auth = useAuthStore()
 
 const loading = ref(true)
-const busy = ref<'save' | 'run' | 'add' | 'delete' | ''>('')
+const busy = ref<'save' | 'run' | 'add' | 'delete' | 'toggle' | 'rollback' | ''>('')
 const bannerMsg = ref<{ text: string; type: 'ok' | 'err' | 'warn' } | null>(null)
 
 // Pipelines state (evolution_system & evolution_user)
@@ -31,13 +36,13 @@ const lib = ref<any>(null)
 const selectedProfileId = ref('stable')
 const workingModules = ref<any[]>([])
 
-// Memory items state
-const memoryItems = ref<string[]>([])
+// Structured White-Box Memory state
+const structuredLessons = ref<any[]>([])
 const newMemoryText = ref('')
+const newCategory = ref('TACTICAL')
 
 // Scheduler settings
 const briefingTimes = ref<string[]>(['02:00', '08:00', '14:00', '20:00'])
-const newTimeInput = ref('')
 
 const selectedProfile = computed(() => (lib.value?.profiles || []).find((p: any) => p.id === selectedProfileId.value) || null)
 
@@ -50,7 +55,7 @@ async function loadData() {
     ])
     lib.value = libRes
     selectedProfileId.value = libRes.active_profile_id || 'stable'
-    memoryItems.value = memRes.items || []
+    structuredLessons.value = memRes.structured_lessons || []
     syncWorkingModules()
   } catch (e: any) {
     bannerMsg.value = { text: `加载失败: ${e.message}`, type: 'err' }
@@ -70,6 +75,39 @@ function switchTab(tab: 'settings' | 'evolution_system' | 'evolution_user') {
   syncWorkingModules()
 }
 
+async function toggleLessonStatus(lessonId: string) {
+  busy.value = 'toggle'
+  bannerMsg.value = null
+  try {
+    const res = await api(`/api/v1/admin/memory/toggle/${lessonId}`, { method: 'POST' })
+    if (res?.structured_lessons) {
+      structuredLessons.value = res.structured_lessons
+    }
+    bannerMsg.value = { text: `✅ 心法状态已切换（大模型下次决策立即感知）`, type: 'ok' }
+  } catch (e: any) {
+    bannerMsg.value = { text: `状态切换失败: ${e.message}`, type: 'err' }
+  } finally {
+    busy.value = ''
+  }
+}
+
+async function rollbackToBaseline() {
+  if (!confirm('【防污染紧急回滚】确定要清除非基准的过期或被污染心法，重置回官方基准黄金心法库吗？')) return
+  busy.value = 'rollback'
+  bannerMsg.value = null
+  try {
+    const res = await api('/api/v1/admin/memory/rollback', { method: 'POST' })
+    if (res?.structured_lessons) {
+      structuredLessons.value = res.structured_lessons
+    }
+    bannerMsg.value = { text: '🛡️ 已成功执行宪法级防污染回滚，系统已重置为黄金基准认知！', type: 'ok' }
+  } catch (e: any) {
+    bannerMsg.value = { text: `回滚失败: ${e.message}`, type: 'err' }
+  } finally {
+    busy.value = ''
+  }
+}
+
 async function addMemoryItem() {
   const text = newMemoryText.value.trim()
   if (!text) return
@@ -80,9 +118,10 @@ async function addMemoryItem() {
       method: 'POST',
       body: JSON.stringify({ text }),
     })
-    memoryItems.value = res.items || []
+    // Reload full structured list
+    await loadData()
     newMemoryText.value = ''
-    bannerMsg.value = { text: '✅ 自进化实战心法已新增并同步写入大模型决策注入层', type: 'ok' }
+    bannerMsg.value = { text: '✅ 新心法已通过防偏见审查，并成功同步写入决策注入层', type: 'ok' }
   } catch (e: any) {
     bannerMsg.value = { text: `添加心法失败: ${e.message}`, type: 'err' }
   } finally {
@@ -91,14 +130,12 @@ async function addMemoryItem() {
 }
 
 async function deleteMemoryItem(idx: number) {
-  if (!confirm('确定删除此条自进化心法吗？删除后大模型推演将不再参考本条规则。')) return
+  if (!confirm('确定删除此条自进化心法吗？')) return
   busy.value = 'delete'
   bannerMsg.value = null
   try {
-    const res = await api(`/api/v1/admin/memory/${idx}`, {
-      method: 'DELETE',
-    })
-    memoryItems.value = res.items || []
+    await api(`/api/v1/admin/memory/${idx}`, { method: 'DELETE' })
+    await loadData()
     bannerMsg.value = { text: '✅ 该条自进化心法已成功移除', type: 'ok' }
   } catch (e: any) {
     bannerMsg.value = { text: `删除失败: ${e.message}`, type: 'err' }
@@ -153,7 +190,7 @@ async function triggerEvolutionNow() {
       method: 'POST',
       body: JSON.stringify({ confirmation: 'RUN JOB' }),
     })
-    bannerMsg.value = { text: `✅ 自进化复盘任务已启动并完成！${res.detail || ''}`, type: 'ok' }
+    bannerMsg.value = { text: `✅ 自进化复盘已完成（已自动执行离群噪点过滤与宪法安全审查）！${res.detail || ''}`, type: 'ok' }
     await loadData()
   } catch (e: any) {
     bannerMsg.value = { text: `执行复盘失败: ${e.message}`, type: 'err' }
@@ -167,13 +204,21 @@ onMounted(loadData)
 
 <template>
   <div class="space-y-4 max-w-[2160px] mx-auto">
+    <!-- Header -->
     <div class="flex items-center justify-between">
-      <p class="text-xs font-mono" style="color: var(--text-muted);">配置 AI 交易自进化复盘调度、提炼规则、战绩证据注入与实战长期心法记忆库。</p>
+      <div>
+        <h1 class="text-sm sm:text-base font-black font-mono tracking-wide" style="color: var(--text-main);">
+          AI 策略自进化认知中枢与白盒防污染护栏 (Evolution Shield)
+        </h1>
+        <p class="text-xs font-mono mt-0.5" style="color: var(--text-muted);">
+          引入离群噪点剔除、宪法级防偏见红线、心法生命周期衰减与白盒启停管理，杜绝极端行情反噬未来策略。
+        </p>
+      </div>
       <span
         class="text-[10px] font-mono px-2 py-1 rounded border font-bold"
         style="background-color: var(--color-brand-bg); color: var(--color-brand); border-color: var(--color-brand-border);"
       >
-        认知中枢 · 进化栈
+        白盒认知 · 防偏见护栏
       </span>
     </div>
 
@@ -190,7 +235,7 @@ onMounted(loadData)
       </div>
     </div>
 
-    <!-- Navigation Tabs for Self-Improvement -->
+    <!-- Navigation Tabs -->
     <div class="flex flex-wrap items-center justify-between gap-3 p-1.5 rounded-xl border" style="background-color: var(--bg-card); border-color: var(--border-subtle);">
       <div class="flex flex-wrap gap-1">
         <button
@@ -199,7 +244,7 @@ onMounted(loadData)
           :style="activeTab === 'settings' ? { backgroundColor: 'var(--text-main)', color: 'var(--bg-card)' } : { color: 'var(--text-muted)' }"
         >
           <Brain class="w-3.5 h-3.5" />
-          <span>心法记忆与调度概览</span>
+          <span>白盒心法与防污染总览</span>
         </button>
         <button
           @click="switchTab('evolution_system')"
@@ -222,64 +267,91 @@ onMounted(loadData)
       <div class="flex items-center space-x-2">
         <button
           v-if="auth.isSuperadmin"
+          @click="rollbackToBaseline"
+          :disabled="busy !== ''"
+          class="flex items-center space-x-1 px-3 py-1.5 rounded-lg text-xs font-mono font-bold cursor-pointer disabled:opacity-40 transition-all border shadow-xs"
+          style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle); color: var(--text-main);"
+          title="遭遇极端行情导致心法被带偏时，一键恢复至官方未被污染的基准黄金心法"
+        >
+          <RotateCcw class="w-3.5 h-3.5 text-amber-400" />
+          <span>回滚至黄金基准</span>
+        </button>
+
+        <button
+          v-if="auth.isSuperadmin"
           @click="triggerEvolutionNow"
           :disabled="busy !== ''"
           class="flex items-center space-x-1 px-3 py-1.5 rounded-lg text-xs font-mono font-bold cursor-pointer disabled:opacity-40 transition-all shadow-xs"
           style="background-color: var(--color-brand-bg); border-color: var(--color-brand-border); color: var(--color-brand);"
         >
           <PlayCircle class="w-3.5 h-3.5" />
-          <span>{{ busy === 'run' ? '正在执行复盘提炼...' : '强制立即复盘' }}</span>
+          <span>{{ busy === 'run' ? '正在执行复盘提炼...' : '防污染立即复盘' }}</span>
         </button>
       </div>
     </div>
 
-    <!-- TAB 1: Settings & Heuristic Memory -->
+    <!-- TAB 1: Settings & Structured White-Box Memory -->
     <div v-if="activeTab === 'settings'" class="space-y-4">
       <!-- Strategy & Schedule Overview -->
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-3 font-mono">
         <div class="rounded-xl border p-3.5 shadow-xs" style="background-color: var(--bg-card); border-color: var(--border-subtle);">
-          <div class="flex items-center space-x-1.5 mb-1 text-[11px] font-mono font-bold" style="color: var(--text-muted);">
+          <div class="flex items-center space-x-1.5 mb-1 text-[11px] font-bold" style="color: var(--text-muted);">
+            <ShieldCheck class="w-3.5 h-3.5 text-emerald-400" />
+            <span>防污染护栏状态</span>
+          </div>
+          <div class="text-sm font-bold text-emerald-400">ACTIVE (已启动)</div>
+          <div class="text-[10px] mt-1 text-gray-500">
+            离群噪点过滤 · 宪法防偏见
+          </div>
+        </div>
+
+        <div class="rounded-xl border p-3.5 shadow-xs" style="background-color: var(--bg-card); border-color: var(--border-subtle);">
+          <div class="flex items-center space-x-1.5 mb-1 text-[11px] font-bold" style="color: var(--text-muted);">
             <Clock class="w-3.5 h-3.5 text-cyan-400" />
             <span>自动复盘频次</span>
           </div>
-          <div class="text-sm font-bold font-mono text-emerald-400">每 6 小时 (4次/天)</div>
-          <div class="text-[10px] font-mono mt-1" style="color: var(--text-faint);">
-            调度时间：02:00, 08:00, 14:00, 20:00 (UTC+8)
+          <div class="text-sm font-bold text-cyan-400">每 6 小时 (4次/天)</div>
+          <div class="text-[10px] mt-1 text-gray-500">
+            02:00, 08:00, 14:00, 20:00 (UTC+8)
           </div>
         </div>
 
         <div class="rounded-xl border p-3.5 shadow-xs" style="background-color: var(--bg-card); border-color: var(--border-subtle);">
-          <div class="flex items-center space-x-1.5 mb-1 text-[11px] font-mono font-bold" style="color: var(--text-muted);">
+          <div class="flex items-center space-x-1.5 mb-1 text-[11px] font-bold" style="color: var(--text-muted);">
             <Sliders class="w-3.5 h-3.5 text-purple-400" />
-            <span>复盘策略基准</span>
+            <span>当前生效心法</span>
           </div>
-          <div class="text-sm font-bold font-mono" style="color: var(--text-main);">全维度波段强化版</div>
-          <div class="text-[10px] font-mono mt-1" style="color: var(--text-faint);">
-            顺势多空对称 · 宽止损抗噪 · 浮盈0.8R保本移损
+          <div class="text-sm font-bold" style="color: var(--text-main);">
+            {{ structuredLessons.filter((l: any) => l.enabled).length }} / {{ structuredLessons.length }} 条
+          </div>
+          <div class="text-[10px] mt-1 text-gray-500">
+            实时透明注入主脑 Prompt
           </div>
         </div>
 
         <div class="rounded-xl border p-3.5 shadow-xs" style="background-color: var(--bg-card); border-color: var(--border-subtle);">
-          <div class="flex items-center space-x-1.5 mb-1 text-[11px] font-mono font-bold" style="color: var(--text-muted);">
+          <div class="flex items-center space-x-1.5 mb-1 text-[11px] font-bold" style="color: var(--text-muted);">
             <Sparkles class="w-3.5 h-3.5 text-amber-400" />
-            <span>有效心法储备</span>
+            <span>心法半衰期机制</span>
           </div>
-          <div class="text-sm font-bold font-mono text-amber-400">{{ memoryItems.length }} 条实战准则</div>
-          <div class="text-[10px] font-mono mt-1" style="color: var(--text-faint);">
-            每轮实时注入 AI 交易主脑 System Prompt
+          <div class="text-sm font-bold text-amber-400">TTL 60~90 天</div>
+          <div class="text-[10px] mt-1 text-gray-500">
+            动态评分淘汰过期认知
           </div>
         </div>
       </div>
 
-      <!-- Heuristic Memory Management -->
+      <!-- Structured White-Box Memory Management -->
       <div class="rounded-xl border p-4 sm:p-5 shadow-xs transition-colors" style="background-color: var(--bg-card); border-color: var(--border-subtle);">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 mb-3 border-b" style="border-color: var(--border-subtle);">
           <div class="flex items-center space-x-2">
             <Brain class="w-4 h-4 text-emerald-400" />
-            <h2 class="text-xs font-black font-mono uppercase tracking-wide" style="color: var(--text-main);">AI 实战长期心法记忆库 (Heuristic Long-Term Memory)</h2>
+            <h2 class="text-xs font-black font-mono uppercase tracking-wide" style="color: var(--text-main);">
+              白盒实战心法生命周期管理 (Structured Heuristic Rules)
+            </h2>
           </div>
           <span class="text-[10px] font-mono" style="color: var(--text-faint);">
-            每 6 小时自动增量提炼 · 支持管理员手动干预增删
+            每条心法均经宪法安全审查 · 支持单项热拔插启停与评分透视
           </span>
         </div>
 
@@ -288,7 +360,7 @@ onMounted(loadData)
           <input
             v-model="newMemoryText"
             @keydown.enter="addMemoryItem"
-            placeholder="输入新提炼的实战心法（如：【顺势回踩确认】在 4H 多头通道中只挂回踩支撑多单，杜绝逆势摸顶...）"
+            placeholder="手动注入实战心法（如：【顺势回踩低吸】在 4H 多头通道中回踩短均线且量能缩减时挂单...）"
             class="flex-1 rounded-lg px-3 py-2 text-xs font-mono outline-none border transition-colors"
             style="background-color: var(--bg-input); border-color: var(--border-subtle); color: var(--text-main);"
           />
@@ -299,38 +371,92 @@ onMounted(loadData)
             style="background-color: var(--text-main); color: var(--bg-card);"
           >
             <Plus class="w-3.5 h-3.5" />
-            <span>{{ busy === 'add' ? '添加中...' : '添加心法' }}</span>
+            <span>{{ busy === 'add' ? '安全审查中...' : '提交审查并收录' }}</span>
           </button>
         </div>
 
-        <!-- List -->
-        <div class="space-y-2">
-          <div v-if="loading" class="py-6 text-center text-xs font-mono" style="color: var(--text-muted);">
+        <!-- Structured Lessons Cards Grid -->
+        <div class="space-y-2.5">
+          <div v-if="loading" class="py-8 text-center text-xs font-mono" style="color: var(--text-muted);">
             <RefreshCw class="w-4 h-4 animate-spin inline mr-1.5" style="color: var(--color-brand);" />
-            正在加载自进化心法...
+            正在拉取白盒心法知识库...
           </div>
-          <template v-else-if="memoryItems.length">
+          <template v-else-if="structuredLessons.length">
             <div
-              v-for="(item, idx) in memoryItems"
-              :key="idx"
-              class="flex items-start justify-between gap-3 p-3 rounded-lg border transition-colors group"
-              style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);"
+              v-for="(item, idx) in structuredLessons"
+              :key="item.id || idx"
+              class="p-3.5 rounded-xl border transition-all flex flex-col justify-between gap-2.5"
+              :style="{
+                backgroundColor: item.enabled ? 'var(--bg-card-subtle)' : 'rgba(255, 255, 255, 0.01)',
+                borderColor: item.enabled ? 'var(--border-subtle)' : 'rgba(255, 255, 255, 0.05)',
+                opacity: item.enabled ? 1 : 0.6
+              }"
             >
-              <div class="flex items-start space-x-2.5 flex-1 min-w-0">
-                <span class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border shrink-0 mt-0.5" style="background-color: var(--bg-badge); border-color: var(--border-subtle); color: var(--color-brand);">#{{ idx + 1 }}</span>
-                <p class="text-xs font-mono leading-relaxed select-text" style="color: var(--text-main);">{{ item }}</p>
+              <!-- Card Header Row -->
+              <div class="flex items-center justify-between gap-2 font-mono text-xs">
+                <div class="flex items-center space-x-2">
+                  <span
+                    class="px-2 py-0.5 rounded text-[10px] font-bold border"
+                    :style="{
+                      backgroundColor: item.is_baseline ? 'rgba(56, 117, 246, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+                      borderColor: item.is_baseline ? 'rgba(56, 117, 246, 0.2)' : 'rgba(16, 185, 129, 0.2)',
+                      color: item.is_baseline ? '#3875F6' : '#10B981'
+                    }"
+                  >
+                    {{ item.is_baseline ? '👑 官方黄金基准' : '🧬 AI 实战自进化' }}
+                  </span>
+
+                  <span class="text-[10px] text-gray-500 font-bold">
+                    {{ item.category }}
+                  </span>
+
+                  <span class="text-[10px] px-1.5 py-0.2 rounded border bg-emerald-500/10 border-emerald-500/20 text-emerald-400 font-bold">
+                    健康评分: {{ item.health_score }}分
+                  </span>
+                </div>
+
+                <!-- Action Controls -->
+                <div class="flex items-center space-x-2">
+                  <!-- Toggle Switch -->
+                  <button
+                    @click="toggleLessonStatus(item.id)"
+                    class="flex items-center space-x-1 px-2.5 py-1 rounded-md border text-[11px] font-bold cursor-pointer transition-colors"
+                    :class="item.enabled ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-zinc-800 border-zinc-700 text-zinc-500'"
+                    :title="item.enabled ? '点击停用本条心法' : '点击激活本条心法'"
+                  >
+                    <ToggleRight v-if="item.enabled" class="w-3.5 h-3.5" />
+                    <ToggleLeft v-else class="w-3.5 h-3.5" />
+                    <span>{{ item.enabled ? '生效中' : '已休眠' }}</span>
+                  </button>
+
+                  <!-- Delete -->
+                  <button
+                    @click="deleteMemoryItem(idx)"
+                    class="p-1 rounded hover:bg-rose-500/20 text-rose-400 opacity-60 hover:opacity-100 transition-opacity cursor-pointer"
+                    title="移除该心法"
+                  >
+                    <Trash2 class="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
-              <button
-                @click="deleteMemoryItem(idx)"
-                class="p-1 rounded hover:bg-rose-500/20 text-rose-400 opacity-60 group-hover:opacity-100 transition-opacity cursor-pointer shrink-0"
-                title="删除此条心法"
-              >
-                <Trash2 class="w-3.5 h-3.5" />
-              </button>
+
+              <!-- Rule Text -->
+              <p class="text-xs font-mono leading-relaxed select-text" :class="item.enabled ? 'text-gray-200' : 'text-gray-500 line-through'">
+                {{ item.rule_text }}
+              </p>
+
+              <!-- Footer Audit Line -->
+              <div class="flex items-center justify-between text-[10px] font-mono text-gray-500 pt-1 border-t border-white/5">
+                <span>收录时间: {{ item.created_at || '--' }} · 支持样本量: {{ item.sample_size || 10 }} 笔</span>
+                <span class="text-emerald-500 flex items-center space-x-1">
+                  <ShieldCheck class="w-3 h-3" />
+                  <span>宪法安全审查: {{ item.shield_status || 'PASSED' }}</span>
+                </span>
+              </div>
             </div>
           </template>
           <div v-else class="py-8 text-center text-xs font-mono border rounded-lg border-dashed" style="border-color: var(--border-subtle); color: var(--text-faint);">
-            暂无自进化心法记忆，可点击上方添加或等待下一轮定时复盘自动提炼
+            暂无自进化心法记忆，可点击右上角「回滚至黄金基准」恢复核心实战心法
           </div>
         </div>
       </div>

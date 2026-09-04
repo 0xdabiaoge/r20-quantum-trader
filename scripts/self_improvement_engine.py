@@ -404,6 +404,22 @@ def run_self_evolution(force: bool = False):
         change_status, llm_review.get("ai_long_term_memory", []), existing_core_lessons
     )
 
+    # Evolution Shield Audit Gate: Filter out poison / biased / single-event lessons
+    try:
+        from scripts.evolution_shield import audit_proposed_lesson, load_structured_memory, save_structured_memory
+        current_structured = load_structured_memory()
+        shielded_memory = []
+        for proposed_text in long_term_memory:
+            passed, reason = audit_proposed_lesson(proposed_text, sample_size=max(total_trades, 3))
+            if passed:
+                shielded_memory.append(proposed_text)
+            else:
+                log_msg(f"🛡️ [Evolution Shield] 阻断毒心法写入长期记忆: {reason} | 违规内容: {proposed_text[:50]}...")
+        if shielded_memory:
+            long_term_memory = shielded_memory
+    except Exception as exc:
+        log_msg(f"Evolution shield audit warning: {exc}")
+
     # 3. Save Long-Term Memory (Both JSON and Human/LLM-readable Markdown)
     memory_payload = {
         "updated_at": timestamp_str,

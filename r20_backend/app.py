@@ -2248,7 +2248,51 @@ def get_admin_memory(x_r20_admin_token: str | None = Header(default=None), x_r20
     require_admin_header(x_r20_admin_token, x_r20_session)
     items = _parse_memory_items()
     raw_content = MEMORY_FILE.read_text(encoding="utf-8") if MEMORY_FILE.exists() else ""
-    return {"items": items, "count": len(items), "raw": raw_content}
+    
+    # Structured white-box evolution shield data
+    structured_lessons = []
+    try:
+        from scripts.evolution_shield import load_structured_memory
+        structured_lessons = load_structured_memory()
+    except Exception:
+        pass
+    return {
+        "items": items,
+        "count": len(items),
+        "raw": raw_content,
+        "structured_lessons": structured_lessons,
+    }
+
+
+@app.post("/api/v1/admin/memory/toggle/{lesson_id}")
+def toggle_admin_memory_lesson(lesson_id: str, x_r20_admin_token: str | None = Header(default=None), x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    refresh_settings()
+    actor = require_admin_header(x_r20_admin_token, x_r20_session)
+    try:
+        from scripts.evolution_shield import toggle_lesson, load_structured_memory
+        target = toggle_lesson(lesson_id)
+        if not target:
+            raise HTTPException(status_code=404, detail="未找到指定心法条目")
+        audit_record("memory.lesson.toggle", "success", {"actor": actor.get("username", "admin"), "id": lesson_id, "enabled": target.get("enabled")})
+        return {"ok": True, "target": target, "structured_lessons": load_structured_memory()}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"心法切换失败: {exc}") from exc
+
+
+@app.post("/api/v1/admin/memory/rollback")
+def rollback_admin_memory_lessons(x_r20_admin_token: str | None = Header(default=None), x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    refresh_settings()
+    actor = require_admin_header(x_r20_admin_token, x_r20_session)
+    try:
+        from scripts.evolution_shield import rollback_to_baseline
+        res = rollback_to_baseline()
+        audit_record("memory.rollback_baseline", "success", {"actor": actor.get("username", "admin"), "count": len(res)})
+        return {"ok": True, "message": "已成功防污染回滚至官方基准心法库", "structured_lessons": res}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"回滚失败: {exc}") from exc
+
 
 @app.post("/api/v1/admin/memory")
 def add_admin_memory_item(payload: MemoryItemRequest, x_r20_admin_token: str | None = Header(default=None), x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
