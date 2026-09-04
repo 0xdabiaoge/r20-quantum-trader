@@ -753,9 +753,10 @@ def execute_batch_ai_brain_cycle(pos_summary: str = "当前总持仓 0/6", activ
     with ThreadPoolExecutor(max_workers=8) as executor:
         packages = list(executor.map(fetch_single_instrument_package, TARGET_INSTRUMENTS))
 
-    # Fetch OKX Smart Money Signals (Top 100 80%+ Winrate Traders)
+    # Fetch OKX Smart Money Signals
     try:
-        sm_cmd = "okx smartmoney signal-overview-by-filter --instCcyList BTC,ETH,SOL,DOGE,SUI,LINK --json 2>/dev/null"
+        instruments_ccy = ",".join([p["name"] for p in packages])
+        sm_cmd = f"okx smartmoney signal-overview-by-filter --instCcyList {instruments_ccy} --json 2>/dev/null"
         sm_res = subprocess.run(sm_cmd, shell=True, capture_output=True, text=True, timeout=8)
         if sm_res.stdout:
             sm_data = json.loads(sm_res.stdout).get("data", [])

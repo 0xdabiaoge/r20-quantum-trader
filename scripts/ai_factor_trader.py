@@ -1779,6 +1779,12 @@ def execute_portfolio():
                     tp_px = round(ai_decision.get("take_profit_price") if (ai_decision and ai_decision.get("take_profit_price", 0) > 0) else (limit_px + tp_dist), prec)
                     sl_px = round(ai_decision.get("stop_loss_price") if (ai_decision and ai_decision.get("stop_loss_price", 0) > 0) else (limit_px - sl_dist), prec)
 
+                    # Hard check: For BUY LONG, OKX strictly requires sl_px < limit_px < tp_px
+                    if sl_px >= limit_px:
+                        sl_px = round(limit_px - max(sl_dist, f["price"] * 0.012), prec)
+                    if tp_px <= limit_px:
+                        tp_px = round(limit_px + max(tp_dist, f["price"] * 0.024), prec)
+
                     accepted, order_ref = submit_protected_limit_order(inst_id, "buy", "long", actual_sz, limit_px, tp_px, sl_px)
                     if accepted:
                         if is_scale_in:
@@ -1850,6 +1856,12 @@ def execute_portfolio():
                     limit_px = round(ai_decision.get("entry_price") if (ai_decision and ai_decision.get("entry_price", 0) > 0) else (f.get("askPx") or f["price"]), prec)
                     tp_px = round(ai_decision.get("take_profit_price") if (ai_decision and ai_decision.get("take_profit_price", 0) > 0) else (limit_px - tp_dist), prec)
                     sl_px = round(ai_decision.get("stop_loss_price") if (ai_decision and ai_decision.get("stop_loss_price", 0) > 0) else (limit_px + sl_dist), prec)
+
+                    # Hard check: For SELL SHORT, OKX strictly requires tp_px < limit_px < sl_px
+                    if sl_px <= limit_px:
+                        sl_px = round(limit_px + max(sl_dist, f["price"] * 0.012), prec)
+                    if tp_px >= limit_px:
+                        tp_px = round(limit_px - max(tp_dist, f["price"] * 0.024), prec)
 
                     accepted, order_ref = submit_protected_limit_order(inst_id, "sell", "short", actual_sz, limit_px, tp_px, sl_px)
                     if accepted:
