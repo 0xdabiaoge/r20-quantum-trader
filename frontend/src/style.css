@@ -311,8 +311,16 @@ td {
   .text-slate-400,
   .text-zinc-400,
   .text-zinc-500,
+  .text-gray-400,
+  .text-gray-500,
   .text-\[\#556677\] {
     color: var(--text-muted) !important;
+  }
+
+  /* High contrast for light mode labels & muted texts */
+  .text-gray-200,
+  .text-gray-300 {
+    color: var(--text-main) !important;
   }
 
   /* Form Elements */
@@ -372,5 +380,10 @@ td {
   .text-\[\#6f7d91\],
   .text-slate-400 {
     color: var(--text-muted);
+  }
+
+  /* Prevent text-gray-500 from disappearing on deep dark background */
+  .text-gray-500 {
+    color: #8C9BAE !important;
   }
 }

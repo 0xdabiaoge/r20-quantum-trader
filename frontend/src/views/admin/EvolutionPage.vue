@@ -300,7 +300,7 @@ onMounted(loadData)
             <span>防污染护栏状态</span>
           </div>
           <div class="text-sm font-bold text-emerald-400">ACTIVE (已启动)</div>
-          <div class="text-[10px] mt-1 text-gray-500">
+          <div class="text-[10px] mt-1" style="color: var(--text-faint);">
             离群噪点过滤 · 宪法防偏见
           </div>
         </div>
@@ -311,7 +311,7 @@ onMounted(loadData)
             <span>自动复盘频次</span>
           </div>
           <div class="text-sm font-bold text-cyan-400">每 6 小时 (4次/天)</div>
-          <div class="text-[10px] mt-1 text-gray-500">
+          <div class="text-[10px] mt-1" style="color: var(--text-faint);">
             02:00, 08:00, 14:00, 20:00 (UTC+8)
           </div>
         </div>
@@ -324,7 +324,7 @@ onMounted(loadData)
           <div class="text-sm font-bold" style="color: var(--text-main);">
             {{ structuredLessons.filter((l: any) => l.enabled).length }} / {{ structuredLessons.length }} 条
           </div>
-          <div class="text-[10px] mt-1 text-gray-500">
+          <div class="text-[10px] mt-1" style="color: var(--text-faint);">
             实时透明注入主脑 Prompt
           </div>
         </div>
@@ -334,9 +334,9 @@ onMounted(loadData)
             <Sparkles class="w-3.5 h-3.5 text-amber-400" />
             <span>心法半衰期机制</span>
           </div>
-          <div class="text-sm font-bold text-amber-400">TTL 60~90 天</div>
-          <div class="text-[10px] mt-1 text-gray-500">
-            动态评分淘汰过期认知
+          <div class="text-sm font-bold text-amber-400">敏锐半衰期 7~14 天</div>
+          <div class="text-[10px] mt-1" style="color: var(--text-faint);">
+            动态评分快速淘汰过期或失效认知
           </div>
         </div>
       </div>
@@ -398,19 +398,19 @@ onMounted(loadData)
                   <span
                     class="px-2 py-0.5 rounded text-[10px] font-bold border"
                     :style="{
-                      backgroundColor: item.is_baseline ? 'rgba(56, 117, 246, 0.1)' : 'rgba(16, 185, 129, 0.1)',
-                      borderColor: item.is_baseline ? 'rgba(56, 117, 246, 0.2)' : 'rgba(16, 185, 129, 0.2)',
+                      backgroundColor: item.is_baseline ? 'rgba(56, 117, 246, 0.15)' : 'rgba(16, 185, 129, 0.15)',
+                      borderColor: item.is_baseline ? 'rgba(56, 117, 246, 0.3)' : 'rgba(16, 185, 129, 0.3)',
                       color: item.is_baseline ? '#3875F6' : '#10B981'
                     }"
                   >
                     {{ item.is_baseline ? '👑 官方黄金基准' : '🧬 AI 实战自进化' }}
                   </span>
 
-                  <span class="text-[10px] text-gray-500 font-bold">
+                  <span class="text-[10px] font-bold" style="color: var(--text-muted);">
                     {{ item.category }}
                   </span>
 
-                  <span class="text-[10px] px-1.5 py-0.2 rounded border bg-emerald-500/10 border-emerald-500/20 text-emerald-400 font-bold">
+                  <span class="text-[10px] px-1.5 py-0.2 rounded border bg-emerald-500/15 border-emerald-500/30 text-emerald-400 font-bold">
                     健康评分: {{ item.health_score }}分
                   </span>
                 </div>
@@ -421,7 +421,15 @@ onMounted(loadData)
                   <button
                     @click="toggleLessonStatus(item.id)"
                     class="flex items-center space-x-1 px-2.5 py-1 rounded-md border text-[11px] font-bold cursor-pointer transition-colors"
-                    :class="item.enabled ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-zinc-800 border-zinc-700 text-zinc-500'"
+                    :style="item.enabled ? {
+                      backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                      borderColor: 'rgba(16, 185, 129, 0.3)',
+                      color: '#10B981',
+                    } : {
+                      backgroundColor: 'var(--bg-card)',
+                      borderColor: 'var(--border-subtle)',
+                      color: 'var(--text-faint)',
+                    }"
                     :title="item.enabled ? '点击停用本条心法' : '点击激活本条心法'"
                   >
                     <ToggleRight v-if="item.enabled" class="w-3.5 h-3.5" />
@@ -441,12 +449,15 @@ onMounted(loadData)
               </div>
 
               <!-- Rule Text -->
-              <p class="text-xs font-mono leading-relaxed select-text" :class="item.enabled ? 'text-gray-200' : 'text-gray-500 line-through'">
+              <p
+                class="text-xs font-mono leading-relaxed select-text"
+                :style="item.enabled ? { color: 'var(--text-main)' } : { color: 'var(--text-faint)', textDecoration: 'line-through' }"
+              >
                 {{ item.rule_text }}
               </p>
 
               <!-- Footer Audit Line -->
-              <div class="flex items-center justify-between text-[10px] font-mono text-gray-500 pt-1 border-t border-white/5">
+              <div class="flex items-center justify-between text-[10px] font-mono pt-1 border-t" style="border-color: var(--border-subtle); color: var(--text-faint);">
                 <span>收录时间: {{ item.created_at || '--' }} · 支持样本量: {{ item.sample_size || 10 }} 笔</span>
                 <span class="text-emerald-500 flex items-center space-x-1">
                   <ShieldCheck class="w-3 h-3" />

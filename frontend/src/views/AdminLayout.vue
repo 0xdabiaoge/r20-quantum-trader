@@ -190,9 +190,9 @@ const showAboutModal = ref(false)
         <div class="flex items-center space-x-2.5">
           <div
             class="w-7 h-7 rounded-md flex items-center justify-center font-mono font-black text-xs border shadow-xs"
-            style="background-color: var(--bg-card-subtle); border-color: var(--border-medium); color: var(--text-main);"
+            style="background-color: var(--color-brand-bg); border-color: var(--color-brand-border); color: var(--color-brand);"
           >
-            R
+            ₿
           </div>
           <div>
             <div class="text-xs font-black tracking-wide font-mono" style="color: var(--text-main);">R20 CONTROL</div>
@@ -201,7 +201,7 @@ const showAboutModal = ref(false)
               class="text-[10px] font-mono transition-colors cursor-pointer text-left block"
               style="color: var(--color-brand);"
             >
-              v7.2.0
+              v7.2.1
             </button>
           </div>
         </div>
@@ -281,9 +281,9 @@ const showAboutModal = ref(false)
         <div class="flex items-center space-x-2.5">
           <div
             class="w-7 h-7 rounded-md flex items-center justify-center font-mono font-black text-xs border shadow-xs"
-            style="background-color: var(--bg-card-subtle); border-color: var(--border-medium); color: var(--text-main);"
+            style="background-color: var(--color-brand-bg); border-color: var(--color-brand-border); color: var(--color-brand);"
           >
-            R
+            ₿
           </div>
           <div>
             <div class="text-xs font-black tracking-wide font-mono" style="color: var(--text-main);">
@@ -295,7 +295,7 @@ const showAboutModal = ref(false)
               style="color: var(--color-brand);"
               title="点击查看开源主仓信息"
             >
-              v7.2.0
+              v7.2.1
             </button>
           </div>
         </div>

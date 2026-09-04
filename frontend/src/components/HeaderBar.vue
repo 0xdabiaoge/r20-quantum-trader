@@ -52,18 +52,27 @@ const tabs = [
     style="background-color: var(--bg-header); border-color: var(--border-subtle); backdrop-filter: blur(12px);"
   >
     <div class="max-w-[2160px] w-full mx-auto flex items-center justify-between gap-2.5 sm:gap-4">
-      <!-- Left: Minimal Institutional Identity (No logo icon, pure site name) -->
+      <!-- Left: Minimal Institutional Identity with subtle crypto currency icon -->
       <div class="flex items-center space-x-2 shrink-0">
-        <span class="font-mono font-black text-xs sm:text-sm tracking-wide whitespace-nowrap" style="color: var(--text-main);">
-          R20 QUANTUM
-        </span>
+        <div class="flex items-center space-x-1.5 cursor-pointer select-none" @click="store.activeTab = 'trading'">
+          <div
+            class="w-5 h-5 rounded flex items-center justify-center font-mono font-black text-xs border"
+            style="background-color: var(--color-brand-bg); color: var(--color-brand); border-color: var(--color-brand-border);"
+            title="Crypto Native Quant"
+          >
+            ₿
+          </div>
+          <span class="font-mono font-black text-xs sm:text-sm tracking-wide whitespace-nowrap" style="color: var(--text-main);">
+            R20 QUANTUM
+          </span>
+        </div>
         <button
           @click="store.showAboutModal = true"
           class="px-1.5 py-0.2 rounded text-[10px] font-mono font-bold border transition-colors cursor-pointer"
           style="background-color: var(--bg-card-subtle); color: var(--text-muted); border-color: var(--border-subtle);"
           title="查看系统版本与开源主仓信息"
         >
-          v7.2.0
+          v7.2.1
         </button>
         <span
           class="w-1.5 h-1.5 rounded-full shrink-0"
