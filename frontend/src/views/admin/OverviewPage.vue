@@ -28,8 +28,16 @@ const loading = ref(true)
 // Backtest state
 const backtestReport = ref<any>(null)
 const runningBacktest = ref(false)
-const selectedSymbol = ref('BTC-USDT-SWAP')
+const selectedSymbol = ref('ALL')
 const selectedBar = ref('1H')
+
+const activeBacktestView = computed(() => {
+  if (!backtestReport.value) return null
+  if (selectedSymbol.value === 'ALL') {
+    return backtestReport.value.portfolio || backtestReport.value
+  }
+  return backtestReport.value.by_symbol?.[selectedSymbol.value] || backtestReport.value.portfolio || backtestReport.value
+})
 
 async function loadBacktest() {
   try {
@@ -426,6 +434,7 @@ const quickNav = [
               class="px-2 py-1 rounded border text-xs font-mono"
               style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle); color: var(--text-main);"
             >
+              <option value="ALL">🌟 全组合 (6币组合)</option>
               <option value="BTC-USDT-SWAP">BTC-USDT-SWAP</option>
               <option value="ETH-USDT-SWAP">ETH-USDT-SWAP</option>
               <option value="SOL-USDT-SWAP">SOL-USDT-SWAP</option>
@@ -457,60 +466,60 @@ const quickNav = [
           </div>
         </div>
 
-        <div v-if="backtestReport" class="space-y-4">
+        <div v-if="activeBacktestView" class="space-y-4">
           <!-- KPI Metrics Row -->
           <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             <div class="rounded-lg border p-3 font-mono" style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);">
               <div class="text-[10px] text-gray-400">总收益率 / 净值</div>
-              <div class="text-sm font-black mt-1" :class="backtestReport.total_return_pct >= 0 ? 'text-emerald-400' : 'text-rose-400'">
-                {{ backtestReport.total_return_pct }}%
+              <div class="text-sm font-black mt-1" :class="activeBacktestView.total_return_pct >= 0 ? 'text-emerald-400' : 'text-rose-400'">
+                {{ activeBacktestView.total_return_pct >= 0 ? '+' : '' }}{{ activeBacktestView.total_return_pct }}%
               </div>
-              <div class="text-[10px] text-gray-500">${{ backtestReport.final_equity }}</div>
+              <div class="text-[10px] text-gray-500">${{ activeBacktestView.final_equity?.toLocaleString() }}</div>
             </div>
 
             <div class="rounded-lg border p-3 font-mono" style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);">
               <div class="text-[10px] text-gray-400">年化夏普比率 (Sharpe)</div>
               <div class="text-sm font-black mt-1 text-indigo-400">
-                {{ backtestReport.sharpe_ratio }}
+                {{ activeBacktestView.sharpe_ratio }}
               </div>
-              <div class="text-[10px] text-gray-500">索提诺: {{ backtestReport.sortino_ratio }}</div>
+              <div class="text-[10px] text-gray-500">索提诺: {{ activeBacktestView.sortino_ratio }}</div>
             </div>
 
             <div class="rounded-lg border p-3 font-mono" style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);">
               <div class="text-[10px] text-gray-400">最大回撤 (Max DD)</div>
               <div class="text-sm font-black mt-1 text-amber-400">
-                {{ backtestReport.max_drawdown_pct }}%
+                {{ activeBacktestView.max_drawdown_pct }}%
               </div>
-              <div class="text-[10px] text-gray-500">卡玛比率: {{ backtestReport.calmar_ratio }}</div>
+              <div class="text-[10px] text-gray-500">卡玛比率: {{ activeBacktestView.calmar_ratio }}</div>
             </div>
 
             <div class="rounded-lg border p-3 font-mono" style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);">
               <div class="text-[10px] text-gray-400">胜率 / 盈亏比</div>
               <div class="text-sm font-black mt-1 text-cyan-400">
-                {{ backtestReport.win_rate_pct }}%
+                {{ activeBacktestView.win_rate_pct }}%
               </div>
-              <div class="text-[10px] text-gray-500">PF: {{ backtestReport.profit_factor }}</div>
+              <div class="text-[10px] text-gray-500">PF: {{ activeBacktestView.profit_factor }}</div>
             </div>
 
             <div class="rounded-lg border p-3 font-mono" style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);">
               <div class="text-[10px] text-gray-400">开平仓单数 (胜/负)</div>
               <div class="text-sm font-black mt-1" style="color: var(--text-main);">
-                {{ backtestReport.total_trades }} 笔
+                {{ activeBacktestView.total_trades }} 笔
               </div>
-              <div class="text-[10px] text-gray-500">多空: {{ backtestReport.winning_trades }}/{{ backtestReport.losing_trades }} (均R: {{ backtestReport.avg_r_multiple }}R)</div>
+              <div class="text-[10px] text-gray-500">胜{{ activeBacktestView.winning_trades }}/负{{ activeBacktestView.losing_trades }} (均R: {{ activeBacktestView.avg_r_multiple }}R)</div>
             </div>
 
             <div class="rounded-lg border p-3 font-mono" style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);">
               <div class="text-[10px] text-gray-400">拦截器物理防割肉</div>
               <div class="text-sm font-black mt-1 text-emerald-400">
-                {{ backtestReport.gatekeeper_filtered_count }} 次
+                {{ activeBacktestView.gatekeeper_filtered_count }} 次
               </div>
               <div class="text-[10px] text-gray-500">置信度/盈亏比拦截</div>
             </div>
           </div>
 
           <div class="text-xs font-mono p-3 rounded border text-gray-400 flex items-center justify-between" style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);">
-            <span>标的: <strong class="text-white">{{ backtestReport.symbol }}</strong> · 初始资金: ${{ backtestReport.initial_equity }} · 严格包含 OKX Taker/Maker 手续费与滑点模拟</span>
+            <span>当前视角: <strong class="text-white">{{ activeBacktestView.symbol }}</strong> · 初始资金: ${{ activeBacktestView.initial_equity?.toLocaleString() }} · 包含完整 Taker/Maker 手续费与滑点模拟</span>
             <span class="text-[10px] text-gray-500">数据源: OKX 官方 Public Candles (最新 100 根)</span>
           </div>
         </div>
