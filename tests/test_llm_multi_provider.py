@@ -279,6 +279,43 @@ class LLMMultiProviderTests(unittest.TestCase):
         self.assertEqual(del_m.status_code, 200)
         self.assertTrue(del_m.json()["deleted"])
 
+    def test_fetch_remote_models_and_providers_crud(self):
+        headers = self.login()
+
+        # 1. Upsert provider
+        p_resp = self.client.post("/api/v1/admin/llm/providers", headers=headers, json={
+            "id": "testprov",
+            "name": "Test Provider",
+            "base_url": "https://api.testprovider.com/v1",
+            "api_key": "sk-testprov",
+            "description": "Custom Provider Unit Test",
+        })
+        self.assertEqual(p_resp.status_code, 200)
+        self.assertEqual(p_resp.json()["id"], "testprov")
+
+        # 2. Mock fetch remote models endpoint
+        with patch.object(app_module, "fetch_remote_models") as mock_fetch:
+            mock_fetch.return_value = {
+                "ok": True,
+                "endpoint_used": "https://api.testprovider.com/v1/models",
+                "total": 2,
+                "models": [
+                    {"id": "testprov/flagship-1", "name": "Flagship 1", "reasoning_type": "standard_effort"},
+                    {"id": "testprov/fast-1", "name": "Fast 1", "reasoning_type": "none"},
+                ],
+            }
+            f_resp = self.client.post("/api/v1/admin/llm/fetch-models", headers=headers, json={
+                "provider_id": "testprov",
+            })
+            self.assertEqual(f_resp.status_code, 200)
+            self.assertTrue(f_resp.json()["ok"])
+            self.assertEqual(f_resp.json()["total"], 2)
+
+        # 3. Delete provider
+        del_p = self.client.delete("/api/v1/admin/llm/providers/testprov", headers=headers)
+        self.assertEqual(del_p.status_code, 200)
+        self.assertTrue(del_p.json()["deleted"])
+
 
 if __name__ == "__main__":
     unittest.main()

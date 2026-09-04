@@ -58,6 +58,7 @@ from r20_backend.llm_manager import (
     upsert_model,
     delete_model,
     test_llm_connection,
+    fetch_remote_models,
     init_llm_providers,
     _atomic_write_json,
     LLM_PROVIDERS_FILE,
@@ -187,6 +188,7 @@ class LLMProviderUpsertRequest(BaseModel):
     name: str
     base_url: str
     api_key: str | None = None
+    api_format: str | None = "openai_chat"
     description: str | None = ""
     models: list[dict[str, Any]] | None = None
 
@@ -194,6 +196,7 @@ class LLMProviderUpsertRequest(BaseModel):
 class LLMModelUpsertRequest(BaseModel):
     id: str
     name: str | None = None
+    provider_id: str | None = None
     provider_name: str | None = None
     base_url: str | None = None
     api_key: str | None = None
@@ -202,6 +205,12 @@ class LLMModelUpsertRequest(BaseModel):
     default_effort: str = "high"
     reasoning_effort: str | None = None
     description: str | None = ""
+
+
+class LLMFetchModelsRequest(BaseModel):
+    base_url: str | None = None
+    api_key: str | None = None
+    provider_id: str | None = None
 
 
 class CouncilConfigUpdateRequest(BaseModel):
@@ -1031,6 +1040,22 @@ def admin_upsert_llm_provider(payload: LLMProviderUpsertRequest, x_r20_session: 
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     audit_record("llm.provider.upsert", "success", {"actor": actor["username"], "provider_id": res.get("id")})
+    return res
+
+
+@app.post("/api/v1/admin/llm/fetch-models")
+def admin_fetch_remote_models(payload: LLMFetchModelsRequest, x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    require_admin_header(x_r20_session=x_r20_session)
+    res = fetch_remote_models(
+        base_url=payload.base_url or "",
+        api_key=payload.api_key or "",
+        provider_id=payload.provider_id,
+    )
+    audit_record("llm.remote.fetch", "success" if res.get("ok") else "failed", {
+        "provider_id": payload.provider_id,
+        "base_url": payload.base_url,
+        "total": res.get("total", 0),
+    })
     return res
 
 
