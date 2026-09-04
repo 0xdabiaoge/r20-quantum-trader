@@ -808,80 +808,80 @@ onMounted(() => {
         </div>
       </div>
 
-      <!-- SUB-VIEW B: 「模型」Tab (对齐截图 3) -->
+      <!-- SUB-VIEW B: 「模型」Tab (完美还原原生截图排版) -->
       <div v-else-if="detailTab === 'models'" class="space-y-4">
         <!-- Models List Container -->
         <div
-          class="rounded-2xl border divide-y overflow-hidden shadow-xs transition-colors"
+          class="rounded-3xl border divide-y overflow-hidden shadow-xs transition-colors"
           style="background-color: var(--bg-card); border-color: var(--border-subtle);"
         >
           <div
             v-for="m in selectedProvider.models"
             :key="m.id"
-            class="p-4 flex items-center justify-between hover:bg-[var(--bg-card-subtle)] transition-colors"
+            class="p-4 sm:p-5 flex items-center justify-between hover:bg-[var(--bg-card-subtle)] transition-colors group"
             style="border-color: var(--border-subtle);"
           >
-            <!-- Left: Model Avatar Icon + Model ID + Badges (对齐截图 3) -->
-            <div class="flex items-center space-x-3.5">
-              <!-- Avatar Sparkle / Model Logo -->
+            <!-- Left: Sparkle Avatar + Model Title + Badges -->
+            <div class="flex items-start sm:items-center space-x-3.5 min-w-0 pr-3">
+              <!-- Avatar: 经典彩色四角星 Sparkle 图标 -->
               <div
-                class="w-9 h-9 rounded-xl flex items-center justify-center border font-bold text-sm shrink-0"
+                class="w-10 h-10 rounded-full flex items-center justify-center shrink-0 shadow-2xs border"
                 style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);"
               >
-                <Sparkles class="w-4 h-4 text-amber-400" />
+                <Sparkles class="w-5 h-5 text-indigo-400" />
               </div>
 
-              <!-- Model Details -->
-              <div>
-                <div class="flex items-center space-x-2">
-                  <span class="font-bold text-sm tracking-tight" style="color: var(--text-main);">
+              <!-- Content Area -->
+              <div class="min-w-0">
+                <!-- Model ID & Status Badge -->
+                <div class="flex flex-wrap items-center gap-2">
+                  <span class="font-bold text-sm tracking-tight truncate max-w-[200px] sm:max-w-md font-mono" style="color: var(--text-main);">
                     {{ m.id }}
                   </span>
-                  <!-- Active Crown Badge -->
                   <span
                     v-if="m.id === cfg?.active_model_id"
-                    class="px-1.5 py-0.2 rounded text-[9px] font-bold border"
-                    style="background-color: var(--color-up-bg); border-color: var(--color-up-border); color: var(--color-up);"
+                    class="px-2 py-0.5 rounded-full text-[10px] font-bold border"
+                    style="background-color: rgba(16, 185, 129, 0.12); border-color: rgba(16, 185, 129, 0.25); color: #10B981;"
                   >
                     主脑生效
                   </span>
                 </div>
 
-                <!-- Capability Badges (对齐截图 3: 聊天、T图>T、锤子等) -->
-                <div class="flex flex-wrap items-center gap-1.5 mt-1.5">
+                <!-- Capability Badges (对齐截图 3: 聊天、T图 > T、工具锤子、CoT思考) -->
+                <div class="flex flex-wrap items-center gap-1.5 mt-2">
                   <span
                     v-if="m.capabilities?.includes('chat')"
-                    class="px-2 py-0.5 rounded-md text-[10px] font-medium border"
-                    style="background-color: rgba(99, 102, 241, 0.1); border-color: rgba(99, 102, 241, 0.2); color: #818CF8;"
+                    class="px-2.5 py-0.5 rounded-full text-[11px] font-medium border"
+                    style="background-color: rgba(99, 102, 241, 0.08); border-color: rgba(99, 102, 241, 0.2); color: #818CF8;"
                   >
                     聊天
                   </span>
                   <span
                     v-if="m.capabilities?.includes('vision')"
-                    class="px-2 py-0.5 rounded-md text-[10px] font-medium border"
-                    style="background-color: rgba(236, 72, 153, 0.1); border-color: rgba(236, 72, 153, 0.2); color: #F472B6;"
+                    class="px-2.5 py-0.5 rounded-full text-[11px] font-medium border"
+                    style="background-color: rgba(236, 72, 153, 0.08); border-color: rgba(236, 72, 153, 0.2); color: #F472B6;"
                   >
                     T图 &gt; T
                   </span>
                   <span
                     v-if="m.capabilities?.includes('tools')"
-                    class="px-1.5 py-0.5 rounded-md text-[10px] border flex items-center"
-                    style="background-color: rgba(59, 130, 246, 0.1); border-color: rgba(59, 130, 246, 0.2); color: #60A5FA;"
+                    class="p-1 rounded-full border flex items-center justify-center"
+                    style="background-color: rgba(59, 130, 246, 0.08); border-color: rgba(59, 130, 246, 0.2); color: #60A5FA;"
                     title="支持工具调用"
                   >
                     <Wrench class="w-3 h-3" />
                   </span>
                   <span
                     v-if="m.capabilities?.includes('reasoning') || m.reasoning_type !== 'none'"
-                    class="px-1.5 py-0.5 rounded-md text-[10px] border flex items-center font-bold text-amber-400"
-                    style="background-color: rgba(245, 158, 11, 0.1); border-color: rgba(245, 158, 11, 0.2);"
-                    title="支持深度链式推演"
+                    class="px-2 py-0.5 rounded-full text-[10px] border flex items-center gap-1 font-bold text-amber-400"
+                    style="background-color: rgba(245, 158, 11, 0.08); border-color: rgba(245, 158, 11, 0.2);"
+                    title="支持长链推演"
                   >
-                    🧠 CoT
+                    🧠 思考
                   </span>
                   <span
                     v-if="m.context_length"
-                    class="text-[10px] font-mono text-gray-400"
+                    class="text-[11px] font-mono text-gray-400 ml-1"
                   >
                     {{ (m.context_length / 1000).toFixed(0) }}k
                   </span>
@@ -889,8 +889,18 @@ onMounted(() => {
               </div>
             </div>
 
-            <!-- Right: Actions (测试、设为主脑、编辑与删除) -->
-            <div class="flex items-center space-x-2">
+            <!-- Right: Minimalist Action Controls -->
+            <div class="flex items-center space-x-1.5 sm:space-x-2 shrink-0">
+              <button
+                v-if="m.id !== cfg?.active_model_id"
+                @click="activateModel(m)"
+                class="px-3 py-1 rounded-xl text-xs font-bold border transition-all cursor-pointer shadow-xs btn-primary-text"
+                style="background-color: #2563EB; color: #FFFFFF;"
+                title="一键设为主脑"
+              >
+                启用
+              </button>
+
               <button
                 @click="runTestModel(m)"
                 :disabled="testLoading && testingModelId === m.id"
@@ -899,16 +909,6 @@ onMounted(() => {
                 title="测试连通性"
               >
                 <RefreshCw class="w-3.5 h-3.5" :class="testLoading && testingModelId === m.id ? 'animate-spin' : ''" />
-              </button>
-
-              <button
-                v-if="m.id !== cfg?.active_model_id"
-                @click="activateModel(m)"
-                class="px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all cursor-pointer shadow-xs btn-primary-text"
-                style="background-color: #2563EB; color: #FFFFFF;"
-                title="一键设为主脑"
-              >
-                启用
               </button>
 
               <button
@@ -931,7 +931,7 @@ onMounted(() => {
             </div>
           </div>
 
-          <div v-if="!selectedProvider.models?.length" class="py-12 text-center text-xs" style="color: var(--text-muted);">
+          <div v-if="!selectedProvider.models?.length" class="py-16 text-center text-xs" style="color: var(--text-muted);">
             该供应商名下暂未配置模型，点击下方「获取」可一键从远端自动拉取。
           </div>
         </div>
@@ -939,7 +939,7 @@ onMounted(() => {
         <!-- Diagnostic Response Box -->
         <div
           v-if="testResult"
-          class="rounded-xl border p-4 transition-all shadow-xs text-xs"
+          class="rounded-2xl border p-4 transition-all shadow-xs text-xs"
           :style="{
             backgroundColor: testResult.ok ? 'var(--color-up-bg)' : 'var(--color-down-bg)',
             borderColor: testResult.ok ? 'var(--color-up-border)' : 'var(--color-down-border)',
@@ -966,36 +966,36 @@ onMounted(() => {
           </div>
         </div>
 
-        <!-- Floating Bottom Operation Bar (对齐截图 3 悬浮底栏: [获取] [+ 添加新模型] [垃圾桶]) -->
-        <div class="flex items-center justify-center pt-2 pb-16">
+        <!-- Floating Bottom Operation Bar (完美对齐截图 3 椭圆气泡底栏: [获取] [+ 添加新模型] [清空]) -->
+        <div class="flex items-center justify-center pt-2 pb-20">
           <div
-            class="flex items-center space-x-3 px-4 py-2 rounded-full border shadow-xl backdrop-blur-md"
+            class="flex items-center space-x-3 p-1.5 rounded-full border shadow-2xl backdrop-blur-md"
             style="background-color: var(--bg-card); border-color: var(--border-subtle);"
           >
-            <!-- 获取 (远端一键自动拉取) -->
+            <!-- 获取 (带方块立方体图标的大圆角按钮) -->
             <button
               @click="openFetchDialog"
-              class="flex items-center space-x-1.5 px-4 py-2 rounded-full font-bold text-xs cursor-pointer border transition-all hover:opacity-90"
+              class="flex items-center space-x-2 px-5 py-2.5 rounded-full font-bold text-xs cursor-pointer border transition-all hover:opacity-90 shadow-2xs"
               style="background-color: rgba(99, 102, 241, 0.1); border-color: rgba(99, 102, 241, 0.25); color: #818CF8;"
             >
               <DownloadCloud class="w-4 h-4" />
               <span>获取</span>
             </button>
 
-            <!-- + 添加新模型 (手动录入) -->
+            <!-- + 添加新模型 -->
             <button
               @click="openAddModelModal"
-              class="flex items-center space-x-1.5 px-4 py-2 rounded-full font-bold text-xs cursor-pointer border transition-all hover:opacity-90"
+              class="flex items-center space-x-2 px-5 py-2.5 rounded-full font-bold text-xs cursor-pointer border transition-all hover:opacity-90 shadow-2xs"
               style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle); color: var(--text-main);"
             >
               <Plus class="w-4 h-4" />
               <span>添加新模型</span>
             </button>
 
-            <!-- 清空删除图标 -->
+            <!-- 清空删除图标 (带红晕气泡) -->
             <button
               @click="clearCurrentProviderModels"
-              class="p-2 rounded-full border cursor-pointer hover:bg-red-500/10 transition-colors text-red-400"
+              class="p-2.5 rounded-full border cursor-pointer hover:bg-red-500/10 transition-colors text-red-400"
               style="border-color: rgba(239, 68, 68, 0.2); background-color: rgba(239, 68, 68, 0.08);"
               title="清空该供应商所有模型"
             >
