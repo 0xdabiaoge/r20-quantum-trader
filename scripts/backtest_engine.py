@@ -308,24 +308,61 @@ class BacktestEngine:
         )
 
 
+def fetch_okx_candles(inst_id: str = "BTC-USDT-SWAP", bar: str = "1H", limit: int = 100) -> List[Dict[str, Any]]:
+    """Fetch live historical K-line candles directly from OKX public market endpoint."""
+    import urllib.request
+    url = f"https://www.okx.com/api/v5/market/candles?instId={inst_id}&bar={bar}&limit={limit}"
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            if data.get("code") == "0" and data.get("data"):
+                # OKX returns newest first -> reverse to chronological order
+                raw = list(reversed(data["data"]))
+                candles = []
+                for c in raw:
+                    candles.append({
+                        "symbol": inst_id,
+                        "timestamp": c[0],
+                        "open": float(c[1]),
+                        "high": float(c[2]),
+                        "low": float(c[3]),
+                        "close": float(c[4]),
+                        "volume": float(c[5]) if len(c) > 5 else 0.0,
+                    })
+                return candles
+    except Exception as exc:
+        print(f"Failed to fetch OKX public candles: {exc}")
+    return []
+
+
 def main():
     parser = argparse.ArgumentParser(description="R20 Quantitative Backtesting & Statistical Verification")
-    parser.add_argument("--candles", default="data/historical_candles.json", help="Path to historical candles JSON")
+    parser.add_argument("--symbol", default="BTC-USDT-SWAP", help="Instrument symbol (e.g. BTC-USDT-SWAP, ETH-USDT-SWAP)")
+    parser.add_argument("--bar", default="1H", help="Candle bar: 15m, 1H, 4H")
+    parser.add_argument("--limit", type=int, default=100, help="Number of historical candles to evaluate")
+    parser.add_argument("--candles", default="", help="Optional path to local historical candles JSON")
     parser.add_argument("--capital", type=float, default=10000.0, help="Initial account capital")
     parser.add_argument("--output", default="data/backtest_report.json", help="Path to save report")
     args = parser.parse_args()
 
-    candles_path = Path(args.candles)
-    if not candles_path.is_file():
-        # Generate synthetic historical dataset for verification demonstration
-        print(f"Candles file {args.candles} not found. Generating sample verification sequence...")
-        candles = []
+    candles = []
+    if args.candles and Path(args.candles).is_file():
+        with open(args.candles, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            candles = data if isinstance(data, list) else data.get("candles", [])
+    else:
+        print(f"Fetching real market candles from OKX public API for {args.symbol} ({args.bar}, limit={args.limit})...")
+        candles = fetch_okx_candles(args.symbol, bar=args.bar, limit=args.limit)
+
+    if not candles:
+        print(f"Fallback to synthetic verification sequence for {args.symbol}...")
         base_price = 65000.0
         for i in range(200):
             delta = math.sin(i / 10.0) * 800 + (i * 25)
             c = base_price + delta
             candles.append({
-                "symbol": "BTC-USDT-SWAP",
+                "symbol": args.symbol,
                 "timestamp": f"2026-08-{10 + (i // 24):02d}T{i % 24:02d}:00:00Z",
                 "open": c - 50,
                 "high": c + 120,
@@ -333,10 +370,6 @@ def main():
                 "close": c,
                 "volume": 1500.0,
             })
-    else:
-        with open(candles_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            candles = data if isinstance(data, list) else data.get("candles", [])
 
     engine = BacktestEngine(initial_capital=args.capital)
     summary = engine.run(candles)

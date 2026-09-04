@@ -16,6 +16,8 @@ import {
   Clock,
   CheckCircle2,
   AlertCircle,
+  TrendingUp,
+  Play,
 } from 'lucide-vue-next'
 
 const router = useRouter()
@@ -23,12 +25,52 @@ const { api } = useApi()
 const runtime = ref<any>(null)
 const loading = ref(true)
 
+// Backtest state
+const backtestReport = ref<any>(null)
+const runningBacktest = ref(false)
+const selectedSymbol = ref('BTC-USDT-SWAP')
+const selectedBar = ref('1H')
+
+async function loadBacktest() {
+  try {
+    const res = await api('/api/v1/admin/backtest/report')
+    if (res?.has_report) {
+      backtestReport.value = res.report
+    }
+  } catch (e) {
+    console.error('Failed to load backtest report:', e)
+  }
+}
+
+async function triggerBacktest() {
+  runningBacktest.value = true
+  try {
+    const res = await api('/api/v1/admin/backtest/run', {
+      method: 'POST',
+      body: JSON.stringify({
+        symbol: selectedSymbol.value,
+        bar: selectedBar.value,
+        limit: 100,
+        capital: 10000.0,
+      }),
+    })
+    if (res?.report) {
+      backtestReport.value = res.report
+    }
+  } catch (e: any) {
+    alert(`回测执行失败: ${e.message}`)
+  } finally {
+    runningBacktest.value = false
+  }
+}
+
 async function loadRuntime() {
   loading.value = true
   try {
     const [rt, cfg] = await Promise.all([
       api('/api/v1/admin/runtime'),
       api('/api/v1/admin/config').catch(() => null),
+      loadBacktest(),
     ])
     if (cfg?.configuration) {
       rt.configuration = { ...cfg.configuration, ...(rt?.configuration || {}) }
@@ -359,6 +401,119 @@ const quickNav = [
               </tbody>
             </table>
           </div>
+        </div>
+      </div>
+
+      <!-- Quantitative Backtesting & Statistical Attribution (学术报告专项验证面板) -->
+      <div
+        class="rounded-xl border p-4 sm:p-5 shadow-xs transition-colors"
+        style="background-color: var(--bg-card); border-color: var(--border-subtle);"
+      >
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-3 mb-3 border-b gap-2" style="border-color: var(--border-subtle);">
+          <div class="flex items-center space-x-2">
+            <TrendingUp class="w-4 h-4 text-indigo-400" />
+            <h2 class="text-xs font-black font-mono uppercase tracking-wider" style="color: var(--text-main);">
+              量化回测与统计显著性归因 (Backtesting Engine)
+            </h2>
+            <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+              OKX 实时历史 K 线实证
+            </span>
+          </div>
+
+          <div class="flex items-center space-x-2">
+            <select
+              v-model="selectedSymbol"
+              class="px-2 py-1 rounded border text-xs font-mono"
+              style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle); color: var(--text-main);"
+            >
+              <option value="BTC-USDT-SWAP">BTC-USDT-SWAP</option>
+              <option value="ETH-USDT-SWAP">ETH-USDT-SWAP</option>
+              <option value="SOL-USDT-SWAP">SOL-USDT-SWAP</option>
+              <option value="DOGE-USDT-SWAP">DOGE-USDT-SWAP</option>
+            </select>
+
+            <select
+              v-model="selectedBar"
+              class="px-2 py-1 rounded border text-xs font-mono"
+              style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle); color: var(--text-main);"
+            >
+              <option value="15m">15m 周期</option>
+              <option value="1H">1H 周期</option>
+              <option value="4H">4H 周期</option>
+            </select>
+
+            <button
+              @click="triggerBacktest"
+              :disabled="runningBacktest"
+              class="flex items-center space-x-1.5 px-3 py-1 rounded border text-xs font-mono font-bold text-white transition-all cursor-pointer shadow-xs disabled:opacity-50"
+              style="background-color: #3875F6; border-color: #2b5ec9;"
+            >
+              <RefreshCw v-if="runningBacktest" class="w-3.5 h-3.5 animate-spin" />
+              <Play v-else class="w-3.5 h-3.5" />
+              <span>{{ runningBacktest ? '回测计算中...' : '一键执行回测' }}</span>
+            </button>
+          </div>
+        </div>
+
+        <div v-if="backtestReport" class="space-y-4">
+          <!-- KPI Metrics Row -->
+          <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div class="rounded-lg border p-3 font-mono" style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);">
+              <div class="text-[10px] text-gray-400">总收益率 / 净值</div>
+              <div class="text-sm font-black mt-1" :class="backtestReport.total_return_pct >= 0 ? 'text-emerald-400' : 'text-rose-400'">
+                {{ backtestReport.total_return_pct }}%
+              </div>
+              <div class="text-[10px] text-gray-500">${{ backtestReport.final_equity }}</div>
+            </div>
+
+            <div class="rounded-lg border p-3 font-mono" style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);">
+              <div class="text-[10px] text-gray-400">年化夏普比率 (Sharpe)</div>
+              <div class="text-sm font-black mt-1 text-indigo-400">
+                {{ backtestReport.sharpe_ratio }}
+              </div>
+              <div class="text-[10px] text-gray-500">索提诺: {{ backtestReport.sortino_ratio }}</div>
+            </div>
+
+            <div class="rounded-lg border p-3 font-mono" style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);">
+              <div class="text-[10px] text-gray-400">最大回撤 (Max DD)</div>
+              <div class="text-sm font-black mt-1 text-amber-400">
+                {{ backtestReport.max_drawdown_pct }}%
+              </div>
+              <div class="text-[10px] text-gray-500">卡玛比率: {{ backtestReport.calmar_ratio }}</div>
+            </div>
+
+            <div class="rounded-lg border p-3 font-mono" style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);">
+              <div class="text-[10px] text-gray-400">胜率 / 盈亏比</div>
+              <div class="text-sm font-black mt-1 text-cyan-400">
+                {{ backtestReport.win_rate_pct }}%
+              </div>
+              <div class="text-[10px] text-gray-500">PF: {{ backtestReport.profit_factor }}</div>
+            </div>
+
+            <div class="rounded-lg border p-3 font-mono" style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);">
+              <div class="text-[10px] text-gray-400">开平仓单数 (胜/负)</div>
+              <div class="text-sm font-black mt-1" style="color: var(--text-main);">
+                {{ backtestReport.total_trades }} 笔
+              </div>
+              <div class="text-[10px] text-gray-500">多空: {{ backtestReport.winning_trades }}/{{ backtestReport.losing_trades }} (均R: {{ backtestReport.avg_r_multiple }}R)</div>
+            </div>
+
+            <div class="rounded-lg border p-3 font-mono" style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);">
+              <div class="text-[10px] text-gray-400">拦截器物理防割肉</div>
+              <div class="text-sm font-black mt-1 text-emerald-400">
+                {{ backtestReport.gatekeeper_filtered_count }} 次
+              </div>
+              <div class="text-[10px] text-gray-500">置信度/盈亏比拦截</div>
+            </div>
+          </div>
+
+          <div class="text-xs font-mono p-3 rounded border text-gray-400 flex items-center justify-between" style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);">
+            <span>标的: <strong class="text-white">{{ backtestReport.symbol }}</strong> · 初始资金: ${{ backtestReport.initial_equity }} · 严格包含 OKX Taker/Maker 手续费与滑点模拟</span>
+            <span class="text-[10px] text-gray-500">数据源: OKX 官方 Public Candles (最新 100 根)</span>
+          </div>
+        </div>
+        <div v-else class="py-6 text-center text-xs font-mono text-gray-500">
+          尚未加载或生成回测报告，点击右上角「一键执行回测」即可开始实证计算。
         </div>
       </div>
 
