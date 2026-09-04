@@ -1230,13 +1230,15 @@ VUE_ADMIN_LEGACY_FILE = os.path.join(VUE_DIST_DIR, "admin", "legacy.html")
 def _serve_vue_spa(html_path: str, is_public: bool = True) -> HTMLResponse:
     with open(html_path, "r", encoding="utf-8") as f:
         content = f.read()
-    # Cloudflare Edge cache: HTML shell cached at edge for 300s (5min), stale-while-revalidate for 600s.
-    # Browser validates immediately (max-age=0) so new releases and script bundles take effect seamlessly.
-    # Private / admin pages are strictly never cached.
-    cache_header = "public, max-age=0, s-maxage=300, stale-while-revalidate=600" if is_public else "private, no-cache, no-store, must-revalidate"
+    # HTML shell strictly never cached in browser or edge to ensure users always load latest Vite bundle immediately
+    cache_header = "no-cache, no-store, must-revalidate, max-age=0"
     return HTMLResponse(
         content=content,
-        headers={"Cache-Control": cache_header},
+        headers={
+            "Cache-Control": cache_header,
+            "Pragma": "no-cache",
+            "Expires": "0",
+        },
     )
 
 

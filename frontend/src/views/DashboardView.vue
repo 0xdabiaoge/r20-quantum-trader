@@ -54,14 +54,14 @@ onMounted(() => {
   syncTabFromRoute()
   store.startPolling(3000)
   try {
-    const saved = localStorage.getItem('r20_dashboard_layout')
+    const saved = localStorage.getItem('r20_dashboard_layout_v2')
     if (saved === 'dual' || saved === 'stacked') {
       layoutMode.value = saved
     } else {
       layoutMode.value = 'stacked'
     }
   } catch {
-    // fallback
+    layoutMode.value = 'stacked'
   }
 })
 
@@ -72,7 +72,7 @@ onUnmounted(() => {
 function setLayout(mode: 'dual' | 'stacked') {
   layoutMode.value = mode
   try {
-    localStorage.setItem('r20_dashboard_layout', mode)
+    localStorage.setItem('r20_dashboard_layout_v2', mode)
   } catch {
     // fallback
   }

@@ -626,11 +626,11 @@ def public_tab_spa_page(subpath: str = "") -> FileResponse:
     if vue_index.is_file():
         return FileResponse(
             str(vue_index),
-            headers={"Cache-Control": "public, max-age=0, s-maxage=300, stale-while-revalidate=600"},
+            headers={"Cache-Control": "no-cache, no-store, must-revalidate, max-age=0"},
         )
     return FileResponse(
         str(ROOT / "dashboard" / "templates" / "index.html"),
-        headers={"Cache-Control": "public, max-age=0, s-maxage=300, stale-while-revalidate=600"},
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate, max-age=0"},
     )
 
 

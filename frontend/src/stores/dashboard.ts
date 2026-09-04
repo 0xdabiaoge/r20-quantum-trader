@@ -76,7 +76,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
       isRefreshing.value = true
     }
     try {
-      const resp = await fetch('/api/all', {
+      const resp = await fetch(`/api/all?_t=${Date.now()}`, {
         headers: {
           'Accept-Encoding': 'gzip, deflate, br',
         },
