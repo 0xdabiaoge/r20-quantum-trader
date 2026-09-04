@@ -91,8 +91,8 @@ onUnmounted(() => {
             class="px-1.5 sm:px-2 py-0.2 rounded text-[10px] font-mono border font-bold shrink-0 whitespace-nowrap"
             style="background-color: var(--color-brand-bg); color: var(--color-brand); border-color: var(--color-brand-border);"
           >
-            <span class="hidden md:inline">v6.8.1 官方开发与使用指南</span>
-            <span class="hidden sm:inline md:hidden">v6.8.1 指南</span>
+            <span class="hidden md:inline">v7.0.0 官方开发与使用指南</span>
+            <span class="hidden sm:inline md:hidden">v7.0.0 指南</span>
             <span class="sm:hidden">DOCS</span>
           </span>
         </div>
@@ -463,14 +463,14 @@ onUnmounted(() => {
           <!-- Screenshot Card -->
           <div class="rounded-2xl border p-2 sm:p-3 overflow-hidden shadow-xl group" style="background-color: var(--bg-card); border-color: var(--border-subtle);">
             <div class="text-[11px] font-mono px-2 py-1 flex items-center justify-between border-b mb-2" style="border-color: var(--border-subtle); color: var(--text-muted);">
-              <span>实机截图 · 控制中心运行总览 (服务在线状态、数据新鲜度、活跃追踪器与快速直达动作条)</span>
+              <span>实机截图 · 物理拦截插件中心 (4H顺势铁律、置信度门禁、ADX震荡过滤与现场沙箱回归测试)</span>
               <span class="font-bold" style="color: var(--color-brand);">点击图片放大</span>
             </div>
             <img
-              src="/images/admin_overview.png"
-              alt="控制中心运行总览"
+              src="/images/admin_interceptors.png"
+              alt="物理拦截插件中心"
               class="w-full rounded-xl cursor-zoom-in group-hover:opacity-95 transition-opacity"
-              @click="zoomImage = '/images/admin_overview.png'"
+              @click="zoomImage = '/images/admin_interceptors.png'"
             />
           </div>
         </section>
@@ -515,17 +515,31 @@ onUnmounted(() => {
         <section id="self_evolution" class="space-y-4 pt-6 border-t" style="border-color: var(--border-subtle);">
           <div class="flex items-center space-x-2">
             <span class="px-2.5 py-0.5 rounded text-[11px] font-mono font-bold border" style="background-color: var(--color-brand-bg); color: var(--color-brand); border-color: var(--color-brand-border);">CHAPTER 07</span>
-            <h2 class="text-xl sm:text-2xl font-black tracking-wide" style="color: var(--text-main);">自进化认知与长期记忆闭环</h2>
+            <h2 class="text-xl sm:text-2xl font-black tracking-wide" style="color: var(--text-main);">自进化认知与长期记忆闭环 (每6小时复盘)</h2>
           </div>
 
           <p class="text-xs sm:text-sm leading-relaxed font-sans" style="color: var(--text-muted);">
-            传统的量化策略往往因静态参数而在牛熊轮动中失效。R20 的<strong>自进化引擎（Self-Improvement Engine）</strong>通过对历史交易流水每日深度复盘，实现策略经验的自我累积与动态淘汰：
+            传统的量化策略往往因静态参数而在牛熊轮动中失效。R20 v7.0.0 将自进化体系升级为<strong>独立的认知中枢模块</strong>，每 6 小时（每日 4 次：02:00、08:00、14:00、20:00）对全天真实成交流水穿透复盘：
           </p>
 
           <div class="space-y-2 text-xs font-sans" style="color: var(--text-muted);">
-            <div>• <strong style="color: var(--text-main);">长上下文弹性调度</strong>：自进化复盘超时阈值延长至 90s，支持覆盖数月流水样本；</div>
-            <div>• <strong style="color: var(--text-main);">动态淘汰机制</strong>：若前期提炼的某些经验在最新单边市中造成连续磨损，引擎将判定为 REVISE，淘汰旧心法；</div>
+            <div>• <strong style="color: var(--text-main);">高频弹性调度</strong>：每 6 小时自动触发穿透，快速感知盘口微观结构变化；</div>
+            <div>• <strong style="color: var(--text-main);">实战心法 CRUD 面板</strong>：管理员可在线一键添加新心法，或剔除失效规则，即时同步注入 System Prompt；</div>
             <div>• <strong style="color: var(--text-main);">双层持久化存储</strong>：机器可读 JSON 与人类可读 Markdown（<code>data/AI_TRADING_MEMORY.md</code>）同步生成并即刻注入下一轮决策。</div>
+          </div>
+
+          <!-- Screenshot Card -->
+          <div class="rounded-2xl border p-2 sm:p-3 overflow-hidden shadow-xl group" style="background-color: var(--bg-card); border-color: var(--border-subtle);">
+            <div class="text-[11px] font-mono px-2 py-1 flex items-center justify-between border-b mb-2" style="border-color: var(--border-subtle); color: var(--text-muted);">
+              <span>实机截图 · 自进化认知配置与长期心法记忆库 (每6小时复盘看板、实战心法CRUD管理与强制立即复盘)</span>
+              <span class="font-bold" style="color: var(--color-brand);">点击图片放大</span>
+            </div>
+            <img
+              src="/images/admin_evolution.png"
+              alt="自进化配置与实战心法面板"
+              class="w-full rounded-xl cursor-zoom-in group-hover:opacity-95 transition-opacity"
+              @click="zoomImage = '/images/admin_evolution.png'"
+            />
           </div>
         </section>
 

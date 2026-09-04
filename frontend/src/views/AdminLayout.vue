@@ -201,7 +201,7 @@ const showAboutModal = ref(false)
               class="text-[10px] font-mono transition-colors cursor-pointer text-left block"
               style="color: var(--color-brand);"
             >
-              v6.8.1
+              v7.0.0
             </button>
           </div>
         </div>
@@ -295,7 +295,7 @@ const showAboutModal = ref(false)
               style="color: var(--color-brand);"
               title="点击查看开源主仓信息"
             >
-              v6.8.1
+              v7.0.0
             </button>
           </div>
         </div>
