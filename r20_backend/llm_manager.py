@@ -76,11 +76,11 @@ def _detect_reasoning_type(model_id: str) -> str:
 def _detect_capabilities(model_id: str) -> List[str]:
     m = model_id.lower()
     caps = ["chat"]
-    if any(k in m for k in ["vision", "image", "flash", "gpt-4o", "gpt-5", "gemini", "claude", "grok", "muse", "vl", "omni", "multimodal"]):
+    if any(k in m for k in ["vision", "image", "flash", "gpt-4o", "gpt-5", "gpt-6", "gemini", "claude", "grok", "muse", "vl", "omni", "multimodal"]):
         caps.append("vision")
     if not ("-r1-distill" in m or "-thinking" in m):
         caps.append("tools")
-    if any(k in m for k in ["reasoner", "r1", "o1", "o3", "o4", "high", "thinking", "qwq", "deepseek-r1"]):
+    if any(k in m for k in ["reasoner", "r1", "o1", "o3", "o4", "gpt-5", "gpt-6", "high", "thinking", "qwq", "deepseek-r1"]):
         caps.append("reasoning")
     return caps
 
@@ -1017,7 +1017,7 @@ def build_request_spec(
                 payload["temperature"] = temperature
 
         # Standard reasoning effort parameter (supports max, xhigh, high, medium, low, minimal, none)
-        if rtype == "standard_effort" or (rtype == "auto" and ("gemini" in m_lower or m_lower.startswith(("o1", "o3", "o4", "gpt-5")) or "gpt-5" in m_lower)):
+        if rtype == "standard_effort" or (rtype == "auto" and ("gemini" in m_lower or m_lower.startswith(("o1", "o3", "o4", "gpt-5", "gpt-6")) or "gpt-5" in m_lower or "gpt-6" in m_lower)):
             if effort in ("max", "xhigh", "high", "medium", "low", "minimal"):
                 payload["reasoning_effort"] = effort
             elif effort == "none" and ("gemini" in m_lower or "gpt" in m_lower):

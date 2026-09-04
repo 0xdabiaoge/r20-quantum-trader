@@ -104,8 +104,8 @@ async function loadConfig() {
 // Model Effort Options depending on model family
 const availableEffortOptions = computed(() => {
   const mid = (modelForm.value.id || '').toLowerCase()
-  // 仅在明确为 GPT-5.6 或 o3 等前沿极限推演模型时，才展示超高与极值档位，避免普通模型出现不支持的选项
-  const supportsExtreme = mid.includes('gpt-5') || mid.includes('o3') || mid.includes('o4')
+  // 智能自适应：支持 GPT-6、GPT-5 以及未来全系前沿具备极值推演能力的旗舰模型
+  const supportsExtreme = mid.includes('gpt-6') || mid.includes('gpt-5') || mid.includes('o3') || mid.includes('o4') || mid.includes('ultra') || mid.includes('max')
   
   const options = [
     { value: 'high', label: '高 (high)' },
