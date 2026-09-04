@@ -93,11 +93,12 @@ function importanceCn(imp: string) {
           </span>
         </div>
         <div class="flex items-center justify-between text-[11px] font-mono">
-          <span style="color: var(--color-up);">{{ s.bullish_ratio || '--' }}多</span>
-          <span style="color: var(--color-down);">{{ s.bearish_ratio || '--' }}空</span>
+          <span style="color: var(--color-up);">多 {{ s.bullish_ratio || s.bullish_pct || '--' }}</span>
+          <span style="color: var(--color-down);">空 {{ s.bearish_ratio || s.bearish_pct || '--' }}</span>
         </div>
-        <div class="text-[9px] font-mono mt-1 pt-1 border-t" style="border-color: var(--border-subtle); color: var(--text-faint);">
-          提及 {{ (s.mentions ?? 0).toLocaleString() }}
+        <div class="flex items-center justify-between text-[10px] font-mono mt-1 pt-1 border-t" style="border-color: var(--border-subtle);">
+          <span style="color: var(--text-faint);">提及 {{ (s.mentions ?? 0).toLocaleString() }}</span>
+          <span v-if="s.long_short_ratio" class="font-bold text-blue-400">比率 {{ s.long_short_ratio }}</span>
         </div>
       </div>
     </div>

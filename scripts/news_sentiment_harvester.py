@@ -161,6 +161,21 @@ def fetch_and_analyze_news_sentiment():
             sent = d.get("sentiment", {})
             bull_ratio = float(sent.get("bullishRatio", 0.5) or 0.5)
             bear_ratio = float(sent.get("bearishRatio", 0.1) or 0.1)
+            neutral_cnt = int(sent.get("neutralCnt", 0) or 0)
+            bull_cnt = int(sent.get("bullishCnt", 0) or 0)
+            bear_cnt = int(sent.get("bearishCnt", 0) or 0)
+            total_dir = bull_cnt + bear_cnt
+            # Calculate standard Long/Short Ratio (多空比 = 看多数 / 看空数)
+            ls_ratio = round(bull_cnt / max(1, bear_cnt), 2)
+
+            # Normalized Bull/Bear Share among active sentiment opinions
+            if total_dir > 0:
+                bull_share = f"{bull_cnt / total_dir * 100:.1f}%"
+                bear_share = f"{bear_cnt / total_dir * 100:.1f}%"
+            else:
+                bull_share = f"{bull_ratio*100:.1f}%"
+                bear_share = f"{bear_ratio*100:.1f}%"
+
             total_mentions = int(d.get("mentionCnt", 0) or 0)
             label = sent.get("label", "neutral")
 
@@ -170,8 +185,14 @@ def fetch_and_analyze_news_sentiment():
             coin_sentiments[ccy] = {
                 "ccy": ccy,
                 "label": label,
-                "bullish_ratio": f"{bull_ratio*100:.1f}%",
-                "bearish_ratio": f"{bear_ratio*100:.1f}%",
+                "bullish_ratio": bull_share,
+                "bearish_ratio": bear_share,
+                "bullish_pct": f"{bull_ratio*100:.1f}%",
+                "bearish_pct": f"{bear_ratio*100:.1f}%",
+                "long_short_ratio": f"{ls_ratio:.2f}",
+                "bull_cnt": bull_cnt,
+                "bear_cnt": bear_cnt,
+                "neutral_cnt": neutral_cnt,
                 "mentions": total_mentions,
                 "sentiment_factor_score": sentiment_score
             }
@@ -184,6 +205,12 @@ def fetch_and_analyze_news_sentiment():
                 "label": "neutral",
                 "bullish_ratio": "50.0%",
                 "bearish_ratio": "50.0%",
+                "bullish_pct": "50.0%",
+                "bearish_pct": "50.0%",
+                "long_short_ratio": "1.00",
+                "bull_cnt": 0,
+                "bear_cnt": 0,
+                "neutral_cnt": 0,
                 "mentions": 0,
                 "sentiment_factor_score": 0.0
             }
