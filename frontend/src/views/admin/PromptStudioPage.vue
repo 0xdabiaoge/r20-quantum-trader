@@ -575,20 +575,21 @@ onMounted(loadLib)
             <button
               @click="saveProfile"
               :disabled="!dirty"
-              class="flex items-center space-x-1.5 px-4 py-2 rounded-lg text-white font-bold cursor-pointer disabled:opacity-40 transition-all shadow-xs"
-              style="background-color: var(--color-brand);"
+              class="btn-primary-text flex items-center space-x-1.5 px-4 py-2 rounded-lg font-bold transition-all shadow-xs"
+              :class="dirty ? 'cursor-pointer hover:bg-blue-600 active:scale-95' : 'opacity-40 cursor-not-allowed'"
+              style="background-color: #2563EB; color: #FFFFFF !important;"
             >
-              <Save class="w-4 h-4" />
-              <span>保存当前方案{{ dirty ? ' *' : '' }}</span>
+              <Save class="w-4 h-4" style="color: #FFFFFF;" />
+              <span style="color: #FFFFFF;">保存当前方案{{ dirty ? ' *' : '' }}</span>
             </button>
             <button
               v-if="selectedProfileId !== lib.active_profile_id && auth.isSuperadmin"
               @click="activateProfile"
-              class="flex items-center space-x-1.5 px-3.5 py-2 rounded-lg text-white font-bold cursor-pointer transition-all shadow-xs"
-              style="background-color: var(--color-up);"
+              class="btn-primary-text flex items-center space-x-1.5 px-3.5 py-2 rounded-lg font-bold cursor-pointer hover:bg-emerald-600 transition-all shadow-xs"
+              style="background-color: #059669; color: #FFFFFF !important;"
             >
-              <CheckCircle2 class="w-4 h-4" />
-              <span>激活为实盘方案</span>
+              <CheckCircle2 class="w-4 h-4" style="color: #FFFFFF;" />
+              <span style="color: #FFFFFF;">激活为实盘方案</span>
             </button>
           </div>
 
@@ -706,10 +707,10 @@ onMounted(loadLib)
               </div>
               <button
                 @click="insertVarIntoActiveModule(v.key); variableGuideVisible = false"
-                class="px-2.5 py-1 rounded-lg text-white font-bold text-[10px] cursor-pointer shadow-xs"
-                style="background-color: var(--color-brand);"
+                class="btn-primary-text px-2.5 py-1 rounded-lg font-bold text-[10px] cursor-pointer shadow-xs hover:bg-blue-600 transition-colors"
+                style="background-color: #2563EB; color: #FFFFFF !important;"
               >
-                插入到当前模块
+                <span style="color: #FFFFFF;">插入到当前模块</span>
               </button>
             </div>
             <p class="text-[11px] font-sans" style="color: var(--text-muted);">{{ v.description }}</p>
