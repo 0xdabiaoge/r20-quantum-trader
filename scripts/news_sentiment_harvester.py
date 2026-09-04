@@ -153,6 +153,16 @@ def fetch_and_analyze_news_sentiment():
     sent_res = run_json_cmd(f"okx news coin-sentiment --coins {coins_str} --json") or []
     coin_sentiments = {}
 
+    # Load existing valid sentiments as fallback to prevent 0-mentions overwrite if API rate limits or drops temporarily
+    existing_sentiments = {}
+    if os.path.exists(NEWS_CACHE_FILE):
+        try:
+            with open(NEWS_CACHE_FILE, "r", encoding="utf-8") as f:
+                old_cache = json.load(f)
+                existing_sentiments = old_cache.get("coins_sentiment", {})
+        except Exception:
+            pass
+
     if isinstance(sent_res, list) and sent_res and "details" in sent_res[0]:
         for d in sent_res[0]["details"]:
             ccy = d.get("ccy", "")
@@ -197,23 +207,27 @@ def fetch_and_analyze_news_sentiment():
                 "sentiment_factor_score": sentiment_score
             }
 
-    # Ensure all active coins are represented in the map
+    # Ensure all active coins are represented in the map; fallback to previous good value if available
     for ccy in target_coins:
         if ccy not in coin_sentiments:
-            coin_sentiments[ccy] = {
-                "ccy": ccy,
-                "label": "neutral",
-                "bullish_ratio": "50.0%",
-                "bearish_ratio": "50.0%",
-                "bullish_pct": "50.0%",
-                "bearish_pct": "50.0%",
-                "long_short_ratio": "1.00",
-                "bull_cnt": 0,
-                "bear_cnt": 0,
-                "neutral_cnt": 0,
-                "mentions": 0,
-                "sentiment_factor_score": 0.0
-            }
+            old_item = existing_sentiments.get(ccy)
+            if old_item and old_item.get("mentions", 0) > 0:
+                coin_sentiments[ccy] = old_item
+            else:
+                coin_sentiments[ccy] = {
+                    "ccy": ccy,
+                    "label": "neutral",
+                    "bullish_ratio": "50.0%",
+                    "bearish_ratio": "50.0%",
+                    "bullish_pct": "50.0%",
+                    "bearish_pct": "50.0%",
+                    "long_short_ratio": "1.00",
+                    "bull_cnt": 0,
+                    "bear_cnt": 0,
+                    "neutral_cnt": 0,
+                    "mentions": 0,
+                    "sentiment_factor_score": 0.0
+                }
 
     # 3. Overall Macro Sentiment Synthesis
     cb_active, cb_info = is_circuit_breaker_active()

@@ -158,6 +158,12 @@ def sync_instruments_state() -> None:
                             "label": "neutral",
                             "bullish_ratio": "50.0%",
                             "bearish_ratio": "50.0%",
+                            "bullish_pct": "50.0%",
+                            "bearish_pct": "50.0%",
+                            "long_short_ratio": "1.00",
+                            "bull_cnt": 0,
+                            "bear_cnt": 0,
+                            "neutral_cnt": 0,
                             "mentions": 0,
                             "sentiment_factor_score": 0.0,
                         }
