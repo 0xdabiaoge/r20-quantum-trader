@@ -20,7 +20,7 @@ Architecture:
 """
 
 import os
-from okx_runtime import freeze_environment as freeze_okx_environment, replace_cli_prefix as okx_private_command, unfreeze_environment as unfreeze_okx_environment
+from okx_runtime import freeze_environment as freeze_okx_environment, replace_cli_prefix as okx_private_command, unfreeze_environment as unfreeze_okx_environment, selected_environment
 import json
 import time
 import datetime
@@ -397,10 +397,44 @@ def prune_trackers(trackers: Dict[str, Any], real_pos_dict: Dict[str, Any]) -> i
 
 def submit_protected_limit_order(inst_id: str, side: str, pos_side: str, size: int, price: float, tp_px: float, sl_px: float) -> Tuple[bool, str]:
     """Submit a protected limit order; acceptance is not treated as a fill."""
+    # Check if we are running in simulated/demo mode and price diverged significantly from demo orderbook
+    env = selected_environment()
+    effective_px = price
+    effective_tp = tp_px
+    effective_sl = sl_px
+
+    if env.simulated:
+        try:
+            demo_ticker = run_json_cmd(f"okx --demo market ticker {inst_id} --json")
+            if demo_ticker and isinstance(demo_ticker, list) and demo_ticker[0].get("last"):
+                demo_last = float(demo_ticker[0]["last"])
+                if demo_last > 0 and price > 0:
+                    divergence = abs(price - demo_last) / demo_last
+                    # If live market price diverged from demo sandbox by more than 5% (e.g. ASTER / illiquid demo pair)
+                    if divergence > 0.05:
+                        scale = demo_last / price
+                        prec = len(str(demo_ticker[0]["last"]).split(".")[1]) if "." in str(demo_ticker[0]["last"]) else 4
+                        effective_px = round(price * scale, prec)
+                        effective_tp = round(tp_px * scale, prec)
+                        effective_sl = round(sl_px * scale, prec)
+                        # Re-verify boundary constraints for demo sandbox
+                        if pos_side == "long":
+                            if effective_sl >= effective_px:
+                                effective_sl = round(effective_px * 0.98, prec)
+                            if effective_tp <= effective_px:
+                                effective_tp = round(effective_px * 1.04, prec)
+                        else:
+                            if effective_sl <= effective_px:
+                                effective_sl = round(effective_px * 1.02, prec)
+                            if effective_tp >= effective_px:
+                                effective_tp = round(effective_px * 0.96, prec)
+        except Exception:
+            pass
+
     command = okx_private_command(
         f"okx swap place --instId {inst_id} --tdMode cross --side {side} "
-        f"--posSide {pos_side} --ordType limit --px {price} --sz {size} "
-        f"--tpTriggerPx {tp_px} --tpOrdPx=-1 --slTriggerPx {sl_px} --slOrdPx=-1 --json"
+        f"--posSide {pos_side} --ordType limit --px {effective_px} --sz {size} "
+        f"--tpTriggerPx {effective_tp} --tpOrdPx=-1 --slTriggerPx {effective_sl} --slOrdPx=-1 --json"
     )
     result = run_cmd_result(command, timeout=20)
     if not result["ok"]:
@@ -1979,7 +2013,7 @@ def execute_portfolio():
     except Exception as e:
         print(f"[Ledger Sync Warning] {e}")
 
-    log_entry = f"[{timestamp_full}] ⚡ R20 Quantum Trader v6.8.1 巡检完成 | 持仓 {active_pos_count}/{MAX_CONCURRENT_POSITIONS} (多{long_count}/空{short_count}) | 动作: {', '.join(executed_actions) if executed_actions else '无开平仓操作'}\n"
+    log_entry = f"[{timestamp_full}] ⚡ R20 Quantum Trader v7.0.0 巡检完成 | 持仓 {active_pos_count}/{MAX_CONCURRENT_POSITIONS} (多{long_count}/空{short_count}) | 动作: {', '.join(executed_actions) if executed_actions else '无开平仓操作'}\n"
     with open(LOG_FILE, "a", encoding="utf-8") as f:
         f.write(log_entry)
     print(log_entry.strip())

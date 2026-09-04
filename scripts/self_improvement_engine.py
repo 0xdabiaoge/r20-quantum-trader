@@ -335,7 +335,7 @@ def run_self_evolution(force: bool = False):
     tz_bj = datetime.timezone(datetime.timedelta(hours=8))
     now_bj = datetime.datetime.now(tz_bj)
     timestamp_str = now_bj.strftime("%Y-%m-%d %H:%M:%S")
-    log_msg("🧬 启动 R20 AI 大脑自进化认知复盘与实战心法提炼 (v6.8.1 Crypto Focus)...")
+    log_msg("🧬 启动 R20 AI 大脑自进化认知复盘与实战心法提炼 (v7.0.0 Crypto Focus)...")
 
     closed_trades = load_closed_trades()
     total_trades = len(closed_trades)
