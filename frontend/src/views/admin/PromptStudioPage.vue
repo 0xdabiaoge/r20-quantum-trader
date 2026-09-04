@@ -30,6 +30,7 @@ const importFileError = ref('')
 
 // Template Variables & Guide State
 const variableGuideVisible = ref(false)
+const showVarRibbon = ref(false)
 const activeEditingIdx = ref<number>(0)
 const previewMode = ref<'rendered' | 'template'>('rendered')
 
@@ -341,58 +342,74 @@ onMounted(loadLib)
 <template>
   <div class="space-y-4 font-mono text-xs">
     <!-- Header Summary & Plaza Gateway -->
-    <div class="flex flex-wrap items-center justify-between gap-2">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-1">
       <div class="flex items-center space-x-2">
-        <Sparkles class="w-4 h-4 text-blue-400" />
+        <Sparkles class="w-4 h-4 text-blue-400 shrink-0" />
         <p class="text-xs text-[#8A99AD] font-sans">
-          四条消息管线自由编排，支持标准语义变量插槽注入。点击变量标签可一键插入到正在编辑的模块中。
+          核心交易消息管线自由编排，支持标准语义变量插槽。右侧实时对照推演实发效果与源码。
         </p>
       </div>
-      <div class="flex items-center space-x-2">
+      <div class="flex items-center space-x-1.5 shrink-0">
+        <button
+          @click="showVarRibbon = !showVarRibbon"
+          class="flex items-center space-x-1 px-2.5 py-1.5 rounded-lg border text-xs font-mono transition-all cursor-pointer shadow-xs"
+          :style="showVarRibbon ? { backgroundColor: 'var(--color-brand-bg)', borderColor: 'var(--color-brand-border)', color: 'var(--color-brand)', fontWeight: 'bold' } : { backgroundColor: 'var(--bg-card-subtle)', borderColor: 'var(--border-subtle)', color: 'var(--text-muted)' }"
+          title="展开/收起快捷变量标签条"
+        >
+          <Layers class="w-3.5 h-3.5" />
+          <span>{{ showVarRibbon ? '收起变量条' : '插入变量' }}</span>
+        </button>
         <button
           @click="variableGuideVisible = true"
-          class="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-[#111c2a] hover:bg-[#1a2b42] border border-[#23354d] text-cyan-400 hover:text-cyan-300 font-bold transition-all cursor-pointer shadow-sm"
+          class="flex items-center space-x-1 px-2.5 py-1.5 rounded-lg border text-xs font-mono transition-all cursor-pointer shadow-xs"
+          style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle); color: var(--color-brand);"
           title="查看所有可用数据插槽与变量字典"
         >
           <BookOpen class="w-3.5 h-3.5" />
-          <span>变量插槽字典</span>
+          <span>变量字典</span>
         </button>
         <button
           @click="importVisible = true"
-          class="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-[#111c2a] hover:bg-[#1a2b42] border border-[#23354d] text-blue-400 hover:text-blue-300 font-bold transition-all cursor-pointer shadow-sm"
+          class="flex items-center space-x-1 px-2.5 py-1.5 rounded-lg border text-xs font-mono transition-all cursor-pointer shadow-xs"
+          style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle); color: var(--text-main);"
           title="从本地文件或文本导入策略方案"
         >
           <Upload class="w-3.5 h-3.5" />
-          <span>导入策略方案</span>
+          <span>导入方案</span>
         </button>
         <button
           @click="exportProfile"
-          class="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-[#111c2a] hover:bg-[#1a2b42] border border-[#23354d] text-[#b8c4d4] hover:text-white font-bold transition-all cursor-pointer shadow-sm"
+          class="flex items-center space-x-1 px-2.5 py-1.5 rounded-lg border text-xs font-mono transition-all cursor-pointer shadow-xs"
+          style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle); color: var(--text-main);"
           title="将当前方案导出为 JSON 策略包"
         >
           <Download class="w-3.5 h-3.5" />
-          <span>导出当前策略</span>
+          <span>导出策略</span>
         </button>
       </div>
     </div>
 
-    <!-- Quick Variable Inserter Ribbon -->
-    <div class="rounded-xl border p-3 flex flex-wrap items-center gap-2 shadow-xs transition-colors" style="background-color: var(--bg-card); border-color: var(--border-subtle);">
+    <!-- Collapsible Quick Variable Inserter Ribbon -->
+    <div
+      v-if="showVarRibbon"
+      class="rounded-xl border p-3 flex flex-wrap items-center gap-2 shadow-xs transition-colors"
+      style="background-color: var(--bg-card); border-color: var(--border-subtle);"
+    >
       <div class="flex items-center space-x-1.5 text-[11px] font-bold mr-1" style="color: var(--text-muted);">
         <Layers class="w-3.5 h-3.5" style="color: var(--color-brand);" />
-        <span>快速插入数据变量:</span>
+        <span>快捷变量插槽:</span>
       </div>
       <button
         v-for="v in templateVariables"
         :key="v.key"
         @click="insertVarIntoActiveModule(v.key)"
-        class="flex items-center space-x-1 px-2.5 py-1 rounded-lg border text-[10px] transition-all cursor-pointer shadow-xs"
+        class="flex items-center space-x-1 px-2 py-1 rounded-lg border text-[10px] transition-all cursor-pointer shadow-xs hover:border-[var(--color-brand)]"
         style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle); color: var(--text-main);"
-        :title="`${v.description}\n点击即可插入到模块 #${activeEditingIdx + 1} (${workingModules[activeEditingIdx]?.title || '选中模块'})`"
+        :title="`${v.description}\n点击插入到正在编辑的模块 #${activeEditingIdx + 1}`"
       >
         <span class="font-bold" style="color: var(--color-brand);">+</span>
         <span class="font-sans font-medium">{{ v.label }}</span>
-        <code class="text-[9px] ml-0.5 font-mono" style="color: var(--text-faint);">&#123;&#123;{{ v.key }}&#125;&#125;</code>
+        <code class="text-[9px] ml-0.5 font-mono opacity-60">&#123;&#123;{{ v.key }}&#125;&#125;</code>
       </button>
     </div>
 
@@ -409,27 +426,27 @@ onMounted(loadLib)
     <div v-if="loading" class="py-12 text-center text-xs font-mono" style="color: var(--text-muted);">正在加载提示词策略库...</div>
 
     <!-- Main Workspace Grid -->
-    <div v-else-if="lib" class="grid grid-cols-1 xl:grid-cols-[250px_minmax(0,1fr)_410px] gap-4">
+    <div v-else-if="lib" class="grid grid-cols-1 xl:grid-cols-[240px_minmax(0,1fr)_400px] gap-3.5 items-start">
       <!-- Left: Profile List -->
-      <div class="rounded-xl border p-3 space-y-2.5 h-fit shadow-xs transition-colors" style="background-color: var(--bg-card); border-color: var(--border-subtle);">
+      <div class="rounded-xl border p-3 space-y-2 h-fit shadow-xs transition-colors" style="background-color: var(--bg-card); border-color: var(--border-subtle);">
         <div class="flex items-center justify-between px-1 pb-2 border-b" style="border-color: var(--border-subtle);">
           <span class="text-[10px] font-bold uppercase tracking-wider" style="color: var(--text-faint);">策略方案列表</span>
           <button
             v-if="auth.isSuperadmin"
             @click="createProfile"
-            class="flex items-center space-x-1 px-2.5 py-1 rounded-lg text-[10px] font-bold cursor-pointer shadow-xs transition-colors"
+            class="flex items-center space-x-1 px-2 py-1 rounded-lg text-[10px] font-bold cursor-pointer shadow-xs transition-colors"
             style="background-color: var(--text-main); color: var(--bg-card);"
           >
             <Plus class="w-3 h-3" />
             <span>新建方案</span>
           </button>
         </div>
-        <div class="space-y-1.5 max-h-[620px] overflow-y-auto pr-0.5">
+        <div class="space-y-1.5 max-h-[calc(100vh-220px)] overflow-y-auto pr-0.5">
           <button
             v-for="p in lib.profiles"
             :key="p.id"
             @click="selectProfile(p.id)"
-            class="w-full text-left p-3 rounded-xl border transition-all cursor-pointer group shadow-xs"
+            class="w-full text-left p-2.5 rounded-xl border transition-all cursor-pointer group shadow-xs"
             :style="selectedProfileId === p.id
               ? { borderColor: 'var(--color-brand-border)', backgroundColor: 'var(--color-brand-bg)' }
               : { borderColor: 'var(--border-subtle)', backgroundColor: 'var(--bg-card-subtle)' }"
@@ -448,28 +465,29 @@ onMounted(loadLib)
       </div>
 
       <!-- Center: Modules Editor (100% Unlocked) -->
-      <div class="rounded-xl border p-4 sm:p-5 min-w-0 shadow-xs space-y-3.5 transition-colors" style="background-color: var(--bg-card); border-color: var(--border-subtle);">
+      <div class="rounded-xl border p-4 min-w-0 shadow-xs space-y-3 transition-colors flex flex-col" style="background-color: var(--bg-card); border-color: var(--border-subtle);">
         <!-- Pipeline Navigation Tabs -->
-        <div class="flex space-x-1.5 border-b pb-1 overflow-x-auto" style="border-color: var(--border-subtle);">
-          <button
-            v-for="p in pipelines"
-            :key="p.id"
-            @click="switchPipeline(p.id)"
-            class="px-3.5 py-2 text-xs font-bold border-b-2 whitespace-nowrap cursor-pointer transition-all"
-            :style="activePipeline === p.id
-              ? { borderBottomColor: 'var(--color-brand)', color: 'var(--text-main)', backgroundColor: 'var(--bg-card-subtle)', borderTopLeftRadius: '8px', borderTopRightRadius: '8px' }
-              : { borderBottomColor: 'transparent', color: 'var(--text-muted)' }"
-          >
-            {{ p.label }}
-          </button>
-        </div>
-        <div class="flex items-center justify-between text-[11px] px-3 py-2 rounded-lg border" style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle); color: var(--text-muted);">
-          <span>{{ pipelines.find(p => p.id === activePipeline)?.desc }}</span>
-          <span class="font-bold" style="color: var(--text-main);">当前方案：{{ selectedProfile?.name }} (聚焦模块 #{{ activeEditingIdx + 1 }})</span>
+        <div class="flex items-center justify-between border-b pb-2" style="border-color: var(--border-subtle);">
+          <div class="flex space-x-1.5">
+            <button
+              v-for="p in pipelines"
+              :key="p.id"
+              @click="switchPipeline(p.id)"
+              class="px-3.5 py-1.5 text-xs font-bold rounded-lg cursor-pointer transition-all"
+              :style="activePipeline === p.id
+                ? { backgroundColor: 'var(--text-main)', color: 'var(--bg-card)' }
+                : { color: 'var(--text-muted)' }"
+            >
+              {{ p.label }}
+            </button>
+          </div>
+          <span class="text-[11px] font-bold" style="color: var(--text-muted);">
+            当前方案：<span style="color: var(--text-main);">{{ selectedProfile?.name }}</span>
+          </span>
         </div>
 
         <!-- Module Cards List -->
-        <div class="space-y-3 max-h-[580px] overflow-y-auto pr-1">
+        <div class="space-y-3 max-h-[calc(100vh-320px)] overflow-y-auto pr-1">
           <div
             v-for="(m, idx) in workingModules"
             :key="m.id"
@@ -548,7 +566,7 @@ onMounted(loadLib)
             <textarea
               v-model="m.content"
               @focus="activeEditingIdx = idx"
-              rows="3"
+              rows="5"
               class="w-full rounded-lg px-3 py-2 text-xs outline-none border resize-y leading-relaxed transition-colors select-text font-mono"
               style="background-color: var(--bg-input); border-color: var(--border-subtle); color: var(--text-main);"
               placeholder="编写该模块的提示词或插入 {{variable}} 数据插槽..."
@@ -623,8 +641,8 @@ onMounted(loadLib)
       </div>
 
       <!-- Right: Compiled Live Preview with Dual-Mode Toggle -->
-      <div class="rounded-xl border p-4 sm:p-5 h-fit shadow-xs space-y-3 transition-colors" style="background-color: var(--bg-card); border-color: var(--border-subtle);">
-        <div class="flex items-center justify-between pb-3 border-b" style="border-color: var(--border-subtle);">
+      <div class="rounded-xl border p-4 h-fit shadow-xs space-y-3 transition-colors" style="background-color: var(--bg-card); border-color: var(--border-subtle);">
+        <div class="flex items-center justify-between pb-2 border-b" style="border-color: var(--border-subtle);">
           <div class="flex items-center space-x-2">
             <Eye class="w-4 h-4 text-cyan-400" />
             <h3 class="text-xs font-bold uppercase tracking-wider font-mono" style="color: var(--text-main);">实时渲染对照</h3>
@@ -657,10 +675,10 @@ onMounted(loadLib)
           </div>
         </div>
         <div class="text-[10px] flex items-center justify-between font-mono" style="color: var(--text-faint);">
-          <span>{{ previewMode === 'rendered' ? '已代入当前真实盘口、最新快讯与自进化心法' : '显示模块包含的原始模版语法与插槽占位符' }}</span>
+          <span>{{ previewMode === 'rendered' ? '已代入当前真实盘口与自进化心法' : '显示模块包含的原始模版语法与插槽' }}</span>
           <span class="num-tabular font-bold" style="color: var(--color-brand);">{{ compiledPreview.length }} 字符</span>
         </div>
-        <pre class="border rounded-xl p-3.5 text-[11px] font-mono whitespace-pre-wrap leading-relaxed max-h-[640px] overflow-y-auto select-text" style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle); color: var(--text-main);">{{ compiledPreview || '（空）' }}</pre>
+        <pre class="border rounded-xl p-3 text-[11px] font-mono whitespace-pre-wrap leading-relaxed max-h-[calc(100vh-280px)] overflow-y-auto select-text" style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle); color: var(--text-main);">{{ compiledPreview || '（空）' }}</pre>
       </div>
     </div>
 
