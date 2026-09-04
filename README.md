@@ -4,13 +4,14 @@
 
 ### 面向 OKX 永续合约的机构级 LLM 原生量化交易终端与多模型参谋系统
 
-**全栈用户自由自定义 · 多模型决策委员会 · 动态标的资产池 · Python 物理拦截管线 · 启发式自进化记忆 · 100% 交易所云端 OCO**
+**全栈用户自由自定义 · 多模型决策委员会 · 动态标的资产池 · Python 物理拦截管线 · 启发式自进化防污染护栏 · 100% 交易所云端 OCO**
 
-[![Release](https://img.shields.io/badge/release-v7.0.1-3875F6?style=flat-square)](https://github.com/555cute/r20-quantum-trader/releases)
+[![Release](https://img.shields.io/badge/release-v7.2.1-3875F6?style=flat-square)](https://github.com/555cute/r20-quantum-trader/releases)
 [![LINUX DO](https://img.shields.io/badge/Community-LINUX%20DO-F97316?style=flat-square&logo=linux&logoColor=white)](https://linux.do/)
-[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/Python-3.11%20%7C%203.12-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![Exchange](https://img.shields.io/badge/Exchange-OKX%20V5%20Direct-111827?style=flat-square)](https://www.okx.com/)
-[![Tests](https://img.shields.io/badge/tests-167%2F167%20passed-0ECB81?style=flat-square)](#-测试与质量保障)
+[![Docker](https://img.shields.io/badge/Docker-Multi--Stage%20Ready-2496ED?style=flat-square&logo=docker&logoColor=white)](#-极速部署指南)
+[![Tests](https://img.shields.io/badge/tests-172%2F172%20passed-0ECB81?style=flat-square)](#-测试与质量保障)
 [![Security](https://img.shields.io/badge/Security-Fail--Closed%20Audit-10B981?style=flat-square)](#-企业级安全与防护体系)
 [![License](https://img.shields.io/badge/license-MIT-10B981?style=flat-square)](LICENSE)
 
@@ -41,10 +42,12 @@
 - **多空对称顺势主轴**：4H/1H 多头通道专注顺势回踩均线/支撑位低吸挂多，4H/1H 空头通道专注反弹承压阻力位逢高挂空，箱体震荡边界双向高抛低吸；执行层门禁科学设在 75%，形态达标自信标定 78%~88%，破除机械空仓。
 - **全自由可视化编排（Prompt Studio）**：从底层解耦硬编码，前台可视化工作室自由编辑 **「交易 System」** 军规与 **「交易 User」** 行情拼装，内置变量插槽快速注入条（`{{macro_4h}}`、`{{calculus_1h}}`、`{{adx_1h}}` 等），支持 JSON 方案一键导入、导出与双模实时对照。
 
-### 2. 🧬 独立的 AI 自进化认知中枢与心法自由干预
-- **每 6 小时自动穿透复盘**：网关调度器每日 **02:00、08:00、14:00、20:00（每日 4 次）** 自动触发穿透，复盘已结流水、持仓时长、动量因果与微积分做功能量，快速感知市场节奏演变。
-- **实战心法 CRUD 后台管理**：打破 AI 自进化黑盒，提炼的心法直接列表化展现；管理员可在后台随时**一键新增心得经验**，或**单条剔除失效规则**；心法持久化落盘（`data/AI_TRADING_MEMORY.md`）并实时动态注入下一轮交易主脑 System Prompt。
-- **复盘模版自定义与强制触发**：复盘官 System 角色定位与战绩证据 User 模版均可在线自由定制；遭遇突发单边行情时支持一键强制执行复盘总结。
+### 2. 🛡️ 独立的 AI 自进化认知中枢与白盒防污染护栏 (Evolution Shield)
+- **宪法级防偏见审查（Constitution Linter）**：在复盘提炼阶段硬性阻断“极端做多/做空偏见”、“违规抗单放大止损”、“马丁格尔倍投”等危险认知，杜绝极端单边暴跌或插针行情反噬带偏大模型；
+- **极端离群噪点过滤（Outlier Rejection）**：单笔插针与偶发亏损判定为市场随机噪点，禁止仅凭单笔事件制造新心法，必须具备连续样本支持；
+- **白盒心法生命周期管理**：后台（`/admin/evolution`）落地结构化透明卡片，支持**心法单项热插拔启停开关（Toggle Switch）**，秒级休眠或激活任一实战心法；
+- **敏锐半衰期机制（TTL 7~14 天）**：黄金基准 14 天半衰期，动态战术心法 7 天敏锐半衰期，配合动态健康评分体系快速淘汰过时经验；
+- **一键黄金基准回滚（Emergency Rollback）**：遭遇突发极端行情时，支持一键将心法知识库瞬时恢复至官方黄金基准，实现安全“解毒”。
 
 ### 3. 🛡️ Python 原生物理拦截插件管线与沙箱热插拔
 - **Fail-Closed 物理硬阻断防线**：任何大模型推演决策必须穿透物理拦截链，任一插件返回 REJECT 立即安全降级为 WAIT。内置 4H 顺势铁律（逆势一票否决）、单笔风险收益比 $R:R \ge 2.0$ 几何门禁、75% 置信度基准、ADX 震荡猴市过滤。
@@ -62,9 +65,10 @@
 - **本地打包下载与外部包上传**：支持本地/云端全量数据灾备，后台归档列表支持一键流式打包下载 `.tar.gz` 至个人电脑，并支持上传本地外部备份压缩包。
 - **一键全量恢复与安全回滚**：输入二次安全确认码即可一键全量解压恢复系统配置、历史数据与策略方案，内置严格的路径遍历（Path Traversal）安全审计防护。
 
-### 7. 🖥️ Web 大屏自适应与无缓存直连
-- **宽屏 6 列横向平整铺满**：大屏采用标准自适应流线排版（`stacked`），资产微结构雷达在宽屏与超宽屏下自适应扩展为 6 列铺满，视野清晰平整。
-- **入口无缓存协议直连**：根除本地强缓存与数据脏读，API 轮询注入动态时间戳防穿透，秒级感知实盘变化。
+### 7. 🎨 现代工程基底、容器化编排与美学体验
+- **无技术债统一前端**：彻底清理历史双前端单文件，全站统一由现代化 Vue 3 + Vite + TypeScript SPA 接管，深色/浅色双模自适应高对比度；优雅点缀原生加密货币微徽（`₿` 图腾）；
+- **生产级 Docker 编排**：内置多阶段轻量构建 `Dockerfile` 与 `docker-compose.yml`，支持一键容器化秒级部署与健康检查监控；
+- **CI/CD 自动化流水线**：配套 GitHub Actions 矩阵测试流，精确定制依赖锁，防范供应链漂移。
 
 ---
 
@@ -77,8 +81,8 @@
 
 ---
 
-### 2. 🧬 独立的 AI 自进化认知中枢（Evolution Engine · 心法自由干预）
-*涵盖复盘官 System 角色定位、战绩证据 User 模版；直观监控每 6 小时（每日 4 次）自动复盘计划；内置实战长期心法记忆库，支持管理员直接在后台一键新增心得、删除无效规则，并提供「强制立即复盘」即时提炼。*
+### 2. 🧬 独立的 AI 自进化认知中枢与白盒心法管理（Evolution Shield）
+*涵盖复盘官 System 角色定位、战绩证据 User 模版；直观监控每 6 小时自动复盘计划；内置白盒心法生命周期卡片，支持单项热拔插启停、健康评分展示与突发极端行情一键回滚基准。*
 
 ![自进化配置与实战心法面板](https://raw.githubusercontent.com/555cute/r20-quantum-trader/main/docs/images/admin_evolution.png)
 
@@ -127,7 +131,7 @@
 │ 【智能决策中枢】(100% 用户自由编排与多模型参谋)                        │
 │  • 提示词策略：多空对称顺势 + 1.8~2.2x ATR 抗噪宽止损 + 0.8R 浮盈保本移损 │
 │  • 模型委员会：N 参谋席位自由增删 + 跨厂商模型自由绑定 + 首席仲裁统一收口 │
-│  • 自进化认知：每 6 小时自动复盘 (02:00/08:00/14:00/20:00) + 心法自由CRUD │
+│  • 自进化认知：Evolution Shield 防污染护栏 + 白盒心法单项启停 + 7~14d半衰期│
 │  • 供应商网关：OpenAI / Gemini / Claude 核心渠道 + 任意自定义扩展通道   │
 ├────────────────────────────────────────────────────────────────────────┤
 │ 【执行与风控防线】(Fail-Closed 物理硬阻断 + 插件自由热插拔)             │
@@ -137,6 +141,7 @@
 ├────────────────────────────────────────────────────────────────────────┤
 │ 【控制面与监控展现】                                                    │
 │  • 前端：Vue 3 + Vite + Tailwind CSS 纯静态轻量 SPA (宽屏横向6列铺满)   │
+│  • 双模对比度：钛金深黑 / 极光亮色双模高对比度，原生点缀 ₿ 极客图腾     │
 │  • 缓存机制：HTML 入口 no-cache 直连，数据轮询时间戳防脏读，CF 边缘加速 │
 │  • 后台：FastAPI 异步控制面 + PBKDF2-SHA256 账号认证 + 全量操作审计     │
 │  • 多渠道告警：企业微信 / Telegram (反代) / QQ 官方机器人 / 通用 Webhook │
@@ -164,38 +169,52 @@
 
 ## 🧪 测试与质量保障
 
-系统配套有高覆盖度的全栈回归测试集，覆盖数学微积分因果律、多因子量化、多模型委员会、提示词编排、API 鉴权、物理拦截沙箱、备份恢复与网关调度：
+系统配套有高覆盖度的全栈回归测试集，覆盖数学微积分因果律、多因子量化、多模型委员会、提示词编排、API 鉴权、物理拦截沙箱、Evolution Shield 防污染护栏、备份恢复与网关调度：
 
 ```bash
 # 执行全量单元与系统回归测试
 python3 -m unittest discover -s tests -p "test_*.py"
 ```
 
-**测试通过状态：`167 / 167 Passed` (100% 通过率)**
+**测试通过状态：`172 / 172 Passed` (100% 通过率)**
 
 ---
 
 ## 🚀 极速部署指南
 
-### 环境依赖
-- Linux 服务器 (Debian 11+ / Ubuntu 22.04+ 推荐)
-- Python 3.10+
-- Node.js 18+ (仅用于前端二次构建，直接运行生产包无需 Node 环境)
+### 方式 A：Docker Compose 一键部署（推荐）
+系统内置完整的多阶段构建轻量镜像与服务编排方案：
 
-### 1. 克隆代码仓库
 ```bash
+# 1. 克隆代码
 git clone https://github.com/555cute/r20-quantum-trader.git
 cd r20-quantum-trader
+
+# 2. 配置环境变量
+cp .env.example .env
+vim .env
+
+# 3. 一键构建并启动
+docker compose up -d
 ```
 
-### 2. 初始化 Python 虚拟环境并安装依赖
+---
+
+### 方式 B：传统 Python 源码部署
+
+#### 1. 环境依赖
+- Linux 服务器 (Debian 11+ / Ubuntu 22.04+ 推荐)
+- Python 3.10+
+- Node.js 18+ (仅用于前端源码二次构建，直接运行生产已编译包无需 Node)
+
+#### 2. 初始化虚拟环境并安装依赖
 ```bash
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 3. 配置核心环境变量
+#### 3. 配置核心环境变量
 复制 `.env.example` 为 `.env`，填入您的 OKX API 与 大模型 API 密钥：
 ```bash
 cp .env.example .env
@@ -206,7 +225,7 @@ vim .env
 - `OKX_SIMULATED`：`1` 为 DEMO 模拟盘，`0` 为真实盘
 - `LLM_BASE_URL` / `LLM_API_KEY`：默认大语言模型接口与密钥
 
-### 4. 启动控制台与交易调度
+#### 4. 启动控制台与交易调度
 ```bash
 # 启动 FastAPI 控制面服务 (默认监听 8080 端口)
 uvicorn r20_backend.app:app --host 0.0.0.0 --port 8080
