@@ -27,7 +27,7 @@ SUPPORTED_API_FORMATS = [
     {"id": "claude_messages", "name": "Claude Messages (/messages)", "desc": "Anthropic Claude 原生 Messages API，支持原生长思维链"},
 ]
 
-STANDARD_REASONING_EFFORTS = ["high", "medium", "low", "minimal", "none", "auto"]
+STANDARD_REASONING_EFFORTS = ["max", "xhigh", "high", "medium", "low", "minimal", "none", "auto"]
 
 
 def _atomic_write_json(path: Path, data: Any) -> None:
@@ -937,8 +937,14 @@ def build_request_spec(
         if system_chunks:
             payload["system"] = "\n\n".join(system_chunks)
 
-        if effort in ("high", "medium", "low"):
-            budget_map = {"high": 16000, "medium": 8000, "low": 2048}
+        if effort in ("max", "xhigh", "high", "medium", "low"):
+            budget_map = {
+                "max": 64000,
+                "xhigh": 32000,
+                "high": 16000,
+                "medium": 8000,
+                "low": 2048,
+            }
             budget = budget_map[effort]
             payload["thinking"] = {"type": "enabled", "budget_tokens": budget}
             payload["max_tokens"] = budget + max_tokens
@@ -972,7 +978,7 @@ def build_request_spec(
         }
         if response_format and response_format.get("type") == "json_object":
             payload["text"] = {"format": {"type": "json_object"}}
-        if effort in ("high", "medium", "low", "minimal"):
+        if effort in ("max", "xhigh", "high", "medium", "low", "minimal"):
             payload["reasoning"] = {"effort": effort}
 
         return endpoint, headers, payload
@@ -1010,11 +1016,11 @@ def build_request_spec(
             if "gemini" in m_lower and temperature is not None:
                 payload["temperature"] = temperature
 
-        # Standard reasoning effort parameter
-        if rtype == "standard_effort" or (rtype == "auto" and ("gemini" in m_lower or m_lower.startswith(("o1", "o3", "o4")))):
-            if effort in ("low", "medium", "high", "minimal"):
+        # Standard reasoning effort parameter (supports max, xhigh, high, medium, low, minimal, none)
+        if rtype == "standard_effort" or (rtype == "auto" and ("gemini" in m_lower or m_lower.startswith(("o1", "o3", "o4", "gpt-5")) or "gpt-5" in m_lower)):
+            if effort in ("max", "xhigh", "high", "medium", "low", "minimal"):
                 payload["reasoning_effort"] = effort
-            elif effort == "none" and "gemini" in m_lower:
+            elif effort == "none" and ("gemini" in m_lower or "gpt" in m_lower):
                 payload["reasoning_effort"] = "none"
 
         if response_format and rtype != "deepseek_reasoner":
