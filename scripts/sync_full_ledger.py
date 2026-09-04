@@ -264,7 +264,9 @@ def build_lifecycle_ledger():
                     inst=t.get("inst", "CRYPTO"),
                     pnl=float(t.get("pnl", 0.0) or 0.0),
                     stage=t.get("exit_reason", "平仓结清"),
-                    exit_px=float(t.get("close_px", 0.0) or 0.0)
+                    exit_px=float(t.get("close_px", 0.0) or 0.0),
+                    roi_pct=float(t.get("roi_pct", 0.0) or 0.0),
+                    duration_str=str(t.get("duration", "")),
                 )
     except Exception as e:
         print(f"[Ledger Sync Notify Warning] {e}")
