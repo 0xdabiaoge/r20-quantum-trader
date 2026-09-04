@@ -58,7 +58,7 @@ def _get_access_token(app_id: str, secret: str) -> tuple[bool, str, str]:
     req = urllib.request.Request(
         QQ_TOKEN_URL,
         data=json.dumps({"appId": app_id, "clientSecret": secret}).encode("utf-8"),
-        headers={"Content-Type": "application/json", "User-Agent": "R20-Standalone/6.6.1"},
+        headers={"Content-Type": "application/json", "User-Agent": "R20-Standalone/6.6.2"},
         method="POST",
     )
     try:
