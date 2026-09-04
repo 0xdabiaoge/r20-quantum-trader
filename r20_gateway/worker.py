@@ -31,7 +31,13 @@ def stop(*_: object) -> None:
 
 
 def format_message(row: dict[str, object]) -> str:
-    return f"【R20 Quantum Trader】{row['created_at']}\n{row['title']}\n{str(row['message']).strip()}"
+    created = str(row.get("created_at", ""))
+    # Format cleaner timestamp if ISO format
+    if "T" in created:
+        created = created.replace("T", " ")[:19]
+    title = str(row.get("title", "")).strip()
+    body = str(row.get("message", "")).strip()
+    return f"【R20 Quantum】{title}\n⏱️ 时间：{created}\n━━━━━━━━━━━━━━\n{body}"
 
 
 def run() -> None:

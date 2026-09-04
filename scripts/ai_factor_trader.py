@@ -1260,6 +1260,11 @@ def execute_ai_position_management(real_pos_dict, trackers, timestamp_full, exec
                 tracker = trackers.get(f"{inst_id}_{pos_side}")
                 if tracker:
                     tracker["trailingStopPx"] = new_sl
+                try:
+                    from qq_notifier import notify_sl_updated
+                    notify_sl_updated(name, pos_side, float(live_algo.get("slTriggerPx", 0)), new_sl, reason)
+                except Exception:
+                    pass
             else:
                 executed_actions.append(f"[{name}] 云端止损更新失败，原保护单保持不变")
 

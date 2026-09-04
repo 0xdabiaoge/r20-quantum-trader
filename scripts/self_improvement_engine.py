@@ -474,6 +474,12 @@ def run_self_evolution(force: bool = False):
     atomic_write_json(REPORT_JSON_FILE, report_payload)
 
     log_msg(f"🧬 自进化认知复盘完成 | 状态={change_status} | 当前保留 {len(long_term_memory)} 条启发式长期记忆")
+    try:
+        from qq_notifier import notify_evolution_report
+        top_lesson = long_term_memory[0] if long_term_memory else "保持风控原则"
+        notify_evolution_report(win_rate, total_trades, change_status, top_lesson)
+    except Exception as e:
+        log_msg(f"自进化通知发送失败: {e}")
     return report_payload
 
 if __name__ == "__main__":

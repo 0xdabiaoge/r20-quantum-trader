@@ -424,12 +424,77 @@ onMounted(() => {
         </div>
       </div>
 
-      <!-- Schedule + Save -->
-      <div class="rounded-xl border p-4 sm:p-5 shadow-xs transition-colors" style="background-color: var(--bg-card); border-color: var(--border-subtle);">
-        <label class="block text-[11px] mb-1 font-mono" style="color: var(--text-muted);">每日量化简报时间 (北京时间)</label>
-        <input v-model="config._briefingTimes" placeholder="08:00, 20:00" class="w-full rounded-lg px-3 py-2 text-xs font-mono outline-none border mb-4" style="background-color: var(--bg-input); border-color: var(--border-subtle); color: var(--text-main);" />
-        <button @click="saveAll" class="px-4 py-2 rounded-lg text-xs font-mono font-bold cursor-pointer transition-all shadow-xs" style="background-color: var(--text-main); color: var(--bg-card);">保存全部通知通道</button>
-        <button @click="saveSchedule" class="ml-2 px-4 py-2 rounded-lg border text-xs font-mono cursor-pointer transition-all shadow-xs" style="background-color: var(--bg-card-subtle); border-color: var(--border-medium); color: var(--text-main);">保存通知时间</button>
+      <!-- Schedule + Notification Categories + Save -->
+      <div class="rounded-xl border p-4 sm:p-5 shadow-xs transition-colors space-y-4" style="background-color: var(--bg-card); border-color: var(--border-subtle);">
+        <div>
+          <h2 class="text-sm font-bold font-mono mb-1" style="color: var(--text-main);">📡 全闭环通知类别与事件流 (Notification Categories)</h2>
+          <p class="text-xs font-mono" style="color: var(--text-muted);">系统底层事件已全面升级，针对不同关键节点自动化推送结构化卡片文案：</p>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 text-xs font-mono">
+          <div class="p-3 rounded-lg border space-y-1" style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);">
+            <div class="flex items-center space-x-1.5 font-bold text-emerald-400">
+              <span>🚀 实盘开仓触发 (trade.opened)</span>
+            </div>
+            <p class="text-[11px] leading-relaxed" style="color: var(--text-muted);">
+              包含标的、多空方向、杠杆、开仓挂单价、OCO云端止盈/止损双轨及大模型因果决策逻辑。
+            </p>
+          </div>
+
+          <div class="p-3 rounded-lg border space-y-1" style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);">
+            <div class="flex items-center space-x-1.5 font-bold text-blue-400">
+              <span>🎯 平仓结清提醒 (trade.closed)</span>
+            </div>
+            <p class="text-[11px] leading-relaxed" style="color: var(--text-muted);">
+              智能区分「🎉 盈利落袋」、「⚖️ 保本结清」与「🛡️ 风控止损」，清晰输出净盈亏 U 数、ROI 与持仓时长。
+            </p>
+          </div>
+
+          <div class="p-3 rounded-lg border space-y-1" style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);">
+            <div class="flex items-center space-x-1.5 font-bold text-indigo-400">
+              <span>🛡️ 保本锁利移损 (trade.sl_updated)</span>
+            </div>
+            <p class="text-[11px] leading-relaxed" style="color: var(--text-muted);">
+              浮盈达标触发保本移损时，即刻播报原止损位与上移后的保本价，确认锁定本单胜率下限。
+            </p>
+          </div>
+
+          <div class="p-3 rounded-lg border space-y-1" style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);">
+            <div class="flex items-center space-x-1.5 font-bold text-purple-400">
+              <span>🧬 AI 自进化心法 (evolution.completed)</span>
+            </div>
+            <p class="text-[11px] leading-relaxed" style="color: var(--text-muted);">
+              每日闭环自进化完成后，实时推送当日全样本胜率、演进状态及大模型提炼的核心实战心法。
+            </p>
+          </div>
+
+          <div class="p-3 rounded-lg border space-y-1" style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);">
+            <div class="flex items-center space-x-1.5 font-bold text-red-400">
+              <span>🚨 黑天鹅避险熔断 (risk.triggered)</span>
+            </div>
+            <p class="text-[11px] leading-relaxed" style="color: var(--text-muted);">
+              全网舆情暴跌或流动性枯竭触发全自动熔断时，以 P0 最高优先级向全部通道进行声光告警。
+            </p>
+          </div>
+
+          <div class="p-3 rounded-lg border space-y-1" style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);">
+            <div class="flex items-center space-x-1.5 font-bold text-amber-400">
+              <span>📊 每日晨/晚报 (briefing.ready)</span>
+            </div>
+            <p class="text-[11px] leading-relaxed" style="color: var(--text-muted);">
+              按下方指定时间自动汇总在手仓位、资金净值、当日累计盈亏与宏观市场因果微积分综述。
+            </p>
+          </div>
+        </div>
+
+        <div class="pt-2 border-t" style="border-color: var(--border-subtle);">
+          <label class="block text-[11px] mb-1 font-mono font-bold" style="color: var(--text-muted);">每日量化简报时间 (北京时间，多个用逗号隔开)</label>
+          <input v-model="config._briefingTimes" placeholder="08:00, 20:00" class="w-full rounded-lg px-3 py-2 text-xs font-mono outline-none border mb-4" style="background-color: var(--bg-input); border-color: var(--border-subtle); color: var(--text-main);" />
+          <div class="flex items-center space-x-3">
+            <button @click="saveAll" class="px-4 py-2 rounded-lg text-xs font-mono font-bold cursor-pointer transition-all shadow-xs" style="background-color: var(--text-main); color: var(--bg-card);">保存全部通知通道</button>
+            <button @click="saveSchedule" class="px-4 py-2 rounded-lg border text-xs font-mono cursor-pointer transition-all shadow-xs" style="background-color: var(--bg-card-subtle); border-color: var(--border-medium); color: var(--text-main);">保存通知时间</button>
+          </div>
+        </div>
       </div>
     </template>
 
