@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useTheme } from '../composables/useTheme'
@@ -114,7 +114,6 @@ function navigateTo(id: string) {
     pendingView.value = null
     isNavigating.value = false
     mobileDrawerOpen.value = false
-    scrollActiveTabIntoView()
   })
 }
 
@@ -122,17 +121,6 @@ function handleLogout() {
   auth.logout()
   router.push('/admin/login')
 }
-
-function scrollActiveTabIntoView() {
-  setTimeout(() => {
-    const el = document.querySelector(`[data-nav-id="${currentView.value}"]`)
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
-    }
-  }, 40)
-}
-
-watch(() => currentView.value, scrollActiveTabIntoView)
 
 // Pre-fetch all admin chunks in background during idle time to guarantee 0ms transitions
 const prefetchViews = () => {
@@ -159,7 +147,6 @@ const prefetchViews = () => {
 }
 
 onMounted(() => {
-  scrollActiveTabIntoView()
   if ('requestIdleCallback' in window) {
     (window as any).requestIdleCallback(prefetchViews)
   } else {
@@ -175,7 +162,7 @@ const showAboutModal = ref(false)
     class="min-h-screen flex flex-col md:flex-row font-sans transition-colors selection:bg-blue-500/30"
     style="background-color: var(--bg-app); color: var(--text-main);"
   >
-    <!-- Top 2px Brand Loading Progress Line -->
+    <!-- Top 2.5px Brand Loading Progress Line -->
     <div
       v-if="isNavigating"
       class="fixed top-0 left-0 right-0 h-[2.5px] z-50 animate-pulse transition-opacity"
@@ -189,7 +176,7 @@ const showAboutModal = ref(false)
       @click="mobileDrawerOpen = false"
     ></div>
 
-    <!-- Mobile Slide Drawer -->
+    <!-- Mobile Slide Drawer (Only for Mobile) -->
     <aside
       class="fixed inset-y-0 left-0 w-[280px] z-50 md:hidden flex flex-col transition-transform duration-250 ease-out shadow-2xl border-r"
       :class="mobileDrawerOpen ? 'translate-x-0' : '-translate-x-full'"
@@ -206,7 +193,13 @@ const showAboutModal = ref(false)
           </div>
           <div>
             <div class="text-xs font-black tracking-wide font-mono" style="color: var(--text-main);">R20 CONTROL</div>
-            <span class="text-[10px] font-mono" style="color: var(--color-brand);">v6.6.1</span>
+            <button
+              @click="showAboutModal = true; mobileDrawerOpen = false"
+              class="text-[10px] font-mono transition-colors cursor-pointer text-left block"
+              style="color: var(--color-brand);"
+            >
+              v6.6.1
+            </button>
           </div>
         </div>
         <button
@@ -219,7 +212,7 @@ const showAboutModal = ref(false)
         </button>
       </div>
 
-      <!-- Drawer Nav Items (Full Height, Ergonomic 44px min Touch Targets) -->
+      <!-- Drawer Nav Items (Full Height, Ergonomic 44px Touch Targets) -->
       <nav class="flex-1 overflow-y-auto p-3 space-y-4">
         <div v-for="group in navGroups" :key="group.label">
           <div
@@ -264,7 +257,7 @@ const showAboutModal = ref(false)
         </div>
         <button
           @click="handleLogout"
-          class="px-2.5 py-1 rounded text-xs font-mono border hover:bg-rose-500/10 transition-colors"
+          class="px-2.5 py-1 rounded text-xs font-mono border hover:bg-rose-500/10 transition-colors cursor-pointer"
           style="color: var(--color-down); border-color: var(--color-down-border); background-color: var(--color-down-bg);"
         >
           退出
@@ -272,14 +265,14 @@ const showAboutModal = ref(false)
       </div>
     </aside>
 
-    <!-- Desktop Sidebar / Mobile Top Horizontal Bar Container -->
+    <!-- Desktop Sidebar (Hidden completely on mobile, only visible on md:) -->
     <aside
-      class="w-full md:w-[220px] md:shrink-0 border-b md:border-b-0 md:border-r md:flex md:flex-col md:h-screen md:sticky md:top-0 transition-colors z-30"
+      class="hidden md:flex md:w-[220px] md:shrink-0 md:border-r md:flex-col md:h-screen md:sticky md:top-0 transition-colors z-30"
       style="background-color: var(--bg-card); border-color: var(--border-subtle);"
     >
       <!-- Brand Header (Desktop) -->
       <div
-        class="px-4 py-3.5 border-b hidden md:flex items-center justify-between"
+        class="px-4 py-3.5 border-b flex items-center justify-between"
         style="border-color: var(--border-subtle);"
       >
         <div class="flex items-center space-x-2.5">
@@ -307,33 +300,25 @@ const showAboutModal = ref(false)
         <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" title="控制面正常"></span>
       </div>
 
-      <!-- Nav Groups (Desktop Vertical + Mobile Horizontal Auto-Centering Pill Bar) -->
-      <nav
-        class="overflow-x-auto md:overflow-y-auto md:overflow-x-hidden md:flex-1 py-1.5 md:py-2 px-2 md:px-2.5 md:space-y-1 flex md:block whitespace-nowrap scroll-smooth touch-manipulation"
-        style="-webkit-overflow-scrolling: touch;"
-      >
-        <div
-          v-for="group in navGroups"
-          :key="group.label"
-          class="mb-0 md:mb-2.5 inline-flex md:block mr-2 md:mr-0 align-middle md:align-top"
-        >
+      <!-- Nav Groups (Desktop Vertical) -->
+      <nav class="overflow-y-auto overflow-x-hidden flex-1 py-2 px-2.5 space-y-1">
+        <div v-for="group in navGroups" :key="group.label" class="mb-2.5">
           <div
-            class="text-[9px] font-mono font-bold uppercase tracking-wider px-2 py-1 hidden md:flex items-center justify-between"
+            class="text-[9px] font-mono font-bold uppercase tracking-wider px-2 py-1 flex items-center justify-between"
             style="color: var(--text-faint);"
           >
             <span>{{ group.label }}</span>
           </div>
-          <div class="flex md:block space-x-1 md:space-x-0 md:space-y-0.5">
+          <div class="space-y-0.5">
             <button
               v-for="item in group.items"
               :key="item.id"
-              :data-nav-id="item.id"
               @click="navigateTo(item.id)"
-              class="shrink-0 md:w-full text-left px-2.5 py-1.5 md:py-1.5 rounded-lg text-xs font-mono font-medium transition-all flex items-center space-x-1.5 md:space-x-2 cursor-pointer touch-manipulation min-h-[32px] md:min-h-0"
+              class="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-mono font-medium transition-all flex items-center space-x-2 cursor-pointer"
               :style="activeView === item.id
                 ? { backgroundColor: 'var(--color-brand-bg)', color: 'var(--color-brand)', borderColor: 'var(--color-brand-border)' }
                 : { color: 'var(--text-muted)' }"
-              :class="activeView === item.id ? 'border font-bold shadow-xs ring-1 ring-blue-500/20' : 'border border-transparent hover:text-[var(--text-main)] hover:bg-[var(--bg-card-hover)] active:scale-95 md:active:scale-100'"
+              :class="activeView === item.id ? 'border font-bold shadow-xs' : 'border border-transparent hover:text-[var(--text-main)] hover:bg-[var(--bg-card-hover)]'"
             >
               <component :is="item.icon" class="w-3.5 h-3.5 shrink-0" />
               <span class="truncate">{{ item.label }}</span>
@@ -344,7 +329,7 @@ const showAboutModal = ref(false)
 
       <!-- Sidebar Footer User Profile (Desktop) -->
       <div
-        class="px-3 py-2.5 border-t hidden md:flex items-center justify-between text-xs font-mono"
+        class="px-3 py-2.5 border-t flex items-center justify-between text-xs font-mono"
         style="border-color: var(--border-subtle); background-color: var(--bg-card-subtle);"
       >
         <div class="flex items-center space-x-2 min-w-0">
@@ -372,19 +357,19 @@ const showAboutModal = ref(false)
 
     <!-- Main Content Shell -->
     <div class="flex-1 flex flex-col min-w-0">
-      <!-- Top Title Header Bar with Breadcrumb & Mobile Drawer Trigger -->
+      <!-- Top Title Header Bar (Clean, Unified) -->
       <header
-        class="h-12 sm:h-14 border-b px-3 sm:px-6 flex items-center justify-between z-20 transition-colors"
+        class="h-13 sm:h-14 border-b px-3 sm:px-6 flex items-center justify-between z-20 transition-colors shrink-0"
         style="background-color: var(--bg-header); border-color: var(--border-subtle); backdrop-filter: blur(12px);"
       >
         <!-- Mobile Drawer Hamburger + Breadcrumbs -->
-        <div class="flex items-center space-x-2 text-xs font-mono">
+        <div class="flex items-center space-x-2.5 text-xs font-mono">
           <!-- Hamburger Button for Mobile -->
           <button
             @click="mobileDrawerOpen = !mobileDrawerOpen"
-            class="md:hidden flex items-center space-x-1.5 px-2 py-1 rounded-lg border transition-all cursor-pointer shadow-xs active:scale-95"
-            style="background-color: var(--bg-card); border-color: var(--border-medium); color: var(--text-main);"
-            title="打开全功能导航菜单"
+            class="md:hidden flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg border transition-all cursor-pointer shadow-xs active:scale-95 touch-manipulation"
+            style="background-color: var(--bg-card-subtle); border-color: var(--border-medium); color: var(--text-main);"
+            title="打开导航菜单"
           >
             <Menu class="w-3.5 h-3.5 text-blue-400" />
             <span class="text-[11px] font-bold">菜单</span>
@@ -452,7 +437,7 @@ const showAboutModal = ref(false)
       </header>
 
       <!-- Router View Workspace -->
-      <main class="flex-1 p-3 sm:p-5 overflow-y-auto max-w-[2160px] w-full mx-auto">
+      <main class="flex-1 p-3.5 sm:p-5 overflow-y-auto max-w-[2160px] w-full mx-auto">
         <router-view />
       </main>
     </div>
