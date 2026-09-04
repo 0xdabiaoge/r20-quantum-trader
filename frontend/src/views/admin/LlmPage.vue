@@ -101,6 +101,27 @@ async function loadConfig() {
   }
 }
 
+// Model Effort Options depending on model family
+const availableEffortOptions = computed(() => {
+  const mid = (modelForm.value.id || '').toLowerCase()
+  // 仅在明确为 GPT-5.6 或 o3 等前沿极限推演模型时，才展示超高与极值档位，避免普通模型出现不支持的选项
+  const supportsExtreme = mid.includes('gpt-5') || mid.includes('o3') || mid.includes('o4')
+  
+  const options = [
+    { value: 'high', label: '高 (high)' },
+    { value: 'medium', label: '中 (medium)' },
+    { value: 'low', label: '低 (low)' },
+    { value: 'none', label: '关闭 (none)' },
+  ]
+  if (supportsExtreme) {
+    options.unshift(
+      { value: 'max', label: '极值 (max)' },
+      { value: 'xhigh', label: '超高 (xhigh)' }
+    )
+  }
+  return options
+})
+
 // ----------------- Filtered Providers -----------------
 const filteredProviders = computed(() => {
   if (!cfg.value?.providers) return []
@@ -1258,25 +1279,22 @@ onMounted(() => {
             </div>
           </div>
 
-          <!-- 思考强度配置 (统一部署在模型层面) -->
+          <!-- 思考强度配置 (动态精简与自适应展示) -->
           <div>
-            <label class="block text-[11px] font-bold mb-1" style="color: var(--text-muted);">思考推演强度 (Reasoning Effort)</label>
+            <label class="block text-[11px] font-bold mb-1" style="color: var(--text-muted);">思考推演强度</label>
             <select
               v-model="modelForm.reasoning_effort"
-              class="w-full rounded-xl px-3.5 py-2 text-xs outline-none border cursor-pointer"
+              class="w-full rounded-xl px-3.5 py-2 text-xs outline-none border cursor-pointer font-mono"
               style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle); color: var(--text-main);"
             >
-              <option value="max">极值思考 (max / 极限数理因果推理，适用 GPT-5.6/前沿旗舰)</option>
-              <option value="xhigh">超高强度 (xhigh / 超长思维链，适用 GPT-5.6/o3)</option>
-              <option value="high">长思考 (high / 深度逻辑推演，标准强力推演)</option>
-              <option value="medium">中强度 (medium / 均衡分析，兼顾速度与深度)</option>
-              <option value="low">低强度 (low / 快速响应)</option>
-              <option value="minimal">微量推演 (minimal / 基础护栏自验)</option>
-              <option value="none">关闭思考链 (none / 纯文本极速输出)</option>
+              <option
+                v-for="opt in availableEffortOptions"
+                :key="opt.value"
+                :value="opt.value"
+              >
+                {{ opt.label }}
+              </option>
             </select>
-            <div class="text-[10px] mt-1" style="color: var(--text-faint);">
-              支持 GPT-5.6、o3 等新一代旗舰的 xhigh/max 极值思考档位；委员会与实盘发单将自动对齐此强度。
-            </div>
           </div>
 
           <div>
