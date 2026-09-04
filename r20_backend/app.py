@@ -601,8 +601,29 @@ def top_sitemap_xml() -> Response:
     return Response(content="""<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>https://www.r20.cn/</loc><priority>1.0</priority></url><url><loc>https://www.r20.cn/factors</loc><priority>0.9</priority></url><url><loc>https://www.r20.cn/news</loc><priority>0.8</priority></url><url><loc>https://www.r20.cn/lab</loc><priority>0.8</priority></url><url><loc>https://www.r20.cn/history</loc><priority>0.8</priority></url><url><loc>https://www.r20.cn/docs</loc><priority>0.9</priority></url></urlset>""", media_type="application/xml")
 
 
+@app.get("/trading", include_in_schema=False)
+@app.get("/factors", include_in_schema=False)
+@app.get("/news", include_in_schema=False)
+@app.get("/lab", include_in_schema=False)
+@app.get("/history", include_in_schema=False)
+@app.get("/docs", include_in_schema=False)
+@app.get("/docs/{subpath:path}", include_in_schema=False)
+def public_tab_spa_page(subpath: str = "") -> FileResponse:
+    vue_index = ROOT / "frontend" / "dist" / "index.html"
+    if vue_index.is_file():
+        return FileResponse(
+            str(vue_index),
+            headers={"Cache-Control": "public, max-age=0, s-maxage=300, stale-while-revalidate=600"},
+        )
+    return FileResponse(
+        str(ROOT / "dashboard" / "templates" / "index.html"),
+        headers={"Cache-Control": "public, max-age=0, s-maxage=300, stale-while-revalidate=600"},
+    )
+
+
 @app.get("/admin", include_in_schema=False)
-def admin_page() -> FileResponse:
+@app.get("/admin/{subpath:path}", include_in_schema=False)
+def admin_page(subpath: str = "") -> FileResponse:
     # Check for Vue SPA build first; fall back to legacy admin.html
     vue_index = ROOT / "frontend" / "dist" / "index.html"
     if vue_index.is_file():
