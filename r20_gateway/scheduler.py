@@ -32,7 +32,7 @@ JOBS = (
     JobSpec("factor_library", "factor_library.py", 60, 55),
     JobSpec("news", "news_sentiment_harvester.py", 10 * 60, 300),
     JobSpec("daily_briefing", "daily_summary_and_backup.py", None, 600, "briefing_times", ("08:00", "20:00")),
-    JobSpec("self_improvement", "self_improvement_engine.py", None, 1200, "self_improvement_time", ("20:00",)),
+    JobSpec("self_improvement", "self_improvement_engine.py", None, 1200, "self_improvement_time", ("02:00", "08:00", "14:00", "20:00")),
 )
 
 

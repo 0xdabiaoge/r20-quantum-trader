@@ -18,7 +18,7 @@ SCRIPTS_DIR = ROOT / "scripts"
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(SCRIPTS_DIR))
 
-from fastapi import FastAPI, Header, HTTPException, Request
+from fastapi import FastAPI, File, Header, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Response
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
@@ -423,6 +423,19 @@ class NotificationScheduleUpdate(BaseModel):
 
 class BackupRequest(BaseModel):
     confirmation: str
+
+
+class BackupRestoreRequest(BaseModel):
+    archive_name: str
+    confirmation: str
+
+
+class MemoryItemRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=1000)
+
+
+class MemoryUpdateAllRequest(BaseModel):
+    items: list[str]
 
 
 def require_admin_token(token: str) -> None:
@@ -2135,6 +2148,138 @@ def run_backup(payload: BackupRequest, x_r20_admin_token: str | None = Header(de
         raise HTTPException(status_code=502, detail=f"灾备任务失败：{result.stderr[-800:] or result.stdout[-800:]}")
     audit_record("backup.run", "success", {})
     return {"completed": True, "output": result.stdout[-2500:]}
+
+
+@app.get("/api/v1/admin/backups/download/{filename:path}")
+def download_backup_archive(filename: str, x_r20_admin_token: str | None = Header(default=None), x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> FileResponse:
+    refresh_settings()
+    require_admin_header(x_r20_admin_token, x_r20_session)
+    clean_name = Path(filename).name
+    backups_dir = ROOT / "backups"
+    candidate = backups_dir / clean_name
+    if not candidate.exists():
+        candidate = backups_dir / "local" / clean_name
+    if not candidate.exists() or not candidate.is_file():
+        raise HTTPException(status_code=404, detail="备份文件不存在或已清理")
+    audit_record("backup.download", "success", {"filename": clean_name})
+    return FileResponse(
+        path=str(candidate),
+        media_type="application/gzip",
+        filename=clean_name,
+        headers={"Content-Disposition": f'attachment; filename="{clean_name}"'}
+    )
+
+
+@app.post("/api/v1/admin/backups/upload")
+async def upload_backup_archive(file: UploadFile = File(...), x_r20_admin_token: str | None = Header(default=None), x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    refresh_settings()
+    require_superadmin(x_r20_session)
+    if not file.filename or not (file.filename.endswith(".tar.gz") or file.filename.endswith(".tgz")):
+        raise HTTPException(status_code=400, detail="仅支持上传 .tar.gz 或 .tgz 格式备份包")
+    clean_name = Path(file.filename).name
+    target_dir = ROOT / "backups" / "local"
+    target_dir.mkdir(parents=True, exist_ok=True)
+    dest_path = target_dir / clean_name
+    content = await file.read()
+    dest_path.write_bytes(content)
+    audit_record("backup.upload", "success", {"filename": clean_name, "bytes": len(content)})
+    return {"uploaded": True, "filename": clean_name, "bytes": len(content), "path": str(dest_path.relative_to(ROOT))}
+
+
+@app.post("/api/v1/admin/backups/restore")
+def restore_backup_archive(payload: BackupRestoreRequest, x_r20_admin_token: str | None = Header(default=None), x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    refresh_settings()
+    require_superadmin(x_r20_session)
+    if payload.confirmation.strip().upper() != "RESTORE R20":
+        raise HTTPException(status_code=400, detail="确认短语必须精确为：RESTORE R20")
+    clean_name = Path(payload.archive_name).name
+    backups_dir = ROOT / "backups"
+    candidate = backups_dir / clean_name
+    if not candidate.exists():
+        candidate = backups_dir / "local" / clean_name
+    if not candidate.exists() or not candidate.is_file():
+        raise HTTPException(status_code=404, detail="指定的备份归档文件不存在")
+
+    import tarfile
+    restored_files = []
+    # Verify archive safety first (prevent directory traversal)
+    with tarfile.open(candidate, "r:gz") as tar:
+        for member in tar.getmembers():
+            member_path = Path(member.name)
+            if member_path.is_absolute() or ".." in member_path.parts:
+                raise HTTPException(status_code=400, detail=f"非法不安全归档路径: {member.name}")
+        for member in tar.getmembers():
+            tar.extract(member, path=ROOT)
+            restored_files.append(member.name)
+
+    audit_record("backup.restore", "success", {"filename": clean_name, "files_count": len(restored_files)})
+    return {"restored": True, "filename": clean_name, "restored_count": len(restored_files), "sample_files": restored_files[:10]}
+
+
+# -------------------------------------------------------------
+# AI Trading Heuristic Memory APIs (Self-Improvement Memory CRUD)
+# -------------------------------------------------------------
+MEMORY_FILE = DATA_DIR / "AI_TRADING_MEMORY.md"
+
+def _parse_memory_items() -> list[str]:
+    if not MEMORY_FILE.exists():
+        return []
+    text = MEMORY_FILE.read_text(encoding="utf-8")
+    items = []
+    for line in text.splitlines():
+        line = line.strip()
+        if line.startswith("- "):
+            clean = line[2:].strip()
+            if clean:
+                items.append(clean)
+    return items
+
+def _save_memory_items(items: list[str]) -> None:
+    header = "# R20 AI 交易实战长期心法 (Heuristic Long-Term Memory)\n\n> 状态：由自进化引擎每 6 小时自动复盘提炼或管理员在后台直接增删维护。\n\n"
+    body = "\n".join(f"- {it.strip()}" for it in items if it.strip())
+    MEMORY_FILE.parent.mkdir(parents=True, exist_ok=True)
+    MEMORY_FILE.write_text(header + body + "\n", encoding="utf-8")
+
+@app.get("/api/v1/admin/memory")
+def get_admin_memory(x_r20_admin_token: str | None = Header(default=None), x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    refresh_settings()
+    require_admin_header(x_r20_admin_token, x_r20_session)
+    items = _parse_memory_items()
+    raw_content = MEMORY_FILE.read_text(encoding="utf-8") if MEMORY_FILE.exists() else ""
+    return {"items": items, "count": len(items), "raw": raw_content}
+
+@app.post("/api/v1/admin/memory")
+def add_admin_memory_item(payload: MemoryItemRequest, x_r20_admin_token: str | None = Header(default=None), x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    refresh_settings()
+    actor = require_admin_header(x_r20_admin_token, x_r20_session)
+    items = _parse_memory_items()
+    new_item = payload.text.strip()
+    if new_item in items:
+        return {"saved": True, "items": items, "message": "条目已存在"}
+    items.insert(0, new_item)
+    _save_memory_items(items)
+    audit_record("memory.item.add", "success", {"actor": actor.get("username", "admin"), "item": new_item[:50]})
+    return {"saved": True, "items": items}
+
+@app.delete("/api/v1/admin/memory/{index}")
+def delete_admin_memory_item(index: int, x_r20_admin_token: str | None = Header(default=None), x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    refresh_settings()
+    actor = require_admin_header(x_r20_admin_token, x_r20_session)
+    items = _parse_memory_items()
+    if index < 0 or index >= len(items):
+        raise HTTPException(status_code=404, detail="指定索引的记忆条目不存在")
+    removed = items.pop(index)
+    _save_memory_items(items)
+    audit_record("memory.item.delete", "success", {"actor": actor.get("username", "admin"), "item": removed[:50]})
+    return {"saved": True, "items": items, "removed": removed}
+
+@app.put("/api/v1/admin/memory")
+def update_admin_memory_all(payload: MemoryUpdateAllRequest, x_r20_admin_token: str | None = Header(default=None), x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    refresh_settings()
+    actor = require_admin_header(x_r20_admin_token, x_r20_session)
+    _save_memory_items(payload.items)
+    audit_record("memory.update_all", "success", {"actor": actor.get("username", "admin"), "count": len(payload.items)})
+    return {"saved": True, "items": payload.items}
 
 
 @app.get("/health", include_in_schema=False)

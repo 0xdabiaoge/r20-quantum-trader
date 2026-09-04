@@ -2,22 +2,23 @@
 import { ref, computed, onMounted } from 'vue'
 import { useApi } from '../../composables/useApi'
 import { useAuthStore } from '../../stores/auth'
-import { HardDrive, RefreshCw, PlugZap, Save, PlayCircle, Archive, AlertCircle } from 'lucide-vue-next'
+import { HardDrive, RefreshCw, PlugZap, Save, PlayCircle, Archive, AlertCircle, Download, Upload, RotateCcw } from 'lucide-vue-next'
 
 const { api } = useApi()
 const auth = useAuthStore()
 
+const loading = ref(true)
+const busy = ref<'test' | 'save' | 'run' | 'restore' | 'upload' | ''>('')
+const bannerMsg = ref<{ text: string; type: 'ok' | 'warn' | 'err' } | null>(null)
+
 const simple = ref<any>(null)
 const targetTypes = ref<any[]>([])
 const status = ref<any>(null)
-const loading = ref(true)
-const busy = ref('')
-const bannerMsg = ref<{ text: string; type: 'ok' | 'err' | 'warn' } | null>(null)
+const uploadFileInput = ref<HTMLInputElement | null>(null)
 
-// form
-const enabled = ref(true)
-const destination = ref('')
+const enabled = ref(false)
 const scheduleTime = ref('02:00')
+const destination = ref('local')
 const retention = ref(3)
 const endpoint = ref('')
 const bucket = ref('')
@@ -26,7 +27,8 @@ const credentials = ref<Record<string, string>>({})
 const remoteDest = computed(() => ['s3', 'oss', 'webdav', 'baidu_oauth'].includes(destination.value))
 const needsBucket = computed(() => destination.value === 's3' || destination.value === 'oss')
 const credentialFields = computed(() => {
-  if (destination.value === 's3' || destination.value === 'oss') return ['access_key_id', 'secret_access_key']
+  if (['s3', 'oss'].includes(destination.value)) return ['access_key_id', 'secret_access_key']
+  if (['webdav', 'aliyundrive', 'quark'].includes(destination.value)) return ['username', 'password']
   if (destination.value === 'baidu_oauth') return ['app_key', 'app_secret', 'refresh_token']
   return []
 })
@@ -110,6 +112,96 @@ async function runNow() {
   }
 }
 
+async function downloadArchive(archiveName: string) {
+  try {
+    const clean = archiveName.split('/').pop() || archiveName
+    const url = `/api/v1/admin/backups/download/${encodeURIComponent(clean)}`
+    const resp = await fetch(url, {
+      headers: {
+        ...(auth.token ? { 'X-R20-Session': auth.token } : {})
+      }
+    })
+    if (!resp.ok) {
+      throw new Error(`下载失败 HTTP ${resp.status}`)
+    }
+    const blob = await resp.blob()
+    const blobUrl = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = blobUrl
+    a.download = clean
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    window.URL.revokeObjectURL(blobUrl)
+    bannerMsg.value = { text: `✅ 归档文件 ${clean} 已成功触发下载`, type: 'ok' }
+  } catch (e: any) {
+    bannerMsg.value = { text: `下载失败：${e.message}`, type: 'err' }
+  }
+}
+
+function triggerUpload() {
+  if (uploadFileInput.value) {
+    uploadFileInput.value.click()
+  }
+}
+
+async function onFileSelected(e: Event) {
+  const target = e.target as HTMLInputElement
+  const file = target.files?.[0]
+  if (!file) return
+  busy.value = 'upload'
+  bannerMsg.value = null
+  try {
+    const formData = new FormData()
+    formData.append('file', file)
+    const resp = await fetch('/api/v1/admin/backups/upload', {
+      method: 'POST',
+      headers: {
+        ...(auth.token ? { 'X-R20-Session': auth.token } : {})
+      },
+      body: formData
+    })
+    const res = await resp.json()
+    if (!resp.ok) {
+      throw new Error(res.detail || `上传失败 HTTP ${resp.status}`)
+    }
+    bannerMsg.value = { text: `✅ 备份包 ${file.name} 上传成功！`, type: 'ok' }
+    await load()
+  } catch (err: any) {
+    bannerMsg.value = { text: `上传备份失败：${err.message}`, type: 'err' }
+  } finally {
+    busy.value = ''
+    if (target) target.value = ''
+  }
+}
+
+async function restoreArchive(archiveName: string) {
+  const clean = archiveName.split('/').pop() || archiveName
+  const phrase = prompt(`警告：恢复备份将解压覆盖当前系统配置、历史数据与策略。\n如确认恢复归档【${clean}】，请输入确认短语：RESTORE R20`)
+  if (!phrase) return
+  if (phrase.trim().toUpperCase() !== 'RESTORE R20') {
+    alert('确认短语不正确，已取消恢复！')
+    return
+  }
+  busy.value = 'restore'
+  bannerMsg.value = null
+  try {
+    const res = await api('/api/v1/admin/backups/restore', {
+      method: 'POST',
+      body: JSON.stringify({
+        archive_name: clean,
+        confirmation: 'RESTORE R20'
+      })
+    })
+    bannerMsg.value = { text: `✅ 备份 ${clean} 恢复成功！共解压 ${res.restored_count} 个核心文件。请重启或刷新服务使新状态接管。`, type: 'ok' }
+    await load()
+  } catch (e: any) {
+    bannerMsg.value = { text: `恢复失败：${e.message}`, type: 'err' }
+  } finally {
+    busy.value = ''
+  }
+}
+
 function fmtBytes(n: number) {
   if (!n) return '--'
   return n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.round(n / 1024) + ' KB'
@@ -124,7 +216,7 @@ onMounted(load)
 <template>
   <div class="space-y-4">
     <div class="flex items-center justify-between">
-      <p class="text-xs text-[#707E94] font-mono">像 Duplicati / Kopia 一样，只配置内容、位置、时间和保留数量；上传成功后自动清理本地压缩包保持 0 磁盘占用。</p>
+      <p class="text-xs text-[#707E94] font-mono">支持本地/云端全量数据灾备、备份打包直接下载、本地备份上传与一键全量恢复。</p>
       <span class="text-[10px] font-mono text-blue-400 bg-blue-500/10 px-2 py-1 rounded border border-blue-500/20">集成与保障 · 2/3</span>
     </div>
 
@@ -201,6 +293,10 @@ onMounted(load)
             <button @click="testConnection" :disabled="busy !== ''" class="flex items-center space-x-1 px-3 py-2 rounded-lg border text-xs font-mono cursor-pointer disabled:opacity-40 transition-all shadow-xs" style="background-color: var(--bg-card-subtle); border-color: var(--border-medium); color: var(--text-main);"><PlugZap class="w-3.5 h-3.5" /><span>{{ busy === 'test' ? '测试中...' : '测试连接' }}</span></button>
             <button @click="save" :disabled="busy !== ''" class="flex items-center space-x-1 px-3 py-2 rounded-lg text-xs font-mono font-bold cursor-pointer disabled:opacity-40 transition-all shadow-xs" style="background-color: var(--text-main); color: var(--bg-card);"><Save class="w-3.5 h-3.5" /><span>{{ busy === 'save' ? '保存中...' : '保存灾备' }}</span></button>
             <button @click="runNow" :disabled="busy !== ''" class="flex items-center space-x-1 px-3 py-2 rounded-lg text-xs font-mono font-bold cursor-pointer disabled:opacity-40 transition-all shadow-xs" style="background-color: var(--color-down-bg); border-color: var(--color-down-border); color: var(--color-down);"><PlayCircle class="w-3.5 h-3.5" /><span>{{ busy === 'run' ? '执行中（最长10分钟）...' : '立即备份' }}</span></button>
+
+            <!-- Hidden file input for upload -->
+            <input ref="uploadFileInput" type="file" accept=".tar.gz,.tgz" class="hidden" @change="onFileSelected" />
+            <button @click="triggerUpload" :disabled="busy !== ''" class="flex items-center space-x-1 px-3 py-2 rounded-lg border text-xs font-mono font-bold cursor-pointer disabled:opacity-40 transition-all shadow-xs" style="background-color: var(--bg-card-subtle); border-color: var(--border-medium); color: var(--color-brand);"><Upload class="w-3.5 h-3.5" /><span>{{ busy === 'upload' ? '正在上传...' : '上传备份包' }}</span></button>
           </template>
           <span v-else class="text-[10px] font-mono" style="color: var(--text-faint);">只读视图 · 修改需超级管理员登录</span>
           <span class="ml-auto text-[10px] font-mono font-bold" :class="simple.configured ? 'text-emerald-500' : 'text-amber-500'">{{ simple.configured ? '● 目标已配置' : '● 目标未配置' }}</span>
@@ -224,9 +320,9 @@ onMounted(load)
           <div class="px-4 py-3 border-b flex items-center justify-between" style="border-color: var(--border-subtle); background-color: var(--bg-card-subtle);">
             <div class="flex items-center space-x-2">
               <Archive class="w-4 h-4 text-cyan-400" />
-              <h2 class="text-xs font-black font-mono uppercase tracking-wide" style="color: var(--text-main);">本地待清归档 ({{ status?.local_archives?.length ?? 0 }})</h2>
+              <h2 class="text-xs font-black font-mono uppercase tracking-wide" style="color: var(--text-main);">备份归档清单 ({{ status?.local_archives?.length ?? 0 }})</h2>
             </div>
-            <span class="text-[10px] font-mono" style="color: var(--text-faint);">异地备份后自动瘦身</span>
+            <span class="text-[10px] font-mono" style="color: var(--text-faint);">支持直接下载与一键恢复</span>
           </div>
           <div class="table-scroll-container">
             <table v-if="status?.local_archives?.length" class="w-full text-left text-xs font-mono whitespace-nowrap">
@@ -235,17 +331,38 @@ onMounted(load)
                   <th class="py-2.5 px-4">归档文件</th>
                   <th class="py-2.5 px-3 text-right">大小</th>
                   <th class="py-2.5 px-4 text-right">创建时间</th>
+                  <th class="py-2.5 px-4 text-center">操作</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="a in status.local_archives.slice(0, 8)" :key="a.name" class="border-b last:border-b-0 hover:bg-[var(--bg-card-hover)] transition-colors" style="border-color: var(--border-subtle);">
-                  <td class="py-2.5 px-4 font-mono font-medium truncate max-w-[220px]" style="color: var(--text-main);">{{ a.name }}</td>
+                <tr v-for="a in status.local_archives.slice(0, 10)" :key="a.name" class="border-b last:border-b-0 hover:bg-[var(--bg-card-hover)] transition-colors" style="border-color: var(--border-subtle);">
+                  <td class="py-2.5 px-4 font-mono font-medium truncate max-w-[200px]" style="color: var(--text-main);" :title="a.name">{{ a.name }}</td>
                   <td class="py-2.5 px-3 text-right num-tabular" style="color: var(--text-muted);">{{ fmtBytes(a.bytes) }}</td>
                   <td class="py-2.5 px-4 text-right num-tabular" style="color: var(--text-faint);">{{ fmtTime(a.mtime) }}</td>
+                  <td class="py-2.5 px-4 text-center">
+                    <div class="flex items-center justify-center space-x-2">
+                      <button
+                        @click="downloadArchive(a.name)"
+                        class="p-1 rounded hover:bg-[var(--bg-badge)] text-[var(--color-brand)] transition-colors cursor-pointer"
+                        title="下载归档到本地"
+                      >
+                        <Download class="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        v-if="auth.isSuperadmin"
+                        @click="restoreArchive(a.name)"
+                        :disabled="busy === 'restore'"
+                        class="p-1 rounded hover:bg-[var(--bg-badge)] text-amber-500 transition-colors cursor-pointer"
+                        title="恢复此备份到系统"
+                      >
+                        <RotateCcw class="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               </tbody>
             </table>
-            <div v-else class="py-8 text-center text-xs font-mono" style="color: var(--color-up);">✓ 本地 0 冗余占用（加密上传成功后已物理瘦身清理）</div>
+            <div v-else class="py-8 text-center text-xs font-mono" style="color: var(--text-muted);">暂无本地待清归档，可点击「立即备份」生成完整镜像包或「上传备份包」</div>
           </div>
         </div>
       </div>

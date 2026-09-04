@@ -83,8 +83,8 @@ function getActionLabel(action?: string) {
       </span>
     </div>
 
-    <!-- 6-Asset Quantitative Ticker Cards Grid (2-columns in right-wing, 3/6 columns in stacked) -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+    <!-- 6-Asset Quantitative Ticker Cards Grid (adaptive 1 col on mobile, 2 cols on tablet, 3 cols on desktop, 6 cols on ultra-wide) -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2.5">
       <div
         v-for="item in store.factors"
         :key="item.instId"

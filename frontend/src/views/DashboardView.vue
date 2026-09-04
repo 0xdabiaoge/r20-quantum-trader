@@ -25,7 +25,7 @@ import {
 const router = useRouter()
 const route = useRoute()
 const store = useDashboardStore()
-const layoutMode = ref<'dual' | 'stacked'>('dual')
+const layoutMode = ref<'dual' | 'stacked'>('stacked')
 
 // Sync initial tab from route path
 function syncTabFromRoute() {
@@ -57,6 +57,8 @@ onMounted(() => {
     const saved = localStorage.getItem('r20_dashboard_layout')
     if (saved === 'dual' || saved === 'stacked') {
       layoutMode.value = saved
+    } else {
+      layoutMode.value = 'stacked'
     }
   } catch {
     // fallback
@@ -107,31 +109,31 @@ function setLayout(mode: 'dual' | 'stacked') {
             style="background-color: var(--bg-card); border-color: var(--border-subtle);"
           >
             <button
-              @click="setLayout('dual')"
-              class="flex items-center space-x-1.5 px-2.5 py-1 rounded-md transition-all cursor-pointer"
-              :style="layoutMode === 'dual'
-                ? { backgroundColor: 'var(--color-brand-bg)', color: 'var(--color-brand)', fontWeight: 'bold' }
-                : { color: 'var(--text-muted)' }"
-              title="双翼协同工作台：左翼操盘中心，右翼六币动力学雷达"
-            >
-              <Columns class="w-3.5 h-3.5" />
-              <span>双翼工作台</span>
-            </button>
-            <button
               @click="setLayout('stacked')"
               class="flex items-center space-x-1.5 px-2.5 py-1 rounded-md transition-all cursor-pointer"
               :style="layoutMode === 'stacked'
                 ? { backgroundColor: 'var(--color-brand-bg)', color: 'var(--color-brand)', fontWeight: 'bold' }
                 : { color: 'var(--text-muted)' }"
-              title="纵向全景模式：全宽展开持仓与六币矩阵"
+              title="标准全景布局：自上而下沉浸式展开资产、操盘台与六币动力学雷达"
             >
               <Rows class="w-3.5 h-3.5" />
               <span>全景视图</span>
             </button>
+            <button
+              @click="setLayout('dual')"
+              class="flex items-center space-x-1.5 px-2.5 py-1 rounded-md transition-all cursor-pointer"
+              :style="layoutMode === 'dual'
+                ? { backgroundColor: 'var(--color-brand-bg)', color: 'var(--color-brand)', fontWeight: 'bold' }
+                : { color: 'var(--text-muted)' }"
+              title="双翼工作台：左翼操盘中心，右翼微结构雷达"
+            >
+              <Columns class="w-3.5 h-3.5" />
+              <span>双翼分栏</span>
+            </button>
           </div>
         </div>
 
-        <!-- Layout Mode 1: Dual-Wing Institutional Workstation -->
+        <!-- Layout Mode 1: Dual-Wing Institutional Workstation (Only when user explicitly chooses dual) -->
         <div v-if="layoutMode === 'dual'" class="flex flex-col lg:flex-row gap-3.5 items-start">
           <!-- Left Wing: Master Asset Cockpit + Tactical Desk (62% width on wide displays) -->
           <div class="w-full lg:w-[62%] 2xl:w-[64%] space-y-3.5">
@@ -147,7 +149,7 @@ function setLayout(mode: 'dual' | 'stacked') {
           </div>
         </div>
 
-        <!-- Layout Mode 2: Stacked Full View -->
+        <!-- Layout Mode 2: Stacked Full View (Default: Natural Top-Down Flow) -->
         <div v-else class="space-y-3.5">
           <TopHudRibbon />
           <TacticalDesk />
