@@ -27,6 +27,7 @@ import {
   Wallet,
   Menu,
   X,
+  Sparkles,
 } from 'lucide-vue-next'
 
 const router = useRouter()
