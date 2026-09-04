@@ -253,11 +253,11 @@ onMounted(loadData)
       <div class="flex items-center space-x-2">
         <Sparkles class="w-4 h-4 text-purple-400" />
         <p class="text-xs text-[#8A99AD] font-mono">
-          多模型委员会决策系统：支持席位启停、共识模式切换、独立长思考链配置、预设套件一键载入与现场辩论审计。
+          多模型委员会决策系统：深度继承提示词工作室最高策略宪法，支持席位启停、共识模式切换与现场攻防辩论审计。
         </p>
       </div>
       <span class="text-[10px] font-mono text-purple-400 bg-purple-500/10 px-2 py-1 rounded border border-purple-500/20">
-        多模型协作 · v7.2.1 升级版
+        主策略宪法对齐 · 参谋白盒审计
       </span>
     </div>
 
