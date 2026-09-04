@@ -116,7 +116,7 @@ async def admin_session_context(request: Request, call_next):
 
 okx = OKXClient()
 admin_auth = AdminAuthStore()
-ADMIN_HTML = ROOT / "r20_backend" / "admin.html"
+VUE_DIST = ROOT / "frontend" / "dist"
 
 
 class AdminLoginRequest(BaseModel):
@@ -637,11 +637,12 @@ def public_tab_spa_page(subpath: str = "") -> FileResponse:
 @app.get("/admin", include_in_schema=False)
 @app.get("/admin/{subpath:path}", include_in_schema=False)
 def admin_page(subpath: str = "") -> FileResponse:
-    # Check for Vue SPA build first; fall back to legacy admin.html
+    # Vue SPA single entry point
     vue_index = ROOT / "frontend" / "dist" / "index.html"
     if vue_index.is_file():
         return FileResponse(str(vue_index), headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
-    return FileResponse(ADMIN_HTML, headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+    fallback_index = ROOT / "frontend" / "index.html"
+    return FileResponse(str(fallback_index), headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
 
 
 @app.get("/api/v1/admin/auth/status")
