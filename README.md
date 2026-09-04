@@ -6,7 +6,7 @@
 
 **全栈用户自由自定义 · 多模型决策委员会 · 动态标的资产池 · Python 物理拦截管线 · 启发式自进化记忆 · 100% 交易所云端 OCO**
 
-[![Release](https://img.shields.io/badge/release-v7.0.0-3875F6?style=flat-square)](https://github.com/555cute/r20-quantum-trader/releases)
+[![Release](https://img.shields.io/badge/release-v7.0.1-3875F6?style=flat-square)](https://github.com/555cute/r20-quantum-trader/releases)
 [![LINUX DO](https://img.shields.io/badge/Community-LINUX%20DO-F97316?style=flat-square&logo=linux&logoColor=white)](https://linux.do/)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![Exchange](https://img.shields.io/badge/Exchange-OKX%20V5%20Direct-111827?style=flat-square)](https://www.okx.com/)

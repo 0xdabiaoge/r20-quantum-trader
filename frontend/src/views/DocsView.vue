@@ -91,8 +91,8 @@ onUnmounted(() => {
             class="px-1.5 sm:px-2 py-0.2 rounded text-[10px] font-mono border font-bold shrink-0 whitespace-nowrap"
             style="background-color: var(--color-brand-bg); color: var(--color-brand); border-color: var(--color-brand-border);"
           >
-            <span class="hidden md:inline">v7.0.0 官方开发与使用指南</span>
-            <span class="hidden sm:inline md:hidden">v7.0.0 指南</span>
+            <span class="hidden md:inline">v7.0.1 官方开发与使用指南</span>
+            <span class="hidden sm:inline md:hidden">v7.0.1 指南</span>
             <span class="sm:hidden">DOCS</span>
           </span>
         </div>
@@ -519,7 +519,7 @@ onUnmounted(() => {
           </div>
 
           <p class="text-xs sm:text-sm leading-relaxed font-sans" style="color: var(--text-muted);">
-            传统的量化策略往往因静态参数而在牛熊轮动中失效。R20 v7.0.0 将自进化体系升级为<strong>独立的认知中枢模块</strong>，每 6 小时（每日 4 次：02:00、08:00、14:00、20:00）对全天真实成交流水穿透复盘：
+            传统的量化策略往往因静态参数而在牛熊轮动中失效。R20 将自进化体系升级为<strong>独立的认知中枢模块</strong>，每 6 小时（每日 4 次：02:00、08:00、14:00、20:00）对全天真实成交流水穿透复盘：
           </p>
 
           <div class="space-y-2 text-xs font-sans" style="color: var(--text-muted);">
