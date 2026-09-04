@@ -74,18 +74,18 @@ const store = useDashboardStore()
               {{ ord.ordId }}
             </td>
             <td class="py-2.5 px-3.5 font-black font-mono text-sm" style="color: var(--text-main);">
-              {{ ord.name || ord.instId }}
+              {{ ord.name || ord.inst || (ord.instId ? ord.instId.split('-')[0] : '--') }}
             </td>
             <td class="py-2.5 px-3.5">
               <span
                 class="px-2 py-0.5 rounded text-[11px] font-bold inline-flex items-center space-x-1 border"
                 :style="{
-                  backgroundColor: ord.side === 'buy' ? 'var(--color-up-bg)' : 'var(--color-down-bg)',
-                  borderColor: ord.side === 'buy' ? 'var(--color-up-border)' : 'var(--color-down-border)',
-                  color: ord.side === 'buy' ? 'var(--color-up)' : 'var(--color-down)'
+                  backgroundColor: (ord.side_raw === 'buy' || ord.side === 'buy' || String(ord.side).includes('多')) ? 'var(--color-up-bg)' : 'var(--color-down-bg)',
+                  borderColor: (ord.side_raw === 'buy' || ord.side === 'buy' || String(ord.side).includes('多')) ? 'var(--color-up-border)' : 'var(--color-down-border)',
+                  color: (ord.side_raw === 'buy' || ord.side === 'buy' || String(ord.side).includes('多')) ? 'var(--color-up)' : 'var(--color-down)'
                 }"
               >
-                <span>{{ ord.side === 'buy' ? '买入开多' : '卖出开空' }}</span>
+                <span>{{ (ord.side_raw === 'buy' || ord.side === 'buy' || String(ord.side).includes('多')) ? '买入开多' : '卖出开空' }}</span>
               </span>
             </td>
             <td class="py-2.5 px-3.5 font-mono font-black num-tabular text-sm" style="color: var(--text-main);">
@@ -95,7 +95,7 @@ const store = useDashboardStore()
               {{ ord.sz }} 张
             </td>
             <td class="py-2.5 px-3.5 num-tabular" style="color: var(--text-muted);">
-              {{ ord.cTime ? new Date(parseInt(ord.cTime)).toLocaleTimeString() : '--' }}
+              {{ ord.time || (ord.cTime ? new Date(parseInt(ord.cTime)).toLocaleTimeString() : '--') }}
             </td>
             <td class="py-2.5 px-3.5 text-right font-bold" style="color: var(--color-brand);">
               <span class="inline-flex items-center space-x-1">

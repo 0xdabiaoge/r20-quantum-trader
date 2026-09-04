@@ -574,9 +574,11 @@ def update_cache_cycle():
 
             pending_orders_list.append({
                 "ordId": str(o.get("ordId", "")),
+                "name": inst_clean,
                 "inst": inst_clean,
                 "instId": inst_id,
-                "side": side_label,
+                "side": "buy" if side_raw == "buy" else "sell",
+                "side_label": side_label,
                 "side_raw": side_raw,
                 "posSide": pos_side,
                 "is_long": is_long,
@@ -585,6 +587,7 @@ def update_cache_cycle():
                 "lever": f"{o.get('lever', '3')}x",
                 "px": px_display,
                 "sz": str(o.get("sz", "--")),
+                "cTime": str(o.get("cTime", "")),
                 "time": c_time_str,
                 "state": str(o.get("state", "live")),
                 "tp_px": tp_px,
