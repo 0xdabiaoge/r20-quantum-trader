@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useApi } from '../../composables/useApi'
 import { MessageCircle, Zap, CheckCircle2, AlertCircle } from 'lucide-vue-next'
 
@@ -10,6 +10,11 @@ const testResults = ref<Record<string, any>>({})
 const captureModal = ref(false)
 const captureStatus = ref<any>(null)
 let captureTimer: any = null
+
+const enabledChannelsCount = computed(() => {
+  if (!config.value) return 0
+  return ['qq', 'telegram', 'wechat', 'webhook'].filter(k => config.value[k]?.enabled).length
+})
 
 const bannerMsg = ref<{ type: 'ok' | 'warn' | 'error'; text: string } | null>(null)
 let bannerTimer: any = null
@@ -55,6 +60,10 @@ async function toggleChannel(channel: string, enabled: boolean) {
         if (config.value.qq?.app_id) payload.qq_app_id = config.value.qq.app_id
         if (config.value.qq?._secret) payload.qq_client_secret = config.value.qq._secret
         if (config.value.qq?.openid) payload.qq_openid = config.value.qq.openid
+      }
+      // Optimistically flip visual state immediately
+      if (config.value[channel]) {
+        config.value[channel].enabled = enabled
       }
     }
     const res = await api(`/api/v1/admin/channels/${channel}/toggle`, { method: 'PUT', body: JSON.stringify(payload) })
@@ -188,15 +197,13 @@ function closeBindModal() {
 
 // ---- protected test send ----
 async function sendTest(channel: string) {
-  const phrase = `SEND TEST ${channel.toUpperCase()}`
-  const input = prompt(`发送真实测试通知到 ${channel} 通道\n输入确认短语：${phrase}`)
-  if (!input) return
   try {
+    testResults.value[channel] = { status: 'testing', detail: '正在请求测试发送…' }
     const res = await api('/api/v1/admin/notifications/test', {
       method: 'POST',
-      body: JSON.stringify({ channel, confirmation: input.trim().toUpperCase() }),
+      body: JSON.stringify({ channel, confirmation: `SEND TEST ${channel.toUpperCase()}` }),
     })
-    testResults.value[channel] = { status: res.result?.status || 'sent', detail: `${res.result?.detail || '已发送'} · ${res.meaning || ''}` }
+    testResults.value[channel] = { status: res.result?.[channel]?.startsWith('accepted:') ? 'ready' : (res.result?.status || 'sent'), detail: `${res.result?.[channel] || res.result?.detail || '已发送'} · ${res.meaning || ''}` }
   } catch (e: any) {
     testResults.value[channel] = { status: 'failed', detail: e.message }
   }
@@ -226,7 +233,7 @@ onMounted(() => {
         class="text-[10px] font-mono px-2 py-1 rounded border font-bold"
         style="background-color: var(--color-brand-bg); color: var(--color-brand); border-color: var(--color-brand-border);"
       >
-        集成保障 · 1/3
+        集成通道 · {{ enabledChannelsCount }}/4
       </span>
     </div>
 
@@ -259,12 +266,31 @@ onMounted(() => {
               <Zap class="w-3 h-3" />
               <span>⚡ 自动获取 OpenID</span>
             </button>
-            <label class="flex items-center cursor-pointer">
-              <input type="checkbox" :checked="config.qq.enabled" @change="toggleChannel('qq', ($event.target as HTMLInputElement).checked)" class="sr-only peer" />
-              <div class="w-9 h-5 rounded-full peer-checked:bg-emerald-500 transition-colors relative" style="background-color: var(--border-medium);">
-                <div class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-4"></div>
-              </div>
-            </label>
+            <div class="flex items-center space-x-2">
+              <button
+                type="button"
+                @click="toggleChannel('qq', !config.qq.enabled)"
+                class="relative inline-flex items-center cursor-pointer focus:outline-none"
+                :title="config.qq.enabled ? '点击关闭 QQ 通知' : '点击开启 QQ 通知'"
+              >
+                <div
+                  class="w-10 h-5 rounded-full transition-colors relative"
+                  :style="{ backgroundColor: config.qq.enabled ? '#10B981' : 'var(--border-medium)' }"
+                >
+                  <div
+                    class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform shadow-xs"
+                    :class="config.qq.enabled ? 'translate-x-5' : 'translate-x-0'"
+                  ></div>
+                </div>
+              </button>
+              <span
+                class="text-xs font-mono font-bold select-none cursor-pointer"
+                @click="toggleChannel('qq', !config.qq.enabled)"
+                :style="{ color: config.qq.enabled ? '#10B981' : 'var(--text-muted)' }"
+              >
+                {{ config.qq.enabled ? '已开启' : '已关闭' }}
+              </span>
+            </div>
           </div>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -286,10 +312,31 @@ onMounted(() => {
             <span class="inline-block w-2 h-2 rounded-full" :class="config.telegram.enabled ? 'bg-emerald-500' : 'bg-zinc-500'"></span>
             <h2 class="text-sm font-bold font-mono" style="color: var(--text-main);">Telegram Bot</h2>
           </div>
-          <label class="flex items-center cursor-pointer">
-            <input type="checkbox" :checked="config.telegram.enabled" @change="toggleChannel('telegram', ($event.target as HTMLInputElement).checked)" class="sr-only peer" />
-            <div class="w-9 h-5 rounded-full peer-checked:bg-emerald-500 transition-colors relative" style="background-color: var(--border-medium);"><div class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-4"></div></div>
-          </label>
+          <div class="flex items-center space-x-2">
+            <button
+              type="button"
+              @click="toggleChannel('telegram', !config.telegram.enabled)"
+              class="relative inline-flex items-center cursor-pointer focus:outline-none"
+              :title="config.telegram.enabled ? '点击关闭 Telegram 通知' : '点击开启 Telegram 通知'"
+            >
+              <div
+                class="w-10 h-5 rounded-full transition-colors relative"
+                :style="{ backgroundColor: config.telegram.enabled ? '#10B981' : 'var(--border-medium)' }"
+              >
+                <div
+                  class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform shadow-xs"
+                  :class="config.telegram.enabled ? 'translate-x-5' : 'translate-x-0'"
+                ></div>
+              </div>
+            </button>
+            <span
+              class="text-xs font-mono font-bold select-none cursor-pointer"
+              @click="toggleChannel('telegram', !config.telegram.enabled)"
+              :style="{ color: config.telegram.enabled ? '#10B981' : 'var(--text-muted)' }"
+            >
+              {{ config.telegram.enabled ? '已开启' : '已关闭' }}
+            </span>
+          </div>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div><label class="block text-[11px] mb-1 font-mono" style="color: var(--text-muted);">Bot Token</label><input v-model="config.telegram._token" type="password" placeholder="留空保持现有" class="w-full rounded-lg px-3 py-2 text-xs font-mono outline-none border" style="background-color: var(--bg-input); border-color: var(--border-subtle); color: var(--text-main);" /></div>
@@ -308,7 +355,31 @@ onMounted(() => {
         <div class="rounded-xl border p-4 sm:p-5 shadow-xs transition-colors" style="background-color: var(--bg-card); border-color: var(--border-subtle);">
           <div class="flex items-center justify-between mb-4">
             <div class="flex items-center space-x-2"><span class="inline-block w-2 h-2 rounded-full" :class="config.wechat.enabled ? 'bg-emerald-500' : 'bg-zinc-500'"></span><h2 class="text-sm font-bold font-mono" style="color: var(--text-main);">企业微信</h2></div>
-            <label class="flex items-center cursor-pointer"><input type="checkbox" :checked="config.wechat.enabled" @change="toggleChannel('wechat', ($event.target as HTMLInputElement).checked)" class="sr-only peer" /><div class="w-9 h-5 rounded-full peer-checked:bg-emerald-500 transition-colors relative" style="background-color: var(--border-medium);"><div class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-4"></div></div></label>
+            <div class="flex items-center space-x-2">
+              <button
+                type="button"
+                @click="toggleChannel('wechat', !config.wechat.enabled)"
+                class="relative inline-flex items-center cursor-pointer focus:outline-none"
+                :title="config.wechat.enabled ? '点击关闭企业微信通知' : '点击开启企业微信通知'"
+              >
+                <div
+                  class="w-10 h-5 rounded-full transition-colors relative"
+                  :style="{ backgroundColor: config.wechat.enabled ? '#10B981' : 'var(--border-medium)' }"
+                >
+                  <div
+                    class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform shadow-xs"
+                    :class="config.wechat.enabled ? 'translate-x-5' : 'translate-x-0'"
+                  ></div>
+                </div>
+              </button>
+              <span
+                class="text-xs font-mono font-bold select-none cursor-pointer"
+                @click="toggleChannel('wechat', !config.wechat.enabled)"
+                :style="{ color: config.wechat.enabled ? '#10B981' : 'var(--text-muted)' }"
+              >
+                {{ config.wechat.enabled ? '已开启' : '已关闭' }}
+              </span>
+            </div>
           </div>
           <label class="block text-[11px] mb-1 font-mono" style="color: var(--text-muted);">Webhook URL</label>
           <input v-model="config.wechat.webhook" class="w-full rounded-lg px-3 py-2 text-xs font-mono outline-none border mb-3" style="background-color: var(--bg-input); border-color: var(--border-subtle); color: var(--text-main);" />
@@ -319,7 +390,31 @@ onMounted(() => {
         <div class="rounded-xl border p-4 sm:p-5 shadow-xs transition-colors" style="background-color: var(--bg-card); border-color: var(--border-subtle);">
           <div class="flex items-center justify-between mb-4">
             <div class="flex items-center space-x-2"><span class="inline-block w-2 h-2 rounded-full" :class="config.webhook.enabled ? 'bg-emerald-500' : 'bg-zinc-500'"></span><h2 class="text-sm font-bold font-mono" style="color: var(--text-main);">通用 Webhook</h2></div>
-            <label class="flex items-center cursor-pointer"><input type="checkbox" :checked="config.webhook.enabled" @change="toggleChannel('webhook', ($event.target as HTMLInputElement).checked)" class="sr-only peer" /><div class="w-9 h-5 rounded-full peer-checked:bg-emerald-500 transition-colors relative" style="background-color: var(--border-medium);"><div class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-4"></div></div></label>
+            <div class="flex items-center space-x-2">
+              <button
+                type="button"
+                @click="toggleChannel('webhook', !config.webhook.enabled)"
+                class="relative inline-flex items-center cursor-pointer focus:outline-none"
+                :title="config.webhook.enabled ? '点击关闭通用 Webhook' : '点击开启通用 Webhook'"
+              >
+                <div
+                  class="w-10 h-5 rounded-full transition-colors relative"
+                  :style="{ backgroundColor: config.webhook.enabled ? '#10B981' : 'var(--border-medium)' }"
+                >
+                  <div
+                    class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform shadow-xs"
+                    :class="config.webhook.enabled ? 'translate-x-5' : 'translate-x-0'"
+                  ></div>
+                </div>
+              </button>
+              <span
+                class="text-xs font-mono font-bold select-none cursor-pointer"
+                @click="toggleChannel('webhook', !config.webhook.enabled)"
+                :style="{ color: config.webhook.enabled ? '#10B981' : 'var(--text-muted)' }"
+              >
+                {{ config.webhook.enabled ? '已开启' : '已关闭' }}
+              </span>
+            </div>
           </div>
           <label class="block text-[11px] mb-1 font-mono" style="color: var(--text-muted);">URL (智能兼容钉钉/飞书/Discord)</label>
           <input v-model="config.webhook.url" class="w-full rounded-lg px-3 py-2 text-xs font-mono outline-none border mb-3" style="background-color: var(--bg-input); border-color: var(--border-subtle); color: var(--text-main);" />
