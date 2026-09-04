@@ -76,14 +76,16 @@ async function loadRuntime() {
   loading.value = true
   try {
     const [rt, cfg] = await Promise.all([
-      api('/api/v1/admin/runtime'),
+      api('/api/v1/admin/runtime').catch(() => null),
       api('/api/v1/admin/config').catch(() => null),
-      loadBacktest(),
+      loadBacktest().catch(() => null),
     ])
-    if (cfg?.configuration) {
-      rt.configuration = { ...cfg.configuration, ...(rt?.configuration || {}) }
+    if (rt) {
+      if (cfg?.configuration) {
+        rt.configuration = { ...cfg.configuration, ...(rt?.configuration || {}) }
+      }
+      runtime.value = rt
     }
-    runtime.value = rt
   } catch (e: any) {
     console.error('Failed to load runtime:', e)
   } finally {
