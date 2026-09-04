@@ -16,7 +16,7 @@ import tempfile
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from fastapi import FastAPI, Request
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -1196,46 +1196,105 @@ VUE_DIST_DIR = os.path.join(WORKSPACE_DIR, "frontend", "dist")
 VUE_ASSETS_DIR = os.path.join(VUE_DIST_DIR, "assets")
 DOCS_IMAGES_DIR = os.path.join(WORKSPACE_DIR, "docs", "images")
 
+
+class CachedStaticFiles(StaticFiles):
+    """Custom static files handler that injects Cloudflare/browser long-term caching headers."""
+    def __init__(self, *args, cache_control: str = "public, max-age=31536000, immutable", **kwargs):
+        self.cache_control = cache_control
+        super().__init__(*args, **kwargs)
+
+    def file_response(self, *args, **kwargs) -> Response:
+        resp = super().file_response(*args, **kwargs)
+        resp.headers["Cache-Control"] = self.cache_control
+        return resp
+
+
 if os.path.isdir(VUE_ASSETS_DIR):
-    app.mount("/assets", StaticFiles(directory=VUE_ASSETS_DIR), name="vue_assets")
+    app.mount("/assets", CachedStaticFiles(directory=VUE_ASSETS_DIR, cache_control="public, max-age=31536000, immutable"), name="vue_assets")
 
 if os.path.isdir(DOCS_IMAGES_DIR):
-    app.mount("/docs/images", StaticFiles(directory=DOCS_IMAGES_DIR), name="docs_images")
-    app.mount("/images", StaticFiles(directory=DOCS_IMAGES_DIR), name="images")
+    app.mount("/docs/images", CachedStaticFiles(directory=DOCS_IMAGES_DIR, cache_control="public, max-age=604800, stale-while-revalidate=86400"), name="docs_images")
+    app.mount("/images", CachedStaticFiles(directory=DOCS_IMAGES_DIR, cache_control="public, max-age=604800, stale-while-revalidate=86400"), name="images")
 
 VUE_ADMIN_DIST_DIR = VUE_DIST_DIR  # Same SPA build handles both / and /admin/*
 VUE_ADMIN_LEGACY_FILE = os.path.join(VUE_DIST_DIR, "admin", "legacy.html")
 
-def _serve_vue_spa(html_path: str) -> HTMLResponse:
+
+def _serve_vue_spa(html_path: str, is_public: bool = True) -> HTMLResponse:
     with open(html_path, "r", encoding="utf-8") as f:
         content = f.read()
+    # Cloudflare Edge micro-cache: public pages cached at edge for 60s, stale-while-revalidate for 300s.
+    # Browser validates immediately (max-age=0) so release updates are instantly visible.
+    # Private / admin pages are never cached.
+    cache_header = "public, max-age=0, s-maxage=60, stale-while-revalidate=300" if is_public else "private, no-cache, no-store, must-revalidate"
     return HTMLResponse(
         content=content,
-        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+        headers={"Cache-Control": cache_header},
     )
+
+
+# --- SEO Endpoints: robots.txt, sitemap.xml, favicon.svg ---
+
+@app.get("/robots.txt", include_in_schema=False)
+async def robots_txt():
+    f = os.path.join(VUE_DIST_DIR, "robots.txt")
+    if os.path.isfile(f):
+        return FileResponse(f, media_type="text/plain", headers={"Cache-Control": "public, max-age=86400, s-maxage=604800"})
+    pf = os.path.join(WORKSPACE_DIR, "frontend", "public", "robots.txt")
+    if os.path.isfile(pf):
+        return FileResponse(pf, media_type="text/plain", headers={"Cache-Control": "public, max-age=86400, s-maxage=604800"})
+    return PlainTextResponse("User-agent: *\nAllow: /\nAllow: /docs\nAllow: /images/\nDisallow: /admin/\nDisallow: /api/\nSitemap: https://www.r20.cn/sitemap.xml\n")
+
+
+@app.get("/sitemap.xml", include_in_schema=False)
+async def sitemap_xml():
+    f = os.path.join(VUE_DIST_DIR, "sitemap.xml")
+    if os.path.isfile(f):
+        return FileResponse(f, media_type="application/xml", headers={"Cache-Control": "public, max-age=86400, s-maxage=604800"})
+    pf = os.path.join(WORKSPACE_DIR, "frontend", "public", "sitemap.xml")
+    if os.path.isfile(pf):
+        return FileResponse(pf, media_type="application/xml", headers={"Cache-Control": "public, max-age=86400, s-maxage=604800"})
+    return Response(content="""<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>https://www.r20.cn/</loc><priority>1.0</priority></url><url><loc>https://www.r20.cn/docs</loc><priority>0.8</priority></url></urlset>""", media_type="application/xml")
+
+
+@app.get("/favicon.svg", include_in_schema=False)
+async def favicon_svg():
+    f = os.path.join(VUE_DIST_DIR, "favicon.svg")
+    if os.path.isfile(f):
+        return FileResponse(f, media_type="image/svg+xml", headers={"Cache-Control": "public, max-age=86400, s-maxage=2592000, immutable"})
+    pf = os.path.join(WORKSPACE_DIR, "frontend", "public", "favicon.svg")
+    if os.path.isfile(pf):
+        return FileResponse(pf, media_type="image/svg+xml", headers={"Cache-Control": "public, max-age=86400, s-maxage=2592000, immutable"})
+    return Response(status_code=404)
+
+
+# --- HTML Page Handlers ---
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     vue_index_file = os.path.join(VUE_DIST_DIR, "index.html")
     if os.path.isfile(vue_index_file):
-        return _serve_vue_spa(vue_index_file)
+        return _serve_vue_spa(vue_index_file, is_public=True)
     return templates.TemplateResponse(
         request=request,
         name="index.html",
-        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+        headers={"Cache-Control": "public, max-age=0, s-maxage=60, stale-while-revalidate=300"},
     )
+
 
 @app.get("/admin", response_class=HTMLResponse, include_in_schema=False)
 async def admin_spa_root(request: Request):
     """Serve the Vue SPA at /admin — the router handles sub-routes client-side."""
     vue_index_file = os.path.join(VUE_DIST_DIR, "index.html")
     if os.path.isfile(vue_index_file):
-        return _serve_vue_spa(vue_index_file)
+        return _serve_vue_spa(vue_index_file, is_public=False)
     return HTMLResponse("Vue build not found. Run `npm run build` in frontend/.", status_code=503)
+
 
 @app.get("/admin/", response_class=HTMLResponse, include_in_schema=False)
 async def admin_spa_root_trailing(request: Request):
     return await admin_spa_root(request)
+
 
 @app.get("/admin/{subpath:path}", response_class=HTMLResponse, include_in_schema=False)
 async def admin_spa_deep_link(request: Request, subpath: str):
@@ -1243,8 +1302,9 @@ async def admin_spa_deep_link(request: Request, subpath: str):
     Real files under dist/admin (e.g. legacy.html) keep priority."""
     candidate = os.path.normpath(os.path.join(VUE_DIST_DIR, "admin", subpath))
     if candidate.startswith(os.path.join(VUE_DIST_DIR, "admin")) and os.path.isfile(candidate):
-        return FileResponse(candidate)
+        return FileResponse(candidate, headers={"Cache-Control": "private, no-cache, no-store, must-revalidate"})
     return await admin_spa_root(request)
+
 
 @app.get("/docs", response_class=HTMLResponse, include_in_schema=False)
 @app.get("/docs/", response_class=HTMLResponse, include_in_schema=False)
@@ -1254,8 +1314,11 @@ async def docs_spa_root(request: Request, subpath: str = ""):
     """Serve the public system documentation page in Vue SPA."""
     vue_index_file = os.path.join(VUE_DIST_DIR, "index.html")
     if os.path.isfile(vue_index_file):
-        return _serve_vue_spa(vue_index_file)
+        return _serve_vue_spa(vue_index_file, is_public=True)
     return HTMLResponse("Vue build not found. Run `npm run build` in frontend/.", status_code=503)
+
+
+# --- Realtime Public Polling APIs (with Cloudflare Edge Micro-Caching) ---
 
 @app.get("/api/all")
 async def get_all_data():
@@ -1265,10 +1328,12 @@ async def get_all_data():
         data = await refresh_cache_if_needed(2.5)
     else:
         data = CACHE_DATA
+    # Micro-cache: edge cache for 3s collapses 100 concurrent users into 1 origin poll every 3s.
     return JSONResponse(
         data,
-        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+        headers={"Cache-Control": "public, max-age=1, s-maxage=3, stale-while-revalidate=5"},
     )
+
 
 @app.get("/api/overview")
 async def get_overview():
@@ -1279,7 +1344,7 @@ async def get_overview():
         data = CACHE_DATA
     return JSONResponse(
         data,
-        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+        headers={"Cache-Control": "public, max-age=1, s-maxage=3, stale-while-revalidate=5"},
     )
 
 if __name__ == "__main__":

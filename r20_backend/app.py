@@ -19,7 +19,7 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(SCRIPTS_DIR))
 
 from fastapi import FastAPI, Header, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Response
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
 from pydantic import BaseModel, Field
@@ -99,7 +99,12 @@ app = FastAPI(title="R20 Quantum Trader Standalone Backend", version="6.5.2", li
 async def admin_session_context(request: Request, call_next):
     token = REQUEST_SESSION.set(request.headers.get("X-R20-Session", ""))
     try:
-        return await call_next(request)
+        response = await call_next(request)
+        path = request.url.path
+        # Guarantee admin routes and sensitive account endpoints never get cached by Cloudflare or public CDNs
+        if path.startswith("/api/v1/admin") or path.startswith("/admin") or path.startswith("/api/v1/account"):
+            response.headers["Cache-Control"] = "private, no-cache, no-store, must-revalidate"
+        return response
     finally:
         REQUEST_SESSION.reset(token)
 
@@ -548,6 +553,27 @@ def update_status() -> dict[str, Any]:
     except RuntimeError as exc:
         return {"error": str(exc)}
 
+
+@app.get("/robots.txt", include_in_schema=False)
+def top_robots_txt() -> Response:
+    rf = ROOT / "frontend" / "dist" / "robots.txt"
+    if rf.is_file():
+        return FileResponse(str(rf), media_type="text/plain", headers={"Cache-Control": "public, max-age=86400, s-maxage=604800"})
+    pf = ROOT / "frontend" / "public" / "robots.txt"
+    if pf.is_file():
+        return FileResponse(str(pf), media_type="text/plain", headers={"Cache-Control": "public, max-age=86400, s-maxage=604800"})
+    return PlainTextResponse("User-agent: *\nAllow: /\nAllow: /docs\nAllow: /images/\nDisallow: /admin/\nDisallow: /api/\nSitemap: https://www.r20.cn/sitemap.xml\n")
+
+
+@app.get("/sitemap.xml", include_in_schema=False)
+def top_sitemap_xml() -> Response:
+    sf = ROOT / "frontend" / "dist" / "sitemap.xml"
+    if sf.is_file():
+        return FileResponse(str(sf), media_type="application/xml", headers={"Cache-Control": "public, max-age=86400, s-maxage=604800"})
+    pf = ROOT / "frontend" / "public" / "sitemap.xml"
+    if pf.is_file():
+        return FileResponse(str(pf), media_type="application/xml", headers={"Cache-Control": "public, max-age=86400, s-maxage=604800"})
+    return Response(content="""<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>https://www.r20.cn/</loc><priority>1.0</priority></url><url><loc>https://www.r20.cn/docs</loc><priority>0.8</priority></url></urlset>""", media_type="application/xml")
 
 
 @app.get("/admin", include_in_schema=False)
