@@ -547,12 +547,17 @@ def runtime_overview() -> dict[str, Any]:
         file_health("news_sentiment.json", 10 * 60),
         file_health("trading_ledger.json", 15 * 60),
     ]
+    all_fresh = all(h.get("fresh", False) for h in health_files)
+    health_payload = {
+        "overall": "LIVE" if all_fresh else "STALE",
+        "files": health_files,
+    }
     positions_payload = read_json("position_trackers.json", {})
     return {
         "service": {"version": "7.2.1", "pid": os.getpid(), "uptime_seconds": int(time.time() - STARTED_AT)},
         "credentials": {"okx": bool(settings.okx_api_key and settings.okx_secret_key and settings.okx_passphrase), "llm": bool(settings.llm_api_key)},
         "configuration": get_admin_configuration(),
-        "data_health": health_files,
+        "data_health": health_payload,
         "decisions": decision_summary(),
         "trackers": len(positions_payload) if isinstance(positions_payload, dict) else 0,
         "logs": {
@@ -757,11 +762,27 @@ ADMIN_LOG_SOURCES = {"trader": "ai_factor_trader.log", "backend": "r20_backend.l
 
 
 @app.get("/api/v1/admin/runtime")
-def admin_runtime(x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
+def admin_runtime(x_r20_admin_token: str | None = Header(default=None), x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
     refresh_settings()
-    require_admin_header(x_r20_admin_token)
+    require_admin_header(x_r20_admin_token, x_r20_session)
     payload = runtime_overview()
-    payload["full_decisions"] = read_json("ai_brain_decisions.json", {})
+    raw_decisions = read_json("ai_brain_decisions.json", {})
+    if isinstance(raw_decisions, dict):
+        full_list = []
+        for k, v in raw_decisions.items():
+            if isinstance(v, dict):
+                full_list.append({
+                    "instId": v.get("instId", k),
+                    "action": v.get("decision", {}).get("action", v.get("action", "WAIT")),
+                    "confidence": (v.get("decision", {}).get("confidence", v.get("confidence", 0.0)) or 0.0) / (100.0 if (v.get("decision", {}).get("confidence", 0) or 0) > 1 else 1.0),
+                    "timestamp": v.get("time_str", str(v.get("timestamp", ""))),
+                    "reason": v.get("decision", {}).get("summary_reason") or v.get("thought_process", {}).get("market_structure") or v.get("reason", ""),
+                })
+        payload["full_decisions"] = full_list
+    elif isinstance(raw_decisions, list):
+        payload["full_decisions"] = raw_decisions
+    else:
+        payload["full_decisions"] = []
     payload["llm_runtime"] = get_active_llm_runtime()
     return payload
 

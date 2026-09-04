@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useApi } from '../../composables/useApi'
 import {
@@ -22,6 +22,47 @@ const router = useRouter()
 const { api } = useApi()
 const runtime = ref<any>(null)
 const loading = ref(true)
+
+function duration(s: number | null): string {
+  if (s == null) return '--'
+  if (s < 60) return `${s}s`
+  if (s < 3600) return `${Math.floor(s / 60)}m`
+  return `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m`
+}
+
+const formattedDecisions = computed(() => {
+  const d = runtime.value?.full_decisions
+  if (!d) return []
+  if (Array.isArray(d)) return d
+  if (typeof d === 'object') {
+    return Object.entries(d).map(([k, v]: [string, any]) => ({
+      instId: v.instId || k,
+      action: v.decision?.action || v.action || 'WAIT',
+      confidence: (v.decision?.confidence ?? v.confidence ?? 0) > 1 ? (v.decision?.confidence ?? v.confidence ?? 0) / 100 : (v.decision?.confidence ?? v.confidence ?? 0),
+      timestamp: v.time_str || (v.timestamp ? String(v.timestamp) : '--'),
+      reason: v.decision?.summary_reason || v.thought_process?.market_structure || v.reason || '',
+    }))
+  }
+  return []
+})
+
+const dataHealthFiles = computed(() => {
+  const dh = runtime.value?.data_health
+  if (!dh) return []
+  if (Array.isArray(dh)) return dh
+  if (Array.isArray(dh.files)) return dh.files
+  return []
+})
+
+const dataHealthOverall = computed(() => {
+  const dh = runtime.value?.data_health
+  if (!dh) return 'UNKNOWN'
+  if (typeof dh === 'object' && dh.overall) return dh.overall
+  if (Array.isArray(dh)) {
+    return dh.every((f: any) => f.fresh) ? 'LIVE' : 'STALE'
+  }
+  return 'UNKNOWN'
+})
 
 async function loadRuntime() {
   loading.value = true
@@ -46,13 +87,6 @@ async function loadRuntime() {
 onMounted(() => {
   loadRuntime()
 })
-
-function duration(s: number | null): string {
-  if (s == null) return '--'
-  if (s < 60) return `${s}s`
-  if (s < 3600) return `${Math.floor(s / 60)}m`
-  return `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m`
-}
 
 const quickNav = [
   { label: '提示词策略工作室', desc: '语义变量与预设方案', route: '/admin/promptlib', icon: FileText },
@@ -262,9 +296,9 @@ const quickNav = [
             </div>
 
             <!-- Decisions List -->
-            <div v-if="runtime.full_decisions && runtime.full_decisions.length" class="space-y-2">
+            <div v-if="formattedDecisions.length" class="space-y-2">
               <div
-                v-for="d in runtime.full_decisions"
+                v-for="d in formattedDecisions"
                 :key="d.instId"
                 class="p-3 rounded-lg border font-mono text-xs transition-colors"
                 style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);"
@@ -317,12 +351,12 @@ const quickNav = [
               <span
                 class="px-2 py-0.5 rounded text-[10px] font-mono font-bold border"
                 :style="{
-                  backgroundColor: runtime.data_health?.overall === 'LIVE' ? 'var(--color-up-bg)' : 'var(--color-down-bg)',
-                  borderColor: runtime.data_health?.overall === 'LIVE' ? 'var(--color-up-border)' : 'var(--color-down-border)',
-                  color: runtime.data_health?.overall === 'LIVE' ? 'var(--color-up)' : 'var(--color-down)'
+                  backgroundColor: dataHealthOverall === 'LIVE' ? 'var(--color-up-bg)' : 'var(--color-down-bg)',
+                  borderColor: dataHealthOverall === 'LIVE' ? 'var(--color-up-border)' : 'var(--color-down-border)',
+                  color: dataHealthOverall === 'LIVE' ? 'var(--color-up)' : 'var(--color-down)'
                 }"
               >
-                {{ runtime.data_health?.overall || 'UNKNOWN' }}
+                {{ dataHealthOverall }}
               </span>
             </div>
 
@@ -337,12 +371,12 @@ const quickNav = [
               </thead>
               <tbody class="divide-y" style="border-color: var(--border-subtle);">
                 <tr
-                  v-for="(x, idx) in runtime.data_health?.files || []"
+                  v-for="(x, idx) in dataHealthFiles"
                   :key="idx"
                   class="hover:bg-[var(--bg-card-subtle)] transition-colors"
                 >
                   <td class="py-2.5 font-bold" style="color: var(--text-main);">
-                    {{ x.file }}
+                    {{ x.file || x.name }}
                   </td>
                   <td class="py-2.5">
                     <span
