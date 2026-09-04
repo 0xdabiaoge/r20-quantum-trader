@@ -150,8 +150,10 @@ def list_plugins() -> list[dict[str, Any]]:
 
 def get_plugin_detail(filename: str) -> dict[str, Any]:
     ensure_plugins_dir()
-    file_path = PLUGINS_DIR / filename
-    if not file_path.exists() or not filename.endswith(".py"):
+    if not filename.endswith(".py") or "/" in filename or "\\" in filename or ".." in filename:
+        raise FileNotFoundError(f"无效的插件文件名: {filename}")
+    file_path = (PLUGINS_DIR / filename).resolve()
+    if not file_path.is_relative_to(PLUGINS_DIR.resolve()) or not file_path.exists():
         raise FileNotFoundError(f"插件不存在: {filename}")
 
     meta = parse_plugin_metadata(file_path)
@@ -163,7 +165,7 @@ def get_plugin_detail(filename: str) -> dict[str, Any]:
 
 def save_plugin_code(filename: str, code: str) -> dict[str, Any]:
     ensure_plugins_dir()
-    if not filename.endswith(".py") or "/" in filename or "\\" in filename:
+    if not filename.endswith(".py") or "/" in filename or "\\" in filename or ".." in filename:
         raise ValueError("无效的插件文件名")
 
     # Validate Python syntax before saving
@@ -172,7 +174,9 @@ def save_plugin_code(filename: str, code: str) -> dict[str, Any]:
     except SyntaxError as err:
         raise ValueError(f"代码语法校验失败 (第 {err.lineno} 行): {err.msg}") from err
 
-    file_path = PLUGINS_DIR / filename
+    file_path = (PLUGINS_DIR / filename).resolve()
+    if not file_path.is_relative_to(PLUGINS_DIR.resolve()):
+        raise ValueError("插件文件路径越界")
     tmp_path = file_path.with_suffix(".tmp")
     tmp_path.write_text(code, encoding="utf-8")
     os.replace(tmp_path, file_path)
@@ -205,10 +209,12 @@ def create_plugin(filename: str, code: str) -> dict[str, Any]:
     ensure_plugins_dir()
     if not filename.endswith(".py"):
         filename = f"{filename}.py"
-    if "/" in filename or "\\" in filename:
+    if "/" in filename or "\\" in filename or ".." in filename:
         raise ValueError("无效的文件名")
 
-    file_path = PLUGINS_DIR / filename
+    file_path = (PLUGINS_DIR / filename).resolve()
+    if not file_path.is_relative_to(PLUGINS_DIR.resolve()):
+        raise ValueError("插件文件路径越界")
     if file_path.exists():
         raise FileExistsError(f"插件文件已存在: {filename}")
 
@@ -232,10 +238,12 @@ def create_plugin(filename: str, code: str) -> dict[str, Any]:
 
 def delete_plugin(filename: str) -> bool:
     ensure_plugins_dir()
-    if not filename.endswith(".py") or "/" in filename or "\\" in filename:
+    if not filename.endswith(".py") or "/" in filename or "\\" in filename or ".." in filename:
         raise ValueError("无效的文件名")
 
-    file_path = PLUGINS_DIR / filename
+    file_path = (PLUGINS_DIR / filename).resolve()
+    if not file_path.is_relative_to(PLUGINS_DIR.resolve()):
+        raise ValueError("插件文件路径越界")
     if not file_path.exists():
         raise FileNotFoundError(f"插件不存在: {filename}")
 

@@ -45,6 +45,20 @@ def mask(value: str, visible: int = 4) -> str:
     return f"{value[:visible]}{'*' * 8}{value[-visible:]}"
 
 
+def mask_url(url: str, visible_tail: int = 6) -> str:
+    """Mask token/key inside webhook URLs like https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxxx."""
+    if not url:
+        return ""
+    if "?" in url:
+        base, query = url.split("?", 1)
+        if len(query) <= visible_tail:
+            return f"{base}?{'*' * 8}"
+        return f"{base}?key={'*' * 8}{query[-visible_tail:]}"
+    if len(url) <= 12:
+        return "*" * len(url)
+    return f"{url[:12]}{'*' * 8}{url[-visible_tail:]}"
+
+
 def remove_env(keys: set[str] | list[str] | tuple[str, ...]) -> None:
     targets = set(keys)
     existing = ENV_FILE.read_text(encoding="utf-8").splitlines() if ENV_FILE.exists() else []

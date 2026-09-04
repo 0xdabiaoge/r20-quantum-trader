@@ -92,7 +92,7 @@ async def lifespan(_: FastAPI):
     stop_gateway_supervisor()
 
 
-app = FastAPI(title="R20 Quantum Trader Standalone Backend", version="6.5.2", lifespan=lifespan, docs_url="/api/docs", redoc_url="/api/redoc")
+app = FastAPI(title="R20 Quantum Trader Standalone Backend", version="6.6.0", lifespan=lifespan, docs_url="/api/docs", redoc_url="/api/redoc")
 
 
 @app.middleware("http")
@@ -511,7 +511,7 @@ def runtime_overview() -> dict[str, Any]:
     ]
     positions_payload = read_json("position_trackers.json", {})
     return {
-        "service": {"version": "6.5.2", "pid": os.getpid(), "uptime_seconds": int(time.time() - STARTED_AT)},
+        "service": {"version": "6.6.0", "pid": os.getpid(), "uptime_seconds": int(time.time() - STARTED_AT)},
         "credentials": {"okx": bool(settings.okx_api_key and settings.okx_secret_key and settings.okx_passphrase), "llm": bool(settings.llm_api_key)},
         "configuration": get_admin_configuration(),
         "data_health": health_files,
@@ -1314,10 +1314,10 @@ def admin_about(x_r20_admin_token: str | None = Header(default=None)) -> dict[st
     import platform
     store = GatewayStore(GATEWAY_DB_PATH)
     return {
-        "product": {"name": "R20 Quantum Trader", "version": "6.5.2", "control_plane": "R20 Gateway Runtime", "gateway_version": GATEWAY_VERSION},
+        "product": {"name": "R20 Quantum Trader", "version": "6.6.0", "control_plane": "R20 Gateway Runtime", "gateway_version": GATEWAY_VERSION},
         "runtime": {"python": platform.python_version(), "platform": platform.platform(), "backend_pid": os.getpid(), "gateway": gateway_status(x_r20_admin_token)},
         "components": [
-            {"name": "FastAPI Control Plane", "version": "6.5.2"},
+            {"name": "FastAPI Control Plane", "version": "6.6.0"},
             {"name": "Gateway Event Runtime", "version": GATEWAY_VERSION},
             {"name": "SQLite", "version": __import__("sqlite3").sqlite_version},
         ],
@@ -1542,9 +1542,10 @@ def notification_config(x_r20_session: str | None = Header(default=None, alias="
     refresh_settings()
     require_admin_header(x_r20_admin_token, x_r20_session)
     env = notification_env()
+    from r20_backend.settings_store import mask_url
     return {
-        "webhook": {"enabled": env.get("R20_NOTIFY_WEBHOOK_ENABLED", "0") == "1", "url": env.get("R20_NOTIFICATION_WEBHOOK", "")},
-        "wechat": {"enabled": env.get("R20_NOTIFY_WECHAT_ENABLED", "0") == "1", "webhook": env.get("R20_WECHAT_WEBHOOK", "")},
+        "webhook": {"enabled": env.get("R20_NOTIFY_WEBHOOK_ENABLED", "0") == "1", "url": mask_url(env.get("R20_NOTIFICATION_WEBHOOK", ""))},
+        "wechat": {"enabled": env.get("R20_NOTIFY_WECHAT_ENABLED", "0") == "1", "webhook": mask_url(env.get("R20_WECHAT_WEBHOOK", ""))},
         "telegram": {"enabled": env.get("R20_NOTIFY_TELEGRAM_ENABLED", "0") == "1", "bot_token": mask(env.get("R20_TELEGRAM_BOT_TOKEN", "")), "chat_id": env.get("R20_TELEGRAM_CHAT_ID", ""), "api_base": env.get("R20_TELEGRAM_API_BASE", "")},
         "qq": {"enabled": env.get("R20_NOTIFY_QQ_ENABLED", "0") == "1", "app_id": env.get("R20_QQ_APP_ID", ""), "client_secret": mask(env.get("R20_QQ_CLIENT_SECRET", "")), "openid": env.get("R20_QQ_OPENID", "")},
     }
@@ -2057,7 +2058,7 @@ def run_backup(payload: BackupRequest, x_r20_admin_token: str | None = Header(de
 def health() -> dict[str, Any]:
     return {
         "service": "r20-standalone-backend",
-        "version": "6.5.2",
+        "version": "6.6.0",
         "status": "ok",
         "timestamp": int(time.time()),
         "credentials": {
@@ -2071,7 +2072,7 @@ def health() -> dict[str, Any]:
 @app.get("/api/v1/status")
 def status() -> dict[str, Any]:
     return {
-        "version": "6.5.2",
+        "version": "6.6.0",
         "mode": "read_only_control_plane",
         "scripts": [
             script_state("ai_factor_trader.py"),
@@ -2086,7 +2087,7 @@ def status() -> dict[str, Any]:
 
 
 @app.get("/api/v1/cache/{resource}")
-def cache(resource: str) -> JSONResponse:
+def cache(resource: str, x_r20_admin_token: str | None = Header(default=None), x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> JSONResponse:
     allowed = {
         "decisions": "ai_brain_decisions.json",
         "factors": "factor_library_snapshot.json",
@@ -2097,6 +2098,9 @@ def cache(resource: str) -> JSONResponse:
     filename = allowed.get(resource)
     if not filename:
         raise HTTPException(status_code=404, detail="unknown cache resource")
+    # Private ledger contains historical financial profit/loss records; require admin auth
+    if resource == "ledger":
+        require_admin_header(x_r20_admin_token, x_r20_session)
     return JSONResponse(read_json(filename, {} if resource != "ledger" else []))
 
 

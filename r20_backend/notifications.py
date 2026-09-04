@@ -38,7 +38,7 @@ def _env() -> dict[str, str]:
 
 
 def _post_json(url: str, payload: dict[str, Any], headers: dict[str, str] | None = None) -> tuple[bool, str, dict[str, Any]]:
-    request_headers = {"Content-Type": "application/json", "User-Agent": "R20-Standalone/6.5.2"}
+    request_headers = {"Content-Type": "application/json", "User-Agent": "R20-Standalone/6.6.0"}
     request_headers.update(headers or {})
     request = urllib.request.Request(url, data=json.dumps(payload, ensure_ascii=False).encode("utf-8"), headers=request_headers, method="POST")
     try:

@@ -1300,9 +1300,13 @@ async def admin_spa_root_trailing(request: Request):
 async def admin_spa_deep_link(request: Request, subpath: str):
     """Vue Router history mode: any /admin/* deep link or refresh serves the SPA shell.
     Real files under dist/admin (e.g. legacy.html) keep priority."""
-    candidate = os.path.normpath(os.path.join(VUE_DIST_DIR, "admin", subpath))
-    if candidate.startswith(os.path.join(VUE_DIST_DIR, "admin")) and os.path.isfile(candidate):
-        return FileResponse(candidate, headers={"Cache-Control": "private, no-cache, no-store, must-revalidate"})
+    admin_dir = Path(VUE_DIST_DIR, "admin").resolve()
+    try:
+        candidate = (admin_dir / subpath).resolve()
+        if candidate.is_relative_to(admin_dir) and candidate.is_file():
+            return FileResponse(str(candidate), headers={"Cache-Control": "private, no-cache, no-store, must-revalidate"})
+    except (ValueError, OSError):
+        pass
     return await admin_spa_root(request)
 
 

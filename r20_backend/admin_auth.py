@@ -144,6 +144,9 @@ class AdminAuthStore:
             if row and not failure_message:
                 digest, _, _ = _hash_password(password, bytes.fromhex(row["salt"]), int(row["iterations"]))
                 valid = hmac.compare_digest(digest, row["password_hash"])
+            elif not row and not failure_message:
+                # Constant-time dummy computation to prevent username enumeration via timing side-channel
+                _hash_password(password, b"\x00" * 24, PBKDF2_ITERATIONS)
             if not valid and not failure_message:
                 if row:
                     failures = int(row["failed_attempts"]) + 1

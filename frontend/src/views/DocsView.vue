@@ -91,8 +91,8 @@ onUnmounted(() => {
             class="px-1.5 sm:px-2 py-0.2 rounded text-[10px] font-mono border font-bold shrink-0 whitespace-nowrap"
             style="background-color: var(--color-brand-bg); color: var(--color-brand); border-color: var(--color-brand-border);"
           >
-            <span class="hidden md:inline">v6.5.2 官方开发与使用指南</span>
-            <span class="hidden sm:inline md:hidden">v6.5.2 指南</span>
+            <span class="hidden md:inline">v6.6.0 官方开发与使用指南</span>
+            <span class="hidden sm:inline md:hidden">v6.6.0 指南</span>
             <span class="sm:hidden">DOCS</span>
           </span>
         </div>
