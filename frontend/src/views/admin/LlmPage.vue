@@ -1,154 +1,358 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useApi } from '../../composables/useApi'
 import {
   Cpu,
   Plus,
   Zap,
   Trash2,
-  Pencil,
   CheckCircle2,
   AlertCircle,
-  Server,
   RefreshCw,
-  ExternalLink,
   Copy,
   Check,
-  LayoutGrid,
-  List,
-  Flame,
-  KeyRound,
-  Network,
+  Search,
+  ArrowLeft,
+  Settings,
+  Layers,
+  Eye,
+  EyeOff,
+  DownloadCloud,
+  Wrench,
+  Image as ImageIcon,
+  MessageSquare,
+  Sparkles,
 } from 'lucide-vue-next'
 
 const { api } = useApi()
+
+// State
 const cfg = ref<any>(null)
 const loading = ref(true)
-const testResult = ref<any>(null)
-const testLoading = ref(false)
-const testingModelId = ref<string | null>(null)
-const modalVisible = ref(false)
-const editingModel = ref<any>(null)
-const copiedId = ref<string | null>(null)
-const viewMode = ref<'cards' | 'table'>('cards')
+const searchQuery = ref('')
 
-const form = ref<any>({
+// Navigation: 'list' (一级：供应商列表) | 'detail' (二级：供应商配置与模型详情)
+const currentView = ref<'list' | 'detail'>('list')
+const selectedProvider = ref<any>(null)
+const detailTab = ref<'config' | 'models'>('config')
+
+// Password visibility toggles
+const showApiKey = ref(false)
+
+// Edit / Add Provider Form
+const providerForm = ref<any>({
   id: '',
   name: '',
-  api_format: 'openai_chat',
-  base_url: 'https://api.openai.com/v1',
+  type: 'OpenAI',
+  group: '其他',
+  enabled: true,
+  multi_key_enabled: false,
+  response_api_enabled: false,
+  base_url: '',
   api_key: '',
-  provider_name: '',
-  reasoning_effort: 'high',
+  api_path: '/chat/completions',
   description: '',
 })
 
-const presets = [
-  { label: 'DeepSeek R1', id: 'deepseek-reasoner', name: 'DeepSeek R1 (满血推理)', api_format: 'openai_chat', base_url: 'https://api.deepseek.com/v1', provider: 'DeepSeek 官方', effort: 'high' },
-  { label: 'Gemini 2.5 Flash', id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', api_format: 'openai_chat', base_url: 'https://generativelanguage.googleapis.com/v1beta/openai', provider: 'Google AI Studio', effort: 'high' },
-  { label: 'Claude 3.7 Sonnet', id: 'claude-3-7-sonnet-20250219', name: 'Claude 3.7 Sonnet', api_format: 'claude_messages', base_url: 'https://api.anthropic.com/v1', provider: 'Anthropic 官方', effort: 'high' },
-  { label: 'OpenAI o3-mini', id: 'o3-mini', name: 'OpenAI o3-mini', api_format: 'openai_responses', base_url: 'https://api.openai.com/v1', provider: 'OpenAI 官方', effort: 'high' },
-  { label: 'Qwen 2.5 72B', id: 'qwen-max-latest', name: '通义千问 Qwen Max', api_format: 'openai_chat', base_url: 'https://dashscope.aliyuncs.com/compatible-mode/v1', provider: '阿里云百炼', effort: 'medium' },
-]
+// Test Connection State
+const testResult = ref<any>(null)
+const testLoading = ref(false)
+const testingModelId = ref<string | null>(null)
 
-function applyPreset(p: typeof presets[0]) {
-  form.value.id = p.id
-  form.value.name = p.name
-  form.value.api_format = p.api_format
-  form.value.base_url = p.base_url
-  form.value.provider_name = p.provider
-  form.value.reasoning_effort = p.effort
-}
+// Remote Fetch State & Modal
+const fetchModalVisible = ref(false)
+const fetchingRemote = ref(false)
+const remoteFetchResult = ref<any>(null)
+const remoteSearch = ref('')
+const customFetchUrl = ref('')
+const customFetchKey = ref('')
 
-function copyUrl(url: string, id: string) {
-  navigator.clipboard.writeText(url)
-  copiedId.value = id
-  setTimeout(() => {
-    copiedId.value = null
-  }, 1800)
-}
+// Add / Edit Single Model Modal
+const modelModalVisible = ref(false)
+const editingModel = ref<any>(null)
+const modelForm = ref<any>({
+  id: '',
+  name: '',
+  provider_id: '',
+  capabilities: ['chat'],
+  reasoning_effort: 'high',
+  context_length: 128000,
+  description: '',
+})
 
+// Copied feedback
+const copiedText = ref<string | null>(null)
+
+// ----------------- Data Loading -----------------
 async function loadConfig() {
   loading.value = true
   try {
     cfg.value = await api('/api/v1/admin/llm/models')
+    if (selectedProvider.value) {
+      const updated = cfg.value.providers?.find((p: any) => p.id === selectedProvider.value.id)
+      if (updated) {
+        selectedProvider.value = updated
+      }
+    }
   } catch (e: any) {
-    console.error(e)
+    console.error('Failed to load LLM config:', e)
   } finally {
     loading.value = false
   }
 }
 
-function openModal(m: any | null) {
-  editingModel.value = m
-  if (m) {
-    form.value = {
-      id: m.id,
-      name: m.name,
-      api_format: m.api_format || 'openai_chat',
-      base_url: m.base_url,
-      api_key: '',
-      provider_name: m.provider_name,
-      reasoning_effort: m.reasoning_effort || 'high',
-      description: m.description,
-    }
-  } else {
-    form.value = {
-      id: '',
-      name: '',
-      api_format: 'openai_chat',
-      base_url: 'https://api.openai.com/v1',
-      api_key: '',
-      provider_name: '',
-      reasoning_effort: 'high',
-      description: '',
-    }
+// ----------------- Filtered Providers -----------------
+const filteredProviders = computed(() => {
+  if (!cfg.value?.providers) return []
+  const q = searchQuery.value.trim().toLowerCase()
+  if (!q) return cfg.value.providers
+  return cfg.value.providers.filter((p: any) =>
+    p.name.toLowerCase().includes(q) ||
+    (p.type && p.type.toLowerCase().includes(q)) ||
+    (p.group && p.group.toLowerCase().includes(q)) ||
+    (p.id && p.id.toLowerCase().includes(q))
+  )
+})
+
+// ----------------- Provider Actions -----------------
+function selectProvider(p: any) {
+  selectedProvider.value = p
+  providerForm.value = {
+    id: p.id,
+    name: p.name,
+    type: p.type || p.name,
+    group: p.group || '其他',
+    enabled: !!p.enabled,
+    multi_key_enabled: !!p.multi_key_enabled,
+    response_api_enabled: !!p.response_api_enabled,
+    base_url: p.base_url || '',
+    api_key: '',
+    api_path: p.api_path || '/chat/completions',
+    description: p.description || '',
   }
-  modalVisible.value = true
+  detailTab.value = 'config'
+  currentView.value = 'detail'
+  testResult.value = null
+  showApiKey.value = false
 }
 
-async function saveModel() {
+function goBackToList() {
+  currentView.value = 'list'
+  selectedProvider.value = null
+  testResult.value = null
+}
+
+async function toggleProviderQuick(p: any, e: Event) {
+  e.stopPropagation()
   try {
-    const payload = { ...form.value }
+    const res = await api(`/api/v1/admin/llm/providers/${encodeURIComponent(p.id)}/toggle`, {
+      method: 'POST',
+      body: JSON.stringify({ enabled: !p.enabled }),
+    })
+    p.enabled = res.enabled
+    await loadConfig()
+  } catch (err: any) {
+    alert(err.message)
+  }
+}
+
+async function saveProviderConfig() {
+  try {
+    const payload = { ...providerForm.value }
     if (!payload.api_key) delete payload.api_key
-    await api('/api/v1/admin/llm/models', { method: 'POST', body: JSON.stringify(payload) })
-    modalVisible.value = false
+    await api('/api/v1/admin/llm/providers', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+    alert('供应商配置已成功保存！')
     await loadConfig()
-  } catch (e: any) {
-    alert(e.message)
+  } catch (err: any) {
+    alert(err.message)
   }
 }
 
-async function activateModel(id: string, effort: string) {
+async function clearCurrentProviderModels() {
+  if (!selectedProvider.value) return
+  if (!confirm(`确定要清空 ${selectedProvider.value.name} 旗下的全部模型吗？`)) return
   try {
-    await api('/api/v1/admin/llm/activate', { method: 'POST', body: JSON.stringify({ model_id: id, reasoning_effort: effort }) })
+    await api(`/api/v1/admin/llm/providers/${encodeURIComponent(selectedProvider.value.id)}/models`, {
+      method: 'DELETE',
+    })
+    alert('已清空该供应商所有模型！')
     await loadConfig()
-  } catch (e: any) {
-    alert(e.message)
+  } catch (err: any) {
+    alert(err.message)
   }
 }
 
-async function deleteModel(id: string) {
-  if (!confirm(`确定删除模型 ${id}？`)) return
+// ----------------- Remote Fetch -----------------
+function openFetchDialog() {
+  if (!selectedProvider.value) return
+  customFetchUrl.value = selectedProvider.value.base_url || ''
+  customFetchKey.value = ''
+  remoteFetchResult.value = null
+  remoteSearch.value = ''
+  fetchModalVisible.value = true
+}
+
+async function executeRemoteFetch() {
+  if (!selectedProvider.value) return
+  fetchingRemote.value = true
+  remoteFetchResult.value = null
   try {
-    await api(`/api/v1/admin/llm/models/${encodeURIComponent(id)}`, { method: 'DELETE' })
-    await loadConfig()
-  } catch (e: any) {
-    alert(e.message)
+    const payload: any = {
+      provider_id: selectedProvider.value.id,
+      base_url: customFetchUrl.value.trim() || selectedProvider.value.base_url,
+    }
+    if (customFetchKey.value.trim()) {
+      payload.api_key = customFetchKey.value.trim()
+    }
+    const res = await api('/api/v1/admin/llm/fetch-models', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+    remoteFetchResult.value = res
+  } catch (err: any) {
+    remoteFetchResult.value = { ok: false, error: err.message }
+  } finally {
+    fetchingRemote.value = false
   }
 }
 
-async function runTest(m: any) {
+const filteredRemoteModels = computed(() => {
+  if (!remoteFetchResult.value?.models) return []
+  const q = remoteSearch.value.trim().toLowerCase()
+  if (!q) return remoteFetchResult.value.models
+  return remoteFetchResult.value.models.filter((m: any) =>
+    m.id.toLowerCase().includes(q) ||
+    (m.name && m.name.toLowerCase().includes(q))
+  )
+})
+
+async function importRemoteModel(m: any, autoActivate = false) {
+  if (!selectedProvider.value) return
+  try {
+    const payload = {
+      id: m.id,
+      name: m.name || m.id,
+      provider_id: selectedProvider.value.id,
+      provider_name: selectedProvider.value.name,
+      base_url: selectedProvider.value.base_url,
+      api_format: m.api_format || selectedProvider.value.api_format || 'openai_chat',
+      reasoning_type: m.reasoning_type || 'auto',
+      reasoning_effort: m.default_effort || 'high',
+      capabilities: m.capabilities || ['chat'],
+      context_length: m.context_length,
+      description: m.description ? m.description.slice(0, 100) : '从远端一键自动收录',
+    }
+    await api('/api/v1/admin/llm/models', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+    if (autoActivate) {
+      await api('/api/v1/admin/llm/activate', {
+        method: 'POST',
+        body: JSON.stringify({ model_id: m.id, reasoning_effort: payload.reasoning_effort }),
+      })
+    }
+    await loadConfig()
+    alert(autoActivate ? `已收录并激活主脑为 ${m.id}！` : `已成功添加 ${m.id} 到模型列表！`)
+  } catch (err: any) {
+    alert(err.message)
+  }
+}
+
+// ----------------- Model Management -----------------
+function openAddModelModal() {
+  if (!selectedProvider.value) return
+  editingModel.value = null
+  modelForm.value = {
+    id: '',
+    name: '',
+    provider_id: selectedProvider.value.id,
+    capabilities: ['chat'],
+    reasoning_effort: 'high',
+    context_length: 128000,
+    description: '',
+  }
+  modelModalVisible.value = true
+}
+
+function openEditModelModal(m: any) {
+  editingModel.value = m
+  modelForm.value = {
+    id: m.id,
+    name: m.name || m.id,
+    provider_id: selectedProvider.value?.id || m.provider_id,
+    capabilities: m.capabilities || ['chat'],
+    reasoning_effort: m.reasoning_effort || 'high',
+    context_length: m.context_length || 128000,
+    description: m.description || '',
+  }
+  modelModalVisible.value = true
+}
+
+async function saveModelForm() {
+  if (!selectedProvider.value) return
+  try {
+    const payload = {
+      ...modelForm.value,
+      provider_id: selectedProvider.value.id,
+      provider_name: selectedProvider.value.name,
+      base_url: selectedProvider.value.base_url,
+      api_format: selectedProvider.value.api_format || 'openai_chat',
+    }
+    await api('/api/v1/admin/llm/models', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+    modelModalVisible.value = false
+    await loadConfig()
+  } catch (err: any) {
+    alert(err.message)
+  }
+}
+
+async function activateModel(m: any) {
+  try {
+    await api('/api/v1/admin/llm/activate', {
+      method: 'POST',
+      body: JSON.stringify({
+        model_id: m.id,
+        reasoning_effort: m.reasoning_effort || 'high',
+      }),
+    })
+    await loadConfig()
+  } catch (err: any) {
+    alert(err.message)
+  }
+}
+
+async function deleteSingleModel(modelId: string) {
+  if (!confirm(`确定删除模型 ${modelId} 吗？`)) return
+  try {
+    await api(`/api/v1/admin/llm/models/${encodeURIComponent(modelId)}`, {
+      method: 'DELETE',
+    })
+    await loadConfig()
+  } catch (err: any) {
+    alert(err.message)
+  }
+}
+
+// ----------------- Test Connection -----------------
+async function runTestModel(m: any) {
   testLoading.value = true
   testingModelId.value = m.id
   testResult.value = null
   try {
+    const prov = selectedProvider.value || cfg.value?.providers?.find((p: any) => p.id === m.provider_id)
     testResult.value = await api('/api/v1/admin/llm/test', {
       method: 'POST',
       body: JSON.stringify({
         model: m.id,
-        base_url: m.base_url,
-        api_format: m.api_format || 'openai_chat',
+        base_url: prov?.base_url || m.base_url,
+        api_format: prov?.api_format || m.api_format || 'openai_chat',
         reasoning_effort: m.reasoning_effort || 'auto',
       }),
     })
@@ -160,10 +364,22 @@ async function runTest(m: any) {
   }
 }
 
-function apiFormatBadge(fmt: string): string {
-  if (fmt === 'claude_messages') return 'Claude Messages'
-  if (fmt === 'openai_responses') return 'OpenAI Responses'
-  return 'OpenAI Chat'
+function copyToClipboard(txt: string) {
+  navigator.clipboard.writeText(txt)
+  copiedText.value = txt
+  setTimeout(() => {
+    copiedText.value = null
+  }, 1800)
+}
+
+function toggleCapability(cap: string) {
+  const caps = modelForm.value.capabilities
+  const idx = caps.indexOf(cap)
+  if (idx > -1) {
+    caps.splice(idx, 1)
+  } else {
+    caps.push(cap)
+  }
 }
 
 onMounted(() => {
@@ -172,548 +388,784 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="space-y-4 max-w-[2160px] mx-auto">
-    <!-- Header Strip -->
-    <div
-      class="rounded-xl border p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs transition-colors"
-      style="background-color: var(--bg-card); border-color: var(--border-subtle);"
-    >
-      <div>
-        <div class="flex items-center space-x-2">
-          <Cpu class="w-4 h-4" style="color: var(--color-brand);" />
-          <h1 class="text-sm sm:text-base font-black font-mono tracking-wide" style="color: var(--text-main);">
-            LLM 多模型连接与供应商中心
-          </h1>
-          <span
-            class="px-2 py-0.2 rounded text-[10px] font-mono font-bold border"
-            style="background-color: var(--color-brand-bg); color: var(--color-brand); border-color: var(--color-brand-border);"
-          >
-            3 大协议全兼容
-          </span>
-        </div>
-        <p class="text-xs font-mono mt-1" style="color: var(--text-muted);">
-          统一纳管 OpenAI Chat、OpenAI Responses 与 Claude Messages 协议；支持长链思考强度（Reasoning Effort）动态适配。
-        </p>
-      </div>
-
-      <div class="flex items-center space-x-2 shrink-0">
-        <!-- View Mode Switcher -->
-        <div class="flex items-center rounded-lg border p-0.5" style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);">
-          <button
-            @click="viewMode = 'cards'"
-            class="p-1.5 rounded-md text-xs font-mono transition-all cursor-pointer"
-            :style="viewMode === 'cards' ? { backgroundColor: 'var(--bg-card)', color: 'var(--text-main)', boxShadow: '0 1px 2px rgba(0,0,0,0.1)' } : { color: 'var(--text-faint)' }"
-            title="卡片视图"
-          >
-            <LayoutGrid class="w-3.5 h-3.5" />
-          </button>
-          <button
-            @click="viewMode = 'table'"
-            class="p-1.5 rounded-md text-xs font-mono transition-all cursor-pointer"
-            :style="viewMode === 'table' ? { backgroundColor: 'var(--bg-card)', color: 'var(--text-main)', boxShadow: '0 1px 2px rgba(0,0,0,0.1)' } : { color: 'var(--text-faint)' }"
-            title="表格视图"
-          >
-            <List class="w-3.5 h-3.5" />
-          </button>
-        </div>
-
-        <button
-          @click="openModal(null)"
-          class="flex items-center justify-center space-x-1.5 px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer shadow-xs"
-          style="background-color: var(--text-main); color: var(--bg-card);"
-        >
-          <Plus class="w-3.5 h-3.5" />
-          <span>添加自定义模型</span>
-        </button>
-      </div>
-    </div>
-
-    <!-- Loading State -->
-    <div v-if="loading" class="py-16 text-center text-xs font-mono" style="color: var(--text-muted);">
-      <RefreshCw class="w-6 h-6 animate-spin mx-auto mb-2" style="color: var(--color-brand);" />
-      <span>正在加载模型连接库...</span>
-    </div>
-
-    <template v-else-if="cfg">
-      <!-- Active Model Hero Bento -->
+  <div class="space-y-4 max-w-4xl mx-auto font-sans text-xs">
+    <!-- VIEW 1: 供应商列表页 (对应截图 1) -->
+    <template v-if="currentView === 'list'">
+      <!-- Top Title & Navigation Bar -->
       <div
-        class="rounded-xl border p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xs transition-colors"
+        class="rounded-2xl border p-4 sm:p-5 flex items-center justify-between shadow-xs transition-colors"
         style="background-color: var(--bg-card); border-color: var(--border-subtle);"
       >
-        <div class="flex items-start sm:items-center space-x-3.5">
+        <div class="flex items-center space-x-3">
           <div
-            class="w-11 h-11 rounded-xl flex items-center justify-center border shrink-0 mt-0.5 sm:mt-0"
-            style="background-color: var(--color-up-bg); border-color: var(--color-up-border); color: var(--color-up);"
+            class="w-10 h-10 rounded-xl flex items-center justify-center border shadow-xs"
+            style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle); color: var(--color-brand);"
           >
-            <Zap class="w-5 h-5 animate-pulse" />
+            <Cpu class="w-5 h-5" />
           </div>
           <div>
-            <div class="flex items-center space-x-2">
-              <span class="text-[10px] font-mono font-bold uppercase tracking-wider" style="color: var(--color-up);">
-                ● 当前全局决策生效主脑
-              </span>
-              <span
-                class="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold border"
-                style="background-color: var(--color-brand-bg); color: var(--color-brand); border-color: var(--color-brand-border);"
-              >
-                生产部署中
-              </span>
-            </div>
-            <div class="text-base sm:text-lg font-black font-mono tracking-tight mt-0.5" style="color: var(--text-main);">
-              {{ cfg.active_model_id }}
-            </div>
-            <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-mono mt-1" style="color: var(--text-muted);">
-              <span>供应商: <strong style="color: var(--text-main);">{{ cfg.models?.find((m: any) => m.id === cfg.active_model_id)?.provider_name || '官方/代理' }}</strong></span>
-              <span>·</span>
-              <span class="flex items-center space-x-1">
-                <span>Base URL:</span>
-                <span class="num-tabular font-bold" style="color: var(--text-main);">{{ cfg.models?.find((m: any) => m.id === cfg.active_model_id)?.base_url }}</span>
-              </span>
-            </div>
+            <h1 class="text-base sm:text-lg font-bold tracking-tight" style="color: var(--text-main);">
+              供应商
+            </h1>
+            <p class="text-[11px]" style="color: var(--text-muted);">
+              管理 AI 模型渠道矩阵与 API 密钥直连配置
+            </p>
           </div>
         </div>
 
-        <div class="flex flex-wrap items-center gap-2 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0" style="border-color: var(--border-subtle);">
-          <span
-            class="px-2.5 py-1 rounded-lg border text-xs font-mono font-bold"
-            style="background-color: var(--bg-badge); border-color: var(--border-subtle); color: var(--text-main);"
-          >
-            思考强度: {{ cfg.active_reasoning_effort?.toUpperCase() || 'HIGH' }}
-          </span>
-          <span
-            class="px-2.5 py-1 rounded-lg border text-xs font-mono font-bold"
-            style="background-color: var(--color-brand-bg); border-color: var(--color-brand-border); color: var(--color-brand);"
-          >
-            {{ apiFormatBadge(cfg.models?.find((m: any) => m.id === cfg.active_model_id)?.api_format || 'openai_chat') }}
-          </span>
+        <!-- Right Quick Actions -->
+        <div class="flex items-center space-x-2">
           <button
-            @click="runTest(cfg.models?.find((m: any) => m.id === cfg.active_model_id))"
-            :disabled="testLoading"
-            class="flex items-center space-x-1.5 px-3 py-1 rounded-lg border text-xs font-mono font-bold cursor-pointer transition-all shadow-xs"
-            style="background-color: var(--bg-card-subtle); border-color: var(--border-medium); color: var(--text-main);"
+            @click="loadConfig"
+            class="p-2 rounded-xl border text-xs cursor-pointer transition-all hover:opacity-80"
+            style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle); color: var(--text-muted);"
+            title="刷新状态"
           >
-            <RefreshCw class="w-3.5 h-3.5" :class="testLoading && testingModelId === cfg.active_model_id ? 'animate-spin' : ''" />
-            <span>诊断主脑连通性</span>
+            <RefreshCw class="w-4 h-4" :class="loading ? 'animate-spin' : ''" />
           </button>
         </div>
       </div>
 
-      <!-- Test Result Diagnostic Box -->
-      <div
-        v-if="testResult"
-        class="rounded-xl border p-4 transition-all shadow-xs font-mono text-xs"
-        :style="{
-          backgroundColor: testResult.ok ? 'var(--color-up-bg)' : 'var(--color-down-bg)',
-          borderColor: testResult.ok ? 'var(--color-up-border)' : 'var(--color-down-border)',
-          color: testResult.ok ? 'var(--color-up)' : 'var(--color-down)'
-        }"
-      >
-        <div class="flex items-center justify-between mb-1.5">
-          <div class="flex items-center space-x-2 font-bold text-sm">
-            <CheckCircle2 v-if="testResult.ok" class="w-4 h-4" />
-            <AlertCircle v-else class="w-4 h-4" />
-            <span>{{ testResult.ok ? `模型网关连接成功 (耗时: ${testResult.latency_ms}ms)` : '连接测试未通过' }}</span>
-          </div>
-          <span class="text-[10px] opacity-75 font-mono">HTTP 200 OK</span>
-        </div>
-
-        <div v-if="testResult.ok" class="space-y-1 text-xs" style="color: var(--text-main);">
-          <div>响应输出: <span class="font-bold">{{ testResult.response_preview }}</span></div>
-          <div v-if="testResult.reasoning_detected" style="color: var(--color-up);" class="font-bold flex items-center space-x-1">
-            <span>🧠 成功捕获链式推演输出</span>
-            <span class="text-[11px] opacity-80">(Reasoning Tokens: {{ testResult.reasoning_tokens || '已成功识别' }})</span>
-          </div>
-        </div>
-        <div v-else class="text-xs break-all" style="color: var(--color-down);">
-          {{ testResult.error || '连通性测试超时或未收到有效响应' }}
-        </div>
+      <!-- Search Box (对应截图 1 顶部的搜索栏) -->
+      <div class="relative">
+        <input
+          v-model="searchQuery"
+          placeholder="搜索供应商或分组"
+          class="w-full rounded-2xl px-4 py-3 pl-11 text-xs outline-none border transition-colors shadow-xs"
+          style="background-color: var(--bg-card); border-color: var(--border-subtle); color: var(--text-main);"
+        />
+        <Search class="w-4 h-4 absolute left-4 top-3.5 text-gray-400 pointer-events-none" />
       </div>
 
-      <!-- Model Library Container -->
-      <div class="space-y-3">
-        <div class="flex items-center justify-between px-1">
-          <div class="flex items-center space-x-2">
-            <Server class="w-4 h-4" style="color: var(--text-muted);" />
-            <h2 class="text-xs font-black font-mono uppercase tracking-wide" style="color: var(--text-main);">
-              已配置模型连接库 ({{ cfg.models?.length || 0 }} 个模型)
-            </h2>
-          </div>
-          <span class="text-[11px] font-mono" style="color: var(--text-faint);">
-            点击「一键启用」即刻热加载至交易主脑
-          </span>
-        </div>
-
-        <!-- Mode 1: Bento Cards View (Organized & Uncrowded) -->
-        <div v-if="viewMode === 'cards'" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5">
-          <div
-            v-for="m in cfg.models"
-            :key="m.id"
-            class="rounded-xl border p-4 flex flex-col justify-between space-y-3 transition-all shadow-xs hover:border-[var(--border-strong)]"
-            :style="{
-              backgroundColor: m.id === cfg.active_model_id ? 'var(--bg-card)' : 'var(--bg-card)',
-              borderColor: m.id === cfg.active_model_id ? 'var(--color-up-border)' : 'var(--border-subtle)',
-              boxShadow: m.id === cfg.active_model_id ? '0 0 0 1px var(--color-up-border)' : 'none'
-            }"
-          >
-            <!-- Card Header -->
-            <div class="space-y-1.5">
-              <div class="flex items-start justify-between gap-2">
-                <div>
-                  <div class="flex items-center space-x-2">
-                    <span class="font-bold text-sm font-mono" style="color: var(--text-main);">{{ m.name || m.id }}</span>
-                    <span
-                      v-if="m.id === cfg.active_model_id"
-                      class="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold border"
-                      style="background-color: var(--color-up-bg); border-color: var(--color-up-border); color: var(--color-up);"
-                    >
-                      当前活跃
-                    </span>
-                  </div>
-                  <div class="text-[11px] font-mono num-tabular mt-0.5" style="color: var(--text-faint);">{{ m.id }}</div>
-                </div>
-
-                <!-- Protocol Badge -->
-                <span
-                  class="px-2 py-0.5 rounded text-[10px] font-mono font-bold border shrink-0"
-                  style="background-color: var(--bg-badge); border-color: var(--border-subtle); color: var(--text-muted);"
-                >
-                  {{ apiFormatBadge(m.api_format) }}
-                </span>
-              </div>
-
-              <!-- Metadata Row -->
-              <div class="flex flex-wrap items-center gap-2 pt-1 text-[11px] font-mono">
-                <span class="px-2 py-0.5 rounded border" style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle); color: var(--text-muted);">
-                  渠道: <strong style="color: var(--text-main);">{{ m.provider_name || '自定义' }}</strong>
-                </span>
-                <span class="px-2 py-0.5 rounded border" style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle); color: var(--text-muted);">
-                  思考: <strong style="color: var(--text-main);">{{ (m.reasoning_effort || 'high').toUpperCase() }}</strong>
-                </span>
-              </div>
-            </div>
-
-            <!-- Base URL Strip -->
+      <!-- Providers List Container -->
+      <div
+        class="rounded-2xl border overflow-hidden shadow-xs divide-y transition-colors"
+        style="background-color: var(--bg-card); border-color: var(--border-subtle);"
+      >
+        <div
+          v-for="prov in filteredProviders"
+          :key="prov.id"
+          @click="selectProvider(prov)"
+          class="p-4 flex items-center justify-between hover:bg-[var(--bg-card-subtle)] transition-colors cursor-pointer group"
+          style="border-color: var(--border-subtle);"
+        >
+          <!-- Left: Provider Logo / Icon & Name -->
+          <div class="flex items-center space-x-3.5">
+            <!-- Icon Avatar -->
             <div
-              class="px-2.5 py-1.5 rounded-lg border flex items-center justify-between text-[11px] font-mono"
+              class="w-10 h-10 rounded-xl flex items-center justify-center border font-bold text-sm shrink-0 transition-transform group-hover:scale-105"
               style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);"
             >
-              <div class="truncate mr-2" style="color: var(--text-muted);" :title="m.base_url">
-                {{ m.base_url }}
-              </div>
-              <button
-                @click="copyUrl(m.base_url, m.id)"
-                class="shrink-0 p-1 rounded hover:bg-[var(--bg-card)] text-[10px] cursor-pointer transition-colors"
-                style="color: var(--text-faint);"
-                title="复制端点 URL"
-              >
-                <Check v-if="copiedId === m.id" class="w-3.5 h-3.5 text-emerald-400" />
-                <Copy v-else class="w-3.5 h-3.5" />
-              </button>
+              <span v-if="prov.id === 'openai'" class="text-emerald-500">❖</span>
+              <span v-else-if="prov.id === 'siliconflow'" class="text-purple-500">⚡</span>
+              <span v-else-if="prov.id === 'gemini'" class="text-blue-500">✦</span>
+              <span v-else-if="prov.id === 'openrouter'" class="text-indigo-500">◈</span>
+              <span v-else-if="prov.id === 'deepseek'" class="text-sky-500">🐳</span>
+              <span v-else-if="prov.id === 'claude'" class="text-amber-500">✳</span>
+              <span v-else-if="prov.id === 'grok'" class="text-neutral-300">Ø</span>
+              <span v-else-if="prov.id === 'volcengine'" class="text-cyan-500">📶</span>
+              <span v-else-if="prov.id === 'dashscope'" class="text-orange-500">[-]</span>
+              <span v-else-if="prov.id === 'zhipu'" class="text-violet-500">◆</span>
+              <span v-else class="text-blue-400">❖</span>
             </div>
 
-            <!-- Card Actions Footer -->
-            <div class="pt-2 border-t flex items-center justify-between gap-2" style="border-color: var(--border-subtle);">
-              <div class="flex items-center space-x-1.5">
-                <button
-                  @click="runTest(m)"
-                  :disabled="testLoading && testingModelId === m.id"
-                  class="flex items-center space-x-1 px-2.5 py-1 rounded-lg border text-xs font-mono font-medium transition-all cursor-pointer shadow-xs"
-                  style="background-color: var(--bg-card-subtle); border-color: var(--border-medium); color: var(--text-main);"
-                >
-                  <RefreshCw class="w-3 h-3" :class="testLoading && testingModelId === m.id ? 'animate-spin' : ''" />
-                  <span>测试</span>
-                </button>
-                <button
-                  @click="openModal(m)"
-                  class="px-2.5 py-1 rounded-lg border text-xs font-mono font-medium transition-all cursor-pointer shadow-xs"
-                  style="background-color: var(--bg-card-subtle); border-color: var(--border-medium); color: var(--text-main);"
-                >
-                  编辑
-                </button>
-                <button
-                  v-if="m.id !== cfg.active_model_id"
-                  @click="deleteModel(m.id)"
-                  class="p-1 rounded-lg border text-xs font-mono transition-all cursor-pointer shadow-xs hover:opacity-80"
-                  style="background-color: var(--color-down-bg); border-color: var(--color-down-border); color: var(--color-down);"
-                  title="从模型库删除"
-                >
-                  <Trash2 class="w-3.5 h-3.5" />
-                </button>
-              </div>
-
-              <!-- Main Switch Action -->
-              <div>
+            <!-- Provider Name & Subtitle -->
+            <div>
+              <div class="flex items-center space-x-2">
+                <span class="font-bold text-sm" style="color: var(--text-main);">{{ prov.name }}</span>
                 <span
-                  v-if="m.id === cfg.active_model_id"
-                  class="text-[11px] font-mono font-bold flex items-center space-x-1"
-                  style="color: var(--color-up);"
+                  v-if="prov.models?.some((m: any) => m.id === cfg?.active_model_id)"
+                  class="px-1.5 py-0.2 rounded text-[9px] font-bold border"
+                  style="background-color: var(--color-up-bg); border-color: var(--color-up-border); color: var(--color-up);"
                 >
-                  <CheckCircle2 class="w-3.5 h-3.5" />
-                  <span>生效中</span>
+                  主脑活跃
                 </span>
-                <button
-                  v-else
-                  @click="activateModel(m.id, m.reasoning_effort)"
-                  class="px-3 py-1 rounded-lg text-xs font-mono font-bold border transition-all cursor-pointer shadow-xs"
-                  style="background-color: var(--text-main); color: var(--bg-card); border-color: var(--text-main);"
-                >
-                  一键启用
-                </button>
+              </div>
+              <div class="text-[11px] mt-0.5" style="color: var(--text-faint);">
+                {{ prov.models_count || 0 }} 个模型 · {{ prov.group || '其他' }}
               </div>
             </div>
           </div>
-        </div>
 
-        <!-- Mode 2: Compact Normalized Table View -->
-        <div
-          v-else
-          class="rounded-xl border shadow-xs transition-colors overflow-hidden"
-          style="background-color: var(--bg-card); border-color: var(--border-subtle);"
-        >
-          <div class="overflow-x-auto">
-            <table class="w-full text-left text-xs font-mono whitespace-nowrap">
-              <thead>
-                <tr
-                  class="border-b text-[11px] uppercase tracking-wider"
-                  style="border-color: var(--border-subtle); background-color: var(--bg-card-subtle); color: var(--text-muted);"
-                >
-                  <th class="py-3 px-4 font-bold">模型名称 / ID</th>
-                  <th class="py-3 px-3 font-bold">协议格式</th>
-                  <th class="py-3 px-3 font-bold">供应商</th>
-                  <th class="py-3 px-3 font-bold">思考强度</th>
-                  <th class="py-3 px-3 font-bold">Base URL</th>
-                  <th class="py-3 px-4 text-right font-bold">操作与调度</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr
-                  v-for="m in cfg.models"
-                  :key="m.id"
-                  class="border-b last:border-b-0 transition-colors hover:bg-[var(--bg-card-hover)]"
-                  :style="{
-                    backgroundColor: m.id === cfg.active_model_id ? 'var(--color-brand-bg)' : 'transparent',
-                    borderColor: 'var(--border-subtle)'
-                  }"
-                >
-                  <!-- 模型 -->
-                  <td class="py-3 px-4">
-                    <div class="flex items-center space-x-2">
-                      <span class="font-bold text-sm" style="color: var(--text-main);">{{ m.name || m.id }}</span>
-                      <span
-                        v-if="m.id === cfg.active_model_id"
-                        class="px-1.5 py-0.2 rounded text-[9px] font-bold border"
-                        style="background-color: var(--color-up-bg); border-color: var(--color-up-border); color: var(--color-up);"
-                      >
-                        活跃
-                      </span>
-                    </div>
-                    <div class="text-[10px] num-tabular" style="color: var(--text-faint);">{{ m.id }}</div>
-                  </td>
+          <!-- Right: Enable / Disable Badge & Chevron Arrow (对齐截图 1) -->
+          <div class="flex items-center space-x-2.5">
+            <!-- Capsule Status Button -->
+            <button
+              @click="toggleProviderQuick(prov, $event)"
+              class="px-3 py-1 rounded-full text-xs font-semibold border transition-all cursor-pointer shadow-2xs"
+              :style="prov.enabled ? {
+                backgroundColor: 'rgba(16, 185, 129, 0.12)',
+                borderColor: 'rgba(16, 185, 129, 0.25)',
+                color: '#10B981',
+              } : {
+                backgroundColor: 'rgba(239, 68, 68, 0.08)',
+                borderColor: 'rgba(239, 68, 68, 0.2)',
+                color: '#F87171',
+              }"
+            >
+              {{ prov.enabled ? '启用' : '禁用' }}
+            </button>
 
-                  <!-- 协议 -->
-                  <td class="py-3 px-3">
-                    <span
-                      class="px-2 py-0.5 rounded text-[10px] font-bold border"
-                      style="background-color: var(--bg-badge); border-color: var(--border-subtle); color: var(--text-muted);"
-                    >
-                      {{ apiFormatBadge(m.api_format) }}
-                    </span>
-                  </td>
-
-                  <!-- 供应商 -->
-                  <td class="py-3 px-3 font-medium" style="color: var(--text-main);">
-                    {{ m.provider_name || '自定义' }}
-                  </td>
-
-                  <!-- 思考强度 -->
-                  <td class="py-3 px-3 font-bold num-tabular" style="color: var(--text-main);">
-                    {{ (m.reasoning_effort || 'high').toUpperCase() }}
-                  </td>
-
-                  <!-- Base URL -->
-                  <td class="py-3 px-3 font-mono text-[11px] max-w-[200px] truncate" style="color: var(--text-muted);" :title="m.base_url">
-                    {{ m.base_url }}
-                  </td>
-
-                  <!-- 操作 -->
-                  <td class="py-3 px-4 text-right space-x-1.5 whitespace-nowrap">
-                    <button
-                      v-if="m.id !== cfg.active_model_id"
-                      @click="activateModel(m.id, m.reasoning_effort)"
-                      class="px-2.5 py-1 rounded-md text-[11px] font-bold border transition-all cursor-pointer shadow-xs"
-                      style="background-color: var(--text-main); color: var(--bg-card); border-color: var(--text-main);"
-                    >
-                      一键启用
-                    </button>
-                    <button
-                      @click="runTest(m)"
-                      :disabled="testLoading && testingModelId === m.id"
-                      class="px-2.5 py-1 rounded-md text-[11px] border transition-all cursor-pointer shadow-xs"
-                      style="background-color: var(--bg-card-subtle); border-color: var(--border-medium); color: var(--text-main);"
-                    >
-                      ⚡ 测试
-                    </button>
-                    <button
-                      @click="openModal(m)"
-                      class="px-2.5 py-1 rounded-md text-[11px] border transition-all cursor-pointer shadow-xs"
-                      style="background-color: var(--bg-card-subtle); border-color: var(--border-medium); color: var(--text-main);"
-                    >
-                      ✏️ 编辑
-                    </button>
-                    <button
-                      v-if="m.id !== cfg.active_model_id"
-                      @click="deleteModel(m.id)"
-                      class="px-2.5 py-1 rounded-md text-[11px] border transition-all cursor-pointer shadow-xs"
-                      style="background-color: var(--color-down-bg); border-color: var(--color-down-border); color: var(--color-down);"
-                    >
-                      删除
-                    </button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+            <!-- Arrow Right -->
+            <span class="text-gray-400 font-bold text-base select-none">›</span>
           </div>
         </div>
       </div>
     </template>
 
-    <!-- Model Add/Edit Modal -->
-    <div
-      v-if="modalVisible"
-      class="fixed inset-0 z-50 bg-black/60 backdrop-blur-md flex items-center justify-center p-3 sm:p-4"
-      @click.self="modalVisible = false"
-    >
+    <!-- VIEW 2: 供应商详情管理 (对应截图 2 配置 & 截图 3 模型) -->
+    <template v-else-if="currentView === 'detail' && selectedProvider">
+      <!-- Detail Top Navigation Bar -->
       <div
-        class="border rounded-2xl w-full max-w-xl shadow-2xl p-5 sm:p-6 space-y-4 font-mono text-xs max-h-[90dvh] overflow-y-auto"
-        style="background-color: var(--bg-card); border-color: var(--border-subtle); color: var(--text-main);"
+        class="rounded-2xl border p-4 flex items-center justify-between shadow-xs transition-colors"
+        style="background-color: var(--bg-card); border-color: var(--border-subtle);"
       >
-        <div class="flex items-center justify-between pb-3 border-b" style="border-color: var(--border-subtle);">
-          <div class="flex items-center space-x-2">
-            <Cpu class="w-4 h-4" style="color: var(--color-brand);" />
-            <h3 class="text-sm font-black uppercase" style="color: var(--text-main);">
-              {{ editingModel ? '编辑模型连接' : '添加自定义模型连接' }}
-            </h3>
+        <button
+          @click="goBackToList"
+          class="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold cursor-pointer transition-all hover:bg-[var(--bg-card-subtle)]"
+          style="background-color: var(--bg-card); border-color: var(--border-subtle); color: var(--text-main);"
+        >
+          <ArrowLeft class="w-4 h-4" />
+          <span>返回</span>
+        </button>
+
+        <div class="flex items-center space-x-2">
+          <div
+            class="w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs"
+            style="background-color: var(--bg-card-subtle); color: var(--color-brand);"
+          >
+            ❖
           </div>
-          <span class="text-[10px] font-mono" style="color: var(--text-faint);">API 凭证加密持久化</span>
+          <span class="font-bold text-sm sm:text-base" style="color: var(--text-main);">
+            {{ selectedProvider.name }}
+          </span>
         </div>
 
-        <!-- Preset Quick Selector (when adding new) -->
-        <div v-if="!editingModel" class="space-y-1.5">
-          <div class="text-[10px] font-bold uppercase" style="color: var(--text-faint);">主流架构一键填入预设:</div>
-          <div class="flex flex-wrap gap-1.5">
+        <div class="w-16"></div>
+      </div>
+
+      <!-- SUB-VIEW A: 「配置」Tab (对齐截图 2) -->
+      <div
+        v-if="detailTab === 'config'"
+        class="space-y-4 rounded-2xl border p-5 shadow-xs transition-colors"
+        style="background-color: var(--bg-card); border-color: var(--border-subtle);"
+      >
+        <!-- Section 1: 管理设置项列表 -->
+        <div class="space-y-1">
+          <div class="text-[11px] font-bold uppercase tracking-wider mb-2" style="color: var(--text-muted);">
+            管理
+          </div>
+
+          <div
+            class="rounded-xl border divide-y overflow-hidden text-xs"
+            style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);"
+          >
+            <!-- 供应商类型 -->
+            <div class="p-3.5 flex items-center justify-between">
+              <span class="font-medium" style="color: var(--text-main);">供应商类型</span>
+              <div class="flex items-center space-x-1" style="color: var(--text-muted);">
+                <span>{{ providerForm.type }}</span>
+                <span class="text-gray-400">›</span>
+              </div>
+            </div>
+
+            <!-- 分组 -->
+            <div class="p-3.5 flex items-center justify-between">
+              <span class="font-medium" style="color: var(--text-main);">分组</span>
+              <div class="flex items-center space-x-1" style="color: var(--text-muted);">
+                <span>{{ providerForm.group }}</span>
+                <span class="text-gray-400">›</span>
+              </div>
+            </div>
+
+            <!-- 是否启用开关 -->
+            <div class="p-3.5 flex items-center justify-between">
+              <span class="font-medium" style="color: var(--text-main);">是否启用</span>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  v-model="providerForm.enabled"
+                  class="sr-only peer"
+                />
+                <div class="w-11 h-6 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+              </label>
+            </div>
+
+            <!-- 多Key模式开关 -->
+            <div class="p-3.5 flex items-center justify-between">
+              <span class="font-medium" style="color: var(--text-main);">多Key模式</span>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  v-model="providerForm.multi_key_enabled"
+                  class="sr-only peer"
+                />
+                <div class="w-11 h-6 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+              </label>
+            </div>
+
+            <!-- Response API (/responses) 开关 -->
+            <div class="p-3.5 flex items-center justify-between">
+              <div>
+                <div class="font-medium" style="color: var(--text-main);">Response API (/responses)</div>
+                <div class="text-[10px]" style="color: var(--text-faint);">针对 OpenAI 新一代结构化 Responses API 协议</div>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  v-model="providerForm.response_api_enabled"
+                  class="sr-only peer"
+                />
+                <div class="w-11 h-6 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 2: 凭据与输入表单区 (对应截图 2 底部字段) -->
+        <div class="space-y-3 pt-2">
+          <!-- 名称 -->
+          <div>
+            <label class="block text-xs font-bold mb-1.5" style="color: var(--text-muted);">名称</label>
+            <input
+              v-model="providerForm.name"
+              placeholder="OpenAI"
+              class="w-full rounded-xl px-4 py-2.5 text-xs outline-none border transition-colors"
+              style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle); color: var(--text-main);"
+            />
+          </div>
+
+          <!-- API Key -->
+          <div>
+            <div class="flex items-center justify-between mb-1.5">
+              <label class="text-xs font-bold" style="color: var(--text-muted);">API Key</label>
+              <span v-if="selectedProvider.has_key" class="text-[10px] text-emerald-500 font-bold">
+                ✓ 密钥已就绪
+              </span>
+            </div>
+            <div class="relative">
+              <input
+                v-model="providerForm.api_key"
+                :type="showApiKey ? 'text' : 'password'"
+                placeholder="••••••••••••••••••••••••"
+                class="w-full rounded-xl px-4 py-2.5 pr-10 text-xs outline-none border transition-colors font-mono"
+                style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle); color: var(--text-main);"
+              />
+              <button
+                type="button"
+                @click="showApiKey = !showApiKey"
+                class="absolute right-3 top-2.5 text-gray-400 hover:text-white cursor-pointer"
+              >
+                <EyeOff v-if="showApiKey" class="w-4 h-4" />
+                <Eye v-else class="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          <!-- API Base URL -->
+          <div>
+            <label class="block text-xs font-bold mb-1.5" style="color: var(--text-muted);">API Base URL</label>
+            <input
+              v-model="providerForm.base_url"
+              placeholder="https://cpa.r20.cn/v1"
+              class="w-full rounded-xl px-4 py-2.5 text-xs outline-none border transition-colors font-mono"
+              style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle); color: var(--text-main);"
+            />
+          </div>
+
+          <!-- API 路径 -->
+          <div>
+            <label class="block text-xs font-bold mb-1.5" style="color: var(--text-muted);">API 路径</label>
+            <input
+              v-model="providerForm.api_path"
+              placeholder="/chat/completions"
+              class="w-full rounded-xl px-4 py-2.5 text-xs outline-none border transition-colors font-mono"
+              style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle); color: var(--text-main);"
+            />
+          </div>
+        </div>
+
+        <!-- Save Button -->
+        <div class="pt-3 flex justify-end">
+          <button
+            @click="saveProviderConfig"
+            class="px-6 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs btn-primary-text"
+            style="background-color: #2563EB; color: #FFFFFF;"
+          >
+            保存供应商配置
+          </button>
+        </div>
+      </div>
+
+      <!-- SUB-VIEW B: 「模型」Tab (对齐截图 3) -->
+      <div v-else-if="detailTab === 'models'" class="space-y-4">
+        <!-- Models List Container -->
+        <div
+          class="rounded-2xl border divide-y overflow-hidden shadow-xs transition-colors"
+          style="background-color: var(--bg-card); border-color: var(--border-subtle);"
+        >
+          <div
+            v-for="m in selectedProvider.models"
+            :key="m.id"
+            class="p-4 flex items-center justify-between hover:bg-[var(--bg-card-subtle)] transition-colors"
+            style="border-color: var(--border-subtle);"
+          >
+            <!-- Left: Model Avatar Icon + Model ID + Badges (对齐截图 3) -->
+            <div class="flex items-center space-x-3.5">
+              <!-- Avatar Sparkle / Model Logo -->
+              <div
+                class="w-9 h-9 rounded-xl flex items-center justify-center border font-bold text-sm shrink-0"
+                style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);"
+              >
+                <Sparkles class="w-4 h-4 text-amber-400" />
+              </div>
+
+              <!-- Model Details -->
+              <div>
+                <div class="flex items-center space-x-2">
+                  <span class="font-bold text-sm tracking-tight" style="color: var(--text-main);">
+                    {{ m.id }}
+                  </span>
+                  <!-- Active Crown Badge -->
+                  <span
+                    v-if="m.id === cfg?.active_model_id"
+                    class="px-1.5 py-0.2 rounded text-[9px] font-bold border"
+                    style="background-color: var(--color-up-bg); border-color: var(--color-up-border); color: var(--color-up);"
+                  >
+                    主脑生效
+                  </span>
+                </div>
+
+                <!-- Capability Badges (对齐截图 3: 聊天、T图>T、锤子等) -->
+                <div class="flex flex-wrap items-center gap-1.5 mt-1.5">
+                  <span
+                    v-if="m.capabilities?.includes('chat')"
+                    class="px-2 py-0.5 rounded-md text-[10px] font-medium border"
+                    style="background-color: rgba(99, 102, 241, 0.1); border-color: rgba(99, 102, 241, 0.2); color: #818CF8;"
+                  >
+                    聊天
+                  </span>
+                  <span
+                    v-if="m.capabilities?.includes('vision')"
+                    class="px-2 py-0.5 rounded-md text-[10px] font-medium border"
+                    style="background-color: rgba(236, 72, 153, 0.1); border-color: rgba(236, 72, 153, 0.2); color: #F472B6;"
+                  >
+                    T图 &gt; T
+                  </span>
+                  <span
+                    v-if="m.capabilities?.includes('tools')"
+                    class="px-1.5 py-0.5 rounded-md text-[10px] border flex items-center"
+                    style="background-color: rgba(59, 130, 246, 0.1); border-color: rgba(59, 130, 246, 0.2); color: #60A5FA;"
+                    title="支持工具调用"
+                  >
+                    <Wrench class="w-3 h-3" />
+                  </span>
+                  <span
+                    v-if="m.capabilities?.includes('reasoning') || m.reasoning_type !== 'none'"
+                    class="px-1.5 py-0.5 rounded-md text-[10px] border flex items-center font-bold text-amber-400"
+                    style="background-color: rgba(245, 158, 11, 0.1); border-color: rgba(245, 158, 11, 0.2);"
+                    title="支持深度链式推演"
+                  >
+                    🧠 CoT
+                  </span>
+                  <span
+                    v-if="m.context_length"
+                    class="text-[10px] font-mono text-gray-400"
+                  >
+                    {{ (m.context_length / 1000).toFixed(0) }}k
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right: Actions (测试、设为主脑、编辑与删除) -->
+            <div class="flex items-center space-x-2">
+              <button
+                @click="runTestModel(m)"
+                :disabled="testLoading && testingModelId === m.id"
+                class="p-2 rounded-xl border text-xs cursor-pointer hover:bg-[var(--bg-card)] transition-colors"
+                style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle); color: var(--text-muted);"
+                title="测试连通性"
+              >
+                <RefreshCw class="w-3.5 h-3.5" :class="testLoading && testingModelId === m.id ? 'animate-spin' : ''" />
+              </button>
+
+              <button
+                v-if="m.id !== cfg?.active_model_id"
+                @click="activateModel(m)"
+                class="px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all cursor-pointer shadow-xs btn-primary-text"
+                style="background-color: #2563EB; color: #FFFFFF;"
+                title="一键设为主脑"
+              >
+                启用
+              </button>
+
+              <button
+                @click="openEditModelModal(m)"
+                class="p-2 rounded-xl border text-xs cursor-pointer hover:bg-[var(--bg-card)] transition-colors"
+                style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle); color: var(--text-muted);"
+                title="编辑参数"
+              >
+                <Settings class="w-3.5 h-3.5" />
+              </button>
+
+              <button
+                @click="deleteSingleModel(m.id)"
+                class="p-2 rounded-xl border text-xs cursor-pointer hover:bg-red-500/10 transition-colors text-red-400"
+                style="border-color: var(--border-subtle);"
+                title="删除该模型"
+              >
+                <Trash2 class="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+
+          <div v-if="!selectedProvider.models?.length" class="py-12 text-center text-xs" style="color: var(--text-muted);">
+            该供应商名下暂未配置模型，点击下方「获取」可一键从远端自动拉取。
+          </div>
+        </div>
+
+        <!-- Diagnostic Response Box -->
+        <div
+          v-if="testResult"
+          class="rounded-xl border p-4 transition-all shadow-xs text-xs"
+          :style="{
+            backgroundColor: testResult.ok ? 'var(--color-up-bg)' : 'var(--color-down-bg)',
+            borderColor: testResult.ok ? 'var(--color-up-border)' : 'var(--color-down-border)',
+            color: testResult.ok ? 'var(--color-up)' : 'var(--color-down)'
+          }"
+        >
+          <div class="flex items-center justify-between mb-1.5">
+            <div class="flex items-center space-x-2 font-bold text-sm">
+              <CheckCircle2 v-if="testResult.ok" class="w-4 h-4" />
+              <AlertCircle v-else class="w-4 h-4" />
+              <span>{{ testResult.ok ? `模型测试通过 (耗时: ${testResult.latency_ms}ms)` : '连通性测试未通过' }}</span>
+            </div>
+            <span class="text-[10px] opacity-75 font-mono">状态: {{ testResult.status_code || 0 }}</span>
+          </div>
+
+          <div v-if="testResult.ok" class="space-y-1 text-xs" style="color: var(--text-main);">
+            <div>输出预览: <span class="font-bold">{{ testResult.response_preview }}</span></div>
+            <div v-if="testResult.reasoning_detected" class="text-emerald-500 font-bold">
+              🧠 成功识别原生长思维链输出
+            </div>
+          </div>
+          <div v-else class="text-xs break-all" style="color: var(--color-down);">
+            {{ testResult.error || '连通性测试超时或未收到有效响应' }}
+          </div>
+        </div>
+
+        <!-- Floating Bottom Operation Bar (对齐截图 3 悬浮底栏: [获取] [+ 添加新模型] [垃圾桶]) -->
+        <div class="flex items-center justify-center pt-2">
+          <div
+            class="flex items-center space-x-3 px-4 py-2 rounded-full border shadow-xl backdrop-blur-md"
+            style="background-color: var(--bg-card); border-color: var(--border-subtle);"
+          >
+            <!-- 获取 (远端一键自动拉取) -->
             <button
-              v-for="p in presets"
-              :key="p.id"
-              @click="applyPreset(p)"
-              class="px-2 py-1 rounded-md border text-[11px] cursor-pointer transition-all hover:border-[var(--text-main)]"
-              style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle); color: var(--text-muted);"
+              @click="openFetchDialog"
+              class="flex items-center space-x-1.5 px-4 py-2 rounded-full font-bold text-xs cursor-pointer border transition-all hover:opacity-90"
+              style="background-color: rgba(99, 102, 241, 0.1); border-color: rgba(99, 102, 241, 0.25); color: #818CF8;"
             >
-              + {{ p.label }}
+              <DownloadCloud class="w-4 h-4" />
+              <span>获取</span>
+            </button>
+
+            <!-- + 添加新模型 (手动录入) -->
+            <button
+              @click="openAddModelModal"
+              class="flex items-center space-x-1.5 px-4 py-2 rounded-full font-bold text-xs cursor-pointer border transition-all hover:opacity-90"
+              style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle); color: var(--text-main);"
+            >
+              <Plus class="w-4 h-4" />
+              <span>添加新模型</span>
+            </button>
+
+            <!-- 清空删除图标 -->
+            <button
+              @click="clearCurrentProviderModels"
+              class="p-2 rounded-full border cursor-pointer hover:bg-red-500/10 transition-colors text-red-400"
+              style="border-color: rgba(239, 68, 68, 0.2); background-color: rgba(239, 68, 68, 0.08);"
+              title="清空该供应商所有模型"
+            >
+              <Trash2 class="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Detail Bottom Tab Bar (对齐截图 2 & 截图 3 的底部「配置」与「模型」双Tab) -->
+      <div
+        class="fixed bottom-3 left-1/2 -translate-x-1/2 z-40 flex items-center rounded-2xl border p-1 shadow-2xl backdrop-blur-lg"
+        style="background-color: var(--bg-card); border-color: var(--border-subtle);"
+      >
+        <button
+          @click="detailTab = 'config'"
+          class="flex items-center space-x-2 px-6 py-2.5 rounded-xl font-bold text-xs cursor-pointer transition-all"
+          :style="detailTab === 'config' ? {
+            backgroundColor: 'var(--color-brand)',
+            color: '#FFFFFF',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+          } : {
+            color: 'var(--text-muted)',
+          }"
+        >
+          <Settings class="w-4 h-4" />
+          <span>配置</span>
+        </button>
+
+        <button
+          @click="detailTab = 'models'"
+          class="flex items-center space-x-2 px-6 py-2.5 rounded-xl font-bold text-xs cursor-pointer transition-all"
+          :style="detailTab === 'models' ? {
+            backgroundColor: 'var(--color-brand)',
+            color: '#FFFFFF',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+          } : {
+            color: 'var(--text-muted)',
+          }"
+        >
+          <Layers class="w-4 h-4" />
+          <span>模型 ({{ selectedProvider.models?.length || 0 }})</span>
+        </button>
+      </div>
+    </template>
+
+    <!-- MODAL A: 远端一键获取模型抽屉/弹窗 -->
+    <div
+      v-if="fetchModalVisible"
+      class="fixed inset-0 z-50 bg-black/60 backdrop-blur-md flex items-center justify-center p-4"
+      @click.self="fetchModalVisible = false"
+    >
+      <div
+        class="border rounded-2xl w-full max-w-2xl shadow-2xl p-5 space-y-4 text-xs max-h-[90dvh] flex flex-col"
+        style="background-color: var(--bg-card); border-color: var(--border-subtle); color: var(--text-main);"
+      >
+        <div class="flex items-center justify-between pb-3 border-b shrink-0" style="border-color: var(--border-subtle);">
+          <div class="flex items-center space-x-2">
+            <DownloadCloud class="w-4 h-4 text-blue-500" />
+            <h3 class="text-sm font-bold uppercase" style="color: var(--text-main);">
+              获取 {{ selectedProvider?.name }} 远端可用模型
+            </h3>
+          </div>
+          <span class="text-[10px]" style="color: var(--text-faint);">探测 /models 兼容端点</span>
+        </div>
+
+        <!-- Probe Configuration -->
+        <div class="p-3.5 rounded-xl border space-y-2.5 shrink-0" style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div>
+              <label class="block text-[11px] font-bold mb-1" style="color: var(--text-muted);">Base URL</label>
+              <input
+                v-model="customFetchUrl"
+                placeholder="https://openrouter.ai/api/v1"
+                class="w-full rounded-lg px-3 py-1.5 text-xs outline-none border font-mono"
+                style="background-color: var(--bg-card); border-color: var(--border-subtle); color: var(--text-main);"
+              />
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold mb-1" style="color: var(--text-muted);">临时覆盖 Key (留空保持已存凭证)</label>
+              <input
+                v-model="customFetchKey"
+                type="password"
+                placeholder="sk-..."
+                class="w-full rounded-lg px-3 py-1.5 text-xs outline-none border font-mono"
+                style="background-color: var(--bg-card); border-color: var(--border-subtle); color: var(--text-main);"
+              />
+            </div>
+          </div>
+
+          <div class="flex justify-end pt-1">
+            <button
+              @click="executeRemoteFetch"
+              :disabled="fetchingRemote"
+              class="flex items-center space-x-1.5 px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-xs btn-primary-text"
+              style="background-color: #2563EB; color: #FFFFFF;"
+            >
+              <RefreshCw class="w-3.5 h-3.5" :class="fetchingRemote ? 'animate-spin' : ''" />
+              <span>{{ fetchingRemote ? '正在探测...' : '开始自动获取' }}</span>
             </button>
           </div>
         </div>
 
-        <!-- Form Fields -->
-        <div class="space-y-3 pt-1">
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label class="block text-[11px] font-bold mb-1" style="color: var(--text-muted);">模型 ID (唯一标识)</label>
-              <input
-                v-model="form.id"
-                :readonly="!!editingModel"
-                placeholder="例如: gemini-2.5-flash"
-                class="w-full rounded-lg px-3 py-2 text-xs font-mono outline-none border transition-colors"
-                style="background-color: var(--bg-input); border-color: var(--border-subtle); color: var(--text-main);"
-              />
-            </div>
-            <div>
-              <label class="block text-[11px] font-bold mb-1" style="color: var(--text-muted);">展示别名</label>
-              <input
-                v-model="form.name"
-                placeholder="例如: Gemini 2.5 Flash"
-                class="w-full rounded-lg px-3 py-2 text-xs font-mono outline-none border transition-colors"
-                style="background-color: var(--bg-input); border-color: var(--border-subtle); color: var(--text-main);"
-              />
-            </div>
+        <!-- Status Banner -->
+        <div v-if="remoteFetchResult" class="shrink-0">
+          <div
+            v-if="remoteFetchResult.ok"
+            class="p-2.5 rounded-xl border text-xs flex items-center justify-between"
+            style="background-color: var(--color-up-bg); border-color: var(--color-up-border); color: var(--color-up);"
+          >
+            <span class="font-bold">✓ 成功探测到 {{ remoteFetchResult.total }} 个可用模型</span>
+            <span class="text-[10px] opacity-80 font-mono">{{ remoteFetchResult.endpoint_used }}</span>
           </div>
+          <div
+            v-else
+            class="p-2.5 rounded-xl border text-xs"
+            style="background-color: var(--color-down-bg); border-color: var(--color-down-border); color: var(--color-down);"
+          >
+            {{ remoteFetchResult.error }}
+          </div>
+        </div>
 
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <!-- Remote Search Box -->
+        <div v-if="remoteFetchResult?.ok" class="relative shrink-0">
+          <input
+            v-model="remoteSearch"
+            placeholder="过滤搜索模型 ID..."
+            class="w-full rounded-xl px-3.5 py-1.5 pl-9 text-xs outline-none border font-mono"
+            style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle); color: var(--text-main);"
+          />
+          <Search class="w-3.5 h-3.5 absolute left-3 top-2.5 text-gray-400 pointer-events-none" />
+        </div>
+
+        <!-- Remote Scroll List -->
+        <div v-if="remoteFetchResult?.ok" class="flex-1 overflow-y-auto space-y-2 pr-1 min-h-[200px]">
+          <div
+            v-for="rm in filteredRemoteModels"
+            :key="rm.id"
+            class="p-3 rounded-xl border flex items-center justify-between hover:border-[var(--border-strong)] transition-colors"
+            style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);"
+          >
             <div>
-              <label class="block text-[11px] font-bold mb-1" style="color: var(--text-muted);">API 协议格式</label>
-              <select
-                v-model="form.api_format"
-                class="w-full rounded-lg px-3 py-2 text-xs font-mono outline-none border transition-colors cursor-pointer"
-                style="background-color: var(--bg-input); border-color: var(--border-subtle); color: var(--text-main);"
+              <div class="font-bold text-xs" style="color: var(--text-main);">{{ rm.name }}</div>
+              <div class="text-[11px] font-mono text-blue-400">{{ rm.id }}</div>
+            </div>
+
+            <div class="flex items-center space-x-2 shrink-0">
+              <button
+                @click="importRemoteModel(rm, false)"
+                class="px-2.5 py-1 rounded-lg text-xs font-medium border cursor-pointer hover:bg-[var(--bg-card)] transition-colors"
+                style="background-color: var(--bg-card); border-color: var(--border-subtle); color: var(--text-main);"
               >
-                <option value="openai_chat">OpenAI Chat (/chat/completions)</option>
-                <option value="openai_responses">OpenAI Responses (/responses)</option>
-                <option value="claude_messages">Claude Messages (/messages)</option>
-              </select>
-            </div>
-            <div>
-              <label class="block text-[11px] font-bold mb-1" style="color: var(--text-muted);">供应商名称 / 渠道渠道</label>
-              <input
-                v-model="form.provider_name"
-                placeholder="例如: 官方直连 / OneAPI / 代理站"
-                class="w-full rounded-lg px-3 py-2 text-xs font-mono outline-none border transition-colors"
-                style="background-color: var(--bg-input); border-color: var(--border-subtle); color: var(--text-main);"
-              />
+                + 添加
+              </button>
+              <button
+                @click="importRemoteModel(rm, true)"
+                class="px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-xs btn-primary-text"
+                style="background-color: #2563EB; color: #FFFFFF;"
+              >
+                添加并启用
+              </button>
             </div>
           </div>
+        </div>
 
+        <div class="flex justify-end pt-3 border-t shrink-0" style="border-color: var(--border-subtle);">
+          <button
+            @click="fetchModalVisible = false"
+            class="px-4 py-1.5 rounded-xl border text-xs cursor-pointer"
+            style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle); color: var(--text-main);"
+          >
+            完成
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL B: 手动添加 / 编辑单模型弹窗 -->
+    <div
+      v-if="modelModalVisible"
+      class="fixed inset-0 z-50 bg-black/60 backdrop-blur-md flex items-center justify-center p-4"
+      @click.self="modelModalVisible = false"
+    >
+      <div
+        class="border rounded-2xl w-full max-w-lg shadow-2xl p-5 sm:p-6 space-y-4 text-xs"
+        style="background-color: var(--bg-card); border-color: var(--border-subtle); color: var(--text-main);"
+      >
+        <div class="flex items-center justify-between pb-3 border-b" style="border-color: var(--border-subtle);">
+          <h3 class="text-sm font-bold uppercase" style="color: var(--text-main);">
+            {{ editingModel ? '编辑模型' : '添加新模型' }}
+          </h3>
+          <span class="text-[10px]" style="color: var(--text-faint);">所属: {{ selectedProvider?.name }}</span>
+        </div>
+
+        <div class="space-y-3">
           <div>
-            <label class="block text-[11px] font-bold mb-1" style="color: var(--text-muted);">API Base URL (端点根路径)</label>
+            <label class="block text-[11px] font-bold mb-1" style="color: var(--text-muted);">模型 ID</label>
             <input
-              v-model="form.base_url"
-              placeholder="https://api.openai.com/v1"
-              class="w-full rounded-lg px-3 py-2 text-xs font-mono outline-none border transition-colors"
-              style="background-color: var(--bg-input); border-color: var(--border-subtle); color: var(--text-main);"
+              v-model="modelForm.id"
+              :readonly="!!editingModel"
+              placeholder="gemini-3.8-flash-high"
+              class="w-full rounded-xl px-3.5 py-2 text-xs outline-none border font-mono"
+              style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle); color: var(--text-main);"
             />
           </div>
 
           <div>
-            <label class="block text-[11px] font-bold mb-1" style="color: var(--text-muted);">
-              API Key (密钥) <span v-if="editingModel" class="text-[10px] font-normal" style="color: var(--text-faint);">(留空保持现有凭证)</span>
-            </label>
+            <label class="block text-[11px] font-bold mb-1" style="color: var(--text-muted);">展示名称</label>
             <input
-              v-model="form.api_key"
-              type="password"
-              placeholder="sk-..."
-              class="w-full rounded-lg px-3 py-2 text-xs font-mono outline-none border transition-colors"
-              style="background-color: var(--bg-input); border-color: var(--border-subtle); color: var(--text-main);"
+              v-model="modelForm.name"
+              placeholder="Gemini 3.8 Flash (高推演)"
+              class="w-full rounded-xl px-3.5 py-2 text-xs outline-none border"
+              style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle); color: var(--text-main);"
             />
           </div>
 
+          <!-- 模型能力标签选择 -->
           <div>
-            <label class="block text-[11px] font-bold mb-1" style="color: var(--text-muted);">思考强度 (Reasoning Effort)</label>
-            <select
-              v-model="form.reasoning_effort"
-              class="w-full rounded-lg px-3 py-2 text-xs font-mono outline-none border transition-colors cursor-pointer"
-              style="background-color: var(--bg-input); border-color: var(--border-subtle); color: var(--text-main);"
-            >
-              <option value="high">HIGH · 深度长链推演 (推荐用于实盘与终审仲裁)</option>
-              <option value="medium">MEDIUM · 均衡推演</option>
-              <option value="low">LOW · 极速响应</option>
-              <option value="auto">AUTO · 自动适配模型默认值</option>
-              <option value="none">NONE · 强制关闭思考</option>
-            </select>
+            <label class="block text-[11px] font-bold mb-1" style="color: var(--text-muted);">能力标签徽标</label>
+            <div class="flex flex-wrap gap-2 pt-1">
+              <button
+                type="button"
+                @click="toggleCapability('chat')"
+                class="px-2.5 py-1 rounded-lg border text-xs font-medium cursor-pointer transition-all"
+                :style="modelForm.capabilities.includes('chat') ? { backgroundColor: 'rgba(99, 102, 241, 0.2)', borderColor: '#818CF8', color: '#818CF8' } : { backgroundColor: 'var(--bg-card-subtle)', borderColor: 'var(--border-subtle)', color: 'var(--text-muted)' }"
+              >
+                聊天 (chat)
+              </button>
+              <button
+                type="button"
+                @click="toggleCapability('vision')"
+                class="px-2.5 py-1 rounded-lg border text-xs font-medium cursor-pointer transition-all"
+                :style="modelForm.capabilities.includes('vision') ? { backgroundColor: 'rgba(236, 72, 153, 0.2)', borderColor: '#F472B6', color: '#F472B6' } : { backgroundColor: 'var(--bg-card-subtle)', borderColor: 'var(--border-subtle)', color: 'var(--text-muted)' }"
+              >
+                T图 &gt; T (vision)
+              </button>
+              <button
+                type="button"
+                @click="toggleCapability('tools')"
+                class="px-2.5 py-1 rounded-lg border text-xs font-medium cursor-pointer transition-all"
+                :style="modelForm.capabilities.includes('tools') ? { backgroundColor: 'rgba(59, 130, 246, 0.2)', borderColor: '#60A5FA', color: '#60A5FA' } : { backgroundColor: 'var(--bg-card-subtle)', borderColor: 'var(--border-subtle)', color: 'var(--text-muted)' }"
+              >
+                工具调用 (tools)
+              </button>
+              <button
+                type="button"
+                @click="toggleCapability('reasoning')"
+                class="px-2.5 py-1 rounded-lg border text-xs font-medium cursor-pointer transition-all"
+                :style="modelForm.capabilities.includes('reasoning') ? { backgroundColor: 'rgba(245, 158, 11, 0.2)', borderColor: '#F59E0B', color: '#F59E0B' } : { backgroundColor: 'var(--bg-card-subtle)', borderColor: 'var(--border-subtle)', color: 'var(--text-muted)' }"
+              >
+                🧠 链式思考 (CoT)
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-[11px] font-bold mb-1" style="color: var(--text-muted);">上下文上限长度 (Tokens)</label>
+            <input
+              v-model.number="modelForm.context_length"
+              type="number"
+              placeholder="1048576"
+              class="w-full rounded-xl px-3.5 py-2 text-xs outline-none border font-mono"
+              style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle); color: var(--text-main);"
+            />
           </div>
         </div>
 
         <div class="flex justify-end space-x-2 pt-3 border-t" style="border-color: var(--border-subtle);">
           <button
-            @click="modalVisible = false"
-            class="px-3.5 py-1.5 rounded-lg border text-xs font-mono cursor-pointer transition-colors"
+            @click="modelModalVisible = false"
+            class="px-4 py-1.5 rounded-xl border text-xs cursor-pointer"
             style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle); color: var(--text-muted);"
           >
             取消
           </button>
           <button
-            @click="saveModel"
-            class="px-4 py-1.5 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer shadow-xs"
-            style="background-color: var(--text-main); color: var(--bg-card);"
+            @click="saveModelForm"
+            class="px-5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs btn-primary-text"
+            style="background-color: #2563EB; color: #FFFFFF;"
           >
-            保存并应用
+            保存模型
           </button>
         </div>
       </div>

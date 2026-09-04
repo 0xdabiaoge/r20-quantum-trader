@@ -5,6 +5,7 @@ Supports:
 3. claude_messages: Anthropic Claude /messages API (Claude 3.7 / 3.5 native)
 """
 from __future__ import annotations
+import copy
 import json
 import os
 import re
@@ -58,11 +59,30 @@ def _detect_reasoning_type(model_id: str) -> str:
     m = model_id.lower()
     if "deepseek-reasoner" in m or "deepseek-r1" in m or "-r1" in m:
         return "deepseek_reasoner"
-    if m.startswith("o1") or m.startswith("o3") or m.startswith("o4") or "gemini" in m or "claude-3-7" in m or "claude" in m:
+    if (
+        m.startswith(("o1", "o3", "o4"))
+        or "/o1" in m or "/o3" in m or "/o4" in m
+        or "gemini" in m
+        or "claude-3-7" in m
+        or "claude-3.7" in m
+        or "qwq" in m
+    ):
         return "standard_effort"
     if "chat" in m or "gpt-4o" in m or "gpt-3" in m or "qwen" in m or "llama" in m:
         return "none"
     return "auto"
+
+
+def _detect_capabilities(model_id: str) -> List[str]:
+    m = model_id.lower()
+    caps = ["chat"]
+    if any(k in m for k in ["vision", "image", "flash", "gpt-4o", "gpt-5", "gemini", "claude", "grok", "muse", "vl", "omni", "multimodal"]):
+        caps.append("vision")
+    if not ("-r1-distill" in m or "-thinking" in m):
+        caps.append("tools")
+    if any(k in m for k in ["reasoner", "r1", "o1", "o3", "o4", "high", "thinking", "qwq", "deepseek-r1"]):
+        caps.append("reasoning")
+    return caps
 
 
 def _detect_api_format(url: str, model_id: str) -> str:
@@ -75,85 +95,563 @@ def _detect_api_format(url: str, model_id: str) -> str:
     return "openai_chat"
 
 
+DEFAULT_PROVIDERS = [
+    {
+        "id": "openai",
+        "name": "OpenAI",
+        "type": "OpenAI",
+        "group": "其他",
+        "enabled": True,
+        "multi_key_enabled": False,
+        "response_api_enabled": False,
+        "base_url": "https://cpa.r20.cn/v1",
+        "api_key": "",
+        "api_format": "openai_chat",
+        "api_path": "/chat/completions",
+        "description": "OpenAI 兼容协议端点，支持中继网关与官方直连",
+        "models": [
+            {
+                "id": "gemini-3.8-flash-high",
+                "name": "gemini-3.8-flash-high",
+                "capabilities": ["chat", "vision", "tools", "reasoning"],
+                "reasoning_type": "standard_effort",
+                "reasoning_effort": "high",
+                "context_length": 1048576,
+                "description": "当前全局生产主力主脑，支持高思考深度长思维链与百万上下文",
+            },
+            {
+                "id": "gemini-3.7-flash-high",
+                "name": "gemini-3.7-flash-high",
+                "capabilities": ["chat", "vision", "tools", "reasoning"],
+                "reasoning_type": "standard_effort",
+                "reasoning_effort": "high",
+                "context_length": 1048576,
+                "description": "Gemini 3.7 Flash 深度推演版，极速响应与强逻辑决策",
+            },
+            {
+                "id": "gemini-3.1-flash-image",
+                "name": "gemini-3.1-flash-image",
+                "capabilities": ["chat", "vision"],
+                "reasoning_type": "none",
+                "reasoning_effort": "none",
+                "context_length": 131072,
+                "description": "Gemini 多模态盘口图表视觉感知模型",
+            },
+            {
+                "id": "gpt-5.6-luna",
+                "name": "gpt-5.6-luna",
+                "capabilities": ["chat", "vision", "tools", "reasoning"],
+                "reasoning_type": "standard_effort",
+                "reasoning_effort": "high",
+                "context_length": 1050000,
+                "description": "2026 最新一代旗舰全模态智能体大模型",
+            },
+            {
+                "id": "gpt-5.4-pro",
+                "name": "gpt-5.4-pro",
+                "capabilities": ["chat", "vision", "tools", "reasoning"],
+                "reasoning_type": "standard_effort",
+                "reasoning_effort": "high",
+                "context_length": 1050000,
+                "description": "GPT-5.4 顶级数理分析与自动化量化建模推理",
+            },
+            {
+                "id": "o3-pro",
+                "name": "o3-pro",
+                "capabilities": ["chat", "tools", "reasoning"],
+                "reasoning_type": "standard_effort",
+                "reasoning_effort": "high",
+                "context_length": 200000,
+                "description": "OpenAI o3 Pro 顶级长思维链数学与因果逻辑推理",
+            },
+            {
+                "id": "o3-mini",
+                "name": "o3-mini",
+                "capabilities": ["chat", "tools", "reasoning"],
+                "reasoning_type": "standard_effort",
+                "reasoning_effort": "high",
+                "context_length": 200000,
+                "description": "OpenAI o3-mini 高性价比快速推演",
+            },
+            {
+                "id": "gpt-4.5-preview",
+                "name": "gpt-4.5-preview",
+                "capabilities": ["chat", "vision", "tools"],
+                "reasoning_type": "none",
+                "reasoning_effort": "none",
+                "context_length": 128000,
+                "description": "OpenAI 知识广度旗舰模型",
+            },
+        ],
+    },
+    {
+        "id": "siliconflow",
+        "name": "SiliconFlow",
+        "type": "SiliconFlow",
+        "group": "国内平台",
+        "enabled": False,
+        "multi_key_enabled": False,
+        "response_api_enabled": False,
+        "base_url": "https://api.siliconflow.cn/v1",
+        "api_key": "",
+        "api_format": "openai_chat",
+        "api_path": "/chat/completions",
+        "description": "硅基流动国内开源大模型高并发托管平台",
+        "models": [
+            {
+                "id": "deepseek-ai/DeepSeek-R1",
+                "name": "DeepSeek R1 满血 (671B)",
+                "capabilities": ["chat", "reasoning"],
+                "reasoning_type": "deepseek_reasoner",
+                "reasoning_effort": "high",
+                "context_length": 65536,
+                "description": "纯血开源强化学习推理架构",
+            },
+            {
+                "id": "deepseek-ai/DeepSeek-V3",
+                "name": "DeepSeek V3 旗舰",
+                "capabilities": ["chat", "tools"],
+                "reasoning_type": "none",
+                "reasoning_effort": "none",
+                "context_length": 65536,
+                "description": "高吞吐通用大语言模型",
+            },
+            {
+                "id": "Qwen/Qwen2.5-72B-Instruct",
+                "name": "Qwen 2.5 72B Instruct",
+                "capabilities": ["chat", "tools"],
+                "reasoning_type": "none",
+                "reasoning_effort": "medium",
+                "context_length": 131072,
+                "description": "通义千问开源 72B 旗舰模型",
+            },
+            {
+                "id": "Pro/deepseek-ai/DeepSeek-R1",
+                "name": "DeepSeek R1 (企业专线)",
+                "capabilities": ["chat", "reasoning"],
+                "reasoning_type": "deepseek_reasoner",
+                "reasoning_effort": "high",
+                "context_length": 65536,
+                "description": "硅基流动专线保障高并发推理",
+            },
+        ],
+    },
+    {
+        "id": "gemini",
+        "name": "Gemini",
+        "type": "Gemini",
+        "group": "官方直连",
+        "enabled": False,
+        "multi_key_enabled": False,
+        "response_api_enabled": False,
+        "base_url": "https://generativelanguage.googleapis.com/v1beta/openai",
+        "api_key": "",
+        "api_format": "openai_chat",
+        "api_path": "/chat/completions",
+        "description": "Google AI Studio 官方原生/OpenAI 兼容端点",
+        "models": [
+            {
+                "id": "gemini-3.8-flash",
+                "name": "Gemini 3.8 Flash (百万上下文)",
+                "capabilities": ["chat", "vision", "tools", "reasoning"],
+                "reasoning_type": "standard_effort",
+                "reasoning_effort": "high",
+                "context_length": 1048576,
+                "description": "最新 3.8 代长思维链极速模型",
+            },
+            {
+                "id": "gemini-3.7-flash",
+                "name": "Gemini 3.7 Flash",
+                "capabilities": ["chat", "vision", "tools", "reasoning"],
+                "reasoning_type": "standard_effort",
+                "reasoning_effort": "high",
+                "context_length": 1048576,
+                "description": "Gemini 3.7 代旗舰思考模型",
+            },
+            {
+                "id": "gemini-2.5-pro",
+                "name": "Gemini 2.5 Pro",
+                "capabilities": ["chat", "vision", "tools", "reasoning"],
+                "reasoning_type": "standard_effort",
+                "reasoning_effort": "high",
+                "context_length": 1048576,
+                "description": "复杂任务综合逻辑推理旗舰",
+            },
+            {
+                "id": "gemini-2.5-flash",
+                "name": "Gemini 2.5 Flash",
+                "capabilities": ["chat", "vision", "tools", "reasoning"],
+                "reasoning_type": "standard_effort",
+                "reasoning_effort": "high",
+                "context_length": 1048576,
+                "description": "高性价比快速多模态模型",
+            },
+        ],
+    },
+    {
+        "id": "openrouter",
+        "name": "OpenRouter",
+        "type": "OpenRouter",
+        "group": "聚合中继",
+        "enabled": False,
+        "multi_key_enabled": False,
+        "response_api_enabled": False,
+        "base_url": "https://openrouter.ai/api/v1",
+        "api_key": "",
+        "api_format": "openai_chat",
+        "api_path": "/chat/completions",
+        "description": "全球模型路由聚合中继，汇集 400+ 最新旗舰模型",
+        "models": [
+            {
+                "id": "google/gemini-3.8-flash",
+                "name": "OpenRouter: Gemini 3.8 Flash",
+                "capabilities": ["chat", "vision", "tools", "reasoning"],
+                "reasoning_type": "standard_effort",
+                "reasoning_effort": "high",
+                "context_length": 1048576,
+                "description": "通过 OpenRouter 路由，自动故障转移",
+            },
+            {
+                "id": "openai/gpt-5.6-luna",
+                "name": "OpenRouter: GPT-5.6 Luna",
+                "capabilities": ["chat", "vision", "tools", "reasoning"],
+                "reasoning_type": "standard_effort",
+                "reasoning_effort": "high",
+                "context_length": 1050000,
+                "description": "2026 前沿旗舰智能体多模态模型",
+            },
+            {
+                "id": "anthropic/claude-3.7-sonnet",
+                "name": "OpenRouter: Claude 3.7 Sonnet",
+                "capabilities": ["chat", "vision", "tools", "reasoning"],
+                "reasoning_type": "standard_effort",
+                "reasoning_effort": "high",
+                "context_length": 200000,
+                "description": "Claude 3.7 原生长思维链推演",
+            },
+            {
+                "id": "deepseek/deepseek-r1-0528",
+                "name": "OpenRouter: DeepSeek R1 0528",
+                "capabilities": ["chat", "reasoning"],
+                "reasoning_type": "deepseek_reasoner",
+                "reasoning_effort": "high",
+                "context_length": 163840,
+                "description": "DeepSeek R1 强化更新版",
+            },
+            {
+                "id": "z-ai/glm-5.3-flash",
+                "name": "OpenRouter: GLM 5.3 Flash",
+                "capabilities": ["chat", "tools", "reasoning"],
+                "reasoning_type": "standard_effort",
+                "reasoning_effort": "high",
+                "context_length": 1310720,
+                "description": "智谱最新百万级超长上下文极速模型",
+            },
+            {
+                "id": "qwen/qwen3.8-flash",
+                "name": "OpenRouter: Qwen 3.8 Flash",
+                "capabilities": ["chat", "tools", "reasoning"],
+                "reasoning_type": "standard_effort",
+                "reasoning_effort": "high",
+                "context_length": 1000000,
+                "description": "通义千问最新一代极速模型",
+            },
+        ],
+    },
+    {
+        "id": "kelivoin",
+        "name": "KelivoIN",
+        "type": "中转服务",
+        "group": "聚合中继",
+        "enabled": False,
+        "multi_key_enabled": False,
+        "response_api_enabled": False,
+        "base_url": "https://api.kelivoin.com/v1",
+        "api_key": "",
+        "api_format": "openai_chat",
+        "api_path": "/chat/completions",
+        "description": "第三方高可用 AI 聚合路由中继",
+        "models": [
+            {"id": "gpt-5-turbo", "name": "GPT-5 Turbo", "capabilities": ["chat", "vision", "tools"], "reasoning_type": "none", "reasoning_effort": "none"},
+            {"id": "claude-3-7-sonnet", "name": "Claude 3.7 Sonnet", "capabilities": ["chat", "vision", "tools", "reasoning"], "reasoning_type": "standard_effort", "reasoning_effort": "high"},
+            {"id": "gemini-3.8-flash", "name": "Gemini 3.8 Flash", "capabilities": ["chat", "vision", "tools", "reasoning"], "reasoning_type": "standard_effort", "reasoning_effort": "high"},
+        ],
+    },
+    {
+        "id": "tensdaq",
+        "name": "Tensdaq",
+        "type": "中转服务",
+        "group": "聚合中继",
+        "enabled": False,
+        "multi_key_enabled": False,
+        "response_api_enabled": False,
+        "base_url": "https://api.tensdaq.com/v1",
+        "api_key": "",
+        "api_format": "openai_chat",
+        "api_path": "/chat/completions",
+        "description": "Tensdaq AI 接口聚合平台",
+        "models": [
+            {"id": "deepseek-r1", "name": "DeepSeek R1", "capabilities": ["chat", "reasoning"], "reasoning_type": "deepseek_reasoner", "reasoning_effort": "high"},
+            {"id": "claude-3-7-sonnet", "name": "Claude 3.7 Sonnet", "capabilities": ["chat", "vision", "tools", "reasoning"], "reasoning_type": "standard_effort", "reasoning_effort": "high"},
+            {"id": "o3-pro", "name": "OpenAI o3 Pro", "capabilities": ["chat", "tools", "reasoning"], "reasoning_type": "standard_effort", "reasoning_effort": "high"},
+        ],
+    },
+    {
+        "id": "deepseek",
+        "name": "DeepSeek",
+        "type": "DeepSeek",
+        "group": "官方直连",
+        "enabled": False,
+        "multi_key_enabled": False,
+        "response_api_enabled": False,
+        "base_url": "https://api.deepseek.com/v1",
+        "api_key": "",
+        "api_format": "openai_chat",
+        "api_path": "/chat/completions",
+        "description": "DeepSeek 官方低延时直连端点",
+        "models": [
+            {"id": "deepseek-chat", "name": "DeepSeek V3.1", "capabilities": ["chat", "tools"], "reasoning_type": "none", "reasoning_effort": "none", "description": "官方通用对话与函数调用模型"},
+            {"id": "deepseek-reasoner", "name": "DeepSeek R1 (满血 671B)", "capabilities": ["chat", "reasoning"], "reasoning_type": "deepseek_reasoner", "reasoning_effort": "high", "description": "官方推理旗舰，深度思考链"},
+            {"id": "deepseek-r1-0528", "name": "DeepSeek R1 0528", "capabilities": ["chat", "reasoning"], "reasoning_type": "deepseek_reasoner", "reasoning_effort": "high", "description": "最新权重增强强化学习版"},
+            {"id": "deepseek-v4-flash-vision-exp", "name": "DeepSeek V4 Flash Vision Exp", "capabilities": ["chat", "vision", "reasoning"], "reasoning_type": "deepseek_reasoner", "reasoning_effort": "high", "description": "下一代多模态推理实验模型"},
+        ],
+    },
+    {
+        "id": "alhubmix",
+        "name": "Alhubmix",
+        "type": "中转服务",
+        "group": "聚合中继",
+        "enabled": False,
+        "multi_key_enabled": False,
+        "response_api_enabled": False,
+        "base_url": "https://api.alhubmix.com/v1",
+        "api_key": "",
+        "api_format": "openai_chat",
+        "api_path": "/chat/completions",
+        "description": "Alhubmix 聚合中转服务",
+        "models": [
+            {"id": "gemini-3.8-flash", "name": "Gemini 3.8 Flash", "capabilities": ["chat", "vision", "tools", "reasoning"], "reasoning_type": "standard_effort", "reasoning_effort": "high"},
+            {"id": "gpt-5.4-pro", "name": "GPT-5.4 Pro", "capabilities": ["chat", "vision", "tools", "reasoning"], "reasoning_type": "standard_effort", "reasoning_effort": "high"},
+        ],
+    },
+    {
+        "id": "suixiang",
+        "name": "随想AI中转站",
+        "type": "中转服务",
+        "group": "聚合中继",
+        "enabled": False,
+        "multi_key_enabled": False,
+        "response_api_enabled": False,
+        "base_url": "https://api.suixiang.ai/v1",
+        "api_key": "",
+        "api_format": "openai_chat",
+        "api_path": "/chat/completions",
+        "description": "随想 AI 聚合中转平台",
+        "models": [
+            {"id": "claude-3-7-sonnet", "name": "Claude 3.7 Sonnet", "capabilities": ["chat", "vision", "tools", "reasoning"], "reasoning_type": "standard_effort", "reasoning_effort": "high"},
+            {"id": "deepseek-r1", "name": "DeepSeek R1", "capabilities": ["chat", "reasoning"], "reasoning_type": "deepseek_reasoner", "reasoning_effort": "high"},
+            {"id": "gemini-3.8-flash", "name": "Gemini 3.8 Flash", "capabilities": ["chat", "vision", "tools", "reasoning"], "reasoning_type": "standard_effort", "reasoning_effort": "high"},
+        ],
+    },
+    {
+        "id": "dashscope",
+        "name": "阿里云千问",
+        "type": "通义千问",
+        "group": "国内平台",
+        "enabled": False,
+        "multi_key_enabled": False,
+        "response_api_enabled": False,
+        "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        "api_key": "",
+        "api_format": "openai_chat",
+        "api_path": "/chat/completions",
+        "description": "阿里云百炼大模型服务平台",
+        "models": [
+            {"id": "qwen-max-latest", "name": "Qwen Max Latest", "capabilities": ["chat", "vision", "tools"], "reasoning_type": "none", "reasoning_effort": "none", "description": "阿里百炼最高性能旗舰"},
+            {"id": "qwen-plus-latest", "name": "Qwen Plus Latest", "capabilities": ["chat", "tools"], "reasoning_type": "none", "reasoning_effort": "none", "description": "高性价比均衡版本"},
+            {"id": "qwq-32b-preview", "name": "QwQ 32B 推理预览", "capabilities": ["chat", "reasoning"], "reasoning_type": "standard_effort", "reasoning_effort": "high", "description": "阿里首款开源深度推演模型"},
+            {"id": "qwen3.8-flash", "name": "Qwen 3.8 Flash", "capabilities": ["chat", "tools"], "reasoning_type": "none", "reasoning_effort": "none", "description": "2026 最新极速千问"},
+        ],
+    },
+    {
+        "id": "zhipu",
+        "name": "智谱",
+        "type": "GLM",
+        "group": "国内平台",
+        "enabled": False,
+        "multi_key_enabled": False,
+        "response_api_enabled": False,
+        "base_url": "https://open.bigmodel.cn/api/paas/v4",
+        "api_key": "",
+        "api_format": "openai_chat",
+        "api_path": "/chat/completions",
+        "description": "智谱 AI BigModel 开放平台",
+        "models": [
+            {"id": "glm-5.3-flash", "name": "GLM 5.3 Flash", "capabilities": ["chat", "tools", "reasoning"], "reasoning_type": "standard_effort", "reasoning_effort": "high", "description": "最新 1.3M 上下文超高速推理"},
+            {"id": "glm-5", "name": "GLM 5 旗舰", "capabilities": ["chat", "vision", "tools", "reasoning"], "reasoning_type": "standard_effort", "reasoning_effort": "high", "description": "智谱第五代通用大模型"},
+            {"id": "glm-4-plus", "name": "GLM 4 Plus", "capabilities": ["chat", "tools"], "reasoning_type": "none", "reasoning_effort": "none", "description": "高泛化综合能力模型"},
+        ],
+    },
+    {
+        "id": "claude",
+        "name": "Claude",
+        "type": "Anthropic",
+        "group": "官方直连",
+        "enabled": False,
+        "multi_key_enabled": False,
+        "response_api_enabled": False,
+        "base_url": "https://api.anthropic.com/v1",
+        "api_key": "",
+        "api_format": "claude_messages",
+        "api_path": "/messages",
+        "description": "Anthropic 官方原生 Messages API 直连",
+        "models": [
+            {"id": "claude-3-7-sonnet-20250219", "name": "Claude 3.7 Sonnet (Thinking)", "capabilities": ["chat", "vision", "tools", "reasoning"], "reasoning_type": "standard_effort", "reasoning_effort": "high", "description": "Anthropic 首款混合思维链模型"},
+            {"id": "claude-fable-5.1", "name": "Claude Fable 5.1", "capabilities": ["chat", "vision", "tools", "reasoning"], "reasoning_type": "standard_effort", "reasoning_effort": "high", "description": "百万上下文长篇综合推演旗舰"},
+            {"id": "claude-3-5-sonnet-20241022", "name": "Claude 3.5 Sonnet v2", "capabilities": ["chat", "vision", "tools"], "reasoning_type": "none", "reasoning_effort": "none", "description": "极强代码与逻辑感知"},
+        ],
+    },
+    {
+        "id": "grok",
+        "name": "Grok",
+        "type": "xAI",
+        "group": "官方直连",
+        "enabled": False,
+        "multi_key_enabled": False,
+        "response_api_enabled": False,
+        "base_url": "https://api.x.ai/v1",
+        "api_key": "",
+        "api_format": "openai_chat",
+        "api_path": "/chat/completions",
+        "description": "xAI 官方 Grok 大模型接口",
+        "models": [
+            {"id": "grok-3", "name": "Grok 3 (最新多模态旗舰)", "capabilities": ["chat", "vision", "tools", "reasoning"], "reasoning_type": "standard_effort", "reasoning_effort": "high", "description": "xAI 顶级算力训练基座"},
+            {"id": "grok-2-1212", "name": "Grok 2", "capabilities": ["chat", "vision", "tools"], "reasoning_type": "none", "reasoning_effort": "none", "description": "高速前沿大模型"},
+        ],
+    },
+    {
+        "id": "volcengine",
+        "name": "火山引擎",
+        "type": "火山引擎",
+        "group": "国内平台",
+        "enabled": False,
+        "multi_key_enabled": False,
+        "response_api_enabled": False,
+        "base_url": "https://ark.cn-beijing.volces.com/api/v3",
+        "api_key": "",
+        "api_format": "openai_chat",
+        "api_path": "/chat/completions",
+        "description": "字节跳动火山方舟大模型服务平台",
+        "models": [
+            {"id": "doubao-1.5-pro-32k", "name": "豆包 1.5 Pro 32K", "capabilities": ["chat", "tools"], "reasoning_type": "none", "reasoning_effort": "none", "description": "高并发低成本主力模型"},
+            {"id": "doubao-1.5-thinking", "name": "豆包 1.5 深度推演版", "capabilities": ["chat", "reasoning"], "reasoning_type": "standard_effort", "reasoning_effort": "high", "description": "长链推演与复杂规划"},
+            {"id": "seed-2-1-turbo", "name": "Seed 2.1 Turbo", "capabilities": ["chat", "tools"], "reasoning_type": "none", "reasoning_effort": "none", "description": "ByteDance 最新代码与推理加速"},
+        ],
+    },
+]
+
+
 def init_llm_config() -> Dict[str, Any]:
-    """Load or initialize clean, user-centric model configuration (no bloated preset lists)."""
+    """Load or initialize clean, user-centric model configuration with multi-provider support."""
     from .config import settings
 
+    data: Dict[str, Any] = {}
     if LLM_CONFIG_FILE.exists():
         try:
             with open(LLM_CONFIG_FILE, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                if isinstance(data, dict) and "models" in data and isinstance(data["models"], list):
-                    return data
+                loaded = json.load(f)
+                if isinstance(loaded, dict):
+                    data = loaded
         except Exception:
-            pass
+            data = {}
 
-    # Check migration from legacy llm_providers.json if present
-    migrated_models = []
-    active_m_id = "gemini-3.8-flash-high"
-    active_effort = "high"
+    # Extract current settings from .env / settings
+    cur_url = getattr(settings, "llm_base_url", "") or os.getenv("LLM_BASE_URL") or "https://cpa.r20.cn/v1"
+    cur_key = getattr(settings, "llm_api_key", "") or os.getenv("LLM_API_KEY") or ""
+    cur_model = getattr(settings, "llm_model", "") or os.getenv("LLM_MODEL") or "gemini-3.8-flash-high"
+    cur_effort = getattr(settings, "llm_reasoning_effort", "") or os.getenv("LLM_REASONING_EFFORT") or "high"
 
-    if LEGACY_PROVIDERS_FILE.exists():
-        try:
-            with open(LEGACY_PROVIDERS_FILE, "r", encoding="utf-8") as f:
-                old = json.load(f)
-                active_pid = old.get("active_provider_id", "")
-                active_m_id = old.get("active_model_id") or active_m_id
-                active_effort = old.get("active_reasoning_effort") or active_effort
-                for p in old.get("providers", []):
-                    p_url = p.get("base_url", "")
-                    p_key = p.get("api_key", "")
-                    p_name = p.get("name", "")
-                    for m in p.get("models", []):
-                        mid = m.get("id")
-                        if not mid:
-                            continue
-                        # Keep only configured models or the active model
-                        if p_key or p.get("id") == active_pid or mid == active_m_id:
-                            migrated_models.append({
-                                "id": mid,
-                                "name": m.get("name") or mid,
-                                "provider_name": p_name or "默认供应商",
-                                "base_url": p_url,
-                                "api_key": p_key,
-                                "api_format": _detect_api_format(p_url, mid),
-                                "reasoning_type": m.get("reasoning_type", _detect_reasoning_type(mid)),
-                                "reasoning_effort": m.get("default_effort", active_effort),
-                                "description": m.get("description", ""),
-                            })
-        except Exception:
-            pass
+    existing_providers = data.get("providers", [])
+    merged_providers: List[Dict[str, Any]] = []
 
-    # If empty, extract current settings from .env / settings
-    if not migrated_models:
-        cur_url = getattr(settings, "llm_base_url", "") or os.getenv("LLM_BASE_URL") or "https://cpa.r20.cn/v1"
-        cur_key = getattr(settings, "llm_api_key", "") or os.getenv("LLM_API_KEY") or ""
-        cur_model = getattr(settings, "llm_model", "") or os.getenv("LLM_MODEL") or "gemini-3.8-flash-high"
-        cur_effort = getattr(settings, "llm_reasoning_effort", "") or os.getenv("LLM_REASONING_EFFORT") or "high"
-        active_m_id = cur_model
-        active_effort = cur_effort
+    for dp in DEFAULT_PROVIDERS:
+        pid = dp["id"]
+        found = next((p for p in existing_providers if p.get("id") == pid), None)
+        if found:
+            p_obj = dict(dp)
+            p_obj.update(found)
+            if not p_obj.get("models"):
+                p_obj["models"] = copy.deepcopy(dp.get("models", []))
+            if pid == "openai":
+                if not p_obj.get("api_key") and cur_key:
+                    p_obj["api_key"] = cur_key
+                if not p_obj.get("base_url"):
+                    p_obj["base_url"] = cur_url
+                p_obj["enabled"] = True
+            merged_providers.append(p_obj)
+        else:
+            p_obj = copy.deepcopy(dp)
+            if pid == "openai":
+                if cur_key:
+                    p_obj["api_key"] = cur_key
+                if cur_url:
+                    p_obj["base_url"] = cur_url
+                p_obj["enabled"] = True
+            merged_providers.append(p_obj)
 
-        migrated_models.append({
-            "id": cur_model,
-            "name": f"{cur_model} (当前生产模型)",
-            "provider_name": "自定义网关/代理",
-            "base_url": cur_url,
-            "api_key": cur_key,
-            "api_format": _detect_api_format(cur_url, cur_model),
-            "reasoning_type": _detect_reasoning_type(cur_model),
-            "reasoning_effort": cur_effort if cur_effort in STANDARD_REASONING_EFFORTS else "high",
-            "description": "当前运行环境配置的主力模型",
-        })
+    # Any custom provider added by user
+    for ep in existing_providers:
+        if not any(dp["id"] == ep.get("id") for dp in DEFAULT_PROVIDERS):
+            merged_providers.append(ep)
 
-    # Ensure active model is in list
-    if not any(m["id"] == active_m_id for m in migrated_models):
-        active_m_id = migrated_models[0]["id"]
+    active_m_id = data.get("active_model_id") or cur_model or "gemini-3.8-flash-high"
+    active_effort = data.get("active_reasoning_effort") or cur_effort or "high"
+
+    models_map: Dict[str, Dict[str, Any]] = {}
+    for p in merged_providers:
+        p_id = p.get("id", "")
+        p_name = p.get("name", p_id)
+        p_base = p.get("base_url", "")
+        p_key = p.get("api_key", "")
+        p_fmt = p.get("api_format", "openai_chat")
+        for m in p.get("models", []):
+            mid = m.get("id", "")
+            if not mid:
+                continue
+            models_map[mid] = {
+                "id": mid,
+                "name": m.get("name", mid),
+                "provider_id": p_id,
+                "provider_name": p_name,
+                "base_url": m.get("base_url") or p_base,
+                "api_key": m.get("api_key") or p_key,
+                "api_format": m.get("api_format") or p_fmt,
+                "reasoning_type": m.get("reasoning_type", _detect_reasoning_type(mid)),
+                "reasoning_effort": m.get("reasoning_effort") or m.get("default_effort", "high"),
+                "capabilities": m.get("capabilities", _detect_capabilities(mid)),
+                "context_length": m.get("context_length"),
+                "description": m.get("description", ""),
+            }
+
+    # Preserve any custom models that were added by user or tests
+    for m in data.get("models", []):
+        mid = m.get("id")
+        if mid:
+            if mid in models_map:
+                models_map[mid].update(m)
+            else:
+                models_map[mid] = m
+
+    flat_models = list(models_map.values())
+    if not any(m["id"] == active_m_id for m in flat_models) and flat_models:
+        active_m_id = flat_models[0]["id"]
 
     config = {
-        "version": "3.0",
+        "version": "3.1",
         "active_model_id": active_m_id,
         "active_reasoning_effort": active_effort,
-        "models": migrated_models,
+        "providers": merged_providers,
+        "models": flat_models,
     }
     _atomic_write_json(LLM_CONFIG_FILE, config)
     return config
@@ -165,46 +663,89 @@ init_llm_providers = init_llm_config
 
 
 def load_llm_config(mask_keys: bool = True) -> Dict[str, Any]:
-    """Return clean model configurations. Masks API keys unless explicitly requested."""
+    """Return clean model configurations and configured providers matching modern client architecture."""
     config = init_llm_config()
-    res = {
-        "version": config.get("version", "3.0"),
-        "active_model_id": config.get("active_model_id", "gemini-3.8-flash-high"),
-        "active_reasoning_effort": config.get("active_reasoning_effort", "high"),
+    providers_list = config.get("providers", [])
+    active_mid = config.get("active_model_id", "gemini-3.8-flash-high")
+    active_effort = config.get("active_reasoning_effort", "high")
+
+    res: Dict[str, Any] = {
+        "version": config.get("version", "3.1"),
+        "active_model_id": active_mid,
+        "active_reasoning_effort": active_effort,
         "standard_reasoning_efforts": STANDARD_REASONING_EFFORTS,
         "supported_api_formats": SUPPORTED_API_FORMATS,
-        "models": [],
-        # Legacy compatibility wrappers
-        "active_provider_id": "custom",
         "providers": [],
+        "models": [],
+        "active_provider_id": "openai",
     }
 
+    for p in providers_list:
+        pid = p.get("id", "")
+        models_in_p = p.get("models", [])
+        formatted_p_models = []
+        for m in models_in_p:
+            m_id = m.get("id", "")
+            formatted_p_models.append({
+                "id": m_id,
+                "name": m.get("name") or m_id,
+                "capabilities": m.get("capabilities") or _detect_capabilities(m_id),
+                "reasoning_type": m.get("reasoning_type") or _detect_reasoning_type(m_id),
+                "reasoning_effort": m.get("reasoning_effort") or "high",
+                "context_length": m.get("context_length"),
+                "description": m.get("description", ""),
+                "is_active": m_id == active_mid,
+            })
+
+        p_copy = {
+            "id": pid,
+            "name": p.get("name", pid),
+            "type": p.get("type", p.get("name", pid)),
+            "group": p.get("group", "其他"),
+            "enabled": bool(p.get("enabled", False)),
+            "multi_key_enabled": bool(p.get("multi_key_enabled", False)),
+            "response_api_enabled": bool(p.get("response_api_enabled", False)),
+            "base_url": p.get("base_url", ""),
+            "api_format": p.get("api_format", "openai_chat"),
+            "api_path": p.get("api_path", "/chat/completions"),
+            "description": p.get("description", ""),
+            "has_key": bool(p.get("api_key")),
+            "models_count": len(models_in_p),
+            "models": formatted_p_models,
+        }
+        if mask_keys:
+            p_copy["api_key_masked"] = mask_secret(p.get("api_key", ""))
+        else:
+            p_copy["api_key"] = p.get("api_key", "")
+        res["providers"].append(p_copy)
+
+    # Flattened models for backward compatibility
     for m in config.get("models", []):
+        m_pid = m.get("provider_id", "openai")
+        p_entry = next((p for p in providers_list if p.get("id") == m_pid), None)
+        m_key = m.get("api_key", "")
+        has_key = bool(m_key or (p_entry and p_entry.get("api_key")))
+
         m_copy = {
             "id": m["id"],
             "name": m.get("name", m["id"]),
-            "provider_name": m.get("provider_name", "自定义"),
-            "base_url": m.get("base_url", ""),
+            "provider_id": m_pid,
+            "provider_name": m.get("provider_name") or (p_entry.get("name") if p_entry else "自定义"),
+            "base_url": m.get("base_url", "") or (p_entry.get("base_url", "") if p_entry else ""),
             "api_format": m.get("api_format", "openai_chat"),
             "reasoning_type": m.get("reasoning_type", "auto"),
             "reasoning_effort": m.get("reasoning_effort", "high"),
+            "capabilities": m.get("capabilities") or _detect_capabilities(m["id"]),
+            "context_length": m.get("context_length"),
             "description": m.get("description", ""),
-            "has_key": bool(m.get("api_key")),
+            "has_key": has_key,
+            "is_active": m["id"] == active_mid,
         }
         if mask_keys:
-            m_copy["api_key_masked"] = mask_secret(m.get("api_key", ""))
+            m_copy["api_key_masked"] = mask_secret(m_key) if m_key else (mask_secret(p_entry.get("api_key", "")) if p_entry and p_entry.get("api_key") else "")
         else:
-            m_copy["api_key"] = m.get("api_key", "")
+            m_copy["api_key"] = m_key
         res["models"].append(m_copy)
-
-    # Legacy provider wrapper so older frontend/api calls don't crash
-    res["providers"] = [{
-        "id": "custom",
-        "name": "自定义模型库",
-        "base_url": res["models"][0]["base_url"] if res["models"] else "",
-        "models": res["models"],
-        "has_key": any(m["has_key"] for m in res["models"]),
-    }]
 
     return res
 
@@ -219,21 +760,41 @@ def get_active_llm_runtime() -> Dict[str, Any]:
     target_model = next((m for m in config.get("models", []) if m["id"] == active_mid), None)
 
     base_url = target_model.get("base_url") if target_model else getattr(settings, "llm_base_url", "")
-    base_url = (base_url or os.getenv("LLM_BASE_URL", "https://cpa.r20.cn/v1")).rstrip("/")
+    api_key = target_model.get("api_key") if target_model else getattr(settings, "llm_api_key", "")
+    provider_id = target_model.get("provider_id", "") if target_model else ""
+    provider_name = target_model.get("provider_name", "") if target_model else "默认"
 
-    api_key = target_model.get("api_key") if target_model and target_model.get("api_key") else getattr(settings, "llm_api_key", "")
+    if target_model:
+        t_base = target_model.get("base_url", "").rstrip("/")
+        prov = next(
+            (
+                p for p in config.get("providers", [])
+                if p.get("id") == provider_id or (t_base and p.get("base_url", "").rstrip("/") == t_base)
+            ),
+            None,
+        )
+        if prov:
+            if not api_key:
+                api_key = prov.get("api_key", "")
+            if not base_url:
+                base_url = prov.get("base_url", "")
+            if not provider_name or provider_name == "自定义":
+                provider_name = prov.get("name", provider_name)
+            if not provider_id:
+                provider_id = prov.get("id", "openai")
+
+    base_url = (base_url or os.getenv("LLM_BASE_URL", "https://cpa.r20.cn/v1")).rstrip("/")
     api_key = api_key or os.getenv("LLM_API_KEY", "")
 
     model_name = active_mid or getattr(settings, "llm_model", "gemini-3.8-flash-high")
     api_format = target_model.get("api_format") if target_model else _detect_api_format(base_url, model_name)
     reasoning_type = target_model.get("reasoning_type", "auto") if target_model else _detect_reasoning_type(model_name)
-    provider_name = target_model.get("provider_name", "自定义") if target_model else "默认"
 
     return {
         "model": model_name,
         "name": target_model.get("name", model_name) if target_model else model_name,
-        "provider_name": provider_name,
-        "provider_id": "custom",
+        "provider_name": provider_name or "默认",
+        "provider_id": provider_id or "openai",
         "base_url": base_url,
         "api_key": api_key,
         "api_format": api_format,
@@ -254,7 +815,26 @@ def activate_provider_model(provider_id: str, model_id: str, reasoning_effort: O
     config = init_llm_config()
     target_model = next((m for m in config.get("models", []) if m["id"] == model_id), None)
     if not target_model:
-        # Create minimal entry if missing
+        # Check providers models
+        for p in config.get("providers", []):
+            m_found = next((m for m in p.get("models", []) if m.get("id") == model_id), None)
+            if m_found:
+                target_model = {
+                    "id": model_id,
+                    "name": m_found.get("name", model_id),
+                    "provider_id": p.get("id"),
+                    "provider_name": p.get("name"),
+                    "base_url": p.get("base_url"),
+                    "api_key": p.get("api_key"),
+                    "api_format": p.get("api_format", "openai_chat"),
+                    "reasoning_type": m_found.get("reasoning_type", _detect_reasoning_type(model_id)),
+                    "reasoning_effort": m_found.get("reasoning_effort", "high"),
+                    "description": m_found.get("description", ""),
+                }
+                config.setdefault("models", []).append(target_model)
+                break
+
+    if not target_model:
         target_model = {
             "id": model_id,
             "name": model_id,
@@ -277,8 +857,18 @@ def activate_provider_model(provider_id: str, model_id: str, reasoning_effort: O
     _atomic_write_json(LLM_CONFIG_FILE, config)
 
     # Sync to .env and secrets
-    base_url = target_model.get("base_url", "").rstrip("/")
+    base_url = target_model.get("base_url", "")
     api_key = target_model.get("api_key", "")
+    m_pid = target_model.get("provider_id")
+    if m_pid:
+        prov = next((p for p in config.get("providers", []) if p.get("id") == m_pid), None)
+        if prov:
+            if not api_key:
+                api_key = prov.get("api_key", "")
+            if not base_url:
+                base_url = prov.get("base_url", "")
+
+    base_url = (base_url or os.getenv("LLM_BASE_URL", "https://cpa.r20.cn/v1")).rstrip("/")
 
     env_values = {
         "LLM_BASE_URL": base_url,
@@ -301,7 +891,7 @@ def activate_provider_model(provider_id: str, model_id: str, reasoning_effort: O
         "base_url": base_url,
         "api_format": target_model.get("api_format", "openai_chat"),
         "provider_name": target_model.get("provider_name", "自定义"),
-        "active_provider_id": "custom",
+        "active_provider_id": target_model.get("provider_id", "openai"),
         "active_provider_name": target_model.get("provider_name", "自定义"),
     }
 
@@ -313,15 +903,35 @@ def upsert_model(provider_id: str, model_data: Dict[str, Any]) -> Dict[str, Any]
     base_url = str(model_data.get("base_url", "")).strip().rstrip("/")
     api_key = str(model_data.get("api_key", "")).strip()
     api_format = str(model_data.get("api_format", "openai_chat")).strip()
-    provider_name = str(model_data.get("provider_name", "")).strip() or "自定义"
+    provider_name = str(model_data.get("provider_name", "")).strip()
     reasoning_type = str(model_data.get("reasoning_type", "auto")).strip()
     default_effort = str(model_data.get("default_effort") or model_data.get("reasoning_effort", "high")).strip()
     desc = str(model_data.get("description", "")).strip()
+    caps = model_data.get("capabilities") or _detect_capabilities(mid)
+    ctx_len = model_data.get("context_length")
 
     if not mid:
         raise ValueError("模型 ID 不能为空")
+
+    config = init_llm_config()
+
+    prov = None
+    if provider_id and provider_id != "custom":
+        prov = next((p for p in config.get("providers", []) if p["id"] == provider_id), None)
+    if not prov and provider_name:
+        prov = next((p for p in config.get("providers", []) if p.get("name") == provider_name), None)
+
+    if prov:
+        if not base_url:
+            base_url = prov.get("base_url", "")
+        if not api_key and prov.get("api_key"):
+            api_key = prov.get("api_key", "")
+        if not provider_name:
+            provider_name = prov.get("name", "自定义")
+        if not provider_id:
+            provider_id = prov.get("id", "openai")
+
     if not base_url or not base_url.startswith(("http://", "https://")):
-        # If omitted, inherit active base_url
         active = get_active_llm_runtime()
         base_url = active.get("base_url", "https://api.openai.com/v1")
 
@@ -329,32 +939,59 @@ def upsert_model(provider_id: str, model_data: Dict[str, Any]) -> Dict[str, Any]
     if api_format not in valid_formats:
         api_format = _detect_api_format(base_url, mid)
 
-    config = init_llm_config()
     models = config.setdefault("models", [])
     existing = next((m for m in models if m["id"] == mid), None)
 
     if existing:
         existing["name"] = name
-        existing["provider_name"] = provider_name
+        existing["provider_id"] = provider_id or existing.get("provider_id", "openai")
+        existing["provider_name"] = provider_name or existing.get("provider_name", "自定义")
         existing["base_url"] = base_url
         if api_key:
             existing["api_key"] = api_key
         existing["api_format"] = api_format
         existing["reasoning_type"] = reasoning_type
         existing["reasoning_effort"] = default_effort
+        existing["capabilities"] = caps
+        existing["context_length"] = ctx_len
         existing["description"] = desc
     else:
         models.append({
             "id": mid,
             "name": name,
-            "provider_name": provider_name,
+            "provider_id": provider_id or "openai",
+            "provider_name": provider_name or "自定义",
             "base_url": base_url,
             "api_key": api_key,
             "api_format": api_format,
             "reasoning_type": reasoning_type,
             "reasoning_effort": default_effort,
+            "capabilities": caps,
+            "context_length": ctx_len,
             "description": desc,
         })
+
+    # Also update provider's local models array
+    if prov:
+        prov_models = prov.setdefault("models", [])
+        p_existing = next((m for m in prov_models if m.get("id") == mid), None)
+        if p_existing:
+            p_existing["name"] = name
+            p_existing["capabilities"] = caps
+            p_existing["reasoning_type"] = reasoning_type
+            p_existing["reasoning_effort"] = default_effort
+            p_existing["context_length"] = ctx_len
+            p_existing["description"] = desc
+        else:
+            prov_models.append({
+                "id": mid,
+                "name": name,
+                "capabilities": caps,
+                "reasoning_type": reasoning_type,
+                "reasoning_effort": default_effort,
+                "context_length": ctx_len,
+                "description": desc,
+            })
 
     _atomic_write_json(LLM_CONFIG_FILE, config)
     return {
@@ -362,6 +999,7 @@ def upsert_model(provider_id: str, model_data: Dict[str, Any]) -> Dict[str, Any]
         "name": name,
         "base_url": base_url,
         "api_format": api_format,
+        "provider_id": provider_id or "openai",
     }
 
 
@@ -373,6 +1011,11 @@ def delete_model(provider_id: str, model_id: str) -> bool:
 
     models = config.get("models", [])
     filtered = [m for m in models if m["id"] != model_id]
+
+    for prov in config.get("providers", []):
+        if not provider_id or provider_id == "custom" or prov.get("id") == provider_id:
+            prov["models"] = [m for m in prov.get("models", []) if m.get("id") != model_id]
+
     if len(filtered) == len(models):
         return False
 
@@ -381,13 +1024,230 @@ def delete_model(provider_id: str, model_id: str) -> bool:
     return True
 
 
-# Legacy provider stubs for API backward compatibility
 def upsert_provider(provider_data: Dict[str, Any]) -> Dict[str, Any]:
-    return {"id": "custom", "name": "自定义模型库", "base_url": provider_data.get("base_url", "")}
+    """Add or update an LLM provider definition."""
+    pid = str(provider_data.get("id", "")).strip().lower()
+    name = str(provider_data.get("name", "")).strip() or pid
+    p_type = str(provider_data.get("type", "")).strip() or name
+    p_group = str(provider_data.get("group", "")).strip() or "其他"
+    enabled = bool(provider_data.get("enabled", False)) if "enabled" in provider_data else None
+    multi_key_enabled = bool(provider_data.get("multi_key_enabled", False))
+    response_api_enabled = bool(provider_data.get("response_api_enabled", False))
+    base_url = str(provider_data.get("base_url", "")).strip().rstrip("/")
+    api_key = str(provider_data.get("api_key", "")).strip()
+    api_format = str(provider_data.get("api_format", "openai_chat")).strip()
+    api_path = str(provider_data.get("api_path", "/chat/completions")).strip()
+    desc = str(provider_data.get("description", "")).strip()
+
+    if not pid:
+        pid = re.sub(r"[^a-zA-Z0-9_\-]", "", name.lower()) or f"prov-{int(time.time())}"
+
+    if not base_url or not base_url.startswith(("http://", "https://")):
+        raise ValueError("供应商 Base URL 必须以 http:// 或 https:// 开头")
+
+    config = init_llm_config()
+    providers = config.setdefault("providers", [])
+    existing = next((p for p in providers if p["id"] == pid), None)
+    if existing:
+        existing["name"] = name
+        existing["type"] = p_type
+        existing["group"] = p_group
+        if enabled is not None:
+            existing["enabled"] = enabled
+        existing["multi_key_enabled"] = multi_key_enabled
+        existing["response_api_enabled"] = response_api_enabled
+        existing["base_url"] = base_url
+        if api_key:
+            existing["api_key"] = api_key
+        existing["api_format"] = api_format
+        existing["api_path"] = api_path
+        existing["description"] = desc
+    else:
+        providers.append({
+            "id": pid,
+            "name": name,
+            "type": p_type,
+            "group": p_group,
+            "enabled": enabled if enabled is not None else False,
+            "multi_key_enabled": multi_key_enabled,
+            "response_api_enabled": response_api_enabled,
+            "base_url": base_url,
+            "api_key": api_key,
+            "api_format": api_format,
+            "api_path": api_path,
+            "description": desc,
+            "models": [],
+        })
+    _atomic_write_json(LLM_CONFIG_FILE, config)
+    return {"id": pid, "name": name, "base_url": base_url}
+
+
+def toggle_provider(provider_id: str, enabled: Optional[bool] = None) -> Dict[str, Any]:
+    """Toggle a provider's enabled/disabled state."""
+    config = init_llm_config()
+    providers = config.get("providers", [])
+    p = next((x for x in providers if x["id"] == provider_id), None)
+    if not p:
+        raise ValueError(f"供应商 {provider_id} 未找到")
+    if enabled is None:
+        p["enabled"] = not p.get("enabled", False)
+    else:
+        p["enabled"] = bool(enabled)
+    _atomic_write_json(LLM_CONFIG_FILE, config)
+    return {"id": provider_id, "enabled": p["enabled"]}
+
+
+def clear_provider_models(provider_id: str) -> bool:
+    """Clear all models under a specific provider."""
+    config = init_llm_config()
+    providers = config.get("providers", [])
+    p = next((x for x in providers if x["id"] == provider_id), None)
+    if not p:
+        return False
+    p["models"] = []
+    config["models"] = [m for m in config.get("models", []) if m.get("provider_id") != provider_id]
+    _atomic_write_json(LLM_CONFIG_FILE, config)
+    return True
 
 
 def delete_provider(provider_id: str) -> bool:
+    """Delete a provider definition."""
+    config = init_llm_config()
+    providers = config.get("providers", [])
+    filtered = [p for p in providers if p["id"] != provider_id]
+    if len(filtered) == len(providers):
+        return False
+    config["providers"] = filtered
+    _atomic_write_json(LLM_CONFIG_FILE, config)
     return True
+
+
+def fetch_remote_models(
+    base_url: str = "",
+    api_key: str = "",
+    provider_id: Optional[str] = None,
+    timeout: float = 12.0,
+) -> Dict[str, Any]:
+    """Fetch live models list from an OpenAI / OpenRouter / Anthropic compatible endpoint."""
+    cleaned_url = str(base_url or "").strip().rstrip("/")
+    config = init_llm_config()
+
+    if not cleaned_url and provider_id:
+        prov = next((p for p in config.get("providers", []) if p["id"] == provider_id), None)
+        if prov:
+            cleaned_url = prov.get("base_url", "").strip().rstrip("/")
+            if not api_key:
+                api_key = prov.get("api_key", "")
+
+    if not cleaned_url:
+        active = get_active_llm_runtime()
+        cleaned_url = active.get("base_url", "").strip().rstrip("/")
+        if not api_key:
+            api_key = active.get("api_key", "")
+
+    if not cleaned_url or not cleaned_url.startswith(("http://", "https://")):
+        return {
+            "ok": False,
+            "error": "Base URL 格式无效，必须以 http:// 或 https:// 开头",
+            "recommendation": "请填写有效的供应商 Base URL",
+        }
+
+    if not api_key:
+        prov = next((p for p in config.get("providers", []) if p.get("base_url", "").rstrip("/") == cleaned_url and p.get("api_key")), None)
+        if prov:
+            api_key = prov.get("api_key", "")
+
+    endpoints = []
+    if "anthropic.com" in cleaned_url:
+        ep = f"{cleaned_url}/models" if not cleaned_url.endswith("/v1") else f"{cleaned_url}/models"
+        hdrs = {"x-api-key": api_key, "anthropic-version": "2023-06-01"} if api_key else {}
+        endpoints.append((ep, hdrs))
+    elif cleaned_url.endswith("/v1"):
+        endpoints.append((f"{cleaned_url}/models", {"Authorization": f"Bearer {api_key}"} if api_key else {}))
+        endpoints.append((f"{cleaned_url[:-3]}/models", {"Authorization": f"Bearer {api_key}"} if api_key else {}))
+    elif cleaned_url.endswith("/models"):
+        endpoints.append((cleaned_url, {"Authorization": f"Bearer {api_key}"} if api_key else {}))
+    else:
+        endpoints.append((f"{cleaned_url}/v1/models", {"Authorization": f"Bearer {api_key}"} if api_key else {}))
+        endpoints.append((f"{cleaned_url}/models", {"Authorization": f"Bearer {api_key}"} if api_key else {}))
+
+    last_err = ""
+    for ep, hdrs in endpoints:
+        hdrs["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 R20-Quantum-Trader/6.6"
+        req = urllib.request.Request(ep, headers=hdrs)
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                data = json.loads(resp.read().decode("utf-8", errors="replace"))
+                raw_list = data.get("data") if isinstance(data, dict) and "data" in data else data.get("models", data if isinstance(data, list) else [])
+                if not isinstance(raw_list, list):
+                    continue
+
+                parsed_models = []
+                for item in raw_list:
+                    if isinstance(item, str):
+                        m_id = item
+                        m_name = item
+                        ctx = None
+                        desc = ""
+                    elif isinstance(item, dict):
+                        m_id = str(item.get("id", "")).strip()
+                        if not m_id:
+                            continue
+                        m_name = str(item.get("name") or item.get("display_name") or m_id).strip()
+                        ctx = item.get("context_length") or item.get("max_tokens")
+                        desc = str(item.get("description") or "").strip()
+                    else:
+                        continue
+
+                    detected_format = _detect_api_format(cleaned_url, m_id)
+                    detected_rtype = _detect_reasoning_type(m_id)
+                    detected_caps = _detect_capabilities(m_id)
+                    default_effort = "high" if detected_rtype != "none" else "auto"
+
+                    parsed_models.append({
+                        "id": m_id,
+                        "name": m_name,
+                        "capabilities": detected_caps,
+                        "context_length": ctx,
+                        "description": desc,
+                        "api_format": detected_format,
+                        "reasoning_type": detected_rtype,
+                        "default_effort": default_effort,
+                    })
+
+                def _model_sort_key(m: Dict[str, Any]) -> Tuple[int, str]:
+                    mid = m["id"].lower()
+                    if any(k in mid for k in ["gemini-3", "claude-3-7", "claude-3.7", "o3", "o4", "gpt-5", "deepseek-r1", "deepseek-v4", "qwen-max", "qwq"]):
+                        return (0, mid)
+                    if any(k in mid for k in ["gemini-2", "claude-3-5", "claude-3.5", "o1", "gpt-4o", "qwen-2.5", "doubao"]):
+                        return (1, mid)
+                    return (2, mid)
+
+                parsed_models.sort(key=_model_sort_key)
+
+                return {
+                    "ok": True,
+                    "endpoint_used": ep,
+                    "total": len(parsed_models),
+                    "models": parsed_models,
+                }
+        except urllib.error.HTTPError as exc:
+            last_err = f"HTTP {exc.code}"
+            if exc.code == 401:
+                return {
+                    "ok": False,
+                    "error": "供应商身份验证失败 (HTTP 401 Unauthorized)",
+                    "recommendation": "请先在此供应商填入正确的 API Key 后再拉取模型",
+                }
+        except Exception as exc:
+            last_err = str(exc)
+
+    return {
+        "ok": False,
+        "error": f"拉取失败: {last_err or '未响应模型列表'}",
+        "recommendation": "请检查 Base URL 是否正确，或供应商是否支持 /models 端点查询",
+    }
+
 
 
 def build_request_spec(

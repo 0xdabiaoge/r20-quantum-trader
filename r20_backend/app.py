@@ -55,9 +55,12 @@ from r20_backend.llm_manager import (
     activate_provider_model,
     upsert_provider,
     delete_provider,
+    toggle_provider,
+    clear_provider_models,
     upsert_model,
     delete_model,
     test_llm_connection,
+    fetch_remote_models,
     init_llm_providers,
     _atomic_write_json,
     LLM_PROVIDERS_FILE,
@@ -185,15 +188,27 @@ class LLMTestRequest(BaseModel):
 class LLMProviderUpsertRequest(BaseModel):
     id: str | None = None
     name: str
+    type: str | None = None
+    group: str | None = "其他"
+    enabled: bool | None = False
+    multi_key_enabled: bool | None = False
+    response_api_enabled: bool | None = False
     base_url: str
     api_key: str | None = None
+    api_format: str | None = "openai_chat"
+    api_path: str | None = "/chat/completions"
     description: str | None = ""
     models: list[dict[str, Any]] | None = None
+
+
+class LLMProviderToggleRequest(BaseModel):
+    enabled: bool | None = None
 
 
 class LLMModelUpsertRequest(BaseModel):
     id: str
     name: str | None = None
+    provider_id: str | None = None
     provider_name: str | None = None
     base_url: str | None = None
     api_key: str | None = None
@@ -201,7 +216,15 @@ class LLMModelUpsertRequest(BaseModel):
     reasoning_type: str = "auto"
     default_effort: str = "high"
     reasoning_effort: str | None = None
+    capabilities: list[str] | None = None
+    context_length: int | None = None
     description: str | None = ""
+
+
+class LLMFetchModelsRequest(BaseModel):
+    base_url: str | None = None
+    api_key: str | None = None
+    provider_id: str | None = None
 
 
 class CouncilConfigUpdateRequest(BaseModel):
@@ -1032,6 +1055,44 @@ def admin_upsert_llm_provider(payload: LLMProviderUpsertRequest, x_r20_session: 
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     audit_record("llm.provider.upsert", "success", {"actor": actor["username"], "provider_id": res.get("id")})
     return res
+
+
+@app.post("/api/v1/admin/llm/fetch-models")
+def admin_fetch_remote_models(payload: LLMFetchModelsRequest, x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    require_admin_header(x_r20_session=x_r20_session)
+    res = fetch_remote_models(
+        base_url=payload.base_url or "",
+        api_key=payload.api_key or "",
+        provider_id=payload.provider_id,
+    )
+    audit_record("llm.remote.fetch", "success" if res.get("ok") else "failed", {
+        "provider_id": payload.provider_id,
+        "base_url": payload.base_url,
+        "total": res.get("total", 0),
+    })
+    return res
+
+
+@app.post("/api/v1/admin/llm/providers/{provider_id}/toggle")
+def admin_toggle_llm_provider(provider_id: str, payload: LLMProviderToggleRequest | None = None, x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    actor = require_superadmin(x_r20_session)
+    try:
+        enabled_val = payload.enabled if payload else None
+        res = toggle_provider(provider_id, enabled=enabled_val)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    audit_record("llm.provider.toggle", "success", {"actor": actor["username"], "provider_id": provider_id, "enabled": res["enabled"]})
+    return res
+
+
+@app.delete("/api/v1/admin/llm/providers/{provider_id}/models")
+def admin_clear_llm_provider_models(provider_id: str, x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    actor = require_superadmin(x_r20_session)
+    cleared = clear_provider_models(provider_id)
+    if not cleared:
+        raise HTTPException(status_code=404, detail="未找到该供应商")
+    audit_record("llm.provider.clear_models", "success", {"actor": actor["username"], "provider_id": provider_id})
+    return {"cleared": True, "provider_id": provider_id}
 
 
 @app.delete("/api/v1/admin/llm/providers/{provider_id}")
