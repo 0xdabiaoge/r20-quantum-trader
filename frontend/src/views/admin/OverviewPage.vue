@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useApi } from '../../composables/useApi'
 import {
@@ -16,8 +16,6 @@ import {
   Clock,
   CheckCircle2,
   AlertCircle,
-  TrendingUp,
-  Play,
 } from 'lucide-vue-next'
 
 const router = useRouter()
@@ -25,60 +23,12 @@ const { api } = useApi()
 const runtime = ref<any>(null)
 const loading = ref(true)
 
-// Backtest state
-const backtestReport = ref<any>(null)
-const runningBacktest = ref(false)
-const selectedSymbol = ref('ALL')
-const selectedBar = ref('1H')
-
-const activeBacktestView = computed(() => {
-  if (!backtestReport.value) return null
-  if (selectedSymbol.value === 'ALL') {
-    return backtestReport.value.portfolio || backtestReport.value
-  }
-  return backtestReport.value.by_symbol?.[selectedSymbol.value] || backtestReport.value.portfolio || backtestReport.value
-})
-
-async function loadBacktest() {
-  try {
-    const res = await api('/api/v1/admin/backtest/report')
-    if (res?.has_report) {
-      backtestReport.value = res.report
-    }
-  } catch (e) {
-    console.error('Failed to load backtest report:', e)
-  }
-}
-
-async function triggerBacktest() {
-  runningBacktest.value = true
-  try {
-    const res = await api('/api/v1/admin/backtest/run', {
-      method: 'POST',
-      body: JSON.stringify({
-        symbol: selectedSymbol.value,
-        bar: selectedBar.value,
-        limit: 100,
-        capital: 10000.0,
-      }),
-    })
-    if (res?.report) {
-      backtestReport.value = res.report
-    }
-  } catch (e: any) {
-    alert(`回测执行失败: ${e.message}`)
-  } finally {
-    runningBacktest.value = false
-  }
-}
-
 async function loadRuntime() {
   loading.value = true
   try {
     const [rt, cfg] = await Promise.all([
       api('/api/v1/admin/runtime').catch(() => null),
       api('/api/v1/admin/config').catch(() => null),
-      loadBacktest().catch(() => null),
     ])
     if (rt) {
       if (cfg?.configuration) {
@@ -200,192 +150,199 @@ const quickNav = [
             {{ duration(runtime.service?.uptime_seconds) }}
           </div>
           <div class="text-[10px] font-mono mt-1" style="color: var(--text-faint);">
-            R20 Standalone · 独立高可用
+            已运行秒数 {{ runtime.service?.uptime_seconds || 0 }}s
           </div>
         </div>
 
-        <!-- 3. 数据链路健康 -->
+        <!-- 3. LLM 核心主脑 -->
         <div
-          class="rounded-xl border p-4 shadow-xs transition-colors"
+          class="rounded-xl border p-4 shadow-xs transition-colors cursor-pointer group"
           style="background-color: var(--bg-card); border-color: var(--border-subtle);"
+          @click="router.push('/admin/llm')"
         >
           <div class="flex items-center justify-between mb-2">
-            <span class="text-[11px] font-mono" style="color: var(--text-muted);">行情数据链路</span>
+            <span class="text-[11px] font-mono" style="color: var(--text-muted);">决策主脑模型</span>
             <div
               class="w-6 h-6 rounded-md flex items-center justify-center border"
-              :style="{
-                backgroundColor: (runtime.data_health?.filter((x: any) => !x.fresh).length || 0) === 0 ? 'var(--color-up-bg)' : 'var(--color-down-bg)',
-                borderColor: (runtime.data_health?.filter((x: any) => !x.fresh).length || 0) === 0 ? 'var(--color-up-border)' : 'var(--color-down-border)',
-                color: (runtime.data_health?.filter((x: any) => !x.fresh).length || 0) === 0 ? 'var(--color-up)' : 'var(--color-down)'
-              }"
+              style="background-color: var(--bg-badge); border-color: var(--border-subtle); color: var(--text-main);"
+            >
+              <Cpu class="w-3.5 h-3.5" />
+            </div>
+          </div>
+          <div class="text-sm sm:text-base font-black font-mono truncate" style="color: var(--text-main);">
+            {{ runtime.llm_runtime?.active_model || 'gemini-3.8-flash-high' }}
+          </div>
+          <div class="text-[10px] font-mono mt-1 flex items-center space-x-1.5" style="color: var(--text-faint);">
+            <span>推理思考: {{ runtime.llm_runtime?.active_reasoning_effort || 'HIGH' }}</span>
+            <span>·</span>
+            <span class="text-indigo-400 group-hover:underline">配置通道 →</span>
+          </div>
+        </div>
+
+        <!-- 4. 交易所环境与授权 -->
+        <div
+          class="rounded-xl border p-4 shadow-xs transition-colors cursor-pointer group"
+          style="background-color: var(--bg-card); border-color: var(--border-subtle);"
+          @click="router.push('/admin/security')"
+        >
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-[11px] font-mono" style="color: var(--text-muted);">OKX 连接环境</span>
+            <div
+              class="w-6 h-6 rounded-md flex items-center justify-center border"
+              style="background-color: var(--bg-badge); border-color: var(--border-subtle); color: var(--text-main);"
             >
               <Database class="w-3.5 h-3.5" />
             </div>
           </div>
-          <div
-            class="text-xl sm:text-2xl font-black font-mono tracking-tight"
-            :style="{ color: (runtime.data_health?.filter((x: any) => !x.fresh).length || 0) === 0 ? 'var(--color-up)' : 'var(--color-down)' }"
-          >
-            {{ (runtime.data_health?.filter((x: any) => !x.fresh).length || 0) === 0 ? '100% FRESH' : 'EXPIRED' }}
+          <div class="text-xl sm:text-2xl font-black font-mono tracking-tight" style="color: var(--color-brand);">
+            {{ runtime.credentials?.simulated_trading ? 'DEMO' : 'LIVE' }}
           </div>
-          <div class="text-[10px] font-mono mt-1" style="color: var(--text-faint);">
-            {{ (runtime.data_health?.filter((x: any) => !x.fresh).length || 0) === 0 ? '全链路低时延新鲜' : '存在异常延迟' }}
-          </div>
-        </div>
-
-        <!-- 4. 持仓追踪与拦截 -->
-        <div
-          class="rounded-xl border p-4 shadow-xs transition-colors"
-          style="background-color: var(--bg-card); border-color: var(--border-subtle);"
-        >
-          <div class="flex items-center justify-between mb-2">
-            <span class="text-[11px] font-mono" style="color: var(--text-muted);">活跃追踪器</span>
-            <div
-              class="w-6 h-6 rounded-md flex items-center justify-center border"
-              style="background-color: var(--bg-badge); border-color: var(--border-medium); color: var(--text-main);"
-            >
-              <ShieldCheck class="w-3.5 h-3.5" />
-            </div>
-          </div>
-          <div class="text-xl sm:text-2xl font-black font-mono tracking-tight num-tabular" style="color: var(--text-main);">
-            {{ runtime.trackers || 0 }} 个
-          </div>
-          <div class="text-[10px] font-mono mt-1" style="color: var(--text-faint);">
-            Fail-Closed 物理防护激活
+          <div class="text-[10px] font-mono mt-1 flex items-center space-x-1" style="color: var(--text-faint);">
+            <span :class="runtime.credentials?.okx_configured ? 'text-emerald-400' : 'text-amber-400'">
+              ● {{ runtime.credentials?.okx_configured ? 'API 凭证就绪' : '模拟环境就绪' }}
+            </span>
+            <span>·</span>
+            <span class="text-indigo-400 group-hover:underline">账户管理 →</span>
           </div>
         </div>
       </div>
 
-      <!-- Quick Navigation Action Bar -->
+      <!-- Quick Nav Action Deck -->
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        <div
-          v-for="item in quickNav"
-          :key="item.route"
-          @click="router.push(item.route)"
-          class="rounded-xl border p-3.5 transition-all duration-150 flex items-center justify-between cursor-pointer group shadow-xs hover:border-[var(--border-medium)]"
+        <button
+          v-for="nav in quickNav"
+          :key="nav.route"
+          @click="router.push(nav.route)"
+          class="p-3.5 rounded-xl border flex items-center justify-between transition-all cursor-pointer text-left group"
           style="background-color: var(--bg-card); border-color: var(--border-subtle);"
         >
           <div class="flex items-center space-x-3">
             <div
-              class="w-8 h-8 rounded-lg flex items-center justify-center border"
-              style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle); color: var(--color-brand);"
+              class="w-8 h-8 rounded-lg flex items-center justify-center border shrink-0 transition-transform group-hover:scale-105"
+              style="background-color: var(--bg-card-subtle); border-color: var(--border-medium); color: var(--text-main);"
             >
-              <component :is="item.icon" class="w-4 h-4" />
+              <component :is="nav.icon" class="w-4 h-4" />
             </div>
             <div>
-              <div class="text-xs font-bold font-mono" style="color: var(--text-main);">{{ item.label }}</div>
-              <div class="text-[10px] font-mono mt-0.5" style="color: var(--text-faint);">{{ item.desc }}</div>
+              <div class="text-xs font-black font-mono group-hover:text-blue-500 transition-colors" style="color: var(--text-main);">
+                {{ nav.label }}
+              </div>
+              <div class="text-[10px] font-mono truncate" style="color: var(--text-faint);">
+                {{ nav.desc }}
+              </div>
             </div>
           </div>
-          <ArrowRight class="w-3.5 h-3.5 opacity-40 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" style="color: var(--text-muted);" />
-        </div>
+          <ArrowRight class="w-3.5 h-3.5 shrink-0 transition-transform group-hover:translate-x-0.5" style="color: var(--text-faint);" />
+        </button>
       </div>
 
-      <!-- Dual Column: AI Decisions & Data Health -->
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
-        <!-- AI Decisions Table -->
+      <!-- Main Dual Panel: LLM Decision Audit & Data Freshness -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <!-- Left: Full Decisions Audit (2 Columns) -->
         <div
-          class="rounded-xl border p-4 sm:p-5 shadow-xs transition-colors"
+          class="lg:col-span-2 rounded-xl border p-4 sm:p-5 shadow-xs transition-colors flex flex-col justify-between"
           style="background-color: var(--bg-card); border-color: var(--border-subtle);"
         >
-          <div class="flex items-center justify-between pb-3 mb-3 border-b" style="border-color: var(--border-subtle);">
-            <div class="flex items-center space-x-2">
-              <Cpu class="w-4 h-4" style="color: var(--color-brand);" />
-              <h2 class="text-xs font-black font-mono uppercase tracking-wider" style="color: var(--text-main);">
-                最新 AI 多币种决策
-              </h2>
+          <div>
+            <div class="flex items-center justify-between pb-3 mb-3 border-b" style="border-color: var(--border-subtle);">
+              <div class="flex items-center space-x-2">
+                <Layers class="w-4 h-4" style="color: var(--color-brand);" />
+                <h2 class="text-xs font-black font-mono uppercase tracking-wider" style="color: var(--text-main);">
+                  大模型决策态势全景 (Realtime Brain Status)
+                </h2>
+              </div>
+              <button
+                @click="router.push('/admin/decisions')"
+                class="text-xs font-mono flex items-center space-x-1 cursor-pointer transition-colors"
+                style="color: var(--color-brand);"
+              >
+                <span>完整推演日志</span>
+                <ArrowRight class="w-3 h-3" />
+              </button>
             </div>
-            <span
-              class="text-[10px] font-mono px-2 py-0.5 rounded border font-bold"
-              style="background-color: var(--bg-badge); color: var(--color-brand); border-color: var(--border-subtle);"
-            >
-              {{ runtime.decisions?.length || 0 }} 标的
-            </span>
-          </div>
 
-          <div class="overflow-x-auto">
-            <table class="w-full text-left text-xs font-mono whitespace-nowrap">
-              <thead>
-                <tr class="border-b text-[11px] uppercase tracking-wider" style="border-color: var(--border-subtle); color: var(--text-muted);">
-                  <th class="pb-2 font-bold">标的</th>
-                  <th class="pb-2 font-bold">建议操作</th>
-                  <th class="pb-2 font-bold">置信度</th>
-                  <th class="pb-2 text-right font-bold">决策时间</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr
-                  v-for="(d, i) in runtime.decisions"
-                  :key="i"
-                  class="border-b last:border-b-0 transition-colors hover:bg-[var(--bg-card-hover)]"
-                  style="border-color: var(--border-subtle);"
-                >
-                  <td class="py-2.5 font-bold font-mono" style="color: var(--text-main);">
-                    {{ d.instId?.replace('-USDT-SWAP', '') }}
-                  </td>
-                  <td class="py-2.5">
+            <!-- Decisions List -->
+            <div v-if="runtime.full_decisions && runtime.full_decisions.length" class="space-y-2">
+              <div
+                v-for="d in runtime.full_decisions"
+                :key="d.instId"
+                class="p-3 rounded-lg border font-mono text-xs transition-colors"
+                style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);"
+              >
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center space-x-2">
+                    <span class="font-black text-sm" style="color: var(--text-main);">{{ d.instId }}</span>
                     <span
                       class="px-2 py-0.5 rounded text-[10px] font-bold border"
                       :style="{
-                        backgroundColor: d.action === 'WAIT' ? 'var(--bg-badge)' : d.action?.includes('LONG') ? 'var(--color-up-bg)' : 'var(--color-down-bg)',
-                        borderColor: d.action === 'WAIT' ? 'var(--border-subtle)' : d.action?.includes('LONG') ? 'var(--color-up-border)' : 'var(--color-down-border)',
-                        color: d.action === 'WAIT' ? 'var(--text-muted)' : d.action?.includes('LONG') ? 'var(--color-up)' : 'var(--color-down)'
+                        backgroundColor: d.action?.includes('BUY') ? 'var(--color-up-bg)' : d.action?.includes('SELL') ? 'var(--color-down-bg)' : 'var(--bg-badge)',
+                        borderColor: d.action?.includes('BUY') ? 'var(--color-up-border)' : d.action?.includes('SELL') ? 'var(--color-down-border)' : 'var(--border-subtle)',
+                        color: d.action?.includes('BUY') ? 'var(--color-up)' : d.action?.includes('SELL') ? 'var(--color-down)' : 'var(--text-muted)'
                       }"
                     >
-                      {{ d.action }}
+                      {{ d.action || '观望 HOLD' }}
                     </span>
-                  </td>
-                  <td class="py-2.5 font-bold num-tabular" style="color: var(--text-main);">
-                    {{ d.confidence }}%
-                  </td>
-                  <td class="py-2.5 text-right num-tabular" style="color: var(--text-muted);">
-                    {{ d.updated_at || '--' }}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+                    <span v-if="d.confidence" class="text-[10px]" style="color: var(--text-faint);">
+                      置信度 {{ Math.round(d.confidence * 100) }}%
+                    </span>
+                  </div>
+                  <div class="text-[10px]" style="color: var(--text-faint);">
+                    {{ d.timestamp ? d.timestamp.substring(11, 19) : '--' }}
+                  </div>
+                </div>
+                <div class="mt-2 text-xs font-sans line-clamp-2 leading-relaxed" style="color: var(--text-muted);">
+                  {{ d.reason || '大模型评估当前动能结构未达到击穿阈值，顺势风控保持被动防御。' }}
+                </div>
+              </div>
+            </div>
+            <div v-else class="py-12 text-center text-xs font-mono" style="color: var(--text-muted);">
+              暂无巡检决策记录，等待下轮 15M 定时任务...
+            </div>
           </div>
         </div>
 
-        <!-- Data Health Table -->
+        <!-- Right: Data Health Monitor (1 Column) -->
         <div
-          class="rounded-xl border p-4 sm:p-5 shadow-xs transition-colors"
+          class="rounded-xl border p-4 sm:p-5 shadow-xs transition-colors flex flex-col justify-between"
           style="background-color: var(--bg-card); border-color: var(--border-subtle);"
         >
-          <div class="flex items-center justify-between pb-3 mb-3 border-b" style="border-color: var(--border-subtle);">
-            <div class="flex items-center space-x-2">
-              <Database class="w-4 h-4" style="color: var(--color-up);" />
-              <h2 class="text-xs font-black font-mono uppercase tracking-wider" style="color: var(--text-main);">
-                数据链路健康度
-              </h2>
+          <div>
+            <div class="flex items-center justify-between pb-3 mb-3 border-b" style="border-color: var(--border-subtle);">
+              <div class="flex items-center space-x-2">
+                <Clock class="w-4 h-4" style="color: var(--color-brand);" />
+                <h2 class="text-xs font-black font-mono uppercase tracking-wider" style="color: var(--text-main);">
+                  关键数据管道时效 (Data Health)
+                </h2>
+              </div>
+              <span
+                class="px-2 py-0.5 rounded text-[10px] font-mono font-bold border"
+                :style="{
+                  backgroundColor: runtime.data_health?.overall === 'LIVE' ? 'var(--color-up-bg)' : 'var(--color-down-bg)',
+                  borderColor: runtime.data_health?.overall === 'LIVE' ? 'var(--color-up-border)' : 'var(--color-down-border)',
+                  color: runtime.data_health?.overall === 'LIVE' ? 'var(--color-up)' : 'var(--color-down)'
+                }"
+              >
+                {{ runtime.data_health?.overall || 'UNKNOWN' }}
+              </span>
             </div>
-            <span
-              class="text-[10px] font-mono px-2 py-0.5 rounded border font-bold"
-              style="background-color: var(--color-up-bg); color: var(--color-up); border-color: var(--color-up-border);"
-            >
-              REALTIME
-            </span>
-          </div>
 
-          <div class="overflow-x-auto">
-            <table class="w-full text-left text-xs font-mono whitespace-nowrap">
+            <table class="w-full text-left font-mono text-xs border-collapse">
               <thead>
-                <tr class="border-b text-[11px] uppercase tracking-wider" style="border-color: var(--border-subtle); color: var(--text-muted);">
-                  <th class="pb-2 font-bold">数据源</th>
-                  <th class="pb-2 font-bold">状态</th>
-                  <th class="pb-2 font-bold">更新时延</th>
-                  <th class="pb-2 text-right font-bold">文件体积</th>
+                <tr class="border-b text-[10px] uppercase" style="border-color: var(--border-subtle); color: var(--text-faint);">
+                  <th class="pb-2 font-medium">通道来源</th>
+                  <th class="pb-2 font-medium">状态</th>
+                  <th class="pb-2 font-medium">更新延时</th>
+                  <th class="pb-2 text-right font-medium">字节数</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody class="divide-y" style="border-color: var(--border-subtle);">
                 <tr
-                  v-for="(x, i) in runtime.data_health"
-                  :key="i"
-                  class="border-b last:border-b-0 transition-colors hover:bg-[var(--bg-card-hover)]"
-                  style="border-color: var(--border-subtle);"
+                  v-for="(x, idx) in runtime.data_health?.files || []"
+                  :key="idx"
+                  class="hover:bg-[var(--bg-card-subtle)] transition-colors"
                 >
-                  <td class="py-2.5 font-mono font-medium" style="color: var(--text-main);">
-                    {{ x.name }}
+                  <td class="py-2.5 font-bold" style="color: var(--text-main);">
+                    {{ x.file }}
                   </td>
                   <td class="py-2.5">
                     <span
@@ -411,122 +368,6 @@ const quickNav = [
               </tbody>
             </table>
           </div>
-        </div>
-      </div>
-
-      <!-- Quantitative Backtesting & Statistical Attribution (学术报告专项验证面板) -->
-      <div
-        class="rounded-xl border p-4 sm:p-5 shadow-xs transition-colors"
-        style="background-color: var(--bg-card); border-color: var(--border-subtle);"
-      >
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-3 mb-3 border-b gap-2" style="border-color: var(--border-subtle);">
-          <div class="flex items-center space-x-2">
-            <TrendingUp class="w-4 h-4 text-indigo-400" />
-            <h2 class="text-xs font-black font-mono uppercase tracking-wider" style="color: var(--text-main);">
-              量化回测与统计显著性归因 (Backtesting Engine)
-            </h2>
-            <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-              OKX 实时历史 K 线实证
-            </span>
-          </div>
-
-          <div class="flex items-center space-x-2">
-            <select
-              v-model="selectedSymbol"
-              class="px-2 py-1 rounded border text-xs font-mono"
-              style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle); color: var(--text-main);"
-            >
-              <option value="ALL">🌟 全组合 (6币组合)</option>
-              <option value="BTC-USDT-SWAP">BTC-USDT-SWAP</option>
-              <option value="ETH-USDT-SWAP">ETH-USDT-SWAP</option>
-              <option value="SOL-USDT-SWAP">SOL-USDT-SWAP</option>
-              <option value="DOGE-USDT-SWAP">DOGE-USDT-SWAP</option>
-              <option value="SUI-USDT-SWAP">SUI-USDT-SWAP</option>
-              <option value="ASTER-USDT-SWAP">ASTER-USDT-SWAP</option>
-            </select>
-
-            <select
-              v-model="selectedBar"
-              class="px-2 py-1 rounded border text-xs font-mono"
-              style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle); color: var(--text-main);"
-            >
-              <option value="15m">15m 周期</option>
-              <option value="1H">1H 周期</option>
-              <option value="4H">4H 周期</option>
-            </select>
-
-            <button
-              @click="triggerBacktest"
-              :disabled="runningBacktest"
-              class="flex items-center space-x-1.5 px-3 py-1 rounded border text-xs font-mono font-bold text-white transition-all cursor-pointer shadow-xs disabled:opacity-50"
-              style="background-color: #3875F6; border-color: #2b5ec9;"
-            >
-              <RefreshCw v-if="runningBacktest" class="w-3.5 h-3.5 animate-spin" />
-              <Play v-else class="w-3.5 h-3.5" />
-              <span>{{ runningBacktest ? '回测计算中...' : '一键执行回测' }}</span>
-            </button>
-          </div>
-        </div>
-
-        <div v-if="activeBacktestView" class="space-y-4">
-          <!-- KPI Metrics Row -->
-          <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            <div class="rounded-lg border p-3 font-mono" style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);">
-              <div class="text-[10px] text-gray-400">总收益率 / 净值</div>
-              <div class="text-sm font-black mt-1" :class="activeBacktestView.total_return_pct >= 0 ? 'text-emerald-400' : 'text-rose-400'">
-                {{ activeBacktestView.total_return_pct >= 0 ? '+' : '' }}{{ activeBacktestView.total_return_pct }}%
-              </div>
-              <div class="text-[10px] text-gray-500">${{ activeBacktestView.final_equity?.toLocaleString() }}</div>
-            </div>
-
-            <div class="rounded-lg border p-3 font-mono" style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);">
-              <div class="text-[10px] text-gray-400">年化夏普比率 (Sharpe)</div>
-              <div class="text-sm font-black mt-1 text-indigo-400">
-                {{ activeBacktestView.sharpe_ratio }}
-              </div>
-              <div class="text-[10px] text-gray-500">索提诺: {{ activeBacktestView.sortino_ratio }}</div>
-            </div>
-
-            <div class="rounded-lg border p-3 font-mono" style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);">
-              <div class="text-[10px] text-gray-400">最大回撤 (Max DD)</div>
-              <div class="text-sm font-black mt-1 text-amber-400">
-                {{ activeBacktestView.max_drawdown_pct }}%
-              </div>
-              <div class="text-[10px] text-gray-500">卡玛比率: {{ activeBacktestView.calmar_ratio }}</div>
-            </div>
-
-            <div class="rounded-lg border p-3 font-mono" style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);">
-              <div class="text-[10px] text-gray-400">胜率 / 盈亏比</div>
-              <div class="text-sm font-black mt-1 text-cyan-400">
-                {{ activeBacktestView.win_rate_pct }}%
-              </div>
-              <div class="text-[10px] text-gray-500">PF: {{ activeBacktestView.profit_factor }}</div>
-            </div>
-
-            <div class="rounded-lg border p-3 font-mono" style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);">
-              <div class="text-[10px] text-gray-400">开平仓单数 (胜/负)</div>
-              <div class="text-sm font-black mt-1" style="color: var(--text-main);">
-                {{ activeBacktestView.total_trades }} 笔
-              </div>
-              <div class="text-[10px] text-gray-500">胜{{ activeBacktestView.winning_trades }}/负{{ activeBacktestView.losing_trades }} (均R: {{ activeBacktestView.avg_r_multiple }}R)</div>
-            </div>
-
-            <div class="rounded-lg border p-3 font-mono" style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);">
-              <div class="text-[10px] text-gray-400">拦截器物理防割肉</div>
-              <div class="text-sm font-black mt-1 text-emerald-400">
-                {{ activeBacktestView.gatekeeper_filtered_count }} 次
-              </div>
-              <div class="text-[10px] text-gray-500">置信度/盈亏比拦截</div>
-            </div>
-          </div>
-
-          <div class="text-xs font-mono p-3 rounded border text-gray-400 flex items-center justify-between" style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);">
-            <span>当前视角: <strong class="text-white">{{ activeBacktestView.symbol }}</strong> · 初始资金: ${{ activeBacktestView.initial_equity?.toLocaleString() }} · 包含完整 Taker/Maker 手续费与滑点模拟</span>
-            <span class="text-[10px] text-gray-500">数据源: OKX 官方 Public Candles (最新 100 根)</span>
-          </div>
-        </div>
-        <div v-else class="py-6 text-center text-xs font-mono text-gray-500">
-          尚未加载或生成回测报告，点击右上角「一键执行回测」即可开始实证计算。
         </div>
       </div>
 

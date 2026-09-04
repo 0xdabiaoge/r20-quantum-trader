@@ -2241,57 +2241,6 @@ def _save_memory_items(items: list[str]) -> None:
     MEMORY_FILE.parent.mkdir(parents=True, exist_ok=True)
     MEMORY_FILE.write_text(header + body + "\n", encoding="utf-8")
 
-@app.get("/api/v1/admin/backtest/report")
-def admin_get_backtest_report(x_r20_admin_token: str | None = Header(default=None), x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
-    require_admin_header(x_r20_admin_token, x_r20_session)
-    report_file = ROOT / "data" / "backtest_report.json"
-    if not report_file.is_file():
-        return {
-            "has_report": False,
-            "report": None,
-            "detail": "尚未生成回测报告，可点击一键运行生成最新统计指标",
-        }
-    try:
-        data = json.loads(report_file.read_text(encoding="utf-8"))
-        return {"has_report": True, "report": data, "detail": "获取成功"}
-    except Exception as exc:
-        return {"has_report": False, "report": None, "detail": f"解析回测报告失败: {exc}"}
-
-
-@app.post("/api/v1/admin/backtest/run")
-def admin_run_backtest(
-    payload: dict[str, Any] = Body(default_factory=dict),
-    x_r20_admin_token: str | None = Header(default=None),
-    x_r20_session: str | None = Header(default=None, alias="X-R20-Session"),
-) -> dict[str, Any]:
-    require_admin_header(x_r20_admin_token, x_r20_session)
-    symbol = payload.get("symbol", "BTC-USDT-SWAP")
-    bar = payload.get("bar", "1H")
-    limit = int(payload.get("limit", 100))
-    capital = float(payload.get("capital", 10000.0))
-
-    import subprocess
-    cmd = [
-        sys.executable,
-        str(ROOT / "scripts" / "backtest_engine.py"),
-        "--symbol", symbol,
-        "--bar", bar,
-        "--limit", str(limit),
-        "--capital", str(capital),
-    ]
-    try:
-        res = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
-        report_file = ROOT / "data" / "backtest_report.json"
-        data = json.loads(report_file.read_text(encoding="utf-8")) if report_file.is_file() else {}
-        return {
-            "ok": res.returncode == 0,
-            "returncode": res.returncode,
-            "stdout": res.stdout,
-            "report": data,
-        }
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"执行回测失败: {exc}") from exc
-
 
 @app.get("/api/v1/admin/memory")
 def get_admin_memory(x_r20_admin_token: str | None = Header(default=None), x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:

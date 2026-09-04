@@ -1164,7 +1164,6 @@ def update_cache_cycle():
         "review": review_data,
         "ai_trading_memory_md": ai_memory_md_content,
         "ai_last_prompt": ai_last_prompt_text,
-        "backtest_report": (lambda: (json.loads(Path(DATA_DIR, "backtest_report.json").read_text(encoding="utf-8")) if Path(DATA_DIR, "backtest_report.json").is_file() else None))(),
         "snapshots": snapshots_list,
         "state_snapshot": state_data,
         "logs": log_lines,
