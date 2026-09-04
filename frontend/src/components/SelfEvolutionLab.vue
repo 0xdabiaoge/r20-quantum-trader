@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useDashboardStore } from '../stores/dashboard'
-import { Sparkles, Brain, Cpu } from 'lucide-vue-next'
+import { Sparkles, Brain, Cpu, TrendingUp, ShieldCheck } from 'lucide-vue-next'
 
 const store = useDashboardStore()
 const review = computed(() => store.data?.review || {})
 const memoryMd = computed(() => store.data?.ai_trading_memory_md || '')
+const backtest = computed(() => store.data?.backtest_report || null)
 </script>
 
 <template>
@@ -116,6 +117,68 @@ const memoryMd = computed(() => store.data?.ai_trading_memory_md || '')
               </div>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. Quantitative Backtesting & Statistical Verification (公开算法实证看板) -->
+    <div
+      v-if="backtest"
+      class="rounded-xl border p-4 sm:p-5 shadow-xs transition-colors"
+      style="background-color: var(--bg-card); border-color: var(--border-subtle);"
+    >
+      <div class="flex items-center justify-between pb-3 mb-3 border-b" style="border-color: var(--border-subtle);">
+        <div class="flex items-center space-x-2">
+          <TrendingUp class="w-4 h-4 text-indigo-400" />
+          <h3 class="text-xs font-black font-mono uppercase tracking-wide" style="color: var(--text-main);">
+            量化回测与统计显著性验证 (Deterministic Backtesting Attribution)
+          </h3>
+          <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+            OKX 真实历史 K 线驱动
+          </span>
+        </div>
+        <span class="text-[10px] font-mono" style="color: var(--text-muted);">
+          标的: {{ backtest.symbol }} · 初始资金: ${{ backtest.initial_equity }}
+        </span>
+      </div>
+
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 font-mono">
+        <div class="p-2.5 rounded-lg border" style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);">
+          <div class="text-[10px]" style="color: var(--text-faint);">收益率 / 净值</div>
+          <div class="font-bold text-sm mt-0.5" :class="backtest.total_return_pct >= 0 ? 'text-emerald-400' : 'text-rose-400'">
+            {{ backtest.total_return_pct }}%
+          </div>
+          <div class="text-[9px] text-gray-500">${{ backtest.final_equity }}</div>
+        </div>
+
+        <div class="p-2.5 rounded-lg border" style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);">
+          <div class="text-[10px]" style="color: var(--text-faint);">夏普比率 (Sharpe)</div>
+          <div class="font-bold text-sm mt-0.5 text-indigo-400">{{ backtest.sharpe_ratio }}</div>
+          <div class="text-[9px] text-gray-500">索提诺: {{ backtest.sortino_ratio }}</div>
+        </div>
+
+        <div class="p-2.5 rounded-lg border" style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);">
+          <div class="text-[10px]" style="color: var(--text-faint);">最大回撤 (Max DD)</div>
+          <div class="font-bold text-sm mt-0.5 text-amber-400">{{ backtest.max_drawdown_pct }}%</div>
+          <div class="text-[9px] text-gray-500">卡玛: {{ backtest.calmar_ratio }}</div>
+        </div>
+
+        <div class="p-2.5 rounded-lg border" style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);">
+          <div class="text-[10px]" style="color: var(--text-faint);">胜率 / 盈亏比</div>
+          <div class="font-bold text-sm mt-0.5 text-cyan-400">{{ backtest.win_rate_pct }}%</div>
+          <div class="text-[9px] text-gray-500">PF: {{ backtest.profit_factor }}</div>
+        </div>
+
+        <div class="p-2.5 rounded-lg border" style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);">
+          <div class="text-[10px]" style="color: var(--text-faint);">回测交易单数</div>
+          <div class="font-bold text-sm mt-0.5" style="color: var(--text-main);">{{ backtest.total_trades }} 笔</div>
+          <div class="text-[9px] text-gray-500">胜{{ backtest.winning_trades }}/负{{ backtest.losing_trades }} (均R: {{ backtest.avg_r_multiple }}R)</div>
+        </div>
+
+        <div class="p-2.5 rounded-lg border" style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle);">
+          <div class="text-[10px]" style="color: var(--text-faint);">拦截器物理防割肉</div>
+          <div class="font-bold text-sm mt-0.5 text-emerald-400">{{ backtest.gatekeeper_filtered_count }} 次</div>
+          <div class="text-[9px] text-gray-500">过滤虚假杂波</div>
         </div>
       </div>
     </div>

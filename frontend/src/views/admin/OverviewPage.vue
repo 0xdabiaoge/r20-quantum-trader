@@ -119,7 +119,7 @@ const quickNav = [
             class="px-2 py-0.2 rounded text-[10px] font-mono font-bold border"
             style="background-color: var(--color-brand-bg); color: var(--color-brand); border-color: var(--color-brand-border);"
           >
-            v7.0.1
+            v7.1.0
           </span>
         </div>
         <p class="text-xs font-mono mt-1" style="color: var(--text-muted);">
@@ -430,6 +430,8 @@ const quickNav = [
               <option value="ETH-USDT-SWAP">ETH-USDT-SWAP</option>
               <option value="SOL-USDT-SWAP">SOL-USDT-SWAP</option>
               <option value="DOGE-USDT-SWAP">DOGE-USDT-SWAP</option>
+              <option value="SUI-USDT-SWAP">SUI-USDT-SWAP</option>
+              <option value="ASTER-USDT-SWAP">ASTER-USDT-SWAP</option>
             </select>
 
             <select

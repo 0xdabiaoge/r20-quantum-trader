@@ -184,6 +184,7 @@ function getActionLabel(action?: string) {
       v-if="drawerVisible && selectedInstrument"
       :visible="drawerVisible"
       :instrument="selectedInstrument"
+      :full-prompt-text="store.data?.ai_last_prompt || ''"
       @close="drawerVisible = false"
     />
   </div>

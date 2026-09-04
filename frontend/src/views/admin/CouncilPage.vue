@@ -257,7 +257,7 @@ onMounted(loadData)
         </p>
       </div>
       <span class="text-[10px] font-mono text-purple-400 bg-purple-500/10 px-2 py-1 rounded border border-purple-500/20">
-        多模型协作 · v7.0.1 升级版
+        多模型协作 · v7.1.0 升级版
       </span>
     </div>
 
