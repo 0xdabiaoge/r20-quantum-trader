@@ -95,7 +95,9 @@ async def lifespan(_: FastAPI):
     stop_gateway_supervisor()
 
 
-app = FastAPI(title="R20 Quantum Trader Standalone Backend", version="6.8.0", lifespan=lifespan, docs_url="/api/docs", redoc_url="/api/redoc")
+from fastapi.middleware.gzip import GZipMiddleware
+app = FastAPI(title="R20 Quantum Trader Standalone Backend", version="6.8.1", lifespan=lifespan, docs_url="/api/docs", redoc_url="/api/redoc")
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 
 @app.middleware("http")
@@ -534,7 +536,7 @@ def runtime_overview() -> dict[str, Any]:
     ]
     positions_payload = read_json("position_trackers.json", {})
     return {
-        "service": {"version": "6.8.0", "pid": os.getpid(), "uptime_seconds": int(time.time() - STARTED_AT)},
+        "service": {"version": "6.8.1", "pid": os.getpid(), "uptime_seconds": int(time.time() - STARTED_AT)},
         "credentials": {"okx": bool(settings.okx_api_key and settings.okx_secret_key and settings.okx_passphrase), "llm": bool(settings.llm_api_key)},
         "configuration": get_admin_configuration(),
         "data_health": health_files,
@@ -585,7 +587,7 @@ def top_robots_txt() -> Response:
     pf = ROOT / "frontend" / "public" / "robots.txt"
     if pf.is_file():
         return FileResponse(str(pf), media_type="text/plain", headers={"Cache-Control": "public, max-age=86400, s-maxage=604800"})
-    return PlainTextResponse("User-agent: *\nAllow: /\nAllow: /docs\nAllow: /images/\nDisallow: /admin/\nDisallow: /api/\nSitemap: https://www.r20.cn/sitemap.xml\n")
+    return PlainTextResponse("User-agent: *\nAllow: /\nAllow: /trading\nAllow: /factors\nAllow: /news\nAllow: /lab\nAllow: /history\nAllow: /docs\nAllow: /images/\nDisallow: /admin/\nDisallow: /api/\nSitemap: https://www.r20.cn/sitemap.xml\n")
 
 
 @app.get("/sitemap.xml", include_in_schema=False)
@@ -596,7 +598,7 @@ def top_sitemap_xml() -> Response:
     pf = ROOT / "frontend" / "public" / "sitemap.xml"
     if pf.is_file():
         return FileResponse(str(pf), media_type="application/xml", headers={"Cache-Control": "public, max-age=86400, s-maxage=604800"})
-    return Response(content="""<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>https://www.r20.cn/</loc><priority>1.0</priority></url><url><loc>https://www.r20.cn/docs</loc><priority>0.8</priority></url></urlset>""", media_type="application/xml")
+    return Response(content="""<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>https://www.r20.cn/</loc><priority>1.0</priority></url><url><loc>https://www.r20.cn/factors</loc><priority>0.9</priority></url><url><loc>https://www.r20.cn/news</loc><priority>0.8</priority></url><url><loc>https://www.r20.cn/lab</loc><priority>0.8</priority></url><url><loc>https://www.r20.cn/history</loc><priority>0.8</priority></url><url><loc>https://www.r20.cn/docs</loc><priority>0.9</priority></url></urlset>""", media_type="application/xml")
 
 
 @app.get("/admin", include_in_schema=False)
@@ -1375,10 +1377,10 @@ def admin_about(x_r20_admin_token: str | None = Header(default=None)) -> dict[st
     import platform
     store = GatewayStore(GATEWAY_DB_PATH)
     return {
-        "product": {"name": "R20 Quantum Trader", "version": "6.8.0", "control_plane": "R20 Gateway Runtime", "gateway_version": GATEWAY_VERSION},
+        "product": {"name": "R20 Quantum Trader", "version": "6.8.1", "control_plane": "R20 Gateway Runtime", "gateway_version": GATEWAY_VERSION},
         "runtime": {"python": platform.python_version(), "platform": platform.platform(), "backend_pid": os.getpid(), "gateway": gateway_status(x_r20_admin_token)},
         "components": [
-            {"name": "FastAPI Control Plane", "version": "6.8.0"},
+            {"name": "FastAPI Control Plane", "version": "6.8.1"},
             {"name": "Gateway Event Runtime", "version": GATEWAY_VERSION},
             {"name": "SQLite", "version": __import__("sqlite3").sqlite_version},
         ],
@@ -2119,7 +2121,7 @@ def run_backup(payload: BackupRequest, x_r20_admin_token: str | None = Header(de
 def health() -> dict[str, Any]:
     return {
         "service": "r20-standalone-backend",
-        "version": "6.8.0",
+        "version": "6.8.1",
         "status": "ok",
         "timestamp": int(time.time()),
         "credentials": {

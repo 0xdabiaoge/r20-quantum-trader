@@ -9,6 +9,36 @@ const routes: RouteRecordRaw[] = [
     meta: { isPublic: true },
   },
   {
+    path: '/trading',
+    name: 'dashboard-trading',
+    component: () => import('../views/DashboardView.vue'),
+    meta: { isPublic: true, tab: 'trading' },
+  },
+  {
+    path: '/factors',
+    name: 'dashboard-factors',
+    component: () => import('../views/DashboardView.vue'),
+    meta: { isPublic: true, tab: 'factors' },
+  },
+  {
+    path: '/news',
+    name: 'dashboard-news',
+    component: () => import('../views/DashboardView.vue'),
+    meta: { isPublic: true, tab: 'news' },
+  },
+  {
+    path: '/lab',
+    name: 'dashboard-lab',
+    component: () => import('../views/DashboardView.vue'),
+    meta: { isPublic: true, tab: 'lab' },
+  },
+  {
+    path: '/history',
+    name: 'dashboard-history',
+    component: () => import('../views/DashboardView.vue'),
+    meta: { isPublic: true, tab: 'history' },
+  },
+  {
     path: '/docs',
     name: 'docs',
     component: () => import('../views/DocsView.vue'),
@@ -82,6 +112,14 @@ router.afterEach((to) => {
 
   if (to.path === '/docs' || to.path.startsWith('/docs/')) {
     title = '官方开发与使用指南 | R20 Quantum Trader 文档中心'
+  } else if (to.path === '/factors') {
+    title = '多因子动能矩阵 | R20 Quantum Trader'
+  } else if (to.path === '/news') {
+    title = '全网舆情与聪明钱雷达 | R20 Quantum Trader'
+  } else if (to.path === '/lab') {
+    title = 'AI 策略自进化认知中枢 | R20 Quantum Trader'
+  } else if (to.path === '/history') {
+    title = '实盘交易台账与复盘审计 | R20 Quantum Trader'
   } else if (to.path.startsWith('/admin')) {
     isNoIndex = true
     const adminLabels: Record<string, string> = {

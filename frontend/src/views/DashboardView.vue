@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useDashboardStore } from '../stores/dashboard'
 import HeaderBar from '../components/HeaderBar.vue'
 import TopHudRibbon from '../components/TopHudRibbon.vue'
@@ -21,10 +22,36 @@ import {
   Rows,
 } from 'lucide-vue-next'
 
+const router = useRouter()
+const route = useRoute()
 const store = useDashboardStore()
 const layoutMode = ref<'dual' | 'stacked'>('dual')
 
+// Sync initial tab from route path
+function syncTabFromRoute() {
+  const metaTab = route.meta?.tab as any
+  if (metaTab && ['trading', 'factors', 'news', 'lab', 'history'].includes(metaTab)) {
+    store.activeTab = metaTab
+  } else if (route.path === '/') {
+    store.activeTab = 'trading'
+  }
+}
+
+// Watch route changes to update activeTab
+watch(() => route.path, () => {
+  syncTabFromRoute()
+})
+
+// Watch store.activeTab to push URL route for perfect SEO & Cloudflare caching
+watch(() => store.activeTab, (newTab) => {
+  const targetPath = newTab === 'trading' ? '/' : `/${newTab}`
+  if (route.path !== targetPath && !route.path.startsWith('/admin') && !route.path.startsWith('/docs')) {
+    router.replace(targetPath).catch(() => {})
+  }
+})
+
 onMounted(() => {
+  syncTabFromRoute()
   store.startPolling(3000)
   try {
     const saved = localStorage.getItem('r20_dashboard_layout')
@@ -161,7 +188,7 @@ function setLayout(mode: 'dual' | 'stacked') {
           class="hover:text-[var(--color-brand)] transition-colors cursor-pointer"
           title="点击查看开源仓库与项目信息"
         >
-          R20 QUANTUM TRADER v6.8.0
+          R20 QUANTUM TRADER v6.8.1
         </button>
         <span>•</span>
         <span>VUE 3 + VITE + TAILWIND CSS</span>

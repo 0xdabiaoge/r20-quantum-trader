@@ -1042,7 +1042,13 @@ def update_cache_cycle():
     if os.path.exists(AI_HISTORY_FILE):
         try:
             with open(AI_HISTORY_FILE, "r", encoding="utf-8") as f:
-                ai_history_list = json.load(f)
+                raw_history = json.load(f)
+                # Keep up to 25 records and trim heavy repeated prompts in older history
+                for idx, item in enumerate(raw_history[:25]):
+                    c = dict(item)
+                    if idx > 0 and "ai_last_prompt" in c and len(str(c["ai_last_prompt"])) > 500:
+                        c["ai_last_prompt"] = str(c["ai_last_prompt"])[:200] + "...(历史已收敛)"
+                    ai_history_list.append(c)
         except Exception:
             pass
 

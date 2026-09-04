@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-R20 High-Alpha Quantitative Multi-Factor Trading Matrix & Execution Engine (R20 Quantum Trader v6.8.0)
+R20 High-Alpha Quantitative Multi-Factor Trading Matrix & Execution Engine (R20 Quantum Trader v6.8.1)
 Architecture:
 1. Multi-Dimensional Quant Factor Sub-Engine:
    - Trend Momentum: EMA Slope (9/21/55), Multi-Timeframe Alignment (15M, 1H, 4H)
@@ -1269,7 +1269,7 @@ def execute_ai_position_management(real_pos_dict, trackers, timestamp_full, exec
                 executed_actions.append(f"[{name}] 云端止损更新失败，原保护单保持不变")
 
 # =============================================================================
-# 🧠 R20 Quantum Trader v6.8.0 Multi-Factor Scoring & Strategy Setup Classifier
+# 🧠 R20 Quantum Trader v6.8.1 Multi-Factor Scoring & Strategy Setup Classifier
 # =============================================================================
 def evaluate_asset_signal(f):
     """
@@ -1939,7 +1939,7 @@ def execute_portfolio():
     except Exception as e:
         print(f"[Ledger Sync Warning] {e}")
 
-    log_entry = f"[{timestamp_full}] ⚡ R20 Quantum Trader v6.8.0 巡检完成 | 持仓 {active_pos_count}/{MAX_CONCURRENT_POSITIONS} (多{long_count}/空{short_count}) | 动作: {', '.join(executed_actions) if executed_actions else '无开平仓操作'}\n"
+    log_entry = f"[{timestamp_full}] ⚡ R20 Quantum Trader v6.8.1 巡检完成 | 持仓 {active_pos_count}/{MAX_CONCURRENT_POSITIONS} (多{long_count}/空{short_count}) | 动作: {', '.join(executed_actions) if executed_actions else '无开平仓操作'}\n"
     with open(LOG_FILE, "a", encoding="utf-8") as f:
         f.write(log_entry)
     print(log_entry.strip())
