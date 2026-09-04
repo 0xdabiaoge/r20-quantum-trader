@@ -24,7 +24,7 @@
 
 ---
 
-![R20 机构级量化终端全景](docs/images/dashboard_trading.png)
+![R20 机构级量化终端全景](https://raw.githubusercontent.com/555cute/r20-quantum-trader/main/docs/images/dashboard_trading.png)
 
 > [!WARNING]
 > R20 Quantum Trader 是面向加密货币市场的开源量化交易系统，致力于为个人交易员与量化团队提供高透明度、自进化与工业级的波段交易底座。**软件不构成任何投资建议，数字资产交易具有极高波动风险**。强烈建议先在 OKX **DEMO 模拟盘** 环境下完成全流程回测与沙箱验证，再评估实盘接入。
@@ -48,42 +48,42 @@
 ### 1. ⌘ 提示词策略方案工作室（Prompt Studio）
 *聚焦交易主脑核心管线！自进化部分拆离后更加专注纯粹，专注于「交易 System 规则纪律」与「交易 User 实时行情快照拼装」；内置变量快速插入条与变量字典手册，支持将策略一键导出为 JSON 分享或导入社区策略包；右侧提供「实发效果」与「模板源码」毫秒级双模对照。*
 
-![提示词策略方案工作室](docs/images/admin_prompt_studio.png)
+![提示词策略方案工作室](https://raw.githubusercontent.com/555cute/r20-quantum-trader/main/docs/images/admin_prompt_studio.png)
 
 ---
 
 ### 2. 🧬 独立的 AI 自进化认知中枢（Evolution Engine）
 *从提示词策略中完整剥离成独立的「自进化配置」中枢。涵盖复盘官 System 角色定位、战绩证据 User 模版；直观监控每 6 小时（每日 4 次）自动复盘计划；内置实战长期心法记忆库，支持管理员直接在后台一键新增心得、删除无效规则，并提供「强制立即复盘」即时提炼。*
 
-![自进化配置与实战心法面板](docs/images/admin_evolution.png)
+![自进化配置与实战心法面板](https://raw.githubusercontent.com/555cute/r20-quantum-trader/main/docs/images/admin_evolution.png)
 
 ---
 
 ### 3. 🛡️ 物理拦截插件中心（Interceptors Safety Pipeline）
 *代码级执行前硬阻断！所有进入 OKX 交易所的发单指令必须通过顺序链式拦截器，任一插件判定 REJECT 则立即终止交易执行。已优化 75% 置信度基准门禁与 4H 宏观顺势铁律，支持现场沙箱测试，可直接载入最近推演决策回放执行并生成审计报告。*
 
-![物理拦截插件中心](docs/images/admin_interceptors.png)
+![物理拦截插件中心](https://raw.githubusercontent.com/555cute/r20-quantum-trader/main/docs/images/admin_interceptors.png)
 
 ---
 
 ### 4. 🏛️ 多模型决策委员会（Council Pro）
 *支持多参谋多线程并发辩论博弈：**动量进攻官**（寻找 Alpha 突破）、**保守风控官**（量价背离与一票否决权）、**量化数理官**（ADX/微积分纯数学门禁）、**舆情侦察官**、**宏观策略官**与**盘口微结构官**各司其职，最终由**首席终审仲裁官**权衡收口。支持席位动态增删、全量动态模型自由绑定与思考深度自动继承。*
 
-![多模型委员会决策系统](docs/images/admin_council.png)
+![多模型委员会决策系统](https://raw.githubusercontent.com/555cute/r20-quantum-trader/main/docs/images/admin_council.png)
 
 ---
 
 ### 5. 🔌 模型连接与供应商矩阵（LLM Connections）
 *极简且强大的模型接入体系：仅保留 OpenAI、Claude、Gemini 三大基础渠道，支持任意自定义供应商扩展；采用真实 API 通信协议下拉矩阵（OpenAI Chat / Responses / Claude Messages 等）；自动继承已存凭据秒级拉取远程 400+ 模型；针对前沿旗舰模型自适应开放 xhigh / max 极限推演。*
 
-![模型连接与供应商矩阵](docs/images/admin_llm.png)
+![模型连接与供应商矩阵](https://raw.githubusercontent.com/555cute/r20-quantum-trader/main/docs/images/admin_llm.png)
 
 ---
 
 ### 6. 机构级实盘监控大屏（Frontend Workstation）
 *全新单行沉浸顶栏，四大财务 HUD 核心指标卡解耦直连；100% 全宽展开在途持仓明细（双行排版清晰舒展、云端止损盾牌与浮盈 ROI 实时透视）；在途 Maker 限价挂单监控与六币因果动力学微结构矩阵横向自适应平整铺满。*
 
-![前台实盘矩阵终端](docs/images/dashboard_trading.png)
+![前台实盘矩阵终端](https://raw.githubusercontent.com/555cute/r20-quantum-trader/main/docs/images/dashboard_trading.png)
 
 ---
 

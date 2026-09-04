@@ -297,10 +297,10 @@ onUnmounted(() => {
               <span class="font-bold" style="color: var(--color-brand);">点击图片放大</span>
             </div>
             <img
-              src="/images/dashboard_trading.png"
+              src="https://raw.githubusercontent.com/555cute/r20-quantum-trader/main/docs/images/dashboard_trading.png"
               alt="双翼量化工作台全景"
               class="w-full rounded-xl cursor-zoom-in group-hover:opacity-95 transition-opacity"
-              @click="zoomImage = '/images/dashboard_trading.png'"
+              @click="zoomImage = 'https://raw.githubusercontent.com/555cute/r20-quantum-trader/main/docs/images/dashboard_trading.png'"
             />
           </div>
         </section>
@@ -341,10 +341,10 @@ onUnmounted(() => {
               <span class="font-bold" style="color: var(--color-brand);">点击图片放大</span>
             </div>
             <img
-              src="/images/admin_council.png"
+              src="https://raw.githubusercontent.com/555cute/r20-quantum-trader/main/docs/images/admin_council.png"
               alt="多模型委员会控制台"
               class="w-full rounded-xl cursor-zoom-in group-hover:opacity-95 transition-opacity"
-              @click="zoomImage = '/images/admin_council.png'"
+              @click="zoomImage = 'https://raw.githubusercontent.com/555cute/r20-quantum-trader/main/docs/images/admin_council.png'"
             />
           </div>
         </section>
@@ -407,10 +407,10 @@ onUnmounted(() => {
               <span class="font-bold" style="color: var(--color-brand);">点击图片放大</span>
             </div>
             <img
-              src="/images/admin_prompt_studio.png"
+              src="https://raw.githubusercontent.com/555cute/r20-quantum-trader/main/docs/images/admin_prompt_studio.png"
               alt="提示词策略工作室"
               class="w-full rounded-xl cursor-zoom-in group-hover:opacity-95 transition-opacity"
-              @click="zoomImage = '/images/admin_prompt_studio.png'"
+              @click="zoomImage = 'https://raw.githubusercontent.com/555cute/r20-quantum-trader/main/docs/images/admin_prompt_studio.png'"
             />
           </div>
         </section>
@@ -467,10 +467,10 @@ onUnmounted(() => {
               <span class="font-bold" style="color: var(--color-brand);">点击图片放大</span>
             </div>
             <img
-              src="/images/admin_interceptors.png"
+              src="https://raw.githubusercontent.com/555cute/r20-quantum-trader/main/docs/images/admin_interceptors.png"
               alt="物理拦截插件中心"
               class="w-full rounded-xl cursor-zoom-in group-hover:opacity-95 transition-opacity"
-              @click="zoomImage = '/images/admin_interceptors.png'"
+              @click="zoomImage = 'https://raw.githubusercontent.com/555cute/r20-quantum-trader/main/docs/images/admin_interceptors.png'"
             />
           </div>
         </section>
@@ -503,10 +503,10 @@ onUnmounted(() => {
               <span class="font-bold" style="color: var(--color-brand);">点击图片放大</span>
             </div>
             <img
-              src="/images/admin_llm.png"
+              src="https://raw.githubusercontent.com/555cute/r20-quantum-trader/main/docs/images/admin_llm.png"
               alt="模型连接控制台"
               class="w-full rounded-xl cursor-zoom-in group-hover:opacity-95 transition-opacity"
-              @click="zoomImage = '/images/admin_llm.png'"
+              @click="zoomImage = 'https://raw.githubusercontent.com/555cute/r20-quantum-trader/main/docs/images/admin_llm.png'"
             />
           </div>
         </section>
@@ -535,10 +535,10 @@ onUnmounted(() => {
               <span class="font-bold" style="color: var(--color-brand);">点击图片放大</span>
             </div>
             <img
-              src="/images/admin_evolution.png"
+              src="https://raw.githubusercontent.com/555cute/r20-quantum-trader/main/docs/images/admin_evolution.png"
               alt="自进化配置与实战心法面板"
               class="w-full rounded-xl cursor-zoom-in group-hover:opacity-95 transition-opacity"
-              @click="zoomImage = '/images/admin_evolution.png'"
+              @click="zoomImage = 'https://raw.githubusercontent.com/555cute/r20-quantum-trader/main/docs/images/admin_evolution.png'"
             />
           </div>
         </section>
