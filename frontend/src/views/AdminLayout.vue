@@ -50,6 +50,7 @@ const navGroups = [
       { id: 'evolution', label: '自进化配置', icon: Sparkles },
       { id: 'interceptors', label: '物理拦截插件', icon: ShieldCheck },
       { id: 'council', label: '模型委员会', icon: Users },
+      { id: 'policy', label: '策略版本快照', icon: Layers },
       { id: 'llm', label: '模型连接', icon: Cpu },
       { id: 'agents', label: '运行单元', icon: Package },
       { id: 'plugins', label: '系统插件', icon: FileCode },
