@@ -785,6 +785,17 @@ def assemble_decision_cache(
     p_summary = policy_snapshot.get("summary", "")
 
     standard_cache = {}
+    # Load dynamic asset multipliers from self-improvement review if present
+    asset_multipliers = {}
+    try:
+        mult_file = ROOT / "data" / "asset_multipliers.json"
+        if mult_file.is_file():
+            with open(mult_file, "r", encoding="utf-8") as f:
+                mult_data = json.load(f)
+            asset_multipliers = mult_data.get("multipliers") or {}
+    except Exception:
+        pass
+
     for p in packages:
         inst_id = p["instId"]
         d_item = decisions_dict.get(inst_id, {})
@@ -796,7 +807,13 @@ def assemble_decision_cache(
         stop_loss = safe_float(d_item.get("stop_loss_price") or d_item.get("stop_loss"))
         confidence = max(0.0, min(100.0, safe_float(d_item.get("confidence"))))
         ai_leverage = int(max(2, min(5, round(safe_float(d_item.get("leverage", 3))))))
-        ai_margin = round(safe_float(d_item.get("margin_usdt") or d_item.get("margin_usd", 0.0)), 2)
+        raw_margin = safe_float(d_item.get("margin_usdt") or d_item.get("margin_usd", 0.0))
+
+        # Dynamically apply self-improvement asset multiplier (e.g. BTC 1.2x, DOGE 0.8x)
+        sym_key = inst_id.split("-")[0] if "-" in inst_id else inst_id
+        mult = float(asset_multipliers.get(sym_key, asset_multipliers.get(inst_id, 1.0)))
+        mult = max(0.5, min(1.5, mult))
+        ai_margin = round(raw_margin * mult, 2) if raw_margin > 0 else 0.0
 
         # Ensure normalized keys exist for downstream interceptors
         normalized_d_item = dict(d_item)

@@ -398,14 +398,36 @@ def run_self_evolution(force: bool = False):
     )
 
     if not preserve_existing_memory:
+        # Safe extraction: convert potential dicts {"rule_text": "..."} to string safely
+        safe_long_term = []
+        for item in long_term_memory:
+            if isinstance(item, dict):
+                val = str(item.get("rule_text") or item.get("text") or item.get("lesson") or "").strip()
+            else:
+                val = str(item or "").strip()
+            if val:
+                safe_long_term.append(val)
+
         try:
             published = memory_service.publish_review(
-                long_term_memory, expected_version=memory_snapshot["version"],
+                safe_long_term, expected_version=memory_snapshot["version"],
                 sample_size=total_trades, change_status=change_status)
             preserve_existing_memory = not published
         except Exception as exc:
             preserve_existing_memory = True
             log_msg(f"Memory publication rejected; retaining authority: {exc}")
+
+    # Persist asset multipliers to data/asset_multipliers.json so brain trader can consume
+    try:
+        mults_payload = {
+            "timestamp": timestamp_str,
+            "multipliers": asset_mults,
+            "updated_by": "self_improvement_engine",
+        }
+        atomic_write_json(ROOT / "data" / "asset_multipliers.json", mults_payload)
+    except Exception as exc:
+        log_msg(f"Failed to persist asset multipliers: {exc}")
+
     # Reflect concurrent toggle/rollback even when the model returns NO_CHANGE.
     _, _, long_term_memory = memory_service.read_trading_context(AI_MEMORY_MD_FILE, AI_MEMORY_FILE)
 

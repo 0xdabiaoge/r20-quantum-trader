@@ -177,8 +177,40 @@ def load_structured_memory() -> List[Dict[str, Any]]:
     return read_memory_snapshot()["lessons"]
 
 
+def is_lesson_expired(item: Dict[str, Any], now: Optional[datetime.datetime] = None) -> bool:
+    """Checks if a non-baseline lesson has exceeded its natural half-life (TTL days)."""
+    if item.get("is_baseline"):
+        return False
+    created_at_str = item.get("created_at")
+    ttl_days = float(item.get("ttl_days") or 7)
+    if not created_at_str:
+        return False
+    try:
+        if created_at_str.endswith("Z"):
+            created_at_str = created_at_str[:-1] + "+00:00"
+        dt = datetime.datetime.fromisoformat(created_at_str)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=datetime.timezone.utc)
+        cur = now or datetime.datetime.now(datetime.timezone.utc)
+        return (cur - dt).total_seconds() > (ttl_days * 86400)
+    except Exception:
+        return False
+
+
 def render_lessons(lessons):
-    return "\n".join(f"- {item['rule_text']}" for item in lessons if item["enabled"])
+    now = datetime.datetime.now(datetime.timezone.utc)
+    active = []
+    for item in lessons:
+        if not item.get("enabled"):
+            continue
+        # If natural half-life expired, suppress from active trading prompt injection
+        if is_lesson_expired(item, now):
+            continue
+        active.append(item)
+    # Capacity limit: strictly select at most top 8 active lessons (baseline first, then recent)
+    sorted_active = sorted(active, key=lambda x: (1 if x.get("is_baseline") else 0, x.get("created_at", "")), reverse=True)
+    capped_active = sorted_active[:8]
+    return "\n".join(f"- {item['rule_text']}" for item in capped_active)
 
 
 def read_trading_context(legacy_md=None, legacy_json=None):
