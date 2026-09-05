@@ -526,3 +526,27 @@ def restore_archived_policy(
         "target_policy_hash": policy_hash,
         "restored_snapshot": new_snapshot,
     }
+
+
+def delete_archived_policy(
+    policy_hash: str,
+    archive_dir: Optional[Path] = None,
+) -> Dict[str, Any]:
+    """Deletes an archived policy file and removes its metadata from index."""
+    a_dir = archive_dir or ARCHIVE_DIR
+    archive_file = a_dir / f"policy_{policy_hash}.json"
+
+    deleted_file = False
+    if archive_file.is_file():
+        archive_file.unlink(missing_ok=True)
+        deleted_file = True
+
+    index_data = load_archive_index(archive_dir=a_dir)
+    original_len = len(index_data)
+    new_index = [item for item in index_data if item.get("policy_hash") != policy_hash]
+
+    if len(new_index) < original_len or deleted_file:
+        save_archive_index(new_index, archive_dir=a_dir)
+        return {"deleted": True, "policy_hash": policy_hash}
+
+    raise FileNotFoundError(f"未找到指定的策略归档: {policy_hash}")

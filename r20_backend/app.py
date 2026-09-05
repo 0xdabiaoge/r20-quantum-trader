@@ -1441,6 +1441,21 @@ def admin_restore_policy(payload: PolicyRestoreRequest, x_r20_session: str | Non
         raise HTTPException(status_code=500, detail=f"恢复策略版本失败: {exc}")
 
 
+@app.delete("/api/v1/admin/policy/archive/{policy_hash}")
+def admin_delete_policy_archive(policy_hash: str, x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    require_superadmin(REQUEST_SESSION.get())
+    from r20_backend.policy_snapshot import delete_archived_policy
+    try:
+        res = delete_archived_policy(policy_hash=policy_hash)
+        audit_record("policy.delete", "success", {"policy_hash": policy_hash})
+        return {"ok": True, **res}
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"删除策略归档失败: {exc}")
+
+
+
 @app.get("/api/v1/admin/okx/account-snapshot")
 def admin_okx_account_snapshot(x_r20_admin_token: str | None = Header(default=None)) -> dict[str, Any]:
     require_admin_header(x_r20_admin_token)

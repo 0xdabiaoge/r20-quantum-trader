@@ -21,6 +21,7 @@ import {
   AlertCircle,
   FolderDown,
   FileCode,
+  Trash2,
 } from 'lucide-vue-next'
 
 const { api } = useApi()
@@ -30,6 +31,7 @@ const loading = ref(true)
 const refreshing = ref(false)
 const archiving = ref(false)
 const restoring = ref(false)
+const deleting = ref<string | null>(null)
 
 const snapshotData = ref<any>(null)
 const archives = ref<any[]>([])
@@ -114,6 +116,27 @@ async function restorePolicy(hash: string, name: string) {
     bannerMsg.value = { text: `回滚失败: ${err.message}`, type: 'err' }
   } finally {
     restoring.value = false
+  }
+}
+
+async function deleteArchive(hash: string, name: string) {
+  if (!auth.isSuperadmin) return
+  if (!confirm(`确定要彻底删除已归档的策略版本【${name}】(#${hash}) 吗？\n删除后不可恢复！`)) {
+    return
+  }
+  deleting.value = hash
+  try {
+    const res = await api(`/api/v1/admin/policy/archive/${hash}`, {
+      method: 'DELETE',
+    })
+    if (res && res.ok) {
+      bannerMsg.value = { text: `🗑️ 策略版本【${name}】已成功删除`, type: 'ok' }
+      await fetchSnapshot()
+    }
+  } catch (err: any) {
+    bannerMsg.value = { text: `删除失败: ${err.message}`, type: 'err' }
+  } finally {
+    deleting.value = null
   }
 }
 
@@ -515,6 +538,16 @@ onMounted(() => {
               >
                 <RotateCcw class="w-3.5 h-3.5" :class="{ 'animate-spin': restoring }" />
                 <span>{{ arc.policy_hash === snapshotData.snapshot.policy_hash ? '已是当前版本' : '一键回滚还原' }}</span>
+              </button>
+
+              <button
+                @click="deleteArchive(arc.policy_hash, arc.name)"
+                :disabled="deleting === arc.policy_hash || !auth.isSuperadmin"
+                class="flex items-center space-x-1 px-2.5 py-1.5 rounded-xl border text-xs font-mono cursor-pointer transition-all hover:bg-rose-500/10 text-rose-400 border-rose-500/20"
+                title="删除此归档版本"
+              >
+                <Trash2 class="w-3.5 h-3.5" :class="{ 'animate-pulse': deleting === arc.policy_hash }" />
+                <span>删除</span>
               </button>
             </div>
           </div>
