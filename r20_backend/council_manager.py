@@ -460,11 +460,14 @@ def execute_council_debate(
         "     {\n"
         '       "action": "BUY_LONG" 或 "SELL_SHORT",\n'
         '       "confidence": 82,  // 最终核定置信度整数 0~100\n'
-        '       "limit_price": 78250.0,  // 挂单入场限价（数字），严禁市价追高\n'
+        '       "entry_price": 78250.0,  // 挂单入场限价（数字），严禁市价追高\n'
+        '       "limit_price": 78250.0,  // 入场限价同义兼容\n'
         '       "stop_loss": 76500.0,  // 严格基于 1.8~2.2x 1H ATR 设置的防插针止损价（数字）\n'
+        '       "stop_loss_price": 76500.0,  // 止损价同义兼容\n'
         '       "take_profit": 81750.0,  // 至少 2.0R 盈亏比的目标止盈价（数字）\n'
+        '       "take_profit_price": 81750.0,  // 止盈价同义兼容\n'
         '       "leverage": 3,  // 杠杆倍数（整型 2~5）\n'
-        '       "margin_usd": 150.0,  // 拟投入保证金（须在可用余额安全范围内）\n'
+        '       "margin_usdt": 150.0,  // 拟投入保证金（须在可用余额安全范围内）\n'
         '       "reasoning": "【CIO批复】采纳/驳回了哪位交易员的提案，资金与风控考量"\n'
         "     }\n"
         "   - 若判定为 WAIT 观望，输出: {\"action\": \"WAIT\", \"confidence\": 50, \"reasoning\": \"【CIO批复】驳回理由与资金保全考量\"}\n\n"

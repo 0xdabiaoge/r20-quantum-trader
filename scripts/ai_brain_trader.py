@@ -1040,15 +1040,24 @@ def execute_batch_ai_brain_cycle(pos_summary: str = "当前总持仓 0/6", activ
             d_item = decisions_dict.get(inst_id, {})
             if not isinstance(d_item, dict):
                 d_item = {}
-            entry = safe_float(d_item.get("entry_price"))
-            take_profit = safe_float(d_item.get("take_profit_price"))
-            stop_loss = safe_float(d_item.get("stop_loss_price"))
+            # Smooth field alias normalization (support both standard contract and council desk outputs)
+            entry = safe_float(d_item.get("entry_price") or d_item.get("limit_price"))
+            take_profit = safe_float(d_item.get("take_profit_price") or d_item.get("take_profit"))
+            stop_loss = safe_float(d_item.get("stop_loss_price") or d_item.get("stop_loss"))
             confidence = max(0.0, min(100.0, safe_float(d_item.get("confidence"))))
             ai_leverage = int(max(2, min(5, round(safe_float(d_item.get("leverage", 3))))))
-            ai_margin = round(safe_float(d_item.get("margin_usdt", 0.0)), 2)
+            ai_margin = round(safe_float(d_item.get("margin_usdt") or d_item.get("margin_usd", 0.0)), 2)
+
+            # Ensure normalized keys exist for downstream interceptors
+            normalized_d_item = dict(d_item)
+            normalized_d_item["entry_price"] = entry
+            normalized_d_item["take_profit_price"] = take_profit
+            normalized_d_item["stop_loss_price"] = stop_loss
+            normalized_d_item["margin_usdt"] = ai_margin
+            normalized_d_item["leverage"] = ai_leverage
 
             final_action, rejection_reason, rr = validate_and_filter_decision(
-                p, d_item, active_inst_ids, active_position_sides
+                p, normalized_d_item, active_inst_ids, active_position_sides
             )
 
             standard_cache[inst_id] = {
