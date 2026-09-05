@@ -1224,14 +1224,51 @@ def admin_reset_council_role(payload: CouncilResetRoleRequest, x_r20_session: st
 def admin_test_council_debate(payload: CouncilTestRequest, x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
     require_admin_header(x_r20_session=x_r20_session)
     from r20_backend.council_manager import execute_council_debate, load_council_config
+    from scripts.instrument_pool import load_instruments
     c_cfg = load_council_config()
-    test_market = payload.mock_market_prompt or (
-        "【测试行情快照】\n"
-        "BTC: $77,750, 1H v=+0.08, a=+0.42, ADX=18.5, CMF=+0.12, 聪明钱多头 74%\n"
-        "ETH: $2,408, 1H v=-0.12, a=-0.38, ADX=26.2, CMF=-0.08, 聪明钱空头 65%\n"
-        "SOL: $100.8, 1H v=+0.02, a=+0.15, ADX=20.1, CMF=+0.05, 聪明钱中性\n"
-    )
-    test_sys = "你是一个遵循极严风控的量化交易系统。"
+
+    # Dynamic generation of 6-asset snapshot if not explicitly provided
+    if payload.mock_market_prompt:
+        test_market = payload.mock_market_prompt
+    else:
+        # Pull live factor snapshot or default to all 6 active instruments
+        active_insts = load_instruments()
+        symbols = [x.get("instId", "") for x in active_insts] if active_insts else [
+            "BTC-USDT-SWAP", "ETH-USDT-SWAP", "SOL-USDT-SWAP", "DOGE-USDT-SWAP", "SUI-USDT-SWAP", "ASTER-USDT-SWAP"
+        ]
+        
+        factor_snap_file = ROOT / "data" / "factor_library_snapshot.json"
+        factor_data = {}
+        if factor_snap_file.is_file():
+            try:
+                factor_data = json.loads(factor_snap_file.read_text(encoding="utf-8"))
+            except Exception:
+                pass
+
+        lines = ["【市场全要素动力学与微结构实时快照 (6大主力标的)】"]
+        for sym in symbols:
+            f = factor_data.get(sym, {})
+            c_px = f.get("close", 78000.0 if "BTC" in sym else (2400.0 if "ETH" in sym else (100.0 if "SOL" in sym else 1.0)))
+            v_val = f.get("v_1h", 0.05)
+            a_val = f.get("a_1h", 0.12)
+            adx_val = f.get("adx_1h", 22.5)
+            cmf_val = f.get("cmf_1h", 0.08)
+            smart_val = f.get("smart_money_long_ratio", 68.0)
+            atr_val = f.get("atr_1h", c_px * 0.015)
+            lines.append(
+                f"- {sym}: 现价 ${c_px}, 1H动能 v={v_val:+.4f}, a={a_val:+.4f}, ADX={adx_val:.1f}, "
+                f"1H ATR={atr_val:.4f}, CMF={cmf_val:+.2f}, 聪明钱多头={smart_val:.1f}%"
+            )
+        test_market = "\n".join(lines)
+
+    from scripts.prompt_library import get_compiled_template_pair
+    # Inherit the master strategy prompt from prompt library
+    try:
+        pair = get_compiled_template_pair()
+        test_sys = pair.get("system_prompt") or "你是 R20 Quantum Trader 首席量化官，执行多空对称顺势战法与 2.0x ATR 宽止损。"
+    except Exception:
+        test_sys = "你是一个遵循多空对称顺势、1.8~2.2x ATR 宽止损与 0.8R 保本锁利的量化交易系统。"
+
     try:
         brain_output, transcript = execute_council_debate(
             market_prompt=test_market,

@@ -253,7 +253,7 @@ onMounted(loadData)
       <div class="flex items-center space-x-2">
         <Sparkles class="w-4 h-4 text-purple-400" />
         <p class="text-xs text-[#8A99AD] font-mono">
-          多模型委员会决策系统：深度继承提示词工作室最高策略宪法，支持席位启停、共识模式切换与现场攻防辩论审计。
+          多模型委员会决策系统：深度继承提示词工作室最高宪法与自进化心法，支持动态插槽注入、席位启停与现场攻防辩论审计。
         </p>
       </div>
       <span class="text-[10px] font-mono text-purple-400 bg-purple-500/10 px-2 py-1 rounded border border-purple-500/20">
@@ -657,7 +657,34 @@ onMounted(loadData)
 
           <!-- Prompt Textarea -->
           <div class="space-y-1">
-            <span class="text-[10px] font-mono font-bold" style="color: var(--text-muted);">角色专有 System Prompt（自由定制核心研判逻辑）：</span>
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-mono font-bold" style="color: var(--text-muted);">
+                角色专有 System Prompt（与主策略宪法无缝融合）：
+              </span>
+              <!-- Variable Slots Inserters -->
+              <div class="flex flex-wrap items-center gap-1 text-[9px] font-mono">
+                <span style="color: var(--text-faint);">快速注入插槽:</span>
+                <button
+                  v-for="v in [
+                    { k: 'macro_4h', label: '4H宏观' },
+                    { k: 'calculus_1h', label: '微积分动能' },
+                    { k: 'smart_money', label: '聪明钱' },
+                    { k: 'orderbook_depth', label: '盘口深度' },
+                    { k: 'sentiment', label: '舆情异动' },
+                    { k: 'trading_memory', label: '长期心法' },
+                  ]"
+                  :key="v.k"
+                  type="button"
+                  @click="role.prompt = role.prompt ? `${role.prompt.trim()}\n- 重点核验: {{${v.k}}}` : `{{${v.k}}}`"
+                  class="px-1.5 py-0.5 rounded border transition-colors cursor-pointer hover:border-blue-500"
+                  style="background-color: var(--bg-card); border-color: var(--border-subtle); color: var(--text-main);"
+                  :title="`在提示词中插入 {{${v.k}}} 数据插槽`"
+                >
+                  +&#123;&#123;{{ v.k }}&#125;&#125;
+                </button>
+              </div>
+            </div>
+
             <textarea
               v-model="role.prompt"
               rows="6"
@@ -736,19 +763,69 @@ onMounted(loadData)
       </div>
 
       <!-- Arbitrator Verdict -->
-      <div class="rounded-xl border p-3.5 space-y-2" style="background-color: var(--bg-card-subtle); border-color: var(--color-brand-border);">
+      <div class="rounded-xl border p-4 space-y-3" style="background-color: var(--bg-card-subtle); border-color: var(--color-brand-border);">
         <div class="flex items-center justify-between">
           <div class="flex items-center space-x-2">
-            <span class="text-xs font-bold font-mono" style="color: var(--color-brand);">【首席仲裁官 裁决指令】</span>
+            <span class="text-xs font-bold font-mono" style="color: var(--color-brand);">【首席仲裁官 终审落地全量点位指令】</span>
             <span class="text-[10px] font-mono" style="color: var(--text-faint);">{{ testResult.transcript?.arbitrator?.model_used }} · 终审耗时 {{ testResult.transcript?.arbitrator?.latency_ms }}ms</span>
           </div>
+          <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+            全量量化点位契约
+          </span>
         </div>
-        <div class="text-xs font-mono font-bold leading-relaxed" style="color: var(--color-up);">
-          宏观基调与仲裁论证: {{ testResult.brain_output?.macro_assessment }}
+
+        <div class="text-xs font-mono font-bold leading-relaxed p-2.5 rounded border" style="background-color: var(--bg-card); border-color: var(--border-subtle); color: var(--color-up);">
+          宏观基调与仲裁取舍: {{ testResult.brain_output?.macro_assessment }}
         </div>
-        <div class="text-[11px] font-mono" style="color: var(--text-muted);">
-          发单决策明细 (Decisions):
-          <pre class="mt-1 p-2.5 rounded border text-[10px] overflow-x-auto max-h-48 select-text" style="background-color: var(--bg-card); border-color: var(--border-subtle); color: var(--text-main);">{{ JSON.stringify(testResult.brain_output?.decisions, null, 2) }}</pre>
+
+        <!-- Decisions Table / Grid for points -->
+        <div v-if="testResult.brain_output?.decisions" class="space-y-1.5">
+          <div class="text-xs font-bold font-mono" style="color: var(--text-main);">六大标的发单参数矩阵 (Decisions Point Matrix):</div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 font-mono text-xs">
+            <div
+              v-for="(dec, sym) in testResult.brain_output?.decisions"
+              :key="sym"
+              class="p-3 rounded-lg border flex flex-col justify-between space-y-2"
+              style="background-color: var(--bg-card); border-color: var(--border-subtle);"
+            >
+              <div class="flex items-center justify-between">
+                <span class="font-black text-sm" style="color: var(--text-main);">{{ sym }}</span>
+                <span
+                  class="px-2 py-0.5 rounded text-[10px] font-bold border"
+                  :style="{
+                    backgroundColor: dec.action?.includes('BUY') ? 'var(--color-up-bg)' : dec.action?.includes('SELL') ? 'var(--color-down-bg)' : 'var(--bg-badge)',
+                    borderColor: dec.action?.includes('BUY') ? 'var(--color-up-border)' : dec.action?.includes('SELL') ? 'var(--color-down-border)' : 'var(--border-subtle)',
+                    color: dec.action?.includes('BUY') ? 'var(--color-up)' : dec.action?.includes('SELL') ? 'var(--color-down)' : 'var(--text-muted)'
+                  }"
+                >
+                  {{ dec.action || 'WAIT' }} ({{ dec.confidence || 0 }}%)
+                </span>
+              </div>
+
+              <!-- Price & Risk Metrics -->
+              <div v-if="dec.action !== 'WAIT'" class="grid grid-cols-3 gap-1.5 p-2 rounded bg-black/20 text-[10px] text-center">
+                <div>
+                  <div class="text-gray-500">入场限价</div>
+                  <div class="font-bold text-white mt-0.5">${{ dec.limit_price || '--' }}</div>
+                </div>
+                <div>
+                  <div class="text-rose-400">2.0x止损</div>
+                  <div class="font-bold text-rose-400 mt-0.5">${{ dec.stop_loss || '--' }}</div>
+                </div>
+                <div>
+                  <div class="text-emerald-400">2.0R止盈</div>
+                  <div class="font-bold text-emerald-400 mt-0.5">${{ dec.take_profit || dec.target_price || '--' }}</div>
+                </div>
+              </div>
+              <div v-else class="p-2 rounded bg-black/10 text-[10px] text-gray-500 italic">
+                保持空仓防守，未达顺势打折或微积分击穿门禁。
+              </div>
+
+              <div class="text-[11px] text-gray-400 line-clamp-3 leading-relaxed">
+                {{ dec.reasoning || dec.reason || '遵从委员会仲裁综合意见。' }}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

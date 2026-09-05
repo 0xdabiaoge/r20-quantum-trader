@@ -173,26 +173,12 @@ ADDITIONAL_PRESET_LIBRARY: Dict[str, Dict[str, Any]] = {
 ALL_AVAILABLE_PRESETS = {**DEFAULT_PRESET_TEMPLATES, **ADDITIONAL_PRESET_LIBRARY}
 
 COUNCIL_PRESET_SUITES: Dict[str, Dict[str, Any]] = {
-    "classic_trio": {
-        "id": "classic_trio",
-        "name": "经典三权分立 (Classic Trio)",
-        "desc": "动量进攻 + 严苛风控 + 量化数理 + 首席仲裁（极速低延迟，推荐生产标配）",
-        "consensus_mode": "strict",
-        "roles": ["alpha", "risk", "quant", "arbitrator"],
-    },
     "full_spectrum": {
         "id": "full_spectrum",
-        "name": "六维全景参谋 (Full Spectrum)",
-        "desc": "进攻 + 风控 + 数理 + 舆情 + 宏观 + 巨鲸穿透 + 终审（高密度辩论与深度博弈）",
+        "name": "全维度攻防博弈基准 (Full Spectrum Consensus)",
+        "desc": "动量进攻 + 严苛风控 + 量化数理 + 首席终审仲裁（系统唯一权威全维度委员会基准方案）",
         "consensus_mode": "weighted",
-        "roles": ["alpha", "risk", "quant", "news_scout", "macro", "whale_tracker", "arbitrator"],
-    },
-    "trend_hunter": {
-        "id": "trend_hunter",
-        "name": "动能突破猎手 (Trend Hunter)",
-        "desc": "动量进攻 + 巨鲸穿透 + 首席仲裁（针对大单边牛市行情捕捉强爆发信号）",
-        "consensus_mode": "aggressive",
-        "roles": ["alpha", "whale_tracker", "arbitrator"],
+        "roles": ["alpha", "risk", "quant", "arbitrator"],
     },
 }
 
@@ -510,6 +496,20 @@ def execute_council_debate(
         f"【特别授权：你现在是 R20 多模型决策委员会的首席仲裁官兼终审执行官】\n"
         f"{arbitrator_spec.get('prompt', '')}\n\n"
         f"{consensus_instructions}\n"
+        "====================================================\n"
+        "【终审发单契约强约束（必须输出全量点位，严禁遗漏！）】\n"
+        "若对某标的做出开仓裁决（BUY_LONG 或 SELL_SHORT），decisions[标的] 内部必须且只能输出完整的四维点位与参数字典，绝不允许只输出止损点：\n"
+        "{\n"
+        '  "action": "BUY_LONG" 或 "SELL_SHORT" 或 "WAIT",\n'
+        '  "confidence": 82,  // 置信度整数 0~100\n'
+        '  "limit_price": 78250.0,  // 挂单入场限价（数字），严禁市价追高\n'
+        '  "stop_loss": 76500.0,  // 严格基于 1.8~2.2x 1H ATR 结构外设置的止损价（数字）\n'
+        '  "take_profit": 81750.0,  // 至少 2.0R 盈亏比的目标止盈价（数字）\n'
+        '  "leverage": 3,  // 杠杆倍数（整型 2~5）\n'
+        '  "margin_usd": 150.0,  // 单笔下注保证金额度（数字）\n'
+        '  "reasoning": "仲裁理由（明确说明采纳了哪位参谋的依据，否决了谁的观点）"\n'
+        "}\n"
+        "若判定为 WAIT，只需输出 action: WAIT, confidence: 0~60, reasoning: 观望理由。\n"
         "你必须权衡各位参谋的攻防辩论，在【最高交易宪法】框架下去伪存真，做出最终全局决策，并严格输出标准 JSON 格式！"
     )
 
