@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useApi } from '../../composables/useApi'
+import { useAuthStore } from '../../stores/auth'
 import {
   Layers,
   FileText,
@@ -12,30 +13,107 @@ import {
   Activity,
   Clock,
   ArrowUpRight,
+  BookmarkPlus,
+  RotateCcw,
+  Archive,
+  History,
+  CheckCircle2,
+  AlertCircle,
+  FolderDown,
+  FileCode,
 } from 'lucide-vue-next'
 
 const { api } = useApi()
+const auth = useAuthStore()
 
 const loading = ref(true)
 const refreshing = ref(false)
+const archiving = ref(false)
+const restoring = ref(false)
+
 const snapshotData = ref<any>(null)
+const archives = ref<any[]>([])
 const errorMsg = ref<string | null>(null)
+const bannerMsg = ref<{ text: string; type: 'ok' | 'err' | 'warn' } | null>(null)
+
+// Archive Dialog State
+const showArchiveModal = ref(false)
+const archiveName = ref('')
+const archiveDesc = ref('')
 
 async function fetchSnapshot() {
   refreshing.value = true
   errorMsg.value = null
   try {
-    const res = await api('/api/v1/admin/policy/current-snapshot')
-    if (res && res.ok) {
-      snapshotData.value = res
-    } else {
-      errorMsg.value = '未能获取到策略快照'
+    const [snapRes, arcRes] = await Promise.all([
+      api('/api/v1/admin/policy/current-snapshot'),
+      api('/api/v1/admin/policy/archives'),
+    ])
+    if (snapRes && snapRes.ok) {
+      snapshotData.value = snapRes
+    }
+    if (arcRes && arcRes.ok) {
+      archives.value = arcRes.archives || []
     }
   } catch (err: any) {
     errorMsg.value = err.message || '获取策略版本快照失败'
   } finally {
     loading.value = false
     refreshing.value = false
+  }
+}
+
+async function saveArchive() {
+  if (!auth.isSuperadmin) {
+    bannerMsg.value = { text: '仅超级管理员可归档策略版本', type: 'err' }
+    return
+  }
+  if (!archiveName.value.trim()) {
+    bannerMsg.value = { text: '请输入策略归档名称', type: 'warn' }
+    return
+  }
+  archiving.value = true
+  try {
+    const res = await api('/api/v1/admin/policy/archive', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: archiveName.value.trim(),
+        description: archiveDesc.value.trim(),
+      }),
+    })
+    if (res && res.ok) {
+      bannerMsg.value = { text: `🎉 策略版本已归档入库：${res.entry?.name} (#${res.entry?.policy_hash})`, type: 'ok' }
+      showArchiveModal.value = false
+      archiveName.value = ''
+      archiveDesc.value = ''
+      await fetchSnapshot()
+    }
+  } catch (err: any) {
+    bannerMsg.value = { text: `归档失败: ${err.message}`, type: 'err' }
+  } finally {
+    archiving.value = false
+  }
+}
+
+async function restorePolicy(hash: string, name: string) {
+  if (!auth.isSuperadmin) return
+  if (!confirm(`确定要将当前策略原子回滚至【${name}】(#${hash}) 吗？\n将同时恢复对应的提示词、心法、拦截器及投委会配置！`)) {
+    return
+  }
+  restoring.value = true
+  try {
+    const res = await api('/api/v1/admin/policy/restore', {
+      method: 'POST',
+      body: JSON.stringify({ policy_hash: hash }),
+    })
+    if (res && res.ok) {
+      bannerMsg.value = { text: `✅ 策略已原子回滚至【${name}】(#${hash})！下一决策周期将立即生效`, type: 'ok' }
+      await fetchSnapshot()
+    }
+  } catch (err: any) {
+    bannerMsg.value = { text: `回滚失败: ${err.message}`, type: 'err' }
+  } finally {
+    restoring.value = false
   }
 }
 
@@ -52,7 +130,16 @@ onMounted(() => {
 
 <template>
   <div class="space-y-4">
-    <!-- Header Banner -->
+    <!-- Notice Banner -->
+    <div
+      v-if="bannerMsg"
+      class="p-3 rounded-xl text-xs font-mono border transition-all"
+      :class="bannerMsg.type === 'ok' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : bannerMsg.type === 'warn' ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'"
+    >
+      {{ bannerMsg.text }}
+    </div>
+
+    <!-- Header Control Station -->
     <div
       class="rounded-2xl border p-4 sm:p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4"
       style="background-color: var(--bg-card); border-color: var(--border-subtle);"
@@ -67,7 +154,7 @@ onMounted(() => {
         <div>
           <div class="flex items-center space-x-2">
             <h2 class="text-sm font-bold font-mono" style="color: var(--text-main);">
-              策略大一统版本快照 (Policy Snapshot)
+              策略大一统版本快照 (Policy Snapshot Workbench)
             </h2>
             <span
               v-if="snapshotData?.policy_version"
@@ -78,12 +165,24 @@ onMounted(() => {
             </span>
           </div>
           <p class="text-xs font-mono mt-0.5" style="color: var(--text-muted);">
-            四大策略单元（提示词、自进化、物理拦截、模型委员会）的不可变指纹聚合与全链路决策归因。
+            四大策略单元（提示词、自进化、物理拦截、模型委员会）的不可变指纹聚合与具名归档/一键回滚。
           </p>
         </div>
       </div>
 
-      <div class="flex items-center space-x-2 shrink-0">
+      <div class="flex flex-wrap items-center gap-2 shrink-0">
+        <!-- Archive Button -->
+        <button
+          @click="showArchiveModal = true"
+          :disabled="!auth.isSuperadmin"
+          class="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-mono font-bold cursor-pointer transition-all shadow-xs"
+          style="background-color: var(--text-main); color: var(--bg-card);"
+        >
+          <BookmarkPlus class="w-3.5 h-3.5" />
+          <span>归档为策略版本</span>
+        </button>
+
+        <!-- Refresh Button -->
         <button
           @click="fetchSnapshot"
           :disabled="refreshing"
@@ -91,7 +190,7 @@ onMounted(() => {
           style="background-color: var(--bg-card-subtle); border-color: var(--border-medium); color: var(--text-main);"
         >
           <RefreshCw class="w-3.5 h-3.5" :class="{ 'animate-spin': refreshing }" />
-          <span>{{ refreshing ? '抓取中...' : '刷新快照指纹' }}</span>
+          <span>{{ refreshing ? '抓取中...' : '刷新指纹' }}</span>
         </button>
       </div>
     </div>
@@ -118,7 +217,7 @@ onMounted(() => {
         <div class="flex items-center space-x-2">
           <Hash class="w-4 h-4 text-purple-400 shrink-0" />
           <div>
-            <div class="text-[10px] text-[#8A99AD]">当前策略版本 (Version)</div>
+            <div class="text-[10px] text-[#8A99AD]">当前活跃策略版本 (Active Version)</div>
             <div class="font-bold text-sm mt-0.5" style="color: var(--text-main);">
               {{ snapshotData.snapshot.policy_version }}
             </div>
@@ -127,7 +226,7 @@ onMounted(() => {
         <div class="flex items-center space-x-2">
           <Activity class="w-4 h-4 text-cyan-400 shrink-0" />
           <div>
-            <div class="text-[10px] text-[#8A99AD]">指纹哈希 (Policy Hash)</div>
+            <div class="text-[10px] text-[#8A99AD]">不可变指纹哈希 (Fingerprint Hash)</div>
             <div class="font-bold text-sm mt-0.5 text-cyan-400">
               #{{ snapshotData.snapshot.policy_hash }}
             </div>
@@ -136,7 +235,7 @@ onMounted(() => {
         <div class="flex items-center space-x-2">
           <Clock class="w-4 h-4 text-emerald-400 shrink-0" />
           <div>
-            <div class="text-[10px] text-[#8A99AD]">快照生成时间 (Captured At)</div>
+            <div class="text-[10px] text-[#8A99AD]">快照生成时间 (Snapshot Time)</div>
             <div class="font-bold text-sm mt-0.5 text-emerald-400">
               {{ formatTimestamp(snapshotData.snapshot.timestamp) }}
             </div>
@@ -349,6 +448,138 @@ onMounted(() => {
           <div class="p-2 rounded-xl text-[11px] font-mono" style="background-color: var(--bg-card-subtle); color: var(--text-muted);">
             ✓ 剔除虚假共识选项，实战双轮互评，超时毫秒级自适应安全降级。
           </div>
+        </div>
+      </div>
+
+      <!-- 3. Policy Archive Vault (历史策略版本库) -->
+      <div
+        class="rounded-2xl border p-4 sm:p-5 shadow-xs space-y-3"
+        style="background-color: var(--bg-card); border-color: var(--border-subtle);"
+      >
+        <div class="flex items-center justify-between pb-2 border-b" style="border-color: var(--border-subtle);">
+          <div class="flex items-center space-x-2">
+            <Archive class="w-4 h-4 text-purple-400" />
+            <h3 class="text-sm font-bold font-mono" style="color: var(--text-main);">
+              历史策略版本库 (Policy Archive Vault)
+            </h3>
+            <span class="text-[10px] font-mono px-2 py-0.5 rounded border" style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle); color: var(--text-muted);">
+              {{ archives.length }} 个已归档策略包
+            </span>
+          </div>
+          <span class="text-[11px] font-mono text-[#8A99AD]">
+            可一键将提示词、心法、拦截器及委员会完整还原至指定瞬间
+          </span>
+        </div>
+
+        <div v-if="archives.length === 0" class="py-8 text-center text-xs font-mono text-zinc-500">
+          暂无已归档的策略版本。点击右上角「归档为策略版本」即可永久固化当前策略包。
+        </div>
+
+        <div v-else class="divide-y" style="border-color: var(--border-subtle);">
+          <div
+            v-for="arc in archives"
+            :key="arc.policy_hash"
+            class="py-3 flex flex-col md:flex-row md:items-center justify-between gap-3 font-mono text-xs hover:bg-[var(--bg-card-hover)] px-2 rounded-xl transition-colors"
+          >
+            <div class="space-y-1 flex-1 min-w-0">
+              <div class="flex items-center space-x-2">
+                <span class="font-bold text-sm" style="color: var(--text-main);">{{ arc.name }}</span>
+                <span class="text-[10px] px-2 py-0.5 rounded border text-cyan-400 border-cyan-500/30 bg-cyan-500/10">
+                  #{{ arc.policy_hash }}
+                </span>
+                <span
+                  v-if="arc.policy_hash === snapshotData.snapshot.policy_hash"
+                  class="text-[9px] font-bold px-2 py-0.2 rounded border text-emerald-400 border-emerald-500/30 bg-emerald-500/10"
+                >
+                  ● 当前正在运行
+                </span>
+              </div>
+              <p v-if="arc.description" class="text-[11px]" style="color: var(--text-muted);">
+                {{ arc.description }}
+              </p>
+              <div class="flex flex-wrap items-center gap-3 text-[10px] text-[#8A99AD]">
+                <span>归档时间: {{ arc.archived_at }}</span>
+                <span>创建者: {{ arc.author }}</span>
+                <span class="truncate max-w-md">{{ arc.summary }}</span>
+              </div>
+            </div>
+
+            <div class="flex items-center space-x-2 shrink-0">
+              <button
+                @click="restorePolicy(arc.policy_hash, arc.name)"
+                :disabled="restoring || !auth.isSuperadmin || arc.policy_hash === snapshotData.snapshot.policy_hash"
+                class="flex items-center space-x-1 px-3 py-1.5 rounded-xl border text-xs font-mono font-bold cursor-pointer disabled:opacity-40 transition-all shadow-xs"
+                :style="arc.policy_hash === snapshotData.snapshot.policy_hash
+                  ? { backgroundColor: 'var(--bg-card-subtle)', borderColor: 'var(--border-subtle)', color: 'var(--text-faint)' }
+                  : { backgroundColor: 'var(--color-up-bg)', borderColor: 'var(--color-up-border)', color: 'var(--color-up)' }"
+              >
+                <RotateCcw class="w-3.5 h-3.5" :class="{ 'animate-spin': restoring }" />
+                <span>{{ arc.policy_hash === snapshotData.snapshot.policy_hash ? '已是当前版本' : '一键回滚还原' }}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Archive Dialog Modal -->
+    <div
+      v-if="showArchiveModal"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs"
+    >
+      <div
+        class="w-full max-w-md rounded-2xl border p-5 shadow-2xl space-y-4"
+        style="background-color: var(--bg-card); border-color: var(--border-medium);"
+      >
+        <div class="flex items-center space-x-2">
+          <BookmarkPlus class="w-5 h-5 text-purple-400" />
+          <h3 class="text-sm font-bold font-mono" style="color: var(--text-main);">
+            归档当前策略版本 (Create Policy Archive)
+          </h3>
+        </div>
+
+        <p class="text-xs font-mono leading-relaxed" style="color: var(--text-muted);">
+          将当前生效的提示词模块、自进化心法、物理拦截器及模型委员会配置打包固化为不可变版本快照，后续可随时一键全盘回滚。
+        </p>
+
+        <div class="space-y-3 font-mono text-xs">
+          <div>
+            <label class="block text-[11px] mb-1 font-bold" style="color: var(--text-muted);">策略名称 (必填):</label>
+            <input
+              v-model="archiveName"
+              placeholder="例如: 2026-09 顺势回踩大牛市高胜率版"
+              class="w-full rounded-xl px-3 py-2 text-xs outline-none border transition-colors"
+              style="background-color: var(--bg-input); border-color: var(--border-subtle); color: var(--text-main);"
+            />
+          </div>
+          <div>
+            <label class="block text-[11px] mb-1 font-bold" style="color: var(--text-muted);">策略描述与实盘备注 (选填):</label>
+            <textarea
+              v-model="archiveDesc"
+              rows="3"
+              placeholder="记录此版本的调参核心逻辑、回测表现或适用行情环境..."
+              class="w-full rounded-xl p-3 text-xs outline-none border transition-colors resize-none"
+              style="background-color: var(--bg-input); border-color: var(--border-subtle); color: var(--text-main);"
+            ></textarea>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-end space-x-2 pt-2 border-t" style="border-color: var(--border-subtle);">
+          <button
+            @click="showArchiveModal = false"
+            class="px-3.5 py-1.5 rounded-xl border text-xs font-mono cursor-pointer transition-colors"
+            style="background-color: var(--bg-card-subtle); border-color: var(--border-subtle); color: var(--text-muted);"
+          >
+            取消
+          </button>
+          <button
+            @click="saveArchive"
+            :disabled="archiving"
+            class="px-4 py-1.5 rounded-xl text-xs font-mono font-bold cursor-pointer transition-all shadow-xs"
+            style="background-color: var(--text-main); color: var(--bg-card);"
+          >
+            {{ archiving ? '正在归档中...' : '确认归档入库' }}
+          </button>
         </div>
       </div>
     </div>

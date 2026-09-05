@@ -1384,8 +1384,17 @@ def admin_test_interceptors(payload: InterceptorTestRequest, x_r20_session: str 
 
 
 # =========================================================================
-# Unified Policy Snapshot API (策略大一统版本快照与决策追溯)
+# Unified Policy Snapshot & Version Control Workbench API
 # =========================================================================
+
+class PolicyArchiveRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+    description: str = Field(default="", max_length=500)
+
+
+class PolicyRestoreRequest(BaseModel):
+    policy_hash: str = Field(min_length=6, max_length=64)
+
 
 @app.get("/api/v1/admin/policy/current-snapshot")
 def admin_get_policy_current_snapshot(x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
@@ -1398,6 +1407,38 @@ def admin_get_policy_current_snapshot(x_r20_session: str | None = Header(default
         "policy_hash": snapshot.get("policy_hash"),
         "snapshot": snapshot,
     }
+
+
+@app.get("/api/v1/admin/policy/archives")
+def admin_get_policy_archives(x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    require_admin_header(x_r20_session=x_r20_session)
+    from r20_backend.policy_snapshot import load_archive_index
+    archives = load_archive_index()
+    return {"ok": True, "archives": archives}
+
+
+@app.post("/api/v1/admin/policy/archive")
+def admin_archive_policy(payload: PolicyArchiveRequest, x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    actor = require_superadmin(REQUEST_SESSION.get())
+    from r20_backend.policy_snapshot import archive_current_policy
+    author = actor.get("username", "admin")
+    entry = archive_current_policy(name=payload.name, description=payload.description, author=author)
+    audit_record("policy.archive", "success", {"name": payload.name, "policy_hash": entry.get("policy_hash")})
+    return {"ok": True, "entry": entry}
+
+
+@app.post("/api/v1/admin/policy/restore")
+def admin_restore_policy(payload: PolicyRestoreRequest, x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+    require_superadmin(REQUEST_SESSION.get())
+    from r20_backend.policy_snapshot import restore_archived_policy
+    try:
+        res = restore_archived_policy(policy_hash=payload.policy_hash)
+        audit_record("policy.restore", "success", {"policy_hash": payload.policy_hash})
+        return {"ok": True, **res}
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"恢复策略版本失败: {exc}")
 
 
 @app.get("/api/v1/admin/okx/account-snapshot")

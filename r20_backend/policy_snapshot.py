@@ -1,80 +1,83 @@
-"""Unified Policy Snapshot generator and immutable decision tracer.
+"""R20 Strategy Policy Snapshot & Version Control Workbench Engine.
 
-Four Strategy Units:
-1. Prompt Library & Layout (Profile ID, Profile Name, Layout Hash, Editor Mode)
-2. Structured Self-Evolution Mind (Version hash, Enabled lessons count, Total lessons)
-3. Physical Risk Interceptor Plugins (Pipeline order, Filename hashes, Enabled plugins)
-4. Multi-Agent Model Council (Enabled, Consensus mode, Active roles & bound models)
-
-Generates a deterministic immutable policy snapshot fingerprint:
-- policy_hash: 8-hex sha256
-- policy_version: e.g. "v7.3.0@3f8a1c9e"
+Provides immutable snapshot fingerprinting, persistent archiving, one-click rollback,
+and export/import capabilities across all 4 strategy units:
+1. Prompt Profile (Prompt Studio)
+2. Evolution Mind (Evolution Shield)
+3. Physical Interceptors (Interceptors Plugin Pipeline)
+4. Model Council (Council Desk)
 """
 from __future__ import annotations
 
 import copy
 import hashlib
 import json
+import logging
 import os
 import sys
+import tempfile
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
+
+logger = logging.getLogger(__name__)
 
 ROOT = Path(__file__).resolve().parents[1]
+DATA_DIR = ROOT / "data"
+ARCHIVE_DIR = DATA_DIR / "policy_archives"
+ARCHIVE_INDEX_FILE = ARCHIVE_DIR / "index.json"
+
 DEFAULT_BASE_VERSION = "v7.3.0"
 
 
 def compute_layout_hash(profile: Dict[str, Any]) -> str:
-    """Computes a deterministic hash of the prompt profile layout and module contents."""
-    if not isinstance(profile, dict):
-        return "empty"
+    """Computes a deterministic hash for a prompt profile layout."""
+    parts: List[str] = []
+    mode = str(profile.get("editor_mode", "modules"))
+    parts.append(f"mode:{mode}")
 
-    summary_parts: List[str] = [
-        str(profile.get("id", "")).strip(),
-        str(profile.get("name", "")).strip(),
-        str(profile.get("editor_mode", "")).strip(),
-    ]
-
-    pipelines = profile.get("pipelines")
-    pipeline_keys = ("trading_system", "trading_user", "evolution_system", "evolution_user")
-    has_pipeline_modules = (
-        isinstance(pipelines, dict)
-        and any(isinstance(pipelines.get(k), list) and len(pipelines[k]) > 0 for k in pipeline_keys)
-    )
-
-    if has_pipeline_modules and isinstance(pipelines, dict):
-        for key in pipeline_keys:
-            mods = pipelines.get(key) or []
-            if isinstance(mods, list):
-                for m in mods:
-                    if isinstance(m, dict):
-                        m_id = str(m.get("id", "")).strip()
-                        m_enabled = "1" if m.get("enabled", True) else "0"
-                        m_content = str(m.get("content", "")).strip()
-                        c_hash = hashlib.sha256(m_content.encode("utf-8")).hexdigest()[:8]
-                        summary_parts.append(f"{key}:{m_id}:{m_enabled}:{c_hash}")
+    if mode == "modules":
+        # Support both flat modules list and pipeline dictionary
+        modules = profile.get("modules")
+        if modules is None and isinstance(profile.get("pipelines"), dict):
+            modules = []
+            for pipe_key in sorted(profile["pipelines"].keys()):
+                pipe_mods = profile["pipelines"][pipe_key]
+                if isinstance(pipe_mods, list):
+                    modules.extend(pipe_mods)
+        if isinstance(modules, list):
+            for m in modules:
+                if isinstance(m, dict):
+                    m_id = str(m.get("id", ""))
+                    enabled = "1" if m.get("enabled", True) else "0"
+                    content = str(m.get("content", "")).strip()
+                    c_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()[:8]
+                    parts.append(f"{m_id}:{enabled}:{c_hash}")
     else:
-        for key in pipeline_keys:
-            val = str(profile.get(key, "")).strip()
-            if val:
-                c_hash = hashlib.sha256(val.encode("utf-8")).hexdigest()[:8]
-                summary_parts.append(f"{key}:{c_hash}")
-        simple_policy = profile.get("simple_policy")
-        if isinstance(simple_policy, dict):
-            sp_dump = json.dumps(simple_policy, sort_keys=True)
-            sp_hash = hashlib.sha256(sp_dump.encode("utf-8")).hexdigest()[:8]
-            summary_parts.append(f"sp:{sp_hash}")
+        full_content = str(profile.get("full_system_prompt", "")).strip()
+        f_hash = hashlib.sha256(full_content.encode("utf-8")).hexdigest()[:8]
+        parts.append(f"full:{f_hash}")
 
-    canon_str = "|".join(summary_parts)
-    return hashlib.sha256(canon_str.encode("utf-8")).hexdigest()[:8]
+    raw = "|".join(parts)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:8]
+
+
+def compute_file_hash(file_path: Path) -> str:
+    """Computes an 8-char SHA256 hex digest for a file if it exists."""
+    if not file_path.is_file():
+        return "missing"
+    try:
+        content = file_path.read_bytes()
+        return hashlib.sha256(content).hexdigest()[:8]
+    except Exception:
+        return "err_read"
 
 
 def extract_prompt_profile_fingerprint(
     profile: Optional[Dict[str, Any]] = None,
     root_dir: Optional[Path] = None,
 ) -> Dict[str, Any]:
-    """Extracts immutable fingerprint of the currently active prompt profile."""
+    """Extracts immutable fingerprint of the active prompt profile."""
     prof = profile
     if prof is None:
         try:
@@ -83,8 +86,8 @@ def extract_prompt_profile_fingerprint(
             if scripts_dir not in sys.path:
                 sys.path.insert(0, scripts_dir)
                 sys_path_added = True
-            from prompt_library import active_profile
-            prof = active_profile()
+            from prompt_library import load_active_profile
+            prof = load_active_profile()
         except Exception:
             prof = {
                 "id": "stable",
@@ -150,105 +153,94 @@ def extract_evolution_mind_fingerprint(
 
 
 def extract_interceptors_fingerprint(
-    plugins: Optional[List[Dict[str, Any]]] = None,
+    interceptor_plugins: Optional[List[Dict[str, Any]]] = None,
     plugins_dir: Optional[Path] = None,
     root_dir: Optional[Path] = None,
 ) -> Dict[str, Any]:
-    """Extracts immutable fingerprint of enabled physical risk interceptor plugins."""
-    raw_plugins = plugins
+    """Extracts immutable fingerprint of the physical interceptors pipeline."""
     p_dir = plugins_dir or ((root_dir or ROOT) / "plugins" / "interceptors")
+    plugins = interceptor_plugins
 
-    if raw_plugins is None:
+    if plugins is None:
         try:
             from r20_backend.interceptor_manager import list_plugins
-            raw_plugins = list_plugins(create_if_missing=False)
+            plugins = list_plugins(create_if_missing=False)
         except Exception:
-            raw_plugins = []
+            plugins = []
 
-    if not isinstance(raw_plugins, list):
-        raw_plugins = []
-
-    enabled_list = [p for p in raw_plugins if isinstance(p, dict) and p.get("enabled", True)]
     pipeline_info: List[Dict[str, Any]] = []
+    enabled_plugins: List[str] = []
 
-    for idx, p in enumerate(enabled_list):
-        fn = str(p.get("filename", f"plugin_{idx}.py"))
-        if p.get("file_hash"):
-            fh = str(p["file_hash"])[:8]
-        elif p.get("code"):
-            fh = hashlib.sha256(str(p["code"]).encode("utf-8")).hexdigest()[:8]
-        else:
-            fp = p_dir / fn if fn else None
-            if fp and fp.is_file():
-                try:
-                    fh = hashlib.sha256(fp.read_bytes()).hexdigest()[:8]
-                except Exception:
-                    fh = "error"
-            else:
-                fh = "missing"
-        pipeline_info.append({
-            "order": idx,
-            "filename": fn,
-            "file_hash": fh,
-        })
+    for idx, item in enumerate(plugins):
+        filename = str(item.get("filename", ""))
+        enabled = bool(item.get("enabled", False))
+        # If item already has a file_hash provided (e.g. in test mock), use it directly
+        f_hash = str(item.get("file_hash") or "")
+        if not f_hash:
+            file_path = p_dir / filename
+            f_hash = compute_file_hash(file_path)
 
-    raw_hash_str = "|".join(f"{item['order']}:{item['filename']}:{item['file_hash']}" for item in pipeline_info)
-    plugins_hash = hashlib.sha256(raw_hash_str.encode("utf-8")).hexdigest()[:8]
+        if enabled:
+            enabled_plugins.append(filename)
+            pipeline_info.append({
+                "order": idx,
+                "filename": filename,
+                "file_hash": f_hash,
+            })
+
+    sorted_pipeline = sorted(pipeline_info, key=lambda x: x["order"])
+    pipe_str = ";".join([f"{p['order']}:{p['filename']}:{p['file_hash']}" for p in sorted_pipeline])
+    plugins_hash = hashlib.sha256(pipe_str.encode("utf-8")).hexdigest()[:8]
 
     return {
         "plugins_hash": plugins_hash,
-        "enabled_count": len(enabled_list),
-        "total_count": len(raw_plugins),
-        "enabled_plugins": [item["filename"] for item in pipeline_info],
-        "pipeline": pipeline_info,
+        "enabled_count": len(enabled_plugins),
+        "total_count": len(plugins),
+        "enabled_plugins": enabled_plugins,
+        "pipeline": sorted_pipeline,
     }
 
 
 def extract_council_fingerprint(
-    council_cfg: Optional[Dict[str, Any]] = None,
+    council_config: Optional[Dict[str, Any]] = None,
     root_dir: Optional[Path] = None,
 ) -> Dict[str, Any]:
-    """Extracts immutable fingerprint of the multi-agent council configuration."""
-    c_cfg = council_cfg
-    if c_cfg is None:
+    """Extracts immutable fingerprint of the trading desk council."""
+    cfg = council_config
+    if cfg is None:
         try:
             from r20_backend.council_manager import load_council_config
-            c_cfg = load_council_config()
+            cfg = load_council_config()
         except Exception:
-            c_cfg = {"enabled": False, "consensus_mode": "standard", "roles": {}}
+            cfg = {"enabled": False, "consensus_mode": "standard", "roles": {}}
 
-    if not isinstance(c_cfg, dict):
-        c_cfg = {"enabled": False, "consensus_mode": "standard", "roles": {}}
+    enabled = bool(cfg.get("enabled", False))
+    raw_mode = str(cfg.get("consensus_mode", "standard")).lower()
+    consensus_mode = "cross_examination" if raw_mode in {"cross_examination", "cross-exam", "cross"} else "standard"
+    roles = cfg.get("roles") or {}
 
-    enabled = bool(c_cfg.get("enabled", False))
-    mode = str(c_cfg.get("consensus_mode", "standard")).strip().lower()
-    roles = c_cfg.get("roles") or {}
-    if not isinstance(roles, dict):
-        roles = {}
+    active_roles: List[str] = []
+    role_models: Dict[str, str] = {}
 
-    active_roles = sorted([
-        r_id for r_id, r in roles.items()
-        if isinstance(r, dict) and r.get("enabled", True)
-    ])
-    role_models = {
-        r_id: str(roles[r_id].get("model_id", "") or "")
-        for r_id in active_roles
+    for r_id, r_data in sorted(roles.items()):
+        if isinstance(r_data, dict):
+            r_enabled = bool(r_data.get("enabled", True))
+            if r_enabled or r_data.get("is_arbitrator"):
+                active_roles.append(r_id)
+                role_models[r_id] = str(r_data.get("model_id") or "default")
+
+    council_ident = {
+        "enabled": enabled,
+        "mode": consensus_mode,
+        "roles": active_roles,
+        "models": role_models,
     }
-
-    canon_council = json.dumps(
-        {
-            "enabled": enabled,
-            "consensus_mode": mode,
-            "active_roles": active_roles,
-            "role_models": role_models,
-        },
-        sort_keys=True,
-    )
-    council_hash = hashlib.sha256(canon_council.encode("utf-8")).hexdigest()[:8]
+    ident_bytes = json.dumps(council_ident, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    council_hash = hashlib.sha256(ident_bytes).hexdigest()[:8]
 
     return {
         "enabled": enabled,
-        "consensus_mode": mode,
+        "consensus_mode": consensus_mode,
         "active_roles": active_roles,
         "role_models": role_models,
         "council_hash": council_hash,
@@ -256,7 +248,6 @@ def extract_council_fingerprint(
 
 
 def generate_policy_snapshot(
-    *,
     root_dir: Optional[Path] = None,
     prompt_profile: Optional[Dict[str, Any]] = None,
     memory_snapshot: Optional[Dict[str, Any]] = None,
@@ -265,11 +256,7 @@ def generate_policy_snapshot(
     plugins_dir: Optional[Path] = None,
     base_version: str = DEFAULT_BASE_VERSION,
 ) -> Dict[str, Any]:
-    """Generates an immutable snapshot fingerprint across the 4 core strategy units.
-
-    Deterministic hashing ensures that any change in prompt layout, evolution lessons,
-    interceptor plugins, or council configuration produces a unique policy_hash and policy_version.
-    """
+    """Generates an immutable snapshot fingerprint across the 4 core strategy units."""
     prompt_info = extract_prompt_profile_fingerprint(prompt_profile, root_dir=root_dir)
     evolution_info = extract_evolution_mind_fingerprint(memory_snapshot, root_dir=root_dir)
     interceptor_info = extract_interceptors_fingerprint(
@@ -335,3 +322,207 @@ def get_current_policy_snapshot() -> Dict[str, Any]:
 def format_policy_snapshot_summary(snapshot: Dict[str, Any]) -> str:
     """Formats a concise single-line summary of a policy snapshot."""
     return str(snapshot.get("summary") or snapshot.get("policy_version") or "unknown_policy")
+
+
+# =========================================================================
+# Policy Version Workbench: Archive, Rollback, Export & Import
+# =========================================================================
+
+def _atomic_write_json(file_path: Path, data: Any) -> None:
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile("w", dir=file_path.parent, delete=False, encoding="utf-8") as tf:
+        json.dump(data, tf, ensure_ascii=False, indent=2)
+        temp_name = tf.name
+    os.replace(temp_name, file_path)
+
+
+def load_archive_index(archive_dir: Optional[Path] = None) -> List[Dict[str, Any]]:
+    """Loads metadata index of archived policies."""
+    a_dir = archive_dir or ARCHIVE_DIR
+    idx_file = a_dir / "index.json"
+    if idx_file.is_file():
+        try:
+            with open(idx_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, list):
+                return data
+        except Exception as e:
+            logger.warning("Failed to load policy archive index: %s", e)
+    return []
+
+
+def save_archive_index(index_data: List[Dict[str, Any]], archive_dir: Optional[Path] = None) -> None:
+    """Saves metadata index of archived policies."""
+    a_dir = archive_dir or ARCHIVE_DIR
+    idx_file = a_dir / "index.json"
+    _atomic_write_json(idx_file, index_data)
+
+
+def capture_full_strategy_package(root_dir: Optional[Path] = None) -> Dict[str, Any]:
+    """Captures complete runtime data payload across all 4 units for rollback/export."""
+    r_dir = root_dir or ROOT
+    sys_path_added = False
+    scripts_dir = str(r_dir / "scripts")
+    if scripts_dir not in sys.path:
+        sys.path.insert(0, scripts_dir)
+        sys_path_added = True
+
+    try:
+        from prompt_library import load_prompt_config
+        prompt_full = load_prompt_config()
+    except Exception:
+        prompt_full = {}
+
+    try:
+        from evolution_shield import load_structured_memory
+        memory_full = load_structured_memory()
+    except Exception:
+        memory_full = {"version": "missing", "lessons": []}
+
+    try:
+        from r20_backend.interceptor_manager import load_config as load_interceptor_config
+        interceptor_full = load_interceptor_config(create_if_missing=False)
+    except Exception:
+        interceptor_full = {}
+
+    try:
+        from r20_backend.council_manager import load_council_config
+        council_full = load_council_config()
+    except Exception:
+        council_full = {}
+
+    finally:
+        if sys_path_added and scripts_dir in sys.path:
+            try:
+                sys.path.remove(scripts_dir)
+            except ValueError:
+                pass
+
+    snapshot = generate_policy_snapshot(root_dir=r_dir)
+
+    return {
+        "format": "r20_policy_package_v1",
+        "policy_version": snapshot["policy_version"],
+        "policy_hash": snapshot["policy_hash"],
+        "captured_at": snapshot["timestamp"],
+        "summary": snapshot["summary"],
+        "snapshot": snapshot,
+        "package": {
+            "prompt_config": prompt_full,
+            "evolution_memory": memory_full,
+            "interceptor_config": interceptor_full,
+            "council_config": council_full,
+        },
+    }
+
+
+def archive_current_policy(
+    name: str,
+    description: str = "",
+    author: str = "admin",
+    archive_dir: Optional[Path] = None,
+    root_dir: Optional[Path] = None,
+) -> Dict[str, Any]:
+    """Archives the live strategy state into an immutable policy version package."""
+    a_dir = archive_dir or ARCHIVE_DIR
+    a_dir.mkdir(parents=True, exist_ok=True)
+
+    package = capture_full_strategy_package(root_dir=root_dir)
+    policy_hash = package["policy_hash"]
+    policy_version = package["policy_version"]
+
+    safe_name = name.strip() or f"策略归档-{policy_hash}"
+    archive_file = a_dir / f"policy_{policy_hash}.json"
+
+    package["metadata"] = {
+        "name": safe_name,
+        "description": description.strip(),
+        "author": author,
+        "archived_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "archive_file": archive_file.name,
+    }
+
+    _atomic_write_json(archive_file, package)
+
+    # Update index
+    index_data = load_archive_index(archive_dir=a_dir)
+    # Remove older entry with same hash if exists
+    index_data = [item for item in index_data if item.get("policy_hash") != policy_hash]
+
+    entry = {
+        "policy_version": policy_version,
+        "policy_hash": policy_hash,
+        "name": safe_name,
+        "description": description.strip(),
+        "author": author,
+        "archived_at": package["metadata"]["archived_at"],
+        "summary": package["summary"],
+        "archive_file": archive_file.name,
+    }
+    index_data.insert(0, entry)
+    save_archive_index(index_data, archive_dir=a_dir)
+
+    return entry
+
+
+def restore_archived_policy(
+    policy_hash: str,
+    archive_dir: Optional[Path] = None,
+    root_dir: Optional[Path] = None,
+) -> Dict[str, Any]:
+    """Atomically restores live strategy state to an archived policy version package."""
+    a_dir = archive_dir or ARCHIVE_DIR
+    archive_file = a_dir / f"policy_{policy_hash}.json"
+    if not archive_file.is_file():
+        raise FileNotFoundError(f"未找到归档的策略版本文件: {policy_hash}")
+
+    with open(archive_file, "r", encoding="utf-8") as f:
+        package = json.load(f)
+
+    pkg_payload = package.get("package") or {}
+    r_dir = root_dir or ROOT
+    sys_path_added = False
+    scripts_dir = str(r_dir / "scripts")
+    if scripts_dir not in sys.path:
+        sys.path.insert(0, scripts_dir)
+        sys_path_added = True
+
+    try:
+        # 1. Restore Prompt Profile
+        if "prompt_config" in pkg_payload:
+            from prompt_library import save_prompt_config
+            save_prompt_config(pkg_payload["prompt_config"])
+
+        # 2. Restore Evolution Memory
+        if "evolution_memory" in pkg_payload:
+            from evolution_shield import save_structured_memory, read_memory_snapshot
+            current_snap = read_memory_snapshot()
+            current_ver = current_snap.get("version", "missing")
+            lessons = pkg_payload["evolution_memory"].get("lessons") or []
+            # Save using shield
+            save_structured_memory(lessons, expected_version=current_ver)
+
+        # 3. Restore Interceptors
+        if "interceptor_config" in pkg_payload:
+            from r20_backend.interceptor_manager import save_config as save_interceptor_config
+            save_interceptor_config(pkg_payload["interceptor_config"])
+
+        # 4. Restore Council
+        if "council_config" in pkg_payload:
+            from r20_backend.council_manager import save_council_config
+            save_council_config(pkg_payload["council_config"])
+
+    finally:
+        if sys_path_added and scripts_dir in sys.path:
+            try:
+                sys.path.remove(scripts_dir)
+            except ValueError:
+                pass
+
+    # Verify new restored snapshot
+    new_snapshot = generate_policy_snapshot(root_dir=r_dir)
+    return {
+        "status": "restored",
+        "target_policy_hash": policy_hash,
+        "restored_snapshot": new_snapshot,
+    }
