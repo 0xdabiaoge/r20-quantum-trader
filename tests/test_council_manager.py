@@ -51,9 +51,9 @@ class TestCouncilManager(unittest.TestCase):
 
     def test_council_debate_execution_mocked(self):
         # Mock execute_llm_request to avoid making external HTTP calls
-        mock_trader_return = ("BUY_LONG 80% 置信度，动能良好", "", {}, 120)
+        mock_trader_return = ("BUY_LONG 80% 置信度，动能良好，建议 HOLD 现有 BTC 持仓", "", {}, 120)
         mock_cio_json = (
-            '{"macro_assessment": "采纳 Trader A 稳健回踩方案", "decisions": {"ETH-USDT-SWAP": {"action": "BUY_LONG", "confidence": 85, "limit_price": 2410.0, "stop_loss": 2350.0, "take_profit": 2530.0, "leverage": 3, "margin_usd": 150.0, "reasoning": "采纳交易员 A 顺势回踩买点"}}, "position_management": []}',
+            '{"macro_assessment": "采纳 Trader A 稳健回踩方案，资金充裕", "position_management": [{"instId": "BTC-USDT-SWAP", "action": "HOLD", "reasoning": "波段顺畅"}], "decisions": {"ETH-USDT-SWAP": {"action": "BUY_LONG", "confidence": 85, "limit_price": 2410.0, "stop_loss": 2350.0, "take_profit": 2530.0, "leverage": 3, "margin_usd": 150.0, "reasoning": "采纳交易员 A 顺势回踩买点"}}}',
             "",
             {},
             250
@@ -74,7 +74,9 @@ class TestCouncilManager(unittest.TestCase):
             )
 
             self.assertIn("decisions", brain_output)
-            self.assertEqual(brain_output["macro_assessment"], "采纳 Trader A 稳健回踩方案")
+            self.assertEqual(brain_output["macro_assessment"], "采纳 Trader A 稳健回踩方案，资金充裕")
+            self.assertEqual(len(brain_output["position_management"]), 1)
+            self.assertEqual(brain_output["position_management"][0]["action"], "HOLD")
             self.assertIn("council_transcript", brain_output)
             self.assertTrue(transcript["council_mode"])
             self.assertIn("advisors", transcript)
