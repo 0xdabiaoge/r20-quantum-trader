@@ -253,11 +253,11 @@ onMounted(loadData)
       <div class="flex items-center space-x-2">
         <Sparkles class="w-4 h-4 text-purple-400" />
         <p class="text-xs text-[#8A99AD] font-mono">
-          多模型委员会决策系统：深度继承提示词工作室最高宪法与自进化心法，支持动态插槽注入、席位启停与现场攻防辩论审计。
+          对冲基金投委会决策系统 (Trading Desk Council)：各资深交易员拿出完整作战方案相互攻防质询，由首席投资官 (CIO) 最终裁定采纳谁的方案入场或全员驳回。
         </p>
       </div>
       <span class="text-[10px] font-mono text-purple-400 bg-purple-500/10 px-2 py-1 rounded border border-purple-500/20">
-        主策略宪法对齐 · 参谋白盒审计
+        对冲基金投委会 · 交易员提案制
       </span>
     </div>
 
@@ -766,16 +766,16 @@ onMounted(loadData)
       <div class="rounded-xl border p-4 space-y-3" style="background-color: var(--bg-card-subtle); border-color: var(--color-brand-border);">
         <div class="flex items-center justify-between">
           <div class="flex items-center space-x-2">
-            <span class="text-xs font-bold font-mono" style="color: var(--color-brand);">【首席仲裁官 终审落地全量点位指令】</span>
-            <span class="text-[10px] font-mono" style="color: var(--text-faint);">{{ testResult.transcript?.arbitrator?.model_used }} · 终审耗时 {{ testResult.transcript?.arbitrator?.latency_ms }}ms</span>
+            <span class="text-xs font-bold font-mono" style="color: var(--color-brand);">【首席投资官 (CIO) 终审裁定批复】</span>
+            <span class="text-[10px] font-mono" style="color: var(--text-faint);">{{ testResult.transcript?.arbitrator?.model_used }} · 审阅耗时 {{ testResult.transcript?.arbitrator?.latency_ms }}ms</span>
           </div>
           <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
-            全量量化点位契约
+            CIO 方案采纳与点位下达
           </span>
         </div>
 
         <div class="text-xs font-mono font-bold leading-relaxed p-2.5 rounded border" style="background-color: var(--bg-card); border-color: var(--border-subtle); color: var(--color-up);">
-          宏观基调与仲裁取舍: {{ testResult.brain_output?.macro_assessment }}
+          投委会宏观决议与批复总述: {{ testResult.brain_output?.macro_assessment }}
         </div>
 
         <!-- Decisions Table / Grid for points -->
