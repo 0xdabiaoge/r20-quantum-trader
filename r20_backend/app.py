@@ -1261,11 +1261,12 @@ def admin_test_council_debate(payload: CouncilTestRequest, x_r20_session: str | 
             )
         test_market = "\n".join(lines)
 
-    from scripts.prompt_library import get_compiled_template_pair
+    from scripts.prompt_library import active_profile, compile_modules
     # Inherit the master strategy prompt from prompt library
     try:
-        pair = get_compiled_template_pair()
-        test_sys = pair.get("system_prompt") or "你是 R20 Quantum Trader 首席量化官，执行多空对称顺势战法与 2.0x ATR 宽止损。"
+        prof = active_profile()
+        sys_mods = prof.get("pipelines", {}).get("trading_system", [])
+        test_sys = compile_modules(sys_mods) if sys_mods else "你是 R20 Quantum Trader 首席量化官，执行多空对称顺势战法与 2.0x ATR 宽止损。"
     except Exception:
         test_sys = "你是一个遵循多空对称顺势、1.8~2.2x ATR 宽止损与 0.8R 保本锁利的量化交易系统。"
 
