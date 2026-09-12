@@ -617,6 +617,68 @@ def close_position_confirmed(inst_id: str, pos_side: str, before_size: float, ve
     return False, f"exchange still reports an open position after close request (before={before_size})"
 
 
+def amend_venue_stop_loss(ad, symbol: str, pos_side: str, new_sl: float,
+                          contracts: float) -> Tuple[bool, str]:
+    """审计 C3（后半）：跨所云端 SL 棘轮——旧实现每轮只 attach 新单、不撤不改旧单，
+    云端止损随棘轮轮次堆积（宽松旧单可能先于新单触发/占额度）。
+    策略：先枚举现存 SL 触发单（Gate 腿带 text=t-r20sl* 标签、Binance 腿 type 含
+    STOP）；有旧单且该所支持 amend_stop_loss → 原生改单（同单改触发价，天然无裸仓
+    缝隙），残余旧单一律撤掉；否则安全序列：先挂新 SL（收紧即刻生效、更新无裸仓
+    窗口）→ 再撤全部旧 SL。旧单撤失败只 warn——新单已生效，旧 reduce_only 双单
+    竞发时后触发者无仓自动无效，绝不回滚收紧（宁可双、不可裸）。"""
+    old_ids: List[str] = []
+    list_error = ""
+    try:
+        for row in (ad.list_protective_orders(symbol) or []):
+            if not isinstance(row, dict):
+                continue
+            _order = row.get("order")
+            text = (str(_order.get("text") or "") if isinstance(_order, dict) else "") \
+                + str(row.get("text") or "") + str(row.get("type") or "")
+            rid = str(row.get("id") or row.get("algo_id") or row.get("order_id") or "")
+            if rid and ("r20sl" in text.lower() or "STOP" in text.upper()):
+                old_ids.append(rid)
+    except Exception as exc:
+        list_error = str(exc)[:160]
+
+    def _cancel(oid: str):
+        if hasattr(ad, "cancel_price_order"):
+            ad.cancel_price_order(oid)
+        elif hasattr(ad, "cancel_algo_order"):
+            ad.cancel_algo_order(algo_id=oid)
+        else:
+            ad.cancel_order(symbol, oid)
+
+    if old_ids and hasattr(ad, "amend_stop_loss"):
+        try:
+            eff = ad.amend_stop_loss(symbol, pos_side, old_ids[0], float(new_sl))
+            for _oid in old_ids[1:]:
+                if str(_oid) != str(eff):
+                    try:
+                        _cancel(_oid)
+                    except Exception as exc:
+                        print(f"[SL-Ratchet] warn {symbol} 清理残余旧SL失败 {_oid}: {exc}")
+            return True, f"原生改单生效（{old_ids[0]}→{eff}），旧单 {len(old_ids)} 笔已处理"
+        except Exception as exc:
+            print(f"[SL-Ratchet] {symbol} amend 不可用（{str(exc)[:120]}），回退先挂新再撤旧")
+
+    placed = ad.attach_protective_orders(symbol, pos_side, sl_px=float(new_sl), contracts=contracts)
+    new_id = str((placed or {}).get("sl") or "")
+    cancelled = 0
+    for _oid in old_ids:
+        if _oid == new_id:
+            continue
+        try:
+            _cancel(_oid)
+            cancelled += 1
+        except Exception as exc:
+            print(f"[SL-Ratchet] warn {symbol} 撤旧SL失败 {_oid}: {exc}")
+    note = f"先挂新再撤旧（新单 {new_id or '?'}，撤旧 {cancelled}/{len(old_ids)}）"
+    if list_error:
+        note += f" [旧单未能枚举: {list_error}]"
+    return True, note
+
+
 def prune_trackers(trackers: Dict[str, Any], real_pos_dict: Dict[str, Any]) -> int:
     """Remove stale/non-universe trackers while preserving every live exchange position."""
     valid_keys = {
@@ -2183,9 +2245,13 @@ def execute_ai_position_management(real_pos_dict, trackers, timestamp_full, exec
                     from r20_backend.close_intent import adapter_environment as _sl_env
                     ad = venue_registry.get_adapter(pos_venue,
                         environment=_sl_env(pos_venue, str(current_environment().mode)))  # 审计 C2+C3
-                    # Attach or update protective stop order on target venue
-                    ad.attach_protective_orders(name, pos_side, sl_px=new_sl, contracts=abs(float(position.get("pos", 0) or 0)))
-                    amend_ok = True
+                    # 审计 C3（后半）：棘轮而非堆单——原生改单优先，回退先挂新再撤旧
+                    _c3_ok, _c3_note = amend_venue_stop_loss(
+                        ad, name, pos_side, float(new_sl), abs(float(position.get("pos", 0) or 0)))
+                    amend_ok = bool(_c3_ok)
+                    if not amend_ok:
+                        executed_actions.append(f"[{name}] {pos_venue.upper()} 云端止损更新失败: {_c3_note}")
+                        continue
                 except Exception as vexc:
                     executed_actions.append(f"[{name}] {pos_venue.upper()} 云端止损更新失败: {vexc}")
                     continue
