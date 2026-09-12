@@ -551,10 +551,34 @@ def close_position_confirmed(inst_id: str, pos_side: str, before_size: float, ve
             # 审计 C2：周期内冻结环境（okx_rest 按 current_environment 签名，读
             # selected 会在 demo↔live 中途切换时产生跨环境混合决策）
             env = current_environment()
-            res = execution_router.close_position(inst_id, venue=target_venue, environment=str(env.mode))
-            if res.get("ok"):
-                return True, f"{target_venue.upper()} position closed"
-            return False, f"{target_venue.upper()} close failed: {res.get('detail')}"
+            res = execution_router.close_position(inst_id, venue=target_venue, environment=str(env.mode), pos_side=pos_side)
+            if not res.get("ok"):
+                return False, f"{target_venue.upper()} close failed: {res.get('detail')}"
+            # 审计 B1：受理≠平掉——与 OKX 分支同一把尺做归零回读，核验通过前
+            # 禁改本地状态（tracker 保留、下周期重试；假成功会让孤儿仓脱管）
+            want_base = str(inst_id).split("-")[0].upper()
+            want_side = str(pos_side or "").strip().lower()
+            saw_successful_query = False
+            for _ in range(6):
+                time.sleep(0.6)
+                xv_ok, xv_snap, _xv_err = fetch_other_venue_positions(str(env.mode))
+                if not xv_ok:
+                    continue
+                saw_successful_query = True
+                remaining = 0.0
+                for row in (xv_snap.get(target_venue) or []):
+                    base = str(row.get("base") or "").upper()
+                    if base != want_base:
+                        continue
+                    row_side = "long" if float(row.get("size_signed") or 0) > 0 else "short"
+                    if want_side in ("long", "short") and row_side != want_side:
+                        continue
+                    remaining = max(remaining, abs(float(row.get("size_signed") or 0)))
+                if remaining < max(1e-12, abs(float(before_size)) * 0.001):
+                    return True, f"{target_venue.upper()} position closed (verified flat)"
+            if not saw_successful_query:
+                return False, f"{target_venue.upper()} close accepted but readback unavailable; state unchanged"
+            return False, f"{target_venue.upper()} still reports open position after close (before={before_size}); state unchanged"
         except Exception as exc:
             return False, f"{target_venue.upper()} close error: {exc}"
 

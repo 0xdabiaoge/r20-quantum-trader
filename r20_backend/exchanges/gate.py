@@ -405,16 +405,27 @@ class GateAdapter(BaseExchangeAdapter):
                                    params={"contract": inst, "status": "open", "limit": "100"})
         return data if isinstance(data, list) else []
 
-    def fast_close_position(self, symbol: str, text: str = "") -> Dict[str, Any]:
-        """市价全平当前持仓（双向与单向模式自适应）。"""
+    def fast_close_position(self, symbol: str, text: str = "", pos_side: Optional[str] = None) -> Dict[str, Any]:
+        """市价全平当前持仓（双向与单向模式自适应；审计 B1：方向钉腿 +
+        非整数张数拒截断——int() 抹零会留残仓却谎报全平）。"""
         inst = self.native_symbol(symbol)
         pos_list = [p for p in self.positions() if p.get("inst_id") == inst or p.get("base") == symbol]
+        want = str(pos_side or "").strip().lower()
+        if want in ("long", "short"):
+            pos_list = [p for p in pos_list
+                        if ("long" if float(p.get("size_signed") or 0) > 0 else "short") == want]
         if not pos_list:
             return {"venue": "gate", "symbol": inst, "closed": False, "reason": "无持仓"}
+        if len(pos_list) > 1:
+            return {"venue": "gate", "symbol": inst, "closed": False,
+                    "reason": "多行持仓/双向同存，拒绝盲平——须指定 pos_side"}
         target = pos_list[0]
         signed_sz = float(target.get("size_signed", 0) or 0)
         if abs(signed_sz) < 1e-12:
             return {"venue": "gate", "symbol": inst, "closed": False, "reason": "持仓为0"}
+        if signed_sz != int(signed_sz):
+            return {"venue": "gate", "symbol": inst, "closed": False,
+                    "reason": f"张数非整数（{signed_sz}），拒绝截断抹零——请所内核对后处理"}
 
         # 反向市价全平
         close_sz = -int(signed_sz)

@@ -460,10 +460,12 @@ class BinanceAdapter(BaseExchangeAdapter):
     # ---- 下单与执行闭环（US-005）----
     def place_order(self, symbol: str, side: str, contracts: float,
                     price: Optional[float] = None, tif: str = "gtc",
-                    text: str = "", position_side: Optional[str] = None) -> Dict[str, Any]:
+                    text: str = "", position_side: Optional[str] = None,
+                    reduce_only: bool = False) -> Dict[str, Any]:
         """Binance 下单接口（US-005）。
         contracts: base_asset 下单量（币数，正数）；
         side: 'long'/'buy' -> 'BUY', 'short'/'sell' -> 'SELL'。
+        reduce_only: 净模式平仓专用（对冲模式禁传，由调用方按 positionSide 分流）。
         """
         inst = self.native_symbol(symbol)
         s = "BUY" if str(side).lower() in ("long", "buy") else "SELL"
@@ -495,6 +497,10 @@ class BinanceAdapter(BaseExchangeAdapter):
             params["newClientOrderId"] = str(text).strip()
         if position_side:
             params["positionSide"] = str(position_side).upper()
+        if reduce_only:
+            if position_side:
+                raise ValueError("reduceOnly 与 positionSide 互斥（对冲模式禁 reduceOnly，审计 §2 契约）")
+            params["reduceOnly"] = "true"
 
         data = self.signed_request("POST", "/fapi/v1/order", params=params)
         if not isinstance(data, dict):
@@ -649,16 +655,33 @@ class BinanceAdapter(BaseExchangeAdapter):
             })
         return out
 
-    def fast_close_position(self, symbol: str) -> Dict[str, Any]:
-        """市价全平当前持仓（US-005）。"""
+    def fast_close_position(self, symbol: str, pos_side: Optional[str] = None) -> Dict[str, Any]:
+        """市价全平当前持仓（US-005；审计 B1）：
+        - 净模式（positionSide=BOTH/缺省）带 reduceOnly=true——与云端 TP 竞态时
+          只减不增，绝不反向开新仓；
+        - 对冲模式（positionSide=LONG/SHORT）按所方契约禁传 reduceOnly，显式钉腿；
+        - 双向同存且调用方未指明方向 = 拒绝盲平，返回 closed:False 由上层 fail-closed。
+        """
         inst = self.native_symbol(symbol)
-        pos_list = [p for p in self.positions() if p.get("inst_id") == inst]
-        if not pos_list:
+        rows = [p for p in self.positions() if p.get("inst_id") == inst]
+        want = str(pos_side or "").strip().lower()
+        if want in ("long", "short"):
+            rows = [p for p in rows if str(p.get("side", "")).lower() == want]
+        if not rows:
             return {"venue": "binance", "symbol": inst, "closed": False, "reason": "无持仓"}
-        target = pos_list[0]
+        if len(rows) > 1:
+            return {"venue": "binance", "symbol": inst, "closed": False,
+                    "reason": "对冲模式双向同存，拒绝盲平——须指定 pos_side"}
+        target = rows[0]
         size = abs(float(target.get("size_signed") or 0.0))
-        close_side = "SELL" if target.get("side") == "long" else "BUY"
-        return self.place_order(symbol, close_side, size, price=None)
+        if size <= 1e-12:
+            return {"venue": "binance", "symbol": inst, "closed": False, "reason": "持仓为0"}
+        close_side = "SELL" if str(target.get("side", "")).lower() == "long" else "BUY"
+        raw = target.get("raw") if isinstance(target.get("raw"), dict) else {}
+        ps = str(raw.get("positionSide") or "").upper()
+        if ps in ("LONG", "SHORT"):
+            return self.place_order(symbol, close_side, size, price=None, position_side=ps)
+        return self.place_order(symbol, close_side, size, price=None, reduce_only=True)
 
     # ---- Algo 私有通道发送入口（US-005 实装）----
     def _private_algo_send(self, request: Dict[str, Any]) -> Any:

@@ -192,7 +192,7 @@ def open_protected_position(decision: Dict[str, Any], *,
 
 
 def close_position(symbol: str, *, venue: str = "gate", adapter: Any = None,
-                   environment: Optional[str] = None) -> RouteResult:
+                   environment: Optional[str] = None, pos_side: Optional[str] = None) -> RouteResult:
     """市价全平（close=true + ioc），依赖同前：开闸 + 凭证。"""
     v = str(venue or getattr(getattr(adapter, "capabilities", None), "venue", "gate") or "gate").lower()
     if environment and is_sandbox_environment(environment) and v == "gate" and environment != "sandbox":
@@ -201,10 +201,21 @@ def close_position(symbol: str, *, venue: str = "gate", adapter: Any = None,
     require_execution(v, environment=str(getattr(ad, "environment", "live") or "live"))
     asset = canonical_base(symbol)
     try:
-        data = ad.fast_close_position(asset)
+        kwargs: Dict[str, Any] = {}
+        try:
+            import inspect
+            if "pos_side" in inspect.signature(ad.fast_close_position).parameters and pos_side:
+                kwargs["pos_side"] = str(pos_side)
+        except (TypeError, ValueError):
+            pass
+        data = ad.fast_close_position(asset, **kwargs)
     except ExchangeCapabilityError:
         raise
     except Exception as exc:
         return _fail("close", f"{v.upper()} 平仓失败: {exc}", venue=v, asset=asset)
+    # 审计 B1：适配器明示未平（closed:False，如无持仓/双向歧义/非整数张数）绝不
+    # 换算成功——旧实现只查异常，把 {"closed": False} 也报成 ok=True。
+    if isinstance(data, dict) and data.get("closed") is False:
+        return _fail("close", f"{v.upper()} 平仓未受理: {data.get('reason') or data}", venue=v, asset=asset)
     return RouteResult(ok=True, venue=v, stage="done", asset=asset,
                        detail=f"{v.upper()} 市价全平已提交: {str(data)[:120]}")

@@ -274,6 +274,20 @@ class TestRouter(unittest.TestCase):
         self.assertTrue(r["ok"])
         self.assertIn(("close", "BTC"), ad.calls)
 
+    def test_close_position_rejects_adapter_closed_false(self):
+        """审计 B1：适配器明示 closed:False（无持仓/双向歧义/非整数张数）
+        绝不可换算成功——旧实现只查异常，closed:False 也会被报成 ok=True。"""
+        class _NotClosed(_StubAdapter):
+            def fast_close_position(self, symbol, text="", pos_side=None):
+                self.calls.append(("close", symbol))
+                return {"venue": "gate", "symbol": symbol, "closed": False,
+                        "reason": "多行持仓/双向同存，拒绝盲平"}
+        ad = _NotClosed()
+        with patch.dict(os.environ, {"R20_GATE_EXECUTION": "1"}):
+            r = router.close_position("BTC", adapter=ad, pos_side="long")
+        self.assertFalse(r["ok"])
+        self.assertIn("拒绝盲平", r["detail"])
+
 
 class TestExternalPositionPrecheck(unittest.TestCase):
     """US-009：开仓前同合约既有仓探针——外部/不符=连坐拒开，探针失败=fail-closed。"""

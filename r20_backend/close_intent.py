@@ -127,7 +127,14 @@ def venue_fast_close(venue: str, environment: str, token: str, confirmation: str
     tolerance = max(1e-12, current * 1e-6)
     if abs(current - expected) > tolerance:
         raise ValueError(f"仓位数量已从 {expected:g} 变化为 {current:g}，请刷新")
-    raw = ad.fast_close_position(sym)
+    import inspect
+    kwargs: dict[str, Any] = {}
+    try:
+        if "pos_side" in inspect.signature(ad.fast_close_position).parameters:
+            kwargs["pos_side"] = want_side
+    except (TypeError, ValueError):
+        pass
+    raw = ad.fast_close_position(sym, **kwargs)
     if isinstance(raw, dict) and raw.get("closed") is False:
         raise RuntimeError(f"平仓未受理：{raw.get('reason') or raw}")
     remaining = current
