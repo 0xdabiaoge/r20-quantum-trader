@@ -62,4 +62,12 @@ export const zhRadar = {
     wait: '观望',
     hold: '持有',
   },
+  xvenue: {
+    title: '三所基差与多空对比',
+    okxPrice: 'OKX 现价',
+    bnPrice: 'Binance (基差)',
+    gatePrice: 'Gate (基差)',
+    lsRatio: 'BN/Gate 多空比',
+    fundingRate: 'BN/Gate 费率',
+  },
 };

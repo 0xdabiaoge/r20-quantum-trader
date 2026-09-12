@@ -56,4 +56,12 @@ export const enRadar = {
     wait: 'Wait',
     hold: 'Hold',
   },
+  xvenue: {
+    title: 'Cross-Venue Basis & Sentiment',
+    okxPrice: 'OKX Price',
+    bnPrice: 'Binance (Basis)',
+    gatePrice: 'Gate (Basis)',
+    lsRatio: 'BN/Gate L/S',
+    fundingRate: 'BN/Gate Funding',
+  },
 };

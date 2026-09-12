@@ -51,6 +51,7 @@ export const zhCommon = {
     notConfigured: '未配置',
     none: '无',
     total: '合计',
+    all: '全部',
     reset: '重置',
     apply: '应用',
     applyAll: '一键应用',
@@ -81,6 +82,8 @@ export const zhCommon = {
     hoursAgo: '{n} 小时前',
     daysAgo: '{n} 天前',
     inSeconds: '{n} 秒后',
+    beijingTime: '北京时间 UTC+8',
+    siteTimeTip: '全站时间：Asia/Shanghai (UTC+8)',
   },
   brand: {
     name: 'R20 量子交易系统',

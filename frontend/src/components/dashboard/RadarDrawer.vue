@@ -195,17 +195,17 @@ function dirOf(a: string): 'long' | 'short' | 'flat' {
 
     <!-- 跨所证据与基差 -->
     <div v-else-if="tab === 'xvenue'" class="space-y-3">
-      <p class="t-label mb-1.5">{{ t('dash.radar.detail.xvenue') }} · 三所基差与多空对比</p>
+      <p class="t-label mb-1.5">{{ t('dash.radar.xvenue.title') }}</p>
       <div class="card overflow-x-auto">
         <table class="table">
           <thead>
             <tr>
               <th>{{ t('dash.matrix.positions.col.symbol') }}</th>
-              <th class="col-num">OKX 现价</th>
-              <th class="col-num">Binance (基差)</th>
-              <th class="col-num">Gate (基差)</th>
-              <th class="col-num">BN/Gate 多空比</th>
-              <th class="col-num">BN/Gate 费率</th>
+              <th class="col-num">{{ t('dash.radar.xvenue.okxPrice') }}</th>
+              <th class="col-num">{{ t('dash.radar.xvenue.bnPrice') }}</th>
+              <th class="col-num">{{ t('dash.radar.xvenue.gatePrice') }}</th>
+              <th class="col-num">{{ t('dash.radar.xvenue.lsRatio') }}</th>
+              <th class="col-num">{{ t('dash.radar.xvenue.fundingRate') }}</th>
             </tr>
           </thead>
           <tbody>

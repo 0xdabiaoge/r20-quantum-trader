@@ -50,6 +50,7 @@ export const enCommon = {
     notConfigured: 'Not configured',
     none: 'None',
     total: 'Total',
+    all: 'All',
     reset: 'Reset',
     apply: 'Apply',
     applyAll: 'Apply all',
@@ -80,6 +81,8 @@ export const enCommon = {
     hoursAgo: '{n}h ago',
     daysAgo: '{n}d ago',
     inSeconds: 'in {n}s',
+    beijingTime: 'Beijing Time UTC+8',
+    siteTimeTip: 'Site time: Asia/Shanghai (UTC+8)',
   },
   brand: {
     name: 'R20 Quantum Trader',

@@ -84,7 +84,7 @@ function symOf(x: { instId?: string; name?: string }): string {
       <div class="flex items-center justify-between sm:justify-end gap-1 rounded-md p-0.5 w-full sm:w-auto" style="background-color: var(--surface-2); border: 1px solid var(--line-1)">
         <button
           v-for="v in [
-            { key: 'all', label: '全部' },
+            { key: 'all', label: t('common.all') },
             { key: 'okx', label: 'OKX' },
             { key: 'binance', label: 'Binance' },
             { key: 'gate', label: 'Gate' },

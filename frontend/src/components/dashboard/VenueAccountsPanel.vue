@@ -90,7 +90,7 @@ function refreshAll(): void {
         <h2 class="text-sm font-bold" style="color: var(--ink-strong)">{{ t('dash.venueAccounts.title') }}</h2>
         <div v-if="crossVenue" class="hidden sm:flex items-center gap-2 text-2xs px-2 py-0.5 rounded" style="background: var(--surface-2); border: 1px solid var(--line-1)">
           <span class="inline-flex items-center gap-1 font-mono">
-            <span class="dot dot-up"></span>OKX <span class="t-faint">{{ venueLatencies.okx ? `${venueLatencies.okx}ms` : '就绪' }}</span>
+            <span class="dot dot-up"></span>OKX <span class="t-faint">{{ venueLatencies.okx ? `${venueLatencies.okx}ms` : t('dash.venueAccounts.ready') }}</span>
           </span>
           <span class="inline-flex items-center gap-1 font-mono">
             <span :class="['dot', venueLatencies.binance ? 'dot-up' : 'dot-warn']"></span>BN <span class="t-faint">{{ venueLatencies.binance ? `${venueLatencies.binance}ms` : '--' }}</span>
@@ -143,13 +143,13 @@ function refreshAll(): void {
     <!-- 移动端紧凑三所资产条 (桌面端隐藏，手机端大幅降低竖向屏高) -->
     <div class="block md:hidden rounded-lg p-2 border" style="background: var(--surface-2); border-color: var(--line-1)">
       <div class="flex items-center justify-between text-2xs mb-1.5">
-        <span class="font-bold" style="color: var(--ink-1)">三所资产一览</span>
+        <span class="font-bold" style="color: var(--ink-1)">{{ t('dash.venueAccounts.mobileSummary') }}</span>
         <button
           class="text-3xs font-medium px-2 py-0.5 rounded cursor-pointer transition-colors"
           style="background: var(--surface-3); color: var(--ink-2)"
           @click="isMobileExpanded = !isMobileExpanded"
         >
-          {{ isMobileExpanded ? '收起明细 ▲' : '展开三所卡片 ▼' }}
+          {{ isMobileExpanded ? t('dash.venueAccounts.collapseCards') : t('dash.venueAccounts.expandCards') }}
         </button>
       </div>
       <div class="grid grid-cols-3 gap-1.5 text-center">
@@ -188,7 +188,7 @@ function refreshAll(): void {
           {{ t('dash.venueAccounts.portfolio.envMismatch') }}
         </span>
         <span v-if="portfolio?.updated_utc" class="num ml-auto text-[10px]" style="color: var(--ink-3)">
-          {{ utcStrToBj(String(portfolio.updated_utc), true) }} 北京
+          {{ utcStrToBj(String(portfolio.updated_utc), true) }} {{ t('dash.venueAccounts.beijing') }}
         </span>
       </div>
       <div v-if="portfolio" class="mt-2 grid grid-cols-3 gap-2 text-center">

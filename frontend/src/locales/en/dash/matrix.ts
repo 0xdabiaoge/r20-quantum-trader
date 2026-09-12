@@ -3,6 +3,10 @@ export const enMatrix = {
   desc: 'Account, positions, orders and factor matrix on one screen.',
   kpi: {
     equity: 'Total equity',
+    multiEquity: 'Multi-Venue Total Equity',
+    venuesConnected: '{n} venues',
+    comboEquity: 'Portfolio Equity (U)',
+    comboEquityTip: 'Aggregated equity across venues',
     todayPnl: 'Realized today',
     floatPnl: 'Floating PnL',
     ls: 'Long / short',

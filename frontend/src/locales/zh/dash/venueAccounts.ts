@@ -10,6 +10,11 @@ export const zhVenueAccounts = {
   needsAuth: '登录后查看真实账户数据',
   captured: '拉取于',
   unknown: '—',
+  ready: '就绪',
+  mobileSummary: '三所资产一览',
+  expandCards: '展开三所卡片 ▼',
+  collapseCards: '收起明细 ▲',
+  beijing: '北京',
   venueNames: {
     okx: 'OKX 欧易',
     gate: 'Gate.io',

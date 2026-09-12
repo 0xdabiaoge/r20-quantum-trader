@@ -21,7 +21,7 @@ const equity = computed(() => fmtNum(Number(account.value.total_eq || 0), 2));
 
 /** 多所组合总权益与保证金占用 */
 const isLiveEnv = computed(() => venueStore.environment === 'live');
-const envBadgeText = computed(() => (isLiveEnv.value ? '实盘' : '模拟'));
+const envBadgeText = computed(() => (isLiveEnv.value ? t('dash.venueAccounts.envLive') : t('dash.venueAccounts.envDemo')));
 
 const portfolioSummary = computed(() => venueStore.portfolioSummary || (store.data as any)?.multi_venue_portfolio || null);
 const hasMultiVenue = computed(() => {
@@ -106,10 +106,10 @@ onMounted(async () => {
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-2xs" style="color: var(--ink-3)">
         <div class="flex items-center justify-between sm:justify-start gap-2">
           <div class="flex items-center gap-1.5">
-            <span class="font-bold text-xs" style="color: var(--ink-1)">多所组合总权益</span>
+            <span class="font-bold text-xs" style="color: var(--ink-1)">{{ t('dash.matrix.kpi.multiEquity') }}</span>
             <span class="num font-bold text-xs sm:text-sm" style="color: var(--ink-strong)">$ {{ totalAggregatedEquity }} U</span>
           </div>
-          <span class="badge text-3xs" style="background: var(--surface-3); color: var(--ink-2)">{{ portfolioSummary?.active_venues_count }} 所接入</span>
+          <span class="badge text-3xs" style="background: var(--surface-3); color: var(--ink-2)">{{ t('dash.matrix.kpi.venuesConnected', undefined, { n: portfolioSummary?.active_venues_count }) }}</span>
         </div>
         <div class="flex items-center justify-between sm:justify-end gap-2.5 num text-3xs pt-0.5 sm:pt-0">
           <span class="flex items-center gap-1"><span class="inline-block w-1.5 h-1.5 rounded-full" style="background-color: #3880ff"></span> OKX {{ distOkx }}%</span>
@@ -142,9 +142,9 @@ onMounted(async () => {
 
     <div class="grid grid-cols-2 gap-1.5 sm:gap-2 md:grid-cols-3 xl:grid-cols-6 xl:gap-0">
     <BaseStat
-      :label="hasMultiVenue ? `[${envBadgeText}] 组合总权益 (U)` : `[${envBadgeText}] ${t('dash.matrix.kpi.equity')}`"
+      :label="hasMultiVenue ? `[${envBadgeText}] ${t('dash.matrix.kpi.comboEquity')}` : `[${envBadgeText}] ${t('dash.matrix.kpi.equity')}`"
       :value="totalAggregatedEquity"
-      :hint="hasMultiVenue ? `${envBadgeText}多所聚合权益` : t('dash.matrix.kpi.equityTip')"
+      :hint="hasMultiVenue ? `${envBadgeText} ${t('dash.matrix.kpi.comboEquityTip')}` : t('dash.matrix.kpi.equityTip')"
     >
       <template #extra>
         <span class="num text-xs font-semibold" :class="todayNet >= 0 ? 'up' : 'down'">

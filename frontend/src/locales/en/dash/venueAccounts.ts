@@ -10,6 +10,11 @@ export const enVenueAccounts = {
   needsAuth: 'Sign in to view real account data',
   captured: 'Captured',
   unknown: '—',
+  ready: 'Ready',
+  mobileSummary: 'Tri-Venue Assets',
+  expandCards: 'Expand Cards ▼',
+  collapseCards: 'Collapse ▲',
+  beijing: 'Beijing',
   venueNames: {
     okx: 'OKX',
     gate: 'Gate.io',
