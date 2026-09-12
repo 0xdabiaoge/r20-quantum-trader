@@ -446,6 +446,14 @@ def update_application(
     except RuntimeError as exc:
         raise HTTPException(status_code=502, detail=f"更新失败：{exc}") from exc
     status_after = fn_status()
+    updated = status_before["local"] != status_after.get("local")
     rec_audit = app_attr("audit_record", audit_record)
     rec_audit("application.update", "success", {"actor": actor.get("username", "admin"), "before": status_before.get("local"), "after": status_after.get("local")})
-    return {"updated": True, "git_output": output, "before": status_before, "after": status_after}
+    return {
+        "updated": updated,
+        "before": status_before,
+        "after": status_after,
+        "git_output": output,
+        "restart_required": updated,
+        "restart_note": "请重启 r20-quantum 与 r20-scheduler 服务，让新代码接管后台与调度。" if updated else "当前代码已是最新，无需重启服务。",
+    }

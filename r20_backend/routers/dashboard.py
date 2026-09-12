@@ -134,6 +134,7 @@ def market_candles(inst_id: str, bar: str = "1H", limit: int = 150, response: Re
         return {"instId": inst_id, "bar": bar, "candles": [], "source": "error", "detail": str(exc)}
 
 
+@router.get("/health", include_in_schema=False)
 @router.get("/api/v1/equity_history")
 def equity_history(days: int = 14) -> dict[str, Any]:
     """权益迷你曲线（公开，与 /api/all 同级暴露）：

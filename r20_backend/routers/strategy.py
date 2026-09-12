@@ -33,8 +33,6 @@ from r20_backend.schemas import (
     PromptImportRequest,
     PromptRollbackRequest,
     PromptOverrideRequest,
-    MemoryItemRequest,
-    MemoryUpdateAllRequest,
 )
 from scripts.prompt_library import (
     active_profile, activate_profile, all_profiles, apply_module_layout,
@@ -686,84 +684,7 @@ def update_prompt_override(
 
 
 # =========================================================================
-# AI Trading Heuristic Memory APIs (Self-Improvement)
-# =========================================================================
-
-def _memory_service_call(name: str, *args, **kwargs):
-    from scripts import evolution_shield as service
-    try:
-        return getattr(service, name)(*args, **kwargs)
-    except service.MemoryVersionRequiredError as exc:
-        raise HTTPException(status_code=428, detail=str(exc)) from exc
-    except service.MemoryConflictError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
-    except service.MemoryCorruptError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
-    except IndexError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-
-
-@router.get("/api/v1/admin/memory")
-def get_admin_memory(x_r20_admin_token: str | None = Header(default=None), x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
-    refresh_settings()
-    require_admin_header(x_r20_admin_token, x_r20_session)
-    return _memory_service_call("admin_memory_view")
-
-
-@router.post("/api/v1/admin/memory/toggle/{lesson_id}")
-def toggle_admin_memory_lesson(lesson_id: str, expected_version: str | None = None, x_r20_admin_token: str | None = Header(default=None), x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
-    refresh_settings()
-    actor = require_admin_header(x_r20_admin_token, x_r20_session)
-    try:
-        target = _memory_service_call("toggle_lesson", lesson_id, expected_version=expected_version)
-        if not target:
-            raise HTTPException(status_code=404, detail="未找到指定心法条目")
-        audit_record("memory.lesson.toggle", "success", {"actor": actor.get("username", "admin"), "id": lesson_id, "enabled": target.get("enabled")})
-        return {"ok": True, "target": target, "structured_lessons": _memory_service_call("load_structured_memory")}
-    except HTTPException:
-        raise
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"心法切换失败: {exc}") from exc
-
-
-@router.post("/api/v1/admin/memory/rollback")
-def rollback_admin_memory_lessons(expected_version: str | None = None, x_r20_admin_token: str | None = Header(default=None), x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
-    refresh_settings()
-    actor = require_admin_header(x_r20_admin_token, x_r20_session)
-    try:
-        res = _memory_service_call("rollback_to_baseline", expected_version=expected_version)
-        audit_record("memory.rollback_baseline", "success", {"actor": actor.get("username", "admin"), "count": len(res)})
-        return {"ok": True, "message": "已成功防污染回滚至官方基准心法库", "structured_lessons": res}
-    except HTTPException:
-        raise
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"回滚失败: {exc}") from exc
-
-
-@router.post("/api/v1/admin/memory")
-def add_admin_memory_item(payload: MemoryItemRequest, x_r20_admin_token: str | None = Header(default=None), x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
-    refresh_settings()
-    actor = require_admin_header(x_r20_admin_token, x_r20_session)
-    result = _memory_service_call("admin_mutate", "add", texts=[payload.text], expected_version=payload.expected_version)
-    audit_record("memory.item.add", "success", {"actor": actor.get("username", "admin")})
-    return result
-
-
-@router.delete("/api/v1/admin/memory/{index}")
-def delete_admin_memory_item(index: int, lesson_id: str | None = None, expected_version: str | None = None, x_r20_admin_token: str | None = Header(default=None), x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
-    refresh_settings()
-    actor = require_admin_header(x_r20_admin_token, x_r20_session)
-    result = _memory_service_call("admin_mutate", "delete", index=index, lesson_id=lesson_id, expected_version=expected_version)
-    audit_record("memory.item.delete", "success", {"actor": actor.get("username", "admin")})
-    return result
-
-
-@router.put("/api/v1/admin/memory")
-def update_admin_memory_all(payload: MemoryUpdateAllRequest, x_r20_admin_token: str | None = Header(default=None), x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
-    refresh_settings()
-    actor = require_admin_header(x_r20_admin_token, x_r20_session)
-    result = _memory_service_call("admin_mutate", "replace", texts=payload.items, expected_version=payload.expected_version)
-    audit_record("memory.update_all", "success", {"actor": actor.get("username", "admin"), "count": len(result["items"])})
-    return result
+# AI 记忆心法 API：唯一定义在 r20_backend/app.py（test_self_evolution_safety 与
+# test_memory_routes_isolated 以 app.py 源码为 AST 契约，且其路由注册先于本 router，
+# 拆分时误留的同实现死副本已于 2026-09-13 移除——再在此处添加将成死代码并触发
+# FastAPI 重复 Operation ID 告警）。
