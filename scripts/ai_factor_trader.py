@@ -107,13 +107,14 @@ try:
     sys.path.append(os.path.join(WORKSPACE_DIR, "scripts"))
     from db_manager import record_trade_sqlite
     from qq_notifier import notify_trade_open, notify_trade_close
-    from ai_brain_trader import execute_batch_ai_brain_cycle, get_latest_ai_decision
+    from ai_brain_trader import execute_batch_ai_brain_cycle, get_latest_ai_decision, read_cycle_health
 except Exception:
     record_trade_sqlite = None
     notify_trade_open = None
     notify_trade_close = None
     execute_batch_ai_brain_cycle = None
     get_latest_ai_decision = None
+    read_cycle_health = None
 
 from instrument_pool import load_instruments
 
@@ -2754,7 +2755,17 @@ def execute_portfolio():
                     execute_ai_position_management(refreshed_pos_dict, trackers, timestamp_full, executed_actions)
                     save_trackers(trackers)
             else:
-                executed_actions.append("本轮AI推理失败或并发跳过，禁止复用旧持仓指令")
+                _hf = read_cycle_health() if read_cycle_health else {}
+                if _hf.get("last_status") == "failed":
+                    _cf = int(_hf.get("consecutive_failures", 0) or 0)
+                    _warn = f"本轮AI推理失败（连续{_cf}轮｜{_hf.get('last_error') or '未知原因'}），禁止复用旧持仓指令"
+                    if _cf >= 3:
+                        _warn = "🔴 AI决策链连续" + str(_cf) + "轮失败——非并发跳过，模型/密钥/额度需人工核查！" + _warn
+                    executed_actions.append(_warn)
+                    if _cf >= 3:
+                        print(f"[AI Health] 🔴 连续 {_cf} 轮批次决策失败，最近错误: {_hf.get('last_error')}")
+                else:
+                    executed_actions.append("本轮AI推理并发跳过（旧指令不违规复用），禁止复用旧持仓指令")
         except Exception as e:
             print(f"[AI Brain Batch Scan Warning] {e}")
 

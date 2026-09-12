@@ -1533,6 +1533,19 @@ def update_cache_cycle():
     except Exception:
         pass
 
+    # 审计监控面：AI 批次决策连续失败并入 source_errors——04:45 起 14 轮停摆
+    # 时巡检「全绿」的根因是失败终态对面板不可见；≥2 连续即降 PARTIAL。
+    try:
+        _ah_path = os.path.join(DATA_DIR, "ai_health.json")
+        if os.path.exists(_ah_path):
+            with open(_ah_path, "r", encoding="utf-8") as _f:
+                _ah = json.load(_f)
+            _cf = int(_ah.get("consecutive_failures", 0) or 0)
+            if _cf >= 2:
+                source_errors.append(f"ai-inference: AI决策链连续{_cf}轮失败({str(_ah.get('last_error') or '')[:120]})，本轮无新指令")
+    except Exception:
+        pass
+
     CACHE_DATA = {
         "timestamp": timestamp_full,
         "date": today_bj_str,

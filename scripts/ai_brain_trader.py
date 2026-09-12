@@ -64,6 +64,50 @@ DATA_DIR = os.path.join(WORKSPACE_DIR, "data")
 from market_data_service import fetch_single_indicator, fetch_ticker, fetch_candles
 AI_DECISION_CACHE_FILE = os.path.join(DATA_DIR, "ai_brain_decisions.json")
 AI_DECISION_HISTORY_FILE = os.path.join(DATA_DIR, "ai_brain_history.json")
+
+
+def _ai_health_path() -> str:
+    # 调用时解析 DATA_DIR——测试 patch 模块属性即封闭（律①）
+    return os.path.join(DATA_DIR, "ai_health.json")
+
+
+def read_cycle_health() -> dict:
+    """供 trader/面板读取最近批次健康；缺文件=无记录（不误伤）。"""
+    try:
+        p = _ai_health_path()
+        if not os.path.exists(p):
+            return {}
+        with open(p, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def _record_cycle_health(status: str, reason: str = "") -> None:
+    """审计监控面：trader 为 15 分钟短驻进程，内存计数跨轮即失忆——连续失败
+    计数持久化到 data/ai_health.json。04:45 起 14 轮 LLM 停摆但巡检 rc=0 全绿
+    的根因就是失败终态没有任何跨进程可查痕迹。>=2 连续失败由 data_health 降
+    PARTIAL、由 trader 在 executed_actions 显式告警。"""
+    prev = read_cycle_health()
+    now_iso = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).isoformat()
+    if status == "ok":
+        payload = {
+            "last_status": "ok", "last_at": now_iso, "consecutive_failures": 0,
+            "last_ok_at": now_iso, "last_error": None,
+            "total_failures": int(prev.get("total_failures", 0) or 0),
+        }
+    else:
+        payload = {
+            "last_status": "failed", "last_at": now_iso,
+            "consecutive_failures": int(prev.get("consecutive_failures", 0) or 0) + 1,
+            "last_error": str(reason)[:300], "last_ok_at": prev.get("last_ok_at"),
+            "total_failures": int(prev.get("total_failures", 0) or 0) + 1,
+        }
+    try:
+        atomic_write_json(_ai_health_path(), payload)
+    except Exception as exc:
+        print(f"[AI Brain Batch] warn ai_health 旁车写入失败: {exc}")
 AI_POSITION_MANAGEMENT_FILE = os.path.join(DATA_DIR, "ai_position_management.json")
 AI_LAST_PROMPT_FILE = os.path.join(DATA_DIR, "ai_brain_last_prompt.txt")
 VENUE_HEALTH_FILE = os.path.join(DATA_DIR, "venue_health.json")
@@ -1286,6 +1330,7 @@ def execute_batch_ai_brain_cycle(
     base_url, api_key = get_cpa_client_config()
     if not api_key:
         print("[AI Brain Batch] Error: CPA API Key not found")
+        _record_cycle_health("failed", "CPA API Key 未配置")
         return None
 
     tz_bj = datetime.timezone(datetime.timedelta(hours=8))
@@ -1603,11 +1648,13 @@ def execute_batch_ai_brain_cycle(
         latency = round(time.time() - t0, 2)
         telemetry.finish("success", raw_res, output_chars=len(content))
         print(f"[AI Brain Batch] ✅ 全标的池({len(packages)} 币种)全景决策完成 (耗时 {latency}s, 宏观基调: {macro_summary})")
+        _record_cycle_health("ok")
         return standard_cache
 
     except Exception as e:
         telemetry.finish("failed", error=e)
         print(f"[AI Brain Batch] Error in batch inference: {e}")
+        _record_cycle_health("failed", str(e))
         return None
 
 def get_latest_ai_decision(inst_id: str, max_age_seconds: int = DECISION_MAX_AGE_SECONDS) -> Optional[Dict[str, Any]]:
