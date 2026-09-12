@@ -1749,7 +1749,11 @@ async def docs_spa_root(request: Request, subpath: str = ""):
 @app.get("/news", response_class=HTMLResponse, include_in_schema=False)
 @app.get("/lab", response_class=HTMLResponse, include_in_schema=False)
 @app.get("/history", response_class=HTMLResponse, include_in_schema=False)
+@app.get("/login", include_in_schema=False)
 async def public_tab_spa_routes(request: Request):
+    if request.url.path == "/login":
+        from starlette.responses import RedirectResponse
+        return RedirectResponse(url="/admin/login")
     """Serve the public Vue SPA shell for dedicated tab routes with Cloudflare edge caching."""
     vue_index_file = os.path.join(VUE_DIST_DIR, "index.html")
     if os.path.isfile(vue_index_file):

@@ -49,6 +49,10 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../views/admin/LoginPage.vue'),
     meta: { isPublic: true },
   },
+  {
+    path: '/login',
+    redirect: '/admin/login',
+  },
 ]
 
 const router = createRouter({
