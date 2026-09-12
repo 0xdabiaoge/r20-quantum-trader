@@ -16,6 +16,7 @@
 """
 from __future__ import annotations
 
+import hashlib
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -167,6 +168,15 @@ def _hard_filters(signal: Dict[str, Any], cand: Dict[str, Any],
 
 
 # ---------------------------------------------------------------- 评分（第二层）
+
+def _balanced_pick(canonical: str, sorted_venues: list) -> str:
+    """审计 D7：跨进程确定的均衡选所。旧式 abs(hash(x))%n 受 PYTHONHASHSEED
+    每进程随机化——同一标的在后端/trader/重启后的不同进程会轮入不同所，
+    「均衡轮换」不可复现。sha256 摘要取模：任何进程任何时刻同输入恒定结果。"""
+    if not sorted_venues:
+        return ""
+    return sorted_venues[int(hashlib.sha256(str(canonical).encode("utf-8")).hexdigest(), 16) % len(sorted_venues)]
+
 
 def _score(cand: Dict[str, Any], signal: Dict[str, Any],
            cfg: RouterConfig, reasons: List[str]) -> float:
@@ -333,7 +343,11 @@ def route_signal(signal: Dict[str, Any], candidates: List[Dict[str, Any]],
             tolerable = [c for c in alive if scores[str(c["venue"])] <= min_score + 15.0]
             if len(tolerable) > 1:
                 sorted_venues = sorted(str(c["venue"]) for c in tolerable)
-                winner = sorted_venues[abs(hash(canonical)) % len(sorted_venues)]
+                # 审计 D7：必须用跨进程确定的哈希——旧 abs(hash(x)) 受
+                # PYTHONHASHSEED 每进程随机化，同一标的在后端/trader/重启后的
+                # 不同进程里会轮入不同所，「均衡轮换」不可复现且决策依据失真。
+                # sha256 摘要取模：任何进程、任何时刻同一 canonical 恒定同结果。
+                winner = _balanced_pick(canonical, sorted_venues)
                 reasons.append(f"均衡模式生效：在合格候选 {sorted_venues} 中，标的 {canonical} 均衡轮动分发至 {winner}")
                 allocation = split_allocation(signal, alive, budget_view, cfg, pre_alive=alive)
                 return RouteDecision(

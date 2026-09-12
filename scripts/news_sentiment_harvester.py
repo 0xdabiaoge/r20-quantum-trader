@@ -170,7 +170,10 @@ def fetch_okx_announcements(limit=15) -> list:
                 time_str = datetime.datetime.fromtimestamp(p_time / 1000.0, tz=tz_bj).strftime("%Y-%m-%d %H:%M:%S")
                 summary = f"OKX官方通告【{ann_type}】: {title}"
                 items.append({
-                    "id": f"okx-{p_time}-{abs(hash(title)) % 10000}",
+                    # 审计 D7：去重 id 禁用 abs(hash())（PYTHONHASHSEED 每进程
+                    # 随机化，重启后同一标题生成新 id → 去重失效重复入库）。
+                    # id 全链按不透明字符串消费（单源核实），改确定性 sha256 前 8 位。
+                    "id": f"okx-{p_time}-{hashlib.sha256(title.encode('utf-8')).hexdigest()[:8]}",
                     "title": title,
                     "summary": summary,
                     "time": time_str,

@@ -533,7 +533,15 @@ class BinanceAdapter(BaseExchangeAdapter):
         inst = self.native_symbol(symbol)
         params: Dict[str, Any] = {"symbol": inst}
         if order_id is not None:
-            params["orderId"] = str(order_id)
+            # 审计 D6：上游 execution_router 的回退链可能把 client text
+            # （t-r20e*，非数字）当 order_id 传入——Binance 只认纯数字 orderId，
+            # 混族直传会被 -2011 拒撤 → 回滚漏网孤儿入场单裸挂。非数字一律
+            # 改走所方原生 origClientOrderId。
+            _oid = str(order_id)
+            if _oid.isdigit():
+                params["orderId"] = _oid
+            else:
+                params["origClientOrderId"] = _oid
         elif client_order_id:
             params["origClientOrderId"] = str(client_order_id)
         else:
