@@ -30,4 +30,6 @@ export const enAdminOverview = {
   dataHealth: 'Data pipeline health',
   dataHealthDesc: 'Last update and size of key artifacts',
   recentAudit: 'Recent admin actions',
+  quickVenues: 'Trading venues & routing',
+  quickVenuesDesc: 'Tri-venue parity config · click to manage',
 };

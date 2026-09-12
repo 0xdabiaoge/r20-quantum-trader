@@ -232,9 +232,9 @@ onMounted(loadData)
 <template>
   <div class="space-y-4 max-w-[2048px] mx-auto">
     <!-- Header -->
-    <PageHeader :title="t('nav.admin.evolution')" description="穿透平仓台账自省归因，提炼心法注入下一轮决策；离群噪点剔除与半衰期淘汰">
+    <PageHeader :title="t('nav.admin.evolution')" :description="t('admin.evolution.desc')">
       <template #actions>
-        <span class="chip"><span class="dot dot-up" />白盒认知 · 防偏见护栏</span>
+        <span class="chip"><span class="dot dot-up" />{{ t('admin.evolution.guardChip') }}</span>
       </template>
     </PageHeader>
 
@@ -248,7 +248,7 @@ onMounted(loadData)
           :style="activeTab === 'settings' ? { backgroundColor: 'var(--ink-1)', color: 'var(--surface-2)' } : { color: 'var(--ink-2)' }"
         >
           <Brain class="w-3.5 h-3.5" />
-          <span>白盒心法与防污染总览</span>
+          <span>{{ t('admin.evolution.tabOverview') }}</span>
         </button>
         <button
           @click="switchTab('evolution_system')"
@@ -256,7 +256,7 @@ onMounted(loadData)
           :style="activeTab === 'evolution_system' ? { backgroundColor: 'var(--ink-1)', color: 'var(--surface-2)' } : { color: 'var(--ink-2)' }"
         >
           <BookOpen class="w-3.5 h-3.5" />
-          <span>复盘官 System 模版</span>
+          <span>{{ t('admin.evolution.tabSystem') }}</span>
         </button>
         <button
           @click="switchTab('evolution_user')"
@@ -264,7 +264,7 @@ onMounted(loadData)
           :style="activeTab === 'evolution_user' ? { backgroundColor: 'var(--ink-1)', color: 'var(--surface-2)' } : { color: 'var(--ink-2)' }"
         >
           <Terminal class="w-3.5 h-3.5" />
-          <span>战绩流水 User 模版</span>
+          <span>{{ t('admin.evolution.tabUser') }}</span>
         </button>
       </div>
 
@@ -275,7 +275,7 @@ onMounted(loadData)
           class="flex items-center space-x-1 px-3 py-1.5 rounded-lg text-xs cursor-pointer disabled:opacity-40 border"
         >
           <RefreshCw class="w-3.5 h-3.5" />
-          <span>重新加载心法</span>
+          <span>{{ t('admin.evolution.reloadMemory') }}</span>
         </button>
         <button
           v-if="auth.isSuperadmin"
@@ -283,10 +283,10 @@ onMounted(loadData)
           :disabled="busy !== ''"
           class="flex items-center space-x-1 px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer disabled:opacity-40 transition-all border shadow-xs"
           style="background-color: var(--surface-1); border-color: var(--line-1); color: var(--ink-1);"
-          title="遭遇极端行情导致心法被带偏时，一键恢复至官方未被污染的基准黄金心法"
+          :title="t('admin.evolution.rollbackTitle')"
         >
           <RotateCcw class="w-3.5 h-3.5 text-amber-400" />
-          <span>回滚至黄金基准</span>
+          <span>{{ t('admin.evolution.rollback') }}</span>
         </button>
 
         <button
@@ -297,7 +297,7 @@ onMounted(loadData)
           style="background-color: var(--accent-bg); border-color: var(--accent-line); color: var(--accent);"
         >
           <PlayCircle class="w-3.5 h-3.5" />
-          <span>{{ busy === 'run' ? '正在执行复盘提炼...' : '防污染立即复盘' }}</span>
+          <span>{{ busy === 'run' ? t('admin.evolution.runningReview') : t('admin.evolution.reviewNow') }}</span>
         </button>
       </div>
     </div>
@@ -310,7 +310,7 @@ onMounted(loadData)
           <div class="flex items-center space-x-2">
             <Sparkles class="w-4 h-4 text-amber-400" />
             <h3 class="text-xs sm:text-sm font-semibold uppercase tracking-wide" style="color: var(--ink-1);">
-              最新自进化复盘实况与诊断档案
+              {{ t('admin.evolution.reportTitle') }}
             </h3>
             <span
               class="text-[11px] px-2 py-0.5 rounded border font-bold"
@@ -320,36 +320,36 @@ onMounted(loadData)
             </span>
           </div>
           <div class="text-[11px]" style="color: var(--ink-2);">
-            复盘时间: <strong class="text-emerald-400 font-bold">{{ fmtDateTime(evolutionReport.timestamp) }}</strong>
+            {{ t('admin.evolution.reviewTime') }} <strong class="text-emerald-400 font-bold">{{ fmtDateTime(evolutionReport.timestamp) }}</strong>
           </div>
         </div>
 
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
           <div class="p-2 rounded-lg border" style="background-color: var(--surface-1); border-color: var(--line-1);">
-            <div class="text-[11px]" style="color: var(--ink-3);">复盘样本数</div>
-            <div class="font-bold text-sm mt-0.5" style="color: var(--ink-1);">{{ evolutionReport.total_trades }} 笔平仓</div>
+            <div class="text-[11px]" style="color: var(--ink-3);">{{ t('admin.evolution.sampleCount') }}</div>
+            <div class="font-bold text-sm mt-0.5" style="color: var(--ink-1);">{{ t('admin.evolution.closedTrades', undefined, { n: evolutionReport.total_trades }) }}</div>
           </div>
           <div class="p-2 rounded-lg border" style="background-color: var(--surface-1); border-color: var(--line-1);">
-            <div class="text-[11px]" style="color: var(--ink-3);">样本综合胜率</div>
+            <div class="text-[11px]" style="color: var(--ink-3);">{{ t('admin.evolution.winRate') }}</div>
             <div class="font-bold text-sm mt-0.5 text-emerald-400">{{ evolutionReport.win_rate }}%</div>
           </div>
           <div class="p-2 rounded-lg border" style="background-color: var(--surface-1); border-color: var(--line-1);">
-            <div class="text-[11px]" style="color: var(--ink-3);">利润因子 (PF)</div>
+            <div class="text-[11px]" style="color: var(--ink-3);">{{ t('admin.evolution.profitFactor') }}</div>
             <div class="font-bold text-sm mt-0.5 text-blue-400">{{ evolutionReport.profit_factor }}</div>
           </div>
           <div class="p-2 rounded-lg border" style="background-color: var(--surface-1); border-color: var(--line-1);">
-            <div class="text-[11px]" style="color: var(--ink-3);">启发式记忆保护</div>
-            <div class="font-bold text-sm mt-0.5 text-purple-400">{{ evolutionReport.memory_preserved ? '100% 启用' : '更新重构' }}</div>
+            <div class="text-[11px]" style="color: var(--ink-3);">{{ t('admin.evolution.memoryGuard') }}</div>
+            <div class="font-bold text-sm mt-0.5 text-purple-400">{{ evolutionReport.memory_preserved ? t('admin.evolution.guardOn') : t('admin.evolution.guardRebuild') }}</div>
           </div>
         </div>
 
         <div v-if="evolutionReport.memory_overwrites_reason" class="p-2.5 rounded-lg border text-xs" style="background-color: var(--surface-1); border-color: var(--line-1);">
-          <div class="text-[11px] uppercase font-bold text-amber-400 mb-0.5">决策裁决理由:</div>
+          <div class="text-[11px] uppercase font-bold text-amber-400 mb-0.5">{{ t('admin.evolution.verdictReason') }}</div>
           <p class="text-[11px] leading-relaxed" style="color: var(--ink-2);">{{ evolutionReport.memory_overwrites_reason }}</p>
         </div>
 
         <div v-if="evolutionReport.insights && evolutionReport.insights.length" class="space-y-1">
-          <div class="text-[11px] font-bold uppercase" style="color: var(--ink-3);">AI 逐单归因与深度诊断切片 ({{ evolutionReport.insights.length }} 条)</div>
+          <div class="text-[11px] font-bold uppercase" style="color: var(--ink-3);">{{ t('admin.evolution.insightsTitle', undefined, { n: evolutionReport.insights.length }) }}</div>
           <div class="space-y-1 max-h-[160px] overflow-y-auto pr-1">
             <div v-for="(ins, idx) in evolutionReport.insights" :key="idx" class="p-2 rounded border text-[11px] leading-relaxed" style="background-color: var(--surface-1); border-color: var(--line-1); color: var(--ink-2);">
               <span class="text-indigo-400 font-bold mr-1">#{{ Number(idx) + 1 }}</span>
@@ -364,20 +364,20 @@ onMounted(loadData)
         <div class="rounded-xl border p-3.5 shadow-xs" style="background-color: var(--surface-2); border-color: var(--line-1);">
           <div class="flex items-center space-x-1.5 mb-1 text-[11px] font-bold" style="color: var(--ink-2);">
             <ShieldCheck class="w-3.5 h-3.5 text-emerald-400" />
-            <span>防污染护栏状态</span>
+            <span>{{ t('admin.evolution.guardrailStatus') }}</span>
           </div>
-          <div class="text-sm font-bold text-emerald-400">ACTIVE (已启动)</div>
+          <div class="text-sm font-bold text-emerald-400">{{ t('admin.evolution.guardrailActive') }}</div>
           <div class="text-[11px] mt-1" style="color: var(--ink-3);">
-            离群噪点过滤 · 宪法防偏见
+            {{ t('admin.evolution.guardrailSub') }}
           </div>
         </div>
 
         <div class="rounded-xl border p-3.5 shadow-xs" style="background-color: var(--surface-2); border-color: var(--line-1);">
           <div class="flex items-center space-x-1.5 mb-1 text-[11px] font-bold" style="color: var(--ink-2);">
             <Clock class="w-3.5 h-3.5 text-cyan-400" />
-            <span>自动复盘频次</span>
+            <span>{{ t('admin.evolution.cadence') }}</span>
           </div>
-          <div class="text-sm font-bold text-cyan-400">每 6 小时 (4次/天)</div>
+          <div class="text-sm font-bold text-cyan-400">{{ t('admin.evolution.cadenceValue') }}</div>
           <div class="text-[11px] mt-1" style="color: var(--ink-3);">
             02:00, 08:00, 14:00, 20:00 (UTC+8)
           </div>
@@ -386,24 +386,24 @@ onMounted(loadData)
         <div class="rounded-xl border p-3.5 shadow-xs" style="background-color: var(--surface-2); border-color: var(--line-1);">
           <div class="flex items-center space-x-1.5 mb-1 text-[11px] font-bold" style="color: var(--ink-2);">
             <Sliders class="w-3.5 h-3.5 text-purple-400" />
-            <span>当前生效心法</span>
+            <span>{{ t('admin.evolution.currentLessons') }}</span>
           </div>
           <div class="text-sm font-bold" style="color: var(--ink-1);">
-            {{ structuredLessons.filter((l: any) => l.enabled).length }} / {{ structuredLessons.length }} 条
+            {{ t('admin.evolution.lessonsCount', undefined, { enabled: structuredLessons.filter((l: any) => l.enabled).length, total: structuredLessons.length }) }}
           </div>
           <div class="text-[11px] mt-1" style="color: var(--ink-3);">
-            实时透明注入主脑 Prompt
+            {{ t('admin.evolution.lessonsSub') }}
           </div>
         </div>
 
         <div class="rounded-xl border p-3.5 shadow-xs" style="background-color: var(--surface-2); border-color: var(--line-1);">
           <div class="flex items-center space-x-1.5 mb-1 text-[11px] font-bold" style="color: var(--ink-2);">
             <Sparkles class="w-3.5 h-3.5 text-amber-400" />
-            <span>心法半衰期机制</span>
+            <span>{{ t('admin.evolution.halfLife') }}</span>
           </div>
-          <div class="text-sm font-bold text-amber-400">敏锐半衰期 7~14 天</div>
+          <div class="text-sm font-bold text-amber-400">{{ t('admin.evolution.halfLifeValue') }}</div>
           <div class="text-[11px] mt-1" style="color: var(--ink-3);">
-            动态评分快速淘汰过期或失效认知
+            {{ t('admin.evolution.halfLifeSub') }}
           </div>
         </div>
       </div>
@@ -414,11 +414,11 @@ onMounted(loadData)
           <div class="flex items-center space-x-2">
             <Brain class="w-4 h-4 text-emerald-400" />
             <h2 class="text-xs font-semibold" style="color: var(--ink-1);">
-              心法生命周期管理
+              {{ t('admin.evolution.lifecycle') }}
             </h2>
           </div>
           <span class="text-[11px]" style="color: var(--ink-3);">
-            每条心法均经宪法安全审查 · 支持单项热拔插启停与评分透视
+            {{ t('admin.evolution.lifecycleHint') }}
           </span>
         </div>
 
@@ -427,7 +427,7 @@ onMounted(loadData)
           <input
             v-model="newMemoryText"
             @keydown.enter="addMemoryItem"
-            placeholder="手动注入实战心法（如：【顺势回踩低吸】在 4H 多头通道中回踩短均线且量能缩减时挂单...）"
+            :placeholder="t('admin.evolution.addPlaceholder')"
             class="flex-1 rounded-lg px-3 py-2 text-xs outline-none border transition-colors"
             style="background-color: var(--surface-input); border-color: var(--line-1); color: var(--ink-1);"
           />
@@ -438,7 +438,7 @@ onMounted(loadData)
             style="background-color: var(--accent); color: var(--accent-ink);"
           >
             <Plus class="w-3.5 h-3.5" />
-            <span>{{ busy === 'add' ? '安全审查中...' : '提交审查并收录' }}</span>
+            <span>{{ busy === 'add' ? t('admin.evolution.auditing') : t('admin.evolution.submitReview') }}</span>
           </button>
         </div>
 
@@ -446,7 +446,7 @@ onMounted(loadData)
         <div class="space-y-2.5">
           <div v-if="loading" class="py-8 text-center text-xs" style="color: var(--ink-2);">
             <RefreshCw class="w-4 h-4 animate-spin inline mr-1.5" style="color: var(--accent);" />
-            正在拉取白盒心法知识库...
+            {{ t('admin.evolution.loadingLibrary') }}
           </div>
           <template v-else-if="structuredLessons.length">
             <div
@@ -470,7 +470,7 @@ onMounted(loadData)
                       color: item.is_baseline ? 'var(--info)' : 'var(--up)'
                     }"
                   >
-                    {{ item.is_baseline ? '👑 官方黄金基准' : '🧬 AI 实战自进化' }}
+                    {{ item.is_baseline ? t('admin.evolution.baselineBadge') : t('admin.evolution.aiBadge') }}
                   </span>
 
                   <span class="text-[11px] px-1.5 py-0.5 rounded-[3px] border" style="background-color: var(--surface-3); border-color: var(--line-1); color: var(--ink-2);">
@@ -478,7 +478,7 @@ onMounted(loadData)
                   </span>
 
                   <span class="text-[11px] px-1.5 py-0.5 rounded-[3px] border bg-emerald-500/10 border-emerald-500/25 text-emerald-400 font-bold">
-                    评分 {{ item.health_score }}
+                    {{ t('admin.evolution.score') }} {{ item.health_score }}
                   </span>
                 </div>
 
@@ -497,18 +497,18 @@ onMounted(loadData)
                       borderColor: 'var(--line-1)',
                       color: 'var(--ink-3)',
                     }"
-                    :title="item.enabled ? '点击停用本条心法' : '点击激活本条心法'"
+                    :title="item.enabled ? t('admin.evolution.disableTitle') : t('admin.evolution.enableTitle')"
                   >
                     <ToggleRight v-if="item.enabled" class="w-3.5 h-3.5" />
                     <ToggleLeft v-else class="w-3.5 h-3.5" />
-                    <span>{{ item.enabled ? '生效中' : '已休眠' }}</span>
+                    <span>{{ item.enabled ? t('admin.evolution.statusOn') : t('admin.evolution.statusOff') }}</span>
                   </button>
 
                   <!-- Delete -->
                   <button
                     @click="deleteMemoryItem(idx, item.id)"
                     class="p-1 rounded hover:bg-rose-500/20 text-rose-400 opacity-60 hover:opacity-100 transition-opacity cursor-pointer"
-                    title="移除该心法"
+                    :title="t('admin.evolution.removeTitle')"
                   >
                     <Trash2 class="w-3.5 h-3.5" />
                   </button>
@@ -525,16 +525,16 @@ onMounted(loadData)
 
               <!-- Footer Audit Line -->
               <div class="flex items-center justify-between text-[11px] pt-1 border-t" style="border-color: var(--line-1); color: var(--ink-3);">
-                <span>收录时间: {{ fmtDateTime(item.created_at) }} · 支持样本量: {{ item.sample_size || 10 }} 笔</span>
+                <span>{{ t('admin.evolution.createdAt') }} {{ fmtDateTime(item.created_at) }} {{ t('admin.evolution.sampleSupport') }} {{ item.sample_size || 10 }} {{ t('admin.evolution.sampleUnit') }}</span>
                 <span class="text-emerald-500 flex items-center space-x-1">
                   <ShieldCheck class="w-3 h-3" />
-                  <span>宪法安全审查: {{ item.shield_status || 'PASSED' }}</span>
+                  <span>{{ t('admin.evolution.shieldAudit') }} {{ item.shield_status || 'PASSED' }}</span>
                 </span>
               </div>
             </div>
           </template>
           <div v-else class="py-8 text-center text-xs border rounded-lg border-dashed" style="border-color: var(--line-1); color: var(--ink-3);">
-            暂无自进化心法记忆，可点击右上角「回滚至黄金基准」恢复核心实战心法
+            {{ t('admin.evolution.emptyLessons') }}
           </div>
         </div>
       </div>
@@ -546,10 +546,10 @@ onMounted(loadData)
         <div class="flex items-center justify-between pb-3 border-b" style="border-color: var(--line-1);">
           <div>
             <h2 class="text-sm font-bold" style="color: var(--ink-1);">
-              {{ activeTab === 'evolution_system' ? '自进化复盘官 System 提示词模版' : '自进化战绩流水 User 提示词模版' }}
+              {{ activeTab === 'evolution_system' ? t('admin.evolution.systemTitle') : t('admin.evolution.userTitle') }}
             </h2>
             <p class="text-xs mt-0.5" style="color: var(--ink-2);">
-              {{ activeTab === 'evolution_system' ? '定义复盘官的角色定位、归因逻辑与心法沉淀标准' : '配置每 6 小时自动组装实战对账单与动力学快照证据的模版语法' }}
+              {{ activeTab === 'evolution_system' ? t('admin.evolution.systemDesc') : t('admin.evolution.userDesc') }}
             </p>
           </div>
           <button
@@ -560,7 +560,7 @@ onMounted(loadData)
             style="background-color: var(--accent); color: var(--accent-ink);"
           >
             <Save class="w-3.5 h-3.5" />
-            <span>{{ busy === 'save' ? '保存中...' : '保存模版' }}</span>
+            <span>{{ busy === 'save' ? t('admin.evolution.saving') : t('admin.evolution.saveTemplate') }}</span>
           </button>
         </div>
 
@@ -576,7 +576,7 @@ onMounted(loadData)
               <span class="text-xs font-bold" style="color: var(--ink-1);">{{ mod.title }}</span>
               <label class="flex items-center space-x-1.5 text-xs cursor-pointer">
                 <input v-model="mod.enabled" type="checkbox" class="accent-blue-500 w-3.5 h-3.5" :disabled="!auth.isSuperadmin" />
-                <span :class="mod.enabled ? 'text-emerald-500 font-bold' : 'text-zinc-500'">{{ mod.enabled ? '启用模块' : '已停用' }}</span>
+                <span :class="mod.enabled ? 'text-emerald-500 font-bold' : 'text-zinc-500'">{{ mod.enabled ? t('admin.evolution.moduleOn') : t('admin.evolution.moduleOff') }}</span>
               </label>
             </div>
             <textarea

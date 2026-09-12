@@ -37,10 +37,10 @@ const showVarRibbon = ref(false)
 const activeEditingIdx = ref<number>(0)
 const previewMode = ref<'rendered' | 'template'>('rendered')
 
-const pipelines = [
-  { id: 'trading_system', label: '交易 System', desc: '发给交易主脑的规则与决策纪律' },
-  { id: 'trading_user', label: '交易 User', desc: '每轮拼装实时行情、动力学与决策任务' },
-] as const
+const pipelines = computed(() => [
+  { id: 'trading_system', label: t('admin.promptStudio.pipelines.tradingSystem'), desc: t('admin.promptStudio.pipelines.tradingSystemDesc') },
+  { id: 'trading_user', label: t('admin.promptStudio.pipelines.tradingUser'), desc: t('admin.promptStudio.pipelines.tradingUserDesc') },
+])
 
 const selectedProfile = computed(() => (lib.value?.profiles || []).find((p: any) => p.id === selectedProfileId.value) || null)
 const templateVariables = computed(() => lib.value?.template_variables || [])
@@ -131,7 +131,7 @@ function insertVarIntoActiveModule(key: string) {
 async function saveProfile() {
   try {
     const pipelinesMap: Record<string, any[]> = {}
-    for (const p of pipelines) {
+    for (const p of pipelines.value) {
       pipelinesMap[p.id] = p.id === activePipeline.value
         ? workingModules.value
         : JSON.parse(JSON.stringify(selectedProfile.value.pipeline_views?.[p.id] || [])).map((m: any) => ({ ...m, locked: false }))
@@ -146,7 +146,7 @@ async function saveProfile() {
         pipelines: pipelinesMap,
       }),
     })
-    toast.ok(`方案「${selectedProfile.value.name}」· ${pipelines.find(p => p.id === activePipeline.value)?.label} 模块布局已保存，下一轮推演自动生效`)
+    toast.ok(`方案「${selectedProfile.value.name}」· ${pipelines.value.find(p => p.id === activePipeline.value)?.label} 模块布局已保存，下一轮推演自动生效`)
     dirty.value = false
     await loadLib()
   } catch (e: any) {
@@ -344,14 +344,14 @@ onMounted(loadLib)
 
 <template>
 
-    <PageHeader :title="t('nav.admin.prompts')" :description="t('admin.promptDesc')" />
+    <PageHeader :title="t('nav.admin.prompts')" :description="t('admin.promptStudio.pageDesc')" />
   <div class="space-y-4 text-xs">
     <!-- Header Summary & Plaza Gateway -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-1">
       <div class="flex items-center space-x-2">
         <Sparkles class="w-4 h-4 text-blue-400 shrink-0" />
         <p class="text-xs text-[var(--ink-2)] font-sans">
-          核心交易消息管线自由编排，支持标准语义变量插槽。右侧仅对照模板拼接文本与源码，不代表实时发送消息。
+          {{ t('admin.promptStudio.intro.note') }}
         </p>
       </div>
       <div class="flex items-center space-x-1.5 shrink-0">
@@ -359,37 +359,37 @@ onMounted(loadLib)
           @click="showVarRibbon = !showVarRibbon"
           class="flex items-center space-x-1 px-2.5 py-1.5 rounded-lg border text-xs transition-all cursor-pointer shadow-xs"
           :style="showVarRibbon ? { backgroundColor: 'var(--accent-bg)', borderColor: 'var(--accent-line)', color: 'var(--accent)', fontWeight: 'bold' } : { backgroundColor: 'var(--surface-1)', borderColor: 'var(--line-1)', color: 'var(--ink-2)' }"
-          title="展开/收起快捷变量标签条"
+          :title="t('admin.promptStudio.toolbar.varRibbonTitle')"
         >
           <Layers class="w-3.5 h-3.5" />
-          <span>{{ showVarRibbon ? '收起变量条' : '插入变量' }}</span>
+          <span>{{ showVarRibbon ? t('admin.promptStudio.toolbar.collapseRibbon') : t('admin.promptStudio.toolbar.insertVars') }}</span>
         </button>
         <button
           @click="variableGuideVisible = true"
           class="flex items-center space-x-1 px-2.5 py-1.5 rounded-lg border text-xs transition-all cursor-pointer shadow-xs"
           style="background-color: var(--surface-1); border-color: var(--line-1); color: var(--accent);"
-          title="查看所有可用数据插槽与变量字典"
+          :title="t('admin.promptStudio.toolbar.dictTitle')"
         >
           <BookOpen class="w-3.5 h-3.5" />
-          <span>变量字典</span>
+          <span>{{ t('admin.promptStudio.toolbar.dictionary') }}</span>
         </button>
         <button
           @click="importVisible = true"
           class="flex items-center space-x-1 px-2.5 py-1.5 rounded-lg border text-xs transition-all cursor-pointer shadow-xs"
           style="background-color: var(--surface-1); border-color: var(--line-1); color: var(--ink-1);"
-          title="从本地文件或文本导入策略方案"
+          :title="t('admin.promptStudio.toolbar.importTitle')"
         >
           <Upload class="w-3.5 h-3.5" />
-          <span>导入方案</span>
+          <span>{{ t('admin.promptStudio.toolbar.import') }}</span>
         </button>
         <button
           @click="exportProfile"
           class="flex items-center space-x-1 px-2.5 py-1.5 rounded-lg border text-xs transition-all cursor-pointer shadow-xs"
           style="background-color: var(--surface-1); border-color: var(--line-1); color: var(--ink-1);"
-          title="将当前方案导出为 JSON 策略包"
+          :title="t('admin.promptStudio.toolbar.exportTitle')"
         >
           <Download class="w-3.5 h-3.5" />
-          <span>导出策略</span>
+          <span>{{ t('admin.promptStudio.toolbar.export') }}</span>
         </button>
       </div>
     </div>
@@ -402,7 +402,7 @@ onMounted(loadLib)
     >
       <div class="flex items-center space-x-1.5 text-[11px] font-bold mr-1" style="color: var(--ink-2);">
         <Layers class="w-3.5 h-3.5" style="color: var(--accent);" />
-        <span>快捷变量插槽:</span>
+        <span>{{ t('admin.promptStudio.ribbon.title') }}</span>
       </div>
       <button
         v-for="v in templateVariables"
@@ -410,7 +410,7 @@ onMounted(loadLib)
         @click="insertVarIntoActiveModule(v.key)"
         class="flex items-center space-x-1 px-2 py-1 rounded-lg border text-[11px] transition-all cursor-pointer shadow-xs hover:border-[var(--accent)]"
         style="background-color: var(--surface-1); border-color: var(--line-1); color: var(--ink-1);"
-        :title="`${v.description}\n点击插入到正在编辑的模块 #${activeEditingIdx + 1}`"
+        :title="`${v.description}\n${t('admin.promptStudio.ribbon.clickToInsert', undefined, { n: activeEditingIdx + 1 })}`"
       >
         <span class="font-bold" style="color: var(--accent);">+</span>
         <span class="font-sans font-medium">{{ v.label }}</span>
@@ -420,14 +420,14 @@ onMounted(loadLib)
 
     <!-- Alert / Banner Message -->
     <!-- Loading State -->
-    <div v-if="loading" class="py-12 text-center text-xs" style="color: var(--ink-2);">正在加载提示词策略库...</div>
+    <div v-if="loading" class="py-12 text-center text-xs" style="color: var(--ink-2);">{{ t('admin.promptStudio.states.loading') }}</div>
 
     <!-- Main Workspace Grid -->
     <div v-else-if="lib" class="grid grid-cols-1 xl:grid-cols-[240px_minmax(0,1fr)_400px] gap-3.5 items-start">
       <!-- Left: Profile List -->
       <div class="rounded-xl border p-3 space-y-2 h-fit shadow-xs transition-colors" style="background-color: var(--surface-2); border-color: var(--line-1);">
         <div class="flex items-center justify-between px-1 pb-2 border-b" style="border-color: var(--line-1);">
-          <span class="text-[11px] font-bold uppercase tracking-wider" style="color: var(--ink-3);">策略方案列表</span>
+          <span class="text-[11px] font-bold uppercase tracking-wider" style="color: var(--ink-3);">{{ t('admin.promptStudio.profiles.title') }}</span>
           <button
             v-if="auth.isSuperadmin"
             @click="createProfile"
@@ -435,7 +435,7 @@ onMounted(loadLib)
             style="background-color: var(--accent); color: var(--accent-ink);"
           >
             <Plus class="w-3 h-3" />
-            <span>新建方案</span>
+            <span>{{ t('admin.promptStudio.profiles.create') }}</span>
           </button>
         </div>
         <div class="space-y-1.5 max-h-[calc(100vh-220px)] overflow-y-auto pr-0.5">
@@ -451,11 +451,11 @@ onMounted(loadLib)
             <div class="flex items-center justify-between">
               <span class="text-xs font-bold transition-colors" style="color: var(--ink-1);">{{ p.name }}</span>
               <span v-if="p.id === lib.active_profile_id" class="text-[11px] font-bold px-1.5 py-0.2 rounded border" style="background-color: var(--up-bg); color: var(--up); border-color: var(--up-line);">
-                当前生效
+                {{ t('admin.promptStudio.profiles.active') }}
               </span>
             </div>
             <div class="text-[11px] mt-1 line-clamp-1" style="color: var(--ink-2);">
-              {{ p.description || '无详细描述' }}
+              {{ p.description || t('admin.promptStudio.profiles.noDesc') }}
             </div>
           </button>
         </div>
@@ -479,7 +479,7 @@ onMounted(loadLib)
             </button>
           </div>
           <span class="text-[11px] font-bold" style="color: var(--ink-2);">
-            当前方案：<span style="color: var(--ink-1);">{{ selectedProfile?.name }}</span>
+            {{ t('admin.promptStudio.modules.currentProfile') }}<span style="color: var(--ink-1);">{{ selectedProfile?.name }}</span>
           </span>
         </div>
 
@@ -508,7 +508,7 @@ onMounted(loadLib)
                   :disabled="idx === 0"
                   class="p-1 rounded disabled:opacity-20 cursor-pointer transition-colors"
                   style="color: var(--ink-2);"
-                  title="上移模块"
+                  :title="t('admin.promptStudio.modules.moveUp')"
                 >
                   <ArrowUp class="w-3.5 h-3.5" />
                 </button>
@@ -517,7 +517,7 @@ onMounted(loadLib)
                   :disabled="idx === workingModules.length - 1"
                   class="p-1 rounded disabled:opacity-20 cursor-pointer transition-colors"
                   style="color: var(--ink-2);"
-                  title="下移模块"
+                  :title="t('admin.promptStudio.modules.moveDown')"
                 >
                   <ArrowDown class="w-3.5 h-3.5" />
                 </button>
@@ -525,7 +525,7 @@ onMounted(loadLib)
                   v-model="m.title"
                   class="bg-transparent border-b border-transparent focus:border-blue-500 text-xs font-bold outline-none flex-1 min-w-[120px] transition-colors"
                   style="color: var(--ink-1);"
-                  placeholder="模块标题"
+                  :placeholder="t('admin.promptStudio.modules.titlePlaceholder')"
                   @input="dirty = true"
                 />
               </div>
@@ -536,14 +536,14 @@ onMounted(loadLib)
                   @click.stop="duplicateModule(idx)"
                   class="p-1.5 rounded-lg cursor-pointer transition-colors"
                   style="color: var(--ink-2);"
-                  title="复制模块"
+                  :title="t('admin.promptStudio.modules.duplicate')"
                 >
                   <Copy class="w-3.5 h-3.5" />
                 </button>
                 <button
                   @click.stop="removeModule(idx)"
                   class="p-1.5 rounded-lg text-rose-400 hover:opacity-80 cursor-pointer transition-opacity"
-                  title="删除模块"
+                  :title="t('admin.promptStudio.modules.delete')"
                 >
                   <Trash2 class="w-3.5 h-3.5" />
                 </button>
@@ -551,7 +551,7 @@ onMounted(loadLib)
                   @click.stop="toggleModule(m)"
                   class="cursor-pointer transition-colors p-1"
                   :class="m.enabled ? 'text-emerald-500' : 'text-zinc-500'"
-                  :title="m.enabled ? '已启用该模块 (点击禁用)' : '已禁用该模块 (点击启用)'"
+                  :title="m.enabled ? t('admin.promptStudio.modules.enabledTip') : t('admin.promptStudio.modules.disabledTip')"
                 >
                   <ToggleRight v-if="m.enabled" class="w-5 h-5" />
                   <ToggleLeft v-else class="w-5 h-5" />
@@ -566,7 +566,7 @@ onMounted(loadLib)
               rows="5"
               class="w-full rounded-lg px-3 py-2 text-xs outline-none border resize-y leading-relaxed transition-colors select-text"
               style="background-color: var(--surface-input); border-color: var(--line-1); color: var(--ink-1);"
-              placeholder="编写该模块的提示词或插入 {{variable}} 数据插槽..."
+              :placeholder="t('admin.promptStudio.modules.contentPlaceholder')"
               @input="dirty = true"
             ></textarea>
           </div>
@@ -578,7 +578,7 @@ onMounted(loadLib)
             style="background-color: var(--surface-1); border-color: var(--line-2); color: var(--ink-2);"
           >
             <Plus class="w-4 h-4" style="color: var(--accent);" />
-            <span>新增自定义规则模块</span>
+            <span>{{ t('admin.promptStudio.modules.add') }}</span>
           </button>
         </div>
 
@@ -593,7 +593,7 @@ onMounted(loadLib)
               style="background-color: var(--accent); color: var(--accent-ink) !important;"
             >
               <Save class="w-4 h-4" style="color: #FFFFFF;" />
-              <span style="color: #FFFFFF;">保存当前方案{{ dirty ? ' *' : '' }}</span>
+              <span style="color: #FFFFFF;">{{ t('admin.promptStudio.modules.save') }}{{ dirty ? ' *' : '' }}</span>
             </button>
             <button
               v-if="selectedProfileId !== lib.active_profile_id && auth.isSuperadmin"
@@ -602,7 +602,7 @@ onMounted(loadLib)
               style="background-color: var(--up); color: #FFFFFF !important;"
             >
               <CheckCircle2 class="w-4 h-4" style="color: #FFFFFF;" />
-              <span style="color: #FFFFFF;">激活为实盘方案</span>
+              <span style="color: #FFFFFF;">{{ t('admin.promptStudio.modules.activate') }}</span>
             </button>
           </div>
 
@@ -614,7 +614,7 @@ onMounted(loadLib)
               style="background-color: var(--surface-1); border-color: var(--line-2); color: var(--ink-1);"
             >
               <Copy class="w-3.5 h-3.5" />
-              <span>复制副本</span>
+              <span>{{ t('admin.promptStudio.modules.duplicateProfile') }}</span>
             </button>
             <button
               @click="showHistory"
@@ -622,7 +622,7 @@ onMounted(loadLib)
               style="background-color: var(--surface-1); border-color: var(--line-2); color: var(--ink-1);"
             >
               <History class="w-3.5 h-3.5" />
-              <span>历史版本</span>
+              <span>{{ t('admin.promptStudio.modules.history') }}</span>
             </button>
             <button
               v-if="selectedProfileId !== lib.active_profile_id && auth.isSuperadmin"
@@ -631,7 +631,7 @@ onMounted(loadLib)
               style="background-color: var(--down-bg); border-color: var(--down-line); color: var(--down);"
             >
               <Trash2 class="w-3.5 h-3.5" />
-              <span>删除</span>
+              <span>{{ t('admin.promptStudio.modules.deleteProfile') }}</span>
             </button>
           </div>
         </div>
@@ -642,7 +642,7 @@ onMounted(loadLib)
         <div class="flex items-center justify-between pb-2 border-b" style="border-color: var(--line-1);">
           <div class="flex items-center space-x-2">
             <Eye class="w-4 h-4 text-cyan-400" />
-            <h3 class="text-xs font-bold uppercase tracking-wider" style="color: var(--ink-1);">模板组装预览</h3>
+            <h3 class="text-xs font-bold uppercase tracking-wider" style="color: var(--ink-1);">{{ t('admin.promptStudio.preview.title') }}</h3>
           </div>
           <div class="flex items-center space-x-1.5">
             <!-- Mode Switch -->
@@ -652,14 +652,14 @@ onMounted(loadLib)
                 class="px-2 py-0.5 rounded text-[11px] font-bold cursor-pointer transition-all"
                 :style="previewMode === 'rendered' ? { backgroundColor: 'var(--ink-1)', color: 'var(--surface-2)' } : { color: 'var(--ink-2)' }"
               >
-                拼接文本
+                {{ t('admin.promptStudio.preview.rendered') }}
               </button>
               <button
                 @click="previewMode = 'template'"
                 class="px-2 py-0.5 rounded text-[11px] font-bold cursor-pointer transition-all"
                 :style="previewMode === 'template' ? { backgroundColor: 'var(--ink-1)', color: 'var(--surface-2)' } : { color: 'var(--ink-2)' }"
               >
-                模板源码
+                {{ t('admin.promptStudio.preview.template') }}
               </button>
             </div>
             <button
@@ -667,15 +667,15 @@ onMounted(loadLib)
               class="px-2 py-1 rounded-lg border text-[11px] cursor-pointer transition-all shadow-xs"
               style="background-color: var(--surface-1); border-color: var(--line-2); color: var(--ink-1);"
             >
-              复制
+              {{ t('admin.promptStudio.preview.copy') }}
             </button>
           </div>
         </div>
         <div class="text-[11px] flex items-center justify-between" style="color: var(--ink-3);">
-          <span>{{ previewMode === 'rendered' ? '仅本地拼接，未代入实时数据；base合并以发送阶段为准' : '显示模块包含的原始模版语法与插槽' }}</span>
-          <span class="num font-bold" style="color: var(--accent);">{{ compiledPreview.length }} 字符</span>
+          <span>{{ previewMode === 'rendered' ? t('admin.promptStudio.preview.hintRendered') : t('admin.promptStudio.preview.hintTemplate') }}</span>
+          <span class="num font-bold" style="color: var(--accent);">{{ t('admin.promptStudio.preview.charCount', undefined, { n: compiledPreview.length }) }}</span>
         </div>
-        <pre class="border rounded-xl p-3 text-[11px] whitespace-pre-wrap leading-relaxed max-h-[calc(100vh-280px)] overflow-y-auto select-text" style="background-color: var(--surface-1); border-color: var(--line-1); color: var(--ink-1);">{{ compiledPreview || '（空）' }}</pre>
+        <pre class="border rounded-xl p-3 text-[11px] whitespace-pre-wrap leading-relaxed max-h-[calc(100vh-280px)] overflow-y-auto select-text" style="background-color: var(--surface-1); border-color: var(--line-1); color: var(--ink-1);">{{ compiledPreview || t('admin.promptStudio.preview.empty') }}</pre>
       </div>
     </div>
 
@@ -692,8 +692,8 @@ onMounted(loadLib)
               <BookOpen class="w-4 h-4" />
             </div>
             <div>
-              <h3 class="text-sm font-bold" style="color: var(--ink-1);">系统数据插槽与变量字典</h3>
-              <p class="text-[11px]" style="color: var(--ink-2);">可以在任意提示词模块中自由引用，系统推演时将自动替换为最新真实数据</p>
+              <h3 class="text-sm font-bold" style="color: var(--ink-1);">{{ t('admin.promptStudio.dictionary.title') }}</h3>
+              <p class="text-[11px]" style="color: var(--ink-2);">{{ t('admin.promptStudio.dictionary.desc') }}</p>
             </div>
           </div>
           <button @click="variableGuideVisible = false" class="cursor-pointer p-1" style="color: var(--ink-2);">
@@ -723,7 +723,7 @@ onMounted(loadLib)
                 class="btn-primary-text px-2.5 py-1 rounded-lg font-bold text-[11px] cursor-pointer shadow-xs hover:bg-blue-600 transition-colors"
                 style="background-color: var(--accent); color: var(--accent-ink) !important;"
               >
-                <span style="color: #FFFFFF;">插入到当前模块</span>
+                <span style="color: #FFFFFF;">{{ t('admin.promptStudio.dictionary.insert') }}</span>
               </button>
             </div>
             <p class="text-[11px] font-sans" style="color: var(--ink-2);">{{ v.description }}</p>
@@ -739,7 +739,7 @@ onMounted(loadLib)
             class="px-5 py-2 rounded-xl border text-xs cursor-pointer shadow-xs"
             style="background-color: var(--surface-1); border-color: var(--line-2); color: var(--ink-2);"
           >
-            关闭字典
+            {{ t('admin.promptStudio.dictionary.close') }}
           </button>
         </div>
       </div>
@@ -758,8 +758,8 @@ onMounted(loadLib)
               <Upload class="w-4 h-4" />
             </div>
             <div>
-              <h3 class="text-sm font-bold" style="color: var(--ink-1);">导入策略方案包</h3>
-              <p class="text-[11px]" style="color: var(--ink-2);">支持标准导出包 (v1~v4)、整库导出文件与裸方案对象三种 JSON 格式</p>
+              <h3 class="text-sm font-bold" style="color: var(--ink-1);">{{ t('admin.promptStudio.import.title') }}</h3>
+              <p class="text-[11px]" style="color: var(--ink-2);">{{ t('admin.promptStudio.import.desc') }}</p>
             </div>
           </div>
           <button @click="importVisible = false" class="cursor-pointer p-1" style="color: var(--ink-2);">
@@ -772,18 +772,18 @@ onMounted(loadLib)
         </div>
 
         <div>
-          <label class="block text-xs font-bold mb-1.5" style="color: var(--ink-1);">方式一：选择本地 .json 策略文件</label>
+          <label class="block text-xs font-bold mb-1.5" style="color: var(--ink-1);">{{ t('admin.promptStudio.import.methodOne') }}</label>
           <div class="flex items-center space-x-3">
             <label class="flex items-center space-x-2 px-3 py-2 rounded-xl border border-dashed text-xs cursor-pointer transition-all shadow-xs" style="background-color: var(--surface-1); border-color: var(--line-2); color: var(--accent);">
               <FileUp class="w-4 h-4" />
-              <span>选择策略文件 (.json)</span>
+              <span>{{ t('admin.promptStudio.import.chooseFile') }}</span>
               <input type="file" accept=".json" class="hidden" @change="handleFileSelect" />
             </label>
           </div>
         </div>
 
         <div>
-          <label class="block text-xs font-bold mb-1.5" style="color: var(--ink-1);">方式二：或直接粘贴策略 JSON 文本</label>
+          <label class="block text-xs font-bold mb-1.5" style="color: var(--ink-1);">{{ t('admin.promptStudio.import.methodTwo') }}</label>
           <textarea
             v-model="importRawJson"
             rows="6"
@@ -794,13 +794,13 @@ onMounted(loadLib)
         </div>
 
         <div>
-          <label class="block text-xs font-bold mb-1.5" style="color: var(--ink-1);">自定义导入方案名称（可选）</label>
+          <label class="block text-xs font-bold mb-1.5" style="color: var(--ink-1);">{{ t('admin.promptStudio.import.nameLabel') }}</label>
           <input
             v-model="importNameOverride"
             type="text"
             class="w-full border rounded-xl px-3 py-2 text-xs outline-none transition-colors"
             style="background-color: var(--surface-input); border-color: var(--line-1); color: var(--ink-1);"
-            placeholder="留空则自动采用策略包内部的原始名称"
+            :placeholder="t('admin.promptStudio.import.namePlaceholder')"
           />
         </div>
 
@@ -810,14 +810,14 @@ onMounted(loadLib)
             class="px-4 py-2 rounded-xl border text-xs cursor-pointer shadow-xs"
             style="background-color: var(--surface-1); border-color: var(--line-2); color: var(--ink-2);"
           >
-            取消
+            {{ t('admin.promptStudio.import.cancel') }}
           </button>
           <button
             @click="submitImport"
             class="px-5 py-2 rounded-xl font-bold text-xs cursor-pointer transition-all shadow-xs"
             style="background-color: var(--accent); color: var(--accent-ink);"
           >
-            确认导入并载入方案
+            {{ t('admin.promptStudio.import.confirm') }}
           </button>
         </div>
       </div>
@@ -831,12 +831,12 @@ onMounted(loadLib)
     >
       <div class="border rounded-2xl p-5 sm:p-6 w-full max-w-[560px] max-h-[85dvh] overflow-y-auto shadow-2xl transition-colors" style="background-color: var(--surface-2); border-color: var(--line-1);">
         <div class="flex items-center justify-between mb-4 pb-3 border-b" style="border-color: var(--line-1);">
-          <h3 class="text-sm font-bold" style="color: var(--ink-1);">版本历史 · {{ selectedProfile?.name }}</h3>
+          <h3 class="text-sm font-bold" style="color: var(--ink-1);">{{ t('admin.promptStudio.history.title') }} · {{ selectedProfile?.name }}</h3>
           <button @click="historyVisible = false" class="cursor-pointer text-xs p-1" style="color: var(--ink-2);">
             <X class="w-4 h-4" />
           </button>
         </div>
-        <div v-if="historyList.length === 0" class="text-xs py-8 text-center" style="color: var(--ink-2);">暂无历史版本</div>
+        <div v-if="historyList.length === 0" class="text-xs py-8 text-center" style="color: var(--ink-2);">{{ t('admin.promptStudio.history.empty') }}</div>
         <div
           v-for="h in historyList"
           :key="h.id || h.revision_id"
@@ -853,7 +853,7 @@ onMounted(loadLib)
             style="background-color: var(--surface-1); border-color: var(--line-2); color: var(--ink-1);"
           >
             <RotateCcw class="w-3 h-3" />
-            <span>回滚</span>
+            <span>{{ t('admin.promptStudio.history.rollback') }}</span>
           </button>
         </div>
       </div>

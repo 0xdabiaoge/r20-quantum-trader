@@ -10,6 +10,8 @@ export const enLedger = {
     best: 'Best trade',
     worst: 'Worst trade',
     avgHold: 'Avg hold',
+    fundingNet: 'Net funding',
+    fundingNetHint: 'Cumulative funding fee net, with income/expense breakdown',
     tipPf: 'Profit factor = gross win / gross loss; >1 = positive expectancy',
   },
   filters: {
@@ -77,6 +79,7 @@ export const enLedger = {
     degraded: 'Council skipped · single-model verdict',
   },
   venue: 'Executing venue (hidden when unlabeled legacy rows — never faked)',
+  fundingTag: 'Fund:',
   exportCsv: 'Export CSV',
   exported: 'Ledger exported',
   empty: 'No closed trades yet — the AI is waiting for its first worthy setup',

@@ -184,7 +184,7 @@ async function removeInstrument(item: any) {
 }
 
 async function loadPositions() {
-  snapshotState.value = '正在读取持仓与挂单…'
+  snapshotState.value = t('admin.security.loadingPositions')
   try {
     const d = await api('/api/v1/admin/okx/account-snapshot')
     snapshot.value = d
@@ -368,10 +368,10 @@ const gateExecDirty = computed(() => gateExec.value !== !!mx.value?.venues?.gate
 type VenueTone = 'up' | 'warn' | 'down'
 function venueStatus(venue: 'binance' | 'gate'): { text: string; tone: VenueTone } {
   const v = mx.value?.venues?.[venue]
-  if (!v) return { text: '状态未知', tone: 'warn' }
+  if (!v) return { text: t('admin.security.statusUnknown'), tone: 'warn' }
   return v.has_api_key
-    ? { text: v.execution_open ? '已配置 Key · 执行开闸' : '已配置 Key · 关闸中', tone: 'up' }
-    : { text: '免密公共行情', tone: 'warn' }
+    ? { text: v.execution_open ? t('admin.security.keyExecOpen') : t('admin.security.keyExecClosed'), tone: 'up' }
+    : { text: t('admin.security.publicMarket'), tone: 'warn' }
 }
 const binanceStatus = computed(() => venueStatus('binance'))
 const gateStatus = computed(() => venueStatus('gate'))
@@ -379,20 +379,20 @@ const gateStatus = computed(() => venueStatus('gate'))
 /** 资金档位文字 */
 const okxEnvText = computed(() => {
   const env = String(config.value?.editable?.okx_environment || '')
-  return env === 'live' ? 'LIVE 实盘' : env === 'demo' ? 'DEMO 模拟盘' : '未知'
+  return env === 'live' ? t('admin.security.envLive') : env === 'demo' ? t('admin.security.envDemoOkx') : t('admin.security.envUnknown')
 })
 function envTextOf(venue: 'binance' | 'gate', sandboxLabel: string) {
-  if (!mx.value?.venues?.[venue]) return '未知'
-  return mxTestnet.value[venue] ? sandboxLabel : 'LIVE 实盘'
+  if (!mx.value?.venues?.[venue]) return t('admin.security.envUnknown')
+  return mxTestnet.value[venue] ? sandboxLabel : t('admin.security.envLive')
 }
-const binanceEnvText = computed(() => envTextOf('binance', 'DEMO 沙盒'))
-const gateEnvText = computed(() => envTextOf('gate', 'SANDBOX 沙盒'))
+const binanceEnvText = computed(() => envTextOf('binance', t('admin.security.envDemoBinance')))
+const gateEnvText = computed(() => envTextOf('gate', t('admin.security.envDemoGate')))
 
-const TABS: Array<{ key: TabKey; label: string }> = [
-  { key: 'venues', label: '交易所与路由' },
-  { key: 'pool', label: '交易标的池' },
-  { key: 'emergency', label: '应急风控与持仓' },
-]
+const TABS = computed<Array<{ key: TabKey; label: string }>>(() => [
+  { key: 'venues', label: t('admin.security.tabVenues') },
+  { key: 'pool', label: t('admin.security.tabPool') },
+  { key: 'emergency', label: t('admin.security.tabEmergency') },
+])
 
 function envBadge(env: string) {
   return (env || 'demo').toUpperCase()
@@ -403,34 +403,34 @@ onMounted(() => { loadAll(); loadMx() })
 
 <template>
   <div class="space-y-4 text-xs">
-    <PageHeader :title="t('nav.admin.security')" description="三所凭证、撮合路由与标的池配置">
+    <PageHeader :title="t('nav.admin.security')" :description="t('admin.security.desc')">
       <template #actions>
         <span class="chip flex items-center gap-1.5">
-          <span>路由</span>
+          <span>{{ t('admin.security.chipRouting') }}</span>
           <b class="num" style="color: var(--accent);">{{ routingMode.toUpperCase() }}</b>
           <span class="text-[10px] opacity-70">·</span>
-          <span>首选</span>
+          <span>{{ t('admin.security.chipPreferred') }}</span>
           <b class="num" style="color: var(--accent);">{{ preferredVenue.toUpperCase() }}</b>
           <span class="text-[10px] opacity-70">·</span>
-          <span>环境</span>
+          <span>{{ t('admin.security.chipEnv') }}</span>
           <b class="num" :style="{ color: runtime?.environment === 'live' ? 'var(--down)' : 'var(--up)' }">{{ envBadge(runtime?.environment) }}</b>
         </span>
       </template>
     </PageHeader>
 
-    <div v-if="loading" class="py-12 text-center" style="color: var(--ink-2);">正在同步配置…</div>
+    <div v-if="loading" class="py-12 text-center" style="color: var(--ink-2);">{{ t('admin.security.syncing') }}</div>
 
     <template v-else-if="config">
       <!-- 状态总览条 -->
       <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
         <div class="card card-pad flex flex-col justify-between" style="background-color: var(--surface-1);">
           <div class="flex items-center justify-between text-[11px]" style="color: var(--ink-3);">
-            <span>OKX · V5 接口</span>
+            <span>{{ t('admin.security.okxApi') }}</span>
             <span class="dot" :class="okxLinked ? 'dot-up' : 'dot-down'" />
           </div>
           <div class="mt-1 flex items-baseline justify-between">
             <b class="text-xs font-bold" :style="{ color: okxLinked ? 'var(--up)' : 'var(--down)' }">
-              {{ okxLinked ? '已接入 (READY)' : '未完整配置' }}
+              {{ okxLinked ? t('admin.security.okxLinked') : t('admin.security.okxUnconfigured') }}
             </b>
             <span class="num text-[10px]" style="color: var(--ink-3);">{{ envBadge(runtime?.environment) }}</span>
           </div>
@@ -443,7 +443,7 @@ onMounted(() => { loadAll(); loadMx() })
           </div>
           <div class="mt-1 flex items-baseline justify-between">
             <b class="text-xs font-bold" :style="{ color: mx?.venues?.binance?.has_api_key ? 'var(--up)' : 'var(--warn)' }">
-              {{ mx?.venues?.binance?.has_api_key ? '凭证已配置' : '免密公共行情' }}
+              {{ mx?.venues?.binance?.has_api_key ? t('admin.security.binanceKeyed') : t('admin.security.publicMarket') }}
             </b>
             <span class="num text-[10px]" style="color: var(--ink-3);">{{ mxTestnet.binance ? 'DEMO' : 'LIVE' }}</span>
           </div>
@@ -451,12 +451,12 @@ onMounted(() => { loadAll(); loadMx() })
 
         <div class="card card-pad flex flex-col justify-between" style="background-color: var(--surface-1);">
           <div class="flex items-center justify-between text-[11px]" style="color: var(--ink-3);">
-            <span>Gate.io · 永续</span>
+            <span>{{ t('admin.security.gatePerp') }}</span>
             <span class="dot" :class="mx?.venues?.gate?.has_api_key ? 'dot-up' : 'dot-warn'" />
           </div>
           <div class="mt-1 flex items-baseline justify-between">
             <b class="text-xs font-bold" :style="{ color: mx?.venues?.gate?.has_api_key ? 'var(--up)' : 'var(--warn)' }">
-              {{ mx?.venues?.gate?.has_api_key ? (mx?.venues?.gate?.execution_open ? '已开闸实盘' : '已配·关闸中') : '免密公共行情' }}
+              {{ mx?.venues?.gate?.has_api_key ? (mx?.venues?.gate?.execution_open ? t('admin.security.gateOpenLive') : t('admin.security.gateClosed')) : t('admin.security.publicMarket') }}
             </b>
             <span class="num text-[10px]" style="color: var(--ink-3);">{{ mxTestnet.gate ? 'TESTNET' : 'LIVE' }}</span>
           </div>
@@ -464,12 +464,12 @@ onMounted(() => { loadAll(); loadMx() })
 
         <div class="card card-pad flex flex-col justify-between" style="background-color: var(--surface-1);">
           <div class="flex items-center justify-between text-[11px]" style="color: var(--ink-3);">
-            <span>活跃交易标的池</span>
+            <span>{{ t('admin.security.activePool') }}</span>
             <Layers class="h-3 w-3" style="color: var(--accent);" />
           </div>
           <div class="mt-1 flex items-baseline justify-between">
-            <b class="num text-xs font-bold" style="color: var(--ink-1);">{{ instruments.length }}/{{ instLimits.maximum }} 标的</b>
-            <span class="text-[10px] font-medium" style="color: var(--ink-2);">USDT 永续</span>
+            <b class="num text-xs font-bold" style="color: var(--ink-1);">{{ t('admin.security.poolCount', undefined, { count: instruments.length, max: instLimits.maximum }) }}</b>
+            <span class="text-[10px] font-medium" style="color: var(--ink-2);">{{ t('admin.security.usdtPerp') }}</span>
           </div>
         </div>
       </div>
@@ -487,216 +487,216 @@ onMounted(() => { loadAll(); loadMx() })
       <!-- ============ 页签 1：交易所与路由 ============ -->
       <div v-if="activeTab === 'venues'" class="space-y-4">
         <!-- 路由主策略 -->
-        <SettingsSection title="撮合路由策略" description="配置 AI 信号的默认撮合交易所。">
+        <SettingsSection :title="t('admin.security.routingTitle')" :description="t('admin.security.routingDesc')">
           <template #actions>
-            <button class="btn btn-primary" :disabled="savingMx" @click="saveRouting"><Save class="h-3.5 w-3.5" /> {{ savingMx ? '保存中…' : '保存路由策略' }}</button>
+            <button class="btn btn-primary" :disabled="savingMx" @click="saveRouting"><Save class="h-3.5 w-3.5" /> {{ savingMx ? t('admin.security.saving') : t('admin.security.saveRouting') }}</button>
           </template>
           <div class="space-y-3 rounded-lg border p-3.5" style="background-color: var(--surface-1); border-color: var(--line-1);">
-            <div class="text-[10px] font-semibold" style="color: var(--ink-2);">路由模式（A/B/C 三档）</div>
+            <div class="text-[10px] font-semibold" style="color: var(--ink-2);">{{ t('admin.security.routingModeLabel') }}</div>
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <label class="flex items-center gap-2 p-2.5 rounded-md border cursor-pointer transition-colors" :style="routingMode === 'balanced' ? { borderColor: 'var(--accent)', backgroundColor: 'var(--surface-2)' } : { borderColor: 'var(--line-1)' }">
                 <input v-model="routingMode" type="radio" value="balanced" class="accent-[var(--accent)]" />
                 <div>
-                  <div class="text-xs font-bold" style="color: var(--ink-1);">A · 均衡轮换</div>
-                  <div class="text-[10px]" style="color: var(--ink-3);">成本带内多所哈希轮动，避免单所扎堆（基线）</div>
+                  <div class="text-xs font-bold" style="color: var(--ink-1);">{{ t('admin.security.modeA') }}</div>
+                  <div class="text-[10px]" style="color: var(--ink-3);">{{ t('admin.security.modeADesc') }}</div>
                 </div>
               </label>
               <label class="flex items-center gap-2 p-2.5 rounded-md border cursor-pointer transition-colors" :style="routingMode === 'auto' ? { borderColor: 'var(--accent)', backgroundColor: 'var(--surface-2)' } : { borderColor: 'var(--line-1)' }">
                 <input v-model="routingMode" type="radio" value="auto" class="accent-[var(--accent)]" />
                 <div>
-                  <div class="text-xs font-bold" style="color: var(--ink-1);">B · 最优执行</div>
-                  <div class="text-[10px]" style="color: var(--ink-3);">纯评分 + 滞回：比深度、双腿费率与返佣</div>
+                  <div class="text-xs font-bold" style="color: var(--ink-1);">{{ t('admin.security.modeB') }}</div>
+                  <div class="text-[10px]" style="color: var(--ink-3);">{{ t('admin.security.modeBDesc') }}</div>
                 </div>
               </label>
               <label class="flex items-center gap-2 p-2.5 rounded-md border cursor-pointer transition-colors" :style="routingMode === 'split' ? { borderColor: 'var(--accent)', backgroundColor: 'var(--surface-2)' } : { borderColor: 'var(--line-1)' }">
                 <input v-model="routingMode" type="radio" value="split" class="accent-[var(--accent)]" />
                 <div>
-                  <div class="text-xs font-bold" style="color: var(--ink-1);">C · 资金拆分</div>
-                  <div class="text-[10px]" style="color: var(--ink-3);">跨所拆单方案随决策证据落盘；逐片执行待名义额口径统一</div>
+                  <div class="text-xs font-bold" style="color: var(--ink-1);">{{ t('admin.security.modeC') }}</div>
+                  <div class="text-[10px]" style="color: var(--ink-3);">{{ t('admin.security.modeCDesc') }}</div>
                 </div>
               </label>
             </div>
-            <div class="text-[10px] font-semibold pt-1" style="color: var(--ink-2);">手选优先（覆盖路由模式，仅指定所参与）</div>
+            <div class="text-[10px] font-semibold pt-1" style="color: var(--ink-2);">{{ t('admin.security.manualLabel') }}</div>
             <div class="grid grid-cols-1 sm:grid-cols-4 gap-2">
               <label class="flex items-center gap-2 p-2.5 rounded-md border cursor-pointer transition-colors" :style="preferredVenue === 'auto' ? { borderColor: 'var(--accent)', backgroundColor: 'var(--surface-2)' } : { borderColor: 'var(--line-1)' }">
                 <input v-model="preferredVenue" type="radio" value="auto" class="accent-[var(--accent)]" />
                 <div>
-                  <div class="text-xs font-bold" style="color: var(--ink-1);">不手选</div>
-                  <div class="text-[10px]" style="color: var(--ink-3);">按上方路由模式自动分发</div>
+                  <div class="text-xs font-bold" style="color: var(--ink-1);">{{ t('admin.security.noManual') }}</div>
+                  <div class="text-[10px]" style="color: var(--ink-3);">{{ t('admin.security.noManualDesc') }}</div>
                 </div>
               </label>
               <label class="flex items-center gap-2 p-2.5 rounded-md border cursor-pointer transition-colors" :style="preferredVenue === 'okx' ? { borderColor: 'var(--accent)', backgroundColor: 'var(--surface-2)' } : { borderColor: 'var(--line-1)' }">
                 <input v-model="preferredVenue" type="radio" value="okx" class="accent-[var(--accent)]" />
                 <div>
-                  <div class="text-xs font-bold" style="color: var(--ink-1);">锁定 OKX</div>
-                  <div class="text-[10px]" style="color: var(--ink-3);">仅 OKX 参与评估</div>
+                  <div class="text-xs font-bold" style="color: var(--ink-1);">{{ t('admin.security.lockOkx') }}</div>
+                  <div class="text-[10px]" style="color: var(--ink-3);">{{ t('admin.security.lockOkxDesc') }}</div>
                 </div>
               </label>
               <label class="flex items-center gap-2 p-2.5 rounded-md border cursor-pointer transition-colors" :style="preferredVenue === 'binance' ? { borderColor: 'var(--accent)', backgroundColor: 'var(--surface-2)' } : { borderColor: 'var(--line-1)' }">
                 <input v-model="preferredVenue" type="radio" value="binance" class="accent-[var(--accent)]" />
                 <div>
-                  <div class="text-xs font-bold" style="color: var(--ink-1);">锁定 Binance</div>
-                  <div class="text-[10px]" style="color: var(--ink-3);">仅币安 USDT-M 参与评估</div>
+                  <div class="text-xs font-bold" style="color: var(--ink-1);">{{ t('admin.security.lockBinance') }}</div>
+                  <div class="text-[10px]" style="color: var(--ink-3);">{{ t('admin.security.lockBinanceDesc') }}</div>
                 </div>
               </label>
               <label class="flex items-center gap-2 p-2.5 rounded-md border cursor-pointer transition-colors" :style="preferredVenue === 'gate' ? { borderColor: 'var(--accent)', backgroundColor: 'var(--surface-2)' } : { borderColor: 'var(--line-1)' }">
                 <input v-model="preferredVenue" type="radio" value="gate" class="accent-[var(--accent)]" />
                 <div>
-                  <div class="text-xs font-bold" style="color: var(--ink-1);">锁定 Gate</div>
-                  <div class="text-[10px]" style="color: var(--ink-3);">仅 Gate USDT 永续参与评估</div>
+                  <div class="text-xs font-bold" style="color: var(--ink-1);">{{ t('admin.security.lockGate') }}</div>
+                  <div class="text-[10px]" style="color: var(--ink-3);">{{ t('admin.security.lockGateDesc') }}</div>
                 </div>
               </label>
             </div>
             <p class="text-[11px] leading-relaxed" style="color: var(--ink-3);">
-              当前生效：<b class="num" style="color: var(--accent);">{{ routingMode.toUpperCase() }}</b>
-              <template v-if="preferredVenue !== 'auto'"> + 手选 <b class="num" style="color: var(--accent);">{{ preferredVenue.toUpperCase() }}</b></template>。
-              未配置或未开闸的所自动退出候选。
+              {{ t('admin.security.currentEffective') }}<b class="num" style="color: var(--accent);">{{ routingMode.toUpperCase() }}</b>
+              <template v-if="preferredVenue !== 'auto'"> {{ t('admin.security.manualTag') }} <b class="num" style="color: var(--accent);">{{ preferredVenue.toUpperCase() }}</b></template>{{ t('admin.security.period') }}
+              {{ t('admin.security.unconfiguredNote') }}
             </p>
           </div>
         </SettingsSection>
 
         <!-- 三所凭证卡 -->
-        <SettingsSection title="三所接入凭证与资金档位" description="三所独立凭证加密存储与测试网档位配置。">
+        <SettingsSection :title="t('admin.security.credsTitle')" :description="t('admin.security.credsDesc')">
           <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
             <!-- 1. OKX -->
             <VenueCredentialCard
-              name="OKX · 欧易" api-label="V5 REST 直签"
-              :status-text="okxLinked ? '已接入 READY' : '未就绪'" :tone="okxLinked ? 'up' : 'down'"
-              :env-text="okxEnvText" env-label="资金环境"
+              :name="t('admin.security.okxName')" :api-label="t('admin.security.okxApiLabel')"
+              :status-text="okxLinked ? t('admin.security.okxReady') : t('admin.security.okxNotReady')" :tone="okxLinked ? 'up' : 'down'"
+              :env-text="okxEnvText" :env-label="t('admin.security.fundEnv')"
             >
               <template #env>
-                <label class="block text-[10px] mb-1" style="color: var(--ink-2);">资金环境档位</label>
+                <label class="block text-[10px] mb-1" style="color: var(--ink-2);">{{ t('admin.security.envTier') }}</label>
                 <select v-model="config.editable.okx_environment" class="input w-full text-xs">
-                  <option value="demo">模拟盘 (DEMO)</option>
-                  <option value="live">实盘 (LIVE)</option>
+                  <option value="demo">{{ t('admin.security.optDemo') }}</option>
+                  <option value="live">{{ t('admin.security.optLive') }}</option>
                 </select>
               </template>
               <div class="space-y-1.5 pt-1">
-                <div class="text-[10px] font-semibold" style="color: var(--ink-2);">实盘 (LIVE) 三件套</div>
-                <input v-model="keys.live_key" type="password" placeholder="API Key（留空不改）" class="input w-full text-xs" />
+                <div class="text-[10px] font-semibold" style="color: var(--ink-2);">{{ t('admin.security.liveTrio') }}</div>
+                <input v-model="keys.live_key" type="password" :placeholder="t('admin.security.apiKeyKeep')" class="input w-full text-xs" />
                 <input v-model="keys.live_secret" type="password" placeholder="Secret Key" class="input w-full text-xs" />
                 <input v-model="keys.live_pass" type="password" placeholder="Passphrase" class="input w-full text-xs" />
               </div>
               <div class="space-y-1.5 pt-1">
-                <div class="text-[10px] font-semibold" style="color: var(--ink-2);">模拟盘 (DEMO) 三件套</div>
-                <input v-model="keys.demo_key" type="password" placeholder="API Key（留空不改）" class="input w-full text-xs" />
+                <div class="text-[10px] font-semibold" style="color: var(--ink-2);">{{ t('admin.security.demoTrio') }}</div>
+                <input v-model="keys.demo_key" type="password" :placeholder="t('admin.security.apiKeyKeep')" class="input w-full text-xs" />
                 <input v-model="keys.demo_secret" type="password" placeholder="Secret Key" class="input w-full text-xs" />
                 <input v-model="keys.demo_pass" type="password" placeholder="Passphrase" class="input w-full text-xs" />
               </div>
               <template #extra>
                 <p class="text-[10px] leading-relaxed pt-1" style="color: var(--ink-3);">
-                  切换 LIVE 需二次确认。
+                  {{ t('admin.security.liveConfirmNote') }}
                 </p>
               </template>
               <template #probe>
-                <button class="btn btn-quiet btn-sm" :disabled="probingVenue === 'okx'" @click="probeVenue('okx')"><RefreshCw class="h-3 w-3" :class="probingVenue === 'okx' ? 'animate-spin' : ''" /> {{ probingVenue === 'okx' ? '检测中…' : '检测' }}</button>
+                <button class="btn btn-quiet btn-sm" :disabled="probingVenue === 'okx'" @click="probeVenue('okx')"><RefreshCw class="h-3 w-3" :class="probingVenue === 'okx' ? 'animate-spin' : ''" /> {{ probingVenue === 'okx' ? t('admin.security.probing') : t('admin.security.detect') }}</button>
               </template>
               <template #save>
-                <button class="btn btn-primary btn-sm" :disabled="savingOkx" @click="saveEnvironment"><Save class="h-3 w-3" /> {{ savingOkx ? '保存中…' : '保存 OKX' }}</button>
+                <button class="btn btn-primary btn-sm" :disabled="savingOkx" @click="saveEnvironment"><Save class="h-3 w-3" /> {{ savingOkx ? t('admin.security.saving') : t('admin.security.saveOkx') }}</button>
               </template>
             </VenueCredentialCard>
 
             <!-- 2. Binance -->
             <VenueCredentialCard
-              name="Binance · 币安" api-label="USDT-M 永续合约"
+              :name="t('admin.security.binanceName')" :api-label="t('admin.security.binanceApiLabel')"
               :status-text="binanceStatus.text" :tone="binanceStatus.tone"
-              :env-text="binanceEnvText" env-label="资金环境"
+              :env-text="binanceEnvText" :env-label="t('admin.security.fundEnv')"
             >
               <template #env>
-                <label class="block text-[10px] mb-1" style="color: var(--ink-2);">端点网络档位</label>
+                <label class="block text-[10px] mb-1" style="color: var(--ink-2);">{{ t('admin.security.endpointTier') }}</label>
                 <label class="flex items-center gap-1.5 text-[11px] cursor-pointer" style="color: var(--ink-2);">
                   <input v-model="mxTestnet.binance" type="checkbox" class="accent-[var(--accent)]" />
-                  使用官方 Demo 沙盒域 (demo-fapi)
+                  {{ t('admin.security.binanceDemoDomain') }}
                 </label>
               </template>
               <div class="space-y-1.5 pt-1">
-                <div class="text-[10px] font-semibold" style="color: var(--ink-2);">实盘 / 沙盒执行凭证（可选）</div>
-                <input v-model="mxForm.binance_api_key" type="text" placeholder="API Key（留空不改）" class="input w-full text-xs" />
+                <div class="text-[10px] font-semibold" style="color: var(--ink-2);">{{ t('admin.security.binanceCredLabel') }}</div>
+                <input v-model="mxForm.binance_api_key" type="text" :placeholder="t('admin.security.apiKeyKeep')" class="input w-full text-xs" />
                 <input v-model="mxForm.binance_secret_key" type="password" placeholder="API Secret" class="input w-full text-xs" />
               </div>
               <template #extra>
                 <p class="text-[10px] leading-relaxed pt-1" style="color: var(--ink-3);">
-                  免密即可读取公共行情；配置密钥后支持账户与执行。
+                  {{ t('admin.security.binanceExtra') }}
                 </p>
               </template>
               <template #probe>
-                <button class="btn btn-quiet btn-sm" :disabled="probingVenue !== '' && probingVenue !== 'binance'" @click="probeVenue('binance')"><RefreshCw class="h-3 w-3" /> 检测</button>
+                <button class="btn btn-quiet btn-sm" :disabled="probingVenue !== '' && probingVenue !== 'binance'" @click="probeVenue('binance')"><RefreshCw class="h-3 w-3" /> {{ t('admin.security.detect') }}</button>
               </template>
               <template #save>
-                <button class="btn btn-primary btn-sm" :disabled="savingVenue !== ''" @click="saveVenue('binance')"><Save class="h-3 w-3" /> {{ savingVenue === 'binance' ? '保存中…' : '保存 Binance' }}</button>
+                <button class="btn btn-primary btn-sm" :disabled="savingVenue !== ''" @click="saveVenue('binance')"><Save class="h-3 w-3" /> {{ savingVenue === 'binance' ? t('admin.security.saving') : t('admin.security.saveBinance') }}</button>
               </template>
             </VenueCredentialCard>
 
             <!-- 3. Gate -->
             <VenueCredentialCard
-              name="Gate.io · 芝麻" api-label="V4 USDT 永续合约"
+              :name="t('admin.security.gateName')" :api-label="t('admin.security.gateApiLabel')"
               :status-text="gateStatus.text" :tone="gateStatus.tone"
-              :env-text="gateEnvText" env-label="资金环境"
+              :env-text="gateEnvText" :env-label="t('admin.security.fundEnv')"
             >
               <template #env>
-                <label class="block text-[10px] mb-1" style="color: var(--ink-2);">端点网络档位</label>
+                <label class="block text-[10px] mb-1" style="color: var(--ink-2);">{{ t('admin.security.endpointTier') }}</label>
                 <label class="flex items-center gap-1.5 text-[11px] cursor-pointer" style="color: var(--ink-2);">
                   <input v-model="mxTestnet.gate" type="checkbox" class="accent-[var(--accent)]" />
-                  使用官方沙盒域 (fx-api-testnet)
+                  {{ t('admin.security.gateSandboxDomain') }}
                 </label>
               </template>
               <div class="space-y-1.5 pt-1">
-                <div class="text-[10px] font-semibold" style="color: var(--ink-2);">执行凭证（开启执行路由必需）</div>
-                <input v-model="mxForm.gate_api_key" type="text" placeholder="API Key（留空不改）" class="input w-full text-xs" />
+                <div class="text-[10px] font-semibold" style="color: var(--ink-2);">{{ t('admin.security.gateCredLabel') }}</div>
+                <input v-model="mxForm.gate_api_key" type="text" :placeholder="t('admin.security.apiKeyKeep')" class="input w-full text-xs" />
                 <input v-model="mxForm.gate_secret_key" type="password" placeholder="API Secret" class="input w-full text-xs" />
               </div>
               <template #extra>
                 <div class="pt-1">
                   <label class="flex items-center gap-1.5 text-[11px] cursor-pointer font-bold" :style="{ color: gateExec ? 'var(--down)' : 'var(--ink-2)' }">
                     <input v-model="gateExec" type="checkbox" class="accent-[var(--accent)]" />
-                    Gate 执行路由总闸 {{ mx?.venues?.gate?.execution_open ? '(已开闸)' : '(关闸)' }}
+                    {{ t('admin.security.gateMaster') }} {{ mx?.venues?.gate?.execution_open ? t('admin.security.gateMasterOpen') : t('admin.security.gateMasterClosed') }}
                   </label>
-                  <input v-if="gateExecDirty && gateExec" v-model="gateExecPhrase" placeholder="输入短语：OPEN GATE EXECUTION" class="input w-full text-xs mt-1.5" />
+                  <input v-if="gateExecDirty && gateExec" v-model="gateExecPhrase" :placeholder="t('admin.security.gatePhrasePlaceholder')" class="input w-full text-xs mt-1.5" />
                 </div>
                 <p class="text-[10px] leading-relaxed pt-1" style="color: var(--ink-3);">
-                  关闸时仅只读行情与账户探针；开闸后进入撮合路由。
+                  {{ t('admin.security.gateExtra') }}
                 </p>
               </template>
               <template #probe>
-                <button class="btn btn-quiet btn-sm" :disabled="probingVenue !== '' && probingVenue !== 'gate'" @click="probeVenue('gate')"><RefreshCw class="h-3 w-3" /> 检测</button>
+                <button class="btn btn-quiet btn-sm" :disabled="probingVenue !== '' && probingVenue !== 'gate'" @click="probeVenue('gate')"><RefreshCw class="h-3 w-3" /> {{ t('admin.security.detect') }}</button>
               </template>
               <template #save>
-                <button class="btn btn-primary btn-sm" :disabled="savingVenue !== ''" @click="saveVenue('gate')"><Save class="h-3 w-3" /> {{ savingVenue === 'gate' ? '保存中…' : '保存 Gate' }}</button>
+                <button class="btn btn-primary btn-sm" :disabled="savingVenue !== ''" @click="saveVenue('gate')"><Save class="h-3 w-3" /> {{ savingVenue === 'gate' ? t('admin.security.saving') : t('admin.security.saveGate') }}</button>
               </template>
             </VenueCredentialCard>
           </div>
         </SettingsSection>
 
         <!-- 跨所行情健康 -->
-        <SettingsSection title="跨所行情健康容灾" description="多所行情源自动健康监测与路由评分。">
+        <SettingsSection :title="t('admin.security.healthTitle')" :description="t('admin.security.healthDesc')">
           <template #actions>
-            <button class="btn btn-quiet btn-sm" @click="loadMx"><RefreshCw class="h-3 w-3" /> 重新检测</button>
+            <button class="btn btn-quiet btn-sm" @click="loadMx"><RefreshCw class="h-3 w-3" /> {{ t('admin.security.recheck') }}</button>
           </template>
           <div v-if="mxHealthChips" class="flex flex-wrap gap-2 text-[11px]">
             <span v-for="h in mxHealthChips" :key="h.name" class="px-2 py-1 rounded border font-bold num" :style="h.ok === h.total ? { color: 'var(--up)', borderColor: 'var(--up-line)', backgroundColor: 'var(--up-bg)' } : { color: 'var(--warn)', borderColor: 'var(--warn-line)', backgroundColor: 'var(--warn-bg)' }">
-              {{ h.name }} {{ h.ok }}/{{ h.total }} 币{{ h.avg_ms ? ' · ' + h.avg_ms + 'ms' : '' }}{{ h.testnet ? ' · 沙盒' : '' }}
+              {{ h.name }} {{ h.ok }}/{{ h.total }} {{ t('admin.security.coinsUnit') }}{{ h.avg_ms ? ' · ' + h.avg_ms + 'ms' : '' }}{{ h.testnet ? ' · ' + t('admin.security.sandboxTag') : '' }}
             </span>
           </div>
-          <div v-else class="text-[11px]" style="color: var(--ink-3);">尚无周期数据，等待下个 15 分钟周期。</div>
+          <div v-else class="text-[11px]" style="color: var(--ink-3);">{{ t('admin.security.noHealthData') }}</div>
         </SettingsSection>
       </div>
 
       <!-- ============ 页签 2：标的池与初始本金 ============ -->
       <div v-if="activeTab === 'pool'" class="space-y-4">
-        <SettingsSection title="交易标的池" description="USDT 永续合约标的池管理。">
+        <SettingsSection :title="t('admin.security.poolTitle')" :description="t('admin.security.poolDesc')">
           <template #actions>
-            <input v-model="newInstId" placeholder="例如: XRP-USDT-SWAP" class="input w-44" @keyup.enter="addInstrument" />
-            <button class="btn btn-primary" @click="addInstrument"><Layers class="h-3.5 w-3.5" /> 添加标的</button>
+            <input v-model="newInstId" :placeholder="t('admin.security.instPlaceholder')" class="input w-44" @keyup.enter="addInstrument" />
+            <button class="btn btn-primary" @click="addInstrument"><Layers class="h-3.5 w-3.5" /> {{ t('admin.security.addInstrument') }}</button>
           </template>
           <div class="overflow-x-auto -mx-4 px-4">
             <table v-if="instruments.length" class="w-full text-left text-xs whitespace-nowrap">
               <thead>
                 <tr class="border-b text-[11px] uppercase tracking-wider font-bold" style="border-color: var(--line-1); color: var(--ink-2);">
-                  <th class="py-2 pl-0 pr-4">合约代码</th>
-                  <th class="py-2 px-3">名称</th>
-                  <th class="py-2 px-3">类型</th>
-                  <th class="py-2 px-3">风控状态</th>
-                  <th class="py-2 px-4 text-right">操作</th>
+                  <th class="py-2 pl-0 pr-4">{{ t('admin.security.colInstId') }}</th>
+                  <th class="py-2 px-3">{{ t('admin.security.colName') }}</th>
+                  <th class="py-2 px-3">{{ t('admin.security.colType') }}</th>
+                  <th class="py-2 px-3">{{ t('admin.security.colRisk') }}</th>
+                  <th class="py-2 px-4 text-right">{{ t('admin.security.colAction') }}</th>
                 </tr>
               </thead>
               <tbody>
@@ -705,56 +705,56 @@ onMounted(() => { loadAll(); loadMx() })
                   <td class="py-2 px-3" style="color: var(--ink-2);">{{ item.name }}</td>
                   <td class="py-2 px-3 num" style="color: var(--ink-3);">{{ item.ctType || 'SWAP' }}</td>
                   <td class="py-2 px-3">
-                    <span v-if="item.protected" class="px-1.5 py-0.5 rounded-[3px] text-[11px] font-bold border" style="background-color: var(--warn-bg); border-color: var(--warn-line); color: var(--warn);">保底必选</span>
-                    <span v-else-if="item.has_tracker" class="px-1.5 py-0.5 rounded-[3px] text-[11px] font-bold border" style="background-color: var(--accent-bg); border-color: var(--accent-line); color: var(--accent);">持仓中</span>
-                    <span v-else class="text-[11px] px-1.5 py-0.5 rounded-[3px] border" style="background-color: var(--surface-3); border-color: var(--line-1); color: var(--ink-3);">可移除</span>
+                    <span v-if="item.protected" class="px-1.5 py-0.5 rounded-[3px] text-[11px] font-bold border" style="background-color: var(--warn-bg); border-color: var(--warn-line); color: var(--warn);">{{ t('admin.security.protectedBadge') }}</span>
+                    <span v-else-if="item.has_tracker" class="px-1.5 py-0.5 rounded-[3px] text-[11px] font-bold border" style="background-color: var(--accent-bg); border-color: var(--accent-line); color: var(--accent);">{{ t('admin.security.holdingBadge') }}</span>
+                    <span v-else class="text-[11px] px-1.5 py-0.5 rounded-[3px] border" style="background-color: var(--surface-3); border-color: var(--line-1); color: var(--ink-3);">{{ t('admin.security.removableBadge') }}</span>
                   </td>
                   <td class="py-2 px-4 text-right">
-                    <button :disabled="item.protected || item.has_tracker" class="p-1 rounded cursor-pointer transition-opacity hover:opacity-80 disabled:opacity-20" style="color: var(--down);" title="从标的池移除" @click="removeInstrument(item)">
+                    <button :disabled="item.protected || item.has_tracker" class="p-1 rounded cursor-pointer transition-opacity hover:opacity-80 disabled:opacity-20" style="color: var(--down);" :title="t('admin.security.removeTitle')" @click="removeInstrument(item)">
                       <Trash2 class="h-3.5 w-3.5" />
                     </button>
                   </td>
                 </tr>
               </tbody>
             </table>
-            <div v-else class="py-8 text-center text-xs" style="color: var(--ink-3);">标的池为空。</div>
+            <div v-else class="py-8 text-center text-xs" style="color: var(--ink-3);">{{ t('admin.security.poolEmpty') }}</div>
           </div>
-          <p class="pt-3 text-[11px]" style="color: var(--ink-3);">保底标的与持仓中的标的不可移除；上限 {{ instLimits.maximum }} 个，仅支持 USDT 永续。</p>
+          <p class="pt-3 text-[11px]" style="color: var(--ink-3);">{{ t('admin.security.poolFooter', undefined, { max: instLimits.maximum }) }}</p>
         </SettingsSection>
       </div>
 
       <!-- ============ 页签 3：应急风控与持仓 ============ -->
       <div v-if="activeTab === 'emergency'" class="space-y-4">
-        <SettingsSection title="后台手动平仓总闸" description="应急市价平仓开关。">
+        <SettingsSection :title="t('admin.security.manualTitle')" :description="t('admin.security.manualDesc')">
           <template #actions>
-            <button class="btn btn-quiet" @click="saveManualClose"><Save class="h-3.5 w-3.5" /> 保存开关</button>
+            <button class="btn btn-quiet" @click="saveManualClose"><Save class="h-3.5 w-3.5" /> {{ t('admin.security.saveSwitch') }}</button>
           </template>
           <label class="flex items-center gap-2 cursor-pointer w-fit">
             <input v-model="manualClose" type="checkbox" class="accent-[var(--accent)]" />
             <span class="text-xs" :style="{ color: manualClose ? 'var(--warn)' : 'var(--ink-2)', fontWeight: manualClose ? 700 : 400 }">
-              {{ manualClose ? '已启用：允许后台市价平仓' : '已禁用：交易核心自主管理' }}
+              {{ manualClose ? t('admin.security.manualOn') : t('admin.security.manualOff') }}
             </span>
           </label>
         </SettingsSection>
 
-        <SettingsSection title="当前活动持仓与挂单快照" description="实时持仓与挂单状态探针。">
+        <SettingsSection :title="t('admin.security.snapshotTitle')" :description="t('admin.security.snapshotDesc')">
           <template #actions>
-            <button class="btn btn-quiet" @click="loadPositions"><Zap class="h-3.5 w-3.5" /> 刷新持仓与挂单</button>
+            <button class="btn btn-quiet" @click="loadPositions"><Zap class="h-3.5 w-3.5" /> {{ t('admin.security.refreshPositions') }}</button>
           </template>
           <div v-if="snapshotState" class="text-[11px] pb-2" style="color: var(--warn);">{{ snapshotState }}</div>
           <div v-if="snapshot" class="text-[11px] pb-2" style="color: var(--ink-2);">
-            环境 <b :style="{ color: snapshot.environment === 'live' ? 'var(--down)' : 'var(--up)' }">{{ envBadge(snapshot.environment) }}</b>
-            · 持仓 {{ snapshot.positions?.length ?? 0 }} · 挂单 {{ snapshot.orders?.length ?? 0 }} · {{ fmtDateTime(snapshot.captured_at_ms) }}
+            {{ t('admin.security.envWord') }} <b :style="{ color: snapshot.environment === 'live' ? 'var(--down)' : 'var(--up)' }">{{ envBadge(snapshot.environment) }}</b>
+            · {{ t('admin.security.positionsWord') }} {{ snapshot.positions?.length ?? 0 }} · {{ t('admin.security.ordersWord') }} {{ snapshot.orders?.length ?? 0 }} · {{ fmtDateTime(snapshot.captured_at_ms) }}
           </div>
           <div class="overflow-x-auto -mx-4 px-4">
             <table v-if="snapshot?.positions?.length" class="w-full text-left text-xs whitespace-nowrap">
               <thead>
                 <tr class="border-b text-[11px] uppercase tracking-wider font-bold" style="border-color: var(--line-1); color: var(--ink-2);">
-                  <th class="py-2 pl-0 pr-4">仓位标的</th>
-                  <th class="py-2 px-3">张数</th>
-                  <th class="py-2 px-3">模式</th>
-                  <th class="py-2 px-3">未实现盈亏</th>
-                  <th class="py-2 px-4 text-right">操作</th>
+                  <th class="py-2 pl-0 pr-4">{{ t('admin.security.colPosition') }}</th>
+                  <th class="py-2 px-3">{{ t('admin.security.colContracts') }}</th>
+                  <th class="py-2 px-3">{{ t('admin.security.colMode') }}</th>
+                  <th class="py-2 px-3">{{ t('admin.security.colUpl') }}</th>
+                  <th class="py-2 px-4 text-right">{{ t('admin.security.colAction') }}</th>
                 </tr>
               </thead>
               <tbody>
@@ -772,13 +772,13 @@ onMounted(() => { loadAll(); loadMx() })
                   <td class="py-2 px-3 text-[11px]" style="color: var(--ink-3);">{{ p.mgnMode || '--' }}</td>
                   <td class="py-2 px-3 font-bold num" :style="{ color: Number(p.upl || 0) >= 0 ? 'var(--up)' : 'var(--down)' }">{{ Number(p.upl || 0).toFixed(4) }}</td>
                   <td class="py-2 px-4 text-right">
-                    <button class="px-2.5 py-1 rounded-md text-[11px] font-bold border cursor-pointer transition-all" style="background-color: var(--down-bg); border-color: var(--down-line); color: var(--down);" @click="openClose(p)">快速平仓</button>
+                    <button class="px-2.5 py-1 rounded-md text-[11px] font-bold border cursor-pointer transition-all" style="background-color: var(--down-bg); border-color: var(--down-line); color: var(--down);" @click="openClose(p)">{{ t('admin.security.quickClose') }}</button>
                   </td>
                 </tr>
               </tbody>
             </table>
-            <div v-else-if="snapshot" class="py-8 text-center text-xs" style="color: var(--up);">✓ 当前环境 0 活跃持仓</div>
-            <div v-else-if="!snapshotState" class="py-8 text-center text-xs" style="color: var(--ink-3);">点击「刷新持仓与挂单」读取实时状态。</div>
+            <div v-else-if="snapshot" class="py-8 text-center text-xs" style="color: var(--up);">{{ t('admin.security.noPositions') }}</div>
+            <div v-else-if="!snapshotState" class="py-8 text-center text-xs" style="color: var(--ink-3);">{{ t('admin.security.clickRefreshHint') }}</div>
           </div>
         </SettingsSection>
       </div>
@@ -787,19 +787,19 @@ onMounted(() => { loadAll(); loadMx() })
     <!-- 平仓双确认弹窗 -->
     <div v-if="closeModal?.show" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4" @click.self="closeModal = null">
       <div class="rounded-xl border p-5 sm:p-6 w-full max-w-[460px] max-h-[88dvh] overflow-y-auto shadow-2xl" style="background-color: var(--surface-2); border-color: var(--line-1);">
-        <h3 class="text-sm font-bold mb-2" style="color: var(--down);">快速安全平仓</h3>
+        <h3 class="text-sm font-bold mb-2" style="color: var(--down);">{{ t('admin.security.closeModalTitle') }}</h3>
         <p class="text-[11px] leading-relaxed mb-3" style="color: var(--ink-2);">
-          将从 <b :style="{ color: snapshot?.environment === 'live' ? 'var(--down)' : 'var(--up)' }">{{ envBadge(snapshot?.environment) }}</b> 环境重新核对并平掉
-          <b style="color: var(--ink-1);">{{ closeModal.pos.instId }} {{ (closeModal.pos.posSide || 'net').toUpperCase() }} {{ Math.abs(Number(closeModal.pos.pos || 0)) }}</b>。
-          令牌 90 秒有效且仅可使用一次。
+          {{ t('admin.security.closePrefix') }} <b :style="{ color: snapshot?.environment === 'live' ? 'var(--down)' : 'var(--up)' }">{{ envBadge(snapshot?.environment) }}</b> {{ t('admin.security.closeMiddle') }}
+          <b style="color: var(--ink-1);">{{ closeModal.pos.instId }} {{ (closeModal.pos.posSide || 'net').toUpperCase() }} {{ Math.abs(Number(closeModal.pos.pos || 0)) }}</b>{{ t('admin.security.period') }}
+          {{ t('admin.security.closeSuffix') }}
         </p>
-        <label class="block text-[11px] mb-1" style="color: var(--ink-2);">当前管理员密码</label>
+        <label class="block text-[11px] mb-1" style="color: var(--ink-2);">{{ t('admin.security.adminPasswordLabel') }}</label>
         <input v-model="closePassword" type="password" class="input w-full mb-3" />
-        <label class="block text-[11px] mb-1" style="color: var(--ink-2);">确认短语：{{ closeModal.pos.close_confirmation }}</label>
+        <label class="block text-[11px] mb-1" style="color: var(--ink-2);">{{ t('admin.security.confirmPhraseLabel') }}{{ closeModal.pos.close_confirmation }}</label>
         <input v-model="closePhraseInput" :placeholder="closeModal.pos.close_confirmation" class="input w-full mb-4" />
         <div class="flex justify-end gap-2">
-          <button class="btn btn-quiet" @click="closeModal = null">取消</button>
-          <button class="px-3 py-2 rounded-lg text-xs font-bold cursor-pointer disabled:opacity-50 transition-all" style="background-color: var(--down-bg); border: 1px solid var(--down-line); color: var(--down);" :disabled="closing" @click="confirmClose">{{ closing ? '执行中，等待成交确认…' : '确认平仓' }}</button>
+          <button class="btn btn-quiet" @click="closeModal = null">{{ t('admin.security.cancel') }}</button>
+          <button class="px-3 py-2 rounded-lg text-xs font-bold cursor-pointer disabled:opacity-50 transition-all" style="background-color: var(--down-bg); border: 1px solid var(--down-line); color: var(--down);" :disabled="closing" @click="confirmClose">{{ closing ? t('admin.security.closing') : t('admin.security.confirmClose') }}</button>
         </div>
       </div>
     </div>

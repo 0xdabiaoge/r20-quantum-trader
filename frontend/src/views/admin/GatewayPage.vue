@@ -26,24 +26,24 @@ async function load() {
   try {
     gw.value = await api('/api/v1/admin/gateway?limit=50')
   } catch (e: any) {
-    toast.err(`加载失败：${e.message}`)
+    toast.err(t('admin.gateway.msgs.loadFailed', undefined, { msg: e.message }))
   } finally {
     loading.value = false
   }
 }
 
 async function replayDelivery(id: number) {
-  const phrase = prompt(`重放投递 #${id} 需精确输入确认短语：REPLAY ${id}`)
+  const phrase = prompt(t('admin.gateway.msgs.replayPrompt', undefined, { id: id }))
   if (!phrase) return
   try {
     await api(`/api/v1/admin/gateway/deliveries/${id}/replay`, {
       method: 'POST',
       body: JSON.stringify({ confirmation: phrase.trim().toUpperCase() }),
     })
-    toast.ok(`投递 #${id} 已重新入队`)
+    toast.ok(t('admin.gateway.msgs.replayed', undefined, { id: id }))
     await load()
   } catch (e: any) {
-    toast.err(`重放失败：${e.message}`)
+    toast.err(t('admin.gateway.msgs.replayFailed', undefined, { msg: e.message }))
   }
 }
 
@@ -60,33 +60,33 @@ onMounted(load)
 <template>
   <div class="space-y-4">
     <div class="flex items-center justify-between">
-      <p class="text-xs text-[var(--ink-3)]">调度任务、事件投递队列与死信重放；Gateway 仅记录无内容遥测。</p>
-      <span class="text-[11px] text-blue-400 bg-blue-500/10 px-2 py-1 rounded border border-blue-500/20">日常运行 · 4/4</span>
+      <p class="text-xs text-[var(--ink-3)]">{{ t('admin.gateway.desc') }}</p>
+      <span class="text-[11px] text-blue-400 bg-blue-500/10 px-2 py-1 rounded border border-blue-500/20">{{ t('admin.gateway.opsBadge') }}</span>
     </div>
-    <div v-if="loading" class="py-12 text-center text-xs text-[var(--ink-3)]"><RefreshCw class="w-5 h-5 animate-spin inline mr-1.5 text-blue-400" />正在加载网关状态...</div>
+    <div v-if="loading" class="py-12 text-center text-xs text-[var(--ink-3)]"><RefreshCw class="w-5 h-5 animate-spin inline mr-1.5 text-blue-400" />{{ t('admin.gateway.loading') }}</div>
 
     <template v-else-if="gw">
       <!-- Worker & Stats Cards -->
       <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <div class="rounded-xl border p-4 shadow-xs transition-colors" style="background-color: var(--surface-2); border-color: var(--line-1);">
-          <div class="flex items-center space-x-2 text-[11px] mb-2" style="color: var(--ink-2);"><Server class="w-4 h-4 text-emerald-500" /><span>Gateway 进程</span></div>
+          <div class="flex items-center space-x-2 text-[11px] mb-2" style="color: var(--ink-2);"><Server class="w-4 h-4 text-emerald-500" /><span>{{ t('admin.gateway.cards.process') }}</span></div>
           <div class="text-lg font-semibold" :class="gw.running ? 'text-emerald-500' : 'text-rose-500'">{{ gw.running ? 'ONLINE' : 'OFFLINE' }}</div>
           <div class="text-[11px] mt-1" style="color: var(--ink-3);">PID {{ gw.pid || '--' }} · v{{ gw.version }}</div>
         </div>
         <div class="rounded-xl border p-4 shadow-xs transition-colors" style="background-color: var(--surface-2); border-color: var(--line-1);">
-          <div class="flex items-center space-x-2 text-[11px] mb-2" style="color: var(--ink-2);"><Zap class="w-4 h-4 text-blue-500" /><span>投递队列</span></div>
+          <div class="flex items-center space-x-2 text-[11px] mb-2" style="color: var(--ink-2);"><Zap class="w-4 h-4 text-blue-500" /><span>{{ t('admin.gateway.cards.deliveryQueue') }}</span></div>
           <div class="text-lg font-semibold num" style="color: var(--ink-1);">{{ deliveredCount }}<span class="text-xs" style="color: var(--ink-2);"> / {{ deliveryTotal }}</span></div>
-          <div class="text-[11px] mt-1" style="color: var(--ink-3);">待处理 {{ gw.stats?.pending ?? 0 }} · 重试 {{ gw.stats?.retry ?? 0 }}</div>
+          <div class="text-[11px] mt-1" style="color: var(--ink-3);">{{ t('admin.gateway.cards.queueStats', undefined, { n: gw.stats?.pending ?? 0, m: gw.stats?.retry ?? 0 }) }}</div>
         </div>
         <div class="rounded-xl border p-4 shadow-xs transition-colors" style="background-color: var(--surface-2); border-color: var(--line-1);">
-          <div class="flex items-center space-x-2 text-[11px] mb-2" style="color: var(--ink-2);"><AlertTriangle class="w-4 h-4 text-amber-500" /><span>死信 / 关键事件</span></div>
+          <div class="flex items-center space-x-2 text-[11px] mb-2" style="color: var(--ink-2);"><AlertTriangle class="w-4 h-4 text-amber-500" /><span>{{ t('admin.gateway.cards.deadLetter') }}</span></div>
           <div class="text-lg font-semibold num" :class="(gw.stats?.dead ?? 0) > 0 ? 'text-rose-500' : 'text-emerald-500'">{{ gw.stats?.dead ?? 0 }}<span class="text-xs" style="color: var(--ink-2);"> / {{ gw.event_health?.critical_total ?? 0 }}</span></div>
-          <div class="text-[11px] mt-1" style="color: var(--ink-3);">关键未达 {{ gw.event_health?.critical_unmet ?? 0 }} · 失败 {{ gw.event_health?.critical_failed ?? 0 }}</div>
+          <div class="text-[11px] mt-1" style="color: var(--ink-3);">{{ t('admin.gateway.cards.criticalStats', undefined, { n: gw.event_health?.critical_unmet ?? 0, m: gw.event_health?.critical_failed ?? 0 }) }}</div>
         </div>
         <div class="rounded-xl border p-4 shadow-xs transition-colors" style="background-color: var(--surface-2); border-color: var(--line-1);">
-          <div class="flex items-center space-x-2 text-[11px] mb-2" style="color: var(--ink-2);"><Clock class="w-4 h-4 text-purple-500" /><span>调度任务</span></div>
+          <div class="flex items-center space-x-2 text-[11px] mb-2" style="color: var(--ink-2);"><Clock class="w-4 h-4 text-purple-500" /><span>{{ t('admin.gateway.cards.scheduler') }}</span></div>
           <div class="text-lg font-semibold num" style="color: var(--ink-1);">{{ gw.scheduler?.jobs?.length ?? 0 }}</div>
-          <div class="text-[11px] mt-1" :class="overdueCount > 0 ? 'text-rose-500' : 'text-emerald-500'">{{ overdueCount > 0 ? overdueCount + ' 个任务逾期!' : '无逾期任务' }}</div>
+          <div class="text-[11px] mt-1" :class="overdueCount > 0 ? 'text-rose-500' : 'text-emerald-500'">{{ overdueCount > 0 ? t('admin.gateway.cards.overdueJobs', undefined, { n: overdueCount }) : t('admin.gateway.cards.noOverdue') }}</div>
         </div>
       </div>
 
@@ -94,18 +94,18 @@ onMounted(load)
       <div v-if="gw.scheduler?.jobs?.length" class="rounded-xl border overflow-hidden shadow-xs" style="background-color: var(--surface-2); border-color: var(--line-1);">
         <div class="px-4 py-3 border-b flex items-center justify-between" style="border-color: var(--line-1); background-color: var(--surface-1);">
           <h2 class="text-xs font-semibold" style="color: var(--ink-1);">{{ t('nav.admin.gateway') }}</h2>
-        <p class="text-[11px] mt-0.5" style="color: var(--ink-2);"> 本地调度计划（北京时间） </p>
-          <span class="text-[11px]" style="color: var(--ink-3);">{{ gw.scheduler.jobs.length }} 个受管定时作业</span>
+        <p class="text-[11px] mt-0.5" style="color: var(--ink-2);"> {{ t('admin.gateway.scheduler.subtitle') }} </p>
+          <span class="text-[11px]" style="color: var(--ink-3);">{{ t('admin.gateway.scheduler.managedJobs', undefined, { n: gw.scheduler.jobs.length }) }}</span>
         </div>
         <div class="table-scroll-container">
           <table class="w-full text-left text-xs whitespace-nowrap">
             <thead>
               <tr class="border-b text-[11px] uppercase tracking-wider font-bold" style="border-color: var(--line-1); background-color: var(--surface-1); color: var(--ink-2);">
-                <th class="py-2.5 px-4">任务</th>
-                <th class="py-2.5 px-3">脚本</th>
-                <th class="py-2.5 px-3">触发</th>
-                <th class="py-2.5 px-3">最近调度</th>
-                <th class="py-2.5 px-4 text-right">状态</th>
+                <th class="py-2.5 px-4">{{ t('admin.gateway.scheduler.colJob') }}</th>
+                <th class="py-2.5 px-3">{{ t('admin.gateway.scheduler.colScript') }}</th>
+                <th class="py-2.5 px-3">{{ t('admin.gateway.scheduler.colTrigger') }}</th>
+                <th class="py-2.5 px-3">{{ t('admin.gateway.scheduler.colLastRun') }}</th>
+                <th class="py-2.5 px-4 text-right">{{ t('admin.gateway.scheduler.colStatus') }}</th>
               </tr>
             </thead>
             <tbody>
@@ -113,9 +113,9 @@ onMounted(load)
                 <td class="py-2.5 px-4 font-bold" style="color: var(--ink-1);">{{ j.name }}</td>
                 <td class="py-2.5 px-3 text-[11px]" style="color: var(--ink-2);">{{ j.script }}</td>
                 <td class="py-2.5 px-3 font-medium" style="color: var(--ink-1);">{{ j.schedule }}</td>
-                <td class="py-2.5 px-3 num" style="color: var(--ink-3);">{{ j.last_scheduled_at ? fmtJobTime(j.last_scheduled_at) : '尚未调度' }}</td>
+                <td class="py-2.5 px-3 num" style="color: var(--ink-3);">{{ j.last_scheduled_at ? fmtJobTime(j.last_scheduled_at) : t('admin.gateway.scheduler.notScheduled') }}</td>
                 <td class="py-2.5 px-4 text-right font-bold" :class="j.overdue ? 'text-rose-400' : 'text-emerald-400'">
-                  {{ j.overdue ? '逾期' : '正常' }}
+                  {{ j.overdue ? t('admin.gateway.scheduler.overdue') : t('admin.gateway.scheduler.normal') }}
                 </td>
               </tr>
             </tbody>
@@ -127,14 +127,14 @@ onMounted(load)
       <div class="rounded-xl border overflow-hidden shadow-xs" style="background-color: var(--surface-2); border-color: var(--line-1);">
         <div class="px-4 py-3 border-b flex items-center justify-between" style="border-color: var(--line-1); background-color: var(--surface-1);">
           <div class="flex items-center space-x-2">
-            <h2 class="text-xs font-semibold" style="color: var(--ink-1);">事件投递队列 (最近 50 条)</h2>
+            <h2 class="text-xs font-semibold" style="color: var(--ink-1);">{{ t('admin.gateway.deliveries.title') }}</h2>
             <span class="text-[11px] px-2 py-0.2 rounded border font-bold" style="background-color: var(--accent-bg); color: var(--accent); border-color: var(--accent-line);">
-              {{ gw.deliveries?.length || 0 }} 记录
+              {{ t('admin.gateway.deliveries.records', undefined, { n: gw.deliveries?.length || 0 }) }}
             </span>
           </div>
           <button @click="load" class="flex items-center space-x-1 px-2.5 py-1 rounded-lg border text-[11px] cursor-pointer transition-all shadow-xs" style="background-color: var(--surface-2); border-color: var(--line-2); color: var(--ink-1);">
             <RefreshCw class="w-3 h-3" />
-            <span>刷新队列</span>
+            <span>{{ t('admin.gateway.deliveries.refresh') }}</span>
           </button>
         </div>
         <div class="table-scroll-container max-h-[420px] overflow-y-auto">
@@ -142,12 +142,12 @@ onMounted(load)
             <thead class="sticky top-0 z-10">
               <tr class="border-b text-[11px] uppercase tracking-wider font-bold" style="border-color: var(--line-1); background-color: var(--surface-1); color: var(--ink-2);">
                 <th class="py-2.5 px-4">#</th>
-                <th class="py-2.5 px-3">事件类型</th>
-                <th class="py-2.5 px-3">投递通道</th>
-                <th class="py-2.5 px-3">状态</th>
-                <th class="py-2.5 px-3">尝试</th>
-                <th class="py-2.5 px-3">时间</th>
-                <th class="py-2.5 px-4 text-right">操作</th>
+                <th class="py-2.5 px-3">{{ t('admin.gateway.deliveries.colEventType') }}</th>
+                <th class="py-2.5 px-3">{{ t('admin.gateway.deliveries.colChannel') }}</th>
+                <th class="py-2.5 px-3">{{ t('admin.gateway.deliveries.colStatus') }}</th>
+                <th class="py-2.5 px-3">{{ t('admin.gateway.deliveries.colAttempts') }}</th>
+                <th class="py-2.5 px-3">{{ t('admin.gateway.deliveries.colTime') }}</th>
+                <th class="py-2.5 px-4 text-right">{{ t('admin.gateway.deliveries.colActions') }}</th>
               </tr>
             </thead>
             <tbody>
@@ -160,13 +160,13 @@ onMounted(load)
                 <td class="py-2.5 px-3 num" style="color: var(--ink-3);">{{ fmtDateTime(d.created_at || d.time) }}</td>
                 <td class="py-2.5 px-4 text-right">
                   <button v-if="d.status === 'dead'" @click="replayDelivery(d.id)" class="flex items-center space-x-1 ml-auto px-2 py-1 rounded-md border text-[11px] cursor-pointer transition-colors" style="background-color: var(--warn-bg); border-color: var(--warn-line); color: var(--warn);">
-                    <RotateCcw class="w-3 h-3" /><span>重放</span>
+                    <RotateCcw class="w-3 h-3" /><span>{{ t('admin.gateway.deliveries.replay') }}</span>
                   </button>
                   <span v-else class="text-[11px]" style="color: var(--ink-3);">--</span>
                 </td>
               </tr>
               <tr v-if="!gw.deliveries || gw.deliveries.length === 0">
-                <td colspan="7" class="py-8 text-center" style="color: var(--ink-3);">暂无投递记录</td>
+                <td colspan="7" class="py-8 text-center" style="color: var(--ink-3);">{{ t('admin.gateway.deliveries.empty') }}</td>
               </tr>
             </tbody>
           </table>

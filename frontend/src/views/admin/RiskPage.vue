@@ -181,11 +181,11 @@ onMounted(loadData)
   <div class="space-y-4 max-w-[1400px] mx-auto pb-24">
     <PageHeader
       :title="t('nav.admin.risk')"
-      description="执行层硬风控集中配置：仓位敞口 · 单笔风险 · 止损熔断 · 金字塔加仓"
+      :description="t('admin.risk.pageDesc')"
     >
       <template #actions>
         <span class="badge-lever">
-          {{ dirtyKeys.length ? `${dirtyKeys.length} 项待保存` : '与线上口径一致' }}
+          {{ dirtyKeys.length ? t('admin.risk.pendingSave', undefined, { n: dirtyKeys.length }) : t('admin.risk.inSync') }}
         </span>
       </template>
     </PageHeader>
@@ -194,7 +194,7 @@ onMounted(loadData)
     <div class="p-3 rounded-lg text-[11px] border flex items-start gap-2" style="background-color: var(--surface-2); border-color: var(--line-1); color: var(--ink-2);">
       <Info class="w-3.5 h-3.5 shrink-0 mt-0.5" style="color: var(--accent, var(--info));" />
       <div class="space-y-1">
-        <p>{{ effectText || '保存后下一巡检周期自动生效，无需重启。' }}</p>
+        <p>{{ effectText || t('admin.risk.effectHint') }}</p>
       </div>
     </div>
 
@@ -215,7 +215,7 @@ onMounted(loadData)
         >
           <div class="flex items-center justify-between gap-2">
             <h3 class="text-xs font-semibold" style="color: var(--ink-1);">{{ s.name }}</h3>
-            <span v-if="activeSuiteId === s.id" class="text-[11px] px-1.5 py-0.5 rounded border border-emerald-500/30 bg-emerald-500/10 text-emerald-400">当前生效</span>
+            <span v-if="activeSuiteId === s.id" class="text-[11px] px-1.5 py-0.5 rounded border border-emerald-500/30 bg-emerald-500/10 text-emerald-400">{{ t('admin.risk.activeNow') }}</span>
             <span v-else class="text-[11px] opacity-60" style="color: var(--ink-2);">{{ s.tagline }}</span>
           </div>
           <p class="text-[11px] leading-relaxed flex-1" style="color: var(--ink-2);">{{ s.desc }}</p>
@@ -225,7 +225,7 @@ onMounted(loadData)
             class="self-start mt-1 px-3 py-1.5 rounded-lg text-[11px] font-bold border transition-colors disabled:opacity-40"
             style="border-color: var(--line-1); color: var(--ink-1);"
           >
-            {{ activeSuiteId === s.id ? '已应用' : '一键应用此预设' }}
+            {{ activeSuiteId === s.id ? t('admin.risk.applied') : t('admin.risk.applySuite') }}
           </button>
         </div>
       </div>
@@ -254,13 +254,13 @@ onMounted(loadData)
           >
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2 flex-wrap">
-                <span class="text-xs font-bold" style="color: var(--ink-1);">单笔杠杆区间（下限 ~ 上限）</span>
-                <span v-if="isCustomized(levMinP) || isCustomized(levMaxP)" class="text-[11px] px-1.5 py-0.5 rounded border border-amber-500/30 bg-amber-500/10 text-amber-400">已自定义</span>
-                <span v-if="levInverted" class="text-[11px] px-1.5 py-0.5 rounded border border-rose-500/40 bg-rose-500/10 text-rose-400">下限高于上限：保存将被拒绝</span>
+                <span class="text-xs font-bold" style="color: var(--ink-1);">{{ t('admin.risk.levRangeTitle') }}</span>
+                <span v-if="isCustomized(levMinP) || isCustomized(levMaxP)" class="text-[11px] px-1.5 py-0.5 rounded border border-amber-500/30 bg-amber-500/10 text-amber-400">{{ t('admin.risk.customized') }}</span>
+                <span v-if="levInverted" class="text-[11px] px-1.5 py-0.5 rounded border border-rose-500/40 bg-rose-500/10 text-rose-400">{{ t('admin.risk.levInverted') }}</span>
               </div>
-              <p class="text-[11px] mt-1 leading-relaxed" style="color: var(--ink-2);">AI 投委会/主脑在区间内按信号强度自主裁决杠杆；区间外执行层强制钳制。调高下限＝强制放大名义敞口，请配合日亏熔断使用。</p>
+              <p class="text-[11px] mt-1 leading-relaxed" style="color: var(--ink-2);">{{ t('admin.risk.levRangeDesc') }}</p>
               <p class="text-[11px] mt-0.5 opacity-60" style="color: var(--ink-2);">
-                默认 {{ toDisplay(levMinP, levMinP.default) }} ~ {{ toDisplay(levMaxP, levMaxP.default) }} x · 可配 {{ toDisplay(levMinP, levMinP.min) }} ~ {{ toDisplay(levMaxP, levMaxP.max) }} x · {{ levMinP.key }} / {{ levMaxP.key }}
+                {{ t('admin.risk.defaultWord') }} {{ toDisplay(levMinP, levMinP.default) }} ~ {{ toDisplay(levMaxP, levMaxP.default) }} x · {{ t('admin.risk.configurableWord') }} {{ toDisplay(levMinP, levMinP.min) }} ~ {{ toDisplay(levMaxP, levMaxP.max) }} x · {{ levMinP.key }} / {{ levMaxP.key }}
               </p>
             </div>
             <div class="flex items-center gap-2 shrink-0">
@@ -302,11 +302,11 @@ onMounted(loadData)
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2 flex-wrap">
                 <span class="text-xs font-bold" style="color: var(--ink-1);">{{ p.label }}</span>
-                <span v-if="isCustomized(p)" class="text-[11px] px-1.5 py-0.5 rounded border border-amber-500/30 bg-amber-500/10 text-amber-400">已自定义</span>
+                <span v-if="isCustomized(p)" class="text-[11px] px-1.5 py-0.5 rounded border border-amber-500/30 bg-amber-500/10 text-amber-400">{{ t('admin.risk.customized') }}</span>
               </div>
               <p class="text-[11px] mt-1 leading-relaxed" style="color: var(--ink-2);">{{ p.desc }}</p>
               <p class="text-[11px] mt-0.5 opacity-60" style="color: var(--ink-2);">
-                默认 {{ toDisplay(p, p.default) }} {{ p.unit }} · 范围 {{ toDisplay(p, p.min) }} ~ {{ toDisplay(p, p.max) }} {{ p.unit }} · <span class="opacity-70">{{ p.key }}</span>
+                {{ t('admin.risk.defaultWord') }} {{ toDisplay(p, p.default) }} {{ p.unit }} · {{ t('admin.risk.rangeWord') }} {{ toDisplay(p, p.min) }} ~ {{ toDisplay(p, p.max) }} {{ p.unit }} · <span class="opacity-70">{{ p.key }}</span>
               </p>
             </div>
             <div class="flex items-center gap-2 shrink-0">
@@ -329,7 +329,7 @@ onMounted(loadData)
                 @click="revertOne(p)"
                 class="p-2 rounded-lg border transition-colors hover:bg-[var(--surface-3)]"
                 style="border-color: var(--line-1); color: var(--ink-2);"
-                title="恢复该项默认值"
+                :title="t('admin.risk.revertItem')"
               >
                 <RotateCcw class="w-3.5 h-3.5" />
               </button>
@@ -340,10 +340,10 @@ onMounted(loadData)
 
       <!-- Danger zone: reset (P2 shared component) -->
       <DangerZone
-        title="恢复出厂基线"
-        description="清除全部自定义覆盖值，执行层回退到代码默认基线；覆盖值本身不可恢复。"
+        :title="t('admin.risk.resetTitle')"
+        :description="t('admin.risk.resetDesc')"
         confirm-phrase="RESET RISK"
-        :action-label="busy === 'reset' ? '重置中…' : '全部恢复默认'"
+        :action-label="busy === 'reset' ? t('admin.risk.resetting') : t('admin.risk.resetAllBtn')"
         @confirm="resetAll"
       />
     </template>
@@ -354,7 +354,7 @@ onMounted(loadData)
       class="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 px-4 py-3 rounded-2xl border shadow-2xl flex items-center gap-3"
       style="background-color: var(--surface-2); border-color: var(--line-1);"
     >
-      <span class="text-xs" style="color: var(--ink-1);">{{ dirtyKeys.length }} 项修改未保存</span>
+      <span class="text-xs" style="color: var(--ink-1);">{{ t('admin.risk.unsavedCount', undefined, { n: dirtyKeys.length }) }}</span>
       <button
         @click="saveChanges"
         :disabled="busy !== ''"
@@ -362,7 +362,7 @@ onMounted(loadData)
         style="background-color: var(--accent); color: var(--accent-ink);"
       >
         <Save class="w-3.5 h-3.5" />
-        {{ busy === 'save' ? '保存中…' : '保存并生效' }}
+        {{ busy === 'save' ? t('admin.risk.saving') : t('admin.risk.saveApply') }}
       </button>
     </div>
   </div>

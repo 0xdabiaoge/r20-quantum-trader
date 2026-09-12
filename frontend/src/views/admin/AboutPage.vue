@@ -35,7 +35,9 @@ async function checkUpdate() {
     }
     updateResult.value = {
       ok: true,
-      message: res.behind > 0 ? `发现远端有 ${res.behind} 个新提交可更新 (远端 ${res.remote})` : '当前代码已是最新，与远端主分支保持同步。',
+      message: res.behind > 0
+        ? t('admin.about.checkBehind', undefined, { behind: res.behind, remote: res.remote })
+        : t('admin.about.checkUpToDate'),
       data: res,
     }
   } catch (e: any) {
@@ -63,7 +65,7 @@ async function executeUpdate() {
     updateResult.value = {
       ok: true,
       updated: res.updated,
-      message: res.updated ? '系统更新成功！' : '当前分支已是最新。',
+      message: res.updated ? t('admin.about.updateSuccess') : t('admin.about.updateNoop'),
       git_output: res.git_output,
       restart_note: res.restart_note,
     }
@@ -85,11 +87,11 @@ onMounted(() => {
 <template>
   <div class="space-y-4 text-xs">
     <div class="flex items-center justify-between">
-      <p class="text-xs text-[var(--ink-3)]">确认版本状态，执行安全快进更新。</p>
-      <span class="text-[11px] text-blue-400 bg-blue-500/10 px-2 py-1 rounded border border-blue-500/20">治理 · 3/3</span>
+      <p class="text-xs text-[var(--ink-3)]">{{ t('admin.about.intro') }}</p>
+      <span class="text-[11px] text-blue-400 bg-blue-500/10 px-2 py-1 rounded border border-blue-500/20">{{ t('admin.about.badge') }}</span>
     </div>
 
-    <div v-if="loading" class="py-12 text-center" style="color: var(--ink-2);">正在加载组件与版本数据...</div>
+    <div v-if="loading" class="py-12 text-center" style="color: var(--ink-2);">{{ t('admin.about.loading') }}</div>
 
     <template v-else-if="about">
       <!-- About Cards -->
@@ -103,21 +105,21 @@ onMounted(() => {
             <span class="text-[11px] px-2 py-0.5 rounded border font-bold" style="background-color: var(--up-bg); color: var(--up); border-color: var(--up-line);">OPEN SOURCE</span>
           </div>
           <div class="space-y-1.5" style="color: var(--ink-2);">
-            <div>产品架构: <strong style="color: var(--ink-1);">{{ about.product?.name }}</strong></div>
-            <div>系统版本: <strong style="color: var(--accent);">v{{ about.product?.version }}</strong></div>
-            <div>网关控制面: <span style="color: var(--ink-1);">{{ about.product?.control_plane }} (v{{ about.product?.gateway_version }})</span></div>
-            <div>运行环境: <span style="color: var(--ink-1);">Python {{ about.runtime?.python }}</span></div>
+            <div>{{ t('admin.about.productArchitecture') }} <strong style="color: var(--ink-1);">{{ about.product?.name }}</strong></div>
+            <div>{{ t('admin.about.systemVersion') }} <strong style="color: var(--accent);">v{{ about.product?.version }}</strong></div>
+            <div>{{ t('admin.about.controlPlane') }} <span style="color: var(--ink-1);">{{ about.product?.control_plane }} (v{{ about.product?.gateway_version }})</span></div>
+            <div>{{ t('admin.about.runtime') }} <span style="color: var(--ink-1);">Python {{ about.runtime?.python }}</span></div>
           </div>
           <a href="https://github.com/555cute/r20-quantum-trader" target="_blank" class="inline-flex items-center space-x-1.5 mt-4 px-3 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer shadow-xs" style="background-color: var(--accent); color: var(--accent-ink);">
             <GitBranch class="w-3.5 h-3.5" />
-            <span>GitHub 官方代码仓库</span>
+            <span>{{ t('admin.about.repoLink') }}</span>
           </a>
         </div>
 
         <div class="rounded-xl border p-4 sm:p-5 shadow-xs transition-colors" style="background-color: var(--surface-2); border-color: var(--line-1);">
           <div class="flex items-center justify-between pb-3 mb-3 border-b" style="border-color: var(--line-1);">
-            <h2 class="text-sm font-bold" style="color: var(--ink-1);">组件版本</h2>
-            <span class="text-[11px]" style="color: var(--ink-3);">生产运行栈</span>
+            <h2 class="text-sm font-bold" style="color: var(--ink-1);">{{ t('admin.about.componentsTitle') }}</h2>
+            <span class="text-[11px]" style="color: var(--ink-3);">{{ t('admin.about.componentsSub') }}</span>
           </div>
           <div class="table-scroll-container">
             <table class="w-full text-left whitespace-nowrap">
@@ -137,7 +139,7 @@ onMounted(() => {
         <div class="flex items-center justify-between pb-3 mb-3 border-b" style="border-color: var(--line-1);">
           <div class="flex items-center space-x-2">
             <ShieldCheck class="w-4 h-4 text-emerald-500" />
-            <h2 class="text-sm font-bold" style="color: var(--ink-1);">安全更新</h2>
+            <h2 class="text-sm font-bold" style="color: var(--ink-1);">{{ t('admin.about.securityUpdate') }}</h2>
           </div>
           <span class="text-[11px] px-2 py-0.5 rounded border font-bold" style="background-color: var(--accent-bg); color: var(--accent); border-color: var(--accent-line);">FF-ONLY</span>
         </div>
@@ -145,22 +147,22 @@ onMounted(() => {
         <!-- Git Status Telemetry Grid -->
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
           <div class="p-2.5 rounded-lg border" style="background-color: var(--surface-1); border-color: var(--line-1);">
-            <div class="text-[11px]" style="color: var(--ink-3);">当前分支</div>
+            <div class="text-[11px]" style="color: var(--ink-3);">{{ t('admin.about.currentBranch') }}</div>
             <div class="text-xs font-bold mt-0.5" style="color: var(--ink-1);">{{ about.update?.branch || 'main' }}</div>
           </div>
           <div class="p-2.5 rounded-lg border" style="background-color: var(--surface-1); border-color: var(--line-1);">
-            <div class="text-[11px]" style="color: var(--ink-3);">本地提交 (HEAD)</div>
+            <div class="text-[11px]" style="color: var(--ink-3);">{{ t('admin.about.localCommit') }}</div>
             <div class="text-xs font-bold mt-0.5 text-blue-400">{{ about.update?.local || '--' }}</div>
           </div>
           <div class="p-2.5 rounded-lg border" style="background-color: var(--surface-1); border-color: var(--line-1);">
-            <div class="text-[11px]" style="color: var(--ink-3);">远端提交 (origin)</div>
-            <div class="text-xs font-bold mt-0.5" style="color: var(--ink-1);">{{ about.update?.remote || '待检查' }}</div>
+            <div class="text-[11px]" style="color: var(--ink-3);">{{ t('admin.about.remoteCommit') }}</div>
+            <div class="text-xs font-bold mt-0.5" style="color: var(--ink-1);">{{ about.update?.remote || t('admin.about.pending') }}</div>
           </div>
           <div class="p-2.5 rounded-lg border" style="background-color: var(--surface-1); border-color: var(--line-1);">
-            <div class="text-[11px]" style="color: var(--ink-3);">待同步差额</div>
+            <div class="text-[11px]" style="color: var(--ink-3);">{{ t('admin.about.syncGap') }}</div>
             <div class="text-xs font-bold mt-0.5" :class="(about.update?.behind || 0) > 0 ? 'text-amber-400' : 'text-emerald-400'">
-              {{ (about.update?.behind || 0) > 0 ? `落后 ${about.update?.behind} 提交` : '已最新' }}
-              <span v-if="about.update?.ahead" class="text-[11px] text-gray-400 font-normal"> (领先 {{ about.update.ahead }})</span>
+              {{ (about.update?.behind || 0) > 0 ? t('admin.about.behind', undefined, { n: about.update?.behind }) : t('admin.about.upToDate') }}
+              <span v-if="about.update?.ahead" class="text-[11px] text-gray-400 font-normal"> {{ t('admin.about.ahead', undefined, { n: about.update.ahead }) }}</span>
             </div>
           </div>
         </div>
@@ -174,7 +176,7 @@ onMounted(() => {
             style="background-color: var(--surface-1); border-color: var(--line-2); color: var(--ink-1);"
           >
             <RefreshCw class="w-3.5 h-3.5" :class="updateChecking ? 'animate-spin' : ''" />
-            <span>{{ updateChecking ? '正在连接远端...' : '检查远端更新' }}</span>
+            <span>{{ updateChecking ? t('admin.about.connecting') : t('admin.about.checkUpdate') }}</span>
           </button>
 
           <button
@@ -184,7 +186,7 @@ onMounted(() => {
             style="background-color: var(--accent); border-color: var(--accent); color: var(--accent-ink);"
           >
             <Download class="w-3.5 h-3.5" />
-            <span>执行安全更新</span>
+            <span>{{ t('admin.about.runUpdate') }}</span>
           </button>
         </div>
 
@@ -209,14 +211,14 @@ onMounted(() => {
           <div v-if="updateResult.git_output" class="p-3 rounded-lg border bg-black/40 text-[11px] text-gray-300 space-y-1">
             <div class="flex items-center space-x-1 text-gray-400 text-[11px]">
               <Terminal class="w-3 h-3" />
-              <span>Git 执行输出：</span>
+              <span>{{ t('admin.about.gitOutput') }}</span>
             </div>
             <pre class="whitespace-pre-wrap leading-relaxed">{{ updateResult.git_output }}</pre>
           </div>
         </div>
 
         <p class="mt-3 text-[11px] leading-relaxed" style="color: var(--ink-3);">
-          安全保护机制：执行更新时仅允许 Fast-Forward 快进合并；如果工作区有未提交的追踪代码冲突、远端不可达或无法快进，后台将自动拒绝更新以保护系统稳定性。
+          {{ t('admin.about.safetyNote') }}
         </p>
       </div>
     </template>
@@ -233,18 +235,18 @@ onMounted(() => {
         <div class="flex items-center space-x-2 pb-3 border-b" style="border-color: var(--line-1);">
           <AlertTriangle class="w-5 h-5 text-amber-500 shrink-0" />
           <div>
-            <h3 class="text-sm font-bold" style="color: var(--ink-1);">确认更新 R20 系统</h3>
-            <p class="text-[11px]" style="color: var(--ink-2);"> 关于 R20：执行 fast-forward 拉取最新主分支代码 </p>
+            <h3 class="text-sm font-bold" style="color: var(--ink-1);">{{ t('admin.about.confirmTitle') }}</h3>
+            <p class="text-[11px]" style="color: var(--ink-2);"> {{ t('admin.about.confirmSubtitle') }} </p>
           </div>
         </div>
 
         <div class="space-y-2 text-xs" style="color: var(--ink-2);">
           <p>
-            为防止误操作，请在下方输入确认短语 <strong class="text-red-400 font-bold">UPDATE R20</strong>：
+            {{ t('admin.about.confirmPrefix') }} <strong class="text-red-400 font-bold">UPDATE R20</strong>{{ t('admin.about.confirmSuffix') }}
           </p>
           <input
             v-model="confirmPhrase"
-            placeholder="请输入 UPDATE R20"
+            :placeholder="t('admin.about.phrasePlaceholder')"
             class="w-full rounded-lg px-3 py-2 text-xs outline-none border uppercase"
             style="background-color: var(--surface-1); border-color: var(--line-1); color: var(--ink-1);"
             @keyup.enter="executeUpdate"
@@ -258,7 +260,7 @@ onMounted(() => {
             class="px-3 py-1.5 rounded-lg border text-xs cursor-pointer"
             style="background-color: var(--surface-1); border-color: var(--line-1); color: var(--ink-2);"
           >
-            取消
+            {{ t('admin.about.cancel') }}
           </button>
           <button
             @click="executeUpdate"
@@ -267,7 +269,7 @@ onMounted(() => {
             style="background-color: var(--accent); border-color: var(--accent); color: var(--accent-ink);"
           >
             <RefreshCw v-if="updateRunning" class="w-3.5 h-3.5 animate-spin" />
-            <span>{{ updateRunning ? '正在更新中...' : '立即确认更新' }}</span>
+            <span>{{ updateRunning ? t('admin.about.updating') : t('admin.about.confirmNow') }}</span>
           </button>
         </div>
       </div>

@@ -85,8 +85,8 @@ const cvRows = computed(() => {
     row('OKX', fmtPrice(f.value.price), ''),
     row('Binance', s ? _px(s.bin_last) + _basis(s.bin_basis_pct) : '--', dirClass(s?.bin_basis_pct)),
     row('Gate', s ? _px(s.gate_last) + _basis(s.gate_basis_pct) : '--', dirClass(s?.gate_basis_pct)),
-    row('L/S 币安/Gate', s ? `${_num(s.bin_ls)} / ${_num(s.gate_ls)}` : '--', ''),
-    row('Fund% 币安/Gate', s ? `${_num(s.bin_funding_pct, 4)} / ${_num(s.gate_funding_pct, 4)}` : '--', ''),
+    row(t('dash.matrix.venue.crossLs'), s ? `${_num(s.bin_ls)} / ${_num(s.gate_ls)}` : '--', ''),
+    row(t('dash.matrix.venue.crossFund'), s ? `${_num(s.bin_funding_pct, 4)} / ${_num(s.gate_funding_pct, 4)}` : '--', ''),
   ];
 });
 const cvHealth = computed(() => {
@@ -188,20 +188,20 @@ const vdBudgetText = computed(() => {
       <!-- 选所决策证据（US-004：消费 US-003 venue_decision 落盘段；缺数据优雅降级） -->
       <div class="card-flat p-3.5" data-test="venue-decision">
         <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
-          <p class="t-label">选所决策 · venue_decision</p>
+          <p class="t-label">{{ t('dash.matrix.venue.title') }}</p>
           <span v-if="vd?.decided_utc" class="num text-[10px]" style="color: var(--ink-3)">
-            {{ utcStrToBj(String(vd.decided_utc), true) }} 北京
+            {{ utcStrToBj(String(vd.decided_utc), true) }} {{ t('dash.matrix.venue.beijing') }}
           </span>
         </div>
         <template v-if="vd">
           <div class="flex flex-wrap items-center gap-1.5">
             <span class="badge" :style="{ color: vd.venue ? venueColor(vd.venue) : 'var(--ink-3)', borderColor: 'currentColor' }">
               <span class="dot" :style="{ backgroundColor: vd.venue ? venueColor(vd.venue) : 'var(--ink-3)' }" />
-              中选 {{ vd.venue ? venueLabel(vd.venue) : '未选中' }}
+              {{ t('dash.matrix.venue.selectedPrefix') }} {{ vd.venue ? venueLabel(vd.venue) : t('dash.matrix.venue.notSelected') }}
             </span>
-            <span :class="vdBadgeCls">{{ vd.reason_code || '原因码 --' }}</span>
-            <span v-if="!vdIsAuto" class="badge">手选优先 · {{ venueLabel(vd.preferred_venue) }}</span>
-            <span v-if="vd.hysteresis_applied" class="badge">滞回保留现任</span>
+            <span :class="vdBadgeCls">{{ vd.reason_code || t('dash.matrix.venue.reasonCodeFallback') }}</span>
+            <span v-if="!vdIsAuto" class="badge">{{ t('dash.matrix.venue.manualPrefix') }} · {{ venueLabel(vd.preferred_venue) }}</span>
+            <span v-if="vd.hysteresis_applied" class="badge">{{ t('dash.matrix.venue.hysteresis') }}</span>
             <span v-if="vd.outcome" class="badge">{{ vd.outcome }}</span>
           </div>
           <p v-if="vd.skip_reason" class="mt-2 text-xs leading-relaxed" style="color: var(--down)">{{ vd.skip_reason }}</p>
@@ -210,16 +210,16 @@ const vdBudgetText = computed(() => {
           </ul>
           <div v-if="vdAllocation.length" class="mt-2 flex flex-wrap gap-1.5">
             <span v-for="(a, i) in vdAllocation" :key="'vd-a-' + i" class="badge num text-[10px]">
-              分配 {{ venueLabel(a.venue) }} {{ fmtNum(numOrNull(a.amount_usdt), 2) }}U
+              {{ t('dash.matrix.venue.allocPrefix') }} {{ venueLabel(a.venue) }} {{ fmtNum(numOrNull(a.amount_usdt), 2) }}U
             </span>
           </div>
           <!-- 被淘汰候选：移动端横滑不折列 -->
           <div v-if="vdRejected.length" class="mt-2.5">
-            <p class="t-label mb-1">被淘汰候选 · {{ vdRejected.length }} 所</p>
+            <p class="t-label mb-1">{{ t('dash.matrix.venue.rejectedTitle', undefined, { n: vdRejected.length }) }}</p>
             <div class="table-scroll-container rounded-lg" style="border: 1px solid var(--line-1)">
               <table class="table">
                 <thead>
-                  <tr><th>交易所</th><th>淘汰阶段</th><th>原因</th></tr>
+                  <tr><th>{{ t('dash.matrix.venue.thVenue') }}</th><th>{{ t('dash.matrix.venue.thStage') }}</th><th>{{ t('dash.matrix.venue.thReason') }}</th></tr>
                 </thead>
                 <tbody>
                   <tr v-for="(r, i) in vdRejected" :key="'vd-j-' + i">
@@ -233,7 +233,7 @@ const vdBudgetText = computed(() => {
           </div>
           <p v-if="vdBudgetText" class="mt-2 border-t pt-2 text-[11px] leading-relaxed" style="border-color: var(--line-1); color: var(--ink-3)">{{ vdBudgetText }}</p>
         </template>
-        <p v-else class="t-muted text-xs">暂无选所决策证据——该信号本周期未走选所路由链路（接线周期生成后自动展示）。</p>
+        <p v-else class="t-muted text-xs">{{ t('dash.matrix.venue.noEvidence') }}</p>
       </div>
 
       <!-- 数据组 -->
@@ -265,8 +265,8 @@ const vdBudgetText = computed(() => {
       <!-- 跨所协调（US-007：/api/all cross_venue 消费端） -->
       <div class="card-flat p-3">
         <div class="mb-2 flex items-baseline justify-between gap-2">
-          <p class="t-label">跨所 · Binance / Gate</p>
-          <span v-if="cvUpdated" class="num text-[10px]" style="color: var(--ink-3)">{{ utcStrToBj(cvUpdated, true) }} 北京</span>
+          <p class="t-label">{{ t('dash.matrix.venue.crossTitle') }}</p>
+          <span v-if="cvUpdated" class="num text-[10px]" style="color: var(--ink-3)">{{ utcStrToBj(cvUpdated, true) }} {{ t('dash.matrix.venue.beijing') }}</span>
         </div>
         <div class="mb-2 flex flex-wrap gap-1.5">
           <span v-for="h in cvHealth" :key="h.key"
@@ -281,7 +281,7 @@ const vdBudgetText = computed(() => {
             <dd class="num font-semibold" :class="r.cls" style="color: var(--ink-1)">{{ r.value }}</dd>
           </div>
         </dl>
-        <p v-if="!cvSymbol" class="t-muted mt-2 text-[11px]">该币暂无跨所快照——等待下一个 15 分钟决策周期生成。</p>
+        <p v-if="!cvSymbol" class="t-muted mt-2 text-[11px]">{{ t('dash.matrix.venue.crossEmpty') }}</p>
       </div>
 
       <!-- 推演过程 -->

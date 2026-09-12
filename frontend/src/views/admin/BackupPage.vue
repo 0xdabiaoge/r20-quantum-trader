@@ -253,10 +253,10 @@ onMounted(load)
 <template>
   <div class="space-y-4">
     <div class="flex items-center justify-between">
-      <p class="text-xs text-[var(--ink-3)]">支持本地/云端全量数据灾备、备份打包直接下载、本地备份上传与一键全量恢复。</p>
-      <span class="text-[11px] text-blue-400 bg-blue-500/10 px-2 py-1 rounded border border-blue-500/20">集成与保障 · 2/3</span>
+      <p class="text-xs text-[var(--ink-3)]">{{ t('admin.backup.intro') }}</p>
+      <span class="text-[11px] text-blue-400 bg-blue-500/10 px-2 py-1 rounded border border-blue-500/20">{{ t('admin.backup.badge') }}</span>
     </div>
-    <div v-if="loading" class="py-12 text-center text-xs" style="color: var(--ink-2);"><RefreshCw class="w-5 h-5 animate-spin inline mr-1.5" style="color: var(--accent);" />正在加载灾备配置...</div>
+    <div v-if="loading" class="py-12 text-center text-xs" style="color: var(--ink-2);"><RefreshCw class="w-5 h-5 animate-spin inline mr-1.5" style="color: var(--accent);" />{{ t('admin.backup.loading') }}</div>
 
     <template v-else-if="simple">
       <!-- Simple Config -->
@@ -265,11 +265,11 @@ onMounted(load)
           <div class="flex items-center space-x-2">
             <HardDrive class="w-4 h-4" style="color: var(--accent);" />
             <h2 class="text-sm font-bold" style="color: var(--ink-1);">{{ t('nav.admin.backup') }}</h2>
-        <p class="text-[11px] mt-0.5" style="color: var(--ink-2);"> 自动灾备 </p>
+        <p class="text-[11px] mt-0.5" style="color: var(--ink-2);"> {{ t('admin.backup.autoBackup') }} </p>
           </div>
           <label class="flex items-center space-x-2 text-xs cursor-pointer">
             <input v-model="enabled" type="checkbox" class="accent-blue-500 w-4 h-4" :disabled="!auth.isSuperadmin" />
-            <span :class="enabled ? 'text-emerald-500 font-bold' : 'text-zinc-500'">{{ enabled ? '每日自动灾备已启用' : '已停用' }}</span>
+            <span :class="enabled ? 'text-emerald-500 font-bold' : 'text-zinc-500'">{{ enabled ? t('admin.backup.enabledOn') : t('admin.backup.enabledOff') }}</span>
           </label>
         </div>
 
@@ -277,34 +277,34 @@ onMounted(load)
 
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <div>
-            <label class="block text-[11px] mb-1" style="color: var(--ink-2);">1. 备份内容</label>
+            <label class="block text-[11px] mb-1" style="color: var(--ink-2);">{{ t('admin.backup.secContent') }}</label>
             <select disabled class="w-full rounded-lg px-3 py-2 text-xs opacity-70 border" style="background-color: var(--surface-input); border-color: var(--line-1); color: var(--ink-1);">
-              <option>R20 系统、策略、配置与运行数据</option>
+              <option>{{ t('admin.backup.scopeValue') }}</option>
             </select>
           </div>
           <div>
-            <label class="block text-[11px] mb-1" style="color: var(--ink-2);">2. 保存位置</label>
+            <label class="block text-[11px] mb-1" style="color: var(--ink-2);">{{ t('admin.backup.secLocation') }}</label>
             <select v-model="destination" :disabled="!auth.isSuperadmin" class="w-full rounded-lg px-3 py-2 text-xs outline-none border cursor-pointer" style="background-color: var(--surface-input); border-color: var(--line-1); color: var(--ink-1);">
-              <option value="local">本地滚动归档</option>
-              <option value="s3">S3 兼容存储</option>
-              <option value="oss">阿里云 OSS</option>
-              <option value="webdav">WebDAV / OpenList</option>
-              <option value="baidu_oauth">百度网盘（官方 OAuth）</option>
+              <option value="local">{{ t('admin.backup.destLocal') }}</option>
+              <option value="s3">{{ t('admin.backup.destS3') }}</option>
+              <option value="oss">{{ t('admin.backup.destOss') }}</option>
+              <option value="webdav">{{ t('admin.backup.destWebdav') }}</option>
+              <option value="baidu_oauth">{{ t('admin.backup.destBaidu') }}</option>
             </select>
           </div>
           <div>
-            <label class="block text-[11px] mb-1" style="color: var(--ink-2);">3. 每天执行时间（北京时间）</label>
+            <label class="block text-[11px] mb-1" style="color: var(--ink-2);">{{ t('admin.backup.secSchedule') }}</label>
             <input v-model="scheduleTime" type="time" :disabled="!auth.isSuperadmin" class="w-full rounded-lg px-3 py-2 text-xs outline-none border" style="background-color: var(--surface-input); border-color: var(--line-1); color: var(--ink-1);" />
           </div>
           <div>
-            <label class="block text-[11px] mb-1" style="color: var(--ink-2);">4. 保留最近几份{{ destination === 'local' ? '（本地）' : '' }}</label>
+            <label class="block text-[11px] mb-1" style="color: var(--ink-2);">{{ t('admin.backup.secRetention') }}{{ destination === 'local' ? t('admin.backup.retentionLocal') : '' }}</label>
             <input v-model="retention" type="number" min="1" max="365" :disabled="!auth.isSuperadmin" class="w-full rounded-lg px-3 py-2 text-xs outline-none border num" style="background-color: var(--surface-input); border-color: var(--line-1); color: var(--ink-1);" />
           </div>
         </div>
 
         <!-- Remote Credentials -->
         <div v-if="remoteDest" class="mt-4 p-3.5 rounded-lg border" style="background-color: var(--surface-1); border-color: var(--line-1);">
-          <div class="text-[11px] mb-2" style="color: var(--ink-2);">连接信息（保存进本机加密密文库，不回显明文）</div>
+          <div class="text-[11px] mb-2" style="color: var(--ink-2);">{{ t('admin.backup.connInfo') }}</div>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div v-if="destination !== 'baidu_oauth'">
               <label class="block text-[11px] mb-1" style="color: var(--ink-2);">Endpoint</label>
@@ -316,35 +316,35 @@ onMounted(load)
             </div>
             <div v-for="f in credentialFields" :key="f">
               <label class="block text-[11px] mb-1" style="color: var(--ink-2);">{{ f }}</label>
-              <input v-model="credentials[f]" type="password" :disabled="!auth.isSuperadmin" :placeholder="simple.configured ? '留空保持现有值' : ''" class="w-full rounded-lg px-3 py-2 text-xs outline-none border" style="background-color: var(--surface-input); border-color: var(--line-1); color: var(--ink-1);" />
+              <input v-model="credentials[f]" type="password" :disabled="!auth.isSuperadmin" :placeholder="simple.configured ? t('admin.backup.keepExisting') : ''" class="w-full rounded-lg px-3 py-2 text-xs outline-none border" style="background-color: var(--surface-input); border-color: var(--line-1); color: var(--ink-1);" />
             </div>
           </div>
         </div>
 
         <div class="flex flex-wrap items-center gap-2 mt-4">
           <template v-if="auth.isSuperadmin">
-            <button @click="testConnection" :disabled="busy !== ''" class="flex items-center space-x-1 px-3 py-2 rounded-lg border text-xs cursor-pointer disabled:opacity-40 transition-all shadow-xs" style="background-color: var(--surface-1); border-color: var(--line-2); color: var(--ink-1);"><PlugZap class="w-3.5 h-3.5" /><span>{{ busy === 'test' ? '测试中...' : '测试连接' }}</span></button>
-            <button @click="save" :disabled="busy !== ''" class="flex items-center space-x-1 px-3 py-2 rounded-lg text-xs font-bold cursor-pointer disabled:opacity-40 transition-all shadow-xs" style="background-color: var(--accent); color: var(--accent-ink);"><Save class="w-3.5 h-3.5" /><span>{{ busy === 'save' ? '保存中...' : '保存灾备' }}</span></button>
-            <button @click="runNow" :disabled="busy !== ''" class="flex items-center space-x-1 px-3 py-2 rounded-lg text-xs font-bold cursor-pointer disabled:opacity-40 transition-all shadow-xs" style="background-color: var(--down-bg); border-color: var(--down-line); color: var(--down);"><PlayCircle class="w-3.5 h-3.5" /><span>{{ busy === 'run' ? '执行中（最长10分钟）...' : '立即备份' }}</span></button>
+            <button @click="testConnection" :disabled="busy !== ''" class="flex items-center space-x-1 px-3 py-2 rounded-lg border text-xs cursor-pointer disabled:opacity-40 transition-all shadow-xs" style="background-color: var(--surface-1); border-color: var(--line-2); color: var(--ink-1);"><PlugZap class="w-3.5 h-3.5" /><span>{{ busy === 'test' ? t('admin.backup.testing') : t('admin.backup.testConnection') }}</span></button>
+            <button @click="save" :disabled="busy !== ''" class="flex items-center space-x-1 px-3 py-2 rounded-lg text-xs font-bold cursor-pointer disabled:opacity-40 transition-all shadow-xs" style="background-color: var(--accent); color: var(--accent-ink);"><Save class="w-3.5 h-3.5" /><span>{{ busy === 'save' ? t('admin.backup.saving') : t('admin.backup.saveBackup') }}</span></button>
+            <button @click="runNow" :disabled="busy !== ''" class="flex items-center space-x-1 px-3 py-2 rounded-lg text-xs font-bold cursor-pointer disabled:opacity-40 transition-all shadow-xs" style="background-color: var(--down-bg); border-color: var(--down-line); color: var(--down);"><PlayCircle class="w-3.5 h-3.5" /><span>{{ busy === 'run' ? t('admin.backup.running') : t('admin.backup.backupNow') }}</span></button>
 
             <!-- Hidden file input for upload -->
             <input ref="uploadFileInput" type="file" accept=".tar.gz,.tgz" class="hidden" @change="onFileSelected" />
-            <button @click="triggerUpload" :disabled="busy !== ''" class="flex items-center space-x-1 px-3 py-2 rounded-lg border text-xs font-bold cursor-pointer disabled:opacity-40 transition-all shadow-xs" style="background-color: var(--surface-1); border-color: var(--line-2); color: var(--accent);"><Upload class="w-3.5 h-3.5" /><span>{{ busy === 'upload' ? '正在上传...' : '上传备份包' }}</span></button>
+            <button @click="triggerUpload" :disabled="busy !== ''" class="flex items-center space-x-1 px-3 py-2 rounded-lg border text-xs font-bold cursor-pointer disabled:opacity-40 transition-all shadow-xs" style="background-color: var(--surface-1); border-color: var(--line-2); color: var(--accent);"><Upload class="w-3.5 h-3.5" /><span>{{ busy === 'upload' ? t('admin.backup.uploading') : t('admin.backup.uploadPackage') }}</span></button>
           </template>
-          <span v-else class="text-[11px]" style="color: var(--ink-3);">只读视图 · 修改需超级管理员登录</span>
-          <span class="ml-auto text-[11px] font-bold" :class="simple.configured ? 'text-emerald-500' : 'text-amber-500'">{{ simple.configured ? '● 目标已配置' : '● 目标未配置' }}</span>
+          <span v-else class="text-[11px]" style="color: var(--ink-3);">{{ t('admin.backup.readonly') }}</span>
+          <span class="ml-auto text-[11px] font-bold" :class="simple.configured ? 'text-emerald-500' : 'text-amber-500'">{{ simple.configured ? t('admin.backup.targetConfigured') : t('admin.backup.targetNotConfigured') }}</span>
         </div>
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <!-- Latest -->
         <div class="rounded-xl border p-4 sm:p-5 shadow-xs transition-colors" style="background-color: var(--surface-2); border-color: var(--line-1);">
-          <h2 class="text-xs font-bold uppercase mb-3" style="color: var(--ink-1);">最近一次灾备</h2>
+          <h2 class="text-xs font-bold uppercase mb-3" style="color: var(--ink-1);">{{ t('admin.backup.latestRun') }}</h2>
           <div v-if="simple.latest" class="space-y-1.5 text-xs">
-            <div class="flex justify-between border rounded-lg px-3 py-2" style="background-color: var(--surface-1); border-color: var(--line-1);"><span style="color: var(--ink-2);">时间</span><span class="num" style="color: var(--ink-1);">{{ fmtBackupTime(simple.latest) }}</span></div>
-            <div class="flex justify-between border rounded-lg px-3 py-2" style="background-color: var(--surface-1); border-color: var(--line-1);"><span style="color: var(--ink-2);">状态</span><span class="text-emerald-500 font-bold">{{ simple.latest.status || 'success' }}</span></div>
+            <div class="flex justify-between border rounded-lg px-3 py-2" style="background-color: var(--surface-1); border-color: var(--line-1);"><span style="color: var(--ink-2);">{{ t('admin.backup.time') }}</span><span class="num" style="color: var(--ink-1);">{{ fmtBackupTime(simple.latest) }}</span></div>
+            <div class="flex justify-between border rounded-lg px-3 py-2" style="background-color: var(--surface-1); border-color: var(--line-1);"><span style="color: var(--ink-2);">{{ t('admin.backup.status') }}</span><span class="text-emerald-500 font-bold">{{ simple.latest.status || 'success' }}</span></div>
           </div>
-          <div v-else class="py-6 text-center text-xs" style="color: var(--ink-3);">尚无匹配的灾备清单记录</div>
+          <div v-else class="py-6 text-center text-xs" style="color: var(--ink-3);">{{ t('admin.backup.noLatest') }}</div>
           <div class="text-[11px] mt-3 leading-relaxed" style="color: var(--ink-3);">{{ status?.schedule }}</div>
         </div>
 
@@ -353,18 +353,18 @@ onMounted(load)
           <div class="px-4 py-3 border-b flex items-center justify-between" style="border-color: var(--line-1); background-color: var(--surface-1);">
             <div class="flex items-center space-x-2">
               <Archive class="w-4 h-4 text-cyan-400" />
-              <h2 class="text-xs font-semibold" style="color: var(--ink-1);">备份归档清单 ({{ status?.local_archives?.length ?? 0 }})</h2>
+              <h2 class="text-xs font-semibold" style="color: var(--ink-1);">{{ t('admin.backup.archiveList') }} ({{ status?.local_archives?.length ?? 0 }})</h2>
             </div>
-            <span class="text-[11px]" style="color: var(--ink-3);">支持直接下载与一键恢复</span>
+            <span class="text-[11px]" style="color: var(--ink-3);">{{ t('admin.backup.archiveHint') }}</span>
           </div>
           <div class="table-scroll-container">
             <table v-if="status?.local_archives?.length" class="w-full text-left text-xs whitespace-nowrap">
               <thead>
                 <tr class="border-b text-[11px] uppercase tracking-wider font-bold" style="border-color: var(--line-1); background-color: var(--surface-1); color: var(--ink-2);">
-                  <th class="py-2.5 px-4">归档文件</th>
-                  <th class="py-2.5 px-3 text-right">大小</th>
-                  <th class="py-2.5 px-4 text-right">创建时间</th>
-                  <th class="py-2.5 px-4 text-center">操作</th>
+                  <th class="py-2.5 px-4">{{ t('admin.backup.thArchive') }}</th>
+                  <th class="py-2.5 px-3 text-right">{{ t('admin.backup.thSize') }}</th>
+                  <th class="py-2.5 px-4 text-right">{{ t('admin.backup.thCreated') }}</th>
+                  <th class="py-2.5 px-4 text-center">{{ t('admin.backup.thActions') }}</th>
                 </tr>
               </thead>
               <tbody>
@@ -378,7 +378,7 @@ onMounted(load)
                         @click="downloadArchive(a.name)"
                         :disabled="downloadingArchive === (a.name.split('/').pop() || a.name)"
                         class="p-1 rounded hover:bg-[var(--surface-3)] text-[var(--accent)] transition-colors cursor-pointer disabled:opacity-50"
-                        title="下载归档到本地"
+                        :title="t('admin.backup.downloadTitle')"
                       >
                         <RefreshCw v-if="downloadingArchive === (a.name.split('/').pop() || a.name)" class="w-3.5 h-3.5 animate-spin" />
                         <Download v-else class="w-3.5 h-3.5" />
@@ -388,7 +388,7 @@ onMounted(load)
                         @click="restoreArchive(a.name)"
                         :disabled="busy === 'restore'"
                         class="p-1 rounded hover:bg-[var(--surface-3)] text-amber-500 transition-colors cursor-pointer"
-                        title="恢复此备份到系统"
+                        :title="t('admin.backup.restoreTitle')"
                       >
                         <RotateCcw class="w-3.5 h-3.5" />
                       </button>
@@ -397,7 +397,7 @@ onMounted(load)
                 </tr>
               </tbody>
             </table>
-            <div v-else class="py-8 text-center text-xs" style="color: var(--ink-2);">暂无本地待清归档，可点击「立即备份」生成完整镜像包或「上传备份包」</div>
+            <div v-else class="py-8 text-center text-xs" style="color: var(--ink-2);">{{ t('admin.backup.emptyArchives') }}</div>
           </div>
         </div>
       </div>

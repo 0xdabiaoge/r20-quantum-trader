@@ -28,17 +28,17 @@ onMounted(load)
 <template>
   <div class="space-y-4 max-w-[2048px] mx-auto">
     <div class="flex items-center justify-between">
-      <p class="text-xs" style="color: var(--ink-2);"> 插件清单：内置插件健康状态；实盘控制面仅允许随仓库审计过的内置插件。 </p>
+      <p class="text-xs" style="color: var(--ink-2);"> {{ t('admin.plugins.intro') }} </p>
       <span
         class="text-[11px] px-2 py-1 rounded border font-bold"
         style="background-color: var(--accent-bg); color: var(--accent); border-color: var(--accent-line);"
       >
-        策略配置 · 2/3
+        {{ t('admin.plugins.badge') }}
       </span>
     </div>
 
     <div v-if="errText" class="p-3 rounded-lg text-xs border" style="background-color: var(--down-bg); border-color: var(--down-line); color: var(--down);">{{ errText }}</div>
-    <div v-if="loading" class="py-12 text-center text-xs" style="color: var(--ink-2);"><RefreshCw class="w-5 h-5 animate-spin inline mr-1.5" style="color: var(--accent);" />正在加载插件状态...</div>
+    <div v-if="loading" class="py-12 text-center text-xs" style="color: var(--ink-2);"><RefreshCw class="w-5 h-5 animate-spin inline mr-1.5" style="color: var(--accent);" />{{ t('admin.plugins.loading') }}</div>
 
     <template v-else-if="data">
       <div class="rounded-xl border p-4 sm:p-5 shadow-xs transition-colors" style="background-color: var(--surface-2); border-color: var(--line-1);">
@@ -49,7 +49,7 @@ onMounted(load)
           </div>
           <button @click="load" class="flex items-center space-x-1 px-2.5 py-1 rounded-lg border text-[11px] cursor-pointer transition-all shadow-xs" style="background-color: var(--surface-1); border-color: var(--line-2); color: var(--ink-1);">
             <RefreshCw class="w-3 h-3" />
-            <span>刷新</span>
+            <span>{{ t('admin.plugins.refresh') }}</span>
           </button>
         </div>
 
@@ -57,12 +57,12 @@ onMounted(load)
           <table class="w-full text-left text-xs whitespace-nowrap">
             <thead>
               <tr class="border-b text-[11px] uppercase tracking-wider font-bold" style="border-color: var(--line-1); background-color: var(--surface-1); color: var(--ink-2);">
-                <th class="py-2.5 px-3">插件</th>
-                <th class="py-2.5 px-3">类型</th>
-                <th class="py-2.5 px-3">版本</th>
-                <th class="py-2.5 px-3">权限声明</th>
-                <th class="py-2.5 px-3">启用开关</th>
-                <th class="py-2.5 px-3">健康状态</th>
+                <th class="py-2.5 px-3">{{ t('admin.plugins.thPlugin') }}</th>
+                <th class="py-2.5 px-3">{{ t('admin.plugins.thType') }}</th>
+                <th class="py-2.5 px-3">{{ t('admin.plugins.thVersion') }}</th>
+                <th class="py-2.5 px-3">{{ t('admin.plugins.thPermissions') }}</th>
+                <th class="py-2.5 px-3">{{ t('admin.plugins.thEnableSwitch') }}</th>
+                <th class="py-2.5 px-3">{{ t('admin.plugins.thHealth') }}</th>
               </tr>
             </thead>
             <tbody>
@@ -74,9 +74,9 @@ onMounted(load)
                 <td class="py-2.5 px-3" style="color: var(--ink-2);">{{ p.plugin_type }}</td>
                 <td class="py-2.5 px-3 num" style="color: var(--ink-3);">{{ p.version }}</td>
                 <td class="py-2.5 px-3 text-[11px]" style="color: var(--ink-2);">{{ (p.permissions || []).join(', ') }}</td>
-                <td class="py-2.5 px-3" style="color: var(--ink-3);">{{ p.enabled_key || '默认启用' }}</td>
+                <td class="py-2.5 px-3" style="color: var(--ink-3);">{{ p.enabled_key || t('admin.plugins.defaultEnabled') }}</td>
                 <td class="py-2.5 px-3 font-bold" :class="p.health === 'healthy' ? 'text-emerald-500' : 'text-amber-500'">
-                  {{ p.health === 'healthy' ? '正常' : p.health === 'disabled' ? '已禁用' : p.health }}
+                  {{ p.health === 'healthy' ? t('admin.plugins.healthNormal') : p.health === 'disabled' ? t('admin.plugins.healthDisabled') : p.health }}
                 </td>
               </tr>
             </tbody>
@@ -87,7 +87,7 @@ onMounted(load)
       <div class="rounded-xl border p-4 flex items-start gap-3 shadow-xs" style="background-color: var(--surface-2); border-color: var(--line-1);">
         <ShieldAlert class="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
         <div>
-          <h3 class="text-xs font-bold text-amber-500 mb-1">安装策略：{{ data.installation_policy === 'builtin-only' ? '仅内置插件' : data.installation_policy }}</h3>
+          <h3 class="text-xs font-bold text-amber-500 mb-1">{{ t('admin.plugins.installPolicy') }}{{ data.installation_policy === 'builtin-only' ? t('admin.plugins.policyBuiltinOnly') : data.installation_policy }}</h3>
           <p class="text-[11px] leading-relaxed" style="color: var(--ink-2);">{{ data.reason }}</p>
         </div>
       </div>

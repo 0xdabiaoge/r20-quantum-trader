@@ -31,4 +31,6 @@ export const zhAdminOverview = {
   dataHealth: '数据管道健康',
   dataHealthDesc: '关键落盘文件的最后更新与体积',
   recentAudit: '最近管理动作',
+  quickVenues: '交易场所与路由',
+  quickVenuesDesc: '三所平权配置 · 点击管理',
 };

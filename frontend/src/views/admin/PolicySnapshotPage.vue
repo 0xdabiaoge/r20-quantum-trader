@@ -55,7 +55,7 @@ async function fetchSnapshot() {
       archives.value = arcRes.archives || []
     }
   } catch (err: any) {
-    errorMsg.value = err.message || '获取策略版本快照失败'
+    errorMsg.value = err.message || t('admin.policySnapshot.err.fetchFailed')
   } finally {
     loading.value = false
     refreshing.value = false
@@ -64,11 +64,11 @@ async function fetchSnapshot() {
 
 async function saveArchive() {
   if (!auth.isSuperadmin) {
-    toast.err('仅超级管理员可归档策略版本')
+    toast.err(t('admin.policySnapshot.err.notSuperadmin'))
     return
   }
   if (!archiveName.value.trim()) {
-    toast.warn('请输入策略归档名称')
+    toast.warn(t('admin.policySnapshot.err.nameRequired'))
     return
   }
   archiving.value = true
@@ -81,14 +81,14 @@ async function saveArchive() {
       }),
     })
     if (res && res.ok) {
-      toast.ok(`策略版本已归档入库：${res.entry?.name} (#${res.entry?.policy_hash})`)
+      toast.ok(t('admin.policySnapshot.toast.archivedOk', undefined, { name: res.entry?.name, hash: res.entry?.policy_hash }))
       showArchiveModal.value = false
       archiveName.value = ''
       archiveDesc.value = ''
       await fetchSnapshot()
     }
   } catch (err: any) {
-    toast.err(`归档失败: ${err.message}`)
+    toast.err(t('admin.policySnapshot.err.archiveFailed', undefined, { msg: err.message }))
   } finally {
     archiving.value = false
   }
@@ -96,7 +96,7 @@ async function saveArchive() {
 
 async function restorePolicy(hash: string, name: string) {
   if (!auth.isSuperadmin) return
-  if (!confirm(`确定要将当前策略原子回滚至【${name}】(#${hash}) 吗？\n将同时恢复对应的提示词、心法、拦截器及投委会配置！`)) {
+  if (!confirm(t('admin.policySnapshot.confirm.restore', undefined, { name, hash }))) {
     return
   }
   restoring.value = true
@@ -106,11 +106,11 @@ async function restorePolicy(hash: string, name: string) {
       body: JSON.stringify({ policy_hash: hash }),
     })
     if (res && res.ok) {
-      toast.ok(`策略已原子回滚至【${name}】(#${hash})！下一决策周期将立即生效`)
+      toast.ok(t('admin.policySnapshot.toast.restoredOk', undefined, { name, hash }))
       await fetchSnapshot()
     }
   } catch (err: any) {
-    toast.err(`回滚失败: ${err.message}`)
+    toast.err(t('admin.policySnapshot.err.restoreFailed', undefined, { msg: err.message }))
   } finally {
     restoring.value = false
   }
@@ -118,7 +118,7 @@ async function restorePolicy(hash: string, name: string) {
 
 async function deleteArchive(hash: string, name: string) {
   if (!auth.isSuperadmin) return
-  if (!confirm(`确定要彻底删除已归档的策略版本【${name}】(#${hash}) 吗？\n删除后不可恢复！`)) {
+  if (!confirm(t('admin.policySnapshot.confirm.delete', undefined, { name, hash }))) {
     return
   }
   deleting.value = hash
@@ -127,18 +127,18 @@ async function deleteArchive(hash: string, name: string) {
       method: 'DELETE',
     })
     if (res && res.ok) {
-      toast.ok(`🗑️ 策略版本【${name}】已成功删除`)
+      toast.ok(t('admin.policySnapshot.toast.deletedOk', undefined, { name }))
       await fetchSnapshot()
     }
   } catch (err: any) {
-    toast.err(`删除失败: ${err.message}`)
+    toast.err(t('admin.policySnapshot.err.deleteFailed', undefined, { msg: err.message }))
   } finally {
     deleting.value = null
   }
 }
 
 function formatTimestamp(ts: number) {
-  if (!ts) return '未记录'
+  if (!ts) return t('admin.policySnapshot.notRecorded')
   return fmtDateTime(ts * 1000)
 }
 
@@ -175,7 +175,7 @@ onMounted(() => {
               {{ snapshotData.policy_version }}
             </span>
           </div>
-          <p class="text-xs 2xl:text-sm mt-0.5" style="color: var(--ink-2);"> 四大策略单元（提示词、自进化、物理拦截、模型委员会）的不可变指纹聚合，支持具名归档与一键回滚 </p>
+          <p class="text-xs 2xl:text-sm mt-0.5" style="color: var(--ink-2);">{{ t('admin.policySnapshot.desc') }}</p>
         </div>
       </div>
 
@@ -188,7 +188,7 @@ onMounted(() => {
           style="background-color: var(--accent); color: var(--accent-ink);"
         >
           <BookmarkPlus class="w-3.5 h-3.5 2xl:w-4 2xl:h-4" />
-          <span>归档为策略版本</span>
+          <span>{{ t('admin.policySnapshot.btn.archive') }}</span>
         </button>
 
         <!-- Refresh Button -->
@@ -199,7 +199,7 @@ onMounted(() => {
           style="background-color: var(--surface-1); border-color: var(--line-2); color: var(--ink-1);"
         >
           <RefreshCw class="w-3.5 h-3.5 2xl:w-4 2xl:h-4" :class="{ 'animate-spin': refreshing }" />
-          <span>{{ refreshing ? '抓取中...' : '刷新指纹' }}</span>
+          <span>{{ refreshing ? t('admin.policySnapshot.btn.refreshing') : t('admin.policySnapshot.btn.refresh') }}</span>
         </button>
       </div>
     </div>
@@ -214,7 +214,7 @@ onMounted(() => {
 
     <!-- Loading Skeleton -->
     <div v-if="loading" class="py-12 text-center text-xs text-zinc-500">
-      正在计算并聚合四大策略单元实时指纹...
+      {{ t('admin.policySnapshot.loading') }}
     </div>
 
     <div v-else-if="snapshotData?.snapshot" class="space-y-4 2xl:space-y-6">
@@ -226,7 +226,7 @@ onMounted(() => {
         <div class="flex items-center space-x-2">
           <Hash class="w-4 h-4 2xl:w-5 2xl:h-5 text-purple-400 shrink-0" />
           <div>
-            <div class="text-[11px] 2xl:text-xs text-[var(--ink-2)]">当前活跃策略版本</div>
+            <div class="text-[11px] 2xl:text-xs text-[var(--ink-2)]">{{ t('admin.policySnapshot.identity.activeVersion') }}</div>
             <div class="font-bold text-sm 2xl:text-base mt-0.5" style="color: var(--ink-1);">
               {{ snapshotData.snapshot.policy_version }}
             </div>
@@ -235,7 +235,7 @@ onMounted(() => {
         <div class="flex items-center space-x-2">
           <Activity class="w-4 h-4 2xl:w-5 2xl:h-5 text-cyan-400 shrink-0" />
           <div>
-            <div class="text-[11px] 2xl:text-xs text-[var(--ink-2)]">不可变指纹哈希</div>
+            <div class="text-[11px] 2xl:text-xs text-[var(--ink-2)]">{{ t('admin.policySnapshot.identity.hash') }}</div>
             <div class="font-bold text-sm 2xl:text-base mt-0.5 text-cyan-400">
               #{{ snapshotData.snapshot.policy_hash }}
             </div>
@@ -244,7 +244,7 @@ onMounted(() => {
         <div class="flex items-center space-x-2">
           <Clock class="w-4 h-4 2xl:w-5 2xl:h-5 text-emerald-400 shrink-0" />
           <div>
-            <div class="text-[11px] 2xl:text-xs text-[var(--ink-2)]">快照生成时间</div>
+            <div class="text-[11px] 2xl:text-xs text-[var(--ink-2)]">{{ t('admin.policySnapshot.identity.generatedAt') }}</div>
             <div class="font-bold text-sm 2xl:text-base mt-0.5 text-emerald-400">
               {{ formatTimestamp(snapshotData.snapshot.timestamp) }}
             </div>
@@ -265,41 +265,41 @@ onMounted(() => {
                 <span class="p-1.5 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400">
                   <FileText class="w-4 h-4" />
                 </span>
-                <span class="font-bold text-xs" style="color: var(--ink-1);">提示词策略工作室</span>
+                <span class="font-bold text-xs" style="color: var(--ink-1);">{{ t('admin.policySnapshot.unit.prompt.title') }}</span>
               </div>
               <router-link
                 to="/admin/promptlib"
                 class="text-[11px] text-blue-400 flex items-center hover:underline"
               >
-                <span>进入配置</span>
+                <span>{{ t('admin.policySnapshot.unit.enter') }}</span>
                 <ArrowUpRight class="w-3 h-3 ml-0.5" />
               </router-link>
             </div>
 
             <div class="space-y-1 text-xs">
               <div class="flex justify-between py-1 border-b border-dashed" style="border-color: var(--line-1);">
-                <span class="text-[var(--ink-2)]">当前方案名称:</span>
+                <span class="text-[var(--ink-2)]">{{ t('admin.policySnapshot.unit.prompt.profile') }}</span>
                 <span class="font-bold" style="color: var(--ink-1);">
                   {{ snapshotData.snapshot.units?.prompt_profile?.active_profile_name || snapshotData.snapshot.units?.prompt_profile?.active_profile_id }}
                 </span>
               </div>
               <div class="flex justify-between py-1 border-b border-dashed" style="border-color: var(--line-1);">
-                <span class="text-[var(--ink-2)]">模块布局指纹 Layout Hash:</span>
+                <span class="text-[var(--ink-2)]">{{ t('admin.policySnapshot.unit.prompt.layoutHash') }}</span>
                 <span class="text-blue-400 font-bold">#{{ snapshotData.snapshot.units?.prompt_profile?.layout_hash }}</span>
               </div>
               <div class="flex justify-between py-1 border-b border-dashed" style="border-color: var(--line-1);">
-                <span class="text-[var(--ink-2)]">编辑模式 Mode:</span>
+                <span class="text-[var(--ink-2)]">{{ t('admin.policySnapshot.unit.prompt.mode') }}</span>
                 <span style="color: var(--ink-1);">{{ snapshotData.snapshot.units?.prompt_profile?.editor_mode }}</span>
               </div>
               <div class="flex justify-between py-1">
-                <span class="text-[var(--ink-2)]">插槽延迟渲染保护:</span>
-                <span class="text-emerald-400 font-bold">单次延迟渲染 · 未提供数据显式标识</span>
+                <span class="text-[var(--ink-2)]">{{ t('admin.policySnapshot.unit.prompt.slotGuard') }}</span>
+                <span class="text-emerald-400 font-bold">{{ t('admin.policySnapshot.unit.prompt.slotGuardValue') }}</span>
               </div>
             </div>
           </div>
 
           <div class="p-2 rounded-xl text-[11px]" style="background-color: var(--surface-1); color: var(--ink-2);">
-            ✓ 模板占位符单次延迟渲染，未提供真实数据明确标记，绝不伪装为空仓。
+            {{ t('admin.policySnapshot.unit.prompt.note') }}
           </div>
         </div>
 
@@ -314,43 +314,43 @@ onMounted(() => {
                 <span class="p-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
                   <Sparkles class="w-4 h-4" />
                 </span>
-                <span class="font-bold text-xs" style="color: var(--ink-1);">自进化心法</span>
+                <span class="font-bold text-xs" style="color: var(--ink-1);">{{ t('admin.policySnapshot.unit.evolution.title') }}</span>
               </div>
               <router-link
                 to="/admin/evolution"
                 class="text-[11px] text-emerald-400 flex items-center hover:underline"
               >
-                <span>进入配置</span>
+                <span>{{ t('admin.policySnapshot.unit.enter') }}</span>
                 <ArrowUpRight class="w-3 h-3 ml-0.5" />
               </router-link>
             </div>
 
             <div class="space-y-1 text-xs">
               <div class="flex justify-between py-1 border-b border-dashed" style="border-color: var(--line-1);">
-                <span class="text-[var(--ink-2)]">已发布心法指纹 Version:</span>
+                <span class="text-[var(--ink-2)]">{{ t('admin.policySnapshot.unit.evolution.version') }}</span>
                 <span class="text-emerald-400 font-bold truncate max-w-[180px]" :title="snapshotData.snapshot.units?.evolution_mind?.version">
                   {{ snapshotData.snapshot.units?.evolution_mind?.version }}
                 </span>
               </div>
               <div class="flex justify-between py-1 border-b border-dashed" style="border-color: var(--line-1);">
-                <span class="text-[var(--ink-2)]">启用心法 / 总收录心法:</span>
+                <span class="text-[var(--ink-2)]">{{ t('admin.policySnapshot.unit.evolution.counts') }}</span>
                 <span class="font-bold" style="color: var(--ink-1);">
                   {{ snapshotData.snapshot.units?.evolution_mind?.enabled_count }} / {{ snapshotData.snapshot.units?.evolution_mind?.total_count }}
                 </span>
               </div>
               <div class="flex justify-between py-1 border-b border-dashed" style="border-color: var(--line-1);">
-                <span class="text-[var(--ink-2)]">白盒审核机制:</span>
-                <span class="text-emerald-400 font-bold">红线防御 · 审核拒绝硬阻断</span>
+                <span class="text-[var(--ink-2)]">{{ t('admin.policySnapshot.unit.evolution.review') }}</span>
+                <span class="text-emerald-400 font-bold">{{ t('admin.policySnapshot.unit.evolution.reviewValue') }}</span>
               </div>
               <div class="flex justify-between py-1">
-                <span class="text-[var(--ink-2)]">并发版本安全保护:</span>
-                <span class="text-emerald-400 font-bold">CAS 乐观锁 · 428/409 拒绝过期覆盖</span>
+                <span class="text-[var(--ink-2)]">{{ t('admin.policySnapshot.unit.evolution.concurrency') }}</span>
+                <span class="text-emerald-400 font-bold">{{ t('admin.policySnapshot.unit.evolution.concurrencyValue') }}</span>
               </div>
             </div>
           </div>
 
           <div class="p-2 rounded-xl text-[11px]" style="background-color: var(--surface-1); color: var(--ink-2);">
-            ✓ 结构化原子发布 + 乐观版本锁，NO_CHANGE 与异常禁止重写交易心法。
+            {{ t('admin.policySnapshot.unit.evolution.note') }}
           </div>
         </div>
 
@@ -365,41 +365,41 @@ onMounted(() => {
                 <span class="p-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400">
                   <ShieldCheck class="w-4 h-4" />
                 </span>
-                <span class="font-bold text-xs" style="color: var(--ink-1);">物理拦截插件</span>
+                <span class="font-bold text-xs" style="color: var(--ink-1);">{{ t('admin.policySnapshot.unit.interceptor.title') }}</span>
               </div>
               <router-link
                 to="/admin/interceptors"
                 class="text-[11px] text-amber-400 flex items-center hover:underline"
               >
-                <span>进入配置</span>
+                <span>{{ t('admin.policySnapshot.unit.enter') }}</span>
                 <ArrowUpRight class="w-3 h-3 ml-0.5" />
               </router-link>
             </div>
 
             <div class="space-y-1 text-xs">
               <div class="flex justify-between py-1 border-b border-dashed" style="border-color: var(--line-1);">
-                <span class="text-[var(--ink-2)]">核心不可禁用底座:</span>
-                <span class="text-amber-400 font-bold">几何/有限性/75%置信/2.0R</span>
+                <span class="text-[var(--ink-2)]">{{ t('admin.policySnapshot.unit.interceptor.core') }}</span>
+                <span class="text-amber-400 font-bold">{{ t('admin.policySnapshot.unit.interceptor.coreValue') }}</span>
               </div>
               <div class="flex justify-between py-1 border-b border-dashed" style="border-color: var(--line-1);">
-                <span class="text-[var(--ink-2)]">插件管线指纹 Plugins Hash:</span>
+                <span class="text-[var(--ink-2)]">{{ t('admin.policySnapshot.unit.interceptor.pluginsHash') }}</span>
                 <span class="text-amber-400 font-bold">#{{ snapshotData.snapshot.units?.physical_interceptors?.plugins_hash }}</span>
               </div>
               <div class="flex justify-between py-1 border-b border-dashed" style="border-color: var(--line-1);">
-                <span class="text-[var(--ink-2)]">启用可选插件:</span>
+                <span class="text-[var(--ink-2)]">{{ t('admin.policySnapshot.unit.interceptor.enabled') }}</span>
                 <span class="font-bold" style="color: var(--ink-1);">
-                  {{ snapshotData.snapshot.units?.physical_interceptors?.enabled_count }} / {{ snapshotData.snapshot.units?.physical_interceptors?.total_count }} 个插件
+                  {{ t('admin.policySnapshot.unit.interceptor.enabledValue', undefined, { n: snapshotData.snapshot.units?.physical_interceptors?.enabled_count, t: snapshotData.snapshot.units?.physical_interceptors?.total_count }) }}
                 </span>
               </div>
               <div class="flex justify-between py-1">
-                <span class="text-[var(--ink-2)]">最终发单二次复验:</span>
-                <span class="text-emerald-400 font-bold">生效报价缩放/舍入后复验</span>
+                <span class="text-[var(--ink-2)]">{{ t('admin.policySnapshot.unit.interceptor.recheck') }}</span>
+                <span class="text-emerald-400 font-bold">{{ t('admin.policySnapshot.unit.interceptor.recheckValue') }}</span>
               </div>
             </div>
           </div>
 
           <div class="p-2 rounded-xl text-[11px]" style="background-color: var(--surface-1); color: var(--ink-2);">
-            ✓ 核心安全与可选插件彻底解耦，插件参数深拷贝隔离防篡改，缺失文件 Fail-Closed。
+            {{ t('admin.policySnapshot.unit.interceptor.note') }}
           </div>
         </div>
 
@@ -414,48 +414,48 @@ onMounted(() => {
                 <span class="p-1.5 rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-400">
                   <Users class="w-4 h-4" />
                 </span>
-                <span class="font-bold text-xs" style="color: var(--ink-1);">模型委员会</span>
+                <span class="font-bold text-xs" style="color: var(--ink-1);">{{ t('admin.policySnapshot.unit.council.title') }}</span>
               </div>
               <router-link
                 to="/admin/council"
                 class="text-[11px] text-purple-400 flex items-center hover:underline"
               >
-                <span>进入配置</span>
+                <span>{{ t('admin.policySnapshot.unit.enter') }}</span>
                 <ArrowUpRight class="w-3 h-3 ml-0.5" />
               </router-link>
             </div>
 
             <div class="space-y-1 text-xs">
               <div class="flex justify-between py-1 border-b border-dashed" style="border-color: var(--line-1);">
-                <span class="text-[var(--ink-2)]">机制启停状态:</span>
+                <span class="text-[var(--ink-2)]">{{ t('admin.policySnapshot.unit.council.status') }}</span>
                 <span
                   class="font-bold"
                   :style="snapshotData.snapshot.units?.model_council?.enabled ? { color: 'var(--up)' } : { color: 'var(--ink-3)' }"
                 >
-                  {{ snapshotData.snapshot.units?.model_council?.enabled ? '● 投委会辩论模式' : '○ 单模型决策模式' }}
+                  {{ snapshotData.snapshot.units?.model_council?.enabled ? t('admin.policySnapshot.unit.council.statusEnabled') : t('admin.policySnapshot.unit.council.statusDisabled') }}
                 </span>
               </div>
               <div class="flex justify-between py-1 border-b border-dashed" style="border-color: var(--line-1);">
-                <span class="text-[var(--ink-2)]">真实共识模式 Mode:</span>
+                <span class="text-[var(--ink-2)]">{{ t('admin.policySnapshot.unit.council.consensus') }}</span>
                 <span class="text-purple-400 font-bold">
-                  {{ snapshotData.snapshot.units?.model_council?.consensus_mode === 'cross_examination' ? '双轮质询' : '标准提案' }}
+                  {{ snapshotData.snapshot.units?.model_council?.consensus_mode === 'cross_examination' ? t('admin.policySnapshot.unit.council.consensusCross') : t('admin.policySnapshot.unit.council.consensusStandard') }}
                 </span>
               </div>
               <div class="flex justify-between py-1 border-b border-dashed" style="border-color: var(--line-1);">
-                <span class="text-[var(--ink-2)]">活跃交易员席位:</span>
+                <span class="text-[var(--ink-2)]">{{ t('admin.policySnapshot.unit.council.seats') }}</span>
                 <span class="font-bold" style="color: var(--ink-1);">
-                  {{ snapshotData.snapshot.units?.model_council?.active_roles?.length || 0 }} 位一线交易员 + CIO
+                  {{ t('admin.policySnapshot.unit.council.seatsValue', undefined, { n: snapshotData.snapshot.units?.model_council?.active_roles?.length || 0 }) }}
                 </span>
               </div>
               <div class="flex justify-between py-1">
-                <span class="text-[var(--ink-2)]">决策采纳追踪 Adopted Role:</span>
-                <span class="text-emerald-400 font-bold">机器可追溯 · 动态截止时间保护</span>
+                <span class="text-[var(--ink-2)]">{{ t('admin.policySnapshot.unit.council.adopted') }}</span>
+                <span class="text-emerald-400 font-bold">{{ t('admin.policySnapshot.unit.council.adoptedValue') }}</span>
               </div>
             </div>
           </div>
 
           <div class="p-2 rounded-xl text-[11px]" style="background-color: var(--surface-1); color: var(--ink-2);">
-            ✓ 剔除虚假共识选项，实战双轮互评，超时毫秒级自适应安全降级。
+            {{ t('admin.policySnapshot.unit.council.note') }}
           </div>
         </div>
       </div>
@@ -469,19 +469,19 @@ onMounted(() => {
           <div class="flex items-center space-x-2">
             <Archive class="w-4 h-4 text-purple-400" />
             <h3 class="text-sm font-bold" style="color: var(--ink-1);">
-              历史策略版本库
+              {{ t('admin.policySnapshot.archive.title') }}
             </h3>
             <span class="text-[11px] px-2 py-0.5 rounded border" style="background-color: var(--surface-1); border-color: var(--line-1); color: var(--ink-2);">
-              {{ archives.length }} 个已归档策略包
+              {{ t('admin.policySnapshot.archive.count', undefined, { n: archives.length }) }}
             </span>
           </div>
           <span class="text-[11px] text-[var(--ink-2)]">
-            可一键将提示词、心法、拦截器及委员会完整还原至指定瞬间
+            {{ t('admin.policySnapshot.archive.hint') }}
           </span>
         </div>
 
         <div v-if="archives.length === 0" class="py-8 text-center text-xs text-zinc-500">
-          暂无已归档的策略版本。点击右上角「归档为策略版本」即可永久固化当前策略包。
+          {{ t('admin.policySnapshot.archive.empty') }}
         </div>
 
         <div v-else class="divide-y" style="border-color: var(--line-1);">
@@ -500,15 +500,15 @@ onMounted(() => {
                   v-if="arc.policy_hash === snapshotData.snapshot.policy_hash"
                   class="text-[11px] font-bold px-2 py-0.2 rounded border text-emerald-400 border-emerald-500/30 bg-emerald-500/10"
                 >
-                  ● 当前正在运行
+                  {{ t('admin.policySnapshot.archive.running') }}
                 </span>
               </div>
               <p v-if="arc.description" class="text-[11px]" style="color: var(--ink-2);">
                 {{ arc.description }}
               </p>
               <div class="flex flex-wrap items-center gap-3 text-[11px] text-[var(--ink-2)]">
-                <span>归档时间: {{ utcStrToBj(arc.archived_at, true) }}</span>
-                <span>创建者: {{ arc.author }}</span>
+                <span>{{ t('admin.policySnapshot.archive.archivedAt') }}: {{ utcStrToBj(arc.archived_at, true) }}</span>
+                <span>{{ t('admin.policySnapshot.archive.author') }}: {{ arc.author }}</span>
                 <span class="truncate max-w-md">{{ arc.summary }}</span>
               </div>
             </div>
@@ -523,17 +523,17 @@ onMounted(() => {
                   : { backgroundColor: 'var(--up-bg)', borderColor: 'var(--up-line)', color: 'var(--up)' }"
               >
                 <RotateCcw class="w-3.5 h-3.5" :class="{ 'animate-spin': restoring }" />
-                <span>{{ arc.policy_hash === snapshotData.snapshot.policy_hash ? '已是当前版本' : '一键回滚还原' }}</span>
+                <span>{{ arc.policy_hash === snapshotData.snapshot.policy_hash ? t('admin.policySnapshot.archive.isCurrent') : t('admin.policySnapshot.archive.restore') }}</span>
               </button>
 
               <button
                 @click="deleteArchive(arc.policy_hash, arc.name)"
                 :disabled="deleting === arc.policy_hash || !auth.isSuperadmin"
                 class="flex items-center space-x-1 px-2.5 py-1.5 rounded-xl border text-xs cursor-pointer transition-all hover:bg-rose-500/10 text-rose-400 border-rose-500/20"
-                title="删除此归档版本"
+                :title="t('admin.policySnapshot.archive.deleteTitle')"
               >
                 <Trash2 class="w-3.5 h-3.5" :class="{ 'animate-pulse': deleting === arc.policy_hash }" />
-                <span>删除</span>
+                <span>{{ t('admin.policySnapshot.archive.delete') }}</span>
               </button>
             </div>
           </div>
@@ -553,30 +553,30 @@ onMounted(() => {
         <div class="flex items-center space-x-2">
           <BookmarkPlus class="w-5 h-5 text-purple-400" />
           <h3 class="text-sm font-bold" style="color: var(--ink-1);">
-            归档当前策略版本
+            {{ t('admin.policySnapshot.modal.title') }}
           </h3>
         </div>
 
         <p class="text-xs leading-relaxed" style="color: var(--ink-2);">
-          将当前生效的提示词模块、自进化心法、物理拦截器及模型委员会配置打包固化为不可变版本快照，后续可随时一键全盘回滚。
+          {{ t('admin.policySnapshot.modal.desc') }}
         </p>
 
         <div class="space-y-3 text-xs">
           <div>
-            <label class="block text-[11px] mb-1 font-bold" style="color: var(--ink-2);">策略名称 (必填):</label>
+            <label class="block text-[11px] mb-1 font-bold" style="color: var(--ink-2);">{{ t('admin.policySnapshot.modal.nameLabel') }}</label>
             <input
               v-model="archiveName"
-              placeholder="例如: 2026-09 顺势回踩大牛市高胜率版"
+              :placeholder="t('admin.policySnapshot.modal.namePlaceholder')"
               class="w-full rounded-xl px-3 py-2 text-xs outline-none border transition-colors"
               style="background-color: var(--surface-input); border-color: var(--line-1); color: var(--ink-1);"
             />
           </div>
           <div>
-            <label class="block text-[11px] mb-1 font-bold" style="color: var(--ink-2);">策略描述与实盘备注 (选填):</label>
+            <label class="block text-[11px] mb-1 font-bold" style="color: var(--ink-2);">{{ t('admin.policySnapshot.modal.descLabel') }}</label>
             <textarea
               v-model="archiveDesc"
               rows="3"
-              placeholder="记录此版本的调参核心逻辑、回测表现或适用行情环境..."
+              :placeholder="t('admin.policySnapshot.modal.descPlaceholder')"
               class="w-full rounded-xl p-3 text-xs outline-none border transition-colors resize-none"
               style="background-color: var(--surface-input); border-color: var(--line-1); color: var(--ink-1);"
             ></textarea>
@@ -589,7 +589,7 @@ onMounted(() => {
             class="px-3.5 py-1.5 rounded-xl border text-xs cursor-pointer transition-colors"
             style="background-color: var(--surface-1); border-color: var(--line-1); color: var(--ink-2);"
           >
-            取消
+            {{ t('admin.policySnapshot.modal.cancel') }}
           </button>
           <button
             @click="saveArchive"
@@ -597,7 +597,7 @@ onMounted(() => {
             class="px-4 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-all shadow-xs"
             style="background-color: var(--accent); color: var(--accent-ink);"
           >
-            {{ archiving ? '正在归档中...' : '确认归档入库' }}
+            {{ archiving ? t('admin.policySnapshot.modal.archiving') : t('admin.policySnapshot.modal.confirm') }}
           </button>
         </div>
       </div>

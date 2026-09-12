@@ -11,6 +11,8 @@ export const zhLedger = {
     best: '最佳一单',
     worst: '最差一单',
     avgHold: '平均持仓',
+    fundingNet: '资金费净收支',
+    fundingNetHint: '累计资金费用净额与收支细分',
     tipPf: '利润因子 = 总盈利 / 总亏损，>1 为正期望',
   },
   filters: {
@@ -78,6 +80,7 @@ export const zhLedger = {
     degraded: '委员会未运行 · 单模型裁决',
   },
   venue: '执行场所（旧数据无标注则不显示，绝不冒充）',
+  fundingTag: '资:',
   exportCsv: '导出 CSV',
   exported: '台账已导出',
   empty: '暂无平仓记录——AI 还在等待第一笔像样的机会',

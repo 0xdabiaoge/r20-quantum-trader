@@ -106,7 +106,7 @@ function toggleFallback(id: string) {
     fallbackIds.value.splice(idx, 1)
   } else {
     if (fallbackIds.value.length >= (cfg.value?.max_fallback_models || 5)) {
-      settingsResult.value = { ok: false, error: '回退模型最多 5 个，避免整轮推演超时' }
+      settingsResult.value = { ok: false, error: t('admin.llm.fallbackLimitErr') }
       setTimeout(() => { settingsResult.value = null }, 3500)
       return
     }
@@ -157,7 +157,11 @@ async function saveGlobalSettings() {
     await loadFailoverEvents()
     settingsResult.value = {
       ok: true,
-      message: `配置已保存：思考上限 ${thinkingTimeoutInput.value}s · 每模型请求 ${requestAttemptsInput.value} 次 · 回退模型 ${fallbackIds.value.length} 个`,
+      message: t(
+        'admin.llm.settingsSaved',
+        undefined,
+        { sec: thinkingTimeoutInput.value, n: requestAttemptsInput.value, m: fallbackIds.value.length },
+      ),
     }
     setTimeout(() => {
       settingsResult.value = null
@@ -203,18 +207,18 @@ const availableEffortOptions = computed(() => {
   const supportsExtreme = mid.includes('gpt-6') || mid.includes('gpt-5') || mid.includes('o3') || mid.includes('o4') || mid.includes('ultra') || mid.includes('max')
   
   const options = [
-    { value: 'high', label: '高 (high)' },
-    { value: 'medium', label: '中 (medium)' },
-    { value: 'low', label: '低 (low)' },
-    { value: 'minimal', label: '极简 (minimal)' },
-    { value: 'none', label: '关闭 (none)' },
+    { value: 'high', label: t('admin.llm.effortHigh') },
+    { value: 'medium', label: t('admin.llm.effortMedium') },
+    { value: 'low', label: t('admin.llm.effortLow') },
+    { value: 'minimal', label: t('admin.llm.effortMinimal') },
+    { value: 'none', label: t('admin.llm.effortNone') },
     // 后端 STANDARD_REASONING_EFFORTS 含 auto/minimal：缺了会让已存 "auto" 的模型在下拉框中无法回显
-    { value: 'auto', label: '自动 (auto)' },
+    { value: 'auto', label: t('admin.llm.effortAuto') },
   ]
   if (supportsExtreme) {
     options.unshift(
-      { value: 'max', label: '极值 (max)' },
-      { value: 'xhigh', label: '超高 (xhigh)' }
+      { value: 'max', label: t('admin.llm.effortMax') },
+      { value: 'xhigh', label: t('admin.llm.effortXhigh') }
     )
   }
   return options
@@ -235,7 +239,7 @@ const filteredProviders = computed(() => {
 
 // ----------------- Provider Actions -----------------
 function openAddProviderModal() {
-  selectedProvider.value = { id: '', name: '新建自定义供应商', is_new: true }
+  selectedProvider.value = { id: '', name: t('admin.llm.newProviderName'), is_new: true }
   providerForm.value = {
     id: '',
     name: '',
@@ -619,22 +623,22 @@ onMounted(() => {
     <!-- VIEW 1: 供应商列表页 (对应截图 1) -->
     <template v-if="currentView === 'list'">
       <!-- Top Title & Navigation Bar -->
-      <PageHeader :title="t('nav.admin.llm')" description="管理大模型渠道矩阵、思考强度与 API 密钥直连">
+      <PageHeader :title="t('nav.admin.llm')" :description="t('admin.llm.desc')">
         <template #actions>
         <div class="flex items-center space-x-2">
           <button
             @click="openAddProviderModal"
             class="btn-admin-primary"
-            title="添加自定义供应商"
+            :title="t('admin.llm.addProviderTitle')"
           >
             <Plus class="w-3.5 h-3.5" />
-            <span>添加供应商</span>
+            <span>{{ t('admin.llm.addProvider') }}</span>
           </button>
 
           <button
             @click="loadConfig"
             class="btn-admin-secondary px-2"
-            title="刷新状态"
+            :title="t('admin.llm.refreshStatus')"
           >
             <RefreshCw class="w-3.5 h-3.5" :class="loading ? 'animate-spin' : ''" />
           </button>
@@ -655,17 +659,17 @@ onMounted(() => {
             <div>
               <div class="flex items-center space-x-2">
                 <h2 class="text-xs sm:text-[13px] font-bold" style="color: var(--ink-1);">
-                  全局思考推演与超时上限
+                  {{ t('admin.llm.globalTimeoutTitle') }}
                 </h2>
                 <span
                   class="px-2 py-0.5 rounded text-[11px] font-bold border"
                   style="background-color: var(--accent-bg); border-color: var(--accent-line); color: var(--accent);"
                 >
-                  当前上限: {{ cfg?.thinking_timeout || 120 }}s
+                  {{ t('admin.llm.currentLimit', undefined, { n: cfg?.thinking_timeout || 120 }) }}
                 </span>
               </div>
               <p class="text-[11px] mt-0.5" style="color: var(--ink-2);">
-                针对长思考链旗舰模型（o1/o3、DeepSeek-R1、Claude 3.7 Thinking、Gemini 3 Pro 等）自定义推演等待上限，杜绝硬编码超时过早截断。
+                {{ t('admin.llm.globalTimeoutDesc') }}
               </p>
             </div>
           </div>
@@ -678,19 +682,19 @@ onMounted(() => {
           >
             <RefreshCw v-if="savingSettings" class="w-3.5 h-3.5 animate-spin" />
             <Save v-else class="w-3.5 h-3.5" />
-            <span>{{ savingSettings ? '保存中...' : '保存推演配置' }}</span>
+            <span>{{ savingSettings ? t('admin.llm.saving') : t('admin.llm.saveReasoning') }}</span>
           </button>
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
           <!-- Active Model & Reasoning Effort Status -->
           <div class="p-3 rounded-xl border space-y-1.5" style="background-color: var(--surface-1); border-color: var(--line-1);">
-            <div class="text-[11px]" style="color: var(--ink-3);">当前主脑活跃模型</div>
+            <div class="text-[11px]" style="color: var(--ink-3);">{{ t('admin.llm.activeModel') }}</div>
             <div class="text-xs font-bold truncate text-blue-400">
-              {{ cfg?.active_model_id || '未选择' }}
+              {{ cfg?.active_model_id || t('admin.llm.notSelected') }}
             </div>
             <div class="text-[11px] flex items-center space-x-1" style="color: var(--ink-2);">
-              <span>思考强度:</span>
+              <span>{{ t('admin.llm.effort') }}</span>
               <span class="font-bold uppercase text-emerald-400">{{ cfg?.active_reasoning_effort || 'HIGH' }}</span>
             </div>
           </div>
@@ -699,9 +703,9 @@ onMounted(() => {
           <div class="p-3 rounded-xl border space-y-1.5 sm:col-span-1 lg:col-span-2" style="background-color: var(--surface-1); border-color: var(--line-1);">
             <div class="flex items-center justify-between">
               <label class="text-[11px] font-bold" style="color: var(--ink-2);">
-                思考时间上限（秒）
+                {{ t('admin.llm.timeoutLabel') }}
               </label>
-              <span class="text-[11px]" style="color: var(--ink-3);">有效范围: 10 ~ 1800 秒</span>
+              <span class="text-[11px]" style="color: var(--ink-3);">{{ t('admin.llm.validRange') }}</span>
             </div>
             <div class="flex flex-wrap items-center gap-2">
               <input
@@ -714,7 +718,7 @@ onMounted(() => {
                 class="w-28 rounded-lg px-3 py-1.5 text-xs outline-none border font-bold"
                 style="background-color: var(--surface-2); border-color: var(--line-2); color: var(--ink-1);"
               />
-              <span class="text-xs font-bold" style="color: var(--ink-2);">秒 (s)</span>
+              <span class="text-xs font-bold" style="color: var(--ink-2);">{{ t('admin.llm.secondsUnit') }}</span>
 
               <!-- Quick Presets -->
               <div class="flex flex-wrap items-center gap-1.5 pl-2">
@@ -724,7 +728,7 @@ onMounted(() => {
                   class="px-2 py-1 rounded text-[11px] border cursor-pointer transition-all"
                   :class="thinkingTimeoutInput === 30 ? 'bg-blue-500/20 text-blue-400 border-blue-500 font-bold' : 'text-gray-400 hover:text-white border-transparent'"
                 >
-                  30s (极速)
+                  {{ t('admin.llm.presetFast') }}
                 </button>
                 <button
                   type="button"
@@ -732,7 +736,7 @@ onMounted(() => {
                   class="px-2 py-1 rounded text-[11px] border cursor-pointer transition-all"
                   :class="thinkingTimeoutInput === 60 ? 'bg-blue-500/20 text-blue-400 border-blue-500 font-bold' : 'text-gray-400 hover:text-white border-transparent'"
                 >
-                  60s (标准)
+                  {{ t('admin.llm.presetStd') }}
                 </button>
                 <button
                   type="button"
@@ -740,7 +744,7 @@ onMounted(() => {
                   class="px-2 py-1 rounded text-[11px] border cursor-pointer transition-all"
                   :class="thinkingTimeoutInput === 120 ? 'bg-blue-500/20 text-blue-400 border-blue-500 font-bold' : 'text-gray-400 hover:text-white border-transparent'"
                 >
-                  120s (推荐)
+                  {{ t('admin.llm.presetRec') }}
                 </button>
                 <button
                   type="button"
@@ -748,7 +752,7 @@ onMounted(() => {
                   class="px-2 py-1 rounded text-[11px] border cursor-pointer transition-all"
                   :class="thinkingTimeoutInput === 180 ? 'bg-blue-500/20 text-blue-400 border-blue-500 font-bold' : 'text-gray-400 hover:text-white border-transparent'"
                 >
-                  180s (深度)
+                  {{ t('admin.llm.presetDeep') }}
                 </button>
                 <button
                   type="button"
@@ -756,7 +760,7 @@ onMounted(() => {
                   class="px-2 py-1 rounded text-[11px] border cursor-pointer transition-all"
                   :class="thinkingTimeoutInput === 300 ? 'bg-blue-500/20 text-blue-400 border-blue-500 font-bold' : 'text-gray-400 hover:text-white border-transparent'"
                 >
-                  300s (长思考链)
+                  {{ t('admin.llm.presetLong') }}
                 </button>
               </div>
             </div>
@@ -790,17 +794,17 @@ onMounted(() => {
             <div>
               <div class="flex items-center space-x-2">
                 <h2 class="text-xs sm:text-[13px] font-bold" style="color: var(--ink-1);">
-                  请求韧性与回退模型
+                  {{ t('admin.llm.resilienceTitle') }}
                 </h2>
                 <span
                   class="px-2 py-0.5 rounded text-[11px] font-bold border"
                   style="background-color: var(--accent-bg); border-color: var(--accent-line); color: var(--accent);"
                 >
-                  每模型 {{ cfg?.request_attempts || 3 }} 次 · 回退 {{ (cfg?.fallback_model_ids || []).length }} 个
+                  {{ t('admin.llm.attemptsChip', undefined, { n: cfg?.request_attempts || 3, m: (cfg?.fallback_model_ids || []).length }) }}
                 </span>
               </div>
               <p class="text-[11px] mt-0.5" style="color: var(--ink-2);">
-                模型请求失败（超时/断连/网关抖动/空响应/额度故障）不再一次即弃：先按请求次数指数退避重试，仍失败则按顺序回退到备用模型继续推演。
+                {{ t('admin.llm.resilienceDesc') }}
               </p>
             </div>
           </div>
@@ -813,7 +817,7 @@ onMounted(() => {
           >
             <RefreshCw v-if="savingSettings" class="w-3.5 h-3.5 animate-spin" />
             <Save v-else class="w-3.5 h-3.5" />
-            <span>{{ savingSettings ? '保存中...' : '保存韧性配置' }}</span>
+            <span>{{ savingSettings ? t('admin.llm.saving') : t('admin.llm.saveResilience') }}</span>
           </button>
         </div>
 
@@ -821,8 +825,8 @@ onMounted(() => {
           <!-- Request attempts -->
           <div class="p-3 rounded-xl border space-y-2" style="background-color: var(--surface-1); border-color: var(--line-1);">
             <div class="flex items-center justify-between">
-              <label class="text-[11px] font-bold" style="color: var(--ink-2);">单模型请求次数（含首次）</label>
-              <span class="text-[11px]" style="color: var(--ink-3);">1 ~ 10 次</span>
+              <label class="text-[11px] font-bold" style="color: var(--ink-2);">{{ t('admin.llm.attemptsLabel') }}</label>
+              <span class="text-[11px]" style="color: var(--ink-3);">{{ t('admin.llm.attemptsRange') }}</span>
             </div>
             <div class="flex flex-wrap items-center gap-2">
               <input
@@ -834,7 +838,7 @@ onMounted(() => {
                 class="w-20 rounded-lg px-3 py-1.5 text-xs outline-none border font-bold"
                 style="background-color: var(--surface-2); border-color: var(--line-2); color: var(--ink-1);"
               />
-              <span class="text-xs font-bold" style="color: var(--ink-2);">次</span>
+              <span class="text-xs font-bold" style="color: var(--ink-2);">{{ t('admin.llm.timesUnit') }}</span>
               <div class="flex flex-wrap items-center gap-1.5 pl-1">
                 <button
                   v-for="n in [1, 2, 3, 5]"
@@ -844,24 +848,24 @@ onMounted(() => {
                   class="px-2 py-1 rounded text-[11px] border cursor-pointer transition-all"
                   :class="requestAttemptsInput === n ? 'bg-amber-500/20 text-amber-400 border-amber-500 font-bold' : 'text-gray-400 hover:text-white border-transparent'"
                 >
-                  {{ n }} 次
+                  {{ t('admin.llm.timesN', undefined, { n }) }}
                 </button>
               </div>
             </div>
             <p class="text-[10px] leading-relaxed" style="color: var(--ink-3);">
-              重试间指数退避；整条模型链共享 600s 总等待预算（低于任务 14 分钟硬超时），防止拖垮本轮推演。
+              {{ t('admin.llm.attemptsDesc') }}
             </p>
           </div>
 
           <!-- Fallback chain -->
           <div class="p-3 rounded-xl border space-y-2" style="background-color: var(--surface-1); border-color: var(--line-1);">
             <div class="flex items-center justify-between">
-              <label class="text-[11px] font-bold" style="color: var(--ink-2);">回退模型链（按序生效）</label>
-              <span class="text-[11px]" style="color: var(--ink-3);">当前主脑: {{ cfg?.active_model_id || '--' }}</span>
+              <label class="text-[11px] font-bold" style="color: var(--ink-2);">{{ t('admin.llm.fallbackLabel') }}</label>
+              <span class="text-[11px]" style="color: var(--ink-3);">{{ t('admin.llm.currentBrain') }} {{ cfg?.active_model_id || '--' }}</span>
             </div>
 
             <div v-if="fallbackIds.length === 0" class="text-[11px] italic px-1 py-0.5" style="color: var(--ink-3);">
-              未配置回退模型 —— 主脑失败重试耗尽后本轮直接放弃
+              {{ t('admin.llm.noFallback') }}
             </div>
             <div v-else class="space-y-1">
               <div
@@ -875,15 +879,15 @@ onMounted(() => {
                   <span class="font-bold truncate" style="color: var(--ink-1);">{{ modelNameOf(fid) }}</span>
                 </div>
                 <div class="flex items-center space-x-1 shrink-0">
-                  <button type="button" title="上移" @click="moveFallback(idx, -1)" class="p-1 rounded hover:bg-[var(--surface-1)] cursor-pointer text-gray-400"><ArrowUp class="w-3 h-3" /></button>
-                  <button type="button" title="下移" @click="moveFallback(idx, 1)" class="p-1 rounded hover:bg-[var(--surface-1)] cursor-pointer text-gray-400"><ArrowDown class="w-3 h-3" /></button>
-                  <button type="button" title="移除" @click="toggleFallback(fid)" class="p-1 rounded hover:bg-[var(--surface-1)] cursor-pointer text-red-400"><X class="w-3 h-3" /></button>
+                  <button type="button" :title="t('admin.llm.moveUp')" @click="moveFallback(idx, -1)" class="p-1 rounded hover:bg-[var(--surface-1)] cursor-pointer text-gray-400"><ArrowUp class="w-3 h-3" /></button>
+                  <button type="button" :title="t('admin.llm.moveDown')" @click="moveFallback(idx, 1)" class="p-1 rounded hover:bg-[var(--surface-1)] cursor-pointer text-gray-400"><ArrowDown class="w-3 h-3" /></button>
+                  <button type="button" :title="t('admin.llm.remove')" @click="toggleFallback(fid)" class="p-1 rounded hover:bg-[var(--surface-1)] cursor-pointer text-red-400"><X class="w-3 h-3" /></button>
                 </div>
               </div>
             </div>
 
             <div class="pt-1 border-t" style="border-color: var(--line-1);">
-              <div class="text-[10px] mb-1.5" style="color: var(--ink-3);">点击加入 / 移出回退链：</div>
+              <div class="text-[10px] mb-1.5" style="color: var(--ink-3);">{{ t('admin.llm.toggleFallbackHint') }}</div>
               <div class="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
                 <button
                   v-for="m in fallbackOptions"
@@ -899,7 +903,7 @@ onMounted(() => {
                   {{ m.name || m.id }}
                 </button>
                 <span v-if="fallbackOptions.length === 0" class="text-[11px] italic" style="color: var(--ink-3);">
-                  暂无其他模型，请先在供应商下添加备用模型
+                  {{ t('admin.llm.noSpareModels') }}
                 </span>
               </div>
             </div>
@@ -911,12 +915,12 @@ onMounted(() => {
           <div class="flex items-center justify-between pb-1.5">
             <div class="flex items-center space-x-1.5 text-[11px] font-bold" style="color: var(--ink-2);">
               <History class="w-3.5 h-3.5 text-amber-400" />
-              <span>最近回退 / 失败记录</span>
+              <span>{{ t('admin.llm.recentFailover') }}</span>
             </div>
-            <button @click="loadFailoverEvents" class="text-[11px] px-2 py-0.5 rounded border cursor-pointer" style="color: var(--ink-2); border-color: var(--line-1);">刷新</button>
+            <button @click="loadFailoverEvents" class="text-[11px] px-2 py-0.5 rounded border cursor-pointer" style="color: var(--ink-2); border-color: var(--line-1);">{{ t('admin.llm.refresh') }}</button>
           </div>
           <div v-if="failoverEvents.length === 0" class="text-[11px] italic px-1" style="color: var(--ink-3);">
-            暂无记录 —— 出现重试耗尽或触发回退时会在此留痕
+            {{ t('admin.llm.noFailover') }}
           </div>
           <div v-else class="rounded-xl border divide-y overflow-hidden" style="background-color: var(--surface-1); border-color: var(--line-1);">
             <div
@@ -927,7 +931,7 @@ onMounted(() => {
             >
               <div class="flex items-center justify-between gap-2">
                 <span class="font-bold" :class="ev.succeeded ? 'text-emerald-400' : 'text-red-400'">
-                  {{ ev.type === 'fallback_hit' ? '✅ 已回退生效' : '⛔ 模型链全灭' }}
+                  {{ ev.type === 'fallback_hit' ? t('admin.llm.fallbackHit') : t('admin.llm.chainDead') }}
                   {{ ev.from_model }}<template v-if="ev.to_model"> → {{ ev.to_model }}</template>
                 </span>
                 <span class="shrink-0" style="color: var(--ink-3);">{{ fmtDateTime(ev.ts || ev.time_str) }} · {{ ev.elapsed_seconds }}s</span>
@@ -944,7 +948,7 @@ onMounted(() => {
       <div class="relative">
         <input
           v-model="searchQuery"
-          placeholder="搜索供应商或分组"
+          :placeholder="t('admin.llm.searchPlaceholder')"
           class="w-full rounded-2xl px-4 py-3 pl-11 text-xs outline-none border transition-colors shadow-xs"
           style="background-color: var(--surface-2); border-color: var(--line-1); color: var(--ink-1);"
         />
@@ -992,11 +996,11 @@ onMounted(() => {
                   class="px-1.5 py-0.2 rounded text-[11px] font-bold border"
                   style="background-color: var(--up-bg); border-color: var(--up-line); color: var(--up);"
                 >
-                  主脑活跃
+                  {{ t('admin.llm.brainActive') }}
                 </span>
               </div>
               <div class="text-[11px] mt-0.5" style="color: var(--ink-3);">
-                {{ prov.models_count || 0 }} 个模型 · {{ prov.group || '其他' }}
+                {{ prov.models_count || 0 }} {{ t('admin.llm.modelsSuffix') }} · {{ prov.group || t('admin.llm.groupOther') }}
               </div>
             </div>
           </div>
@@ -1017,7 +1021,7 @@ onMounted(() => {
                 color: '#F87171',
               }"
             >
-              {{ prov.enabled ? '启用' : '禁用' }}
+              {{ prov.enabled ? t('admin.llm.enabledOnList') : t('admin.llm.disabledOnList') }}
             </button>
 
             <!-- Arrow Right -->
@@ -1040,7 +1044,7 @@ onMounted(() => {
           style="background-color: var(--surface-2); border-color: var(--line-1); color: var(--ink-1);"
         >
           <ArrowLeft class="w-4 h-4" />
-          <span>返回</span>
+          <span>{{ t('admin.llm.back') }}</span>
         </button>
 
         <div class="flex items-center space-x-2">
@@ -1067,7 +1071,7 @@ onMounted(() => {
         <!-- Section 1: 管理设置项列表 -->
         <div class="space-y-1">
           <div class="text-[11px] font-bold uppercase tracking-wider mb-2" style="color: var(--ink-2);">
-            管理
+            {{ t('admin.llm.manage') }}
           </div>
 
           <div
@@ -1076,7 +1080,7 @@ onMounted(() => {
           >
             <!-- 供应商类型 -->
             <div class="p-3.5 flex items-center justify-between">
-              <span class="font-medium" style="color: var(--ink-1);">供应商类型</span>
+              <span class="font-medium" style="color: var(--ink-1);">{{ t('admin.llm.providerType') }}</span>
               <div class="flex items-center space-x-1" style="color: var(--ink-2);">
                 <span>{{ providerForm.type }}</span>
                 <span class="text-gray-400">›</span>
@@ -1086,8 +1090,8 @@ onMounted(() => {
             <!-- API 交互协议类型 (下拉选择) -->
             <div class="p-3.5 flex items-center justify-between">
               <div>
-                <span class="font-medium" style="color: var(--ink-1);">API 交互协议</span>
-                <div class="text-[11px]" style="color: var(--ink-3);">选择该端点底层支持的通信协议标准</div>
+                <span class="font-medium" style="color: var(--ink-1);">{{ t('admin.llm.apiProtocol') }}</span>
+                <div class="text-[11px]" style="color: var(--ink-3);">{{ t('admin.llm.apiProtocolDesc') }}</div>
               </div>
               <select
                 v-model="providerForm.api_format"
@@ -1103,7 +1107,7 @@ onMounted(() => {
 
             <!-- 分组 -->
             <div class="p-3.5 flex items-center justify-between">
-              <span class="font-medium" style="color: var(--ink-1);">分组</span>
+              <span class="font-medium" style="color: var(--ink-1);">{{ t('admin.llm.group') }}</span>
               <div class="flex items-center space-x-1" style="color: var(--ink-2);">
                 <span>{{ providerForm.group }}</span>
                 <span class="text-gray-400">›</span>
@@ -1112,7 +1116,7 @@ onMounted(() => {
 
             <!-- 是否启用开关 -->
             <div class="p-3.5 flex items-center justify-between">
-              <span class="font-medium" style="color: var(--ink-1);">是否启用</span>
+              <span class="font-medium" style="color: var(--ink-1);">{{ t('admin.llm.enabledField') }}</span>
               <label class="relative inline-flex items-center cursor-pointer">
                 <input
                   type="checkbox"
@@ -1125,7 +1129,7 @@ onMounted(() => {
 
             <!-- 多Key模式开关 -->
             <div class="p-3.5 flex items-center justify-between">
-              <span class="font-medium" style="color: var(--ink-1);">多Key模式</span>
+              <span class="font-medium" style="color: var(--ink-1);">{{ t('admin.llm.multiKey') }}</span>
               <label class="relative inline-flex items-center cursor-pointer">
                 <input
                   type="checkbox"
@@ -1143,10 +1147,10 @@ onMounted(() => {
         <div class="space-y-3 pt-2">
           <!-- 供应商唯一标识 ID (仅新建自定义供应商时展示) -->
           <div v-if="selectedProvider.is_new">
-            <label class="block text-xs font-bold mb-1.5" style="color: var(--ink-2);">供应商唯一标识 (ID)</label>
+            <label class="block text-xs font-bold mb-1.5" style="color: var(--ink-2);">{{ t('admin.llm.providerId') }}</label>
             <input
               v-model="providerForm.id"
-              placeholder="例如: openrouter 或 my-proxy"
+              :placeholder="t('admin.llm.providerIdPlaceholder')"
               class="w-full rounded-xl px-4 py-2.5 text-xs outline-none border transition-colors"
               style="background-color: var(--surface-1); border-color: var(--line-1); color: var(--ink-1);"
             />
@@ -1154,7 +1158,7 @@ onMounted(() => {
 
           <!-- 名称 -->
           <div>
-            <label class="block text-xs font-bold mb-1.5" style="color: var(--ink-2);">名称</label>
+            <label class="block text-xs font-bold mb-1.5" style="color: var(--ink-2);">{{ t('admin.llm.name') }}</label>
             <input
               v-model="providerForm.name"
               placeholder="OpenAI"
@@ -1168,7 +1172,7 @@ onMounted(() => {
             <div class="flex items-center justify-between mb-1.5">
               <label class="text-xs font-bold" style="color: var(--ink-2);">API Key</label>
               <span v-if="selectedProvider.has_key" class="text-[11px] text-emerald-500 font-bold">
-                ✓ 密钥已就绪
+                {{ t('admin.llm.keyReady') }}
               </span>
             </div>
             <div class="relative">
@@ -1195,18 +1199,18 @@ onMounted(() => {
             <label class="block text-xs font-bold mb-1.5" style="color: var(--ink-2);">API Base URL</label>
             <input
               v-model="providerForm.base_url"
-              placeholder="按供应商要求原样填写，如 https://open.bigmodel.cn/api/paas/v4"
+              :placeholder="t('admin.llm.baseUrlPlaceholder')"
               class="w-full rounded-xl px-4 py-2.5 text-xs outline-none border transition-colors"
               style="background-color: var(--surface-1); border-color: var(--line-1); color: var(--ink-1);"
             />
             <p class="mt-1 text-[10px]" style="color: var(--ink-3);">
-              已取消自动补 /v1：带版本路径（/v1、/v4、/v1beta 等）以填写内容为准，直接拼接请求端点；仅裸域名自动兼容补 /v1。
+              {{ t('admin.llm.baseUrlDesc') }}
             </p>
           </div>
 
           <!-- API 路径 -->
           <div>
-            <label class="block text-xs font-bold mb-1.5" style="color: var(--ink-2);">API 路径</label>
+            <label class="block text-xs font-bold mb-1.5" style="color: var(--ink-2);">{{ t('admin.llm.apiPath') }}</label>
             <input
               v-model="providerForm.api_path"
               placeholder="/chat/completions"
@@ -1225,7 +1229,7 @@ onMounted(() => {
             style="color: #F87171; border-color: rgba(239, 68, 68, 0.3); background-color: rgba(239, 68, 68, 0.06);"
           >
             <Trash2 class="w-3.5 h-3.5" />
-            <span>删除供应商</span>
+            <span>{{ t('admin.llm.deleteProvider') }}</span>
           </button>
           <span v-else></span>
           <button
@@ -1233,7 +1237,7 @@ onMounted(() => {
             class="px-6 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs btn-primary-text"
             style="background-color: var(--accent); color: var(--accent-ink);"
           >
-            保存供应商配置
+            {{ t('admin.llm.saveProvider') }}
           </button>
         </div>
       </div>
@@ -1273,7 +1277,7 @@ onMounted(() => {
                     class="px-2 py-0.5 rounded-full text-[11px] font-bold border"
                     style="background-color: rgba(16, 185, 129, 0.12); border-color: rgba(16, 185, 129, 0.25); color: var(--up);"
                   >
-                    主脑生效
+                    {{ t('admin.llm.brainActiveModel') }}
                   </span>
                 </div>
 
@@ -1284,20 +1288,20 @@ onMounted(() => {
                     class="px-2.5 py-0.5 rounded-full text-[11px] font-medium border"
                     style="background-color: rgba(99, 102, 241, 0.08); border-color: rgba(99, 102, 241, 0.2); color: #818CF8;"
                   >
-                    聊天
+                    {{ t('admin.llm.capChat') }}
                   </span>
                   <span
                     v-if="m.capabilities?.includes('vision')"
                     class="px-2.5 py-0.5 rounded-full text-[11px] font-medium border"
                     style="background-color: rgba(236, 72, 153, 0.08); border-color: rgba(236, 72, 153, 0.2); color: #F472B6;"
                   >
-                    T图 &gt; T
+                    {{ t('admin.llm.capVision') }}
                   </span>
                   <span
                     v-if="m.capabilities?.includes('tools')"
                     class="p-1 rounded-full border flex items-center justify-center"
                     style="background-color: rgba(59, 130, 246, 0.08); border-color: rgba(59, 130, 246, 0.2); color: var(--info);"
-                    title="支持工具调用"
+                    :title="t('admin.llm.capToolsTitle')"
                   >
                     <Wrench class="w-3 h-3" />
                   </span>
@@ -1305,9 +1309,9 @@ onMounted(() => {
                     v-if="m.capabilities?.includes('reasoning') || m.reasoning_type !== 'none'"
                     class="px-2 py-0.5 rounded-full text-[11px] border flex items-center gap-1 font-bold text-amber-400"
                     style="background-color: rgba(245, 158, 11, 0.08); border-color: rgba(245, 158, 11, 0.2);"
-                    title="支持长链推演"
+                    :title="t('admin.llm.capReasonTitle')"
                   >
-                    🧠 思考
+                    {{ t('admin.llm.capThink') }}
                   </span>
                   <span
                     v-if="m.context_length"
@@ -1326,9 +1330,9 @@ onMounted(() => {
                 @click="activateModel(m)"
                 class="px-3 py-1 rounded-xl text-xs font-bold border transition-all cursor-pointer shadow-xs btn-primary-text"
                 style="background-color: var(--accent); color: var(--accent-ink);"
-                title="一键设为主脑"
+                :title="t('admin.llm.setBrainTitle')"
               >
-                启用
+                {{ t('admin.llm.enable') }}
               </button>
 
               <button
@@ -1336,7 +1340,7 @@ onMounted(() => {
                 :disabled="testLoading && testingModelId === m.id"
                 class="p-2 rounded-xl border text-xs cursor-pointer hover:bg-[var(--surface-2)] transition-colors"
                 style="background-color: var(--surface-1); border-color: var(--line-1); color: var(--ink-2);"
-                title="测试连通性"
+                :title="t('admin.llm.testConnTitle')"
               >
                 <RefreshCw class="w-3.5 h-3.5" :class="testLoading && testingModelId === m.id ? 'animate-spin' : ''" />
               </button>
@@ -1345,7 +1349,7 @@ onMounted(() => {
                 @click="openEditModelModal(m)"
                 class="p-2 rounded-xl border text-xs cursor-pointer hover:bg-[var(--surface-2)] transition-colors"
                 style="background-color: var(--surface-1); border-color: var(--line-1); color: var(--ink-2);"
-                title="编辑参数"
+                :title="t('admin.llm.editParamsTitle')"
               >
                 <Settings class="w-3.5 h-3.5" />
               </button>
@@ -1354,7 +1358,7 @@ onMounted(() => {
                 @click="deleteSingleModel(m)"
                 class="p-2 rounded-xl border text-xs cursor-pointer hover:bg-red-500/10 transition-colors text-red-400"
                 style="border-color: var(--line-1);"
-                title="删除该模型"
+                :title="t('admin.llm.deleteModelTitle')"
               >
                 <Trash2 class="w-3.5 h-3.5" />
               </button>
@@ -1362,7 +1366,7 @@ onMounted(() => {
           </div>
 
           <div v-if="!selectedProvider.models?.length" class="py-16 text-center text-xs" style="color: var(--ink-2);">
-            该供应商名下暂未配置模型，点击下方「获取」可一键从远端自动拉取。
+            {{ t('admin.llm.noModels') }}
           </div>
         </div>
 
@@ -1380,19 +1384,19 @@ onMounted(() => {
             <div class="flex items-center space-x-2 font-bold text-sm">
               <CheckCircle2 v-if="testResult.ok" class="w-4 h-4" />
               <AlertCircle v-else class="w-4 h-4" />
-              <span>{{ testResult.ok ? `模型测试通过 (耗时: ${testResult.latency_ms}ms)` : '连通性测试未通过' }}</span>
+              <span>{{ testResult.ok ? t('admin.llm.testPassed', undefined, { ms: testResult.latency_ms }) : t('admin.llm.testFailed') }}</span>
             </div>
-            <span class="text-[11px] opacity-75">状态: {{ testResult.status_code || 0 }}</span>
+            <span class="text-[11px] opacity-75">{{ t('admin.llm.status') }} {{ testResult.status_code || 0 }}</span>
           </div>
 
           <div v-if="testResult.ok" class="space-y-1 text-xs" style="color: var(--ink-1);">
-            <div>输出预览: <span class="font-bold">{{ testResult.response_preview }}</span></div>
+            <div>{{ t('admin.llm.outputPreview') }} <span class="font-bold">{{ testResult.response_preview }}</span></div>
             <div v-if="testResult.reasoning_detected" class="text-emerald-500 font-bold">
-              🧠 成功识别原生长思维链输出
+              {{ t('admin.llm.reasoningDetected') }}
             </div>
           </div>
           <div v-else class="text-xs break-all" style="color: var(--down);">
-            {{ testResult.error || '连通性测试超时或未收到有效响应' }}
+            {{ testResult.error || t('admin.llm.testTimeoutErr') }}
           </div>
         </div>
 
@@ -1409,7 +1413,7 @@ onMounted(() => {
               style="background-color: rgba(99, 102, 241, 0.1); border-color: rgba(99, 102, 241, 0.25); color: #818CF8;"
             >
               <DownloadCloud class="w-4 h-4" />
-              <span>获取</span>
+              <span>{{ t('admin.llm.fetch') }}</span>
             </button>
 
             <!-- + 添加新模型 -->
@@ -1419,7 +1423,7 @@ onMounted(() => {
               style="background-color: var(--surface-1); border-color: var(--line-1); color: var(--ink-1);"
             >
               <Plus class="w-4 h-4" />
-              <span>添加新模型</span>
+              <span>{{ t('admin.llm.addNewModel') }}</span>
             </button>
 
             <!-- 清空删除图标 (带红晕气泡) -->
@@ -1427,7 +1431,7 @@ onMounted(() => {
               @click="clearCurrentProviderModels"
               class="p-2.5 rounded-full border cursor-pointer hover:bg-red-500/10 transition-colors text-red-400"
               style="border-color: rgba(239, 68, 68, 0.2); background-color: rgba(239, 68, 68, 0.08);"
-              title="清空该供应商所有模型"
+              :title="t('admin.llm.clearModelsTitle')"
             >
               <Trash2 class="w-4 h-4" />
             </button>
@@ -1455,7 +1459,7 @@ onMounted(() => {
           }"
         >
           <Settings class="w-4 h-4" />
-          <span>配置</span>
+          <span>{{ t('admin.llm.tabConfig') }}</span>
         </button>
 
         <button
@@ -1473,7 +1477,7 @@ onMounted(() => {
           }"
         >
           <Layers class="w-4 h-4" />
-          <span>模型 ({{ selectedProvider.models?.length || 0 }})</span>
+          <span>{{ t('admin.llm.tabModels') }} ({{ selectedProvider.models?.length || 0 }})</span>
         </button>
       </div>
     </template>
@@ -1492,22 +1496,22 @@ onMounted(() => {
           <div class="flex items-center space-x-2">
             <DownloadCloud class="w-4 h-4 text-blue-500" />
             <h3 class="text-sm font-bold uppercase" style="color: var(--ink-1);">
-              获取 {{ selectedProvider?.name }} 远端可用模型
+              {{ t('admin.llm.fetchTitle', undefined, { name: selectedProvider?.name }) }}
             </h3>
           </div>
-          <span class="text-[11px]" style="color: var(--ink-3);">探测 /models 兼容端点</span>
+          <span class="text-[11px]" style="color: var(--ink-3);">{{ t('admin.llm.probeHint') }}</span>
         </div>
 
         <!-- Probe Configuration (仅当需要微调或端点无预存 Key 时作为高级选项展开) -->
         <div class="p-3 rounded-xl border space-y-2 shrink-0 text-xs" style="background-color: var(--surface-1); border-color: var(--line-1);">
           <div class="flex items-center justify-between">
             <div class="flex items-center space-x-2">
-              <span class="font-bold text-[11px]" style="color: var(--ink-1);">探测端点:</span>
+              <span class="font-bold text-[11px]" style="color: var(--ink-1);">{{ t('admin.llm.probeEndpoint') }}</span>
               <span class="text-[11px] text-blue-400">{{ customFetchUrl || selectedProvider?.base_url }}</span>
             </div>
             <div class="flex items-center space-x-1.5">
               <span v-if="selectedProvider?.has_key" class="text-[11px] text-emerald-400 font-bold">
-                ✓ 使用已存凭证
+                {{ t('admin.llm.useStoredKey') }}
               </span>
               <button
                 @click="executeRemoteFetch"
@@ -1516,7 +1520,7 @@ onMounted(() => {
                 style="background-color: var(--accent); color: var(--accent-ink);"
               >
                 <RefreshCw class="w-3.5 h-3.5" :class="fetchingRemote ? 'animate-spin' : ''" />
-                <span>{{ fetchingRemote ? '正在探测...' : '重新探测' }}</span>
+                <span>{{ fetchingRemote ? t('admin.llm.probing') : t('admin.llm.reprobe') }}</span>
               </button>
             </div>
           </div>
@@ -1530,7 +1534,7 @@ onMounted(() => {
             class="p-2.5 rounded-xl border text-xs flex items-center justify-between"
             style="background-color: var(--up-bg); border-color: var(--up-line); color: var(--up);"
           >
-            <span class="font-bold">✓ 成功探测到 {{ remoteFetchResult.total }} 个可用模型</span>
+            <span class="font-bold">{{ t('admin.llm.probeSuccess', undefined, { n: remoteFetchResult.total }) }}</span>
             <span class="text-[11px] opacity-80">{{ remoteFetchResult.endpoint_used }}</span>
           </div>
           <div
@@ -1546,7 +1550,7 @@ onMounted(() => {
         <div v-if="remoteFetchResult?.ok" class="relative shrink-0">
           <input
             v-model="remoteSearch"
-            placeholder="过滤搜索模型 ID..."
+            :placeholder="t('admin.llm.filterPlaceholder')"
             class="w-full rounded-xl px-3.5 py-1.5 pl-9 text-xs outline-none border"
             style="background-color: var(--surface-1); border-color: var(--line-1); color: var(--ink-1);"
           />
@@ -1572,14 +1576,14 @@ onMounted(() => {
                 class="px-2.5 py-1 rounded-lg text-xs font-medium border cursor-pointer hover:bg-[var(--surface-2)] transition-colors"
                 style="background-color: var(--surface-2); border-color: var(--line-1); color: var(--ink-1);"
               >
-                + 添加
+                {{ t('admin.llm.addBtn') }}
               </button>
               <button
                 @click="importRemoteModel(rm, true)"
                 class="px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-xs btn-primary-text"
                 style="background-color: var(--accent); color: var(--accent-ink);"
               >
-                添加并启用
+                {{ t('admin.llm.addAndEnable') }}
               </button>
             </div>
           </div>
@@ -1587,7 +1591,7 @@ onMounted(() => {
 
         <div class="flex items-center justify-between pt-3 border-t shrink-0" style="border-color: var(--line-1);">
           <div class="text-[11px]" style="color: var(--ink-2);">
-            <span v-if="filteredRemoteModels.length">当前显示 {{ filteredRemoteModels.length }} 个模型</span>
+            <span v-if="filteredRemoteModels.length">{{ t('admin.llm.showingCount', undefined, { n: filteredRemoteModels.length }) }}</span>
           </div>
           <div class="flex items-center space-x-2">
             <button
@@ -1596,14 +1600,14 @@ onMounted(() => {
               class="px-3 py-1.5 rounded-xl border text-xs font-bold cursor-pointer transition-all hover:opacity-90"
               style="background-color: rgba(99, 102, 241, 0.1); border-color: rgba(99, 102, 241, 0.25); color: #818CF8;"
             >
-              一键添加当前全部 ({{ filteredRemoteModels.length }})
+              {{ t('admin.llm.addAll', undefined, { n: filteredRemoteModels.length }) }}
             </button>
             <button
               @click="fetchModalVisible = false"
               class="px-4 py-1.5 rounded-xl border text-xs cursor-pointer"
               style="background-color: var(--surface-1); border-color: var(--line-1); color: var(--ink-1);"
             >
-              完成
+              {{ t('admin.llm.done') }}
             </button>
           </div>
         </div>
@@ -1622,28 +1626,28 @@ onMounted(() => {
       >
         <div class="flex items-center justify-between pb-3 border-b" style="border-color: var(--line-1);">
           <h3 class="text-sm font-bold uppercase" style="color: var(--ink-1);">
-            {{ editingModel ? '编辑模型' : '添加新模型' }}
+            {{ editingModel ? t('admin.llm.editModel') : t('admin.llm.addNewModel') }}
           </h3>
-          <span class="text-[11px]" style="color: var(--ink-3);">所属: {{ selectedProvider?.name }}</span>
+          <span class="text-[11px]" style="color: var(--ink-3);">{{ t('admin.llm.belongsTo') }} {{ selectedProvider?.name }}</span>
         </div>
 
         <div class="space-y-3">
           <div>
-            <label class="block text-[11px] font-bold mb-1" style="color: var(--ink-2);">模型 ID</label>
+            <label class="block text-[11px] font-bold mb-1" style="color: var(--ink-2);">{{ t('admin.llm.modelIdLabel') }}</label>
             <input
               v-model="modelForm.id"
               :readonly="!!editingModel"
-              placeholder="例如 gemini-3.7-flash-high / deepseek-chat"
+              :placeholder="t('admin.llm.modelIdPlaceholder')"
               class="w-full rounded-xl px-3.5 py-2 text-xs outline-none border"
               style="background-color: var(--surface-1); border-color: var(--line-1); color: var(--ink-1);"
             />
           </div>
 
           <div>
-            <label class="block text-[11px] font-bold mb-1" style="color: var(--ink-2);">展示名称</label>
+            <label class="block text-[11px] font-bold mb-1" style="color: var(--ink-2);">{{ t('admin.llm.displayName') }}</label>
             <input
               v-model="modelForm.name"
-              placeholder="Gemini 3.8 Flash (高推演)"
+              :placeholder="t('admin.llm.displayNamePlaceholder')"
               class="w-full rounded-xl px-3.5 py-2 text-xs outline-none border"
               style="background-color: var(--surface-1); border-color: var(--line-1); color: var(--ink-1);"
             />
@@ -1651,7 +1655,7 @@ onMounted(() => {
 
           <!-- 模型能力标签选择 -->
           <div>
-            <label class="block text-[11px] font-bold mb-1" style="color: var(--ink-2);">能力标签徽标</label>
+            <label class="block text-[11px] font-bold mb-1" style="color: var(--ink-2);">{{ t('admin.llm.capBadges') }}</label>
             <div class="flex flex-wrap gap-2 pt-1">
               <button
                 type="button"
@@ -1659,7 +1663,7 @@ onMounted(() => {
                 class="px-2.5 py-1 rounded-lg border text-xs font-medium cursor-pointer transition-all"
                 :style="modelForm.capabilities.includes('chat') ? { backgroundColor: 'rgba(99, 102, 241, 0.2)', borderColor: '#818CF8', color: '#818CF8' } : { backgroundColor: 'var(--surface-1)', borderColor: 'var(--line-1)', color: 'var(--ink-2)' }"
               >
-                聊天 (chat)
+                {{ t('admin.llm.capChatFull') }}
               </button>
               <button
                 type="button"
@@ -1667,7 +1671,7 @@ onMounted(() => {
                 class="px-2.5 py-1 rounded-lg border text-xs font-medium cursor-pointer transition-all"
                 :style="modelForm.capabilities.includes('vision') ? { backgroundColor: 'rgba(236, 72, 153, 0.2)', borderColor: '#F472B6', color: '#F472B6' } : { backgroundColor: 'var(--surface-1)', borderColor: 'var(--line-1)', color: 'var(--ink-2)' }"
               >
-                T图 &gt; T (vision)
+                {{ t('admin.llm.capVisionFull') }}
               </button>
               <button
                 type="button"
@@ -1675,7 +1679,7 @@ onMounted(() => {
                 class="px-2.5 py-1 rounded-lg border text-xs font-medium cursor-pointer transition-all"
                 :style="modelForm.capabilities.includes('tools') ? { backgroundColor: 'rgba(59, 130, 246, 0.2)', borderColor: 'var(--info)', color: 'var(--info)' } : { backgroundColor: 'var(--surface-1)', borderColor: 'var(--line-1)', color: 'var(--ink-2)' }"
               >
-                工具调用 (tools)
+                {{ t('admin.llm.capToolsFull') }}
               </button>
               <button
                 type="button"
@@ -1683,14 +1687,14 @@ onMounted(() => {
                 class="px-2.5 py-1 rounded-lg border text-xs font-medium cursor-pointer transition-all"
                 :style="modelForm.capabilities.includes('reasoning') ? { backgroundColor: 'rgba(245, 158, 11, 0.2)', borderColor: 'var(--warn)', color: 'var(--warn)' } : { backgroundColor: 'var(--surface-1)', borderColor: 'var(--line-1)', color: 'var(--ink-2)' }"
               >
-                🧠 链式思考 (CoT)
+                {{ t('admin.llm.capCotFull') }}
               </button>
             </div>
           </div>
 
           <!-- 思考强度配置 (动态精简与自适应展示) -->
           <div>
-            <label class="block text-[11px] font-bold mb-1" style="color: var(--ink-2);">思考推演强度</label>
+            <label class="block text-[11px] font-bold mb-1" style="color: var(--ink-2);">{{ t('admin.llm.effortLabel') }}</label>
             <select
               v-model="modelForm.reasoning_effort"
               class="w-full rounded-xl px-3.5 py-2 text-xs outline-none border cursor-pointer"
@@ -1707,7 +1711,7 @@ onMounted(() => {
           </div>
 
           <div>
-            <label class="block text-[11px] font-bold mb-1" style="color: var(--ink-2);">上下文上限长度 (Tokens)</label>
+            <label class="block text-[11px] font-bold mb-1" style="color: var(--ink-2);">{{ t('admin.llm.contextLen') }}</label>
             <input
               v-model.number="modelForm.context_length"
               type="number"
@@ -1725,14 +1729,14 @@ onMounted(() => {
             class="px-4 py-1.5 rounded-xl border text-xs cursor-pointer"
             style="background-color: var(--surface-1); border-color: var(--line-1); color: var(--ink-2);"
           >
-            取消
+            {{ t('admin.llm.cancel') }}
           </button>
           <button
             @click="saveModelForm"
             class="px-5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs btn-primary-text"
             style="background-color: var(--accent); color: var(--accent-ink);"
           >
-            保存模型
+            {{ t('admin.llm.saveModel') }}
           </button>
         </div>
       </div>

@@ -187,7 +187,7 @@ def check_risk(package: dict, decision: dict, context: dict) -> tuple[bool, str]
 async function submitCreate() {
   createError.value = ''
   if (!newFilename.value.trim()) {
-    createError.value = '请输入插件文件名'
+    createError.value = t('admin.interceptors.filenameRequired')
     return
   }
   try {
@@ -212,7 +212,7 @@ onMounted(loadPlugins)
 <template>
   <div class="space-y-4 text-xs max-w-[2048px] mx-auto">
     <!-- Header & Action Bar -->
-    <PageHeader :title="t('nav.admin.interceptors')" description="交易决策发出前必须逐层通过 Python 物理拦截管线，任何异常默认拒单">
+    <PageHeader :title="t('nav.admin.interceptors')" :description="t('admin.interceptors.desc')">
       <template #actions>
       <div class="flex items-center space-x-2">
         <button
@@ -221,7 +221,7 @@ onMounted(loadPlugins)
           class="btn-admin-secondary text-xs disabled:opacity-50"
         >
           <Play class="w-3 h-3 text-emerald-400" />
-          <span>{{ testing ? '正在回归测试...' : '现场沙箱回归测试' }}</span>
+          <span>{{ testing ? t('admin.interceptors.testing') : t('admin.interceptors.runSandbox') }}</span>
         </button>
         <button
           v-if="auth.isSuperadmin"
@@ -229,16 +229,16 @@ onMounted(loadPlugins)
           class="btn-admin-primary text-xs"
         >
           <Plus class="w-3.5 h-3.5" />
-          <span>新建插件</span>
+          <span>{{ t('admin.interceptors.newPlugin') }}</span>
         </button>
-        <span class="chip"><span class="dot dot-up" />Fail-Closed 防线</span>
+        <span class="chip"><span class="dot dot-up" />{{ t('admin.interceptors.failClosed') }}</span>
       </div>
       </template>
     </PageHeader>
 
     <!-- Alert / Banner Message -->
     <!-- Loading State -->
-    <div v-if="loading" class="py-12 text-center text-xs" style="color: var(--ink-2);">正在扫描加载物理拦截插件...</div>
+    <div v-if="loading" class="py-12 text-center text-xs" style="color: var(--ink-2);">{{ t('admin.interceptors.loading') }}</div>
 
     <!-- Plugins Pipeline List -->
     <div v-else class="space-y-3">
@@ -261,7 +261,7 @@ onMounted(loadPlugins)
               :disabled="idx === 0"
               class="p-1 rounded disabled:opacity-20 cursor-pointer transition-colors"
               style="color: var(--ink-2);"
-              title="提高执行优先级"
+              :title="t('admin.interceptors.raiseTitle')"
             >
               <ArrowUp class="w-3.5 h-3.5" />
             </button>
@@ -270,7 +270,7 @@ onMounted(loadPlugins)
               :disabled="idx === plugins.length - 1"
               class="p-1 rounded disabled:opacity-20 cursor-pointer transition-colors"
               style="color: var(--ink-2);"
-              title="降低执行优先级"
+              :title="t('admin.interceptors.lowerTitle')"
             >
               <ArrowDown class="w-3.5 h-3.5" />
             </button>
@@ -297,7 +297,7 @@ onMounted(loadPlugins)
             </div>
 
             <p class="text-xs font-sans leading-relaxed" style="color: var(--ink-2);">
-              {{ p.description || '暂无详细描述' }}
+              {{ p.description || t('admin.interceptors.noDescription') }}
             </p>
 
             <!-- Tags -->
@@ -325,17 +325,17 @@ onMounted(loadPlugins)
             @click="openEditor(p)"
             class="flex items-center space-x-1 px-3 py-1.5 rounded-lg border font-bold cursor-pointer transition-all shadow-xs"
             style="background-color: var(--surface-1); border-color: var(--line-2); color: var(--ink-1);"
-            title="查看或修改 Python 源码"
+            :title="t('admin.interceptors.sourceTitle')"
           >
             <Code class="w-3.5 h-3.5" style="color: var(--accent);" />
-            <span>源码与规则</span>
+            <span>{{ t('admin.interceptors.sourceCode') }}</span>
           </button>
 
           <button
             v-if="auth.isSuperadmin && !p.filename.startsWith('0')"
             @click="deletePlugin(p)"
             class="p-2 rounded-lg hover:bg-rose-500/10 text-rose-500 cursor-pointer transition-colors"
-            title="删除插件"
+            :title="t('admin.interceptors.deleteTitle')"
           >
             <Trash2 class="w-4 h-4" />
           </button>
@@ -344,7 +344,7 @@ onMounted(loadPlugins)
             @click="togglePlugin(p)"
             class="cursor-pointer transition-colors p-1"
             :class="p.enabled ? 'text-emerald-500' : 'text-zinc-400'"
-            :title="p.enabled ? '已启用 (点击停用)' : '已停用 (点击启用)'"
+            :title="p.enabled ? t('admin.interceptors.enabledTitle') : t('admin.interceptors.disabledTitle')"
           >
             <ToggleRight v-if="p.enabled" class="w-6 h-6" />
             <ToggleLeft v-else class="w-6 h-6" />
@@ -371,7 +371,7 @@ onMounted(loadPlugins)
                 <span class="truncate max-w-[180px] sm:max-w-[320px]">{{ editingName }}</span>
                 <span class="text-[11px] sm:text-xs font-normal truncate max-w-[140px] sm:max-w-[200px]" style="color: var(--ink-3);">({{ editingFilename }})</span>
               </h3>
-              <p class="text-[11px] hidden sm:block truncate mt-0.5" style="color: var(--ink-2);">Python 源码热更新，保存后下一轮决策实时执行</p>
+              <p class="text-[11px] hidden sm:block truncate mt-0.5" style="color: var(--ink-2);">{{ t('admin.interceptors.editorHint') }}</p>
             </div>
           </div>
           <div class="flex items-center space-x-1.5 shrink-0">
@@ -379,10 +379,10 @@ onMounted(loadPlugins)
               @click="exportPluginCode(editingFilename, editingCode)"
               class="flex items-center space-x-1 px-2 sm:px-2.5 py-1 rounded-lg border text-[11px] sm:text-xs cursor-pointer shadow-xs transition-colors"
               style="background-color: var(--surface-1); border-color: var(--line-2); color: var(--ink-1);"
-              title="导出当前 .py 脚本文件"
+              :title="t('admin.interceptors.exportTitle')"
             >
               <Download class="w-3.5 h-3.5" />
-              <span class="hidden sm:inline">导出 .py</span>
+              <span class="hidden sm:inline">{{ t('admin.interceptors.exportPy') }}</span>
             </button>
             <button
               @click="editorVisible = false"
@@ -411,7 +411,7 @@ onMounted(loadPlugins)
         <!-- Modal Footer -->
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-3 border-t" style="border-color: var(--line-1);">
           <div class="text-[11px] sm:text-[11px] truncate" style="color: var(--ink-3);" title="def check_risk(package, decision, context) -> tuple[bool, str]">
-            <span class="font-bold">接口契约:</span> <code class="opacity-80">check_risk(package, decision, ctx)</code>
+            <span class="font-bold">{{ t('admin.interceptors.contractLabel') }}</span> <code class="opacity-80">check_risk(package, decision, ctx)</code>
           </div>
           <div class="flex items-center justify-end space-x-2 shrink-0">
             <button
@@ -419,7 +419,7 @@ onMounted(loadPlugins)
               class="px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-xl border text-xs cursor-pointer shadow-xs transition-colors"
               style="background-color: var(--surface-1); border-color: var(--line-2); color: var(--ink-2);"
             >
-              取消
+              {{ t('admin.interceptors.cancel') }}
             </button>
             <button
               @click="saveCode"
@@ -428,7 +428,7 @@ onMounted(loadPlugins)
               style="background-color: var(--accent); color: var(--accent-ink);"
             >
               <Save class="w-4 h-4" />
-              <span>{{ savingCode ? '正在保存...' : '保存代码并热加载' }}</span>
+              <span>{{ savingCode ? t('admin.interceptors.saving') : t('admin.interceptors.saveAndReload') }}</span>
             </button>
           </div>
         </div>
@@ -448,8 +448,8 @@ onMounted(loadPlugins)
               <Sparkles class="w-4 h-4" />
             </div>
             <div>
-              <h3 class="text-xs sm:text-sm font-bold" style="color: var(--ink-1);">新建物理拦截插件</h3>
-              <p class="text-[11px] hidden sm:block" style="color: var(--ink-2);">编写自定义 Python 拦截规则，适配策略广场规范</p>
+              <h3 class="text-xs sm:text-sm font-bold" style="color: var(--ink-1);">{{ t('admin.interceptors.createTitle') }}</h3>
+              <p class="text-[11px] hidden sm:block" style="color: var(--ink-2);">{{ t('admin.interceptors.createHint') }}</p>
             </div>
           </div>
           <button @click="createModalVisible = false" class="cursor-pointer p-1" style="color: var(--ink-2);">
@@ -462,18 +462,18 @@ onMounted(loadPlugins)
         </div>
 
         <div>
-          <label class="block text-xs font-bold mb-1.5" style="color: var(--ink-1);">插件文件名 (.py)</label>
+          <label class="block text-xs font-bold mb-1.5" style="color: var(--ink-1);">{{ t('admin.interceptors.filenameLabel') }}</label>
           <input
             v-model="newFilename"
             type="text"
             class="w-full border rounded-xl px-3 py-2 text-xs outline-none transition-colors"
             style="background-color: var(--surface-input); border-color: var(--line-1); color: var(--ink-1);"
-            placeholder="如: my_volatility_filter.py"
+            :placeholder="t('admin.interceptors.filenamePlaceholder')"
           />
         </div>
 
         <div class="flex-1 min-h-[200px] sm:min-h-[280px] flex flex-col">
-          <label class="block text-xs font-bold mb-1.5" style="color: var(--ink-1);">插件 Python 源码</label>
+          <label class="block text-xs font-bold mb-1.5" style="color: var(--ink-1);">{{ t('admin.interceptors.codeLabel') }}</label>
           <textarea
             v-model="newCode"
             class="flex-1 w-full border rounded-xl p-3 sm:p-3.5 text-[11px] sm:text-xs leading-relaxed outline-none resize-y transition-colors min-h-[160px]"
@@ -488,14 +488,14 @@ onMounted(loadPlugins)
             class="px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-xl border text-xs cursor-pointer shadow-xs"
             style="background-color: var(--surface-1); border-color: var(--line-2); color: var(--ink-2);"
           >
-            取消
+            {{ t('admin.interceptors.cancel') }}
           </button>
           <button
             @click="submitCreate"
             class="px-4 sm:px-5 py-1.5 sm:py-2 rounded-xl font-bold text-xs cursor-pointer transition-all shadow-xs"
             style="background-color: var(--accent); color: var(--accent-ink);"
           >
-            创建并加入管线
+            {{ t('admin.interceptors.createAndAdd') }}
           </button>
         </div>
       </div>
@@ -514,9 +514,9 @@ onMounted(loadPlugins)
               <Play class="w-4 h-4" />
             </div>
             <div>
-              <h3 class="text-xs sm:text-sm font-bold" style="color: var(--ink-1);">沙箱拦截回归测试报告</h3>
+              <h3 class="text-xs sm:text-sm font-bold" style="color: var(--ink-1);">{{ t('admin.interceptors.reportTitle') }}</h3>
               <p class="text-[11px]" style="color: var(--ink-2);">
-                已激活 {{ testResults.enabled_plugins_count }}/{{ testResults.total_plugins_count }} 个拦截插件 · 总执行耗时 {{ testResults.duration_total_ms }}ms
+                {{ t('admin.interceptors.reportSummary', undefined, { enabled: testResults.enabled_plugins_count, total: testResults.total_plugins_count, ms: testResults.duration_total_ms }) }}
               </p>
             </div>
           </div>
@@ -544,17 +544,17 @@ onMounted(loadPlugins)
                     ? { backgroundColor: 'var(--surface-2)', borderColor: 'var(--warn-line)', color: 'var(--warn)' }
                     : { backgroundColor: 'var(--surface-2)', borderColor: 'var(--up-line)', color: 'var(--up)' }"
                 >
-                  {{ r.intercepted ? '🛑 已成功物理拦截 (WAIT)' : '🟢 顺势放行通过' }}
+                  {{ r.intercepted ? t('admin.interceptors.intercepted') : t('admin.interceptors.passed') }}
                 </span>
               </div>
             </div>
             <div class="text-[11px] flex flex-wrap items-center gap-x-3 gap-y-1" style="color: var(--ink-2);">
-              <span>原始意向: <strong style="color: var(--ink-1);">{{ r.raw_action }}</strong></span>
-              <span>最终指令: <strong :style="{ color: r.final_action === 'WAIT' ? 'var(--warn)' : 'var(--up)' }">{{ r.final_action }}</strong></span>
-              <span v-if="r.risk_reward !== '--'">盈亏比: {{ r.risk_reward }}</span>
+              <span>{{ t('admin.interceptors.rawAction') }} <strong style="color: var(--ink-1);">{{ r.raw_action }}</strong></span>
+              <span>{{ t('admin.interceptors.finalAction') }} <strong :style="{ color: r.final_action === 'WAIT' ? 'var(--warn)' : 'var(--up)' }">{{ r.final_action }}</strong></span>
+              <span v-if="r.risk_reward !== '--'">{{ t('admin.interceptors.riskReward') }} {{ r.risk_reward }}</span>
             </div>
             <div v-if="r.reason" class="text-[11px] mt-1 font-sans break-words" style="color: var(--warn);">
-              拦截审计：{{ r.reason }}
+              {{ t('admin.interceptors.interceptAudit') }}{{ r.reason }}
             </div>
           </div>
         </div>
@@ -565,7 +565,7 @@ onMounted(loadPlugins)
             class="px-4 sm:px-5 py-1.5 sm:py-2 rounded-xl text-xs font-bold cursor-pointer transition-all shadow-xs"
             style="background-color: var(--accent); color: var(--accent-ink);"
           >
-            关闭测试报告
+            {{ t('admin.interceptors.closeReport') }}
           </button>
         </div>
       </div>

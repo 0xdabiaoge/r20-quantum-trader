@@ -71,7 +71,7 @@ function act() {
             </button>
           </div>
           <p class="text-[11px] mt-1.5" style="color: var(--ink-3);">
-            {{ t('admin.dzUnlock').replace('{phrase}', confirmPhrase) }}
+            {{ t('admin.shell.danger.confirmHint').replace('{phrase}', confirmPhrase) }}
           </p>
         </div>
       </div>

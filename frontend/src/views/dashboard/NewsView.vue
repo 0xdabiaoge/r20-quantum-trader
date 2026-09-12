@@ -34,6 +34,14 @@ const selectedCoin = ref<string | null>(null);
 // 选中的来源过滤状态（all 为全部，支持 'OKX官方' | '金十数据' | '全球宏观'）
 const selectedSource = ref<string>('all');
 
+// 来源分类筛选按钮：key 为数据值（匹配平台名，不可翻译），label 走 i18n
+const sourceFilters = computed(() => [
+  { key: 'all', label: t('dash.news.filters.all') },
+  { key: 'OKX官方', label: t('dash.news.source.okx') },
+  { key: '金十数据', label: t('dash.news.source.jin10') },
+  { key: '全球宏观', label: t('dash.news.filters.macro') },
+]);
+
 const ni = computed<any>(() => (store.data as any)?.news_intelligence || {});
 const macro = computed(() => ni.value.macro_sentiment || '偏多震荡');
 const rawNews = computed<any[]>(() => ni.value.latest_news || []);
@@ -136,13 +144,13 @@ async function refreshNews() {
           </span>
           <span class="font-medium" style="color: var(--ink-2)">{{ sourceReason }}</span>
           <span class="mx-1 text-[10px] opacity-30">|</span>
-          <span>新鲜度: <b class="num font-semibold" style="color: var(--ink-1)">{{ freshAt || '刚刚' }}</b></span>
+          <span>{{ t('dash.news.freshness') }} <b class="num font-semibold" style="color: var(--ink-1)">{{ freshAt || t('dash.news.justNow') }}</b></span>
         </div>
 
         <button
           class="btn btn-quiet btn-icon btn-sm"
           :disabled="store.isRefreshing"
-          title="立即刷新舆情数据"
+          :title="t('dash.news.refreshTitle')"
           @click="refreshNews"
         >
           <RefreshCw class="h-3.5 w-3.5" :class="store.isRefreshing && 'animate-spin'" />
@@ -173,21 +181,21 @@ async function refreshNews() {
           </div>
           <div>
             <div class="flex items-center gap-2">
-              <span class="badge badge-down font-bold text-xs">🚨 黑天鹅熔断机制已激活</span>
+              <span class="badge badge-down font-bold text-xs">{{ t('dash.news.cb.badge') }}</span>
               <span class="text-2xs num t-faint">{{ circuitBreaker.triggered_at }}</span>
             </div>
             <h3 class="text-sm font-bold mt-1" style="color: var(--ink-strong)">
-              {{ circuitBreaker.headline || '检测到极端市场不可抗力冲击' }}
+              {{ circuitBreaker.headline || t('dash.news.cb.headlineFallback') }}
             </h3>
             <p class="text-xs mt-0.5 t-faint">
-              触发高危识别词：<b class="down">{{ circuitBreaker.keyword || '突发恶性异动' }}</b> ·
-              防御动作：<span class="font-medium" style="color: var(--ink-2)">{{ circuitBreaker.action || '暂停新开仓 30 分钟，启动存量持仓保本防御' }}</span>
+              {{ t('dash.news.cb.keywordLabel') }}<b class="down">{{ circuitBreaker.keyword || t('dash.news.cb.keywordFallback') }}</b> ·
+              {{ t('dash.news.cb.actionLabel') }}<span class="font-medium" style="color: var(--ink-2)">{{ circuitBreaker.action || t('dash.news.cb.actionFallback') }}</span>
             </p>
           </div>
         </div>
         <div class="shrink-0 flex items-center gap-2">
           <span class="badge font-semibold" style="color: var(--down); border-color: var(--down-line); background-color: var(--down-bg)">
-            开仓通道已硬冻结
+            {{ t('dash.news.cb.frozen') }}
           </span>
         </div>
       </div>
@@ -200,10 +208,10 @@ async function refreshNews() {
           </div>
           <div class="min-w-0">
             <div class="flex items-center gap-2 flex-wrap">
-              <span class="badge badge-accent font-bold text-2xs">🔥 置顶突发 BREAKING</span>
+              <span class="badge badge-accent font-bold text-2xs">{{ t('dash.news.breaking.badge') }}</span>
               <span class="badge badge-mono text-2xs" v-for="p in (pinnedNews.platforms || []).slice(0, 2)" :key="p">{{ p }}</span>
               <span class="t-faint text-2xs num">{{ fmtHM(pinnedNews.time) }} · <TimeAgo :time="pinnedNews.time" /></span>
-              <span class="badge badge-accent text-2xs">宏观：{{ macro }}</span>
+              <span class="badge badge-accent text-2xs">{{ t('dash.news.breaking.macroPrefix') }}{{ macro }}</span>
             </div>
             <a
               :href="pinnedNews.url || '#'"
@@ -223,7 +231,7 @@ async function refreshNews() {
         <div class="shrink-0 flex items-center gap-2">
           <div class="flex items-center gap-1.5 text-2xs font-semibold px-2 py-1 rounded border" style="background-color: var(--up-bg); border-color: var(--up-line); color: var(--up)">
             <ShieldCheck class="h-3.5 w-3.5" />
-            黑天鹅哨兵 7×24H 防御中
+            {{ t('dash.news.breaking.sentinel') }}
           </div>
         </div>
       </div>
@@ -239,11 +247,11 @@ async function refreshNews() {
               <Flame class="h-4 w-4" style="color: var(--accent)" />
               {{ t('dash.news.band.title') }}
             </h2>
-            <p class="t-faint text-2xs">点击币种可联动筛选快讯流</p>
+            <p class="t-faint text-2xs">{{ t('dash.news.matrixHint') }}</p>
           </div>
           <div v-if="selectedCoin" class="flex items-center gap-1 text-2xs">
             <span class="badge badge-accent font-bold">{{ selectedCoin }}</span>
-            <button class="btn btn-ghost btn-icon btn-sm" title="清除筛选" @click="selectedCoin = null">
+            <button class="btn btn-ghost btn-icon btn-sm" :title="t('dash.news.clearFilter')" @click="selectedCoin = null">
               <X class="h-3 w-3" />
             </button>
           </div>
@@ -264,7 +272,7 @@ async function refreshNews() {
                   borderColor: 'transparent',
                   backgroundColor: 'var(--surface-2)',
                 }"
-            :title="`点击筛选 ${c.sym} 快讯`"
+            :title="t('dash.news.filterCoin', undefined, { sym: c.sym })"
             @click="toggleCoinFilter(c.sym)"
           >
             <!-- 币种标识 -->
@@ -276,15 +284,15 @@ async function refreshNews() {
             <!-- 双极性多空能量槽 (Polarity Energy Bar) -->
             <div class="min-w-0 flex-1">
               <div class="flex h-2 overflow-hidden rounded-full" style="background-color: var(--surface-1)">
-                <div :style="{ width: c.bull + '%', backgroundColor: 'var(--up)' }" :title="`多头占比: ${c.bull}%`" />
+                <div :style="{ width: c.bull + '%', backgroundColor: 'var(--up)' }" :title="t('dash.news.longPct', undefined, { n: c.bull })" />
                 <div :style="{ width: (100 - c.bull - c.bear) + '%', backgroundColor: 'var(--line-2)' }" />
-                <div :style="{ width: c.bear + '%', backgroundColor: 'var(--down)' }" :title="`空头占比: ${c.bear}%`" />
+                <div :style="{ width: c.bear + '%', backgroundColor: 'var(--down)' }" :title="t('dash.news.shortPct', undefined, { n: c.bear })" />
               </div>
               <div class="num mt-1 flex justify-between text-2xs" style="color: var(--ink-3)">
                 <span class="up font-semibold flex items-center gap-0.5">
                   <TrendingUp class="h-2.5 w-2.5" /> {{ fmtNum(c.bull, 0) }}%
                 </span>
-                <span class="text-3xs" style="color: var(--ink-faint)">{{ c.mentions ?? 0 }} 篇</span>
+                <span class="text-3xs" style="color: var(--ink-faint)">{{ t('dash.news.mentions', undefined, { n: c.mentions ?? 0 }) }}</span>
                 <span class="down font-semibold flex items-center gap-0.5">
                   {{ fmtNum(c.bear, 0) }}% <TrendingDown class="h-2.5 w-2.5" />
                 </span>
@@ -310,12 +318,7 @@ async function refreshNews() {
             <!-- 来源分类筛选按钮 -->
             <div class="flex items-center gap-0.5 p-0.5 rounded-md text-2xs" style="background-color: var(--surface-2); border: 1px solid var(--line-1);">
               <button
-                v-for="s in [
-                  { key: 'all', label: '全部' },
-                  { key: 'OKX官方', label: 'OKX官方' },
-                  { key: '金十数据', label: '金十数据' },
-                  { key: '全球宏观', label: '宏观快讯' },
-                ]"
+                v-for="s in sourceFilters"
                 :key="s.key"
                 class="px-2 py-0.5 rounded transition-colors"
                 :style="selectedSource === s.key ? { backgroundColor: 'var(--surface-3)', color: 'var(--ink-strong)', fontWeight: 'bold' } : { color: 'var(--ink-3)' }"
@@ -325,22 +328,22 @@ async function refreshNews() {
               </button>
             </div>
             <span v-if="selectedCoin" class="badge badge-accent text-2xs flex items-center gap-1">
-              <Filter class="h-2.5 w-2.5" /> {{ selectedCoin }} 过滤
+              <Filter class="h-2.5 w-2.5" /> {{ t('dash.news.filterTag', undefined, { sym: selectedCoin }) }}
             </span>
           </div>
           <div class="flex items-center gap-2">
-            <span class="t-faint text-2xs">共 {{ filteredNews.length }} 条快讯</span>
+            <span class="t-faint text-2xs">{{ t('dash.news.count', undefined, { n: filteredNews.length }) }}</span>
             <button
               v-if="selectedCoin || selectedSource !== 'all'"
               class="btn btn-ghost btn-sm text-2xs"
               @click="selectedCoin = null; selectedSource = 'all'"
             >
-              重置筛选
+              {{ t('dash.news.resetFilters') }}
             </button>
           </div>
         </div>
 
-        <BaseEmpty v-if="!filteredNews.length" :text="selectedCoin ? `暂无与 ${selectedCoin} 相关的快讯` : t('dash.news.feed.empty')" />
+        <BaseEmpty v-if="!filteredNews.length" :text="selectedCoin ? t('dash.news.emptyCoin', undefined, { sym: selectedCoin }) : t('dash.news.feed.empty')" />
         <div v-else class="flex-1 max-h-[640px] divide-y overflow-y-auto" style="--tw-divide-y-reverse:0">
           <a
             v-for="item in filteredNews"

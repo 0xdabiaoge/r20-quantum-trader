@@ -134,11 +134,11 @@ function venueLabel(v: unknown): string {
       <BaseStat :label="t('dash.ledger.summary.net')" :value="fmtSigned(netSum)" :delta-tone="netSum >= 0 ? 'up' : 'down'" />
       <BaseStat :label="t('dash.ledger.summary.fees')" :value="`-${fmtNum(feeSum, 2)}`" delta-tone="muted" />
       <BaseStat
-        label="资金费净收支"
+        :label="t('dash.ledger.summary.fundingNet')"
         :value="fmtSigned(fundingSum)"
         :delta="`+${fmtNum(fundingIncome, 2)} / -${fmtNum(fundingExpense, 2)}`"
         :delta-tone="fundingSum >= 0 ? 'up' : 'down'"
-        hint="累计资金费用净额与收支细分"
+        :hint="t('dash.ledger.summary.fundingNetHint')"
       />
       <BaseStat
         :label="t('dash.ledger.summary.pf')"
@@ -240,7 +240,7 @@ function venueLabel(v: unknown): string {
                 <td class="col-num t-faint">
                   <span>{{ fmtNum(Math.abs(Number(x.fee) || 0), 2) }}</span>
                   <span v-if="Number(x.funding_fee || 0) !== 0" class="block text-3xs num" :class="Number(x.funding_fee) >= 0 ? 'up' : 'down'">
-                    资: {{ Number(x.funding_fee) >= 0 ? '+' : '' }}{{ fmtNum(x.funding_fee, 2) }}
+                    {{ t('dash.ledger.fundingTag') }} {{ Number(x.funding_fee) >= 0 ? '+' : '' }}{{ fmtNum(x.funding_fee, 2) }}
                   </span>
                 </td>
                 <td class="num text-xs" style="color: var(--ink-2)">{{ x.duration || '--' }}</td>

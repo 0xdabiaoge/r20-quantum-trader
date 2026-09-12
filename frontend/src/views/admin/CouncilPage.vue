@@ -2,7 +2,7 @@
 import { fmtDate } from '../../utils/format';
 import { useToast } from '../../composables/useToast'
 const toast = useToast()
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import PageHeader from '../../components/admin/PageHeader.vue'
 import { useI18n } from '../../composables/useI18n'
 import { useApi } from '../../composables/useApi'
@@ -46,20 +46,29 @@ const expandedRole = ref<string>('trader_trend')
 const testResult = ref<any>(null)
 const expandedReasoning = ref<Record<string, boolean>>({})
 
-const consensusModes = [
+const consensusModes = computed(() => [
   {
     id: 'standard',
-    name: '标准提案模式',
-    tag: '高效终审',
-    desc: '各交易员提交首轮独立方案与审查汇报，汇编完整卷宗直接由 CIO 终审查决。',
+    name: t('admin.council.modeStandardName'),
+    tag: t('admin.council.modeStandardTag'),
+    desc: t('admin.council.modeStandardDesc'),
   },
   {
     id: 'cross_examination',
-    name: '双轮质询互评',
-    tag: '深度攻防',
-    desc: '第一轮独立方案 -> 第二轮同行交叉漏洞质询辩论 -> 第三轮 CIO 统筹审阅攻防并拍板。',
+    name: t('admin.council.modeCrossName'),
+    tag: t('admin.council.modeCrossTag'),
+    desc: t('admin.council.modeCrossDesc'),
   },
-]
+])
+
+const dataSlots = computed(() => [
+  { k: 'macro_4h', label: t('admin.council.slotMacro4h') },
+  { k: 'calculus_1h', label: t('admin.council.slotCalculus1h') },
+  { k: 'smart_money', label: t('admin.council.slotSmartMoney') },
+  { k: 'orderbook_depth', label: t('admin.council.slotOrderbook') },
+  { k: 'sentiment', label: t('admin.council.slotSentiment') },
+  { k: 'trading_memory', label: t('admin.council.slotMemory') },
+])
 
 const roleIcons: Record<string, any> = {
   trader_trend: Shield,
@@ -116,7 +125,7 @@ async function saveConfig() {
     })
     councilConfig.value = res.config
     toast.ok(councilConfig.value.enabled
-        ? `对冲基金投委会配置已保存并生效（${consensusModes.find((m) => m.id === councilConfig.value.consensus_mode)?.name || '标准提案模式'}）`
+        ? `对冲基金投委会配置已保存并生效（${consensusModes.value.find((m) => m.id === councilConfig.value.consensus_mode)?.name || '标准提案模式'}）`
         : '投委会配置已保存（当前为单模型直连决策）')
   } catch (e: any) {
     toast.err(`保存失败: ${e.message}`)
@@ -155,7 +164,7 @@ function pickImportFile(ev: Event) {
     importRawJson.value = String(reader.result || '')
     importFileError.value = ''
   }
-  reader.onerror = () => { importFileError.value = '文件读取失败，请重试或直接粘贴 JSON 内容' }
+  reader.onerror = () => { importFileError.value = t('admin.council.importReadFileFailed') }
   reader.readAsText(file)
 }
 
@@ -165,7 +174,7 @@ async function doImportConfig() {
   try {
     payload = JSON.parse(importRawJson.value)
   } catch {
-    importFileError.value = 'JSON 格式不合法，请检查导出包内容'
+    importFileError.value = t('admin.council.importJsonInvalid')
     return
   }
   importing.value = true
@@ -179,7 +188,7 @@ async function doImportConfig() {
     importRawJson.value = ''
     toast.ok(`投委会配置导入成功：席位 ${(res.roles || []).join(' / ')}${res.backup_file ? `；原配置已自动备份为 ${res.backup_file}` : ''}`)
   } catch (e: any) {
-    importFileError.value = `导入失败：${e.message}`
+    importFileError.value = t('admin.council.importFailed', undefined, { msg: e.message })
   } finally {
     importing.value = false
   }
@@ -283,10 +292,10 @@ onMounted(loadData)
     <!-- 1. Top Control Station: Switch, Consensus Mode & Actions -->
     <div class="rounded-2xl border p-4 sm:p-5 shadow-xs space-y-4" style="background-color: var(--surface-2); border-color: var(--line-1);">
       <!-- Header row -->
-      <PageHeader :title="t('nav.admin.council')" description="多交易员独立提案、交叉质询，首席仲裁官统筹资金与敞口后终审发单" stacked>
+      <PageHeader :title="t('nav.admin.council')" :description="t('admin.council.desc')" stacked>
         <template #actions>
         <div class="flex shrink-0 items-center justify-end gap-2">
-          <span class="chip"><span class="dot" :class="councilConfig.enabled ? 'dot-up' : ''" />{{ councilConfig.enabled ? '议事中' : '单模型直连' }}</span>
+          <span class="chip"><span class="dot" :class="councilConfig.enabled ? 'dot-up' : ''" />{{ councilConfig.enabled ? t('admin.council.chipInSession') : t('admin.council.chipDirect') }}</span>
           <!-- Toggle Button -->
           <button
             type="button"
@@ -297,7 +306,7 @@ onMounted(loadData)
           >
             <ToggleRight v-if="councilConfig.enabled" class="w-3.5 h-3.5 text-emerald-400" />
             <ToggleLeft v-else class="w-3.5 h-3.5 opacity-50" />
-            <span>{{ councilConfig.enabled ? '机制已开启' : '机制已关闭' }}</span>
+            <span>{{ councilConfig.enabled ? t('admin.council.enabledOn') : t('admin.council.enabledOff') }}</span>
           </button>
 
           <!-- Save Button -->
@@ -307,7 +316,7 @@ onMounted(loadData)
             class="btn-admin-primary disabled:opacity-40"
           >
             <Save class="w-3.5 h-3.5" />
-            <span>{{ saving ? '保存中...' : '保存配置' }}</span>
+            <span>{{ saving ? t('admin.council.saving') : t('admin.council.save') }}</span>
           </button>
 
           <!-- Test Button -->
@@ -317,7 +326,7 @@ onMounted(loadData)
             class="btn-admin-secondary disabled:opacity-40"
           >
             <Play class="w-3.5 h-3.5" :class="{ 'animate-spin': testing }" />
-            <span>{{ testing ? '现场辩论中...' : '现场辩论测试' }}</span>
+            <span>{{ testing ? t('admin.council.testing') : t('admin.council.runTest') }}</span>
           </button>
 
           <!-- Export / Import Buttons -->
@@ -325,19 +334,19 @@ onMounted(loadData)
             @click="exportConfig"
             :disabled="!auth.isSuperadmin"
             class="btn-admin-secondary disabled:opacity-40"
-            title="导出当前投委会席位、提示词与议事规则为 JSON 包"
+            :title="t('admin.council.exportTitle')"
           >
             <Download class="w-3.5 h-3.5" />
-            <span>导出配置</span>
+            <span>{{ t('admin.council.export') }}</span>
           </button>
           <button
             @click="auth.isSuperadmin && (importVisible = !importVisible)"
             :disabled="!auth.isSuperadmin"
             class="btn-admin-secondary disabled:opacity-40"
-            title="导入投委会配置 JSON 包（导入前自动备份当前配置）"
+            :title="t('admin.council.importTitle')"
           >
             <Upload class="w-3.5 h-3.5" />
-            <span>导入配置</span>
+            <span>{{ t('admin.council.import') }}</span>
           </button>
         </div>
         </template>
@@ -350,7 +359,7 @@ onMounted(loadData)
         style="border-color: var(--line-1); background: rgba(255, 255, 255, 0.02);"
       >
         <p class="text-[11px]" style="color: var(--ink-2);">
-          选择 r20-council-config JSON 导出包，或直接粘贴其内容。导入前当前配置将自动备份（保留最近 10 份）；席位绑定的模型 ID 按导入包原样恢复，若本机无同名模型请导入后在席位卡片重新绑定。
+          {{ t('admin.council.importHint') }}
         </p>
         <input
           type="file"
@@ -362,7 +371,7 @@ onMounted(loadData)
         <textarea
           v-model="importRawJson"
           rows="8"
-          placeholder='粘贴导出包 JSON：{"format":"r20-council-config","version":1,"config":{...}}'
+          :placeholder="t('admin.council.importPlaceholder')"
           class="w-full text-[11px] rounded p-2 bg-transparent border"
           style="border-color: var(--line-1); color: var(--ink-1);"
         ></textarea>
@@ -374,13 +383,13 @@ onMounted(loadData)
             class="btn-admin-primary disabled:opacity-40"
           >
             <Upload class="w-3.5 h-3.5" />
-            <span>{{ importing ? '导入中...' : '确认导入' }}</span>
+            <span>{{ importing ? t('admin.council.importing') : t('admin.council.confirmImport') }}</span>
           </button>
           <button
             @click="importVisible = false; importRawJson = ''; importFileError = ''"
             class="btn-admin-secondary"
           >
-            <span>取消</span>
+            <span>{{ t('admin.council.cancel') }}</span>
           </button>
         </div>
       </div>
@@ -416,7 +425,7 @@ onMounted(loadData)
       <!-- Quick Timeout & Preset Bar -->
       <div class="flex flex-wrap items-center justify-between gap-3 pt-2 border-t" style="border-color: var(--line-1);">
         <div class="flex items-center space-x-2">
-          <span class="text-[11px] font-bold" style="color: var(--ink-2);">投委会超时保护:</span>
+          <span class="text-[11px] font-bold" style="color: var(--ink-2);">{{ t('admin.council.timeoutLabel') }}</span>
           <input
             v-model="councilConfig.timeout_seconds"
             type="number"
@@ -427,7 +436,7 @@ onMounted(loadData)
             style="background-color: var(--surface-input); border-color: var(--line-1); color: var(--ink-1);"
             :disabled="!auth.isSuperadmin"
           />
-          <span class="text-[11px] text-[var(--ink-2)]">秒 (超时自动降级为单模型决策)</span>
+          <span class="text-[11px] text-[var(--ink-2)]">{{ t('admin.council.timeoutHint') }}</span>
         </div>
 
         <div class="flex items-center space-x-2">
@@ -438,7 +447,7 @@ onMounted(loadData)
             style="background-color: var(--surface-1); border-color: var(--line-1); color: var(--ink-1);"
           >
             <RotateCcw class="w-3 h-3 text-purple-400" />
-            <span>恢复对冲基金标准阵容</span>
+            <span>{{ t('admin.council.restoreSuite') }}</span>
           </button>
           <button
             @click="addNewCustomTrader"
@@ -447,7 +456,7 @@ onMounted(loadData)
             style="border-color: var(--accent); color: var(--accent);"
           >
             <Plus class="w-3 h-3" />
-            <span>添加自定义交易员席位</span>
+            <span>{{ t('admin.council.addTrader') }}</span>
           </button>
         </div>
       </div>
@@ -482,30 +491,30 @@ onMounted(loadData)
                   class="bg-transparent border-b border-dashed text-sm font-bold outline-none max-w-[240px]"
                   style="border-color: var(--line-2); color: var(--ink-1);"
                   :readonly="!auth.isSuperadmin"
-                  placeholder="角色名称"
+                  :placeholder="t('admin.council.seatNamePlaceholder')"
                 />
                 <span
                   class="rounded px-2 py-0.5 text-[11px] border"
                   style="background-color: var(--surface-1); border-color: var(--line-1); color: var(--ink-2);"
                 >
-                  {{ role.role_title || (role.is_arbitrator ? 'CIO / 终审' : 'Senior Trader') }}
+                  {{ role.role_title || (role.is_arbitrator ? t('admin.council.cioTitle') : 'Senior Trader') }}
                 </span>
                 <span
                   v-if="role.is_arbitrator || roleId === 'cio'"
                   class="text-[11px] font-bold px-1.5 py-0.2 rounded border shrink-0 text-purple-400 border-purple-500/30 bg-purple-500/10"
                 >
-                  ⚖️ 终审发单席位
+                  {{ t('admin.council.arbitratorBadge') }}
                 </span>
                 <span
                   v-else
                   class="text-[11px] px-1.5 py-0.2 rounded border shrink-0"
                   :style="role.enabled !== false ? { backgroundColor: 'var(--up-bg)', color: 'var(--up)', borderColor: 'var(--up-line)' } : { backgroundColor: 'var(--surface-3)', color: 'var(--ink-3)', borderColor: 'var(--line-1)' }"
                 >
-                  {{ role.enabled !== false ? '活跃参与' : '已静音' }}
+                  {{ role.enabled !== false ? t('admin.council.seatActive') : t('admin.council.seatMuted') }}
                 </span>
               </div>
               <p class="text-[11px] mt-0.5 truncate" style="color: var(--ink-2);">
-                {{ role.description || '负责当前交易台的独立审查与实战方案提交' }}
+                {{ role.description || t('admin.council.seatDescFallback') }}
               </p>
             </div>
           </div>
@@ -514,14 +523,14 @@ onMounted(loadData)
           <div class="flex flex-wrap items-center justify-end gap-2 shrink-0">
             <!-- Bound Model -->
             <div class="flex items-center space-x-1">
-              <span class="text-[11px] text-[var(--ink-2)]">模型:</span>
+              <span class="text-[11px] text-[var(--ink-2)]">{{ t('admin.council.modelLabel') }}</span>
               <select
                 v-model="role.model_id"
                 class="rounded-xl px-2 py-1 text-xs outline-none border cursor-pointer max-w-[150px]"
                 style="background-color: var(--surface-input); border-color: var(--line-1); color: var(--ink-1);"
                 :disabled="!auth.isSuperadmin"
               >
-                <option value="">(继承全局主脑)</option>
+                <option value="">{{ t('admin.council.inheritGlobalBrain') }}</option>
                 <option v-for="m in availableModels" :key="m.id" :value="m.id">
                   {{ m.name || m.id }}
                 </option>
@@ -530,7 +539,7 @@ onMounted(loadData)
 
             <!-- Weight (For traders only) -->
             <div v-if="!role.is_arbitrator && roleId !== 'cio'" class="flex items-center space-x-1">
-              <span class="text-[11px] text-[var(--ink-2)]">权重:</span>
+              <span class="text-[11px] text-[var(--ink-2)]">{{ t('admin.council.weightLabel') }}</span>
               <input
                 v-model="role.weight"
                 type="number"
@@ -550,7 +559,7 @@ onMounted(loadData)
               :disabled="!auth.isSuperadmin"
               class="cursor-pointer p-1"
               :class="role.enabled !== false ? 'text-emerald-400' : 'text-zinc-500'"
-              :title="role.enabled !== false ? '静音此交易员' : '激活此交易员'"
+              :title="role.enabled !== false ? t('admin.council.muteTitle') : t('admin.council.activateTitle')"
             >
               <ToggleRight v-if="role.enabled !== false" class="w-5 h-5" />
               <ToggleLeft v-else class="w-5 h-5" />
@@ -562,7 +571,7 @@ onMounted(loadData)
               @click="removeRole(String(roleId))"
               :disabled="!auth.isSuperadmin"
               class="p-1.5 rounded text-rose-400 hover:opacity-80 cursor-pointer"
-              title="移除此席位"
+              :title="t('admin.council.removeSeatTitle')"
             >
               <Trash2 class="w-3.5 h-3.5" />
             </button>
@@ -572,7 +581,7 @@ onMounted(loadData)
               @click="expandedRole = expandedRole === roleId ? '' : String(roleId)"
               class="p-1.5 rounded cursor-pointer transition-colors"
               style="color: var(--ink-2);"
-              title="展开/收起定制提示词"
+              :title="t('admin.council.expandPromptTitle')"
             >
               <ChevronUp v-if="expandedRole === roleId" class="w-4 h-4" />
               <ChevronDown v-else class="w-4 h-4" />
@@ -584,7 +593,7 @@ onMounted(loadData)
         <div v-if="expandedRole === roleId" class="mt-3 pt-3 border-t space-y-3" style="border-color: var(--line-1);">
           <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
             <div class="flex items-center space-x-2">
-              <span style="color: var(--ink-2);">采样温度:</span>
+              <span style="color: var(--ink-2);">{{ t('admin.council.temperatureLabel') }}</span>
               <input
                 v-model="role.temperature"
                 type="number"
@@ -595,24 +604,17 @@ onMounted(loadData)
                 style="background-color: var(--surface-input); border-color: var(--line-1); color: var(--ink-1);"
                 :disabled="!auth.isSuperadmin"
               />
-              <span class="text-[11px] text-[var(--ink-2)]">(0.1~0.2 严格理性 / 0.3+ 进取)</span>
+              <span class="text-[11px] text-[var(--ink-2)]">{{ t('admin.council.temperatureHint') }}</span>
             </div>
 
             <!-- Quick Data Slots Inserter -->
             <div class="flex flex-wrap items-center gap-1 text-[11px]">
-              <span class="text-[var(--ink-2)]">插入插槽:</span>
+              <span class="text-[var(--ink-2)]">{{ t('admin.council.insertSlotLabel') }}</span>
               <button
-                v-for="slot in [
-                  { k: 'macro_4h', label: '4H宏观' },
-                  { k: 'calculus_1h', label: '微积分动能' },
-                  { k: 'smart_money', label: '聪明钱' },
-                  { k: 'orderbook_depth', label: '盘口深度' },
-                  { k: 'sentiment', label: '情绪异动' },
-                  { k: 'trading_memory', label: '长期心法' },
-                ]"
+                v-for="slot in dataSlots"
                 :key="slot.k"
                 type="button"
-                @click="role.prompt = role.prompt ? `${role.prompt.trim()}\n- 重点核验: {{${slot.k}}}` : `{{${slot.k}}}`"
+                @click="role.prompt = role.prompt ? `${role.prompt.trim()}\n${t('admin.council.slotVerifyLine')}{{${slot.k}}}` : `{{${slot.k}}}`"
                 class="px-2 py-0.5 rounded-md border cursor-pointer hover:border-purple-400 transition-colors"
                 style="background-color: var(--surface-2); border-color: var(--line-1); color: var(--ink-1);"
               >
@@ -625,7 +627,7 @@ onMounted(loadData)
                 class="ml-2 flex items-center space-x-1 text-[11px] text-purple-400 hover:underline cursor-pointer"
               >
                 <RotateCcw class="w-3 h-3" />
-                <span>恢复预设提示词</span>
+                <span>{{ t('admin.council.restorePrompt') }}</span>
               </button>
             </div>
           </div>
@@ -637,7 +639,7 @@ onMounted(loadData)
             class="w-full rounded-xl p-3 text-xs outline-none border leading-relaxed resize-y select-text transition-colors"
             style="background-color: var(--surface-input); border-color: var(--line-1); color: var(--ink-1);"
             :disabled="!auth.isSuperadmin"
-            placeholder="编写该席位的实战职责、资金/持仓审查规范与作战提案指引..."
+            :placeholder="t('admin.council.promptPlaceholder')"
           ></textarea>
         </div>
       </div>
@@ -648,12 +650,12 @@ onMounted(loadData)
       <div class="flex items-center justify-between pb-3 border-b" style="border-color: var(--line-1);">
         <div class="flex flex-wrap items-center gap-2">
           <CheckCircle2 class="w-4 h-4 text-emerald-400" />
-          <h3 class="text-sm font-bold" style="color: var(--ink-1);">投委会现场辩论与 CIO 裁定实录</h3>
+          <h3 class="text-sm font-bold" style="color: var(--ink-1);">{{ t('admin.council.transcriptTitle') }}</h3>
           <span class="text-[11px] px-2 py-0.5 rounded border border-purple-500/30 bg-purple-500/10 text-purple-400">
-            共识机制: {{ testResult.transcript?.consensus_mode }}
+            {{ t('admin.council.consensusLabel') }} {{ testResult.transcript?.consensus_mode }}
           </span>
           <span class="text-[11px] px-2 py-0.5 rounded border border-emerald-500/30 bg-emerald-500/10 text-emerald-400">
-            全流程耗时 {{ testResult.transcript?.total_duration_ms }}ms
+            {{ t('admin.council.totalDuration') }} {{ testResult.transcript?.total_duration_ms }}ms
           </span>
         </div>
         <button
@@ -661,13 +663,13 @@ onMounted(loadData)
           class="text-xs cursor-pointer px-3 py-1 rounded-lg border"
           style="background-color: var(--surface-1); border-color: var(--line-1); color: var(--ink-2);"
         >
-          收起
+          {{ t('admin.council.collapse') }}
         </button>
       </div>
 
       <!-- Traders' Proposals Grid -->
       <div class="space-y-1">
-        <div class="text-xs font-bold text-zinc-400">第一轮：交易员独立实操审查与作战提案</div>
+        <div class="text-xs font-bold text-zinc-400">{{ t('admin.council.round1Title') }}</div>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div
             v-for="(adv, key) in testResult.transcript?.advisors || {}"
@@ -681,7 +683,7 @@ onMounted(loadData)
                 <span class="text-[11px] text-purple-400 truncate max-w-[120px]">{{ adv.model_used }}</span>
               </div>
               <div class="flex items-center justify-between text-[11px] text-[var(--ink-2)]">
-                <span>响应: {{ adv.latency_ms }}ms</span>
+                <span>{{ t('admin.council.responseLabel') }} {{ adv.latency_ms }}ms</span>
                 <span v-if="adv.proposal_id" class="text-zinc-500 text-[11px]">ID: {{ adv.proposal_id }}</span>
               </div>
               <p class="text-xs whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto pr-1 select-text" style="color: var(--ink-2);">
@@ -694,7 +696,7 @@ onMounted(loadData)
                 @click="expandedReasoning[String(key)] = !expandedReasoning[String(key)]"
                 class="text-[11px] text-purple-400 cursor-pointer"
               >
-                <span>{{ expandedReasoning[String(key)] ? '收起思考链' : '展开思考链 (Reasoning)' }}</span>
+                <span>{{ expandedReasoning[String(key)] ? t('admin.council.collapseReasoning') : t('admin.council.expandReasoning') }}</span>
               </button>
               <div
                 v-if="expandedReasoning[String(key)]"
@@ -711,7 +713,7 @@ onMounted(loadData)
       <!-- Optional: Round 2 Cross-Examinations Grid (only in cross_examination mode) -->
       <div v-if="testResult.transcript?.cross_examinations && Object.keys(testResult.transcript.cross_examinations).length > 0" class="space-y-1 pt-2">
         <div class="flex items-center space-x-2 text-xs font-bold text-amber-400">
-          <span>第二轮：交叉质询与攻防实录</span>
+          <span>{{ t('admin.council.round2Title') }}</span>
         </div>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div
@@ -721,9 +723,9 @@ onMounted(loadData)
             style="background-color: var(--surface-1); border-color: var(--line-1);"
           >
             <div class="flex items-center justify-between text-xs font-bold">
-              <span style="color: var(--ink-1);">{{ crit.role_name || cKey }} 的质询</span>
+              <span style="color: var(--ink-1);">{{ t('admin.council.critiqueBy', undefined, { name: crit.role_name || cKey }) }}</span>
               <span class="text-[11px]" :class="crit.status === 'ok' ? 'text-amber-400' : 'text-zinc-500'">
-                {{ crit.status === 'ok' ? `${crit.latency_ms}ms` : (crit.status === 'skipped' ? '安全跳过' : '异常') }}
+                {{ crit.status === 'ok' ? `${crit.latency_ms}ms` : (crit.status === 'skipped' ? t('admin.council.critiqueSkipped') : t('admin.council.critiqueError')) }}
               </span>
             </div>
             <p class="text-xs whitespace-pre-wrap leading-relaxed max-h-40 overflow-y-auto pr-1 select-text" style="color: var(--ink-2);">
@@ -737,21 +739,21 @@ onMounted(loadData)
       <div class="rounded-xl border p-4 space-y-3" style="background-color: var(--surface-1); border-color: var(--accent-line);">
         <div class="flex items-center justify-between">
           <div class="flex items-center space-x-2">
-            <span class="text-xs font-bold text-purple-400">【首席投资官 (CIO) 终审批复】</span>
-            <span class="text-[11px] text-[var(--ink-2)]">{{ testResult.transcript?.arbitrator?.model_used }} · 审阅耗时 {{ testResult.transcript?.arbitrator?.latency_ms }}ms</span>
+            <span class="text-xs font-bold text-purple-400">{{ t('admin.council.cioVerdictTitle') }}</span>
+            <span class="text-[11px] text-[var(--ink-2)]">{{ testResult.transcript?.arbitrator?.model_used }} · {{ t('admin.council.reviewDuration') }} {{ testResult.transcript?.arbitrator?.latency_ms }}ms</span>
           </div>
           <span class="text-[11px] font-bold px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
-            方案采纳与点位落地
+            {{ t('admin.council.adoptionBadge') }}
           </span>
         </div>
 
         <div class="text-xs font-bold leading-relaxed p-2.5 rounded border text-emerald-400" style="background-color: var(--surface-2); border-color: var(--line-1);">
-          资金总括与决议: {{ testResult.brain_output?.macro_assessment }}
+          {{ t('admin.council.capitalSummary') }} {{ testResult.brain_output?.macro_assessment }}
         </div>
 
         <!-- 6 Instruments Points Matrix -->
         <div v-if="testResult.brain_output?.decisions" class="space-y-1.5">
-          <div class="text-xs font-bold" style="color: var(--ink-1);">六大标的落盘点位矩阵:</div>
+          <div class="text-xs font-bold" style="color: var(--ink-1);">{{ t('admin.council.matrixTitle') }}</div>
           <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 text-xs">
             <div
               v-for="(dec, sym) in testResult.brain_output?.decisions"
@@ -767,7 +769,7 @@ onMounted(loadData)
                     class="px-1.5 py-0.5 rounded text-[11px] font-bold border"
                     :class="dec.adopted_role === 'REJECT_ALL' ? 'text-zinc-400 border-zinc-700 bg-zinc-800/40' : 'text-purple-300 border-purple-500/30 bg-purple-500/10'"
                   >
-                    {{ dec.adopted_role === 'REJECT_ALL' ? '全员驳回' : `采纳: ${councilConfig.roles[dec.adopted_role]?.name || dec.adopted_role}` }}
+                    {{ dec.adopted_role === 'REJECT_ALL' ? t('admin.council.rejectAll') : t('admin.council.adoptFrom', undefined, { name: councilConfig.roles[dec.adopted_role]?.name || dec.adopted_role }) }}
                   </span>
                   <span
                     class="px-2 py-0.5 rounded text-[11px] font-bold border"
@@ -785,24 +787,24 @@ onMounted(loadData)
               <!-- Price & Risk Metrics -->
               <div v-if="dec.action !== 'WAIT'" class="grid grid-cols-3 gap-1.5 p-2 rounded-lg bg-black/20 text-[11px] text-center">
                 <div>
-                  <div class="text-zinc-400">入场限价</div>
+                  <div class="text-zinc-400">{{ t('admin.council.entryLimit') }}</div>
                   <div class="font-bold text-white mt-0.5">${{ dec.limit_price || dec.entry_price || '--' }}</div>
                 </div>
                 <div>
-                  <div class="text-rose-400">2.0x止损</div>
+                  <div class="text-rose-400">{{ t('admin.council.stopLabel') }}</div>
                   <div class="font-bold text-rose-400 mt-0.5">${{ dec.stop_loss || '--' }}</div>
                 </div>
                 <div>
-                  <div class="text-emerald-400">2.0R止盈</div>
+                  <div class="text-emerald-400">{{ t('admin.council.takeProfitLabel') }}</div>
                   <div class="font-bold text-emerald-400 mt-0.5">${{ dec.take_profit || '--' }}</div>
                 </div>
               </div>
               <div v-else class="p-2 rounded-lg bg-black/10 text-[11px] text-zinc-500 italic">
-                保持空仓防守，未达顺势回踩或微积分爆发要求。
+                {{ t('admin.council.waitNote') }}
               </div>
 
               <div class="text-[11px] text-zinc-400 line-clamp-3 leading-relaxed">
-                {{ dec.reasoning || dec.reason || '遵从投委会综合裁定。' }}
+                {{ dec.reasoning || dec.reason || t('admin.council.defaultReason') }}
               </div>
             </div>
           </div>

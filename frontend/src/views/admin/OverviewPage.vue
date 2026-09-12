@@ -104,11 +104,11 @@ function actionLabel(a: string): string {
 
       <a class="card card-pad block transition-colors hover:bg-[var(--surface-3)]" href="/admin/security">
         <div class="flex items-center justify-between">
-          <span class="t-label">交易场所与路由</span>
+          <span class="t-label">{{ t('admin.overview.quickVenues') }}</span>
           <Wallet class="h-4 w-4" style="color: var(--ink-3)" />
         </div>
         <p class="mt-1.5 text-md font-bold truncate" :style="{ color: isDemo ? 'var(--warn)' : 'var(--up)' }">{{ venueEnv }}</p>
-        <p class="t-faint mt-0.5 text-xs">三所平权配置 · 点击管理</p>
+        <p class="t-faint mt-0.5 text-xs">{{ t('admin.overview.quickVenuesDesc') }}</p>
       </a>
     </div>
 

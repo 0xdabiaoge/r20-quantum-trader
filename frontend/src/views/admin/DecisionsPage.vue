@@ -49,9 +49,9 @@ async function fetchLogStream(type: 'trader' | 'backend' | 'scheduler') {
   try {
     const res = await api(`/api/v1/admin/logs?source=${type}&lines=100`)
     const raw: string = res.content || res.lines?.join('\n') || ''
-    logContent.value = raw ? reverseLogEntries(raw) : '无实时日志'
+    logContent.value = raw ? reverseLogEntries(raw) : t('admin.decisions.noLiveLogs')
   } catch (e: any) {
-    logContent.value = `获取日志失败: ${e.message}`
+    logContent.value = t('admin.decisions.fetchLogFailed', undefined, { message: e.message })
   } finally {
     logLoading.value = false
   }
@@ -64,9 +64,9 @@ onMounted(() => {
 
 <template>
   <div class="space-y-4 max-w-[2048px] mx-auto">
-    <PageHeader :title="t('nav.admin.decisions')" description="核对 AI 宏观基调与逐币动作，并审查交易、后台与任务调度三路实时日志流">
+    <PageHeader :title="t('nav.admin.decisions')" :description="t('admin.decisions.desc')">
       <template #actions>
-        <span class="chip"><span class="dot dot-live" />日常运行</span>
+        <span class="chip"><span class="dot dot-live" />{{ t('admin.decisions.normalRun') }}</span>
       </template>
     </PageHeader>
 
@@ -76,7 +76,7 @@ onMounted(() => {
         <div class="flex items-center space-x-2">
           <Terminal class="w-4 h-4 text-purple-400" />
           <h2 class="text-xs font-semibold" style="color: var(--ink-1);">{{ t('nav.admin.decisions') }}</h2>
-          <span class="text-[11px] px-1.5 py-0.5 rounded border font-bold" style="background-color: var(--surface-1); border-color: var(--line-1); color: var(--ink-3);">最新在前</span>
+          <span class="text-[11px] px-1.5 py-0.5 rounded border font-bold" style="background-color: var(--surface-1); border-color: var(--line-1); color: var(--ink-3);">{{ t('admin.decisions.latestFirst') }}</span>
         </div>
         <!-- Log Selector Tabs -->
         <div class="flex flex-wrap gap-1 p-1 rounded-lg border" style="background-color: var(--surface-1); border-color: var(--line-1);">
@@ -85,21 +85,21 @@ onMounted(() => {
             class="px-2.5 py-1 rounded text-xs font-bold cursor-pointer transition-colors"
             :style="activeLogTab === 'trader' ? { backgroundColor: 'var(--ink-1)', color: 'var(--surface-2)' } : { color: 'var(--ink-2)' }"
           >
-            交易巡检 (Trader)
+            {{ t('admin.decisions.tabTrader') }}
           </button>
           <button
             @click="fetchLogStream('backend')"
             class="px-2.5 py-1 rounded text-xs font-bold cursor-pointer transition-colors"
             :style="activeLogTab === 'backend' ? { backgroundColor: 'var(--ink-1)', color: 'var(--surface-2)' } : { color: 'var(--ink-2)' }"
           >
-            控制面服务
+            {{ t('admin.decisions.tabBackend') }}
           </button>
           <button
             @click="fetchLogStream('scheduler')"
             class="px-2.5 py-1 rounded text-xs font-bold cursor-pointer transition-colors"
             :style="activeLogTab === 'scheduler' ? { backgroundColor: 'var(--ink-1)', color: 'var(--surface-2)' } : { color: 'var(--ink-2)' }"
           >
-            任务调度器
+            {{ t('admin.decisions.tabScheduler') }}
           </button>
         </div>
       </div>
@@ -107,7 +107,7 @@ onMounted(() => {
       <div class="relative">
         <div v-if="logLoading" class="absolute inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center text-xs" style="color: var(--accent);">
           <RefreshCw class="w-4 h-4 animate-spin mr-1.5" />
-          <span>正在拉取最新日志流...</span>
+          <span>{{ t('admin.decisions.pullingLogs') }}</span>
         </div>
         <pre class="border rounded-lg p-3 text-xs max-h-[520px] overflow-y-auto whitespace-pre-wrap leading-relaxed select-text" style="background-color: var(--surface-1); border-color: var(--line-1); color: var(--ink-1);">{{ logContent }}</pre>
       </div>
