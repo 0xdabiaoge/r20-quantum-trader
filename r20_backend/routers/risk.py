@@ -185,7 +185,10 @@ def manual_close_position(payload: ManualCloseRequest) -> dict[str, Any]:
     refresh_settings()
     from scripts.okx_runtime import current_environment
     _close_env = current_environment()
-    if not _close_env.configured:
+    _close_venue = str(getattr(payload, "venue", "") or "okx").strip().lower()
+    if _close_venue not in ("okx", "binance", "gate"):
+        raise HTTPException(status_code=400, detail=f"不支持的平仓场所：{_close_venue}")
+    if _close_venue == "okx" and not _close_env.configured:
         raise HTTPException(status_code=503, detail=f"OKX {_close_env.mode.upper()} 静态 API Key 未配置（系统 NOT READY）：V5 直签是唯一私有通道，禁止后台手动平仓；请先在「账户接入」补齐完整三件套")
     if not settings.manual_close_enabled:
         raise HTTPException(status_code=403, detail="后台手动平仓功能未启用")
@@ -202,17 +205,21 @@ def manual_close_position(payload: ManualCloseRequest) -> dict[str, Any]:
         except BlockingIOError:
             raise HTTPException(status_code=409, detail="交易主循环正在执行，暂不允许后台快速平仓；请等待本周期结束")
         try:
-            result = fast_close_confirmed(payload.close_token, payload.confirmation)
-            audit_record("position.close", "confirmed_closed", {"instId": result.get("instId"), "side": result.get("posSide"), "environment": result.get("environment"), "size": result.get("closed_size")})
+            if _close_venue == "okx":
+                result = fast_close_confirmed(payload.close_token, payload.confirmation)
+            else:
+                from r20_backend.close_intent import venue_fast_close
+                result = venue_fast_close(_close_venue, _close_env.mode, payload.close_token, payload.confirmation)
+            audit_record("position.close", "confirmed_closed", {"instId": result.get("instId"), "side": result.get("posSide"), "venue": _close_venue, "environment": result.get("environment"), "size": result.get("closed_size")})
             return result
         except OKXNotConfigured as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
         except ValueError as exc:
-            audit_record("position.close", "rejected", {"error": str(exc)[:300]})
+            audit_record("position.close", "rejected", {"venue": _close_venue, "error": str(exc)[:300]})
             raise HTTPException(status_code=409, detail=str(exc)) from exc
         except Exception as exc:
-            audit_record("position.close", "verification_failed", {"error": str(exc)[:300]})
-            raise HTTPException(status_code=502, detail=f"OKX 快速平仓未完成确认：{exc}") from exc
+            audit_record("position.close", "verification_failed", {"venue": _close_venue, "error": str(exc)[:300]})
+            raise HTTPException(status_code=502, detail=f"{_close_venue.upper()} 快速平仓未完成确认：{exc}") from exc
         finally:
             try:
                 fcntl.flock(lock_handle.fileno(), fcntl.LOCK_UN)

@@ -10,8 +10,8 @@ onBeforeUnmount(() => { if (timer) clearInterval(timer); });
 </script>
 
 <template>
-  <time class="num whitespace-nowrap text-[10px] leading-tight" :datetime="now.toISOString()" :title="t('common.time.siteTimeTip')">
+  <time class="num whitespace-nowrap text-[10px] leading-tight" :datetime="now.toISOString()" :title="t('time.siteTimeTip')">
     <span class="hidden xl:inline">{{ fmtDateTime(now).slice(0, 11) }}</span>{{ fmtDateTime(now).slice(11) }}
-    <span class="block text-center" style="color: var(--ink-3)">{{ t('common.time.beijingTime') }}</span>
+    <span class="block text-center" style="color: var(--ink-3)">{{ t('time.beijingTime') }}</span>
   </time>
 </template>

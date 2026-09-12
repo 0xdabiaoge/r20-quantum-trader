@@ -400,26 +400,38 @@ def admin_okx_account_snapshot(
     except Exception:
         pass
 
+    from r20_backend.close_intent import create as _create_close_intent, INTENT_TTL_SECONDS as _CLOSE_INTENT_TTL
+    # 三所档位轴：OKX env.mode(demo/live) 是全站唯一档位；binance 同名，gate demo→sandbox。
+    _ADAPTER_ENV = {"binance": {"demo": "demo", "live": "live"}, "gate": {"demo": "sandbox", "live": "live"}}
     for venue in ("binance", "gate"):
         try:
             from r20_backend.exchanges import get_adapter
-            ad = get_adapter(venue, environment=env.mode)
+            adapter_env = _ADAPTER_ENV[venue].get(env.mode, env.mode)
+            ad = get_adapter(venue, environment=adapter_env)
             if hasattr(ad, "positions"):
                 for p in (ad.positions() or []):
                     amt = float(p.get("size_signed", 0) or 0)
                     if abs(amt) < 1e-12:
                         continue
-                    sym = p.get("symbol") or p.get("base") or ""
+                    sym = str(p.get("symbol") or p.get("base") or "").split("-")[0]
+                    if not sym:
+                        continue
+                    inst_display = f"{sym}-USDT-SWAP"
+                    pos_side = "long" if amt > 0 else "short"
+                    close_token, close_confirmation = _create_close_intent(
+                        venue=venue, environment=env.mode, display_inst=inst_display,
+                        symbol=sym, pos_side=pos_side, expected_size=abs(amt))
                     combined_positions.append({
                         "venue": venue,
                         "exchange": venue,
-                        "instId": f"{sym}-USDT-SWAP",
-                        "posSide": "long" if amt > 0 else "short",
+                        "instId": inst_display,
+                        "posSide": pos_side,
                         "pos": str(abs(amt)),
                         "mgnMode": "cross",
                         "upl": float(p.get("unrealized_pnl", 0) or 0),
-                        "close_confirmation": f"CLOSE {sym.split('-')[0]}",
-                        "close_token": f"token-{venue}-{sym.split('-')[0]}-{int(time.time())}",
+                        "close_confirmation": close_confirmation,
+                        "close_token": close_token,
+                        "close_token_expires_in": _CLOSE_INTENT_TTL,
                     })
             if hasattr(ad, "open_orders"):
                 for o in (ad.open_orders() or []):

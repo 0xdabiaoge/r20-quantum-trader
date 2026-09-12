@@ -197,6 +197,7 @@ class ManualCloseRequest(BaseModel):
     close_token: str = Field(min_length=20, max_length=200)
     admin_password: str = Field(min_length=1, max_length=128)
     confirmation: str = Field(min_length=8, max_length=200)
+    venue: str = Field(default="okx")
 
 
 class UpdateRequest(BaseModel):

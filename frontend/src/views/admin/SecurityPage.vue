@@ -214,7 +214,7 @@ async function confirmClose() {
   try {
     const d = await api('/api/v1/admin/positions/close', {
       method: 'POST',
-      body: JSON.stringify({ close_token: pos.close_token, admin_password: closePassword.value, confirmation: closePhraseInput.value.trim().toUpperCase() }),
+      body: JSON.stringify({ close_token: pos.close_token, admin_password: closePassword.value, confirmation: closePhraseInput.value.trim().toUpperCase(), venue: pos.venue || 'okx' }),
     })
     toast.ok(`已确认平仓：${d.instId} ${d.closed_size}`)
     closeModal.value = null
@@ -222,6 +222,11 @@ async function confirmClose() {
     await loadPositions()
   } catch (e: any) {
     toast.err(`平仓失败：${e.message}`)
+    // 一次性令牌可能已被消费/过期：自动刷新快照，并把弹窗指向新令牌的同仓位行，允许直接重试
+    await loadPositions()
+    const fresh = (snapshot.value?.positions || []).find((x: any) => x.instId === pos.instId && (x.posSide || 'net') === (pos.posSide || 'net') && (x.venue || 'okx') === (pos.venue || 'okx'))
+    if (fresh) closeModal.value = { show: true, pos: fresh }
+    else { closeModal.value = null; closePassword.value = '' }
   } finally {
     closing.value = false
   }
