@@ -101,36 +101,12 @@ def market_candles(inst_id: str, bar: str = "1H", limit: int = 150, response: Re
             return {"instId": inst_id, "bar": bar, "candles": candles, "source": "OKX REST"}
         raise RuntimeError("upstream returned no candles (all fallback levels exhausted)")
     except Exception as exc:
-        if cached:
-            return {"instId": inst_id, "bar": bar, "candles": cached[1], "source": "stale_cache", "warn": str(exc)}
-        factor_file = ROOT / "data" / "factor_library_snapshot.json"
-        if factor_file.exists():
-            try:
-                snap = json.loads(factor_file.read_text(encoding="utf-8"))
-                instruments = snap.get("instruments") or {}
-                sym = inst_id.split("-")[0]
-                inst_data = instruments.get(sym) or instruments.get(inst_id) or {}
-                px = float(inst_data.get("price") or 100.0)
-                if px > 0:
-                    candles = []
-                    step_sec = 3600 if "H" in bar else 900
-                    for i in range(limit):
-                        ts = int((now_ts - (limit - i) * step_sec) * 1000)
-                        c_open = round(px * (1.0 + (i - limit/2) * 0.0003), 4)
-                        c_close = round(px * (1.0 + (i - limit/2 + 0.3) * 0.0003), 4)
-                        c_high = round(max(c_open, c_close) * 1.0015, 4)
-                        c_low = round(min(c_open, c_close) * 0.9985, 4)
-                        candles.append({
-                            "ts": ts,
-                            "open": c_open,
-                            "high": c_high,
-                            "low": c_low,
-                            "close": c_close,
-                            "vol": round(float(inst_data.get("vol_24h") or 1000.0) / 24.0, 2),
-                        })
-                    return {"instId": inst_id, "bar": bar, "candles": candles, "source": "factor_fallback"}
-            except Exception:
-                pass
+        # 审计 C5（数据诚实）：删除旧「factor_fallback 合成 OHLC 爬升曲线」分支——
+        # 行情全链失败时渲染形状与真 K 线不可分辨，是「错误数据伪装错误提示」。
+        # 兜底改为：有界陈旧缓存（≤5 分钟，显式 stale_cache+warn）否则空数据+error。
+        if cached and (now_ts - cached[0] <= 300.0):
+            return {"instId": inst_id, "bar": bar, "candles": cached[1], "source": "stale_cache",
+                    "cache_age_seconds": round(now_ts - cached[0], 1), "warn": str(exc)}
         return {"instId": inst_id, "bar": bar, "candles": [], "source": "error", "detail": str(exc)}
 
 
@@ -148,6 +124,12 @@ def equity_history(days: int = 14) -> dict[str, Any]:
     tz8 = _dt.timezone(_dt.timedelta(hours=8))
     out: dict[str, Any] = {"days": [], "initial_capital": None, "source": "trading_ledger"}
     try:
+        try:
+            from scripts.okx_runtime import current_environment
+            _env_mode = str(current_environment().mode).strip().lower()
+        except Exception:
+            _env_mode = ""
+        out["environment"] = _env_mode or None
         init_cap = None
         try:
             p_init = ROOT / "data" / "account_initial_state.json"
@@ -157,16 +139,27 @@ def equity_history(days: int = 14) -> dict[str, Any]:
             init_cap = None
         p_led = ROOT / "data" / "trading_ledger.json"
         daily: dict[str, float] = {}
+        excluded_env = 0
+        legacy_unlabeled = 0
         if p_led.exists():
             data = json.loads(p_led.read_text("utf-8"))
             rows = data if isinstance(data, list) else data.get("trades", []) or data.get("records", [])
             for r in rows:
                 if not isinstance(r, dict):
                     continue
-                if str(r.get("status", "")).lower() not in ("closed", "已平仓", "completed"):
-                    ct = str(r.get("close_time") or "")
-                    if not ct or "持仓" in ct:
+                # 审计 C4-1：只认显式结清状态；旧实现给「状态未知但有 close_time」
+                # 的行留了后门（重命名/新增状态会被当已平计入曲线）。
+                if str(r.get("status", "")).strip().lower() not in ("closed", "已平仓", "completed"):
+                    continue
+                # 审计 C4-2：环境隔离——demo↔live 切换后旧环境行不再混算进当前曲线；
+                # 无环境列的旧行保留但计数暴露（数据诚实）。
+                row_env = str(r.get("environment") or "").strip().lower()
+                if _env_mode:
+                    if row_env and row_env != _env_mode:
+                        excluded_env += 1
                         continue
+                    if not row_env:
+                        legacy_unlabeled += 1
                 ct = str(r.get("close_time") or "")
                 if len(ct) < 10:
                     continue
@@ -177,6 +170,7 @@ def equity_history(days: int = 14) -> dict[str, Any]:
                     daily[day] = daily.get(day, 0.0) + float(r.get("net_pnl") or r.get("pnl") or 0.0)
                 except (TypeError, ValueError):
                     pass
+        out["excluded_rows"] = {"other_environment": excluded_env, "unlabeled_environment": legacy_unlabeled}
         base = init_cap if init_cap is not None else 0.0
         out["initial_capital"] = init_cap
         today = _dt.datetime.now(tz8).date()
