@@ -12,6 +12,7 @@ export const enRadar = {
     quotes: 'Advisor quotes',
     verdict: 'Final verdict',
     intercept: 'Interceptor chain',
+    xvenue: 'Cross-Venue Evidence',
     raw: 'Raw record',
     adopted: 'Adopted: {role}',
     noQuotes: 'Single-model decision this cycle — no advisor quotes',

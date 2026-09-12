@@ -18,6 +18,7 @@ export const zhRadar = {
     quotes: '参谋报价单',
     verdict: '终审结论',
     intercept: '拦截链路',
+    xvenue: '跨所证据与基差',
     raw: '原始记录',
     adopted: '采纳：{role}',
     noQuotes: '本周期为单模型直连决策，无参谋报价',

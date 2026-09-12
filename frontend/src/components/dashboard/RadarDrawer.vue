@@ -37,12 +37,29 @@ const arbitrator = computed<any>(() => transcript.value?.arbitrator || null);
 const modeLabel = computed(() => transcript.value?.consensus_mode === 'cross_examination'
   ? t('dash.radar.council.cross') : t('dash.radar.council.standard'));
 
+const xvenueRows = computed(() => {
+  const byAsset = c.value?.cross_venue?.by_asset || {};
+  return Object.entries(byAsset).map(([sym, data]: [string, any]) => ({
+    symbol: sym,
+    okx_last: data?.okx_last,
+    bin_last: data?.bin_last,
+    bin_basis_pct: data?.bin_basis_pct,
+    gate_last: data?.gate_last,
+    gate_basis_pct: data?.gate_basis_pct,
+    bin_ls: data?.bin_ls,
+    gate_ls: data?.gate_ls,
+    bin_funding_pct: data?.bin_funding_pct,
+    gate_funding_pct: data?.gate_funding_pct,
+  }));
+});
+
 const tabs = computed(() => {
   const items = [
     { key: 'macro', label: t('dash.radar.detail.macro') },
     { key: 'quotes', label: t('dash.radar.detail.quotes'), count: opps.value.length + posMgmt.value.length },
   ];
   if (transcript.value || councilStatus.value) items.push({ key: 'council', label: t('dash.radar.council.title') });
+  if (xvenueRows.value.length > 0) items.push({ key: 'xvenue', label: t('dash.radar.detail.xvenue'), count: xvenueRows.value.length });
   items.push({ key: 'raw', label: t('dash.radar.detail.raw') });
   return items;
 });
@@ -173,6 +190,51 @@ function dirOf(a: string): 'long' | 'short' | 'flat' {
       </template>
       <div v-else class="card-flat p-3 text-xs leading-relaxed" style="color: var(--warn, #d97706)">
         {{ t('dash.radar.council.notRan') }}：{{ councilStatus?.reason || '--' }}
+      </div>
+    </div>
+
+    <!-- 跨所证据与基差 -->
+    <div v-else-if="tab === 'xvenue'" class="space-y-3">
+      <p class="t-label mb-1.5">{{ t('dash.radar.detail.xvenue') }} · 三所基差与多空对比</p>
+      <div class="card overflow-x-auto">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>{{ t('dash.matrix.positions.col.symbol') }}</th>
+              <th class="col-num">OKX 现价</th>
+              <th class="col-num">Binance (基差)</th>
+              <th class="col-num">Gate (基差)</th>
+              <th class="col-num">BN/Gate 多空比</th>
+              <th class="col-num">BN/Gate 费率</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="row in xvenueRows" :key="row.symbol">
+              <td class="num font-semibold">{{ row.symbol }}</td>
+              <td class="col-num">{{ row.okx_last ? fmtPrice(row.okx_last) : '--' }}</td>
+              <td class="col-num">
+                <span>{{ row.bin_last ? fmtPrice(row.bin_last) : '--' }}</span>
+                <span v-if="row.bin_basis_pct !== undefined && row.bin_basis_pct !== null" :class="['ms-1 text-2xs font-mono', row.bin_basis_pct >= 0 ? 'color-up' : 'color-down']">
+                  ({{ row.bin_basis_pct >= 0 ? '+' : '' }}{{ row.bin_basis_pct }}%)
+                </span>
+              </td>
+              <td class="col-num">
+                <span>{{ row.gate_last ? fmtPrice(row.gate_last) : '--' }}</span>
+                <span v-if="row.gate_basis_pct !== undefined && row.gate_basis_pct !== null" :class="['ms-1 text-2xs font-mono', row.gate_basis_pct >= 0 ? 'color-up' : 'color-down']">
+                  ({{ row.gate_basis_pct >= 0 ? '+' : '' }}{{ row.gate_basis_pct }}%)
+                </span>
+              </td>
+              <td class="col-num text-2xs font-mono">
+                <span :title="'Binance: ' + (row.bin_ls || '--')">{{ row.bin_ls ?? '--' }}</span> / 
+                <span :title="'Gate: ' + (row.gate_ls || '--')">{{ row.gate_ls ?? '--' }}</span>
+              </td>
+              <td class="col-num text-2xs font-mono">
+                <span>{{ row.bin_funding_pct !== undefined && row.bin_funding_pct !== null ? `${row.bin_funding_pct}%` : '--' }}</span> / 
+                <span>{{ row.gate_funding_pct !== undefined && row.gate_funding_pct !== null ? `${row.gate_funding_pct}%` : '--' }}</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
 

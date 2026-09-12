@@ -19,6 +19,20 @@ const VENUES: VenueKey[] = ['okx', 'gate', 'binance'];
 const isDemo = computed(() => store.environment === 'demo');
 const isMobileExpanded = ref(false);
 
+/** 跨所健康与延迟监控（US-007 闭环 G4） */
+const crossVenue = computed(() => {
+  const cv = (dash.data as any)?.cross_venue;
+  return isPlainObj(cv) ? cv : null;
+});
+const venueLatencies = computed(() => {
+  const v = crossVenue.value?.venues || {};
+  return {
+    okx: v.okx?.avg_ms ?? (v.okx?.ok?.length ? '<50' : null),
+    gate: v.gate?.avg_ms ?? null,
+    binance: v.binance?.avg_ms ?? null,
+  };
+});
+
 /** 组合风险占用行。 */
 const portfolio = computed(() => {
   const raw = (dash.data as any)?.portfolio_risk;
@@ -72,7 +86,20 @@ function refreshAll(): void {
 <template>
   <section class="card card-pad space-y-3" data-test="venue-accounts-panel">
     <div class="flex flex-wrap items-center justify-between gap-2">
-      <h2 class="text-sm font-bold" style="color: var(--ink-strong)">{{ t('dash.venueAccounts.title') }}</h2>
+      <div class="flex flex-wrap items-center gap-2.5">
+        <h2 class="text-sm font-bold" style="color: var(--ink-strong)">{{ t('dash.venueAccounts.title') }}</h2>
+        <div v-if="crossVenue" class="hidden sm:flex items-center gap-2 text-2xs px-2 py-0.5 rounded" style="background: var(--surface-2); border: 1px solid var(--line-1)">
+          <span class="inline-flex items-center gap-1 font-mono">
+            <span class="dot dot-up"></span>OKX <span class="t-faint">{{ venueLatencies.okx ? `${venueLatencies.okx}ms` : '就绪' }}</span>
+          </span>
+          <span class="inline-flex items-center gap-1 font-mono">
+            <span :class="['dot', venueLatencies.binance ? 'dot-up' : 'dot-warn']"></span>BN <span class="t-faint">{{ venueLatencies.binance ? `${venueLatencies.binance}ms` : '--' }}</span>
+          </span>
+          <span class="inline-flex items-center gap-1 font-mono">
+            <span :class="['dot', venueLatencies.gate ? 'dot-up' : 'dot-warn']"></span>Gate <span class="t-faint">{{ venueLatencies.gate ? `${venueLatencies.gate}ms` : '--' }}</span>
+          </span>
+        </div>
+      </div>
       <div class="flex flex-wrap items-center gap-2">
         <!-- 环境切换药丸 -->
         <div
