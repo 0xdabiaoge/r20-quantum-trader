@@ -9,6 +9,7 @@ from fastapi import APIRouter, Header, HTTPException, Query, Request, Response
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse
 
 from r20_backend.config import settings, refresh_settings
+from r20_backend.time_utils import beijing_day
 from r20_backend.dependencies import (
     ROOT, DATA_DIR, VUE_DIST, okx, read_json, require_admin_header,
 )
@@ -135,7 +136,69 @@ def market_candles(inst_id: str, bar: str = "1H", limit: int = 150, response: Re
 
 @router.get("/api/v1/equity_history")
 def equity_history(days: int = 14) -> dict[str, Any]:
-    return dash_app.get_equity_history(days=days)
+    """权益迷你曲线（公开，与 /api/all 同级暴露）：
+    初始资金 + 按北京时区自然日累计的已实现净盈亏（含手续费口径以台账 net_pnl 为准）。
+    仅用于前端 sparkline 形状，精确数值以账户接口为准。"""
+    import datetime as _dt
+    try:
+        days = max(5, min(60, int(days)))
+    except Exception:
+        days = 14
+    tz8 = _dt.timezone(_dt.timedelta(hours=8))
+    out: dict[str, Any] = {"days": [], "initial_capital": None, "source": "trading_ledger"}
+    try:
+        init_cap = None
+        try:
+            p_init = ROOT / "data" / "account_initial_state.json"
+            if p_init.exists():
+                init_cap = float(json.loads(p_init.read_text("utf-8")).get("initial_capital") or 0) or None
+        except Exception:
+            init_cap = None
+        p_led = ROOT / "data" / "trading_ledger.json"
+        daily: dict[str, float] = {}
+        if p_led.exists():
+            data = json.loads(p_led.read_text("utf-8"))
+            rows = data if isinstance(data, list) else data.get("trades", []) or data.get("records", [])
+            for r in rows:
+                if not isinstance(r, dict):
+                    continue
+                if str(r.get("status", "")).lower() not in ("closed", "已平仓", "completed"):
+                    ct = str(r.get("close_time") or "")
+                    if not ct or "持仓" in ct:
+                        continue
+                ct = str(r.get("close_time") or "")
+                if len(ct) < 10:
+                    continue
+                day = beijing_day(ct)
+                if not day:
+                    continue
+                try:
+                    daily[day] = daily.get(day, 0.0) + float(r.get("net_pnl") or r.get("pnl") or 0.0)
+                except (TypeError, ValueError):
+                    pass
+        base = init_cap if init_cap is not None else 0.0
+        out["initial_capital"] = init_cap
+        today = _dt.datetime.now(tz8).date()
+        start = today - _dt.timedelta(days=days - 1)
+        if daily:
+            earliest = min(daily.keys())
+            try:
+                ed = _dt.date.fromisoformat(earliest)
+                if ed < start:
+                    base = base + sum(v for k, v in daily.items() if k < start.isoformat())
+            except ValueError:
+                pass
+        cum = base
+        series = []
+        d = start
+        while d <= today:
+            cum += daily.get(d.isoformat(), 0.0)
+            series.append({"date": d.isoformat(), "equity": round(cum, 2)})
+            d += _dt.timedelta(days=1)
+        out["days"] = series
+    except Exception as exc:
+        out["error"] = str(exc)
+    return out
 
 
 @router.get("/robots.txt", include_in_schema=False)

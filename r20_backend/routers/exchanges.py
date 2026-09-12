@@ -481,7 +481,7 @@ def listing_status(environment: str = Query(default="demo"),
             "ok": snap.ok,
             "reason": snap.reason,
             "listed_count": snap.listed_count,
-            "sample_symbols": snap.sample_symbols,
+            "sample_symbols": getattr(snap, "sample_symbols", []),
             "source": snap.source,
             "checked_at": snap.checked_at,
         }

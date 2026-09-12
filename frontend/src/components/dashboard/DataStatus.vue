@@ -16,7 +16,8 @@ const engine = computed(() => {
   const s = String(health.value.status || '').toUpperCase();
   if (s === 'LIVE') return { dot: 'dot-live', cls: '', label: t('status.live') };
   if (s === 'PARTIAL') return { dot: 'dot-warn', cls: '', label: t('status.attention') };
-  if (store.isStale) return { dot: 'dot-warn', cls: '', label: t('status.stale') };
+  if (s === 'NOT_READY') return { dot: 'dot-warn', cls: '', label: t('common.notConfigured') };
+  if (s === 'STALE' || store.isStale) return { dot: 'dot-warn', cls: '', label: t('status.stale') };
   return { dot: 'dot-down', cls: '', label: t('status.offline') };
 });
 const updated = computed(() => store.lastUpdated);
