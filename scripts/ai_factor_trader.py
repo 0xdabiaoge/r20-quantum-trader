@@ -548,7 +548,9 @@ def close_position_confirmed(inst_id: str, pos_side: str, before_size: float, ve
     if target_venue != "okx":
         try:
             from r20_backend import execution_router
-            env = selected_environment()
+            # 审计 C2：周期内冻结环境（okx_rest 按 current_environment 签名，读
+            # selected 会在 demo↔live 中途切换时产生跨环境混合决策）
+            env = current_environment()
             res = execution_router.close_position(inst_id, venue=target_venue, environment=str(env.mode))
             if res.get("ok"):
                 return True, f"{target_venue.upper()} position closed"
@@ -701,7 +703,11 @@ def fetch_other_venue_positions(environment: str) -> Tuple[bool, Dict[str, List[
         if not venue_execution_ready(name, environment):
             continue
         try:
-            ad = venue_registry.get_adapter(name)
+            # 审计 C3：档位轴必须经 ADAPTER_ENV 唯一映射（execution_router/manual
+            # close 同源）——无档 get_adapter 走 legacy 布尔→未钉死域，generic LIVE
+            # 键被打进错误沙盒域正是「跨所封顶每周期 INVALID_KEY 禁开仓」的根因。
+            from r20_backend.close_intent import adapter_environment as _adapter_env
+            ad = venue_registry.get_adapter(name, environment=_adapter_env(name, environment or ""))
             rows = ad.positions() or []
             live = [p for p in rows if abs(float(p.get("size_signed") or 0)) > 1e-12]
             snapshot[name] = live
@@ -1109,7 +1115,7 @@ def submit_protected_limit_order(inst_id: str, side: str, pos_side: str, size: f
     不下单；不带上下文 = 非 AI 信号的通用提交（保留 US-007 listing gate 契约），
     只 warn 不闸门——新增开仓路径时必须传 ctx。
     """
-    env = selected_environment()
+    env = current_environment()  # 审计 C2：冻结周期环境单源（同 close 路径）
     _reservation = None
     target_venue = "okx"
     if isinstance(venue_ctx, dict):
@@ -2150,7 +2156,9 @@ def execute_ai_position_management(real_pos_dict, trackers, timestamp_full, exec
             old_sl = 0.0
             if pos_venue != "okx":
                 try:
-                    ad = venue_registry.get_adapter(pos_venue, environment=str(selected_environment().mode))
+                    from r20_backend.close_intent import adapter_environment as _sl_env
+                    ad = venue_registry.get_adapter(pos_venue,
+                        environment=_sl_env(pos_venue, str(current_environment().mode)))  # 审计 C2+C3
                     # Attach or update protective stop order on target venue
                     ad.attach_protective_orders(name, pos_side, sl_px=new_sl, contracts=abs(float(position.get("pos", 0) or 0)))
                     amend_ok = True
