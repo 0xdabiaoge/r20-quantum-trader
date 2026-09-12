@@ -9,6 +9,17 @@
 4) 再首次导入 risk_constants（此时得到代码默认基线），并断言静态键表与单一事实源一致。
 """
 import os
+import tempfile
+
+# 审计卫生（2026-09-13 清积压）：audit.py / self_improvement_engine.log_msg 的
+# 路径此前是模块级硬编码、不可重定向，走 TestClient 的后台测试把伪造记录直写
+# 生产 logs/r20_admin_audit.jsonl（实测 2000+ 条 testclient）与
+# self_improvement.log（fake "corrupt" 行）。二者已改为调用时读环境变量；这里
+# 在 discover 导入任何测试模块之前把变量指到会话级临时目录，一次性隔离所有
+# 此类落盘副作用（律①：测试不触生产文件）。
+_TEST_SANDBOX = tempfile.mkdtemp(prefix="r20-tests-")
+os.environ.setdefault("R20_AUDIT_FILE", os.path.join(_TEST_SANDBOX, "r20_admin_audit.jsonl"))
+os.environ.setdefault("R20_SELF_IMPROVEMENT_LOG", os.path.join(_TEST_SANDBOX, "self_improvement.log"))
 
 import r20_backend.config as _config
 

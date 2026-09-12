@@ -74,9 +74,24 @@ class LlmCredentialRotationTests(unittest.TestCase):
         import r20_gateway.secrets as sec
         self.lm = lm
         self.tmp = tempfile.TemporaryDirectory()
-        #  tripwire：记录真实生产文件指纹，tearDown 校验测试绝无触碰
+        #  主动式 tripwire（替代旧 stat() 指纹比对）：旧实现比 stat() 含 mtime，
+        #  生产服务器每 ~30s 幂等重写 data/llm_models.json 即误报「测试触碰生产」。
+        #  改为包裹 _atomic_write_json：任何一次写向真实路径的调用当场记录并拒绝，
+        #  tearDown 断言从未触发——既确定性地抓住测试越界写，又不受并发重写干扰。
         self._real_file = ROOT / "data" / "llm_models.json"
-        self._real_hash = self._real_file.stat() if self._real_file.exists() else None
+        self._tripwire_hit = None
+        self._real_resolved = self._real_file.resolve() if self._real_file.exists() else None
+        self._orig_atomic = lm._atomic_write_json
+
+        def _guarded_atomic(path, data, _o=self._orig_atomic, _rr=self._real_resolved, _box=self):
+            try:
+                if _rr is not None and Path(path).resolve() == _rr:
+                    _box._tripwire_hit = str(path)
+                    return None  # 拒绝写生产
+            except Exception:
+                pass
+            return _o(path, data)
+        lm._atomic_write_json = _guarded_atomic
         self._orig = [(lm.LLM_CONFIG_FILE, "llm_manager"), (ss.ENV_FILE, "settings_store")]
         lm.LLM_CONFIG_FILE = Path(self.tmp.name) / "llm_models.json"
         lm.LLM_PROVIDERS_FILE = lm.LLM_CONFIG_FILE  # 兼容别名必须同步 patch，否则端点写真实文件
@@ -105,8 +120,9 @@ class LlmCredentialRotationTests(unittest.TestCase):
         import r20_gateway.secrets as sec
         sec.save_secrets = self._orig_save
         self.tmp.cleanup()
-        after = self._real_file.stat() if self._real_file.exists() else None
-        self.assertEqual(after, self._real_hash, "测试触碰了生产 data/llm_models.json！")
+        self.lm._atomic_write_json = self._orig_atomic
+        self.assertIsNone(self._tripwire_hit,
+                          f"测试试图写生产 data/llm_models.json（{self._tripwire_hit}）！")
 
     def _raw(self):
         return json.loads(self.lm.LLM_CONFIG_FILE.read_text(encoding="utf-8"))

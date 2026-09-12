@@ -87,14 +87,22 @@ def single_evolution_cycle(func):
     return wrapped
 
 
+def _log_file() -> str:
+    """调用时解析（审计卫生）：测试未 patch LOG_FILE 时（如 evolution_fallback_model
+    的异常路径）不再污染生产 logs/self_improvement.log。R20_SELF_IMPROVEMENT_LOG
+    覆盖 + tests/__init__.py 统一隔离；生产默认不变。"""
+    return os.environ.get("R20_SELF_IMPROVEMENT_LOG") or LOG_FILE
+
+
 def log_msg(msg: str):
     tz_bj = datetime.timezone(datetime.timedelta(hours=8))
     timestamp = datetime.datetime.now(tz_bj).strftime("%Y-%m-%d %H:%M:%S")
     line = f"[{timestamp}] {msg}"
     print(line)
     try:
-        os.makedirs(LOGS_DIR, exist_ok=True)
-        with open(LOG_FILE, "a", encoding="utf-8") as f:
+        target = _log_file()
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        with open(target, "a", encoding="utf-8") as f:
             f.write(line + "\n")
     except Exception:
         pass

@@ -1,6 +1,7 @@
 """Single-owner R20 Gateway delivery worker."""
 from __future__ import annotations
 import fcntl
+import os
 import signal
 import time
 from datetime import datetime, timedelta, timezone
@@ -48,6 +49,15 @@ def run() -> None:
     except BlockingIOError:
         log("gateway worker already running; exiting")
         return
+    # 审计风暴修复：抢到锁者自我登记为权威 PID（唯一确知「我持锁」的实体）。
+    # supervisor 旧实现对注定秒退的子进程盲写 PID 文件 → 文件长期指向死 pid，
+    # 活体持锁者反而不可见，每 10s 重生一次（logs/r20_gateway.log 948 条）。
+    try:
+        _pid_file = ROOT / "data" / "r20_gateway.pid"
+        _pid_file.write_text(str(os.getpid()), encoding="utf-8")
+        os.chmod(_pid_file, 0o600)
+    except OSError:
+        pass
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
     store = GatewayStore(DB_PATH)

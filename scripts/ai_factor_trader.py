@@ -2641,6 +2641,10 @@ def execute_portfolio():
         _xv_env = ""
         print(f"[跨所封顶] warn 周期冻结环境不可得（{_xv_exc}），按不可信环境处理")
     xv_ok, xv_positions_by_venue, xv_error = fetch_other_venue_positions(_xv_env)
+    # 巡检文案口径（审计 D 级）：持仓数历来只报 OKX，跨所持仓仅在封顶逻辑里
+    # 出现——面板/日志读起来「0/8」像全空，实际外所可能有数笔。此处统一算出
+    # 跨所笔数供 AI 提示词与巡检日志；拉取失败显式标「未知」，绝不装 0。
+    _xv_total = sum(len(v or []) for v in (xv_positions_by_venue or {}).values()) if xv_ok else None
     xv_enabled = bool(_xv_env) and any(venue_execution_ready(v, _xv_env)
                                        for v in ("gate", "binance"))
     if (xv_enabled or not _xv_env) and not xv_ok:
@@ -2700,7 +2704,7 @@ def execute_portfolio():
     # One LLM call covers the full six-instrument universe and all active positions.
     if not cb_active and execute_batch_ai_brain_cycle:
         try:
-            pos_desc = f"当前系统总持仓 {active_pos_count}/{MAX_CONCURRENT_POSITIONS} (多{long_count}/空{short_count})"
+            pos_desc = f"当前系统总持仓 OKX {active_pos_count}/{MAX_CONCURRENT_POSITIONS} (多{long_count}/空{short_count})｜跨所持仓 {_xv_total if _xv_total is not None else '未知(拉取失败)'} 笔"
             active_pos_list = []
             for f in all_factors:
                 position = f.get("position")
@@ -3123,7 +3127,7 @@ def execute_portfolio():
     except Exception as e:
         print(f"[Ledger Sync Warning] {e}")
 
-    log_entry = f"[{timestamp_full}] ⚡ R20 Quantum Trader v{__version__} 巡检完成 | 持仓 {active_pos_count}/{MAX_CONCURRENT_POSITIONS} (多{long_count}/空{short_count}) | 动作: {', '.join(executed_actions) if executed_actions else '无开平仓操作'}\n"
+    log_entry = f"[{timestamp_full}] ⚡ R20 Quantum Trader v{__version__} 巡检完成 | 持仓 OKX {active_pos_count}/{MAX_CONCURRENT_POSITIONS} (多{long_count}/空{short_count})｜跨所 {_xv_total if _xv_total is not None else '未知'} 笔 | 动作: {', '.join(executed_actions) if executed_actions else '无开平仓操作'}\n"
     with open(LOG_FILE, "a", encoding="utf-8") as f:
         f.write(log_entry)
     print(log_entry.strip())

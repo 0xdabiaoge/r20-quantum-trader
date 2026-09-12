@@ -8,7 +8,6 @@ import PageHeader from '../../components/admin/PageHeader.vue'
 
 const { api } = useApi()
 const loading = ref(true)
-const logs = ref<string[]>([])
 const activeLogTab = ref<'trader' | 'backend' | 'scheduler'>('trader')
 const logContent = ref<string>('')
 const logLoading = ref(false)
@@ -16,8 +15,8 @@ const logLoading = ref(false)
 async function loadDecisions() {
   loading.value = true
   try {
-    const res = await api('/api/v1/admin/runtime')
-    logs.value = res.recent_logs || []
+    // 审计 D 级清理：原 /api/v1/admin/runtime + res.recent_logs 是死链——后端
+    // 从无该键、logs ref 从未被模板读取。日志唯一真源是 fetchLogStream。
     await fetchLogStream('trader')
   } catch (e: any) {
     console.error(e)
