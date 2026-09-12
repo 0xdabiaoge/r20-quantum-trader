@@ -26,6 +26,7 @@ from .identity import (
     is_sandbox_environment,
 )
 from .okx import OKXAdapter, OKXPublicAdapter
+from r20_backend.sandbox.adapter import SandboxExchangeAdapter
 from .registry import (
     ADAPTER_EXECUTION_ENABLED,
     clear_instances,
@@ -45,7 +46,7 @@ __all__ = [
     "BaseExchangeAdapter", "ExchangeCapabilities", "ExchangeCapabilityError",
     "BinanceAPIError", "GateAPIError",
     "InstrumentSpec", "canonical_base", "BinanceAdapter", "GateAdapter",
-    "OKXAdapter", "OKXPublicAdapter", "ADAPTER_EXECUTION_ENABLED", "execution_open",
+    "OKXAdapter", "OKXPublicAdapter", "SandboxExchangeAdapter", "ADAPTER_EXECUTION_ENABLED", "execution_open",
     "get_adapter", "is_registered", "registered_venues", "require_execution",
     "resolve_symbol", "clear_instances", "venue_credentials", "venue_passphrase",
     "venue_testnet_enabled", "env_profiles", "diagnose_venue_connection",

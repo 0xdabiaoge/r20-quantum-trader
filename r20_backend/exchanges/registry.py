@@ -25,6 +25,7 @@ from .gate import GateAdapter
 from .identity import (AccountKey, credential_fingerprint,
                        is_sandbox_environment)
 from .okx import OKXAdapter, OKXPublicAdapter
+from r20_backend.sandbox.adapter import SandboxExchangeAdapter
 
 _ADAPTERS: Dict[str, type] = {
     "okx": OKXAdapter,
@@ -115,6 +116,10 @@ def get_adapter(venue: str, environment: Optional[str] = None) -> BaseExchangeAd
     """
     from . import env_profiles
     key = str(venue or "").strip().lower()
+    if key == "sandbox":
+        if "sandbox_instance" not in _INSTANCES:
+            _INSTANCES["sandbox_instance"] = SandboxExchangeAdapter(environment="sandbox")
+        return _INSTANCES["sandbox_instance"]
     cls = _ADAPTERS.get(key)
     if cls is None:
         raise ExchangeCapabilityError(f"未知交易所 venue={venue!r}，可用: {sorted(_ADAPTERS)}")
