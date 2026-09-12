@@ -25,7 +25,7 @@ from .identity import (
     credential_fingerprint,
     is_sandbox_environment,
 )
-from .okx import OKXPublicAdapter
+from .okx import OKXAdapter, OKXPublicAdapter
 from .registry import (
     ADAPTER_EXECUTION_ENABLED,
     clear_instances,
@@ -45,7 +45,7 @@ __all__ = [
     "BaseExchangeAdapter", "ExchangeCapabilities", "ExchangeCapabilityError",
     "BinanceAPIError", "GateAPIError",
     "InstrumentSpec", "canonical_base", "BinanceAdapter", "GateAdapter",
-    "OKXPublicAdapter", "ADAPTER_EXECUTION_ENABLED", "execution_open",
+    "OKXAdapter", "OKXPublicAdapter", "ADAPTER_EXECUTION_ENABLED", "execution_open",
     "get_adapter", "is_registered", "registered_venues", "require_execution",
     "resolve_symbol", "clear_instances", "venue_credentials", "venue_passphrase",
     "venue_testnet_enabled", "env_profiles", "diagnose_venue_connection",

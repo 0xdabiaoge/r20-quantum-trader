@@ -24,10 +24,10 @@ from .binance import BinanceAdapter
 from .gate import GateAdapter
 from .identity import (AccountKey, credential_fingerprint,
                        is_sandbox_environment)
-from .okx import OKXPublicAdapter
+from .okx import OKXAdapter, OKXPublicAdapter
 
 _ADAPTERS: Dict[str, type] = {
-    "okx": OKXPublicAdapter,       # 只读行情；生产执行仍居 ai_factor_trader 遗留路径
+    "okx": OKXAdapter,
     "binance": BinanceAdapter,
     "gate": GateAdapter,
 }

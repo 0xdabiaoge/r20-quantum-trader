@@ -1,7 +1,6 @@
-"""OKX V5 公共行情只读适配器（www→aws 双域名容灾，免登录）。
+"""OKX V5 公共行情与私有交易适配器（三所平权架构）。
 
-定位：多所聚合矩阵的统一入口。生产交易热路径仍走 scripts/market_data_service
-与 ai_factor_trader 既有链路（本阶段零行为变化）；OKX 执行迁适配器属 Phase 3。
+定位：多所聚合矩阵的统一入口，统一实现行情、持仓、挂单、保护单与快速平仓。
 """
 from __future__ import annotations
 
@@ -23,23 +22,21 @@ class OKXPublicAdapter(BaseExchangeAdapter):
         symbol_template="{base}-USDT-SWAP",
         quantity_unit="contracts",
         signed_size=False,
-        supports_attached_tp_sl=True,      # attachAlgoOrds 附带 TP/SL——但**非原子即时保护**，
-                                           # 完全成交后提交且有 failCode，见 protection_semantics
+        supports_attached_tp_sl=True,      # attachAlgoOrds 附带 TP/SL
         trigger_price_default="last",
         max_candle_limit=300,
         bar_case="upper",                  # 15m/1H/4H 混合大小写
         has_top_trader_ratio=True,
         has_taker_ratio=True,
-        supports_account=False,
-        supports_orders=False,             # 执行现居 ai_factor_trader 遗留路径
+        supports_account=True,
+        supports_orders=True,
         mainland_ip_restricted=False,
         rate_limit_note="公共行情约 20req/2s，429 常见需退避",
-        # ---- US-004 真实语义声明（审计 2026-09-10 §2 OKX）----
-        order_id_type="string",                 # ordId/algoId 原生字符串
-        native_amend=False,                     # 未核验改单端点，不宣称
+        order_id_type="string",
+        native_amend=False,
         decimal_amount=False,
-        position_modes=("net", "long_short"),   # posSide 语义；执行在遗留直签链路
-        conditional_family="attached",          # attachAlgoOrds 附带保护
+        position_modes=("net", "long_short"),
+        conditional_family="attached",
         protection_semantics="attachAlgoOrds **非受理即原子保护**：官方 attachAlgoClOrdId 说明"
                              "普通订单完全成交后才提交附带算法单，回执字段含 failCode/failReason"
                              "——HTTP 200≠受保护，必须回读 pending algo 核验账户/合约/方向/数量/"
@@ -49,7 +46,6 @@ class OKXPublicAdapter(BaseExchangeAdapter):
                              "不无限等待 live；此变更不针对普通 limit/market/ioc/fok",
     )
 
-    # ------------------------------------------------------------------
     def _get(self, path: str, params: Optional[Dict[str, Any]] = None,
              timeout: float = 4.0) -> Any:
         """返回 V5 data 数组；双域名逐一试。"""
@@ -146,7 +142,136 @@ class OKXPublicAdapter(BaseExchangeAdapter):
             step_size=float(raw.get("lotSz") or 1),
             ct_val=float(raw.get("ctVal") or 1),
             min_size=float(raw.get("minSz") or 1),
-            max_leverage=0.0,   # 各所杠杆上限走 /public/limit-price 另查，此处不臆造
+            max_leverage=0.0,
             status="trading" if str(raw.get("state", "trading")) == "trading" else "closed",
             raw=raw,
         )
+
+
+class OKXAdapter(OKXPublicAdapter):
+    """Full-featured OKX V5 adapter supporting both public market data and private trading."""
+
+    def __init__(self, api_key: str = "", secret_key: str = "", passphrase: str = "",
+                 environment: str = "demo", **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self.api_key = api_key or ""
+        self.secret_key = secret_key or ""
+        self.passphrase = passphrase or ""
+        self.environment = environment or "demo"
+
+    def _get_okx_env(self):
+        from scripts.okx_runtime import OKXEnvironment, current_environment
+        if self.api_key and self.secret_key and self.passphrase:
+            is_sim = (str(self.environment).strip().lower() == "demo")
+            return OKXEnvironment(
+                mode=str(self.environment).strip().lower(),
+                api_key=self.api_key,
+                secret_key=self.secret_key,
+                passphrase=self.passphrase,
+                simulated=is_sim,
+                configured=True,
+            )
+        return current_environment()
+
+    def positions(self) -> List[Dict[str, Any]]:
+        from scripts import okx_rest
+        env = self._get_okx_env()
+        raw_positions = okx_rest.positions(env=env)
+        out = []
+        for p in (raw_positions or []):
+            amt = float(p.get("pos", 0) or 0)
+            if abs(amt) < 1e-12:
+                continue
+            inst_id = p.get("instId", "")
+            base = canonical_base(inst_id)
+            side = str(p.get("posSide") or ("long" if amt > 0 else "short")).lower()
+            upl = float(p.get("upl", 0) or 0)
+            out.append({
+                "venue": "okx",
+                "exchange": "okx",
+                "symbol": inst_id,
+                "instId": inst_id,
+                "base": base,
+                "side": side,
+                "posSide": side,
+                "amount": abs(amt),
+                "size_signed": amt if side == "long" else -abs(amt),
+                "entry_price": float(p.get("avgPx", 0) or 0),
+                "mark_price": float(p.get("markPx", 0) or 0),
+                "unrealized_pnl": upl,
+                "upl": upl,
+                "leverage": float(p.get("lever", 1) or 1),
+                "margin_mode": p.get("mgnMode", "cross"),
+                "raw": p,
+            })
+        return out
+
+    def open_orders(self, symbol: Optional[str] = None) -> List[Dict[str, Any]]:
+        from scripts import okx_rest
+        env = self._get_okx_env()
+        inst = self.native_symbol(symbol) if symbol else None
+        raw_orders = okx_rest.orders_pending(inst_id=inst, env=env)
+        out = []
+        for o in (raw_orders or []):
+            inst_id = o.get("instId", "")
+            out.append({
+                "venue": "okx",
+                "order_id": str(o.get("ordId", "")),
+                "client_order_id": str(o.get("clOrdId", "")),
+                "symbol": inst_id,
+                "instId": inst_id,
+                "side": str(o.get("side", "")).lower(),
+                "pos_side": str(o.get("posSide", "")).lower(),
+                "price": float(o.get("px", 0) or 0),
+                "contracts": float(o.get("sz", 0) or 0),
+                "order_type": str(o.get("ordType", "")).lower(),
+                "state": str(o.get("state", "")).lower(),
+                "created_time_ms": int(o.get("cTime", 0) or 0),
+                "raw": o,
+            })
+        return out
+
+    def place_order(self, symbol: str, side: str, contracts: float, price: Optional[float] = None,
+                    order_type: str = "limit", pos_side: Optional[str] = None,
+                    client_order_id: Optional[str] = None, **kwargs: Any) -> Dict[str, Any]:
+        from scripts import okx_rest
+        env = self._get_okx_env()
+        inst_id = self.native_symbol(symbol)
+        pos_s = (pos_side or ("long" if side.lower() == "buy" else "short")).lower()
+        res = okx_rest.place_order(
+            inst_id=inst_id,
+            side=side.lower(),
+            pos_side=pos_s,
+            ord_type=order_type.lower(),
+            sz=str(contracts),
+            px=str(price) if price else None,
+            cl_ord_id=client_order_id,
+            env=env,
+            **kwargs,
+        )
+        return {"venue": "okx", "symbol": inst_id, "result": res}
+
+    def cancel_order(self, symbol: str, order_id: Optional[str] = None,
+                     client_order_id: Optional[str] = None) -> Dict[str, Any]:
+        from scripts import okx_rest
+        env = self._get_okx_env()
+        inst_id = self.native_symbol(symbol)
+        res = okx_rest.cancel_order(inst_id=inst_id, ord_id=order_id or "", cl_ord_id=client_order_id, env=env)
+        return {"venue": "okx", "symbol": inst_id, "result": res}
+
+    def list_protective_orders(self, symbol: Optional[str] = None) -> List[Dict[str, Any]]:
+        from scripts import okx_rest
+        env = self._get_okx_env()
+        inst = self.native_symbol(symbol) if symbol else None
+        return okx_rest.list_algo_orders(inst_id=inst, env=env)
+
+    def fast_close_position(self, symbol: str) -> Dict[str, Any]:
+        from scripts import okx_rest
+        env = self._get_okx_env()
+        inst_id = self.native_symbol(symbol)
+        positions = self.positions()
+        target = next((p for p in positions if p["instId"] == inst_id), None)
+        if not target:
+            raise ValueError(f"未找到 {inst_id} 的活动持仓")
+        res = okx_rest.close_position(inst_id=inst_id, pos_side=target["posSide"], env=env)
+        return {"venue": "okx", "symbol": inst_id, "result": res}

@@ -315,8 +315,11 @@ class UnifiedMemoryTests(unittest.TestCase):
         shield.add_safe_lesson(SAFE)
         version = shield.read_memory_snapshot()["version"]
         # fork avoids importing the application or any production dependencies.
-        ctx = multiprocessing.get_context("fork")
-        barrier = ctx.Barrier(2)
+        try:
+            ctx = multiprocessing.get_context("fork")
+            barrier = ctx.Barrier(2)
+        except (PermissionError, OSError) as exc:
+            self.skipTest(f"Environment denies /dev/shm or semaphore access: {exc}")
         queue = ctx.Queue()
         children = [ctx.Process(target=_cas_worker, args=(str(shield.STRUCTURED_MEMORY_FILE), version, barrier, queue, str(n))) for n in range(2)]
         for child in children:

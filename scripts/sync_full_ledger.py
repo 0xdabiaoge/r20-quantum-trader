@@ -282,18 +282,19 @@ def build_lifecycle_ledger():
     tz_bj = datetime.timezone(datetime.timedelta(hours=8))
 
     env = okx_runtime.current_environment()
+    if not env.configured:
+        raise okx_rest.OKXNotConfigured("OKX API Key 未配置 — 台账同步 fail-closed（既有 trading_ledger.json 保持不动）")
     pos_history = []
     pos_data = []
     close_orders = []
 
-    if env.configured:
-        try:
-            pos_history = okx_rest.positions_history(limit=100) or []
-            pos_data = okx_rest.positions() or []
-            orders_history = okx_rest.orders_history(limit=100) or []
-            close_orders = [o for o in orders_history if str(o.get('reduceOnly', '')).lower() == 'true' and o.get('state') == 'filled']
-        except Exception as _okx_err:
-            print(f"[sync_full_ledger] OKX 台账同步跳过: {_okx_err}")
+    try:
+        pos_history = okx_rest.positions_history(limit=100) or []
+        pos_data = okx_rest.positions() or []
+        orders_history = okx_rest.orders_history(limit=100) or []
+        close_orders = [o for o in orders_history if str(o.get('reduceOnly', '')).lower() == 'true' and o.get('state') == 'filled']
+    except Exception as _okx_err:
+        print(f"[sync_full_ledger] OKX 台账同步跳过: {_okx_err}")
 
     trades_lifecycle = []
 

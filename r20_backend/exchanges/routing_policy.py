@@ -41,6 +41,14 @@ from .registry import (execution_open, gate_environment_axis,
 ROOT = Path(__file__).resolve().parents[2]
 ROUTING_FILE = ROOT / "data" / "venue_routing.json"
 
+DEFAULT_GATE_POOL: Dict[str, Any] = {
+    "assets": [],
+    "margin_per_trade_usdt": 50.0,
+    "max_open": 5,
+    "min_confidence": 72.0,
+    "dry_run": True,
+}
+
 
 def global_risk_defaults() -> Dict[str, Any]:
     """单一事实源风控基线（来自 scripts/risk_constants.py 与 .env）。"""

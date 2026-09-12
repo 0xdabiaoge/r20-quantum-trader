@@ -154,13 +154,21 @@ def _stable_python() -> str:
     uv run 下 sys.executable 指向 /root/.cache/uv/builds-v0/.tmpXXXX/，
     目录被清理后进程变成"可执行文件已消失"的孤儿，无法按路径识别与治理。"""
     exe = sys.executable or "python3"
-    resolved = str(Path(exe).resolve()) if Path(exe).exists() else ""
+    try:
+        resolved = str(Path(exe).resolve()) if Path(exe).exists() else ""
+    except OSError:
+        resolved = ""
     if resolved and "/.cache/uv/" not in resolved and "/tmp/" not in resolved and ".venv" not in resolved:
         return exe
-    for cand in ("/app/venv/bin/python3", "/usr/bin/python3"):
-        if Path(cand).exists():
-            return cand
-    return "python3"
+    root = Path(__file__).resolve().parents[1]
+    venv_py = root / ".venv" / "bin" / "python"
+    for cand in (str(venv_py), "/app/venv/bin/python3", "/usr/bin/python3", "/usr/local/bin/python3"):
+        try:
+            if Path(cand).exists():
+                return cand
+        except OSError:
+            pass
+    return sys.executable or "python3"
 
 
 def ensure_qq_gateway_daemon_running() -> None:
