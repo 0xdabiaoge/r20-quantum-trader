@@ -21,6 +21,47 @@ import scripts.okx_runtime as okx_runtime
 WORKSPACE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(WORKSPACE_DIR, "data")
 LEDGER_JSON_FILE = os.path.join(DATA_DIR, "trading_ledger.json")
+LEDGER_SYNC_STATUS_FILE = os.path.join(DATA_DIR, "ledger_sync_status.json")
+# 审计 A2（数据诚实）：逐所台账同步状态旁车。任一 fetch 失败只 print-warn 后
+# 返回 []，与「该所确无平仓」在 trading_ledger.json 里不可分辨；旁车记录
+# ok/failed(原因)/failed(截断风险)，供 data_health/前台显式 PARTIAL。
+_FETCH_STATUS = {}
+
+
+def _mark(venue, status, **extra):
+    rec = {"status": status}
+    rec.update(extra)
+    _FETCH_STATUS[venue] = rec
+
+
+def _write_sync_status(env):
+    """原子写旁车；读侧一律容错缺文件（旧版本无旁车=按 OK 不误伤）。
+    路径按调用时 DATA_DIR 解析——测试 patch 模块 DATA_DIR 即封闭（律①）。"""
+    _dir = DATA_DIR
+    target = os.path.join(_dir, "ledger_sync_status.json")
+    payload = {
+        "generated_at": datetime.datetime.now(
+            datetime.timezone(datetime.timedelta(hours=8))).isoformat(),
+        "environment": "demo" if getattr(env, "simulated", False) else "live",
+        "venues": dict(_FETCH_STATUS),
+    }
+    fd, tmp = tempfile.mkstemp(prefix=".lss-", suffix=".tmp", dir=_dir)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(payload, f, ensure_ascii=False, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, target)
+    except Exception as exc:
+        print(f"[sync_full_ledger] warn 台账同步状态旁车写入失败: {exc}")
+    finally:
+        if os.path.exists(tmp):
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+
+
 INITIAL_STATE_FILE = os.path.join(DATA_DIR, "account_initial_state.json")
 POSITION_TRACKER_FILE = os.path.join(DATA_DIR, "position_trackers.json")
 
@@ -166,6 +207,7 @@ def fetch_binance_closed_trades(environment: str = "demo", tz_bj=None) -> list:
                 "exit_reason": "🎯 目标止盈达成" if net_pnl > 0 else "🛑 触发云端止损"
             })
     except Exception as exc:
+        _mark("binance", "failed", reason=str(exc)[:200])
         print(f"[sync_full_ledger] warn Binance 台账同步跳过: {exc}")
     return out
 
@@ -228,6 +270,7 @@ def fetch_gate_closed_trades(environment: str = "sandbox", tz_bj=None) -> list:
                 "exit_reason": "🎯 目标止盈达成" if net_pnl > 0 else "🛑 触发云端止损"
             })
     except Exception as exc:
+        _mark("gate", "failed", reason=str(exc)[:200])
         print(f"[sync_full_ledger] warn Gate 台账同步跳过: {exc}")
     return out
 
@@ -293,7 +336,10 @@ def build_lifecycle_ledger():
         pos_data = okx_rest.positions() or []
         orders_history = okx_rest.orders_history(limit=100) or []
         close_orders = [o for o in orders_history if str(o.get('reduceOnly', '')).lower() == 'true' and o.get('state') == 'filled']
+        _mark("okx", "partial" if (len(pos_history) >= 100 or len(orders_history) >= 100) else "ok",
+              **({"truncated_at": 100} if len(pos_history) >= 100 or len(orders_history) >= 100 else {}))
     except Exception as _okx_err:
+        _mark("okx", "failed", reason=str(_okx_err)[:200])
         print(f"[sync_full_ledger] OKX 台账同步跳过: {_okx_err}")
 
     trades_lifecycle = []
@@ -308,7 +354,19 @@ def build_lifecycle_ledger():
             continue
         inst = inst_id.replace("-USDT-SWAP", "")
         side_raw = p.get("posSide", p.get("side", "")).lower()
-        side = "多" if "long" in side_raw else "空"
+        # 审计 C8：net-mode 行 posSide="net"，旧式 `"long" in side_raw` 恒 False
+        # → 净模式多仓被系统性标成"空"（策略/追踪 join 全错位）。按符号回退判向，
+        # 符号不可判 → 诚实标"未知"，绝不猜。
+        if "long" in side_raw:
+            side = "多"
+        elif "short" in side_raw:
+            side = "空"
+        else:
+            try:
+                _signed = float(p.get("pos", 0) or 0)
+            except (TypeError, ValueError):
+                _signed = 0.0
+            side = "多" if _signed > 0 else ("空" if _signed < 0 else "未知")
         avg_px = float(p.get("avgPx", 0) or 0)
         mark_px = float(p.get("markPx", 0) or 0)
         upl = float(p.get("upl", 0) or 0)
@@ -483,8 +541,13 @@ def build_lifecycle_ledger():
         })
 
     # 多所台账协同（US-009 / v7.9.1）：自动并发拉取 Binance 与 Gate 真实平仓盈亏
+    # 审计 A2：fetch 内部吞异常（except 内 _mark failed）——调用点为未标失败的所
+    # 记 ok，并携带行数与 limit=100 截断风险标记，供旁车/data_health 诚实呈现。
     binance_trades = fetch_binance_closed_trades("demo" if env.simulated else "live", tz_bj=tz_bj)
     gate_trades = fetch_gate_closed_trades("sandbox" if env.simulated else "live", tz_bj=tz_bj)
+    for _v, _rows in (("binance", binance_trades), ("gate", gate_trades)):
+        if _FETCH_STATUS.get(_v, {}).get("status") != "failed":
+            _mark(_v, "ok", rows=len(_rows), truncated=len(_rows) >= 100)
 
     # 聚合去重合并（按 id 去重，按 close_time 降序）
     trades_map = {}
@@ -511,6 +574,9 @@ def build_lifecycle_ledger():
     finally:
         if os.path.exists(tmp_path):
             os.unlink(tmp_path)
+
+    # 审计 A2：台账原子写成功后同步落逐所状态旁车（读侧容错缺文件）。
+    _write_sync_status(env)
 
     # Notify newly closed trades via QQ
     try:

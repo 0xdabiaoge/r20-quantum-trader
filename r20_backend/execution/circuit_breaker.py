@@ -16,6 +16,36 @@ DATA_DIR = ROOT / "data"
 NEWS_SENTIMENT_FILE = DATA_DIR / "news_sentiment.json"
 CIRCUIT_BREAKER_FILE = DATA_DIR / "circuit_breaker.json"
 LEDGER_JSON_FILE = DATA_DIR / "trading_ledger.json"
+# 审计 A2（数据诚实→fail-closed）：台账是逐所拼合的，任一所在同步周期内拉取
+# 失败时其平仓亏损缺席，日亏求和天然偏小；此时「未触限」不可判定，按本模块
+# 「不可判定=不放松」纪律暂停开仓（宁停不错，与状态文件损坏同策）。
+
+
+
+def _sync_status_path():
+    """调用时解析（测试 patch 模块 DATA_DIR 即封闭，律①）。"""
+    return DATA_DIR / "ledger_sync_status.json"
+
+
+def _ledger_sync_failed_venues(max_age_seconds: float = 2700.0) -> list[str]:
+    """读台账同步旁车：返回最近一次同步 failed 的所列表。旁车缺失/过旧/损坏
+    一律返回空（过旧场景由 ledger 文件 file_health 的 STALE 通道兜底）。"""
+    try:
+        path = _sync_status_path()
+        if not path.exists():
+            return []
+        with open(path, "r", encoding="utf-8") as f:
+            payload = json.load(f)
+        generated_at = str(payload.get("generated_at") or "")
+        if generated_at:
+            ts = datetime.datetime.fromisoformat(generated_at)
+            age = (datetime.datetime.now(ts.tzinfo) - ts).total_seconds()
+            if age > max_age_seconds:
+                return []
+        return [str(v) for v, d in (payload.get("venues") or {}).items()
+                if isinstance(d, dict) and d.get("status") == "failed"]
+    except Exception:
+        return []
 STOP_COOLDOWN_FILE = DATA_DIR / "stop_cooldowns.json"
 
 
@@ -111,6 +141,10 @@ def is_circuit_breaker_active(usdt_available: Optional[float] = None, fetch_cand
             return True, f"熔断状态文件损坏，安全暂停开仓: {e}"
 
     if LEDGER_JSON_FILE.exists():
+        _failed_venues = _ledger_sync_failed_venues()
+        if _failed_venues:
+            return True, ("台账跨所同步不完整（失败所: " + ",".join(_failed_venues) +
+                          "），当日亏损求和不可判全，安全暂停开仓")
         try:
             with open(LEDGER_JSON_FILE, "r", encoding="utf-8") as f:
                 ledger = json.load(f)

@@ -1510,6 +1510,29 @@ def update_cache_cycle():
     total_b, used_b, free_b = shutil.disk_usage("/")
     disk_free_gb = round(free_b / (1024 ** 3), 1)
 
+    # 审计 A2：台账逐所同步状态旁车并入 source_errors——binance/gate 拉取失败
+    # 时数据不再以「完整」示人（PARTIAL），并携带失败原因。旁车缺失/过旧=跳过
+    # （过旧由 trading_ledger 文件新鲜度通道兜底 STALE）。
+    try:
+        _lss = os.path.join(DATA_DIR, "ledger_sync_status.json")
+        if os.path.exists(_lss):
+            with open(_lss, "r", encoding="utf-8") as _f:
+                _ls = json.load(_f)
+            _fresh = True
+            try:
+                _gen = datetime.datetime.fromisoformat(str(_ls.get("generated_at") or ""))
+                _fresh = (datetime.datetime.now(_gen.tzinfo) - _gen).total_seconds() <= 2700
+            except Exception:
+                _fresh = False
+            if _fresh:
+                for _v, _d in (_ls.get("venues") or {}).items():
+                    if isinstance(_d, dict) and _d.get("status") == "failed":
+                        source_errors.append(f"ledger-{_v}: 台账同步失败({str(_d.get('reason') or '')[:120]})，所盈亏/日亏数据不全")
+                    elif isinstance(_d, dict) and (_d.get("truncated") or _d.get("truncated_at")):
+                        source_errors.append(f"ledger-{_v}: 平仓记录触顶 limit=100，可能存在截断")
+    except Exception:
+        pass
+
     CACHE_DATA = {
         "timestamp": timestamp_full,
         "date": today_bj_str,
