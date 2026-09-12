@@ -540,7 +540,10 @@ class BinanceAdapter(BaseExchangeAdapter):
             raise ValueError("撤单需 order_id 或 client_order_id")
 
         data = self.signed_request("DELETE", "/fapi/v1/order", params=params)
-        return {"venue": "binance", "order_id": str(data.get("orderId") or ""), "status": "CANCELED", "raw": data}
+        # 审计 D3：status 必须回显交易所真实状态——旧实现硬编码 "CANCELED"，
+        # 抢撤竞态（下单方先成交）时响应实为 FILLED 也会被伪报撤成功。
+        return {"venue": "binance", "order_id": str(data.get("orderId") or ""),
+                "status": str(data.get("status") or "UNKNOWN"), "raw": data}
 
     def cancel_all_orders(self, symbol: str) -> Dict[str, Any]:
         """撤销该标的所有普通挂单（US-005）。"""
@@ -705,15 +708,20 @@ class BinanceAdapter(BaseExchangeAdapter):
         inst = self.native_symbol(symbol) if symbol else ""
         open_algos = self.list_protective_orders(symbol=inst)
         results = []
+        failures = []
         for o in open_algos:
             aid = o.get("algo_id") or o.get("id")
             if aid:
                 try:
                     res = self.cancel_algo_order(algo_id=aid)
                     results.append(res)
-                except Exception:
-                    pass
-        return {"code": "200", "msg": "success", "canceled": results}
+                except Exception as exc:
+                    # 审计 D3：逐笔失败必须收集上报——旧实现 pass 吞掉后仍
+                    # 伪造 {"code":"200","msg":"success"}，全败也报成功（保护单
+                    # 清场链路据此放行 = 裸旧单残留）。
+                    failures.append({"algo_id": str(aid), "error": str(exc)[:200]})
+        return {"success": not failures, "attempted": len(results) + len(failures),
+                "canceled": results, "failed": failures}
 
     @staticmethod
     def merged_protection_view(normal_open: List[Dict[str, Any]],
