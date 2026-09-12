@@ -542,8 +542,20 @@ def query_positions() -> Tuple[bool, List[Dict[str, Any]], str]:
     return True, rows, ""
 
 
-def close_position_confirmed(inst_id: str, pos_side: str, before_size: float) -> Tuple[bool, str]:
-    """Close a position and verify at the exchange before changing local state."""
+def close_position_confirmed(inst_id: str, pos_side: str, before_size: float, venue: str = "okx") -> Tuple[bool, str]:
+    """Close a position and verify at the exchange before changing local state (Three-Venue Capable)."""
+    target_venue = str(venue or "okx").lower()
+    if target_venue != "okx":
+        try:
+            from r20_backend import execution_router
+            env = selected_environment()
+            res = execution_router.close_position(inst_id, venue=target_venue, environment=str(env.mode))
+            if res.get("ok"):
+                return True, f"{target_venue.upper()} position closed"
+            return False, f"{target_venue.upper()} close failed: {res.get('detail')}"
+        except Exception as exc:
+            return False, f"{target_venue.upper()} close error: {exc}"
+
     # Pre-cancel any conflicting pending/reduce-only orders for this instrument to release available size
     try:
         for o in okx_rest.pending_orders(inst_id):
@@ -1440,139 +1452,14 @@ def record_trade(trade_data):
 # =============================================================================
 # 🧮 Enhanced Quantitative Technical Indicators Math Engine
 # =============================================================================
-def calc_ema(prices, period):
-    if not prices or len(prices) < period:
-        return prices[-1] if prices else 0.0
-    k = 2.0 / (period + 1)
-    ema = prices[0]
-    for p in prices[1:]:
-        ema = p * k + ema * (1 - k)
-    return ema
-
-def calc_rsi(prices, period=14):
-    if not prices or len(prices) <= period:
-        return 50.0
-    gains, losses = [], []
-    for i in range(1, len(prices)):
-        chg = prices[i] - prices[i-1]
-        if chg >= 0:
-            gains.append(chg)
-            losses.append(0.0)
-        else:
-            gains.append(0.0)
-            losses.append(abs(chg))
-    
-    if len(gains) < period:
-        return 50.0
-    avg_gain = sum(gains[:period]) / period
-    avg_loss = sum(losses[:period]) / period
-    for i in range(period, len(gains)):
-        avg_gain = (avg_gain * (period - 1) + gains[i]) / period
-        avg_loss = (avg_loss * (period - 1) + losses[i]) / period
-    
-    if avg_loss == 0:
-        return 100.0
-    rs = avg_gain / avg_loss
-    return 100.0 - (100.0 / (1.0 + rs))
-
-def calc_atr(candles, period=14):
-    if not candles or len(candles) < 2:
-        return 0.0
-    trs = []
-    for i in range(1, len(candles)):
-        h = float(candles[i][2])
-        l = float(candles[i][3])
-        prev_c = float(candles[i-1][4])
-        tr = max(h - l, abs(h - prev_c), abs(l - prev_c))
-        trs.append(tr)
-    if not trs:
-        return 0.0
-    if len(trs) < period:
-        return sum(trs) / len(trs)
-    atr = sum(trs[:period]) / period
-    for tr in trs[period:]:
-        atr = (atr * (period - 1) + tr) / period
-    return atr
-
-def calc_macd_histogram_acceleration(prices, fast=12, slow=26, signal=9):
-    """Calculates MACD Line, Signal Line, Histogram, and Histogram Delta (Acceleration)"""
-    if len(prices) < slow + signal:
-        return 0.0, 0.0, 0.0, 0.0
-    
-    # Calculate fast & slow EMA series
-    k_fast = 2.0 / (fast + 1)
-    k_slow = 2.0 / (slow + 1)
-    k_sig = 2.0 / (signal + 1)
-
-    fast_ema = prices[0]
-    slow_ema = prices[0]
-    macd_series = []
-
-    for p in prices:
-        fast_ema = p * k_fast + fast_ema * (1 - k_fast)
-        slow_ema = p * k_slow + slow_ema * (1 - k_slow)
-        macd_series.append(fast_ema - slow_ema)
-
-    sig_ema = macd_series[0]
-    hist_series = []
-    for m in macd_series:
-        sig_ema = m * k_sig + sig_ema * (1 - k_sig)
-        hist_series.append(m - sig_ema)
-
-    latest_macd = macd_series[-1]
-    latest_sig = sig_ema
-    latest_hist = hist_series[-1]
-    hist_accel = hist_series[-1] - hist_series[-2] if len(hist_series) >= 2 else 0.0
-
-    return latest_macd, latest_sig, latest_hist, hist_accel
-
-def calc_obv_trend(closes, vols, period=14):
-    """On-Balance Volume (OBV) and OBV Divergence Slope"""
-    if len(closes) < period or len(vols) < period:
-        return 0.0, "NEUTRAL"
-    
-    obv_val = 0.0
-    obv_series = [0.0]
-    for i in range(1, len(closes)):
-        if closes[i] > closes[i-1]:
-            obv_val += vols[i]
-        elif closes[i] < closes[i-1]:
-            obv_val -= vols[i]
-        obv_series.append(obv_val)
-
-    # Slope of last 5 bars
-    recent_obv = obv_series[-5:]
-    recent_px = closes[-5:]
-    obv_up = recent_obv[-1] > recent_obv[0]
-    px_up = recent_px[-1] > recent_px[0]
-
-    if obv_up and not px_up:
-        div_state = "BULL_ACCUMULATION" # 主力隐蔽吸筹
-    elif not obv_up and px_up:
-        div_state = "BEAR_DISTRIBUTION" # 主力拉高出货背离
-    elif obv_up and px_up:
-        div_state = "BULL_FLOW"
-    else:
-        div_state = "BEAR_FLOW"
-
-    return obv_val, div_state
-
-def calc_bollinger_squeeze(closes, period=20, mult=2.0):
-    """Bollinger Bandwidth & Squeeze Ratio"""
-    if len(closes) < period:
-        return 0.0, 0.0, False
-    
-    sub = closes[-period:]
-    sma = sum(sub) / period
-    variance = sum((x - sma) ** 2 for x in sub) / period
-    std_dev = variance ** 0.5
-    upper = sma + mult * std_dev
-    lower = sma - mult * std_dev
-    bandwidth = ((upper - lower) / sma) * 100.0 if sma > 0 else 0.0
-    
-    # Squeeze detected if bandwidth is in lowest 20% quantile (< 1.8% for crypto/stock)
-    is_squeeze = bandwidth < 1.80
-    return bandwidth, std_dev, is_squeeze
+from r20_backend.execution import (
+    calc_ema,
+    calc_rsi,
+    calc_atr,
+    calc_macd_histogram_acceleration,
+    calc_obv_trend,
+    calc_bollinger_squeeze,
+)
 
 # =============================================================================
 # 🚀 High-Alpha Multi-Factor Extraction & Quantitative Feature Assembly
@@ -2221,6 +2108,7 @@ def execute_ai_position_management(real_pos_dict, trackers, timestamp_full, exec
             continue
 
         pos_side = str(position.get("posSide", "net")).lower()
+        pos_venue = str(position.get("venue") or position.get("exchange") or "okx").lower()
         current_px = float(position.get("markPx", position.get("last", 0)) or 0)
         avg_px = float(position.get("avgPx", 0) or 0)
         name = inst_id.replace("-USDT-SWAP", "")
@@ -2229,9 +2117,9 @@ def execute_ai_position_management(real_pos_dict, trackers, timestamp_full, exec
             if confidence < 85:
                 executed_actions.append(f"[{name}] AI平仓置信度{confidence:.0f}<85，拒绝执行")
                 continue
-            closed, close_detail = close_position_confirmed(inst_id, pos_side, float(position.get("pos", 0) or 0))
+            closed, close_detail = close_position_confirmed(inst_id, pos_side, float(position.get("pos", 0) or 0), venue=pos_venue)
             if closed:
-                executed_actions.append(f"[{name}] AI高置信度整仓退出: {reason}")
+                executed_actions.append(f"[{name}] AI高置信度整仓退出 ({pos_venue.upper()}): {reason}")
                 trackers.pop(f"{inst_id}_{pos_side}", None)
             else:
                 executed_actions.append(f"[{name}] AI平仓请求未获交易所确认，仓位保持不变: {close_detail}")
@@ -2257,28 +2145,43 @@ def execute_ai_position_management(real_pos_dict, trackers, timestamp_full, exec
             if not tightens_risk:
                 executed_actions.append(f"[{name}] 浮盈空间不足或与现价缓冲过近({current_px} vs 拟调SL {new_sl})，拒绝过早收紧止损")
                 continue
-            try:
-                algo_orders = okx_rest.pending_algo_orders(inst_id)
-            except Exception as exc:
-                executed_actions.append(f"[{name}] 云端止损收紧失败，原保护单保持不变（查询异常：{exc}）")
-                continue
-            live_algo = next((o for o in algo_orders if o.get("state") == "live" and o.get("posSide") == pos_side and o.get("slTriggerPx")), None)
-            if not live_algo:
-                executed_actions.append(f"[{name}] 未找到真实云端止损单，无法更新")
-                continue
-            try:
-                okx_rest.amend_algo_sl(live_algo["algoId"], new_sl, inst_id=inst_id, new_sl_ord_px="-1")
-                amend_ok = True
-            except Exception:
-                amend_ok = False
+
+            amend_ok = False
+            old_sl = 0.0
+            if pos_venue != "okx":
+                try:
+                    ad = venue_registry.get_adapter(pos_venue, environment=str(selected_environment().mode))
+                    # Attach or update protective stop order on target venue
+                    ad.attach_protective_orders(name, pos_side, sl_px=new_sl, contracts=abs(float(position.get("pos", 0) or 0)))
+                    amend_ok = True
+                except Exception as vexc:
+                    executed_actions.append(f"[{name}] {pos_venue.upper()} 云端止损更新失败: {vexc}")
+                    continue
+            else:
+                try:
+                    algo_orders = okx_rest.pending_algo_orders(inst_id)
+                except Exception as exc:
+                    executed_actions.append(f"[{name}] 云端止损收紧失败，原保护单保持不变（查询异常：{exc}）")
+                    continue
+                live_algo = next((o for o in algo_orders if o.get("state") == "live" and o.get("posSide") == pos_side and o.get("slTriggerPx")), None)
+                if not live_algo:
+                    executed_actions.append(f"[{name}] 未找到真实云端止损单，无法更新")
+                    continue
+                old_sl = float(live_algo.get("slTriggerPx", 0) or 0)
+                try:
+                    okx_rest.amend_algo_sl(live_algo["algoId"], new_sl, inst_id=inst_id, new_sl_ord_px="-1")
+                    amend_ok = True
+                except Exception:
+                    amend_ok = False
+
             if amend_ok:
-                executed_actions.append(f"[{name}] 云端止损收紧至 {new_sl}: {reason}")
+                executed_actions.append(f"[{name}] 云端止损收紧至 {new_sl} ({pos_venue.upper()}): {reason}")
                 tracker = trackers.get(f"{inst_id}_{pos_side}")
                 if tracker:
                     tracker["trailingStopPx"] = new_sl
                 try:
                     from qq_notifier import notify_sl_updated
-                    notify_sl_updated(name, pos_side, float(live_algo.get("slTriggerPx", 0)), new_sl, reason)
+                    notify_sl_updated(name, pos_side, old_sl, new_sl, reason)
                 except Exception:
                     pass
             else:
