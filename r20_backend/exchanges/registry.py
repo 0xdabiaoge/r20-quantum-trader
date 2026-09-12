@@ -160,27 +160,23 @@ def venue_credentials(venue: str, environment: Optional[str] = None) -> Tuple[st
 
     env = str(environment or "").strip().lower() if environment is not None else ""
     if env:
+        # 审计 A3：按「原子凭证档」解析——key 与 secret 必须同档成对命中，绝不逐
+        # 字段跨档借位（此前 GATE_DEMO_API_KEY 可与 generic GATE_SECRET_KEY 拼成
+        # 混合身份，违背 okx_runtime「profile 是原子凭证组」律）。档位优先级链保持
+        # 原契约（含沙盒→generic 优雅回退，见 test_multi_exchange_admin）。
         if is_sandbox_environment(env):
-            cand_keys = [f"{key}_DEMO_API_KEY", f"{key}_TESTNET_API_KEY", f"{key}_SANDBOX_API_KEY", f"{key}_API_KEY"]
-            cand_secs = [f"{key}_DEMO_SECRET_KEY", f"{key}_TESTNET_SECRET_KEY", f"{key}_SANDBOX_SECRET_KEY", f"{key}_SECRET_KEY"]
+            tiers = [f"{key}_DEMO", f"{key}_TESTNET", f"{key}_SANDBOX", key]
         else:
-            cand_keys = [f"{key}_LIVE_API_KEY", f"{key}_API_KEY"]
-            cand_secs = [f"{key}_LIVE_SECRET_KEY", f"{key}_SECRET_KEY"]
-
-        api_key = ""
-        for ck in cand_keys:
-            v = str(vals.get(ck) or "").strip()
-            if v:
-                api_key = v
-                break
-
-        secret_key = ""
-        for cs in cand_secs:
-            v = str(vals.get(cs) or "").strip()
-            if v:
-                secret_key = v
-                break
-        return (api_key, secret_key)
+            tiers = [f"{key}_LIVE", key]
+        for tier in tiers:
+            api_key = str(vals.get(f"{tier}_API_KEY") or "").strip()
+            secret_key = str(vals.get(f"{tier}_SECRET_KEY") or "").strip()
+            if api_key and secret_key:
+                return (api_key, secret_key)
+            if api_key or secret_key:
+                # 该档半配：不得用另一档补齐另一半——视作该档不可用，继续下一档
+                continue
+        return ("", "")
 
     return (str(vals.get(f"{key}_API_KEY") or "").strip(), str(vals.get(f"{key}_SECRET_KEY") or "").strip())
 

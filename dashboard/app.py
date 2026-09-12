@@ -505,14 +505,24 @@ def get_cache_lock():
         CACHE_LOCK = asyncio.Lock()
     return CACHE_LOCK
 
+def _global_env_axis() -> str:
+    """审计 B2：资金/行情环境轴统一走全站唯一事实源（R20_OKX_ENV → okx_runtime），
+    不再私读遗留 OKX_IS_SIMULATED——两轴失同步时曾把 LIVE 所数据并进 DEMO 板。
+    解析失败保守取 demo（与 okx_runtime 未知档默认一致，绝不抬到 live）。"""
+    try:
+        from scripts.okx_runtime import current_environment
+        return str(current_environment().mode)
+    except Exception:
+        return "demo"
+
 def _load_portfolio_risk_data() -> dict:
     """透传组合风险预留层状态给前台三所面板（零网络，纯本地只读）。
 
     契约对齐（2026-09-11 修复面板恒显「—」）：
     - 字段名对齐前端 PortfolioRiskRow：total_budget_usdt / reserved_usdt /
       available_usdt / environment / updated_utc；
-    - 资金环境轴与 _load_multi_venue_portfolio 同源（OKX_IS_SIMULATED），
-      修旧式 `not os.environ.get(...) == "1"` 的优先级坑（恒判 live）；
+    - 资金环境轴与 _load_multi_venue_portfolio 同源（_global_env_axis →
+      okx_runtime 单源，2026-09-13 审计 B2 起不再读遗留 OKX_IS_SIMULATED）；
     - 总预算单源 R20_PORTFOLIO_RISK_BUDGET_USDT（与 trader 同口径）；未配置
       = 无上限模式 → 诚实 None（前端显「—」），绝不编 10000 假预算；
     - 读层异常不再裸吞成 {}：返回 status=unavailable + 空值结构，error 留痕。
@@ -536,7 +546,7 @@ def _load_portfolio_risk_data() -> dict:
                 budget_val = 5000.0
 
         total_budget = budget_val if budget_val > 0 else 5000.0
-        env = "demo" if os.environ.get("OKX_IS_SIMULATED", "1") == "1" else "live"
+        env = _global_env_axis()
         from r20_backend.risk_reservation import get_manager
         mgr = get_manager()
         reserved = float(mgr.gross_exposure(env) or 0.0)
@@ -555,7 +565,7 @@ def _load_portfolio_risk_data() -> dict:
         }
     except Exception as exc:
         return {
-            "environment": "demo" if os.environ.get("OKX_IS_SIMULATED", "1") == "1" else "live",
+            "environment": _global_env_axis(),
             "status": "unavailable",
             "total_budget_usdt": None, "reserved_usdt": None,
             "available_usdt": None, "utilization_pct": None, "by_venue": {},
@@ -567,7 +577,7 @@ def _load_multi_venue_portfolio(total_eq: float, avail_eq: float, positions: lis
     """US-006/US-007：dashboard /api/all 组合多所资产与权益快照（OKX + Gate + Binance 全量对账）。"""
     try:
         from r20_backend.portfolio_aggregator import aggregate_venue_accounts
-        env = "demo" if os.environ.get("OKX_IS_SIMULATED", "1") == "1" else "live"
+        env = _global_env_axis()
         venues_map = {
             "okx": {
                 "status": "ready" if total_eq > 0 else "unavailable",
@@ -578,12 +588,21 @@ def _load_multi_venue_portfolio(total_eq: float, avail_eq: float, positions: lis
             },
         }
         try:
-            from r20_backend.app import _venue_accounts_gate, _venue_accounts_binance
-            venues_map["gate"] = _venue_accounts_gate(env)
-            venues_map["binance"] = _venue_accounts_binance(env)
-        except Exception:
-            venues_map["gate"] = {"status": "unavailable", "equity": None}
-            venues_map["binance"] = {"status": "unavailable", "equity": None}
+            # 审计 A1：33cc95d 拆分把两函数移入 routers/exchanges.py，此处旧引用
+            # ImportError 被吞 → gate/binance 永远伪报 unavailable。改指真源。
+            from r20_backend.routers.exchanges import _venue_accounts_gate, _venue_accounts_binance
+        except Exception as exc:
+            venues_map["gate"] = {"status": "unavailable", "equity": None, "reason": f"账户模块缺失: {exc}"}
+            venues_map["binance"] = {"status": "unavailable", "equity": None, "reason": f"账户模块缺失: {exc}"}
+        else:
+            try:
+                venues_map["gate"] = _venue_accounts_gate(env)
+            except Exception as exc:
+                venues_map["gate"] = {"status": "unavailable", "equity": None, "reason": f"Gate 账户面异常: {str(exc)[:180]}"}
+            try:
+                venues_map["binance"] = _venue_accounts_binance(env)
+            except Exception as exc:
+                venues_map["binance"] = {"status": "unavailable", "equity": None, "reason": f"Binance 账户面异常: {str(exc)[:180]}"}
 
         return aggregate_venue_accounts(venues_map, env)
     except Exception:
@@ -968,7 +987,7 @@ def update_cache_cycle():
     # 2.5 Multi-Venue Parity: Aggregate active positions & open orders from Binance & Gate
     try:
         from r20_backend.exchanges import get_adapter, is_registered
-        env_axis = "demo" if os.environ.get("OKX_IS_SIMULATED", "1") == "1" else "live"
+        env_axis = _global_env_axis()
         for v_name in ("binance", "gate"):
             try:
                 ad = get_adapter(v_name, environment=env_axis)

@@ -210,15 +210,16 @@ def manual_close_position(payload: ManualCloseRequest) -> dict[str, Any]:
             else:
                 from r20_backend.close_intent import venue_fast_close
                 result = venue_fast_close(_close_venue, _close_env.mode, payload.close_token, payload.confirmation)
-            audit_record("position.close", "confirmed_closed", {"instId": result.get("instId"), "side": result.get("posSide"), "venue": _close_venue, "environment": result.get("environment"), "size": result.get("closed_size")})
+            audit_record("position.close", "confirmed_closed", {"instId": result.get("instId"), "side": result.get("posSide"), "venue": _close_venue, "environment": result.get("environment"), "size": result.get("closed_size"), "actor": actor.get("username", "admin")})
             return result
         except OKXNotConfigured as exc:
+            audit_record("position.close", "rejected_not_ready", {"venue": _close_venue, "error": str(exc)[:300], "actor": actor.get("username", "admin")})
             raise HTTPException(status_code=503, detail=str(exc)) from exc
         except ValueError as exc:
-            audit_record("position.close", "rejected", {"venue": _close_venue, "error": str(exc)[:300]})
+            audit_record("position.close", "rejected", {"venue": _close_venue, "error": str(exc)[:300], "actor": actor.get("username", "admin")})
             raise HTTPException(status_code=409, detail=str(exc)) from exc
         except Exception as exc:
-            audit_record("position.close", "verification_failed", {"venue": _close_venue, "error": str(exc)[:300]})
+            audit_record("position.close", "verification_failed", {"venue": _close_venue, "error": str(exc)[:300], "actor": actor.get("username", "admin")})
             raise HTTPException(status_code=502, detail=f"{_close_venue.upper()} 快速平仓未完成确认：{exc}") from exc
         finally:
             try:

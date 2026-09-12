@@ -108,10 +108,13 @@ def _venue_accounts_okx(environment: str) -> dict[str, Any]:
 
 def _venue_accounts_gate(environment: str) -> dict[str, Any]:
     from r20_backend.exchanges import ExchangeCapabilityError, get_adapter, venue_credentials
-    api_key, secret = venue_credentials("gate")
+    from r20_backend.close_intent import adapter_environment as _ae
+    # 审计 C7：预检必须按档位轴取凭证（与 binance :151 同权），否则仅有分层
+    # GATE_DEMO/LIVE 键时误报"未配置"，或反向放行 generic LIVE 键打错主机
+    api_key, secret = venue_credentials("gate", _ae("gate", environment))
     if not api_key or not secret:
         return _venue_account_unknown(
-            "unavailable", "Gate API Key/Secret 未配置，未发起任何请求；请在后台「多交易所凭证」录入")
+            "unavailable", f"Gate {_ae('gate', environment)} 档 API Key/Secret 未配置，未发起任何请求；请在后台「多交易所凭证」录入")
     gate_env = "sandbox" if environment == "demo" else "live"
     try:
         ad = get_adapter("gate", environment=gate_env)
@@ -383,6 +386,7 @@ def admin_okx_account_snapshot(
 
     combined_positions: list[dict[str, Any]] = []
     combined_orders: list[dict[str, Any]] = []
+    venue_errors: dict[str, str] = {}
 
     try:
         fn_snap = app_attr("okx_account_snapshot", okx_account_snapshot)
@@ -397,17 +401,19 @@ def admin_okx_account_snapshot(
             combined_orders.append(o_copy)
     except OKXNotConfigured as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
-    except Exception:
-        pass
+    except Exception as exc:  # 审计 C6：所失败显式化，不再抹平为"完整"
+        venue_errors["okx"] = f"{type(exc).__name__}: {str(exc)[:180]}"
 
-    from r20_backend.close_intent import create as _create_close_intent, INTENT_TTL_SECONDS as _CLOSE_INTENT_TTL
-    # 三所档位轴：OKX env.mode(demo/live) 是全站唯一档位；binance 同名，gate demo→sandbox。
-    _ADAPTER_ENV = {"binance": {"demo": "demo", "live": "live"}, "gate": {"demo": "sandbox", "live": "live"}}
+    from r20_backend.close_intent import (
+        create as _create_close_intent, INTENT_TTL_SECONDS as _CLOSE_INTENT_TTL,
+        adapter_environment as _close_adapter_env, _current_credential_fp as _close_cred_fp,
+    )
     for venue in ("binance", "gate"):
         try:
             from r20_backend.exchanges import get_adapter
-            adapter_env = _ADAPTER_ENV[venue].get(env.mode, env.mode)
+            adapter_env = _close_adapter_env(venue, env.mode)
             ad = get_adapter(venue, environment=adapter_env)
+            cred_fp = _close_cred_fp(venue, adapter_env)  # 审计 B3：令牌钉住凭证身份
             if hasattr(ad, "positions"):
                 for p in (ad.positions() or []):
                     amt = float(p.get("size_signed", 0) or 0)
@@ -420,7 +426,8 @@ def admin_okx_account_snapshot(
                     pos_side = "long" if amt > 0 else "short"
                     close_token, close_confirmation = _create_close_intent(
                         venue=venue, environment=env.mode, display_inst=inst_display,
-                        symbol=sym, pos_side=pos_side, expected_size=abs(amt))
+                        symbol=sym, pos_side=pos_side, expected_size=abs(amt),
+                        credential_fingerprint=cred_fp)
                     combined_positions.append({
                         "venue": venue,
                         "exchange": venue,
@@ -438,11 +445,11 @@ def admin_okx_account_snapshot(
                     o_copy = dict(o)
                     o_copy.setdefault("venue", venue)
                     combined_orders.append(o_copy)
-        except Exception:
-            pass
+        except Exception as exc:
+            venue_errors[venue] = f"{type(exc).__name__}: {str(exc)[:180]}"
 
     if not env.configured and not combined_positions and not combined_orders:
-        raise HTTPException(status_code=503, detail="OKX DEMO API Key 未配置：V5 直签是唯一私有通道（fail-closed，无 CLI 回退）")
+        raise HTTPException(status_code=503, detail=f"OKX {str(env.mode).upper()} API Key 未配置：V5 直签是唯一私有通道（fail-closed，无 CLI 回退）")
 
     return {
         "environment": env.mode,
@@ -450,6 +457,7 @@ def admin_okx_account_snapshot(
         "credential_source": "multi-venue-aggregator",
         "positions": combined_positions,
         "orders": combined_orders,
+        "venue_errors": venue_errors,
         "captured_at_ms": int(time.time() * 1000),
     }
 

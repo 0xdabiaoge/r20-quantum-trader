@@ -551,7 +551,8 @@ class BinanceAdapter(BaseExchangeAdapter):
             })
         except BinanceAPIError as exc:
             if exc.code != -4046:  # -4046: No need to change margin type.
-                pass
+                raise  # 审计 C1：其余 marginType 错误（如 -4059 对冲模式冲突）不得
+                # 静默吞掉后在错误保证金模式下强设杠杆——fail-closed 上抛
         return self.signed_request("POST", "/fapi/v1/leverage", params={
             "symbol": inst, "leverage": int(leverage)
         })

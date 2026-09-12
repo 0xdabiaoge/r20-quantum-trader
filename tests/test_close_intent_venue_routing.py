@@ -99,6 +99,20 @@ class CloseIntentTests(unittest.TestCase):
                 close_intent.venue_fast_close("binance", "demo", token, "CLOSE BINANCE DEMO ETH-USDT-SWAP LONG 0.275")
             self.assertIn("目标仓位已不存在", str(ctx.exception))
 
+    def test_credential_rotation_invalidates_token(self):
+        # 审计 B3：签发与点击之间凭证轮换 → 指纹失配必须拒平（对齐 OKX identity 强度）
+        token, confirmation = close_intent.create(venue="binance", environment="demo", display_inst="ETH-USDT-SWAP",
+                                                  symbol="ETH", pos_side="long", expected_size=0.275,
+                                                  credential_fingerprint="aaaa1111bbbb2222")
+        adapter = _FakeAdapter(0.275)
+        with patch("r20_backend.exchanges.get_adapter", return_value=adapter), \
+             patch("r20_backend.exchanges.venue_credentials", return_value=("rotated-key", "rotated-secret")):
+            with self.assertRaises(ValueError) as ctx:
+                close_intent.venue_fast_close("binance", "demo", token, confirmation)
+            self.assertIn("已轮换", str(ctx.exception))
+        self.assertEqual(adapter.close_calls, [])
+        self.assertIsNotNone(close_intent.peek(token))  # 预检失败不烧令牌
+
     def test_happy_path_closes_market_and_confirms_zero(self):
         token, confirmation = self._make_intent()
         adapter = _FakeAdapter(-1795.8)  # 空头

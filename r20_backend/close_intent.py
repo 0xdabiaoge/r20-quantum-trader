@@ -15,8 +15,29 @@ _LOCK = threading.Lock()
 INTENT_TTL_SECONDS = 90
 
 
+# 三所档位轴：OKX env.mode(demo/live) 为全站唯一档位；gate demo→sandbox，binance 同名。
+# 唯一定义点（审计 C3：ai_factor_trader/ exchanges 等所有非 OKX 适配器路径都应引用本表）。
+ADAPTER_ENV = {"binance": {"demo": "demo", "live": "live"}, "gate": {"demo": "sandbox", "live": "live"}}
+_ADAPTER_ENV = ADAPTER_ENV
+
+
+def adapter_environment(venue: str, mode: str) -> str:
+    """OKX 档位轴 → 该所适配器档位（未知轴值原样透传给适配器自校验）。"""
+    return ADAPTER_ENV.get(str(venue or "").lower(), {}).get(str(mode or "").lower(), str(mode or ""))
+
+
+def _current_credential_fp(venue: str, adapter_env: str) -> str:
+    from r20_backend.exchanges import venue_credentials
+    from r20_backend.exchanges.identity import credential_fingerprint
+    try:
+        api_key, _ = venue_credentials(venue, adapter_env)
+    except Exception:
+        api_key = ""
+    return credential_fingerprint(api_key)
+
+
 def create(*, venue: str, environment: str, display_inst: str, symbol: str,
-           pos_side: str, expected_size: float) -> tuple[str, str]:
+           pos_side: str, expected_size: float, credential_fingerprint: str = "") -> tuple[str, str]:
     """登记一次平仓意图，返回 (token, confirmation)。confirmation 由前端逐字回显。"""
     token = secrets.token_urlsafe(32)
     confirmation = f"CLOSE {venue.upper()} {environment.upper()} {display_inst} {pos_side.upper()} {float(expected_size):g}"
@@ -24,6 +45,7 @@ def create(*, venue: str, environment: str, display_inst: str, symbol: str,
         "venue": venue, "environment": environment, "display_inst": display_inst,
         "symbol": symbol, "pos_side": pos_side, "expected_size": float(expected_size),
         "confirmation": confirmation, "expires_at": time.time() + INTENT_TTL_SECONDS,
+        "credential_fingerprint": str(credential_fingerprint or ""),
     }
     with _LOCK:
         now = time.time()
@@ -51,8 +73,7 @@ def consume(token: str) -> dict[str, Any]:
     return intent
 
 
-# 三所档位轴：OKX env.mode(demo/live) 为全站唯一档位；gate demo→sandbox，binance 同名。
-_ADAPTER_ENV = {"binance": {"demo": "demo", "live": "live"}, "gate": {"demo": "sandbox", "live": "live"}}
+# （_ADAPTER_ENV 已上移至文件头唯一定义——审计 C3 单一事实源）
 
 
 def _pos_side(size_signed: float) -> str:
@@ -75,9 +96,15 @@ def venue_fast_close(venue: str, environment: str, token: str, confirmation: str
         raise ValueError(f"{venue.upper()} 环境已切换为 {environment}，请刷新当前持仓")
     if str(confirmation or "").strip().upper() != str(pending["confirmation"]):
         raise ValueError(f"确认短语必须精确为：{pending['confirmation']}")
+    adapter_env = adapter_environment(venue, environment)
+    # 审计 B3（对齐 OKX env.identity 强度）：快照签发与此刻之间若发生过凭证轮换，
+    # 旧令牌会打到新账户——按 api_key 指纹钉死，指纹漂移即拒绝并令刷新。
+    pinned_fp = str(pending.get("credential_fingerprint") or "")
+    live_fp = _current_credential_fp(venue, adapter_env)
+    if pinned_fp and pinned_fp != live_fp:
+        raise ValueError(f"{venue.upper()} API Key 已轮换（指纹 {pinned_fp}→{live_fp}），请刷新当前持仓后重新签发")
     intent = consume(token)
     from r20_backend.exchanges import get_adapter
-    adapter_env = _ADAPTER_ENV[venue].get(str(environment), str(environment))
     ad = get_adapter(venue, environment=adapter_env)
     sym = str(intent["symbol"])
     expected = float(intent["expected_size"])
