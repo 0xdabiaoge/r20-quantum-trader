@@ -511,8 +511,12 @@ def build_lifecycle_ledger():
 
         funding_fee = round(float(h.get("fundingFee") or 0.0), 4)
 
+        # 审计 D8：去重键原嵌 u_ts（持仓最后更新时间）——同一笔平仓被 OKX 改写
+        # uTime（如补算资金费/结算修正）时 id 漂移，与旧行按 id 去重失败 → 同笔
+        # 重复计入台账/日亏。改用不可变 posId，缺失时退回开仓时刻 c_ts（同样稳定）。
+        _stable = str(h.get("posId") or "").strip() or (str(int(c_ts)) if c_ts > 0 else str(int(u_ts)))
         trades_lifecycle.append({
-            "id": f"pos_hist_{u_ts}_{inst}",
+            "id": f"pos_hist_{_stable}_{inst}",
             "inst": inst,
             "side": side,
             "venue": "okx",   # G10：同上，OKX 历史行源头标注
@@ -554,6 +558,18 @@ def build_lifecycle_ledger():
     for t in old_trades:
         if t.get("id"):
             trades_map[t["id"]] = t
+
+    # 审计 D8 迁移：去重键由 u_ts 换为 posId 后首跑，同一笔持仓的新旧行 id 不同
+    # 会并存双计。对 okx 历史行按 (venue, inst, open_time, close_time) 稳定签名
+    # 撞键——旧键行让位于本轮再生成的新键行；窗口外无法再生的旧行一律不动（防迁移误删）。
+    def _sig(t):
+        return (str(t.get("venue") or ""), str(t.get("inst") or ""),
+                str(t.get("open_time") or ""), str(t.get("close_time") or ""))
+    _new_sigs = {_sig(t) for t in trades_lifecycle}
+    for _oid in [k for k, v in trades_map.items()
+                 if str(k).startswith("pos_hist_") and isinstance(v, dict) and _sig(v) in _new_sigs]:
+        trades_map.pop(_oid)
+
     for t in (trades_lifecycle + binance_trades + gate_trades):
         if t.get("id"):
             trades_map[t["id"]] = t

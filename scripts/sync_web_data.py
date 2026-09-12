@@ -150,7 +150,12 @@ def generate_trading_data():
                 with open(LEDGER_JSON_FILE, "r", encoding="utf-8") as f:
                     t_list = json.load(f)
                     for t in t_list:
-                        if beijing_day(t.get("time")) == today_str:
+                        # 审计 D5：台账行根本没有 "time" 键（真实键名 close_time）
+                        # ——旧代码 beijing_day(t.get("time")) 恒 None，JSON 兜底
+                        # 分支的当日胜负统计静默归零。同时补结清状态白名单。
+                        if str(t.get("status", "")).strip().lower() not in ("closed", "已平仓", "completed"):
+                            continue
+                        if beijing_day(t.get("close_time") or t.get("time")) == today_str:
                             p = float(t.get("pnl", 0.0) or 0)
                             if p > 0:
                                 today_win_trades += 1

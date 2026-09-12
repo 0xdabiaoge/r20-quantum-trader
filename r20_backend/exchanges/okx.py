@@ -162,14 +162,13 @@ class OKXAdapter(OKXPublicAdapter):
     def _get_okx_env(self):
         from scripts.okx_runtime import OKXEnvironment, current_environment
         if self.api_key and self.secret_key and self.passphrase:
-            is_sim = (str(self.environment).strip().lower() == "demo")
+            # 审计 D4：OKXEnvironment 是 frozen dataclass——simulated/configured
+            # 是派生 property，旧写法当构造参数传=一调用即 TypeError（接线即炸）。
             return OKXEnvironment(
                 mode=str(self.environment).strip().lower(),
                 api_key=self.api_key,
                 secret_key=self.secret_key,
                 passphrase=self.passphrase,
-                simulated=is_sim,
-                configured=True,
             )
         return current_environment()
 
@@ -210,7 +209,8 @@ class OKXAdapter(OKXPublicAdapter):
         from scripts import okx_rest
         env = self._get_okx_env()
         inst = self.native_symbol(symbol) if symbol else None
-        raw_orders = okx_rest.orders_pending(inst_id=inst, env=env)
+        # 审计 D4：真实 API 名是 pending_orders（orders_pending 不存在，AttributeError）
+        raw_orders = okx_rest.pending_orders(inst_id=inst, env=env)
         out = []
         for o in (raw_orders or []):
             inst_id = o.get("instId", "")
@@ -263,7 +263,8 @@ class OKXAdapter(OKXPublicAdapter):
         from scripts import okx_rest
         env = self._get_okx_env()
         inst = self.native_symbol(symbol) if symbol else None
-        return okx_rest.list_algo_orders(inst_id=inst, env=env)
+        # 审计 D4：真实 API 名是 pending_algo_orders（list_algo_orders 不存在）
+        return okx_rest.pending_algo_orders(inst_id=inst, env=env)
 
     def fast_close_position(self, symbol: str) -> Dict[str, Any]:
         from scripts import okx_rest
