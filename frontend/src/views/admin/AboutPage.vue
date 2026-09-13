@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import DataTable from '../../components/admin/DataTable.vue'
 import { useI18n } from '../../composables/useI18n'
 const { t } = useI18n()
 import { useApi } from '../../composables/useApi'
@@ -102,16 +103,20 @@ const { run: executeUpdate, busy: updateRunning } = useAsyncAction(async () => {
             <h2 class="text-sm font-bold" style="color: var(--ink-1);">{{ t('admin.about.componentsTitle') }}</h2>
             <span class="text-[11px]" style="color: var(--ink-3);">{{ t('admin.about.componentsSub') }}</span>
           </div>
-          <div class="table-scroll-container">
-            <table class="w-full text-left whitespace-nowrap">
-              <tbody>
-                <tr v-for="c in about.components" :key="c.name" class="border-b last:border-b-0 hover:bg-[var(--surface-3)] transition-colors" style="border-color: var(--line-1);">
-                  <td class="py-2" style="color: var(--ink-2);">{{ c.name }}</td>
-                  <td class="py-2 font-bold num" style="color: var(--ink-1);">{{ c.version }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            flat
+            class="table-scroll-container"
+            :rows="about.components || []"
+            :row-key="(c: any) => c.name"
+            :empty-text="t('common.noRecords')"
+          >
+            <!-- 原表没有表头（纯 name/version 两列清单），故不传 #head；
+                 DataTable 的空表头行无单元格、不可见。 -->
+            <template #row="{ row: c }">
+              <td class="py-2" style="color: var(--ink-2);">{{ c.name }}</td>
+              <td class="py-2 font-bold num" style="color: var(--ink-1);">{{ c.version }}</td>
+            </template>
+          </DataTable>
         </div>
       </div>
 

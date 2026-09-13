@@ -2,6 +2,7 @@
 import { fmtDateTime } from '../../utils/format';
 import { useI18n } from '../../composables/useI18n'
 const { t } = useI18n()
+import DataTable from '../../components/admin/DataTable.vue'
 import { useResource } from '../../composables/useResource'
 import { Package, Cpu, KeyRound, RefreshCw } from 'lucide-vue-next'
 
@@ -40,30 +41,32 @@ function statusColor(s: string) {
             <span>{{ t('admin.agents.refresh') }}</span>
           </button>
         </div>
-        <div class="table-scroll-container">
-          <table class="w-full text-left text-xs whitespace-nowrap">
-            <thead>
-              <tr class="border-b text-[11px] uppercase tracking-wider font-bold" style="border-color: var(--line-1); background-color: var(--surface-1); color: var(--ink-2);">
-                <th class="py-2.5 px-4">{{ t('admin.agents.colUnit') }}</th>
-                <th class="py-2.5 px-3">{{ t('admin.agents.colRole') }}</th>
-                <th class="py-2.5 px-3">{{ t('admin.agents.colHealth') }}</th>
-                <th class="py-2.5 px-3">{{ t('admin.agents.colLastRun') }}</th>
-                <th class="py-2.5 px-3">{{ t('admin.agents.colResult') }}</th>
-                <th class="py-2.5 px-4 text-right">{{ t('admin.agents.colOutputAge') }}</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="a in data.agents" :key="a.id" class="border-b last:border-b-0 hover:bg-[var(--surface-3)] transition-colors" style="border-color: var(--line-1);">
-                <td class="py-2.5 px-4 font-bold" style="color: var(--ink-1);">{{ a.name }}</td>
-                <td class="py-2.5 px-3" style="color: var(--ink-2);">{{ a.role }}</td>
-                <td class="py-2.5 px-3 font-bold" :class="statusColor(a.health)">{{ a.health }}</td>
-                <td class="py-2.5 px-3 num" style="color: var(--ink-3);">{{ fmtDateTime(a.last_run_at || t('admin.agents.notScheduled')) }}</td>
-                <td class="py-2.5 px-3 font-bold" :class="statusColor(a.last_run_status)">{{ a.last_run_status }}</td>
-                <td class="py-2.5 px-4 text-right" style="color: var(--ink-2);">{{ a.output_age_seconds != null ? t('admin.agents.minutesAgo', undefined, { n: Math.round(a.output_age_seconds / 60) }) : (a.output ? t('admin.agents.coldStart') : t('admin.agents.noOutput')) }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          flat
+          class="table-scroll-container"
+          :rows="data.agents || []"
+          :row-key="(a: any) => a.id"
+          :empty-text="t('common.noRecords')"
+        >
+          <template #head>
+            <tr class="border-b text-[11px] uppercase tracking-wider font-bold" style="border-color: var(--line-1); background-color: var(--surface-1); color: var(--ink-2);">
+                            <th class="py-2.5 px-4">{{ t('admin.agents.colUnit') }}</th>
+                            <th class="py-2.5 px-3">{{ t('admin.agents.colRole') }}</th>
+                            <th class="py-2.5 px-3">{{ t('admin.agents.colHealth') }}</th>
+                            <th class="py-2.5 px-3">{{ t('admin.agents.colLastRun') }}</th>
+                            <th class="py-2.5 px-3">{{ t('admin.agents.colResult') }}</th>
+                            <th class="py-2.5 px-4 text-right">{{ t('admin.agents.colOutputAge') }}</th>
+                          </tr>
+          </template>
+          <template #row="{ row: a }">
+            <td class="py-2.5 px-4 font-bold" style="color: var(--ink-1);">{{ a.name }}</td>
+            <td class="py-2.5 px-3" style="color: var(--ink-2);">{{ a.role }}</td>
+            <td class="py-2.5 px-3 font-bold" :class="statusColor(a.health)">{{ a.health }}</td>
+            <td class="py-2.5 px-3 num" style="color: var(--ink-3);">{{ fmtDateTime(a.last_run_at || t('admin.agents.notScheduled')) }}</td>
+            <td class="py-2.5 px-3 font-bold" :class="statusColor(a.last_run_status)">{{ a.last_run_status }}</td>
+            <td class="py-2.5 px-4 text-right" style="color: var(--ink-2);">{{ a.output_age_seconds != null ? t('admin.agents.minutesAgo', undefined, { n: Math.round(a.output_age_seconds / 60) }) : (a.output ? t('admin.agents.coldStart') : t('admin.agents.noOutput')) }}</td>
+          </template>
+        </DataTable>
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -76,28 +79,31 @@ function statusColor(s: string) {
             <div class="rounded-lg border p-2" style="background-color: var(--surface-1); border-color: var(--line-1);"><div class="text-[11px]" style="color: var(--ink-3);">{{ t('admin.agents.successRate') }}</div><div class="text-sm font-bold num mt-0.5" :class="(data.model_stats?.total_calls ?? 0) > 0 && (data.model_stats?.successful_calls ?? 0) < (data.model_stats?.total_calls ?? 0) ? 'text-amber-500' : 'text-emerald-500'">{{ (data.model_stats?.total_calls ?? 0) > 0 ? Math.round(100 * (data.model_stats?.successful_calls ?? 0) / data.model_stats.total_calls) + '%' : '--' }}</div></div>
             <div class="rounded-lg border p-2" style="background-color: var(--surface-1); border-color: var(--line-1);"><div class="text-[11px]" style="color: var(--ink-3);">{{ t('admin.agents.avgLatency') }}</div><div class="text-sm font-bold num mt-0.5" style="color: var(--ink-1);">{{ data.model_stats?.avg_duration_ms ? Math.round(data.model_stats.avg_duration_ms) + 'ms' : '--' }}</div></div>
           </div>
-          <div class="table-scroll-container max-h-60 overflow-y-auto rounded-lg border" style="border-color: var(--line-1);">
-            <table class="w-full text-left text-xs whitespace-nowrap">
-              <thead class="sticky top-0 z-10">
-                <tr class="border-b text-[11px] uppercase tracking-wider font-bold" style="border-color: var(--line-1); background-color: var(--surface-1); color: var(--ink-2);">
-                  <th class="py-2 px-3">{{ t('admin.agents.colCaller') }}</th>
-                  <th class="py-2 px-2">{{ t('admin.agents.colModel') }}</th>
-                  <th class="py-2 px-2">{{ t('admin.agents.colStatus') }}</th>
-                  <th class="py-2 px-2">Tokens</th>
-                  <th class="py-2 px-3 text-right">{{ t('admin.agents.colDuration') }}</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="c in (data.model_calls || []).slice(0, 30)" :key="c.id" class="border-b last:border-b-0 hover:bg-[var(--surface-3)] transition-colors" style="border-color: var(--line-1);">
-                  <td class="py-1.5 px-3" style="color: var(--ink-2);">{{ c.caller || '--' }}</td>
-                  <td class="py-1.5 px-2 num" style="color: var(--ink-3);">{{ c.model || '--' }}</td>
-                  <td class="py-1.5 px-2 font-bold" :class="statusColor(c.status)">{{ c.status }}</td>
-                  <td class="py-1.5 px-2 num" style="color: var(--ink-2);">{{ c.total_tokens ?? '--' }}</td>
-                  <td class="py-1.5 px-3 text-right num" style="color: var(--ink-2);">{{ c.duration_ms ? Math.round(c.duration_ms) + 'ms' : '--' }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            flat
+            class="table-scroll-container max-h-60 overflow-y-auto rounded-lg border"
+            style="border-color: var(--line-1);"
+            :rows="(data.model_calls || []).slice(0, 30) || []"
+            :row-key="(c: any) => c.id"
+            :empty-text="t('common.noRecords')"
+          >
+            <template #head>
+              <tr class="border-b text-[11px] uppercase tracking-wider font-bold" style="border-color: var(--line-1); background-color: var(--surface-1); color: var(--ink-2);">
+                                <th class="py-2 px-3">{{ t('admin.agents.colCaller') }}</th>
+                                <th class="py-2 px-2">{{ t('admin.agents.colModel') }}</th>
+                                <th class="py-2 px-2">{{ t('admin.agents.colStatus') }}</th>
+                                <th class="py-2 px-2">Tokens</th>
+                                <th class="py-2 px-3 text-right">{{ t('admin.agents.colDuration') }}</th>
+                              </tr>
+            </template>
+            <template #row="{ row: c }">
+              <td class="py-1.5 px-3" style="color: var(--ink-2);">{{ c.caller || '--' }}</td>
+              <td class="py-1.5 px-2 num" style="color: var(--ink-3);">{{ c.model || '--' }}</td>
+              <td class="py-1.5 px-2 font-bold" :class="statusColor(c.status)">{{ c.status }}</td>
+              <td class="py-1.5 px-2 num" style="color: var(--ink-2);">{{ c.total_tokens ?? '--' }}</td>
+              <td class="py-1.5 px-3 text-right num" style="color: var(--ink-2);">{{ c.duration_ms ? Math.round(c.duration_ms) + 'ms' : '--' }}</td>
+            </template>
+          </DataTable>
         </div>
 
         <!-- Secret Store -->

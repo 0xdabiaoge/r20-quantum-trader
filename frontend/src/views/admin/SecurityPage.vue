@@ -6,6 +6,7 @@ const { ask } = useConfirm()
 import { ref, computed, onMounted } from 'vue'
 import PageHeader from '../../components/admin/PageHeader.vue'
 import SettingsSection from '../../components/admin/SettingsSection.vue'
+import DataTable from '../../components/admin/DataTable.vue'
 import { useI18n } from '../../composables/useI18n'
 import { useApi } from '../../composables/useApi'
 import { useAuthStore } from '../../stores/auth'
@@ -739,45 +740,48 @@ onMounted(() => { loadAll(); loadMx() })
             <input v-model="newInstId" :placeholder="t('admin.security.instPlaceholder')" class="input w-44" @keyup.enter="addInstrument" />
             <button class="btn btn-primary" @click="addInstrument"><Layers class="h-3.5 w-3.5" /> {{ t('admin.security.addInstrument') }}</button>
           </template>
-          <div class="overflow-x-auto -mx-4 px-4">
-            <table v-if="instruments.length" class="w-full text-left text-xs whitespace-nowrap">
-              <thead>
-                <tr class="border-b text-[11px] uppercase tracking-wider font-bold" style="border-color: var(--line-1); color: var(--ink-2);">
-                  <th class="py-2 pl-0 pr-4">{{ t('admin.security.colInstId') }}</th>
-                  <th class="py-2 px-3">{{ t('admin.security.colName') }}</th>
-                  <th class="py-2 px-3">{{ t('admin.security.colType') }}</th>
-                  <th class="py-2 px-3">{{ t('admin.security.colRisk') }}</th>
-                  <th class="py-2 px-4 text-right">{{ t('admin.security.colAction') }}</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="item in instruments" :key="item.instId" class="border-b last:border-b-0 transition-colors hover:bg-[var(--surface-3)]" style="border-color: var(--line-1);">
-                  <td class="py-2 pl-0 pr-4 font-bold num" style="color: var(--ink-1);">{{ item.instId }}</td>
-                  <td class="py-2 px-3" style="color: var(--ink-2);">{{ item.name }}</td>
-                  <td class="py-2 px-3 num" style="color: var(--ink-3);">{{ item.ctType || 'SWAP' }}</td>
-                  <td class="py-2 px-3">
-                    <span v-if="item.protected" class="px-1.5 py-0.5 rounded-[3px] text-[11px] font-bold border" style="background-color: var(--warn-bg); border-color: var(--warn-line); color: var(--warn);">{{ t('admin.security.protectedBadge') }}</span>
-                    <span v-else-if="item.held_live" class="px-1.5 py-0.5 rounded-[3px] text-[11px] font-bold border" style="background-color: var(--accent-bg); border-color: var(--accent-line); color: var(--accent);">{{ t('admin.security.holdingLiveBadge', undefined, { venues: (item.held_venues || []).join('/') || '—' }) }}</span>
-                    <span v-else-if="item.has_tracker" class="px-1.5 py-0.5 rounded-[3px] text-[11px] font-bold border" style="background-color: var(--accent-bg); border-color: var(--accent-line); color: var(--accent);">{{ t('admin.security.holdingBadge') }}</span>
-                    <span v-else-if="item.holdings_unknown" class="px-1.5 py-0.5 rounded-[3px] text-[11px] font-bold border" style="background-color: var(--surface-3); border-color: var(--warn-line); color: var(--warn);" :title="String(item.holdings_unknown)">{{ t('admin.security.holdingUnknownBadge') }}</span>
-                    <span v-else class="text-[11px] px-1.5 py-0.5 rounded-[3px] border" style="background-color: var(--surface-3); border-color: var(--line-1); color: var(--ink-3);">{{ t('admin.security.removableBadge') }}</span>
-                  </td>
-                  <td class="py-2 px-4 text-right">
-                    <button
-                      :disabled="item.protected || item.has_tracker || item.held_live || item.holdings_unknown"
-                      class="p-1 rounded cursor-pointer transition-opacity hover:opacity-80 disabled:opacity-20"
-                      style="color: var(--down);"
-                      :title="item.held_live ? t('admin.security.removeBlockedHoldings', undefined, { venues: (item.held_venues || []).join('/') || '—' }) : item.holdings_unknown ? t('admin.security.removeBlockedUnknown') : t('admin.security.removeTitle')"
-                      @click="removeInstrument(item)"
-                    >
-                      <Trash2 class="h-3.5 w-3.5" />
-                    </button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+          <DataTable
+            flat
+            v-if="instruments.length"
+            class="overflow-x-auto -mx-4 px-4"
+            :rows="instruments || []"
+            :row-key="(item: any) => item.instId"
+            :empty-text="t('common.noRecords')"
+          >
+            <template #head>
+              <tr class="border-b text-[11px] uppercase tracking-wider font-bold" style="border-color: var(--line-1); color: var(--ink-2);">
+                                <th class="py-2 pl-0 pr-4">{{ t('admin.security.colInstId') }}</th>
+                                <th class="py-2 px-3">{{ t('admin.security.colName') }}</th>
+                                <th class="py-2 px-3">{{ t('admin.security.colType') }}</th>
+                                <th class="py-2 px-3">{{ t('admin.security.colRisk') }}</th>
+                                <th class="py-2 px-4 text-right">{{ t('admin.security.colAction') }}</th>
+                              </tr>
+            </template>
+            <template #row="{ row: item }">
+              <td class="py-2 pl-0 pr-4 font-bold num" style="color: var(--ink-1);">{{ item.instId }}</td>
+              <td class="py-2 px-3" style="color: var(--ink-2);">{{ item.name }}</td>
+              <td class="py-2 px-3 num" style="color: var(--ink-3);">{{ item.ctType || 'SWAP' }}</td>
+              <td class="py-2 px-3">
+                <span v-if="item.protected" class="px-1.5 py-0.5 rounded-[3px] text-[11px] font-bold border" style="background-color: var(--warn-bg); border-color: var(--warn-line); color: var(--warn);">{{ t('admin.security.protectedBadge') }}</span>
+                <span v-else-if="item.held_live" class="px-1.5 py-0.5 rounded-[3px] text-[11px] font-bold border" style="background-color: var(--accent-bg); border-color: var(--accent-line); color: var(--accent);">{{ t('admin.security.holdingLiveBadge', undefined, { venues: (item.held_venues || []).join('/') || '—' }) }}</span>
+                <span v-else-if="item.has_tracker" class="px-1.5 py-0.5 rounded-[3px] text-[11px] font-bold border" style="background-color: var(--accent-bg); border-color: var(--accent-line); color: var(--accent);">{{ t('admin.security.holdingBadge') }}</span>
+                <span v-else-if="item.holdings_unknown" class="px-1.5 py-0.5 rounded-[3px] text-[11px] font-bold border" style="background-color: var(--surface-3); border-color: var(--warn-line); color: var(--warn);" :title="String(item.holdings_unknown)">{{ t('admin.security.holdingUnknownBadge') }}</span>
+                <span v-else class="text-[11px] px-1.5 py-0.5 rounded-[3px] border" style="background-color: var(--surface-3); border-color: var(--line-1); color: var(--ink-3);">{{ t('admin.security.removableBadge') }}</span>
+              </td>
+              <td class="py-2 px-4 text-right">
+                <button
+                  :disabled="item.protected || item.has_tracker || item.held_live || item.holdings_unknown"
+                  class="p-1 rounded cursor-pointer transition-opacity hover:opacity-80 disabled:opacity-20"
+                  style="color: var(--down);"
+                  :title="item.held_live ? t('admin.security.removeBlockedHoldings', undefined, { venues: (item.held_venues || []).join('/') || '—' }) : item.holdings_unknown ? t('admin.security.removeBlockedUnknown') : t('admin.security.removeTitle')"
+                  @click="removeInstrument(item)"
+                >
+                  <Trash2 class="h-3.5 w-3.5" />
+                </button>
+              </td>
+            </template>
+          </DataTable>
             <div v-else class="py-8 text-center text-xs" style="color: var(--ink-3);">{{ t('admin.security.poolEmpty') }}</div>
-          </div>
           <p class="pt-3 text-[11px]" style="color: var(--ink-3);">{{ t('admin.security.poolFooter', undefined, { max: instLimits.maximum }) }}</p>
         </SettingsSection>
       </div>
@@ -805,40 +809,43 @@ onMounted(() => { loadAll(); loadMx() })
             {{ t('admin.security.envWord') }} <b :style="{ color: snapshot.environment === 'live' ? 'var(--down)' : 'var(--up)' }">{{ envBadge(snapshot.environment) }}</b>
             · {{ t('admin.security.positionsWord') }} {{ snapshot.positions?.length ?? 0 }} · {{ t('admin.security.ordersWord') }} {{ snapshot.orders?.length ?? 0 }} · {{ fmtDateTime(snapshot.captured_at_ms) }}
           </div>
-          <div class="overflow-x-auto -mx-4 px-4">
-            <table v-if="snapshot?.positions?.length" class="w-full text-left text-xs whitespace-nowrap">
-              <thead>
-                <tr class="border-b text-[11px] uppercase tracking-wider font-bold" style="border-color: var(--line-1); color: var(--ink-2);">
-                  <th class="py-2 pl-0 pr-4">{{ t('admin.security.colPosition') }}</th>
-                  <th class="py-2 px-3">{{ t('admin.security.colContracts') }}</th>
-                  <th class="py-2 px-3">{{ t('admin.security.colMode') }}</th>
-                  <th class="py-2 px-3">{{ t('admin.security.colUpl') }}</th>
-                  <th class="py-2 px-4 text-right">{{ t('admin.security.colAction') }}</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="p in snapshot.positions" :key="p.instId + p.posSide" class="border-b last:border-b-0 transition-colors hover:bg-[var(--surface-3)]" style="border-color: var(--line-1);">
-                  <td class="py-2 pl-0 pr-4">
-                    <b class="num" style="color: var(--ink-1);">{{ p.instId }}</b>
-                    <span v-if="p.venue" class="ml-1 px-1 py-0.5 rounded text-[10px] font-bold uppercase border" :style="p.venue === 'binance' ? { color: '#f3ba2f', borderColor: '#f3ba2f33' } : p.venue === 'gate' ? { color: '#00be98', borderColor: '#00be9833' } : { color: '#3880ff', borderColor: '#3880ff33' }">
-                      {{ p.venue }}
-                    </span>
-                    <span class="ml-1.5 px-1.5 py-0.5 rounded text-[11px] font-bold border" :style="p.posSide === 'long' ? { backgroundColor: 'var(--up-bg)', borderColor: 'var(--up-line)', color: 'var(--up)' } : { backgroundColor: 'var(--down-bg)', borderColor: 'var(--down-line)', color: 'var(--down)' }">
-                      {{ (p.posSide || 'net').toUpperCase() }}
-                    </span>
-                  </td>
-                  <td class="py-2 px-3 num" style="color: var(--ink-2);">{{ p.pos || '0' }}</td>
-                  <td class="py-2 px-3 text-[11px]" style="color: var(--ink-3);">{{ p.mgnMode || '--' }}</td>
-                  <td class="py-2 px-3 font-bold num" :style="{ color: Number(p.upl || 0) >= 0 ? 'var(--up)' : 'var(--down)' }">{{ Number(p.upl || 0).toFixed(4) }}</td>
-                  <td class="py-2 px-4 text-right">
-                    <button class="px-2.5 py-1 rounded-md text-[11px] font-bold border cursor-pointer transition-all" style="background-color: var(--down-bg); border-color: var(--down-line); color: var(--down);" @click="openClose(p)">{{ t('admin.security.quickClose') }}</button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+          <DataTable
+            flat
+            v-if="snapshot?.positions?.length"
+            class="overflow-x-auto -mx-4 px-4"
+            :rows="snapshot.positions || []"
+            :row-key="(p: any) => p.instId + p.posSide"
+            :empty-text="t('common.noRecords')"
+          >
+            <template #head>
+              <tr class="border-b text-[11px] uppercase tracking-wider font-bold" style="border-color: var(--line-1); color: var(--ink-2);">
+                                <th class="py-2 pl-0 pr-4">{{ t('admin.security.colPosition') }}</th>
+                                <th class="py-2 px-3">{{ t('admin.security.colContracts') }}</th>
+                                <th class="py-2 px-3">{{ t('admin.security.colMode') }}</th>
+                                <th class="py-2 px-3">{{ t('admin.security.colUpl') }}</th>
+                                <th class="py-2 px-4 text-right">{{ t('admin.security.colAction') }}</th>
+                              </tr>
+            </template>
+            <template #row="{ row: p }">
+              <td class="py-2 pl-0 pr-4">
+                <b class="num" style="color: var(--ink-1);">{{ p.instId }}</b>
+                <span v-if="p.venue" class="ml-1 px-1 py-0.5 rounded text-[10px] font-bold uppercase border" :style="p.venue === 'binance' ? { color: '#f3ba2f', borderColor: '#f3ba2f33' } : p.venue === 'gate' ? { color: '#00be98', borderColor: '#00be9833' } : { color: '#3880ff', borderColor: '#3880ff33' }">
+                  {{ p.venue }}
+                </span>
+                <span class="ml-1.5 px-1.5 py-0.5 rounded text-[11px] font-bold border" :style="p.posSide === 'long' ? { backgroundColor: 'var(--up-bg)', borderColor: 'var(--up-line)', color: 'var(--up)' } : { backgroundColor: 'var(--down-bg)', borderColor: 'var(--down-line)', color: 'var(--down)' }">
+                  {{ (p.posSide || 'net').toUpperCase() }}
+                </span>
+              </td>
+              <td class="py-2 px-3 num" style="color: var(--ink-2);">{{ p.pos || '0' }}</td>
+              <td class="py-2 px-3 text-[11px]" style="color: var(--ink-3);">{{ p.mgnMode || '--' }}</td>
+              <td class="py-2 px-3 font-bold num" :style="{ color: Number(p.upl || 0) >= 0 ? 'var(--up)' : 'var(--down)' }">{{ Number(p.upl || 0).toFixed(4) }}</td>
+              <td class="py-2 px-4 text-right">
+                <button class="px-2.5 py-1 rounded-md text-[11px] font-bold border cursor-pointer transition-all" style="background-color: var(--down-bg); border-color: var(--down-line); color: var(--down);" @click="openClose(p)">{{ t('admin.security.quickClose') }}</button>
+              </td>
+            </template>
+          </DataTable>
             <div v-else-if="snapshot" class="py-8 text-center text-xs" style="color: var(--up);">{{ t('admin.security.noPositions') }}</div>
             <div v-else-if="!snapshotState" class="py-8 text-center text-xs" style="color: var(--ink-3);">{{ t('admin.security.clickRefreshHint') }}</div>
-          </div>
         </SettingsSection>
       </div>
     </template>

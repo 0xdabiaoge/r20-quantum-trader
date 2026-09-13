@@ -6,6 +6,7 @@ import { computed } from 'vue'
 import { useI18n } from '../../composables/useI18n'
 const { t } = useI18n()
 import { useApi } from '../../composables/useApi'
+import DataTable from '../../components/admin/DataTable.vue'
 import { useResource } from '../../composables/useResource'
 import { Zap, RefreshCw, RotateCcw, Server, Clock, AlertTriangle } from 'lucide-vue-next'
 
@@ -88,30 +89,32 @@ function statusColor(s: string) {
         <p class="text-[11px] mt-0.5" style="color: var(--ink-2);"> {{ t('admin.gateway.scheduler.subtitle') }} </p>
           <span class="text-[11px]" style="color: var(--ink-3);">{{ t('admin.gateway.scheduler.managedJobs', undefined, { n: gw.scheduler.jobs.length }) }}</span>
         </div>
-        <div class="table-scroll-container">
-          <table class="w-full text-left text-xs whitespace-nowrap">
-            <thead>
-              <tr class="border-b text-[11px] uppercase tracking-wider font-bold" style="border-color: var(--line-1); background-color: var(--surface-1); color: var(--ink-2);">
-                <th class="py-2.5 px-4">{{ t('admin.gateway.scheduler.colJob') }}</th>
-                <th class="py-2.5 px-3">{{ t('admin.gateway.scheduler.colScript') }}</th>
-                <th class="py-2.5 px-3">{{ t('admin.gateway.scheduler.colTrigger') }}</th>
-                <th class="py-2.5 px-3">{{ t('admin.gateway.scheduler.colLastRun') }}</th>
-                <th class="py-2.5 px-4 text-right">{{ t('admin.gateway.scheduler.colStatus') }}</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="j in gw.scheduler.jobs" :key="j.name" class="border-b last:border-b-0 hover:bg-[var(--surface-3)] transition-colors" style="border-color: var(--line-1);">
-                <td class="py-2.5 px-4 font-bold" style="color: var(--ink-1);">{{ j.name }}</td>
-                <td class="py-2.5 px-3 text-[11px]" style="color: var(--ink-2);">{{ j.script }}</td>
-                <td class="py-2.5 px-3 font-medium" style="color: var(--ink-1);">{{ j.schedule }}</td>
-                <td class="py-2.5 px-3 num" style="color: var(--ink-3);">{{ j.last_scheduled_at ? fmtJobTime(j.last_scheduled_at) : t('admin.gateway.scheduler.notScheduled') }}</td>
-                <td class="py-2.5 px-4 text-right font-bold" :class="j.overdue ? 'text-rose-400' : 'text-emerald-400'">
-                  {{ j.overdue ? t('admin.gateway.scheduler.overdue') : t('admin.gateway.scheduler.normal') }}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          flat
+          class="table-scroll-container"
+          :rows="gw.scheduler.jobs || []"
+          :row-key="(j: any) => j.name"
+          :empty-text="t('common.noRecords')"
+        >
+          <template #head>
+            <tr class="border-b text-[11px] uppercase tracking-wider font-bold" style="border-color: var(--line-1); background-color: var(--surface-1); color: var(--ink-2);">
+                            <th class="py-2.5 px-4">{{ t('admin.gateway.scheduler.colJob') }}</th>
+                            <th class="py-2.5 px-3">{{ t('admin.gateway.scheduler.colScript') }}</th>
+                            <th class="py-2.5 px-3">{{ t('admin.gateway.scheduler.colTrigger') }}</th>
+                            <th class="py-2.5 px-3">{{ t('admin.gateway.scheduler.colLastRun') }}</th>
+                            <th class="py-2.5 px-4 text-right">{{ t('admin.gateway.scheduler.colStatus') }}</th>
+                          </tr>
+          </template>
+          <template #row="{ row: j }">
+            <td class="py-2.5 px-4 font-bold" style="color: var(--ink-1);">{{ j.name }}</td>
+            <td class="py-2.5 px-3 text-[11px]" style="color: var(--ink-2);">{{ j.script }}</td>
+            <td class="py-2.5 px-3 font-medium" style="color: var(--ink-1);">{{ j.schedule }}</td>
+            <td class="py-2.5 px-3 num" style="color: var(--ink-3);">{{ j.last_scheduled_at ? fmtJobTime(j.last_scheduled_at) : t('admin.gateway.scheduler.notScheduled') }}</td>
+            <td class="py-2.5 px-4 text-right font-bold" :class="j.overdue ? 'text-rose-400' : 'text-emerald-400'">
+              {{ j.overdue ? t('admin.gateway.scheduler.overdue') : t('admin.gateway.scheduler.normal') }}
+            </td>
+          </template>
+        </DataTable>
       </div>
 
       <!-- Deliveries -->
@@ -128,40 +131,42 @@ function statusColor(s: string) {
             <span>{{ t('admin.gateway.deliveries.refresh') }}</span>
           </button>
         </div>
-        <div class="table-scroll-container max-h-[420px] overflow-y-auto">
-          <table class="w-full text-left text-xs whitespace-nowrap">
-            <thead class="sticky top-0 z-10">
-              <tr class="border-b text-[11px] uppercase tracking-wider font-bold" style="border-color: var(--line-1); background-color: var(--surface-1); color: var(--ink-2);">
-                <th class="py-2.5 px-4">#</th>
-                <th class="py-2.5 px-3">{{ t('admin.gateway.deliveries.colEventType') }}</th>
-                <th class="py-2.5 px-3">{{ t('admin.gateway.deliveries.colChannel') }}</th>
-                <th class="py-2.5 px-3">{{ t('admin.gateway.deliveries.colStatus') }}</th>
-                <th class="py-2.5 px-3">{{ t('admin.gateway.deliveries.colAttempts') }}</th>
-                <th class="py-2.5 px-3">{{ t('admin.gateway.deliveries.colTime') }}</th>
-                <th class="py-2.5 px-4 text-right">{{ t('admin.gateway.deliveries.colActions') }}</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="d in gw.deliveries" :key="d.id" class="border-b last:border-b-0 hover:bg-[var(--surface-3)] transition-colors" style="border-color: var(--line-1);">
-                <td class="py-2.5 px-4 num" style="color: var(--ink-3);">{{ d.id }}</td>
-                <td class="py-2.5 px-3 font-bold" style="color: var(--ink-1);">{{ d.event_type || d.topic || '--' }}</td>
-                <td class="py-2.5 px-3" style="color: var(--ink-2);">{{ d.channel || '--' }}</td>
-                <td class="py-2.5 px-3 font-bold" :class="statusColor(d.status)">{{ d.status }}</td>
-                <td class="py-2.5 px-3 num" style="color: var(--ink-2);">{{ d.attempts ?? d.attempt_count ?? 1 }}</td>
-                <td class="py-2.5 px-3 num" style="color: var(--ink-3);">{{ fmtDateTime(d.created_at || d.time) }}</td>
-                <td class="py-2.5 px-4 text-right">
-                  <button v-if="d.status === 'dead'" @click="replayDelivery(d.id)" class="flex items-center space-x-1 ml-auto px-2 py-1 rounded-md border text-[11px] cursor-pointer transition-colors" style="background-color: var(--warn-bg); border-color: var(--warn-line); color: var(--warn);">
-                    <RotateCcw class="w-3 h-3" /><span>{{ t('admin.gateway.deliveries.replay') }}</span>
-                  </button>
-                  <span v-else class="text-[11px]" style="color: var(--ink-3);">--</span>
-                </td>
-              </tr>
-              <tr v-if="!gw.deliveries || gw.deliveries.length === 0">
-                <td colspan="7" class="py-8 text-center" style="color: var(--ink-3);">{{ t('admin.gateway.deliveries.empty') }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          flat
+          class="table-scroll-container max-h-[420px] overflow-y-auto"
+          :rows="gw.deliveries || []"
+          :row-key="(d: any) => d.id"
+          :empty-text="t('common.noRecords')"
+        >
+          <template #head>
+            <tr class="border-b text-[11px] uppercase tracking-wider font-bold" style="border-color: var(--line-1); background-color: var(--surface-1); color: var(--ink-2);">
+                            <th class="py-2.5 px-4">#</th>
+                            <th class="py-2.5 px-3">{{ t('admin.gateway.deliveries.colEventType') }}</th>
+                            <th class="py-2.5 px-3">{{ t('admin.gateway.deliveries.colChannel') }}</th>
+                            <th class="py-2.5 px-3">{{ t('admin.gateway.deliveries.colStatus') }}</th>
+                            <th class="py-2.5 px-3">{{ t('admin.gateway.deliveries.colAttempts') }}</th>
+                            <th class="py-2.5 px-3">{{ t('admin.gateway.deliveries.colTime') }}</th>
+                            <th class="py-2.5 px-4 text-right">{{ t('admin.gateway.deliveries.colActions') }}</th>
+                          </tr>
+          </template>
+          <template #row="{ row: d }">
+            <td class="py-2.5 px-4 num" style="color: var(--ink-3);">{{ d.id }}</td>
+            <td class="py-2.5 px-3 font-bold" style="color: var(--ink-1);">{{ d.event_type || d.topic || '--' }}</td>
+            <td class="py-2.5 px-3" style="color: var(--ink-2);">{{ d.channel || '--' }}</td>
+            <td class="py-2.5 px-3 font-bold" :class="statusColor(d.status)">{{ d.status }}</td>
+            <td class="py-2.5 px-3 num" style="color: var(--ink-2);">{{ d.attempts ?? d.attempt_count ?? 1 }}</td>
+            <td class="py-2.5 px-3 num" style="color: var(--ink-3);">{{ fmtDateTime(d.created_at || d.time) }}</td>
+            <td class="py-2.5 px-4 text-right">
+              <button v-if="d.status === 'dead'" @click="replayDelivery(d.id)" class="flex items-center space-x-1 ml-auto px-2 py-1 rounded-md border text-[11px] cursor-pointer transition-colors" style="background-color: var(--warn-bg); border-color: var(--warn-line); color: var(--warn);">
+                <RotateCcw class="w-3 h-3" /><span>{{ t('admin.gateway.deliveries.replay') }}</span>
+              </button>
+              <span v-else class="text-[11px]" style="color: var(--ink-3);">--</span>
+            </td>
+            tr>
+            r v-if="!gw.deliveries || gw.deliveries.length === 0">
+            <td colspan="7" class="py-8 text-center" style="color: var(--ink-3);">{{ t('admin.gateway.deliveries.empty') }}</td>
+          </template>
+        </DataTable>
       </div>
     </template>
   </div>

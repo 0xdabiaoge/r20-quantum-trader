@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useI18n } from '../../composables/useI18n'
 const { t } = useI18n()
+import DataTable from '../../components/admin/DataTable.vue'
 import { useResource } from '../../composables/useResource'
 import { Blocks, ShieldAlert, RefreshCw } from 'lucide-vue-next'
 
@@ -36,35 +37,38 @@ const { data, loading, error, reload: load } = useResource<any>('/api/v1/admin/p
           </button>
         </div>
 
-        <div class="table-scroll-container rounded-lg border my-2" style="border-color: var(--line-1);">
-          <table class="w-full text-left text-xs whitespace-nowrap">
-            <thead>
-              <tr class="border-b text-[11px] uppercase tracking-wider font-bold" style="border-color: var(--line-1); background-color: var(--surface-1); color: var(--ink-2);">
-                <th class="py-2.5 px-3">{{ t('admin.plugins.thPlugin') }}</th>
-                <th class="py-2.5 px-3">{{ t('admin.plugins.thType') }}</th>
-                <th class="py-2.5 px-3">{{ t('admin.plugins.thVersion') }}</th>
-                <th class="py-2.5 px-3">{{ t('admin.plugins.thPermissions') }}</th>
-                <th class="py-2.5 px-3">{{ t('admin.plugins.thEnableSwitch') }}</th>
-                <th class="py-2.5 px-3">{{ t('admin.plugins.thHealth') }}</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="p in data.plugins" :key="p.plugin_id" class="border-b last:border-b-0 hover:bg-[var(--surface-3)] transition-colors" style="border-color: var(--line-1);">
-                <td class="py-2.5 px-3 font-bold" style="color: var(--ink-1);">
-                  {{ p.name }}
-                  <div class="text-[11px] font-normal" style="color: var(--ink-3);">{{ p.plugin_id }}</div>
-                </td>
-                <td class="py-2.5 px-3" style="color: var(--ink-2);">{{ p.plugin_type }}</td>
-                <td class="py-2.5 px-3 num" style="color: var(--ink-3);">{{ p.version }}</td>
-                <td class="py-2.5 px-3 text-[11px]" style="color: var(--ink-2);">{{ (p.permissions || []).join(', ') }}</td>
-                <td class="py-2.5 px-3" style="color: var(--ink-3);">{{ p.enabled_key || t('admin.plugins.defaultEnabled') }}</td>
-                <td class="py-2.5 px-3 font-bold" :class="p.health === 'healthy' ? 'text-emerald-500' : 'text-amber-500'">
-                  {{ p.health === 'healthy' ? t('admin.plugins.healthNormal') : p.health === 'disabled' ? t('admin.plugins.healthDisabled') : p.health }}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          flat
+          class="table-scroll-container rounded-lg border my-2"
+          style="border-color: var(--line-1);"
+          :rows="data.plugins || []"
+          :row-key="(p: any) => p.plugin_id"
+          :empty-text="t('common.noRecords')"
+        >
+          <template #head>
+            <tr class="border-b text-[11px] uppercase tracking-wider font-bold" style="border-color: var(--line-1); background-color: var(--surface-1); color: var(--ink-2);">
+                            <th class="py-2.5 px-3">{{ t('admin.plugins.thPlugin') }}</th>
+                            <th class="py-2.5 px-3">{{ t('admin.plugins.thType') }}</th>
+                            <th class="py-2.5 px-3">{{ t('admin.plugins.thVersion') }}</th>
+                            <th class="py-2.5 px-3">{{ t('admin.plugins.thPermissions') }}</th>
+                            <th class="py-2.5 px-3">{{ t('admin.plugins.thEnableSwitch') }}</th>
+                            <th class="py-2.5 px-3">{{ t('admin.plugins.thHealth') }}</th>
+                          </tr>
+          </template>
+          <template #row="{ row: p }">
+            <td class="py-2.5 px-3 font-bold" style="color: var(--ink-1);">
+              {{ p.name }}
+              <div class="text-[11px] font-normal" style="color: var(--ink-3);">{{ p.plugin_id }}</div>
+            </td>
+            <td class="py-2.5 px-3" style="color: var(--ink-2);">{{ p.plugin_type }}</td>
+            <td class="py-2.5 px-3 num" style="color: var(--ink-3);">{{ p.version }}</td>
+            <td class="py-2.5 px-3 text-[11px]" style="color: var(--ink-2);">{{ (p.permissions || []).join(', ') }}</td>
+            <td class="py-2.5 px-3" style="color: var(--ink-3);">{{ p.enabled_key || t('admin.plugins.defaultEnabled') }}</td>
+            <td class="py-2.5 px-3 font-bold" :class="p.health === 'healthy' ? 'text-emerald-500' : 'text-amber-500'">
+              {{ p.health === 'healthy' ? t('admin.plugins.healthNormal') : p.health === 'disabled' ? t('admin.plugins.healthDisabled') : p.health }}
+            </td>
+          </template>
+        </DataTable>
       </div>
 
       <div class="rounded-xl border p-4 flex items-start gap-3 shadow-xs" style="background-color: var(--surface-2); border-color: var(--line-1);">

@@ -5,6 +5,7 @@ import { useConfirm } from '../../composables/useConfirm'
 const toast = useToast()
 const { ask } = useConfirm()
 import { ref, onMounted } from 'vue'
+import DataTable from '../../components/admin/DataTable.vue'
 import { useI18n } from '../../composables/useI18n'
 const { t } = useI18n()
 import { useApi } from '../../composables/useApi'
@@ -161,42 +162,45 @@ onMounted(load)
       </div>
 
       <div v-else class="table-scroll-container">
-        <table class="w-full text-left text-xs whitespace-nowrap">
-          <thead>
+        <DataTable
+          flat
+          :rows="users || []"
+          :row-key="(u: any) => u.id"
+          :empty-text="t('common.noRecords')"
+        >
+          <template #head>
             <tr class="border-b text-[11px] uppercase tracking-wider font-bold" style="border-color: var(--line-1); background-color: var(--surface-1); color: var(--ink-2);">
-              <th class="py-2.5 px-4">UID</th>
-              <th class="py-2.5 px-3">{{ t('admin.adminsys.users.colAccount') }}</th>
-              <th class="py-2.5 px-3">{{ t('admin.adminsys.users.colRole') }}</th>
-              <th class="py-2.5 px-3">{{ t('admin.adminsys.users.colStatus') }}</th>
-              <th class="py-2.5 px-3">{{ t('admin.adminsys.users.colLastLogin') }}</th>
-              <th class="py-2.5 px-4 text-right">{{ t('admin.adminsys.users.colActions') }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="u in users" :key="u.id" class="border-b last:border-b-0 hover:bg-[var(--surface-3)] transition-colors" style="border-color: var(--line-1);">
-              <td class="py-2.5 px-4 num" style="color: var(--ink-3);">{{ u.id }}</td>
-              <td class="py-2.5 px-3 font-bold" style="color: var(--ink-1);">
-                {{ u.username }}
-                <span v-if="u.id === currentUserId" class="px-1 py-0.2 rounded text-[11px] font-bold border ml-1" style="background-color: var(--accent-bg); border-color: var(--accent-line); color: var(--accent);">{{ t('admin.adminsys.users.currentSession') }}</span>
-              </td>
-              <td class="py-2.5 px-3">
-                <span class="px-2 py-0.5 rounded text-[11px] font-bold border" :style="u.role === 'superadmin' ? { backgroundColor: 'var(--accent-bg)', borderColor: 'var(--accent-line)', color: 'var(--accent)' } : { backgroundColor: 'var(--surface-3)', borderColor: 'var(--line-1)', color: 'var(--ink-2)' }">
-                  {{ u.role === 'superadmin' ? t('admin.adminsys.users.roleSuperadmin') : t('admin.adminsys.users.roleAdmin') }}
-                </span>
-              </td>
-              <td class="py-2.5 px-3 font-bold" :class="u.enabled ? (u.locked_until ? 'text-amber-500' : 'text-emerald-500') : 'text-rose-500'">
-                {{ !u.enabled ? t('admin.adminsys.users.statusDisabled') : (u.locked_until && Number(u.locked_until) * 1000 > Date.now() ? t('admin.adminsys.users.statusLocked') : t('admin.adminsys.users.statusActive')) }}
-              </td>
-              <td class="py-2.5 px-3 num" style="color: var(--ink-3);">{{ u.last_login_at ? fmtDateTime(u.last_login_at) : t('admin.adminsys.users.neverLoggedIn') }}</td>
-              <td class="py-2.5 px-4 text-right whitespace-nowrap space-x-1.5">
-                <button v-if="u.id !== currentUserId" @click="toggleEnabled(u)" class="px-2.5 py-1 rounded-md border text-[11px] transition-all cursor-pointer shadow-xs" style="background-color: var(--surface-1); border-color: var(--line-2); color: var(--ink-1);">
-                  <component :is="u.enabled ? Lock : Unlock" class="w-3 h-3 inline" /> {{ u.enabled ? t('admin.adminsys.users.disable') : t('admin.adminsys.users.enable') }}
-                </button>
-                <button v-if="u.locked_until" @click="unlockUser(u)" class="px-2.5 py-1 rounded-md border text-[11px] cursor-pointer transition-colors" style="background-color: var(--warn-bg); border-color: var(--warn-line); color: var(--warn);">{{ t('admin.adminsys.users.unlock') }}</button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+                          <th class="py-2.5 px-4">UID</th>
+                          <th class="py-2.5 px-3">{{ t('admin.adminsys.users.colAccount') }}</th>
+                          <th class="py-2.5 px-3">{{ t('admin.adminsys.users.colRole') }}</th>
+                          <th class="py-2.5 px-3">{{ t('admin.adminsys.users.colStatus') }}</th>
+                          <th class="py-2.5 px-3">{{ t('admin.adminsys.users.colLastLogin') }}</th>
+                          <th class="py-2.5 px-4 text-right">{{ t('admin.adminsys.users.colActions') }}</th>
+                        </tr>
+          </template>
+          <template #row="{ row: u }">
+            <td class="py-2.5 px-4 num" style="color: var(--ink-3);">{{ u.id }}</td>
+            <td class="py-2.5 px-3 font-bold" style="color: var(--ink-1);">
+              {{ u.username }}
+              <span v-if="u.id === currentUserId" class="px-1 py-0.2 rounded text-[11px] font-bold border ml-1" style="background-color: var(--accent-bg); border-color: var(--accent-line); color: var(--accent);">{{ t('admin.adminsys.users.currentSession') }}</span>
+            </td>
+            <td class="py-2.5 px-3">
+              <span class="px-2 py-0.5 rounded text-[11px] font-bold border" :style="u.role === 'superadmin' ? { backgroundColor: 'var(--accent-bg)', borderColor: 'var(--accent-line)', color: 'var(--accent)' } : { backgroundColor: 'var(--surface-3)', borderColor: 'var(--line-1)', color: 'var(--ink-2)' }">
+                {{ u.role === 'superadmin' ? t('admin.adminsys.users.roleSuperadmin') : t('admin.adminsys.users.roleAdmin') }}
+              </span>
+            </td>
+            <td class="py-2.5 px-3 font-bold" :class="u.enabled ? (u.locked_until ? 'text-amber-500' : 'text-emerald-500') : 'text-rose-500'">
+              {{ !u.enabled ? t('admin.adminsys.users.statusDisabled') : (u.locked_until && Number(u.locked_until) * 1000 > Date.now() ? t('admin.adminsys.users.statusLocked') : t('admin.adminsys.users.statusActive')) }}
+            </td>
+            <td class="py-2.5 px-3 num" style="color: var(--ink-3);">{{ u.last_login_at ? fmtDateTime(u.last_login_at) : t('admin.adminsys.users.neverLoggedIn') }}</td>
+            <td class="py-2.5 px-4 text-right whitespace-nowrap space-x-1.5">
+              <button v-if="u.id !== currentUserId" @click="toggleEnabled(u)" class="px-2.5 py-1 rounded-md border text-[11px] transition-all cursor-pointer shadow-xs" style="background-color: var(--surface-1); border-color: var(--line-2); color: var(--ink-1);">
+                <component :is="u.enabled ? Lock : Unlock" class="w-3 h-3 inline" /> {{ u.enabled ? t('admin.adminsys.users.disable') : t('admin.adminsys.users.enable') }}
+              </button>
+              <button v-if="u.locked_until" @click="unlockUser(u)" class="px-2.5 py-1 rounded-md border text-[11px] cursor-pointer transition-colors" style="background-color: var(--warn-bg); border-color: var(--warn-line); color: var(--warn);">{{ t('admin.adminsys.users.unlock') }}</button>
+            </td>
+          </template>
+        </DataTable>
       </div>
     </div>
 

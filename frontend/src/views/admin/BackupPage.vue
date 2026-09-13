@@ -5,6 +5,7 @@ import { useConfirm } from '../../composables/useConfirm'
 const toast = useToast()
 const { ask } = useConfirm()
 import { ref, computed, onMounted } from 'vue'
+import DataTable from '../../components/admin/DataTable.vue'
 import { useI18n } from '../../composables/useI18n'
 const { t } = useI18n()
 import { useApi } from '../../composables/useApi'
@@ -372,45 +373,50 @@ onMounted(load)
             <span class="text-[11px]" style="color: var(--ink-3);">{{ t('admin.backup.archiveHint') }}</span>
           </div>
           <div class="table-scroll-container">
-            <table v-if="status?.local_archives?.length" class="w-full text-left text-xs whitespace-nowrap">
-              <thead>
-                <tr class="border-b text-[11px] uppercase tracking-wider font-bold" style="border-color: var(--line-1); background-color: var(--surface-1); color: var(--ink-2);">
-                  <th class="py-2.5 px-4">{{ t('admin.backup.thArchive') }}</th>
-                  <th class="py-2.5 px-3 text-right">{{ t('admin.backup.thSize') }}</th>
-                  <th class="py-2.5 px-4 text-right">{{ t('admin.backup.thCreated') }}</th>
-                  <th class="py-2.5 px-4 text-center">{{ t('admin.backup.thActions') }}</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="a in status.local_archives.slice(0, 10)" :key="a.name" class="border-b last:border-b-0 hover:bg-[var(--surface-3)] transition-colors" style="border-color: var(--line-1);">
-                  <td class="py-2.5 px-4 font-medium truncate max-w-[200px]" style="color: var(--ink-1);" :title="a.name">{{ a.name }}</td>
-                  <td class="py-2.5 px-3 text-right num" style="color: var(--ink-2);">{{ fmtBytes(a.bytes) }}</td>
-                  <td class="py-2.5 px-4 text-right num" style="color: var(--ink-3);">{{ fmtTime(a.mtime) }}</td>
-                  <td class="py-2.5 px-4 text-center">
-                    <div class="flex items-center justify-center space-x-2">
-                      <button
-                        @click="downloadArchive(a.name)"
-                        :disabled="downloadingArchive === (a.name.split('/').pop() || a.name)"
-                        class="p-1 rounded hover:bg-[var(--surface-3)] text-[var(--accent)] transition-colors cursor-pointer disabled:opacity-50"
-                        :title="t('admin.backup.downloadTitle')"
-                      >
-                        <RefreshCw v-if="downloadingArchive === (a.name.split('/').pop() || a.name)" class="w-3.5 h-3.5 animate-spin" />
-                        <Download v-else class="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        v-if="auth.isSuperadmin"
-                        @click="restoreArchive(a.name)"
-                        :disabled="busy === 'restore'"
-                        class="p-1 rounded hover:bg-[var(--surface-3)] text-amber-500 transition-colors cursor-pointer"
-                        :title="t('admin.backup.restoreTitle')"
-                      >
-                        <RotateCcw class="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+          <DataTable
+            flat
+            v-if="status?.local_archives?.length"
+            class="table-scroll-container"
+            :rows="status.local_archives.slice(0, 10) || []"
+            :row-key="(a: any) => a.name"
+            :empty-text="t('common.noRecords')"
+          >
+            <template #head>
+              <tr class="border-b text-[11px] uppercase tracking-wider font-bold" style="border-color: var(--line-1); background-color: var(--surface-1); color: var(--ink-2);">
+                                <th class="py-2.5 px-4">{{ t('admin.backup.thArchive') }}</th>
+                                <th class="py-2.5 px-3 text-right">{{ t('admin.backup.thSize') }}</th>
+                                <th class="py-2.5 px-4 text-right">{{ t('admin.backup.thCreated') }}</th>
+                                <th class="py-2.5 px-4 text-center">{{ t('admin.backup.thActions') }}</th>
+                              </tr>
+            </template>
+            <template #row="{ row: a }">
+              <td class="py-2.5 px-4 font-medium truncate max-w-[200px]" style="color: var(--ink-1);" :title="a.name">{{ a.name }}</td>
+              <td class="py-2.5 px-3 text-right num" style="color: var(--ink-2);">{{ fmtBytes(a.bytes) }}</td>
+              <td class="py-2.5 px-4 text-right num" style="color: var(--ink-3);">{{ fmtTime(a.mtime) }}</td>
+              <td class="py-2.5 px-4 text-center">
+                <div class="flex items-center justify-center space-x-2">
+                  <button
+                    @click="downloadArchive(a.name)"
+                    :disabled="downloadingArchive === (a.name.split('/').pop() || a.name)"
+                    class="p-1 rounded hover:bg-[var(--surface-3)] text-[var(--accent)] transition-colors cursor-pointer disabled:opacity-50"
+                    :title="t('admin.backup.downloadTitle')"
+                  >
+                    <RefreshCw v-if="downloadingArchive === (a.name.split('/').pop() || a.name)" class="w-3.5 h-3.5 animate-spin" />
+                    <Download v-else class="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    v-if="auth.isSuperadmin"
+                    @click="restoreArchive(a.name)"
+                    :disabled="busy === 'restore'"
+                    class="p-1 rounded hover:bg-[var(--surface-3)] text-amber-500 transition-colors cursor-pointer"
+                    :title="t('admin.backup.restoreTitle')"
+                  >
+                    <RotateCcw class="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </td>
+            </template>
+          </DataTable>
             <div v-else class="py-8 text-center text-xs" style="color: var(--ink-2);">{{ t('admin.backup.emptyArchives') }}</div>
           </div>
         </div>
