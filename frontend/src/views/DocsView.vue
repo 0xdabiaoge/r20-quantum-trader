@@ -583,7 +583,7 @@ onUnmounted(() => {
           <!-- Screenshot Card -->
           <div class="rounded-2xl border p-2 sm:p-3 overflow-hidden shadow-xl group" style="background-color: var(--surface-2); border-color: var(--line-1);">
             <div class="text-[11px] px-2 py-1 flex items-center justify-between border-b mb-2" style="border-color: var(--line-1); color: var(--ink-2);">
-              <span>实机截图 · 执行层风控管理中心 (17 项硬风控可视化与三套优质预设一键应用)</span>
+              <span>实机截图 · 执行层风控管理中心（硬风控可视化与三套优质预设一键应用）</span>
               <span class="font-bold" style="color: var(--accent);">点击图片放大</span>
             </div>
             <img
@@ -733,7 +733,7 @@ pip install -r requirements.txt
             <div class="p-4 rounded-xl border space-y-2 shadow-xs" style="background-color: var(--surface-2); border-color: var(--line-1);">
               <h3 class="text-sm font-bold" style="color: var(--ink-1);">Q4: 风控参数（持仓数、保证金占比、最长持仓时间等）在哪里修改？改完要重启吗？</h3>
               <p class="text-xs leading-relaxed" style="color: var(--ink-2);">
-                在后台「策略配置 → 风控管理」页集中配置全部 17 项执行层硬风控，或直接一键应用稳健防守/均衡波段/进取猎手三套预设。保存即写入 <code>.env</code> 单一事实源，交易引擎在下一巡检周期（≤15 分钟）自动加载生效，<strong>无需重启</strong>；AI 主脑每轮收到的【本周期风险预算】小节会同步展示最新口径，越界数值由服务端物理拒绝并留痕审计。
+                在后台「策略配置 → 风控管理」页集中配置<strong>全部执行层硬风控项</strong>（具体清单与当前生效值以该页实时列表为准），或直接一键应用稳健防守/均衡波段/进取猎手三套预设。保存即写入 <code>.env</code> 单一事实源，交易引擎在下一巡检周期（≤15 分钟）自动加载生效，<strong>无需重启</strong>；AI 主脑每轮收到的【本周期风险预算】小节与执行层取同一函数对象同步展示最新口径，越界数值由服务端物理拒绝并留痕审计。
               </p>
             </div>
           </div>

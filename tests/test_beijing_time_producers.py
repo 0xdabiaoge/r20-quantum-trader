@@ -4,6 +4,7 @@ Compile real producer functions/expressions from their AST; dependencies are moc
 so no project data, credentials, network, or process configuration is touched.
 """
 import ast
+import contextlib
 import datetime as dt
 import inspect
 import json
@@ -98,7 +99,14 @@ def test_council_save_export_and_backup_mocked():
                    validate_council_roles=lambda roles: "",
                    validate_seat_model_bindings=lambda roles, previous=None: [],
                    # save_council_config 用 Path 收敛"旧配置读取"（只认真路径，避免把 mock 当 fd 打开）
-                   Path=Path)
+                   Path=Path,
+                   # P2-6 起 council 写入口持可重入 file_lock（隔离执行注入空实现即可）
+                   file_lock=lambda _target: contextlib.nullcontext(),
+                   # save_council_config 现带 @_locked_council 装饰器（P2-6），隔离执行注入透传壳
+                   _locked_council=lambda fn: fn,
+                   # P2-13：超时预算统一夹取（单一事实源），隔离执行注入直通实现
+                   clamp_council_timeout=lambda value: float(value),
+                   MIN_COUNCIL_TIMEOUT=30.0, MAX_COUNCIL_TIMEOUT=420.0)
     assert mod.save_council_config({"roles": {"cio": {}}})["updated_at"] == EXPECTED
     assert write.call_count == 1
     assert mod.export_council_config()["exported_at"] == EXPECTED

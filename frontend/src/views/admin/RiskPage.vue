@@ -149,11 +149,36 @@ async function saveChanges() {
     toast.err('杠杆下限不能高于上限，请调整区间后再保存')
     return
   }
+  // 审计 P2-9：极端值（单标的占比≥50% / 日亏≥25% 权益 / 杠杆≥10x 等）此前一次点击即落盘，
+  // 误触就能把硬风控放松到接近失效。后端要求逐字短语 HIGH RISK，这里补上确认框。
+  const values: Record<string, number> = {}
+  for (const k of dirtyKeys.value) values[k] = draft[k]
+  const limitOf = (key: string): number | null => {
+    const row = schema.value?.params.find((x: any) => x.key === key)
+    return row && (row as any).high_risk_at != null ? Number((row as any).high_risk_at) : null
+  }
+  const extreme = dirtyKeys.value.filter((k) => {
+    const lim = limitOf(k)
+    return lim != null && Number(values[k]) >= lim
+  })
+  let confirmation = ''
+  if (extreme.length) {
+    const detail = extreme
+      .map((k) => `${schema.value?.params.find((x: any) => x.key === k)?.label || k} = ${values[k]}`)
+      .join('；')
+    const _ok = await ask({
+      title: '极端风控参数确认',
+      desc: `以下参数已进入极端区间，将显著放松硬风控：${detail}`,
+      danger: true,
+      confirmPhrase: 'HIGH RISK',
+      okText: '确认写入',
+    })
+    if (!_ok) return
+    confirmation = 'HIGH RISK'
+  }
   busy.value = 'save'
   try {
-    const values: Record<string, number> = {}
-    for (const k of dirtyKeys.value) values[k] = draft[k]
-    const res = await api('/api/v1/admin/risk', { method: 'POST', body: JSON.stringify({ values }) })
+    const res = await api('/api/v1/admin/risk', { method: 'POST', body: JSON.stringify({ values, confirmation }) })
     syncFromServer(res.values)
     toast.ok(`已保存 ${res.updated.length} 项修改 ✓ ${res.effect}`)
   } catch (e: any) {

@@ -27,12 +27,19 @@ except ImportError:
     from order_risk import validate_quote_geometry_and_rr
 
 try:  # 单一事实源：全局保证金闸门（审计 P0-1 前本模块 0 处引用 risk_constants）
-    from scripts.risk_constants import MAX_MARGIN_EQUITY_RATIO, MAX_SINGLE_ASSET_MARGIN
+    from scripts.risk_constants import MAX_LEVERAGE, MAX_MARGIN_EQUITY_RATIO, MAX_SINGLE_ASSET_MARGIN, MIN_LEVERAGE
+    try:
+        from scripts.risk_constants import MAX_TOTAL_EXPOSURE_USDT as TOTAL_EXPOSURE_CAP
+    except ImportError:
+        TOTAL_EXPOSURE_CAP = 0.0
 except ImportError:  # pragma: no cover - scripts/ 在 sys.path 时走上面分支
     try:
         from risk_constants import MAX_MARGIN_EQUITY_RATIO, MAX_SINGLE_ASSET_MARGIN
     except ImportError:
         MAX_MARGIN_EQUITY_RATIO, MAX_SINGLE_ASSET_MARGIN = 0.20, 0.0
+        # 常量不可得时不臆造区间：夹取退化为 no-op（下面靠 `or leverage` 短路），
+        # 绝不因为读不到配置就凭空放大或缩小杠杆。
+        MAX_LEVERAGE = MIN_LEVERAGE = None  # type: ignore[assignment]
 
 
 class RouteResult(Dict[str, Any]):
@@ -94,6 +101,24 @@ def open_protected_position(decision: Dict[str, Any], *,
         if not math.isfinite(v) or v <= 0:
             return _fail("validate", f"{tag} 必须为有限正数，收到 {v}", venue=venue)
 
+    # ── 杠杆区间（审计 P2-8，2026-09-13）──────────────────────────────────
+    # 旧实现只有主脑写决策时夹 [MIN_LEVERAGE, MAX_LEVERAGE]，执行层只夹上限：
+    # 决策缓存被回填/多所路径直接构造决策时，1x 这种低于配置下限的杠杆会真的发出去，
+    # 「杠杆区间」在市场侧不成立。执行层是最后一道，必须有同样的两端夹取。
+    leverage_before_clamp = leverage
+    try:
+        _inst_cap = float(decision.get("max_leverage") or 0.0)
+    except (TypeError, ValueError):
+        _inst_cap = 0.0
+    _upper = float(MAX_LEVERAGE or 0.0) or leverage
+    if _inst_cap > 0:
+        _upper = min(_upper, _inst_cap)  # 池内单标的硬上限（tier 派生），比全局更严时生效
+    leverage = min(max(leverage, float(MIN_LEVERAGE or 0.0) or leverage), _upper)
+    if abs(leverage - leverage_before_clamp) > 1e-9:
+        decision = {**decision, "leverage": leverage}
+        print(f"[杠杆闸门] {venue.upper()} {asset} 杠杆 {leverage_before_clamp:g}x 超出配置区间 "
+              f"[{float(MIN_LEVERAGE or 0):g}x, {float(MAX_LEVERAGE or 0):g}x]，已夹至 {leverage:g}x")
+
     # ── 全局保证金闸门（审计 P0-1，2026-09-13）──────────────────────────────
     # 本模块曾把 decision["margin_usdt"] 原样 ×leverage 变成名义额（见下方 notional），
     # 即 LLM 报多少就用多少：OKX 路径的「可用余额占比硬顶 / 单标的绝对封顶」在多所
@@ -121,6 +146,32 @@ def open_protected_position(decision: Dict[str, Any], *,
               f"超上限 {margin}U（权益占比 {MAX_MARGIN_EQUITY_RATIO:.0%} / 单标的封顶 "
               f"{float(MAX_SINGLE_ASSET_MARGIN or 0):.0f}U / 该所预算 "
               f"{float((pool or {}).get('margin_per_trade_usdt') or 0):.0f}U），已夹至上限")
+    # ── 跨所同向合并敞口上限（审计 P2-1，2026-09-13）─────────────────────
+    # R20_MAX_TOTAL_EXPOSURE_USDT 自 US-005 起就在 MANAGED_KEYS 里（后台可写、写进 .env），
+    # 但全仓 0 个读者：设了等于没设。这里落实为"发送前按同向名义额合计拒开"——只统计
+    # 已开同向仓位 + 本单，超限则拒（不是夹，因为敞口超限意味着不该再开）。
+    exposure_cap = float(TOTAL_EXPOSURE_CAP or 0.0)
+    if exposure_cap > 0:
+        try:
+            all_positions = _all_positions if _all_positions is not None else (ad.positions() or [])
+        except Exception as exc:
+            return _fail("exposure", f"无法读取持仓以核算跨所敞口: {exc}", venue=venue)
+        same_side = 0.0
+        for row in all_positions:
+            if str(row.get("base") or "").upper() != asset:
+                continue
+            row_side = str(row.get("side") or "").lower()
+            row_action = "buy" if row_side in ("long", "buy") else "sell" if row_side in ("short", "sell") else ""
+            if row_action != action:
+                continue
+            same_side += abs(float(row.get("size_signed") or 0)) * float(row.get("mark_price") or row.get("entry_price") or 0)
+        projected = same_side + margin * leverage
+        if projected > exposure_cap:
+            return _fail("exposure",
+                         f"跨所同向敞口将达 {projected:.0f}U，超上限 {exposure_cap:.0f}U"
+                         f"（已持有同向 {same_side:.0f}U + 本单名义 {margin * leverage:.0f}U）",
+                         venue=venue, projected_exposure=round(projected, 2), cap=exposure_cap)
+
     ok, reason, rr = validate_quote_geometry_and_rr(action, entry, tp, sl)
     if not ok:
         return _fail("risk_gate", f"物理风控拒绝: {reason}", venue=venue, rr=rr)

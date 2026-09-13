@@ -22,7 +22,7 @@ from r20_backend.schemas import (
 )
 from r20_backend.okx_trade_service import fast_close_confirmed
 from scripts.okx_rest import OKXNotConfigured
-from scripts.instrument_pool import from_okx_instrument, load_instruments, save_instruments
+from scripts.instrument_pool import from_okx_instrument, load_instruments, mutate_instruments, save_instruments
 
 router = APIRouter(tags=["risk"])
 
@@ -112,6 +112,19 @@ def admin_risk_update(payload: RiskConfigUpdate, x_r20_session: str | None = Hea
     merged.update(payload.values)
     if not merged:
         raise HTTPException(status_code=400, detail="没有需要保存的修改")
+    # 审计 P2-9：极端值（单标的占比≥50% / 日亏≥25% 权益 / 杠杆≥10x 等）必须逐字确认，
+    # 否则一次误触即把硬风控放松到接近失效。阈值不是硬上限——显式确认后仍可越过。
+    high_risk = risk_config.high_risk_changes(merged)
+    if high_risk:
+        if str(payload.confirmation or "").strip().upper() != risk_config.HIGH_RISK_PHRASE:
+            audit_record("risk.config.update", "rejected_high_risk", {
+                "actor": actor["username"], "items": high_risk,
+            })
+            detail = "；".join(f"{i['label']} = {i['value'] * 100 if 'RATIO' in i['key'] else i['value']:g}"
+                              f"（阈值 {i['threshold'] * 100 if 'RATIO' in i['key'] else i['threshold']:g}）" for i in high_risk)
+            raise HTTPException(
+                status_code=400,
+                detail=f"以下参数已进入极端区间，必须逐字确认 {risk_config.HIGH_RISK_PHRASE}：{detail}")
     before = risk_config.current_values()
     try:
         env_updates = risk_config.normalize(merged)
@@ -124,6 +137,7 @@ def admin_risk_update(payload: RiskConfigUpdate, x_r20_session: str | None = Hea
         "actor": actor["username"],
         "suite": payload.suite_id or None,
         "changed": {k: {"before": before.get(k), "after": float(v)} for k, v in env_updates.items()},
+        "high_risk_confirmed": [i["key"] for i in high_risk],
     })
     return {
         "updated": sorted(env_updates.keys()),
@@ -213,11 +227,6 @@ def add_admin_instrument(payload: InstrumentAddRequest, x_r20_admin_token: str |
     refresh_settings()
     require_admin_header(x_r20_admin_token)
     inst_id = payload.inst_id.upper()
-    current = load_instruments()
-    if any(item["instId"] == inst_id for item in current):
-        raise HTTPException(status_code=409, detail="该币种已在交易池中")
-    if len(current) >= MAX_POOL_SIZE:
-        raise HTTPException(status_code=409, detail=f"交易池最多允许 {MAX_POOL_SIZE} 个币种；请先删除一个无持仓币种，或调整环境变量 R20_MAX_POOL_SIZE")
     try:
         matches = okx.instruments("SWAP", inst_id)
     except Exception as exc:
@@ -226,9 +235,19 @@ def add_admin_instrument(payload: InstrumentAddRequest, x_r20_admin_token: str |
     if raw.get("instId") != inst_id or raw.get("settleCcy") != "USDT" or raw.get("state") != "live":
         raise HTTPException(status_code=400, detail="仅允许添加 OKX 在线可交易的 USDT 永续合约")
     item = from_okx_instrument(raw)
-    save_instruments([*current, item])
+
+    # 审计 P2-6：load→校验→改→save 整段持锁（旧实现无锁 → 两个并发保存丢标的）；
+    # 去重与容量不变量放进锁内，避免"检查通过后另一个请求插进来"。
+    def _append(pool: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        if any(row["instId"] == inst_id for row in pool):
+            raise HTTPException(status_code=409, detail="该币种已在交易池中")
+        if len(pool) >= MAX_POOL_SIZE:
+            raise HTTPException(status_code=409, detail=f"交易池最多允许 {MAX_POOL_SIZE} 个币种；请先删除一个无持仓币种，或调整环境变量 R20_MAX_POOL_SIZE")
+        return [*pool, item]
+
+    updated = mutate_instruments(_append)
     audit_record("instrument.add", "success", {"instId": inst_id})
-    return {"added": item, "count": len(current) + 1, "effective": "immediate", "message": f"{item['name']} 已成功加入交易池并实时同步全网大屏与因果雷达"}
+    return {"added": item, "count": len(updated), "effective": "immediate", "message": f"{item['name']} 已成功加入交易池并实时同步全网大屏与因果雷达"}
 
 
 @router.delete("/api/v1/admin/instruments/{inst_id}")
@@ -268,8 +287,9 @@ def delete_admin_instrument(
         # 未知 ≠ 无持仓：拒绝而不是放行（破坏性操作 fail-closed）
         audit_record("instrument.remove", "rejected_unknown_holdings", {"instId": inst_id, "reason": report["holdings_unknown"]})
         raise HTTPException(status_code=503, detail=f"无法确认实时持仓（{report['holdings_unknown']}），为防止删掉有持仓的标的而失去风控接管，已拒绝删除；请稍后重试")
-    updated = [item for item in current if item["instId"] != inst_id]
-    save_instruments(updated)
+    # 审计 P2-6：删除也在锁内重读整池后再落盘——否则并发保存（例如另一页在改
+    # 另一标的的参数）会被这份旧快照整份覆盖。
+    updated = mutate_instruments(lambda pool: [item for item in pool if item["instId"] != inst_id])
     audit_record("instrument.remove", "success", {"instId": inst_id, "holdings_cleared": {"tracker_keys": [], "held_live": False}})
     return {"removed": inst_id, "count": len(updated), "effective": "immediate", "message": f"{inst_id} 已从交易池移除并实时同步全网大屏与因果雷达"}
 

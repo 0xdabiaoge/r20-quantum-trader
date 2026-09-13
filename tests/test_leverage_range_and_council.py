@@ -160,11 +160,19 @@ class CouncilBudgetTests(unittest.TestCase):
     def test_debate_stage_budgets_have_90s_floor(self):
         """思考型模型单席提案实测需 60~180s：0.35/0.50 纯比例切分在中低预算下
         会压出 53s 级必死窗口（09-10 05:15 实测），两段预算都必须有 90s 地板。"""
+        import re
         import r20_backend.council_manager as cm
         src = Path(cm.__file__).read_text(encoding="utf-8")
-        self.assertNotIn("rem * 0.35", src)
         self.assertNotIn("min(rem * 0.50,", src)
         self.assertGreaterEqual(src.count("max(rem * 0.55, 90.0)"), 2)
+        # P2-14 起比例只允许出现在「CIO 预留」的有界表达式里（min(CIO_MIN_ARBITRATION_TIME, ...)），
+        # 且必须至少有 2 处（两种共识模式各一份），保证 CIO 不会被席位吃光预算。
+        reserves = re.findall(r"cio_reserve = min\(CIO_MIN_ARBITRATION_TIME,[^\n]*\)", src)
+        self.assertGreaterEqual(len(reserves), 2, "两种共识模式都必须为 CIO 预留预算")
+        proportional = [line for line in src.splitlines()
+                        if re.search(r"rem \* 0\.\d+", line) and "CIO_MIN_ARBITRATION_TIME" not in line
+                        and "max(rem * 0.55, 90.0)" not in line]
+        self.assertEqual(proportional, [], f"出现无地板/无预留的比例切分: {proportional}")
 
 
 class BrainCouncilTransparencyTests(unittest.TestCase):

@@ -1,6 +1,7 @@
 """Versioned prompt profile library used directly by Python trading processes."""
 from __future__ import annotations
 import copy
+import functools
 import json
 import os
 import re
@@ -443,6 +444,42 @@ def load_library() -> dict[str, Any]:
     return payload
 
 
+def _library_lock():
+    """跨进程互斥（审计 P2-6）：提示词方案库是 RMW 目标（管理页多次点击 / 导入 / 回滚 /
+    采集脚本都会 load→改→save）。优先用可重入的后端锁，退化为本地 flock。"""
+    try:
+        from r20_backend.file_locks import file_lock
+        return file_lock(LIBRARY_FILE)
+    except Exception:
+        import fcntl
+        from contextlib import contextmanager
+
+        @contextmanager
+        def _local_lock():
+            lock_path = LIBRARY_FILE.with_name("." + LIBRARY_FILE.name + ".lock")
+            lock_path.parent.mkdir(parents=True, exist_ok=True)
+            fd = os.open(str(lock_path), os.O_RDWR | os.O_CREAT, 0o600)
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX)
+                yield
+            finally:
+                try:
+                    fcntl.flock(fd, fcntl.LOCK_UN)
+                finally:
+                    os.close(fd)
+        return _local_lock()
+
+
+def _locked_library(fn):
+    """装饰器：整个 load→改→save 期间持锁（可重入，嵌套 save_library 不会自锁）。"""
+    @functools.wraps(fn)
+    def _wrapper(*args, **kwargs):
+        with _library_lock():
+            return fn(*args, **kwargs)
+    return _wrapper
+
+
+@_locked_library
 def save_library(payload: dict[str, Any]) -> None:
     # Accept the v1 shape used by older admin clients. If a caller changed only
     # active_style/custom while active_profile_id still equals the persisted value,
@@ -565,6 +602,7 @@ def _revision(profile: dict[str, Any], action: str, note: str = "") -> dict[str,
     return {"id": f"rev-{uuid.uuid4().hex[:12]}", "profile_id": profile["id"], "action": action, "note": str(note)[:240], "created_at": _now(), "snapshot": copy.deepcopy(profile)}
 
 
+@_locked_library
 def create_profile(name: str, description: str = "", source_id: str = "stable", note: str = "创建方案") -> dict[str, Any]:
     library = load_library()
     source = get_profile(source_id)
@@ -587,6 +625,7 @@ def create_profile(name: str, description: str = "", source_id: str = "stable", 
     return profile
 
 
+@_locked_library
 def update_profile(profile_id: str, changes: dict[str, Any], note: str = "更新方案") -> dict[str, Any]:
     library = load_library()
     if profile_id in PRESETS and profile_id not in library["profiles"]:
@@ -636,6 +675,7 @@ def update_profile(profile_id: str, changes: dict[str, Any], note: str = "更新
     return updated
 
 
+@_locked_library
 def delete_profile(profile_id: str) -> None:
     if profile_id in PRESETS:
         raise ValueError("内置预设不可删除")
@@ -649,6 +689,7 @@ def delete_profile(profile_id: str) -> None:
         raise ValueError("提示词方案不存在")
 
 
+@_locked_library
 def activate_profile(profile_id: str) -> dict[str, Any]:
     library = load_library()
     profile = get_profile(profile_id)
@@ -673,6 +714,7 @@ def profile_history(profile_id: str) -> list[dict[str, Any]]:
     return [copy.deepcopy(x) for x in reversed(load_library()["revisions"]) if x.get("profile_id") == profile_id]
 
 
+@_locked_library
 def rollback_profile(profile_id: str, revision_id: str) -> dict[str, Any]:
     library = load_library()
     revision = next((x for x in library["revisions"] if x.get("id") == revision_id and x.get("profile_id") == profile_id), None)
@@ -735,6 +777,7 @@ def _unknown_variable_errors(errors: list[str]) -> list[str]:
     return [item for item in errors if "未知变量" in item]
 
 
+@_locked_library
 def import_profile(payload: dict[str, Any], name_override: str = "") -> dict[str, Any]:
     source, origin = _normalize_import_source(payload)
     library = load_library()

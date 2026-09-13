@@ -95,8 +95,11 @@ class PromptRiskBudgetAlignmentTests(_SandboxBase):
         for missing in (None, -1.0):
             self.assertEqual(self.brain.build_risk_budget_text(missing), "[MISSING_CONTEXT:risk_budget]")
 
-    def test_all_19_knobs_are_visible_to_the_model(self):
-        """覆盖扫描：19 个旋钮（含此前完全不可见的 5 个）都必须在小节里露面。"""
+    def test_all_20_knobs_are_visible_to_the_model(self):
+        """覆盖扫描：全部旋钮（含此前完全不可见的 5 个）都必须在小节里露面。
+
+        批4 P2-1 新增第 20 个旋钮 R20_MAX_TOTAL_EXPOSURE_USDT（跨所同向敞口上限），
+        它此前只在 MANAGED_KEYS 里、零消费者；现在执行层真拒绝且提示词同源披露。"""
         text = self.brain.build_risk_budget_text(4989.41)
         required = {
             "R20_MAX_MARGIN_EQUITY_RATIO": "强信号单笔保证金上限",
@@ -118,8 +121,10 @@ class PromptRiskBudgetAlignmentTests(_SandboxBase):
             "R20_MAX_SCALE_IN_COUNT": "金字塔加仓",
             "R20_MIN_SCALE_IN_PROFIT_RATIO": f"{self.rc.MIN_SCALE_IN_PROFIT_RATIO:.1%}",
             "R20_MIN_SCALE_IN_CONFIDENCE": f"{self.rc.MIN_SCALE_IN_CONFIDENCE:g}%",
+            "R20_MAX_TOTAL_EXPOSURE_USDT": "跨所同向敞口上限",
         }
-        self.assertEqual(set(required), set(self.rc.RISK_ENV_KEYS), "覆盖表必须覆盖全部 19 个旋钮")
+        self.assertEqual(set(required), set(self.rc.RISK_ENV_KEYS),
+                         f"覆盖表必须覆盖全部 {len(self.rc.RISK_ENV_KEYS)} 个旋钮")
         missing = [key for key, needle in required.items() if needle not in text]
         self.assertEqual(missing, [], f"以下旋钮对模型不可见: {missing}")
 

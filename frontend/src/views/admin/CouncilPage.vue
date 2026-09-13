@@ -445,8 +445,8 @@ onMounted(loadData)
           <input
             v-model="councilConfig.timeout_seconds"
             type="number"
-            min="10"
-            max="300"
+            :min="30"
+            :max="420"
             step="10"
             class="w-16 rounded-lg px-2 py-1 text-xs outline-none border text-center"
             style="background-color: var(--surface-input); border-color: var(--line-1); color: var(--ink-1);"
@@ -565,7 +565,7 @@ onMounted(loadData)
 
             <!-- Weight (For traders only) -->
             <div v-if="!role.is_arbitrator && roleId !== 'cio'" class="flex items-center space-x-1">
-              <span class="text-[11px] text-[var(--ink-2)]">{{ t('admin.council.weightLabel') }}</span>
+              <span class="text-[11px] text-[var(--ink-2)]" :title="t('admin.council.weightHint')">{{ t('admin.council.weightLabel') }}</span>
               <input
                 v-model="role.weight"
                 type="number"

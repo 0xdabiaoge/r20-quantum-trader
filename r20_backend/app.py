@@ -18,7 +18,7 @@ sys.path.insert(0, str(SCRIPTS_DIR))
 
 from r20_backend.version import __version__, APP_NAME
 from r20_backend.config import refresh_settings, settings
-from r20_backend.settings_store import update_env
+from r20_backend.settings_store import EnvValueError, update_env
 from r20_gateway.secrets import save_secrets
 from r20_backend.audit import record as audit_record
 from r20_backend.okx_trade_service import account_snapshot as okx_account_snapshot
@@ -136,6 +136,13 @@ app = FastAPI(
     docs_url="/api/docs",
     redoc_url="/api/redoc",
 )
+
+
+@app.exception_handler(EnvValueError)
+async def _env_value_error_handler(_request, exc: EnvValueError):
+    """审计 P2-7：.env 写入校验失败属客户端输入问题 → 400（而不是裸 500）。"""
+    from fastapi.responses import JSONResponse
+    return JSONResponse(status_code=400, content={"detail": str(exc)})
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 

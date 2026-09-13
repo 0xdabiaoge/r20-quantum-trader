@@ -40,7 +40,7 @@ from risk_constants import (
     TIME_STOP_ATR_BAND,
     TIME_STOP_HOURS,
     effective_daily_loss_limit,
-    effective_single_asset_margin,
+    effective_single_asset_margin,    MAX_TOTAL_EXPOSURE_USDT,
 )
 import json
 import time
@@ -134,6 +134,21 @@ from r20_gateway.telemetry import ModelCallTelemetry
 
 TARGET_INSTRUMENTS = load_instruments()
 
+try:  # 跨所符号归一（审计 P2-12）：把 BINANCE:BTCUSDT / BTC_USDT / BTC 统一成 OKX 形态
+    from r20_backend.exchanges.base import canonical_base as _canonical_base_name
+except Exception:  # pragma: no cover - scripts/ 直接运行时走兜底
+    try:
+        from exchanges.base import canonical_base as _canonical_base_name  # type: ignore
+    except Exception:
+        def _canonical_base_name(symbol: str) -> str:
+            s = str(symbol or "").strip().upper()
+            for marker in ("-USDT-SWAP", "USDT", "_USDT", "-USDT"):
+                if s.endswith(marker):
+                    s = s[: -len(marker)]
+                    break
+            return s.replace("-", "").replace("_", "")
+
+
 def atomic_write_json(path: str, payload: Any) -> None:
     """Replace JSON atomically so readers never observe a partial cache."""
     os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -212,6 +227,57 @@ def read_prompt_override() -> str:
     except OSError:
         pass
     return ""
+
+
+# 止损基准（审计 P2-5）：池条目 per-instrument 值优先——与 ai_factor_trader.instrument_profile
+# 同一优先级；TRADFI 等不在池内的标的回落到资产类别档（数值与 ai_factor_trader.
+# ASSET_CLASS_PROFILES 逐项对齐，tests/test_audit_config_p4_cleanup.py 有源码钉守着）。
+_SL_ATR_BY_ASSET_CLASS = {"commodity": 1.3, "index": 1.2, "stock": 1.3, "crypto": 1.4}
+
+
+def canonical_position_inst_id(raw: Any) -> str:
+    """跨所持仓符号 → OKX 形态（审计 P2-12，模块级便于直接测试）。
+
+    规则：池内币种映射回池内 instId；标准 USDT 永续写法补齐成 OKX 形态；
+    其余（日期合约/币本位/不认识的写法）原样保留——绝不假装认识。
+    """
+    text = str(raw or "").strip().upper()
+    if not text:
+        return ""
+    bare = text.split(":")[-1]
+    pool_by_base: Dict[str, str] = {}
+    for item in (TARGET_INSTRUMENTS if isinstance(TARGET_INSTRUMENTS, list) else []):
+        iid = str((item or {}).get("instId") or "").strip().upper()
+        if iid:
+            pool_by_base.setdefault(_canonical_base_name(iid), iid)
+    base = _canonical_base_name(bare)
+    if base in pool_by_base:
+        return pool_by_base[base]
+    if base and bare in (base, f"{base}USDT", f"{base}_USDT", f"{base}-USDT", f"{base}-USDT-SWAP"):
+        return f"{base}-USDT-SWAP"
+    return text
+
+
+def _sl_atr_mult_for(package: Dict[str, Any]) -> float:
+    """提示词里展示的止损基准＝执行层真正会用的那个数（不再硬编码 1.5~2.0x）。"""
+    raw = (package or {}).get("sl_atr_mult")
+    try:
+        value = float(raw)
+        if value > 0:
+            return value
+    except (TypeError, ValueError):
+        pass
+    name = str((package or {}).get("name") or "").strip().upper()
+    for item in (TARGET_INSTRUMENTS if isinstance(TARGET_INSTRUMENTS, list) else []):
+        if str((item or {}).get("name") or "").strip().upper() == name:
+            try:
+                pooled = float((item or {}).get("sl_atr_mult"))
+                if pooled > 0:
+                    return pooled
+            except (TypeError, ValueError):
+                pass
+            break
+    return float(_SL_ATR_BY_ASSET_CLASS.get(str((package or {}).get("type") or "crypto"), 1.4))
 
 
 def get_effective_system_prompt(profile: Dict[str, Any] = None, context: Dict[str, Any] = None) -> str:
@@ -899,6 +965,13 @@ def build_risk_budget_text(usdt_available: float = None) -> str:
             if PORTFOLIO_RISK_BUDGET_USDT > 0 else
             "- 组合风险总预算(跨所合算): 未设上限 (0=引擎不封顶，仅受单标的/同向/并发上限约束)\n"
         )
+        # 审计 P2-1：跨所同向敞口上限现已真执行（execution_router 发送前拒开），
+        # 这里必须同源披露，否则"提示词口径 == 代码口径"又多一处例外。
+        + (
+            f"- 跨所同向敞口上限: {MAX_TOTAL_EXPOSURE_USDT:.2f} USDT (同一标同方向跨所合计名义额，含本单；超出执行层拒开)\n"
+            if MAX_TOTAL_EXPOSURE_USDT > 0 else
+            "- 跨所同向敞口上限: 未设上限 (0=不限制；仍受单标的/同向/并发上限约束)\n"
+        )
         + f"- 最长持仓时间: {TIME_STOP_HOURS:g} 小时 (超时且横盘无突破将被时间止损离场；横盘判定带宽 ±{TIME_STOP_ATR_BAND:.0%} ATR)\n"
         f"- 单笔杠杆区间: {MIN_LEVERAGE:g}x ~ {MAX_LEVERAGE:g}x (在区间内按信号强度自主裁决；区间外执行层自动钳制)\n"
         f"- 盈亏比 R:R 硬底线: {MIN_RISK_REWARD_RATIO:.1f} (低于此值的报价执行层物理拒绝)\n"
@@ -933,6 +1006,10 @@ def construct_full_market_prompt(packages: List[Dict[str, Any]], pos_summary: st
 
         sm = p.get("smart_money", {})
         adx_val = p.get("adx_1h", "--")
+        # 审计 P2-5：止损基准不再硬编码「1.5~2.0x」——它必须等于真正下单用的那一套
+        # （池条目 per-instrument sl_atr_mult 优先，资产类别档兜底），否则提示词与执行面
+        # 又是两份口径（模型以为 1.5~2.0x，实际按 1.4x 下单）。
+        sl_atr_desc = f"{_sl_atr_mult_for(p):g}x 1H ATR（与执行层同源）"
         calc = p.get("calculus", {})
         calc_tfs = calc.get("timeframes", {}) if isinstance(calc, dict) else {}
         d_int = calc.get("definite_integrals", {}) if isinstance(calc, dict) else {}
@@ -973,7 +1050,7 @@ def construct_full_market_prompt(packages: List[Dict[str, Any]], pos_summary: st
 【{p['name']} ({p['instId']})】| 数据质量: {quality} | 现价: {p['price']} | 24H涨跌: {p['chg24h']}% | 盘口买/卖: {p['bidPx']}/{p['askPx']}
 - 🏛️ 三重滤网宏观结构: 4H宏观大势={p.get('macro_4h', '4H_MACRO_RANGE')} | 1H波段结构={p.get('structure_1h', '1H_SWING_CHOP')}
 - 👑 顶级聪明钱 (SmartMoney Top100): {("加权做多占比=" + str(sm.get('weighted_long_pct')) + "% | 24H净流入=" + str(sm.get('net_flow_usdt', '--')) + " | 多头均价=" + str(sm.get('avg_long_entry', '--')) + " | 空头均价=" + str(sm.get('avg_short_entry', '--')) + " | " + str(sm.get('top_win_rate', ''))) if sm.get('available') else "数据源缺失（OKX CLI 已移除，暂无公开 V5 等价接口；本项不构成任何方向的证据，禁止臆测填充）"}
-- 📐 1H核心波段指标: 1H ATR(14)={p.get('atr_1h', p.get('atr', '--'))} (止损基准: 1.5~2.0x 1H ATR) | 1H RSI(14)={p.get('rsi_1h', '--')} | 1H ADX趋势强度={adx_val} (注:<20无趋势垃圾市, ≥22强单边)
+- 📐 1H核心波段指标: 1H ATR(14)={p.get('atr_1h', p.get('atr', '--'))} (止损基准: {sl_atr_desc}) | 1H RSI(14)={p.get('rsi_1h', '--')} | 1H ADX趋势强度={adx_val} (注:<20无趋势垃圾市, ≥22强单边)
 - ⚡ 15M微观执行参考: 15M ATR={p.get('atr_15m', '--')} | 15M RSI={p.get('rsi_15m', '--')} | VWAP乖离={p.get('vwap_bias', '--')}% | 15M量比={p.get('vol_ratio', '--')}x | OBV资金流={p.get('obv_flow', '--')}
 - 📐 1H三大数理基石硬证据: {core_math_line}
 - ∂ 多周期微积分动力学摘要: {calc_line}
@@ -1429,13 +1506,20 @@ def execute_batch_ai_brain_cycle(
 
     positions_context = active_positions_detail
     active_positions_detail = active_positions_detail or []
+
+    # 审计 P2-12：跨所 id 归一（模块级 canonical_position_inst_id，含单元测试）
+    def _canonical_inst_id(raw: Any) -> str:
+        return canonical_position_inst_id(raw)
+
     active_inst_ids = {
-        str(p.get("instId", "")) for p in active_positions_detail if p.get("instId")
+        _canonical_inst_id(p.get("instId")) for p in active_positions_detail if p.get("instId")
     }
+    active_inst_ids.discard("")
     active_position_sides = {
-        str(p.get("instId", "")): str(p.get("side", p.get("posSide", ""))).lower()
+        _canonical_inst_id(p.get("instId")): str(p.get("side", p.get("posSide", ""))).lower()
         for p in active_positions_detail if p.get("instId")
     }
+    active_position_sides.pop("", None)
     # 审计D(2026-09-13)：package_by_id 死构造清除（全函数无消费）
 
     # Automatically Update & Persist Comprehensive Factor Library Snapshot

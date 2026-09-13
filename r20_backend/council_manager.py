@@ -20,6 +20,7 @@ Fully Re-architected in v7.2.2 with Full Account Awareness:
 from __future__ import annotations
 
 import concurrent.futures
+import functools
 import json
 import os
 import re
@@ -28,6 +29,8 @@ import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
+
+from r20_backend.file_locks import file_lock
 
 _BJ = timezone(timedelta(hours=8))
 
@@ -38,9 +41,25 @@ COUNCIL_CONFIG_FILE = DATA_DIR / "council_config.json"
 VALID_CONSENSUS_MODES = {"standard", "cross_examination"}
 DEFAULT_CONSENSUS_MODE = "standard"
 MIN_SAFE_REASONING_TIME: float = 5.0
+# 审计 P2-14：CIO 裁决最低预算（秒）——唯一会被真正执行的输出
+CIO_MIN_ARBITRATION_TIME: float = 45.0
 # 60s 总预算在真实网关 RT（单席 20~250s、参谋并行+CIO 至少两段串行）下必然整体
 # 超时静默降级（50 周期 0 成功实测，2026-09-10）；240s 兼顾决策时效与调度器 600s 硬超时。
+# 审计 P2-13：超时预算单一事实源。旧实现三套默认（schemas 60 / 本模块 240 / 前端 240）
+# 且只有导入路径夹取 → 手改配置文件写 5000 会被原样当预算用，撞上调度器 600s 击杀。
+MIN_COUNCIL_TIMEOUT: float = 30.0
+MAX_COUNCIL_TIMEOUT: float = 420.0  # 留出余量：调度器 600s 硬杀，主脑与委员会同一进程
 DEFAULT_COUNCIL_TIMEOUT: float = 240.0
+
+
+def clamp_council_timeout(value: Any) -> float:
+    try:
+        num = float(value)
+    except (TypeError, ValueError):
+        return DEFAULT_COUNCIL_TIMEOUT
+    if num != num or num in (float("inf"), float("-inf")):
+        return DEFAULT_COUNCIL_TIMEOUT
+    return min(MAX_COUNCIL_TIMEOUT, max(MIN_COUNCIL_TIMEOUT, round(num, 1)))
 
 DEFAULT_PRESET_TEMPLATES: Dict[str, Dict[str, Any]] = {
     "trader_trend": {
@@ -256,6 +275,17 @@ def validate_seat_model_bindings(roles: Any, previous_roles: Any = None) -> List
     return problems
 
 
+def _locked_council(fn):
+    """装饰器（审计 P2-6）：council_config.json 是 RMW 目标，一次辩论会重写多次；
+    旧实现无锁 → 面板保存与辩论写回互相覆盖（席位提示词丢失的复现路径之一）。
+    使用可重入 file_lock，嵌套 save_council_config 不会自锁。"""
+    @functools.wraps(fn)
+    def _wrapper(*args, **kwargs):
+        with file_lock(COUNCIL_CONFIG_FILE):
+            return fn(*args, **kwargs)
+    return _wrapper
+
+
 def _atomic_write_json(file_path: Path, data: Any) -> None:
     file_path.parent.mkdir(parents=True, exist_ok=True)
     temp_dir = file_path.parent
@@ -284,6 +314,7 @@ def validate_council_roles(roles: Any) -> str:
     return ""
 
 
+@_locked_council
 def load_council_config() -> Dict[str, Any]:
     """读取委员会配置；**绝不**用工厂默认覆盖可解析的用户文件。
 
@@ -331,6 +362,7 @@ def load_council_config() -> Dict[str, Any]:
     return default_config
 
 
+@_locked_council
 def save_council_config(config: Dict[str, Any], *, enforce_models: bool = True) -> Dict[str, Any]:
     if not isinstance(config, dict):
         raise ValueError("Council config must be a dict")
@@ -387,6 +419,8 @@ def save_council_config(config: Dict[str, Any], *, enforce_models: bool = True) 
     if mode not in VALID_CONSENSUS_MODES:
         mode = DEFAULT_CONSENSUS_MODE
     config["consensus_mode"] = mode
+    # 审计 P2-13：超时预算在任何写入口都夹到 [MIN, MAX]（含直接改文件后保存的路径）
+    config["timeout_seconds"] = clamp_council_timeout(config.get("timeout_seconds", DEFAULT_COUNCIL_TIMEOUT))
 
     config["updated_at"] = datetime.now(_BJ).isoformat(sep=" ", timespec="seconds")
     _atomic_write_json(COUNCIL_CONFIG_FILE, config)
@@ -451,6 +485,7 @@ def _backup_council_config() -> str:
             pass
     return dst.name
 
+@_locked_council
 def import_council_config(payload: Dict[str, Any]) -> Dict[str, Any]:
     """导入投委会配置：接受标准导出包或裸 {roles:...} 对象；结构校验+字段清洗，
     导入前自动备份当前配置（保留最近 10 份）。"""
@@ -527,6 +562,7 @@ def get_preset_suites() -> List[Dict[str, Any]]:
     return list(COUNCIL_PRESET_SUITES.values())
 
 
+@_locked_council
 def apply_preset_suite(suite_id: str) -> Dict[str, Any]:
     suite = COUNCIL_PRESET_SUITES.get(suite_id)
     if not suite:
@@ -546,6 +582,7 @@ def apply_preset_suite(suite_id: str) -> Dict[str, Any]:
     return save_council_config(config)
 
 
+@_locked_council
 def reset_role_template(role_id: str) -> Dict[str, Any]:
     config = load_council_config()
     roles = config.get("roles", {})
@@ -817,6 +854,9 @@ def execute_council_debate(
 
     t_start = time.time()
     effective_timeout = max(1.0, float(timeout))
+    # 审计 P2-13：这里只夹**上限**（防手改配置撞调度器 600s 击杀）；
+    # 下限不夹——显式传入极小超时是"立即中止"的既有契约（测试与降级路径依赖它）。
+    effective_timeout = min(float(MAX_COUNCIL_TIMEOUT), max(0.0, float(effective_timeout)))
     deadline = t_start + effective_timeout
 
     rem = deadline - time.time()
@@ -853,7 +893,9 @@ def execute_council_debate(
         # Stage 1: Round 1 Independent Proposals
         # 首轮提案预算：思考型模型出一次带推理链的提案实测需 60~180s，纯比例切分
         # 在中低总预算下会把它压到 53s 级必死（2026-09-10 05:15 实测），故加 90s 地板。
-        round1_budget = max(2.0, min(max(rem * 0.55, 90.0), rem - (MIN_SAFE_REASONING_TIME * 2.0)))
+        # 审计 P2-14：跨审模式同样为 CIO 预留（两轮之后仍要有裁决时间）
+        cio_reserve = min(CIO_MIN_ARBITRATION_TIME, max(MIN_SAFE_REASONING_TIME * 2.0, rem * 0.35))
+        round1_budget = max(2.0, min(max(rem * 0.55, 90.0), rem - cio_reserve))
         with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, len(trader_keys))) as pool:
             futures = {
                 pool.submit(
@@ -894,7 +936,7 @@ def execute_council_debate(
                     "latency_ms": 0,
                 }
         else:
-            round2_budget = max(2.0, min(rem * 0.40, rem - MIN_SAFE_REASONING_TIME))
+            round2_budget = max(2.0, min(rem * 0.40, rem - min(CIO_MIN_ARBITRATION_TIME, max(MIN_SAFE_REASONING_TIME, rem * 0.5))))
             with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, len(trader_keys))) as pool:
                 critique_futures = {}
                 for k in trader_keys:
@@ -940,7 +982,10 @@ def execute_council_debate(
                 f"Council timeout: remaining time {rem:.2f}s insufficient for standard deliberation (requires >= {MIN_SAFE_REASONING_TIME + 2.0}s)"
             )
 
-        member_timeout = max(2.0, min(max(rem * 0.55, 90.0), rem - MIN_SAFE_REASONING_TIME))
+        # 审计 P2-14：CIO 是唯一会被执行的输出，必须给它留足预算——旧实现只留
+        # MIN_SAFE_REASONING_TIME(5s)，四席思考型模型吃满后 CIO 只能在几秒内草率定稿。
+        cio_reserve = min(CIO_MIN_ARBITRATION_TIME, max(MIN_SAFE_REASONING_TIME, rem * 0.35))
+        member_timeout = max(2.0, min(max(rem * 0.55, 90.0), rem - cio_reserve))
         with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, len(trader_keys))) as pool:
             futures = {
                 pool.submit(

@@ -50,6 +50,10 @@ _PARAMS: list[dict[str, Any]] = [
      "label": "单标的保证金绝对封顶", "label_en": "Single-Asset Margin Hard Cap",
      "desc": "单标的累计保证金的绝对金额封顶（USDT）。实际生效取 min(本值, 余额×占比上限)，小资金账户自动收紧。",
      "type": "float", "min": 1.0, "max": 100000.0, "step": 10.0, "unit": "USDT", "display_scale": 1},
+    {"key": "R20_MAX_TOTAL_EXPOSURE_USDT", "group": "exposure",
+     "label": "跨所同向敞口上限", "label_en": "Cross-Venue Same-Side Exposure Cap",
+     "desc": "同一标同方向的跨所合计名义敞口上限（USDT，0 = 不限制）。发送前核算：已开同向名义额 + 本单名义额超过即拒开（不夹取）。",
+     "type": "float", "min": 0.0, "max": 1000000.0, "step": 50.0, "unit": "USDT", "display_scale": 1},
     {"key": "R20_MIN_LEVERAGE", "group": "exposure",
      "label": "单笔杠杆下限", "label_en": "Min Leverage",
      "desc": "AI 自主裁决杠杆的区间下限：模型须在 [下限, 上限] 内按信号强度取值，低于下限会被执行层抬升钳制。调高下限 = 强制放大名义敞口，请配合日亏熔断使用。",
@@ -123,6 +127,7 @@ SUITES: list[dict[str, Any]] = [
          "R20_DAILY_LOSS_EQUITY_RATIO": 0.03, "R20_MAX_DAILY_LOSS_USDT": 100.0,
          "R20_TIME_STOP_HOURS": 12.0, "R20_TIME_STOP_ATR_BAND": 0.10, "R20_STOP_COOLDOWN_MINUTES": 60,
          "R20_MAX_SCALE_IN_COUNT": 0, "R20_MIN_SCALE_IN_PROFIT_RATIO": 0.012, "R20_MIN_SCALE_IN_CONFIDENCE": 85.0,
+         "R20_MAX_TOTAL_EXPOSURE_USDT": 600.0,
      }},
     {"id": "balanced", "name": "⚖️ 均衡波段", "tagline": "推荐默认 · 攻守兼备",
      "desc": "系统出厂基线：同向 3 仓防共振踩踏、单笔保证金 20% 硬顶、2% 单笔风险、R:R 底线 2.0、"
@@ -140,6 +145,7 @@ SUITES: list[dict[str, Any]] = [
          "R20_DAILY_LOSS_EQUITY_RATIO": 0.08, "R20_MAX_DAILY_LOSS_USDT": 300.0,
          "R20_TIME_STOP_HOURS": 16.0, "R20_TIME_STOP_ATR_BAND": 0.20, "R20_STOP_COOLDOWN_MINUTES": 15,
          "R20_MAX_SCALE_IN_COUNT": 2, "R20_MIN_SCALE_IN_PROFIT_RATIO": 0.006, "R20_MIN_SCALE_IN_CONFIDENCE": 70.0,
+         "R20_MAX_TOTAL_EXPOSURE_USDT": 3000.0,
      }},
 ]
 
@@ -166,8 +172,45 @@ for _p in _PARAMS:
     _p["default"] = DEFAULTS[_p["key"]]
 
 
+# ── 审计 P2-9：极端值必须二次确认（逐字短语） ─────────────────────
+# 风控页此前允许把单标的占比拉到 100%、日亏熔断拉到 50% 权益，一次点击即落盘——
+# 移动端误触就能把硬风控放松到接近失效。超过下表阈值时后端要求 confirmation 逐字
+# 匹配 HIGH RISK，前端弹逐字确认框；阈值本身不是硬上限（管理员仍可显式确认后越过），
+# 但"悄悄放松风控"不再可能。
+HIGH_RISK_PHRASE = "HIGH RISK"
+HIGH_RISK_LIMITS: dict[str, float] = {
+    "R20_SINGLE_ASSET_EQUITY_RATIO": 0.50,   # 单标的累计保证金占权益 ≥50%
+    "R20_DAILY_LOSS_EQUITY_RATIO": 0.25,     # 日亏熔断 ≥25% 权益
+    "R20_MAX_MARGIN_EQUITY_RATIO": 0.50,     # 单笔保证金 ≥50% 权益
+    "R20_MAX_SINGLE_ASSET_MARGIN_USDT": 5000.0,
+    "R20_MAX_LEVERAGE": 10.0,
+    "R20_MIN_LEVERAGE": 10.0,
+}
+
+
+def high_risk_changes(values: dict[str, Any]) -> list[dict[str, Any]]:
+    """返回本次保存中越过"极端值"线的参数（含阈值与请求值），供路由要求二次确认。"""
+    out: list[dict[str, Any]] = []
+    for key, threshold in HIGH_RISK_LIMITS.items():
+        if key not in values:
+            continue
+        try:
+            value = float(values[key])
+        except (TypeError, ValueError):
+            continue
+        if value < threshold:
+            continue
+        label = next((p.get("label", key) for p in _PARAMS if p.get("key") == key), key)
+        out.append({"key": key, "label": label, "value": value, "threshold": threshold})
+    return out
+
+
 def schema() -> dict[str, Any]:
-    return {"groups": GROUPS, "params": _PARAMS}
+    # 审计 P2-9：把"极端值线"随 schema 一起给前端，避免前端再抄一份阈值（漂移源）
+    params = [
+        {**p, "high_risk_at": HIGH_RISK_LIMITS.get(str(p.get("key")))} for p in _PARAMS
+    ]
+    return {"groups": GROUPS, "params": params, "high_risk_phrase": HIGH_RISK_PHRASE}
 
 
 def current_values() -> dict[str, float | int]:

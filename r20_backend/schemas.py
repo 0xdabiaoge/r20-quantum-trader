@@ -156,7 +156,9 @@ class LLMFetchModelsRequest(BaseModel):
 class CouncilConfigUpdateRequest(BaseModel):
     enabled: bool
     consensus_mode: str = Field(default="standard")
-    timeout_seconds: float = Field(default=60.0, ge=10.0, le=300.0)
+    # 审计 P2-13：与 council_manager.MIN/MAX/DEFAULT_COUNCIL_TIMEOUT 同源
+    # （旧默认 60 与引擎默认 240 不一致，管理员不改这一项时前后端口径就不同）
+    timeout_seconds: float = Field(default=240.0, ge=30.0, le=420.0)
     roles: dict[str, Any]
 
 
@@ -396,6 +398,8 @@ class MemoryUpdateAllRequest(BaseModel):
 class RiskConfigUpdate(BaseModel):
     values: dict[str, Any] = Field(default_factory=dict)
     suite_id: str = ""
+    # 审计 P2-9：越过"极端值"线时须逐字提交 HIGH RISK（前端弹逐字确认框）
+    confirmation: str = ""
 
 
 class RiskResetRequest(BaseModel):

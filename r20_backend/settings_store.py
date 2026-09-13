@@ -1,9 +1,10 @@
 """Safe local .env configuration persistence for the R20 admin plane."""
 from __future__ import annotations
 import os
+import re
 import tempfile
 from pathlib import Path
-from typing import Mapping
+from typing import Any, Mapping
 from .config import ROOT, refresh_settings
 from .file_locks import file_lock
 
@@ -92,8 +93,30 @@ def mask_url(url: str, visible_tail: int = 6) -> str:
     return f"{url[:12]}{'*' * 8}{url[-visible_tail:]}"
 
 
+_ENV_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
+class EnvValueError(ValueError):
+    """非法的环境变量写入（值含换行/控制字符、键名非法）——路由层映射为 400。"""
+
+
+def sanitize_env_value(key: str, value: Any) -> str:
+    """审计 P2-7(2026-09-13)：.env 是"每行一个 KEY=VALUE"的格式，值里出现换行就等于
+    追加新键（密钥页/通知页/LLM 页任一输入框都能伪造 `R20_BINANCE_EXECUTION=1` 这类
+    执行开闸键）。这里统一拒绝换行/NUL，并顺带拒绝控制字符与首尾空白污染。"""
+    text = "" if value is None else str(value)
+    if any(ch in text for ch in ("\n", "\r", "\0")):
+        raise EnvValueError(f"环境变量 {key} 的值不得包含换行或空字符（防止注入新配置键）")
+    if any(ord(ch) < 32 for ch in text):
+        raise EnvValueError(f"环境变量 {key} 的值包含控制字符，已拒绝写入")
+    return text.strip()
+
+
 def remove_env(keys: set[str] | list[str] | tuple[str, ...]) -> None:
-    targets = set(keys)
+    targets = {str(k) for k in keys}
+    invalid = sorted(k for k in targets if not _ENV_KEY_RE.match(k))
+    if invalid:
+        raise EnvValueError(f"非法的环境变量键名: {', '.join(invalid)}")
     ENV_FILE.parent.mkdir(parents=True, exist_ok=True)
     # 审计 P0-2(2026-09-13)：.env 是全站配置唯一写入口，此处读-改-写必须整体持锁。
     # 旧实现无锁 → 两个并发保存（风控页 / 通知页 / LLM 页 / 密钥页 / 策略回滚）各自
@@ -124,7 +147,11 @@ def update_env(values: Mapping[str, str | bool | None]) -> None:
     # 磁盘未生效」的谎报都源于此处无锁。绝不能只锁写那一半（会退化成另一种丢更新）。
     with file_lock(ENV_FILE):
         existing: list[str] = ENV_FILE.read_text(encoding="utf-8").splitlines() if ENV_FILE.exists() else []
-        remaining = {key: value for key, value in values.items() if key in MANAGED_KEYS and value is not None}
+        remaining = {
+            str(key): sanitize_env_value(str(key), value)
+            for key, value in values.items()
+            if key in MANAGED_KEYS and value is not None
+        }
         result: list[str] = []
         for line in existing:
             stripped = line.strip()
@@ -136,11 +163,11 @@ def update_env(values: Mapping[str, str | bool | None]) -> None:
                 result.append(line)
                 continue
             value = remaining.pop(key)
-            result.append(f"{key}={str(value)}")
+            result.append(f"{key}={value}")
         if remaining:
             if result and result[-1]:
                 result.append("")
-            result.extend(f"{key}={str(value)}" for key, value in remaining.items())
+            result.extend(f"{key}={value}" for key, value in remaining.items())
 
         fd, temp_path = tempfile.mkstemp(prefix=".r20-env-", dir=ENV_FILE.parent)
         try:

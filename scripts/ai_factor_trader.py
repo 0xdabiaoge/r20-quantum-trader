@@ -121,7 +121,7 @@ except Exception:
     get_latest_ai_decision = None
     read_cycle_health = None
 
-from instrument_pool import load_instruments
+from instrument_pool import load_instruments, pool_is_trustworthy, pool_state
 
 TARGET_INSTRUMENTS = load_instruments()
 
@@ -371,6 +371,24 @@ def clamp(value, lower, upper, default):
         return max(lower, min(upper, float(value)))
     except (TypeError, ValueError):
         return default
+
+
+def instrument_profile(inst: dict[str, Any], asset_type: str = "crypto") -> dict[str, Any]:
+    """单标的参数解析（审计 P2-5）。
+
+    旧实现：池文件里每条都写了 `max_leverage`/`sl_atr_mult`（TIER_PROFILES 派生），
+    但代码只读硬编码 ASSET_CLASS_PROFILES —— 于是管理页/池文件里的参数是装饰品，
+    而提示词又给出第三套口径（"止损基准 1.5~2.0x 1H ATR"）。现在单一优先级：
+    池条目 per-instrument > 资产类别档 > 代码兜底，三处（提示词/下单/复算）同源。"""
+    base = dict(ASSET_CLASS_PROFILES.get(asset_type, ASSET_CLASS_PROFILES["crypto"]))
+    for key in ("sl_atr_mult", "tp_atr_mult", "trailing_kick_in", "trailing_pullback", "entry_threshold", "min_profit_ratio"):
+        raw = (inst or {}).get(key)
+        try:
+            if raw is not None and str(raw).strip() != "":
+                base[key] = float(raw)
+        except (TypeError, ValueError):
+            continue
+    return base
 
 
 def load_adaptive_config():
@@ -2137,7 +2155,7 @@ def fetch_single_instrument_data(item, all_positions, usdt_available):
     pos_multipliers = adaptive_cfg.get("position_size_multipliers", {})
     pos_mult = float(pos_multipliers.get(f["name"], 1.0))
 
-    sl_mult = ASSET_CLASS_PROFILES.get(asset_type, {}).get("sl_atr_mult", 1.3)
+    sl_mult = float(instrument_profile(f, asset_type).get("sl_atr_mult", 1.3))
     atr_val = max(f["atr"], f["price"] * 0.005)
     if f["ctVal"] > 0 and atr_val > 0:
         raw_dyn_sz = (f["risk_per_trade_usd"] * pos_mult) / (f["ctVal"] * atr_val * sl_mult)
@@ -3167,7 +3185,17 @@ def execute_portfolio():
         except Exception as e:
             print(f"[AI Brain Batch Scan Warning] {e}")
 
-    if not cb_active:
+    # 审计 P2-11：标的池不可信（文件损坏/为空/条目非法）时，旧实现会拿 10 币出厂默认
+    # 清单继续开新仓 —— 管理员删掉的标的会因"文件坏了"重新被交易。这里 fail-closed：
+    # 只保留持仓风控接管（止损/移动止损/AI 平仓在上面的分支已跑完），不开新仓。
+    if not cb_active and not pool_is_trustworthy():
+        _ps = pool_state()
+        _pool_warn = (f"⛔ 标的池不可信（{_ps.get('status')}: {_ps.get('detail')}）"
+                      f"——本轮只做持仓风控接管，禁止开新仓")
+        print(f"[交易池闸门] {_pool_warn}")
+        executed_actions.append(_pool_warn)
+
+    if not cb_active and pool_is_trustworthy():
         for f in all_factors:
             asset_type = f.get("type", "crypto")
             if not is_tradfi_market_liquid(asset_type):
@@ -3181,8 +3209,10 @@ def execute_portfolio():
             profile = ASSET_CLASS_PROFILES.get(asset_type, ASSET_CLASS_PROFILES["crypto"])
             
             adaptive_cfg = load_adaptive_config()
-            tp_mult = adaptive_cfg.get("tp_atr_mult", profile.get("tp_atr_mult", 2.2))
-            sl_mult = adaptive_cfg.get("sl_atr_mult", profile.get("sl_atr_mult", 1.3))
+            # P2-5：池条目 per-instrument 参数优先（旧实现只认资产类别硬编码）
+            _inst_profile = instrument_profile(f, asset_type)
+            tp_mult = adaptive_cfg.get("tp_atr_mult", _inst_profile.get("tp_atr_mult", 2.2))
+            sl_mult = adaptive_cfg.get("sl_atr_mult", _inst_profile.get("sl_atr_mult", 1.3))
 
             atr = max(f["atr"], f["price"] * 0.005)
             min_prof = adaptive_cfg.get("min_profit_ratio", profile.get("min_profit_ratio", 0.008))
@@ -3223,8 +3253,22 @@ def execute_portfolio():
             actual_sz = f["sz"]
             ai_margin = float(ai_decision.get("margin_usdt", 0.0) or 0.0)
             ai_lever = float(ai_decision.get("leverage", 3) or 3)
-            # 杠杆硬钳制：无论 AI 裁决多激进，执行层不超过后台风控管理页配置的杠杆上限
-            ai_lever = max(1.0, min(ai_lever, MAX_LEVERAGE))
+            # 杠杆硬钳制：无论 AI 裁决多激进，执行层都夹在后台风控页配置的区间内
+            # （审计 P2-8：旧实现下限写死 1.0，风控页的 MIN_LEVERAGE 在单所路径不成立）
+            ai_lever = min(max(ai_lever, float(MIN_LEVERAGE or 0.0) or 1.0), float(MAX_LEVERAGE or 20.0))
+            # 审计 P2-5：池条目的 per-instrument max_leverage（tier 派生 3x/5x）此前无人读；
+            # 现在它是该标的的硬上限（与全局上限取更严者），并透传给多所路由。
+            try:
+                _inst_lever_cap = float(f.get("max_leverage") or 0.0)
+            except (TypeError, ValueError):
+                _inst_lever_cap = 0.0
+            if _inst_lever_cap > 0 and ai_lever > _inst_lever_cap:
+                print(f"[杠杆闸门] {f['name']} 池内单标的杠杆上限 {_inst_lever_cap:g}x < 全局 {ai_lever:g}x，已按池值收紧")
+                ai_lever = _inst_lever_cap
+            if abs(ai_lever - float(ai_decision.get("leverage", 3) or 3)) > 1e-9:
+                print(f"[杠杆闸门] {f['name']} AI 裁决杠杆 {ai_decision.get('leverage')}x "
+                      f"超出配置区间 [{float(MIN_LEVERAGE or 0):g}x, {float(MAX_LEVERAGE or 0):g}x]，"
+                      f"已夹至 {ai_lever:g}x")
             step_sz = float(f.get("minSz", 1) or 1)
 
             # If AI planned margin & leverage, calculate custom contract size
@@ -3329,6 +3373,8 @@ def execute_portfolio():
                                    "margin_usdt": _order_margin,
                                    "max_margin_usdt": equity_margin_cap(usdt_available),
                                    "leverage": ai_lever,
+                                   # 审计 P2-5：池内单标的杠杆上限一并透传（router 取更严者）
+                                   "max_leverage": _inst_lever_cap,
                                    # 审计 P1-7：per-venue min_confidence 闸门需要原始置信度（决策载荷里本没有）
                                    "confidence": ai_conf,
                                    "intent_id": f"{inst_id}:BUY_LONG:{int(ai_info.get('timestamp') or time.time())}"})
@@ -3444,6 +3490,7 @@ def execute_portfolio():
                                    "margin_usdt": _order_margin,
                                    "max_margin_usdt": equity_margin_cap(usdt_available),
                                    "leverage": ai_lever,
+                                   "max_leverage": _inst_lever_cap,   # 审计 P2-5：池内单标的杠杆上限
                                    "confidence": ai_conf,   # 审计 P1-7：per-venue 置信度门禁
                                    "intent_id": f"{inst_id}:SELL_SHORT:{int(ai_info.get('timestamp') or time.time())}"})
                     if accepted:

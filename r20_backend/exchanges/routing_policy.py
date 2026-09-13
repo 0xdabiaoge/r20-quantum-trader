@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -79,6 +80,31 @@ DEFAULT_GATE_POOL: Dict[str, Any] = {
 }
 
 
+_ASSET_TOKEN_RE = re.compile(r"^[A-Z0-9]{2,15}$")
+
+
+def _normalize_assets(raw_assets: Any, venue: str) -> List[str]:
+    """准入币种规范化：单字符串视作一个币种；非法项丢弃并吼出来（绝不静默拆字符）。"""
+    if raw_assets in (None, ""):
+        return []
+    items = [raw_assets] if isinstance(raw_assets, str) else list(raw_assets) if isinstance(raw_assets, (list, tuple, set)) else None
+    if items is None:
+        print(f"[routing_policy] warn {venue} 的 assets 既不是字符串也不是列表（{type(raw_assets).__name__}），已按空池处理")
+        return []
+    out: List[str] = []
+    for item in items:
+        if not isinstance(item, str):
+            print(f"[routing_policy] warn {venue} 的 assets 含非字符串项 {item!r}，已丢弃")
+            continue
+        token = item.strip().upper()
+        if not _ASSET_TOKEN_RE.match(token):
+            print(f"[routing_policy] warn {venue} 的 assets 项 {item!r} 不是合法币种名，已丢弃")
+            continue
+        if token not in out:
+            out.append(token)
+    return out
+
+
 def load_venue_pool(venue: str) -> Dict[str, Any]:
     """统一多所池配置加载：优先读取各所覆盖项，缺省自动继承全局风控单一事实源。"""
     vkey = str(venue or "").strip().lower()
@@ -98,6 +124,9 @@ def load_venue_pool(venue: str) -> Dict[str, Any]:
                 for k in ("assets", "dry_run"):
                     if k in v_cfg:
                         base_pool[k] = v_cfg[k]
+                # 审计 P2-10：assets 旧实现直接拿配置值去迭代 → 写成字符串 "BTC" 时
+                # 会变成 ['B','C','T']，于是"准入币种"静默变成三个单字母垃圾。
+                base_pool["assets"] = _normalize_assets(base_pool.get("assets"), vkey)
                 # 数值风控参数：若配置且 > 0 则覆盖，未配置或 0/负数则继承全局风控默认值
                 for k in ("margin_per_trade_usdt", "max_open", "min_confidence"):
                     if k in v_cfg and v_cfg[k] not in (None, 0, ""):

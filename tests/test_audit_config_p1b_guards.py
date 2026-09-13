@@ -77,9 +77,11 @@ class DeleteGuardRouteTests(_Base):
         self.pool_file = Path(pool.POOL_FILE)
         self.pool_file.parent.mkdir(parents=True, exist_ok=True)
         self.pool_file.write_text(json.dumps({"version": 1, "instruments": [
-            {"instId": "BTC-USDT-SWAP", "name": "BTC", "ctType": "SWAP"},
-            {"instId": "ALGO-USDT-SWAP", "name": "ALGO", "ctType": "SWAP"},
-            {"instId": "DOGE-USDT-SWAP", "name": "DOGE", "ctType": "SWAP"},
+            # P2-11 起 load_instruments 会校验必需字段（instId/name/ctVal），
+            # 夹具补齐 ctVal 以反映真实池（data/instrument_pool.json 每条都有）
+            {"instId": "BTC-USDT-SWAP", "name": "BTC", "ctType": "SWAP", "ctVal": 0.01},
+            {"instId": "ALGO-USDT-SWAP", "name": "ALGO", "ctType": "SWAP", "ctVal": 100.0},
+            {"instId": "DOGE-USDT-SWAP", "name": "DOGE", "ctType": "SWAP", "ctVal": 1000.0},
         ]}), encoding="utf-8")
         # save_instruments 会扇出下游同步文件，测试里禁掉（只关心池文件本身）
         p4 = patch.object(self.pool, "sync_instruments_state", lambda: None)

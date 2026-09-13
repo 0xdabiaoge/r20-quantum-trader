@@ -4,7 +4,7 @@ import json
 import os
 import tempfile
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict
 
 ROOT = Path(__file__).resolve().parents[1]
 POOL_FILE = ROOT / "data" / "instrument_pool.json"
@@ -117,25 +117,133 @@ def from_okx_instrument(raw: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+REQUIRED_POOL_FIELDS = ("instId", "name", "ctVal")
+
+# 审计 P2-11(2026-09-13)：池文件坏掉时旧实现静默返回 10 币 DEFAULT_INSTRUMENTS ——
+# 于是管理员删掉的标的会因为"文件坏了"重新出现在交易池里（缺失≠0 的反面：坏掉≠默认）。
+# 现在把状态记在这里，交易侧据此 fail-closed（只做风控接管、不开新仓），而
+# dashboard/后端仍能读到一份可展示的数据，不至于整个 API 起不来。
+_POOL_STATE: Dict[str, Any] = {"status": "unknown", "detail": "", "dropped": []}
+
+
+def pool_state() -> Dict[str, Any]:
+    """最近一次 load_instruments() 的可信度快照（status: ok|missing|corrupt|empty|invalid）。"""
+    return {**_POOL_STATE, "dropped": list(_POOL_STATE.get("dropped") or [])}
+
+
+def pool_is_trustworthy() -> bool:
+    """true 仅当 POOL_FILE 存在且解析出一份通过字段校验的非空池。"""
+    return _POOL_STATE.get("status") == "ok"
+
+
+def _validate_pool_items(instruments: list[Any]) -> tuple[list[dict[str, Any]], list[str]]:
+    """逐项校验：缺必需字段/类型不对的条目丢弃并点名（旧实现是周期中途 KeyError 崩掉）。"""
+    kept: list[dict[str, Any]] = []
+    dropped: list[str] = []
+    for index, item in enumerate(instruments):
+        if not isinstance(item, dict):
+            dropped.append(f"#{index}({type(item).__name__})")
+            continue
+        missing = [field for field in REQUIRED_POOL_FIELDS if not str(item.get(field) or "").strip()]
+        if missing:
+            dropped.append(f"#{index} {item.get('instId') or item.get('name') or '?'} 缺 {','.join(missing)}")
+            continue
+        try:
+            float(item.get("ctVal"))
+        except (TypeError, ValueError):
+            dropped.append(f"#{index} {item.get('instId')} 的 ctVal 非数值（{item.get('ctVal')!r}）")
+            continue
+        kept.append(item)
+    return kept, dropped
+
+
 def load_instruments() -> list[dict[str, Any]]:
     if not POOL_FILE.exists():
+        # 首次启动没有池文件：用出厂默认并把状态标成 missing（交易侧不据此开新仓）
+        _POOL_STATE.update({"status": "missing", "detail": f"{POOL_FILE} 不存在，已按出厂默认池返回", "dropped": []})
+        print(f"[instrument_pool] warn 未找到 {POOL_FILE}，返回出厂默认 {len(DEFAULT_INSTRUMENTS)} 币；"
+              f"交易侧本轮不开新仓（请先在后台保存一次标的池）")
         return [dict(item) for item in DEFAULT_INSTRUMENTS]
     try:
         payload = json.loads(POOL_FILE.read_text(encoding="utf-8"))
-        instruments = payload.get("instruments", payload) if isinstance(payload, dict) else payload
-        if isinstance(instruments, list) and instruments:
-            for item in instruments:
-                if "tier" not in item:
-                    item["tier"] = evaluate_instrument_tier(item.get("instId", ""), item.get("name", ""))
-                    item["max_leverage"] = TIER_PROFILES[item["tier"]]["max_leverage"]
-                    item["sl_atr_mult"] = TIER_PROFILES[item["tier"]]["sl_atr_mult"]
-            return instruments
-    except (OSError, json.JSONDecodeError):
-        pass
-    return [dict(item) for item in DEFAULT_INSTRUMENTS]
+    except (OSError, json.JSONDecodeError) as exc:
+        _POOL_STATE.update({"status": "corrupt", "detail": f"{POOL_FILE} 解析失败: {exc}", "dropped": []})
+        print(f"[instrument_pool] error 标的池文件损坏（{exc}）→ 已退回出厂默认清单仅供展示，"
+              f"交易侧本轮不开新仓。请修复或重新保存标的池。")
+        return [dict(item) for item in DEFAULT_INSTRUMENTS]
+    instruments = payload.get("instruments", payload) if isinstance(payload, dict) else payload
+    if not isinstance(instruments, list) or not instruments:
+        _POOL_STATE.update({"status": "empty", "detail": f"{POOL_FILE} 里没有 instruments", "dropped": []})
+        print(f"[instrument_pool] error 标的池为空（{POOL_FILE}）→ 交易侧本轮不开新仓")
+        return [dict(item) for item in DEFAULT_INSTRUMENTS]
+    kept, dropped = _validate_pool_items(instruments)
+    if dropped:
+        print(f"[instrument_pool] error 标的池有 {len(dropped)} 项非法，已丢弃: {', '.join(dropped)}")
+    if not kept:
+        _POOL_STATE.update({"status": "invalid", "detail": f"{POOL_FILE} 全部条目非法", "dropped": dropped})
+        print(f"[instrument_pool] error 标的池无一条合法 → 交易侧本轮不开新仓")
+        return [dict(item) for item in DEFAULT_INSTRUMENTS]
+    for item in kept:
+        if "tier" not in item:
+            item["tier"] = evaluate_instrument_tier(item.get("instId", ""), item.get("name", ""))
+            item["max_leverage"] = TIER_PROFILES[item["tier"]]["max_leverage"]
+            item["sl_atr_mult"] = TIER_PROFILES[item["tier"]]["sl_atr_mult"]
+    _POOL_STATE.update({
+        "status": "ok" if not dropped else "invalid",
+        "detail": "" if not dropped else f"丢弃 {len(dropped)} 项: {', '.join(dropped)}",
+        "dropped": dropped,
+    })
+    return kept
+
+
+def _pool_lock():
+    """跨进程互斥（审计 P2-6）：池文件是多进程 RMW 目标（后台路由写、采集脚本写）。
+    优先用 r20_backend.file_locks（可重入、锁文件同目录），后端不在路径时退化为
+    本地 flock —— 绝不在"锁不可用"时静默放行。"""
+    try:
+        from r20_backend.file_locks import file_lock
+        return file_lock(POOL_FILE)
+    except Exception:
+        import fcntl
+        from contextlib import contextmanager
+
+        @contextmanager
+        def _local_lock():
+            lock_path = POOL_FILE.with_name("." + POOL_FILE.name + ".lock")
+            lock_path.parent.mkdir(parents=True, exist_ok=True)
+            fd = os.open(str(lock_path), os.O_RDWR | os.O_CREAT, 0o600)
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX)
+                yield
+            finally:
+                try:
+                    fcntl.flock(fd, fcntl.LOCK_UN)
+                finally:
+                    os.close(fd)
+        return _local_lock()
+
+
+def mutate_instruments(mutator):
+    """在锁内完成 load → mutate → save 的整段 RMW（审计 P2-6）。
+
+    旧实现里路由各自 `current = load_instruments(); save_instruments([...])`——
+    两个并发保存（两次点击、页面重试、采集脚本同时跑）基于同一份旧池回写，后写者
+    静默吞掉先写者（丢标的/丢参数）。mutator 接收当前池列表，返回要落盘的新列表。"""
+    with _pool_lock():
+        current = load_instruments()
+        updated = mutator([dict(item) for item in current])
+        if updated is None:
+            return current
+        save_instruments(list(updated))
+        return updated
 
 
 def save_instruments(instruments: list[dict[str, Any]]) -> None:
+    with _pool_lock():
+        _write_pool_file(instruments)
+
+
+def _write_pool_file(instruments: list[dict[str, Any]]) -> None:
     POOL_FILE.parent.mkdir(parents=True, exist_ok=True)
     fd, temp_path = tempfile.mkstemp(prefix=".instrument-pool-", suffix=".tmp", dir=POOL_FILE.parent)
     try:

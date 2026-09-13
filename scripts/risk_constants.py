@@ -95,12 +95,20 @@ MIN_SCALE_IN_CONFIDENCE = _env_float("R20_MIN_SCALE_IN_CONFIDENCE", 75.0)
 # 属展示启发式而非引擎策略。现引擎侧 budget>0 时按 gross_exposure 跨所合算强制。
 PORTFOLIO_RISK_BUDGET_USDT = _env_float("R20_PORTFOLIO_RISK_BUDGET_USDT", 0.0)
 
+# 跨所同向合并敞口上限（USDT；0 = 不限制）。
+# 审计 P2-1(2026-09-13)：该键自 US-005 起就写在 settings_store.MANAGED_KEYS（后台可写、
+# 可落 .env），但**全仓 0 个读者** —— 设了等于没设，UI 却把它当风控项。现落地为
+# execution_router 发送前判定：同向（base 相同且方向一致）已开仓名义额 + 本单名义额
+# 超过本上限即拒开（不夹取——敞口超限意味着这笔根本不该发）。
+MAX_TOTAL_EXPOSURE_USDT = _env_float("R20_MAX_TOTAL_EXPOSURE_USDT", 0.0)
+
 # ── 默认值表（供后台风控管理页 schema 引用，键 = 环境变量名） ────
 # 注意：必须是字面量默认值，绝不能引用上面「已按 .env 解析」的常量——
 # 否则后台进程在用户应用过套件后重启，DEFAULTS 会被 .env 污染，
 # 导致「均衡波段」套件写入用户当前值、UI「默认」提示失真。
 DEFAULTS = {
     "R20_PORTFOLIO_RISK_BUDGET_USDT": 0.0,
+    "R20_MAX_TOTAL_EXPOSURE_USDT": 0.0,
     "R20_MAX_CONCURRENT_POSITIONS": 0,
     "R20_MAX_SAME_DIRECTION_POSITIONS": 3,
     "R20_MAX_MARGIN_EQUITY_RATIO": 0.20,

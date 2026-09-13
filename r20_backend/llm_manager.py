@@ -19,6 +19,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
 
+from .file_locks import file_lock
+
 _BJ = timezone(timedelta(hours=8))
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -482,8 +484,12 @@ init_llm_providers = init_llm_config
 
 
 def save_llm_config(config: Dict[str, Any]) -> None:
-    """唯一配置写入口：调用时解析 LLM_CONFIG_FILE 模块全局，测试沙箱 patch 必然生效。"""
-    _atomic_write_json(LLM_CONFIG_FILE, config)
+    """唯一配置写入口：调用时解析 LLM_CONFIG_FILE 模块全局，测试沙箱 patch 必然生效。
+
+    审计 P2-6：llm_models.json 同属多进程 RMW 目标（LLM 页保存 / 主脑探活写回 /
+    模型同步脚本）——旧实现只有原子写、没有互斥，两个并发保存会丢一个。"""
+    with file_lock(LLM_CONFIG_FILE):
+        _atomic_write_json(LLM_CONFIG_FILE, config)
 
 
 def load_llm_config(mask_keys: bool = True) -> Dict[str, Any]:

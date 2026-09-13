@@ -8,8 +8,10 @@
    因为其常量在 import 时一次性绑定；
 4) 再首次导入 risk_constants（此时得到代码默认基线），并断言静态键表与单一事实源一致。
 """
+import builtins
 import os
 import tempfile
+from pathlib import Path
 
 # 审计卫生（2026-09-13 清积压）：audit.py / self_improvement_engine.log_msg 的
 # 路径此前是模块级硬编码、不可重定向，走 TestClient 的后台测试把伪造记录直写
@@ -31,6 +33,8 @@ _config.load_dotenv = lambda path: None
 
 _RISK_KEYS_STATIC = (
     "R20_PORTFOLIO_RISK_BUDGET_USDT",
+    # 批4 P2-1：跨所同向敞口上限（此前只在 settings_store.MANAGED_KEYS 里，无任何读者）
+    "R20_MAX_TOTAL_EXPOSURE_USDT",
     "R20_MAX_CONCURRENT_POSITIONS", "R20_MAX_SAME_DIRECTION_POSITIONS",
     "R20_MAX_MARGIN_EQUITY_RATIO", "R20_SINGLE_ASSET_EQUITY_RATIO",
     "R20_MAX_SINGLE_ASSET_MARGIN_USDT", "R20_MAX_LEVERAGE", "R20_MIN_LEVERAGE",
@@ -71,3 +75,91 @@ def _sandbox_required(original, name):
 
 _settings_store.update_env = _sandbox_required(_settings_store.update_env, "update_env")
 _settings_store.remove_env = _sandbox_required(_settings_store.remove_env, "remove_env")
+
+
+# ── 生产配置写保护（2026-09-14 事故后加）────────────────────────────────
+# 事故：批4 测试文件的 `_Base` 把 isolate_config 的返回值误当 dict → 回落到项目根，
+# 于是测试直接覆盖了生产 data/venue_routing.json（多所路由配置）与
+# data/instrument_pool.json（交易池），并把因子快照刷成垃圾池；两者都只能靠审计记录 +
+# OKX 重建恢复。教训是"缺省必须安全"：**运维配置文件的写入一律硬失败**，
+# 其余 data/ 产物（锁、缓存、快照、台账）只告警不阻断（历史测试依赖它们）。
+_PROJECT_ROOT = Path(__file__).resolve().parents[1]
+_PROTECTED_CONFIG_FILES = {
+    (_PROJECT_ROOT / ".env").resolve(),
+    (_PROJECT_ROOT / "data" / "venue_routing.json").resolve(),
+    (_PROJECT_ROOT / "data" / "instrument_pool.json").resolve(),
+    (_PROJECT_ROOT / "data" / "council_config.json").resolve(),
+    (_PROJECT_ROOT / "data" / "prompt_library.json").resolve(),
+    (_PROJECT_ROOT / "data" / "llm_models.json").resolve(),
+    (_PROJECT_ROOT / "data" / "account_baseline.json").resolve(),
+    (_PROJECT_ROOT / "data" / "position_trackers.json").resolve(),
+}
+_DATA_DIR = (_PROJECT_ROOT / "data").resolve()
+_ALLOW_REAL_WRITES = os.environ.get("R20_TESTS_ALLOW_REAL_DATA", "") == "1"
+_WARNED_PATHS: set[str] = set()
+
+
+def _assert_not_production(path: object, action: str = "写入") -> None:
+    """运维配置文件禁止测试写入；其余生产路径仅提示（每个路径一次）。"""
+    if _ALLOW_REAL_WRITES:
+        return
+    try:
+        resolved = Path(os.fspath(path)).resolve()  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return
+    if resolved in _PROTECTED_CONFIG_FILES:
+        raise AssertionError(
+            f"测试禁止{action}生产配置文件 {resolved}——请用 tests.config_sandbox.isolate_config "
+            f"的沙箱根（其返回值就是临时根 Path），不要回落到项目根")
+    if resolved == _DATA_DIR or str(resolved).startswith(str(_DATA_DIR) + os.sep):
+        key = str(resolved)
+        if key not in _WARNED_PATHS:
+            _WARNED_PATHS.add(key)
+            print(f"[tests] 提示：测试正在{action}生产 data/ 下的 {resolved.name}"
+                  f"（非运维配置，仅提示；建议改用沙箱）")
+
+
+if not _ALLOW_REAL_WRITES:
+    _real_write_text = Path.write_text
+    _real_write_bytes = Path.write_bytes
+    _real_path_open = Path.open
+    _real_open = open
+    _real_replace = os.replace
+    _real_remove = os.remove
+
+    def _guarded_write_text(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        _assert_not_production(self)
+        return _real_write_text(self, *args, **kwargs)
+
+    def _guarded_write_bytes(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        _assert_not_production(self)
+        return _real_write_bytes(self, *args, **kwargs)
+
+    def _guarded_path_open(self, mode="r", *args, **kwargs):  # type: ignore[no-untyped-def]
+        if any(flag in str(mode) for flag in ("w", "a", "x", "+")):
+            _assert_not_production(self)
+        return _real_path_open(self, mode, *args, **kwargs)
+
+    def _guarded_open(file, mode="r", *args, **kwargs):  # type: ignore[no-untyped-def]
+        if any(flag in str(mode) for flag in ("w", "a", "x", "+")):
+            _assert_not_production(file)
+        return _real_open(file, mode, *args, **kwargs)
+
+    def _guarded_replace(src, dst, *args, **kwargs):  # type: ignore[no-untyped-def]
+        _assert_not_production(dst, "替换")
+        return _real_replace(src, dst, *args, **kwargs)
+
+    def _guarded_remove(path, *args, **kwargs):  # type: ignore[no-untyped-def]
+        # dir_fd 形式（shutil.rmtree 的 _rmtree_safe_fd 会用）里的 path 是相对名，
+        # 不能拿 CWD 解析 —— 否则临时目录清理会被误判成"删除生产 .env"。
+        if kwargs.get("dir_fd") is None:
+            _assert_not_production(path, "删除")
+        return _real_remove(path, *args, **kwargs)
+
+    Path.write_text = _guarded_write_text
+    Path.write_bytes = _guarded_write_bytes
+    Path.open = _guarded_path_open
+    builtins.open = _guarded_open
+    os.replace = _guarded_replace
+    os.remove = _guarded_remove
+    os.unlink = _guarded_remove
