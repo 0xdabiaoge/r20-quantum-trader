@@ -46,16 +46,43 @@ class AdminAuthTests(unittest.TestCase):
         self.assertIsNotNone(self.store.login("operator", "NewOperatorPassword456"))
 
     def test_failed_login_reports_remaining_attempts_and_unlocks(self):
+        # 审计D(2026-09-13)·枚举面收口后重写：旧钉「还可尝试 N 次/已锁定」逐态文案，
+        # 正是账号枚举神谕。现在对**所有**失败态（含锁定期内输对密码）只有一句话；
+        # 锁定机制本身照旧生效（用 DB 状态与 unlock_user 后行为证明），原因进 stderr。
+        import io
+        import sys as _sys
+        from unittest.mock import patch
         user = self.store.create_user("operator", "OperatorPassword123", "admin")
-        for remaining in (4, 3, 2, 1):
-            with self.assertRaisesRegex(PermissionError, f"还可尝试 {remaining} 次"):
+        for _ in range(5):
+            with self.assertRaisesRegex(PermissionError, "^账号或密码错误$"):
                 self.store.login("operator", "wrong-password")
-        with self.assertRaisesRegex(PermissionError, "已锁定 15 分钟"):
-            self.store.login("operator", "wrong-password")
-        with self.assertRaisesRegex(PermissionError, "临时锁定"):
-            self.store.login("operator", "OperatorPassword123")
+        with patch.object(_sys, "stderr", new_callable=io.StringIO) as err:
+            with self.assertRaisesRegex(PermissionError, "^账号或密码错误$"):
+                self.store.login("operator", "OperatorPassword123")   # 锁定期连对也不放行
+        self.assertIn("账号锁定中", err.getvalue())              # 真实原因在服务器侧（预检锁定分支）
+        # 「不存在账号」与「锁定账号」对外文案逐字节一致 → 无枚举差
+        with self.assertRaisesRegex(PermissionError, "^账号或密码错误$"):
+            self.store.login("ghost-user", "whatever")
         self.store.unlock_user(user["id"])
         self.assertEqual(self.store.login("operator", "OperatorPassword123")["user"]["username"], "operator")
+
+    def test_remaining_counter_never_shows_negative(self):
+        # max(0,…) 夹紧：残余计数漂移不得再产出「-1 次」字样（现在原因也不外露，
+        # 但 stderr 理由串同样夹死）
+        import io
+        import sys as _sys
+        from unittest.mock import patch
+        self.store.create_user("drifty", "OperatorPassword123", "admin")
+        for _ in range(4):
+            with self.assertRaises(PermissionError):
+                self.store.login("drifty", "wrong")
+        with self.store.connect() as connection:
+            connection.execute("UPDATE admin_users SET locked_until=0, failed_attempts=6 WHERE username='drifty'")
+        with patch.object(_sys, "stderr", new_callable=io.StringIO) as err:
+            with self.assertRaises(PermissionError):
+                self.store.login("drifty", "wrong")
+        self.assertNotIn("-1 次", err.getvalue())
+        self.assertIn("触发 15 分钟锁定", err.getvalue())  # 6>=5 直接重锁
 
     def test_invalid_password_policy(self):
         with self.assertRaises(ValueError):

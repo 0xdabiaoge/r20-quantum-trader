@@ -62,29 +62,37 @@ def run() -> None:
     signal.signal(signal.SIGINT, stop)
     store = GatewayStore(DB_PATH)
     store.recover_processing()
+    _adopted = store.recover_stale_job_runs()
+    if _adopted:
+        log(f"收编僵尸 running 作业行 {_adopted} 条（→ interrupted）")
     scheduler = GatewayScheduler(store)
     scheduler.initialize_migration_baseline()
     log("gateway worker started with scheduler ownership")
     while RUNNING:
+        # 审计#4(2026-09-13)·tick 饥饿修复：旧循环一次批量领 20 条投递并**串行**
+        # HTTP 发送（webhook 卡死时每发可达超时秒级），期间 scheduler.tick() 无人喂——
+        # 有积压时交易周期任务可被投递重试饿死数分钟。现每轮至多发 1 条，发完立即
+        # 回到循环顶 tick；积压只影响投递速率，不再波及排程。配合 claim_due 租约
+        # 老化（#11），崩溃遗留 processing 行过 120s 也可被本循环重领。
         launched = scheduler.tick()
         for job_name in launched:
             log(f"scheduled job={job_name}")
-        deliveries = store.claim_due(20)
+        deliveries = store.claim_due(1)
         if not deliveries:
             time.sleep(1)
             continue
-        for delivery in deliveries:
-            try:
-                result = NotificationChannelAdapter(str(delivery["channel"])).send(format_message(delivery))
-                if result.success:
-                    store.complete(int(delivery["id"]), result.status, result.detail)
-                    log(f"{result.status} event={delivery['event_id']} channel={delivery['channel']} detail={result.detail}")
-                else:
-                    store.fail(int(delivery["id"]), int(delivery["attempts"]), result.detail)
-                    log(f"delivery failed event={delivery['event_id']} channel={delivery['channel']} detail={result.detail}")
-            except Exception as exc:
-                store.fail(int(delivery["id"]), int(delivery["attempts"]), str(exc))
-                log(f"delivery exception event={delivery['event_id']} channel={delivery['channel']} type={type(exc).__name__}")
+        delivery = deliveries[0]
+        try:
+            result = NotificationChannelAdapter(str(delivery["channel"])).send(format_message(delivery))
+            if result.success:
+                store.complete(int(delivery["id"]), result.status, result.detail)
+                log(f"{result.status} event={delivery['event_id']} channel={delivery['channel']} detail={result.detail}")
+            else:
+                store.fail(int(delivery["id"]), int(delivery["attempts"]), result.detail)
+                log(f"delivery failed event={delivery['event_id']} channel={delivery['channel']} detail={result.detail}")
+        except Exception as exc:
+            store.fail(int(delivery["id"]), int(delivery["attempts"]), str(exc))
+            log(f"delivery exception event={delivery['event_id']} channel={delivery['channel']} type={type(exc).__name__}")
     scheduler.shutdown()
     log("gateway worker stopped")
 

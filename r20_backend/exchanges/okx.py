@@ -269,6 +269,18 @@ class OKXAdapter(OKXPublicAdapter):
         )
         return {"venue": "okx", "symbol": inst_id, "result": res}
 
+    def set_leverage(self, symbol: str, leverage: float, margin_mode: str = "cross",
+                     pos_side: Optional[str] = None) -> Any:
+        """审计④5(2026-09-13)：补齐三所契约对称（Binance/Gate 早有）。OKX 杠杆是
+        账户级、按 instId+mgnMode（双向另分 posSide）的持久档位——AI 裁决的杠杆
+        必须落档，否则保证金/强平价按账户旧档算。net 模式省略 posSide（该 instId
+        全模式生效，官方语义）。"""
+        from scripts import okx_rest
+        env = self._get_okx_env()
+        inst_id = self.native_symbol(symbol)
+        return okx_rest.set_leverage(inst_id, int(leverage), mgn_mode=margin_mode,
+                                     pos_side=pos_side, env=env)
+
     def cancel_order(self, symbol: str, order_id: Optional[str] = None,
                      client_order_id: Optional[str] = None) -> Dict[str, Any]:
         from scripts import okx_rest

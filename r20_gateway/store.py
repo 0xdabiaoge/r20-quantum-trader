@@ -112,21 +112,32 @@ class GatewayStore:
                 )
         return event.event_id
 
-    def claim_due(self, limit: int = 20) -> list[dict[str, Any]]:
-        now = datetime.now(BJ_TZ).strftime("%Y-%m-%d %H:%M:%S")
+    def claim_due(self, limit: int = 20, lease_seconds: int = 120) -> list[dict[str, Any]]:
+        """领取到点投递；带**租约老化**（审计#11 2026-09-13）：领取同时把
+        next_attempt_at 推到 now+lease，崩溃/被杀遗留的 'processing' 行在租约到期后
+        可被重新领取——旧实现只在进程启动时 recover_processing() 一次性收编，
+        运行中挂掉的行永久卡死（不重启就永不重投）。
+        与慢发送的竞态按 at-least-once 语义容忍（重复投优于永久漏投）。"""
+        now_dt = datetime.now(BJ_TZ)
+        now = now_dt.strftime("%Y-%m-%d %H:%M:%S")
+        lease_until = (now_dt + timedelta(seconds=max(30, lease_seconds))).strftime("%Y-%m-%d %H:%M:%S")
         with self.connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             rows = connection.execute(
                 """SELECT d.id, d.channel, d.attempts, e.* FROM deliveries d
                    JOIN events e ON e.event_id=d.event_id
-                   WHERE d.status IN ('pending','retry') AND d.next_attempt_at<=?
+                   WHERE (d.status IN ('pending','retry')
+                          OR (d.status='processing' AND d.next_attempt_at<=?))
+                     AND d.next_attempt_at<=?
                    ORDER BY e.priority DESC, d.id ASC LIMIT ?""",
-                (now, limit),
+                (now, now, limit),
             ).fetchall()
             ids = [row["id"] for row in rows]
             if ids:
                 marks = ",".join("?" for _ in ids)
-                connection.execute(f"UPDATE deliveries SET status='processing' WHERE id IN ({marks})", ids)
+                connection.execute(
+                    f"UPDATE deliveries SET status='processing', next_attempt_at=? WHERE id IN ({marks})",
+                    [lease_until, *ids])
             return [dict(row) for row in rows]
 
     def complete(self, delivery_id: int, status: str = "delivered", detail: str = "") -> None:
@@ -168,6 +179,16 @@ class GatewayStore:
         with self.connect() as connection:
             cursor = connection.execute("INSERT INTO job_runs(job_name,status,started_at) VALUES (?,'running',?)", (job_name, now))
             return int(cursor.lastrowid)
+
+    def recover_stale_job_runs(self) -> int:
+        """审计#12(2026-09-13)：worker 被杀/崩溃时 running 行无人收尾——面板「运行中」
+        永久假亮。新 worker 启动时收编为 interrupted（诚实标注，不冒充 success/failed）。"""
+        now = datetime.now(BJ_TZ).strftime("%Y-%m-%d %H:%M:%S")
+        with self.connect() as connection:
+            cursor = connection.execute(
+                "UPDATE job_runs SET status='interrupted', finished_at=?, detail='进程终止未收尾——worker 启动时收编僵尸 running 行'"
+                " WHERE status='running'", (now,))
+            return cursor.rowcount
 
     def finish_job(self, run_id: int, return_code: int, detail: str) -> None:
         now = datetime.now(BJ_TZ).strftime("%Y-%m-%d %H:%M:%S")

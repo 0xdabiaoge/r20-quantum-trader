@@ -344,8 +344,16 @@ def load_adaptive_config():
     return {}
 
 def clean_stale_open_orders(keep_ord_ids: Optional[set] = None) -> Tuple[bool, str]:
-    """Cancel stale entry orders; any inability to verify/cancel blocks the trading cycle."""
+    """Cancel stale entry orders; any inability to verify/cancel blocks the trading cycle.
+
+    审计④8(2026-09-13)·外所 GTC 回收：路由能把信号派到 gate/binance（三所平权+
+    gate 费率占优即会被选中），但本回收过去只扫 OKX——外所入场限价 GTC 挂单
+    永不超时撤除，孤儿逐日堆积占保证金并在深夜反抽时意外成交于无保护价。
+    现对**执行闸开启**的场所同尺回收（闸关=该所不可能有本系统单，零触碰、其
+    适配器故障也绝不拖累主链）；核验/撤销失败与 OKX 同标准 fail-closed 拦本周期。
+    """
     keep_ord_ids = keep_ord_ids or set()
+    STALE_MS = 240_000
     try:
         open_orders = okx_rest.pending_orders()
     except Exception as exc:
@@ -358,13 +366,63 @@ def clean_stale_open_orders(keep_ord_ids: Optional[set] = None) -> Tuple[bool, s
             continue  # 挂单对账已判定归属（接管），不受超时生命周期清理影响
         state = str(order.get("state", "live")).lower()
         created_at = int(order.get("cTime", now_ts) or now_ts)
-        if state not in {"live", "partially_filled"} or not order_id or now_ts - created_at <= 240000:
+        if state not in {"live", "partially_filled"} or not order_id or now_ts - created_at <= STALE_MS:
             continue
         try:
             okx_rest.cancel_order(inst_id, order_id)
         except Exception as exc:
             return False, f"failed to cancel stale order {inst_id}/{order_id}: {exc}"
         print(f"[挂单生命周期管理] 自动撤销超时挂单: {inst_id} (ordId={order_id}, state={state})")
+
+    try:
+        _env_mode = str(current_environment().mode or "demo")
+    except Exception:
+        _env_mode = ""
+    for _v in ("gate", "binance"):
+        try:
+            if not (_env_mode and venue_registry.execution_open(_v, _env_mode)):
+                continue
+            _ad = venue_registry.get_adapter(_v, environment=_env_mode)
+            _rows: List[Dict[str, Any]] = []
+            if _v == "binance":
+                _rows = _ad.open_orders() or []          # 全合约在途普通单
+            else:
+                try:
+                    _pool = load_instruments()
+                except Exception:
+                    _pool = []
+                for _ins in _pool:                        # Gate 列表端点按合约，逐标的扫
+                    _base = str(_ins.get("instId") or "").split("-")[0].upper()
+                    if not _base:
+                        continue
+                    try:
+                        _rows.extend(_ad.list_open_orders(_base) or [])
+                    except Exception as cexc:
+                        return False, f"gate 挂单枚举失败 {_base}: {cexc}"
+            for o in _rows:
+                if not isinstance(o, dict):
+                    continue
+                _raw = o.get("raw") if isinstance(o.get("raw"), dict) else {}
+                order_id = str(o.get("order_id") or o.get("id") or _raw.get("id") or "")
+                if order_id and order_id in keep_ord_ids:
+                    continue
+                if _v == "binance":
+                    inst_disp = str(o.get("inst_id") or _raw.get("symbol") or "")
+                    created_ms = float(_raw.get("time") or _raw.get("updateTime") or now_ts)
+                else:
+                    inst_disp = str(o.get("contract") or _raw.get("contract") or "")
+                    created_ms = float(o.get("create_time") or _raw.get("create_time") or (now_ts / 1000)) * 1000
+                if not order_id or now_ts - int(created_ms) <= STALE_MS:
+                    continue
+                _base = str(o.get("base") or "").upper() or str(inst_disp).split("_")[0].split("-")[0].upper() or inst_disp
+                try:
+                    _ad.cancel_order(_base, order_id)
+                except Exception as exc:
+                    return False, f"failed to cancel stale order {_v} {inst_disp}/{order_id}: {exc}"
+                print(f"[挂单生命周期管理] 自动撤销超时挂单({_v.upper()}): {inst_disp} (id={order_id})")
+        except Exception as exc:
+            # 枚举/适配器故障与 OKX 同尺：不可核验 = 拦本轮（宁可不交易，不带未知孤儿单继续开新仓）
+            return False, f"{_v} 挂单回收不可用: {type(exc).__name__}: {exc}"
     return True, "open orders verified"
 
 
@@ -1467,6 +1525,25 @@ def submit_protected_limit_order(inst_id: str, side: str, pos_side: str, size: f
             release_signal_reservation(_reservation, f"多所执行异常: {exc}")
             return False, f"{target_venue.upper()} 执行异常: {exc}"
 
+    # 审计④5(2026-09-13)：OKX 直下路径从不落 AI 裁决杠杆——张数按 ai_lever 折算，
+    # 但账户档位不变 → 实际保证金/强平价按旧档算，风险模型与实况脱节（净模式或
+    # 10x 旧档可把 3x 计划仓的强平价拉得极近）。best-effort 发单前对齐档位：失败仅
+    # warn 不阻断（保护腿/张数/几何已定，杠杆只影响保证金效率，绝不因此裸奔）。
+    _want_lever = 0.0
+    if isinstance(venue_ctx, dict):
+        try:
+            _want_lever = float(venue_ctx.get("leverage") or 0.0)
+        except (TypeError, ValueError):
+            _want_lever = 0.0
+    if _want_lever > 0:
+        _want_lever = max(1.0, min(_want_lever, float(MAX_LEVERAGE or 20.0)))
+        try:
+            okx_rest.set_leverage(inst_id, int(_want_lever), mgn_mode="cross",
+                                  pos_side=(pos_side or None))
+        except Exception as lev_exc:
+            print(f"[杠杆落地] warn {inst_id} 设档至 {int(_want_lever)}x 失败，"
+                  f"按账户现档发单（不影响 TP/SL 覆盖）: {lev_exc}")
+
     try:
         rows = okx_rest.place_order(
             inst_id, side, f"{size:g}",
@@ -1870,7 +1947,7 @@ def fetch_single_instrument_data(item, all_positions, usdt_available):
         
         e9_1h = calc_ema(closes_1h, 9)
         e21_1h = calc_ema(closes_1h, 21)
-        e55_1h = calc_ema(closes_1h, 55)
+        # 审计D(2026-09-13)：e55_1h 死算清除（趋势判定只用 e9/e21；ema55 基线另在 f["ema55"] 生产）
         
         f["trend_1h_bullish"] = (e9_1h >= e21_1h and closes_1h[-1] >= e21_1h * 0.996)
         f["trend_1h_bearish"] = (e9_1h <= e21_1h and closes_1h[-1] <= e21_1h * 1.004)
@@ -2464,12 +2541,10 @@ def evaluate_asset_signal(f):
     ema55 = f.get("ema55", px)
     e21_slope = f.get("ema21_slope_pct", 0.0)
     rsi = f.get("rsi", 50.0)
-    rsi_7 = f.get("rsi_7", 50.0)
     vwap_bias = f.get("vwap_bias", 0.0)
     macd_hist = f.get("macd_hist", 0.0)
     macd_accel = f.get("macd_accel", 0.0)
     obv_flow = f.get("obv_flow", "NEUTRAL")
-    bb_squeeze = f.get("bb_squeeze", False)
     vol_ratio = f.get("vol_ratio", 1.0)
     regime = f.get("market_regime", "CHOP")
     struct_1h = f.get("structure_1h", "CHOP")
@@ -3075,6 +3150,7 @@ def execute_portfolio():
                         inst_id, "buy", "long", actual_sz, limit_px, tp_px, sl_px,
                         venue_ctx={"notional_usdt": _notional,
                                    "margin_usdt": ai_margin if ai_margin > 0 else (_notional / max(1.0, ai_lever)),
+                                   "leverage": ai_lever,
                                    "intent_id": f"{inst_id}:BUY_LONG:{int(ai_info.get('timestamp') or time.time())}"})
                     if accepted:
                         if is_scale_in:
@@ -3092,7 +3168,7 @@ def execute_portfolio():
                                     reason=str(ai_reason),
                                     tp_px=tp_px,
                                     sl_px=sl_px,
-                                    leverage=3,
+                                    leverage=int(ai_lever),  # 审计D(2026-09-13)：曾恒写 3——5x 仓实开也通知「3x 杠杆」，票圈谎报
                                 )
                         else:
                             executed_actions.append(f"[{f['name']}] AI限价多单已提交待成交 {actual_sz}张@{limit_px} (order={order_ref}, TP={tp_px}, SL={sl_px})")
@@ -3109,7 +3185,7 @@ def execute_portfolio():
                                     reason=str(ai_reason),
                                     tp_px=tp_px,
                                     sl_px=sl_px,
-                                    leverage=3,
+                                    leverage=int(ai_lever),  # 审计D(2026-09-13)：曾恒写 3——5x 仓实开也通知「3x 杠杆」，票圈谎报
                                 )
                     else:
                         executed_actions.append(f"[{f['name']}] AI限价多单提交失败: {order_ref}")
@@ -3182,6 +3258,7 @@ def execute_portfolio():
                         inst_id, "sell", "short", actual_sz, limit_px, tp_px, sl_px,
                         venue_ctx={"notional_usdt": _notional,
                                    "margin_usdt": ai_margin if ai_margin > 0 else (_notional / max(1.0, ai_lever)),
+                                   "leverage": ai_lever,
                                    "intent_id": f"{inst_id}:SELL_SHORT:{int(ai_info.get('timestamp') or time.time())}"})
                     if accepted:
                         if is_scale_in:
@@ -3199,7 +3276,7 @@ def execute_portfolio():
                                     reason=str(ai_reason),
                                     tp_px=tp_px,
                                     sl_px=sl_px,
-                                    leverage=3,
+                                    leverage=int(ai_lever),  # 审计D(2026-09-13)：曾恒写 3——5x 仓实开也通知「3x 杠杆」，票圈谎报
                                 )
                         else:
                             executed_actions.append(f"[{f['name']}] AI限价空单已提交待成交 {actual_sz}张@{limit_px} (order={order_ref}, TP={tp_px}, SL={sl_px})")
@@ -3216,7 +3293,7 @@ def execute_portfolio():
                                     reason=str(ai_reason),
                                     tp_px=tp_px,
                                     sl_px=sl_px,
-                                    leverage=3,
+                                    leverage=int(ai_lever),  # 审计D(2026-09-13)：曾恒写 3——5x 仓实开也通知「3x 杠杆」，票圈谎报
                                 )
                     else:
                         executed_actions.append(f"[{f['name']}] AI限价空单提交失败: {order_ref}")

@@ -329,9 +329,10 @@ def _credentials(target: dict[str, Any]) -> dict[str, str]:
 
 
 def _urlencoded_json(url: str, data: dict[str, Any] | None = None, timeout: int = 60) -> dict[str, Any]:
+    from r20_backend.net_security import safe_urlopen
     body = urllib.parse.urlencode(data).encode() if data is not None else None
     request = urllib.request.Request(url, data=body, headers={"User-Agent": "R20-Backup/6.2.0"}, method="POST" if body is not None else "GET")
-    with urllib.request.urlopen(request, timeout=timeout) as response:
+    with safe_urlopen(request, timeout=timeout) as response:
         raw = response.read().decode("utf-8")
     payload = json.loads(raw or "{}")
     if payload.get("errno") not in (None, 0) or payload.get("error"):
@@ -340,10 +341,11 @@ def _urlencoded_json(url: str, data: dict[str, Any] | None = None, timeout: int 
 
 
 def _multipart_upload(url: str, field_name: str, filename: str, content: bytes, timeout: int = 180) -> dict[str, Any]:
+    from r20_backend.net_security import safe_urlopen
     boundary = f"----R20{hashlib.sha256(os.urandom(16)).hexdigest()[:24]}"
     body = (f"--{boundary}\r\nContent-Disposition: form-data; name=\"{field_name}\"; filename=\"{filename}\"\r\nContent-Type: application/octet-stream\r\n\r\n").encode() + content + f"\r\n--{boundary}--\r\n".encode()
     request = urllib.request.Request(url, data=body, headers={"Content-Type": f"multipart/form-data; boundary={boundary}", "User-Agent": "R20-Backup/6.2.0"}, method="POST")
-    with urllib.request.urlopen(request, timeout=timeout) as response:
+    with safe_urlopen(request, timeout=timeout) as response:
         payload = json.loads(response.read().decode("utf-8") or "{}")
     if payload.get("errno") not in (None, 0):
         raise RuntimeError(str(payload.get("errmsg") or payload))
@@ -358,8 +360,17 @@ def upload_baidu_oauth(source: Path, target: dict[str, Any]) -> dict[str, Any]:
     refresh_token = creds.get("refresh_token", "")
     if not app_key or not app_secret or not refresh_token:
         raise RuntimeError("百度官方 OAuth 需要 App Key、App Secret 与 Refresh Token")
-    token_url = "https://openapi.baidu.com/oauth/2.0/token?" + urllib.parse.urlencode({"grant_type": "refresh_token", "refresh_token": refresh_token, "client_id": app_key, "client_secret": app_secret})
-    token = _urlencoded_json(token_url)
+    # 审计D(2026-09-13)·凭证不进 query string：旧实现把 client_secret / refresh_token
+    # 拼进 URL 走 GET——OAuth2 token 端点参数一旦入 query 就会被访问日志、代理、
+    # Referer、浏览器历史逐字留存（RFC 6749 §2.3.1 明确要求 client credentials 走
+    # POST body）。百度 token 端点对 POST form 与 GET query 等价受理，纯改道零风险。
+    token_url = "https://openapi.baidu.com/oauth/2.0/token"
+    token = _urlencoded_json(token_url, {
+        "grant_type": "refresh_token",
+        "refresh_token": refresh_token,
+        "client_id": app_key,
+        "client_secret": app_secret,
+    })
     access_token = str(token.get("access_token") or "")
     if not access_token:
         raise RuntimeError("百度 OAuth 未返回 Access Token")
@@ -468,6 +479,7 @@ def upload_oss(source: Path, target: dict[str, Any]) -> dict[str, Any]:
 
 
 def upload_webdav(source: Path, target: dict[str, Any]) -> dict[str, Any]:
+    from r20_backend.net_security import safe_urlopen
     creds = _credentials(target)
     endpoint = str(target["endpoint"]).rstrip("/")
     remote = str(target.get("remote_path") or "").strip("/")
@@ -481,7 +493,7 @@ def upload_webdav(source: Path, target: dict[str, Any]) -> dict[str, Any]:
         current += "/" + urllib.parse.quote(part, safe="")
         req = urllib.request.Request(current, headers={"Authorization": auth} if auth else {}, method="MKCOL")
         try:
-            urllib.request.urlopen(req, timeout=20).close()
+            safe_urlopen(req, timeout=20).close()
         except urllib.error.HTTPError as exc:
             if exc.code not in (301, 302, 405):
                 raise

@@ -132,7 +132,10 @@ def _rebuild_to_v2(conn, cur, cols):
 def _write_migration_log(stats):
     """仅真实迁移事件（rebuild/alter）落日志；noop/fresh 不写——重跑幂等零 diff。"""
     entry = dict(stats)
-    entry["ts"] = datetime.datetime.now().isoformat(timespec="seconds")
+    # 审计D(2026-09-13)·naive→aware：旧 datetime.now() 落的是无时区本地串，与全仓
+    # Asia/Shanghai 显式时区约定不一致（跨时区主机/容器会把迁移时刻记错或记成歧义值）。
+    entry["ts"] = datetime.datetime.now(
+        datetime.timezone(datetime.timedelta(hours=8))).isoformat(timespec="seconds")
     entry["db"] = DB_PATH
     try:
         path = migration_log_path()

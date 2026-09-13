@@ -40,13 +40,18 @@ def aggregate_venue_accounts(venues_dict: Dict[str, Any], environment: str) -> D
         if card.get("status") == "ready":
             eq = card.get("equity")
             avail = card.get("available")
+            # 审计⑤(2026-09-13)·门对称：旧实现 eq 与 avail 各判各的——某卡 eq 失效
+            # （缺字段/负数）但 avail 有效时，它不进 reporting_venues 却把 avail
+            # 混进聚合，margin_used=Σeq-Σavail 口径失真（假负值被 max(0,…) 掩盖）。
+            # 一张卡要么整体参与聚合，要么整体不进；avail 缺失但 eq 有效仍按 0 占用
+            # 计入（全额 margin 是保守侧）。
             if eq is not None and isinstance(eq, (int, float)) and eq >= 0:
                 eq_val = float(eq)
                 total_equity += eq_val
                 venue_equities[v] = eq_val
                 active_venues.append(v)
-            if avail is not None and isinstance(avail, (int, float)) and avail >= 0:
-                total_available += float(avail)
+                if avail is not None and isinstance(avail, (int, float)) and avail >= 0:
+                    total_available += float(avail)
             pos_cnt = card.get("positions_count")
             if isinstance(pos_cnt, int) and pos_cnt >= 0:
                 total_positions += pos_cnt

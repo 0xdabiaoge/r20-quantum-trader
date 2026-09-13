@@ -308,6 +308,21 @@ def cancel_order(inst_id: str, ord_id: str, *, cl_ord_id: str | None = None, env
     return request("POST", "/api/v5/trade/cancel-order", {"instId": inst_id, "ordId": ord_id, "clOrdId": cl_ord_id}, env=env)
 
 
+def set_leverage(inst_id: str, lever: Any, *, mgn_mode: str = "cross",
+                 pos_side: str | None = None, env: OKXEnvironment | None = None) -> list[dict[str, Any]]:
+    """POST /api/v5/account/set-leverage（审计④5 · 2026-09-13 补缺口）。
+
+    V5 语义如实：杠杆是**账户级、按 instId+tdMode（双向另分 posSide）**的持久档位，
+    不是逐单参数——下单前必须把 AI 裁决的杠杆真正落到档位上，否则保证金占用与
+    强平价按账户旧档计算，风险模型与实况脱节。posSide 省略时该 instId 全模式生效
+    （官方行为）；返回 data 行含 lever，sCode 非 0 由 request() 统一抛错。
+    """
+    params: dict[str, Any] = {"instId": inst_id, "lever": str(lever), "mgnMode": mgn_mode}
+    if pos_side:
+        params["posSide"] = pos_side
+    return request("POST", "/api/v5/account/set-leverage", params, env=env)
+
+
 def amend_order(
     inst_id: str, ord_id: str, *, new_px: Any = None, new_sz: Any = None,
     req_id: str | None = None, req_tx_id: str | None = None,

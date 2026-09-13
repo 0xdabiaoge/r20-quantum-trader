@@ -935,7 +935,7 @@ def construct_full_market_prompt(packages: List[Dict[str, Any]], pos_summary: st
             c_time_str = datetime.datetime.fromtimestamp(c_ts, tz=tz_bj).strftime("%Y-%m-%d %H:%M:%S") if c_ts > 0 else "--"
             inst_id = o.get("instId", "")
             side_raw = str(o.get("side", "")).lower()
-            pos_side = str(o.get("posSide", "net")).lower()
+            # 审计D(2026-09-13)：死局部清除——pos_side 从未参与下方展示/判定
             reduce_only = str(o.get("reduceOnly", "false")).lower() == "true"
             ord_type = str(o.get("ordType", "limit")).lower()
 
@@ -1009,7 +1009,7 @@ def construct_full_market_prompt(packages: List[Dict[str, Any]], pos_summary: st
             f"- 盈亏比 R:R 硬底线: {MIN_RISK_REWARD_RATIO:.1f} (低于此值的报价执行层物理拒绝)\n"
             f"- 新开仓最低置信度门禁: {MIN_ENTRY_CONFIDENCE:g}% (低于此值禁止新开仓)\n"
             + (
-                f"- 金字塔加仓: 已禁用 (最大加仓次数 0，在途持仓仅可 HOLD/UPDATE_SL/CLOSE_MARKET)\n"
+                "- 金字塔加仓: 已禁用 (最大加仓次数 0，在途持仓仅可 HOLD/UPDATE_SL/CLOSE_MARKET)\n"
                 if MAX_SCALE_IN_COUNT <= 0 else
                 f"- 金字塔加仓门禁: 最多 {MAX_SCALE_IN_COUNT} 次 · 底仓浮盈 ≥ {MIN_SCALE_IN_PROFIT_RATIO:.1%} 且已保本 · 置信度 ≥ {MIN_SCALE_IN_CONFIDENCE:g}%\n"
             )
@@ -1145,7 +1145,6 @@ def validate_and_filter_decision(p: Dict[str, Any], d_item: Dict[str, Any], acti
         return run_interceptor_pipeline(p, d_item, context)
     except Exception as exc:
         # Fail-closed fallback in case interceptor manager cannot be reached
-        inst_id = p.get("instId", "")
         raw_action = str((d_item or {}).get("action", "WAIT")).upper()
         if raw_action not in {"BUY_LONG", "SELL_SHORT", "WAIT"}:
             raw_action = "WAIT"
@@ -1380,7 +1379,7 @@ def execute_batch_ai_brain_cycle(
         str(p.get("instId", "")): str(p.get("side", p.get("posSide", ""))).lower()
         for p in active_positions_detail if p.get("instId")
     }
-    package_by_id = {p["instId"]: p for p in packages}
+    # 审计D(2026-09-13)：package_by_id 死构造清除（全函数无消费）
 
     # Automatically Update & Persist Comprehensive Factor Library Snapshot
     try:
@@ -1464,7 +1463,7 @@ def execute_batch_ai_brain_cycle(
         council_status: Dict[str, Any] = {"ran": False, "reason": "未启用（后台投委会开关关闭）"}
         if council_enabled:
             council_status = {"ran": False, "reason": "辩论未返回"}
-            print(f"[AI Brain Council] 🏛️ 多模型委员会已开启，正在启动各专家参谋现场辩论与首席仲裁...")
+            print("[AI Brain Council] 🏛️ 多模型委员会已开启，正在启动各专家参谋现场辩论与首席仲裁...")
             try:
                 brain_output, council_transcript = execute_council_debate(
                     market_prompt=prompt,

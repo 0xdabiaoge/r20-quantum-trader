@@ -9,7 +9,7 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 from typing import Any
-from r20_backend.net_security import validate_outbound_url
+from r20_backend.net_security import validate_outbound_url, safe_urlopen
 
 ROOT = Path(__file__).resolve().parents[1]
 SECRET_LOADER = None
@@ -53,7 +53,9 @@ def _post_json(url: str, payload: dict[str, Any], headers: dict[str, str] | None
         # Request 构造必须在 try 内：非法 scheme 抛 ValueError(f"unknown url type: {url}")，
         # 旧写法让它裸穿到 500 traceback，把含 token 的完整 URL 写进 uvicorn.log。
         request = urllib.request.Request(url, data=json.dumps(payload, ensure_ascii=False).encode("utf-8"), headers=request_headers, method="POST")
-        with urllib.request.urlopen(request, timeout=15) as response:
+        # 审计D(2026-09-13)：validate_outbound_url 只核首跳，urllib 默认跟随 3xx——
+        # 首跳合法却 302→内网/元数据即借道 SSRF。通知类无跟随重定向场景，走禁跳口。
+        with safe_urlopen(request, timeout=15) as response:
             raw = response.read().decode("utf-8")
             try:
                 data = json.loads(raw) if raw else {}
