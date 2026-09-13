@@ -3,7 +3,6 @@ Web Dashboard Application Module
 """
 from __future__ import annotations
 from typing import Any
-from pathlib import Path
 from r20_backend.time_utils import beijing_text
 from scripts import okx_rest
 from scripts.instrument_pool import load_instruments
@@ -18,7 +17,7 @@ import tempfile
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from fastapi import FastAPI, Request
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -1905,29 +1904,19 @@ def _serve_vue_spa(html_path: str, is_public: bool = True) -> HTMLResponse:
     )
 
 
-# --- SEO Endpoints: robots.txt, sitemap.xml, favicon.svg ---
-
-@app.get("/robots.txt", include_in_schema=False)
-async def robots_txt():
-    f = os.path.join(VUE_DIST_DIR, "robots.txt")
-    if os.path.isfile(f):
-        return FileResponse(f, media_type="text/plain", headers={"Cache-Control": "public, max-age=86400, s-maxage=604800"})
-    pf = os.path.join(WORKSPACE_DIR, "frontend", "public", "robots.txt")
-    if os.path.isfile(pf):
-        return FileResponse(pf, media_type="text/plain", headers={"Cache-Control": "public, max-age=86400, s-maxage=604800"})
-    return PlainTextResponse("User-agent: *\nAllow: /\nAllow: /docs\nAllow: /images/\nDisallow: /admin/\nDisallow: /api/\nSitemap: https://www.r20.cn/sitemap.xml\n")
-
-
-@app.get("/sitemap.xml", include_in_schema=False)
-async def sitemap_xml():
-    f = os.path.join(VUE_DIST_DIR, "sitemap.xml")
-    if os.path.isfile(f):
-        return FileResponse(f, media_type="application/xml", headers={"Cache-Control": "public, max-age=86400, s-maxage=604800"})
-    pf = os.path.join(WORKSPACE_DIR, "frontend", "public", "sitemap.xml")
-    if os.path.isfile(pf):
-        return FileResponse(pf, media_type="application/xml", headers={"Cache-Control": "public, max-age=86400, s-maxage=604800"})
-    return Response(content="""<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>https://www.r20.cn/</loc><priority>1.0</priority></url><url><loc>https://www.r20.cn/docs</loc><priority>0.8</priority></url></urlset>""", media_type="application/xml")
-
+# --- SEO Endpoints ---
+#
+# 结构优化阶段 1（2026-09-14）· 拆除被遮蔽的重复注册。
+# 背景：本项目有两套路由层 —— r20_backend/routers/*（模块化）与 dashboard/app.py
+# （legacy 整包）。r20_backend/app.py 是「先 include_router(...) 再
+# mount("/", dashboard_app)」，Starlette 按注册顺序匹配，故凡两边同路径者，
+# 一律 routers 那套生效，本文件的同名 handler 函数体永不执行 —— 改它不会
+# 有任何效果，也不报错（这是最难排查的一类坑）。
+#
+# /robots.txt 与 /sitemap.xml：路由器已实现（routers/dashboard.py 的
+# robots_txt / sitemap_xml），本文件两份连同函数体删除。
+#
+# /favicon.svg：只在本文件定义（路由器没有同名路由）→ 真实生效，保留。
 
 @app.get("/favicon.svg", include_in_schema=False)
 async def favicon_svg():
@@ -1954,37 +1943,19 @@ async def index(request: Request):
     )
 
 
-@app.get("/admin", response_class=HTMLResponse, include_in_schema=False)
-async def admin_spa_root(request: Request):
-    """Serve the Vue SPA at /admin — the router handles sub-routes client-side."""
-    vue_index_file = os.path.join(VUE_DIST_DIR, "index.html")
-    if os.path.isfile(vue_index_file):
-        return _serve_vue_spa(vue_index_file, is_public=False)
-    return HTMLResponse("Vue build not found. Run `npm run build` in frontend/.", status_code=503)
+# --- /admin/* 路由 ---
+#
+# 阶段 1 拆除：/admin、/admin/、/admin/{subpath:path} 三条原先在本文件就地实现，
+# 但 r20_backend/routers/dashboard.py 已注册同路径（admin_page）且先注册 →
+# 本文件这三份永不执行，已删除。
+# 生效实现在 r20_backend/routers/dashboard.py 的 admin_page()，含 batch7 审计⑤#6
+# 的「dist/admin 真实文件优先」逻辑（/admin/legacy.html 依赖它）。
 
 
-@app.get("/admin/", response_class=HTMLResponse, include_in_schema=False)
-async def admin_spa_root_trailing(request: Request):
-    return await admin_spa_root(request)
-
-
-@app.get("/admin/{subpath:path}", response_class=HTMLResponse, include_in_schema=False)
-async def admin_spa_deep_link(request: Request, subpath: str):
-    """Vue Router history mode: any /admin/* deep link or refresh serves the SPA shell.
-    Real files under dist/admin (e.g. legacy.html) keep priority."""
-    admin_dir = Path(VUE_DIST_DIR, "admin").resolve()
-    try:
-        candidate = (admin_dir / subpath).resolve()
-        if candidate.is_relative_to(admin_dir) and candidate.is_file():
-            return FileResponse(str(candidate), headers={"Cache-Control": "private, no-cache, no-store, must-revalidate"})
-    except (ValueError, OSError):
-        pass
-    return await admin_spa_root(request)
-
-
-@app.get("/docs", response_class=HTMLResponse, include_in_schema=False)
-@app.get("/docs/", response_class=HTMLResponse, include_in_schema=False)
-@app.get("/docs/{subpath:path}", response_class=HTMLResponse, include_in_schema=False)
+# 阶段 1 拆除：/docs、/docs/、/docs/{subpath:path} 三条被
+# r20_backend/routers/dashboard.py 的 serve_vue_spa_subroutes 遮蔽，已移除。
+# 本函数的 /doc 装饰器保留 —— 路由器只注册了 /docs，没有 /doc，
+# 所以 /doc 是「仅此处生效」的真实路由（线上实测 200）。
 @app.get("/doc", response_class=HTMLResponse, include_in_schema=False)
 async def docs_spa_root(request: Request, subpath: str = ""):
     """Serve the public system documentation page in Vue SPA."""
@@ -1994,26 +1965,25 @@ async def docs_spa_root(request: Request, subpath: str = ""):
     return HTMLResponse("Vue build not found. Run `npm run build` in frontend/.", status_code=503)
 
 
-@app.get("/trading", response_class=HTMLResponse, include_in_schema=False)
-@app.get("/factors", response_class=HTMLResponse, include_in_schema=False)
-@app.get("/news", response_class=HTMLResponse, include_in_schema=False)
-@app.get("/lab", response_class=HTMLResponse, include_in_schema=False)
-@app.get("/history", response_class=HTMLResponse, include_in_schema=False)
+# 阶段 1 拆除：/trading、/factors、/news、/lab、/history 五条被
+# r20_backend/routers/dashboard.py 的 serve_vue_spa_subroutes 遮蔽，已移除。
+# 保留 /login —— 路由器没有这条，前端 router 里 /login 也不是公开 tab，
+# 实际是跳后台登录页（线上实测 307 → /admin/login）。
 @app.get("/login", include_in_schema=False)
-async def public_tab_spa_routes(request: Request):
-    if request.url.path == "/login":
-        from starlette.responses import RedirectResponse
-        return RedirectResponse(url="/admin/login")
-    """Serve the public Vue SPA shell for dedicated tab routes with Cloudflare edge caching."""
-    vue_index_file = os.path.join(VUE_DIST_DIR, "index.html")
-    if os.path.isfile(vue_index_file):
-        return _serve_vue_spa(vue_index_file, is_public=True)
-    return await index(request)
+async def login_redirect(request: Request):
+    from starlette.responses import RedirectResponse
+    return RedirectResponse(url="/admin/login")
 
 
 # --- Realtime Public Polling APIs (with Cloudflare Edge Micro-Caching) ---
+#
+# 阶段 1：拆除本文件里 @app.get("/api/all") 与 @app.get("/api/overview") 两个
+# 装饰器 —— 同路径已由 r20_backend/routers/dashboard.py 先注册，本文件的注册
+# 永不命中。但**函数体必须保留**：routers/dashboard.py 的对应路由是薄委托，
+# 反过来调用 dash_app.get_all_data / dash_app.get_overview（实现在此、路由在彼）。
+# 这正是「路由层与实现层分离」的半成品状态，删除装饰器后语义变清晰：
+# 本文件提供实现，routers 提供路由。
 
-@app.get("/api/all")
 async def get_all_data(full: bool = False):
     global CACHE_DATA, LAST_CACHE_TIME
     # Return pre-warmed in-memory snapshot immediately (<1ms)
@@ -2030,7 +2000,6 @@ async def get_all_data(full: bool = False):
     )
 
 
-@app.get("/api/overview")
 async def get_overview():
     global CACHE_DATA, LAST_CACHE_TIME
     if not CACHE_DATA or time.time() - LAST_CACHE_TIME > 12.0:
