@@ -4,6 +4,7 @@ Web Dashboard Application Module
 from __future__ import annotations
 from typing import Any
 from r20_backend.time_utils import beijing_text
+from r20_backend.dashboard_payload import read_json, read_text, read_text_lines
 from scripts import okx_rest
 from scripts.instrument_pool import load_instruments
 import os
@@ -1133,14 +1134,12 @@ def update_cache_cycle():
     account_init_file = os.path.join(DATA_DIR, "account_initial_state.json")
     reset_time_str = "1970-01-01 00:00:00"
     initial_capital_val = float(os.getenv("INITIAL_CAPITAL", "10000.0"))
-    if os.path.exists(account_init_file):
-        try:
-            with open(account_init_file, "r", encoding="utf-8") as f:
-                acc_init = json.load(f)
-                reset_time_str = acc_init.get("reset_time", "1970-01-01 00:00:00")
-                initial_capital_val = float(acc_init.get("initial_capital", 10000.0) or 10000.0)
-        except Exception:
-            pass
+    acc_init = read_json(account_init_file, {})
+    try:
+        reset_time_str = acc_init.get("reset_time", "1970-01-01 00:00:00")
+        initial_capital_val = float(acc_init.get("initial_capital", 10000.0) or 10000.0)
+    except Exception:
+        pass
 
     # 4. Load Bills and Real Order-Level Ledger
     bills_ok, bills_data, bills_error = _fetch_json(okx_rest.bills, limit=100)
@@ -1275,49 +1274,32 @@ def update_cache_cycle():
     inst_leaderboard.sort(key=lambda x: x["pnl"], reverse=True)
 
     # 5. Load Log Lines
-    log_lines = []
-    if os.path.exists(LOG_FILE):
-        try:
-            with open(LOG_FILE, "r", encoding="utf-8") as f:
-                lines = f.readlines()
-                log_lines = [l.strip() for l in lines[-60:] if l.strip()]
-        except Exception:
-            pass
+    log_lines = read_text_lines(LOG_FILE, 60)
 
     # 6. Read Trading State & AI Brain LLM Decisions
     state_data = {}
-    ai_decisions = {}
-    if os.path.exists(AI_DECISIONS_FILE):
-        try:
-            with open(AI_DECISIONS_FILE, "r", encoding="utf-8") as f:
-                ai_decisions = json.load(f)
-        except Exception:
-            pass
+    ai_decisions = read_json(AI_DECISIONS_FILE, {})
 
     factors_list = []
     pos_map = {p.get("instId"): p for p in positions} if isinstance(positions, list) else {}
     active_pool = load_instruments()
     inst_state_map = {}
-    if os.path.exists(STATE_JSON_FILE):
-        try:
-            with open(STATE_JSON_FILE, "r", encoding="utf-8") as f:
-                state_data = json.load(f)
-                for ins in state_data.get("instruments", []):
-                    if isinstance(ins, dict) and ins.get("instId"):
-                        inst_state_map[ins["instId"]] = ins
-        except Exception:
-            pass
+    state_data = read_json(STATE_JSON_FILE, {})
+    try:
+        for ins in state_data.get("instruments", []):
+            if isinstance(ins, dict) and ins.get("instId"):
+                inst_state_map[ins["instId"]] = ins
+    except Exception:
+        pass
 
     factor_lib_map = {}
-    if os.path.exists(FACTOR_LIBRARY_FILE):
-        try:
-            with open(FACTOR_LIBRARY_FILE, "r", encoding="utf-8") as f_lib:
-                lib_data = json.load(f_lib)
-                for item in lib_data.get("instruments", []):
-                    if isinstance(item, dict) and item.get("instId"):
-                        factor_lib_map[item["instId"]] = item
-        except Exception:
-            pass
+    lib_data = read_json(FACTOR_LIBRARY_FILE, {})
+    try:
+        for item in lib_data.get("instruments", []):
+            if isinstance(item, dict) and item.get("instId"):
+                factor_lib_map[item["instId"]] = item
+    except Exception:
+        pass
 
     for target in active_pool:
         inst_id = target.get("instId")
@@ -1465,13 +1447,7 @@ def update_cache_cycle():
     trades_table = valid_ledger_trades[:60]
 
     # 8. Read Review & Adaptive Config
-    review_data = {}
-    if os.path.exists(REPORT_JSON_FILE):
-        try:
-            with open(REPORT_JSON_FILE, "r", encoding="utf-8") as f:
-                review_data = json.load(f)
-        except Exception:
-            pass
+    review_data = read_json(REPORT_JSON_FILE, {})
 
     adaptive_cfg = {}
 
@@ -1508,21 +1484,9 @@ def update_cache_cycle():
     })
 
     # 10. Read News & AI Decisions History
-    news_data = {}
-    if os.path.exists(NEWS_SENTIMENT_FILE):
-        try:
-            with open(NEWS_SENTIMENT_FILE, "r", encoding="utf-8") as f:
-                news_data = json.load(f)
-        except Exception:
-            pass
+    news_data = read_json(NEWS_SENTIMENT_FILE, {})
 
-    ai_last_prompt_text = ""
-    if os.path.exists(AI_LAST_PROMPT_FILE):
-        try:
-            with open(AI_LAST_PROMPT_FILE, "r", encoding="utf-8") as f:
-                ai_last_prompt_text = f.read()
-        except Exception:
-            pass
+    ai_last_prompt_text = read_text(AI_LAST_PROMPT_FILE)
 
     ai_history_list = []
     if os.path.exists(AI_HISTORY_FILE):
@@ -1542,23 +1506,11 @@ def update_cache_cycle():
     if isinstance(review_data, dict):
         review_data["ai_last_prompt"] = ai_last_prompt_text
 
-    factor_lib_snapshot = {}
-    if os.path.exists(FACTOR_LIBRARY_FILE):
-        try:
-            with open(FACTOR_LIBRARY_FILE, "r", encoding="utf-8") as f:
-                factor_lib_snapshot = json.load(f)
-        except Exception:
-            pass
+    factor_lib_snapshot = read_json(FACTOR_LIBRARY_FILE, {})
 
     ai_memory_md_content = load_trading_memory_md()
 
-    ai_last_prompt_text = ""
-    if os.path.exists(AI_LAST_PROMPT_FILE):
-        try:
-            with open(AI_LAST_PROMPT_FILE, "r", encoding="utf-8") as f:
-                ai_last_prompt_text = f.read()
-        except Exception:
-            pass
+    ai_last_prompt_text = read_text(AI_LAST_PROMPT_FILE)
 
     # System Disk info
     total_b, used_b, free_b = shutil.disk_usage("/")
