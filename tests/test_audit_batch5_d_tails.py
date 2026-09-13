@@ -125,7 +125,12 @@ class TestNoRedirect(unittest.TestCase):
 class TestCleanupDisk(unittest.TestCase):
     def test_copytruncate_keeps_inode_for_live_writer(self):
         import cleanup_disk as cd
+        import shutil
         d = tempfile.mkdtemp(prefix="r20-b5-cl2-")
+        # 事故(2026-09-13)：本钉写 10MB 日志却从不清理——全量套件每跑一轮就在 /tmp
+        # (256MB tmpfs) 漏 11MB，累积把 tmpfs 撑满→其余测试集体 Errno 28、套件中断。
+        # 测试自己造的临时物必须自己收尸（addCleanup 无论成败都执行）。
+        self.addCleanup(shutil.rmtree, d, ignore_errors=True)
         log = os.path.join(d, "uvicorn.log")
         with open(log, "wb") as f:
             f.write(b"x" * (10 * 1024 * 1024 + 10))   # 越 10MB 阈值
@@ -165,6 +170,8 @@ class TestBaiduTokenPost(unittest.TestCase):
                 return {"uploadid": "u1"}
             return {"fs_id": "f1"}
         d = tempfile.mkdtemp(prefix="r20-b5-bd-")
+        import shutil
+        self.addCleanup(shutil.rmtree, d, ignore_errors=True)
         src = Path(d) / "r20_backup_x_20260913_010000.tar.gz"
         src.write_bytes(b"payload-less-than-chunk" * 3)
         target = {"id": "j", "credential_ref": "c", "remote_path": "R20"}
