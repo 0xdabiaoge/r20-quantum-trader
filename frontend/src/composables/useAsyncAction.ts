@@ -39,6 +39,12 @@ export interface UseAsyncActionOptions<R> {
   onSuccess?: (result: R) => void
   /** 出错时既不弹 toast 也不做别的（仅写 `error`） */
   silent?: boolean
+  /**
+   * `busy` 的初始值，默认 false。
+   * 页面**首次加载**场景应传 true —— 手写样板是 `loading = ref(true)`，
+   * 首帧就显示加载态；若 busy 从 false 起步，首帧会先闪一下空态再进入加载态。
+   */
+  initialBusy?: boolean
 }
 
 export interface UseAsyncActionResult<Args extends any[], R> {
@@ -52,7 +58,7 @@ export function useAsyncAction<Args extends any[] = any[], R = any>(
   options: UseAsyncActionOptions<R> = {},
 ): UseAsyncActionResult<Args, R> {
   const toast = useToast()
-  const busy = ref(false)
+  const busy = ref(Boolean(options.initialBusy))
   const error = ref<string | null>(null)
 
   async function run(...args: Args): Promise<R | undefined> {

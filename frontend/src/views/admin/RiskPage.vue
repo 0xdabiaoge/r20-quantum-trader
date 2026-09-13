@@ -7,6 +7,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { useI18n } from '../../composables/useI18n'
 const { t } = useI18n()
 import { useApi } from '../../composables/useApi'
+import { useAsyncAction } from '../../composables/useAsyncAction'
 import { useDashboardStore } from '../../stores/dashboard'
 import PageHeader from '../../components/admin/PageHeader.vue'
 import DangerZone from '../../components/admin/DangerZone.vue'
@@ -23,7 +24,6 @@ import {ShieldAlert,
 const { api } = useApi()
 const store = useDashboardStore()
 
-const loading = ref(true)
 const busy = ref<'save' | 'reset' | ''>('')
 
 const schema = ref<{ groups: any[]; params: any[]; high_risk_phrase?: string } | null>(null)
@@ -106,26 +106,21 @@ function syncFromServer(values: Record<string, number>) {
   }
 }
 
-async function loadData() {
-  loading.value = true
-  try {
-    // 带上页面上展示的可用权益，让后端派生"引擎此刻的口径"（权益未知时后端会如实标 None）
-    const eq = Number((store as any)?.data?.account?.avail_eq)
-    const query = Number.isFinite(eq) && eq > 0 ? `?equity=${eq}` : ''
-    const res = await api(`/api/v1/admin/risk${query}`)
-    schema.value = res.schema
-    suites.value = res.suites || []
-    effectText.value = res.effect || ''
-    processValues.value = res.process_values || {}
-    processFresh.value = res.process_freshness || null
-    engineValues.value = res.engine_values || null
-    syncFromServer(res.values)
-  } catch (e: any) {
-    toast.err(`加载失败: ${e.message}`)
-  } finally {
-    loading.value = false
-  }
-}
+// F2：动作类样板（busy + 统一错误出口）。error → toast 与原实现一致；
+// initialBusy: true 保持"首帧即加载态"（原为 loading = ref(true)）。
+const { run: loadData, busy: loading } = useAsyncAction(async () => {
+  // 带上页面上展示的可用权益，让后端派生"引擎此刻的口径"（权益未知时后端会如实标 None）
+  const eq = Number((store as any)?.data?.account?.avail_eq)
+  const query = Number.isFinite(eq) && eq > 0 ? `?equity=${eq}` : ''
+  const res = await api<any>(`/api/v1/admin/risk${query}`)
+  schema.value = res.schema
+  suites.value = res.suites || []
+  effectText.value = res.effect || ''
+  processValues.value = res.process_values || {}
+  processFresh.value = res.process_freshness || null
+  engineValues.value = res.engine_values || null
+  syncFromServer(res.values)
+}, { onError: (e) => toast.err(`加载失败: ${e.message}`), initialBusy: true })
 
 const dirtyKeys = computed(() => {
   if (!schema.value) return []

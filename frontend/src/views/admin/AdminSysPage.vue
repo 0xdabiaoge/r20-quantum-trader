@@ -8,6 +8,7 @@ import { ref, onMounted } from 'vue'
 import { useI18n } from '../../composables/useI18n'
 const { t } = useI18n()
 import { useApi } from '../../composables/useApi'
+import { useAsyncAction } from '../../composables/useAsyncAction'
 import { useAuthStore } from '../../stores/auth'
 import {UserCog, KeyRound, Plus, Lock, Unlock, ShieldCheck} from 'lucide-vue-next'
 
@@ -16,8 +17,6 @@ const auth = useAuthStore()
 
 const users = ref<any[]>([])
 const currentUserId = ref<number>(0)
-const loading = ref(true)
-
 // Password form
 const pwdUserId = ref<number>(0)
 const currentPassword = ref('')
@@ -30,20 +29,16 @@ const newUsername = ref('')
 const newRole = ref('admin')
 const newPasswordForCreate = ref('')
 
-async function load() {
-  if (!auth.isSuperadmin) { loading.value = false; return }
-  loading.value = true
-  try {
-    const res = await api('/api/v1/admin/users')
-    users.value = res.users || []
-    currentUserId.value = res.current_user_id
-    pwdUserId.value = res.current_user_id
-  } catch (e: any) {
-    toast.err(e.message)
-  } finally {
-    loading.value = false
-  }
-}
+// F2：统一错误出口（error → toast，与原实现一致）。
+// 只取 run：原实现的 `loading` 是**死状态** —— 脚本里来回切换，模板从不渲染它
+// （模板中 loading 出现 0 次），故这里不引入 busy，否则 trigger 未读告警。
+const { run: load } = useAsyncAction(async () => {
+  if (!auth.isSuperadmin) return
+  const res = await api<any>('/api/v1/admin/users')
+  users.value = res.users || []
+  currentUserId.value = res.current_user_id
+  pwdUserId.value = res.current_user_id
+}, { onError: (e) => toast.err(e.message) })
 
 async function changePassword() {
   if (newPassword.value.length < 12) {

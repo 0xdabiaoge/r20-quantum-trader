@@ -2,10 +2,11 @@
 import { fmtDateTime } from '../../utils/format';
 import { useToast } from '../../composables/useToast'
 const toast = useToast()
-import { ref, computed, onMounted } from 'vue'
+import { computed } from 'vue'
 import { useI18n } from '../../composables/useI18n'
 const { t } = useI18n()
 import { useApi } from '../../composables/useApi'
+import { useResource } from '../../composables/useResource'
 import { Zap, RefreshCw, RotateCcw, Server, Clock, AlertTriangle } from 'lucide-vue-next'
 
 const { api } = useApi()
@@ -14,23 +15,14 @@ const { api } = useApi()
 function fmtJobTime(iso: string): string {
   return fmtDateTime(iso).slice(5)
 }
-const gw = ref<any>(null)
-const loading = ref(true)
+// F2：取数样板收成一行；错误出口与原实现一致（toast，带 i18n 文案）
+const { data: gw, loading, reload: load } = useResource<any>('/api/v1/admin/gateway?limit=50', {
+  onError: (e) => toast.err(t('admin.gateway.msgs.loadFailed', undefined, { msg: e.message })),
+})
 
 const deliveredCount = computed(() => (gw.value?.stats?.delivered ?? 0) + (gw.value?.stats?.accepted ?? 0))
 const deliveryTotal = computed(() => Object.values(gw.value?.stats || {}).reduce((a: number, b: any) => a + Number(b || 0), 0))
 const overdueCount = computed(() => (gw.value?.scheduler?.jobs || []).filter((j: any) => j.overdue).length)
-
-async function load() {
-  loading.value = true
-  try {
-    gw.value = await api('/api/v1/admin/gateway?limit=50')
-  } catch (e: any) {
-    toast.err(t('admin.gateway.msgs.loadFailed', undefined, { msg: e.message }))
-  } finally {
-    loading.value = false
-  }
-}
 
 async function replayDelivery(id: number) {
   const phrase = prompt(t('admin.gateway.msgs.replayPrompt', undefined, { id: id }))
@@ -54,7 +46,6 @@ function statusColor(s: string) {
   return 'text-zinc-300'
 }
 
-onMounted(load)
 </script>
 
 <template>
