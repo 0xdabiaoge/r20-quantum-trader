@@ -448,7 +448,13 @@ class DocsAndExampleDriftTests(_Base):
         self.assertEqual(missing, [], f"风控页 schema 未覆盖单一事实源的键: {missing}")
 
     def test_docsview_has_no_hardcoded_param_count(self):
-        text = (ROOT / "frontend" / "src" / "views" / "DocsView.vue").read_text(encoding="utf-8")
+        # 结构优化阶段 0（2026-09-14）：DocsView.vue 从 views/ 移入 views/docs/。
+        # 原本按绝对路径钉死文件位置，文件一移动就 FileNotFoundError（对断言意图无意义）。
+        # 改为按文件名定位 + 唯一性断言：断言强度不变（仍是同一批 needle），
+        # 但今后再次整理目录不会再误伤这条防漂移检查。
+        matches = sorted((ROOT / "frontend" / "src" / "views").rglob("DocsView.vue"))
+        self.assertEqual(len(matches), 1, f"DocsView.vue 应恰好存在一份，实得 {matches}")
+        text = matches[0].read_text(encoding="utf-8")
         for needle in ("17 项", "全部 17"):
             self.assertNotIn(needle, text, "docs 页不得写死风控项数（会随 schema 漂移）")
 

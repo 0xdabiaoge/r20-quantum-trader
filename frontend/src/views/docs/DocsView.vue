@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { useTheme } from '../composables/useTheme'
+import { useTheme } from '../../composables/useTheme'
 import {ShieldCheck, Cpu, FileText, ArrowLeft,
   ExternalLink, Copy, Terminal, Users, Brain, TrendingUp,
   Layers, Lock, ShieldAlert, ChevronRight, Menu, X, Sun, Moon, Server} from 'lucide-vue-next'
 
 const router = useRouter()
 const { theme, toggleTheme } = useTheme()
-import { APP_VERSION, APP_NAME } from '../config/version'
+import { APP_VERSION, APP_NAME } from '../../config/version'
 
 const activeSection = ref('overview')
 const mobileMenuOpen = ref(false)

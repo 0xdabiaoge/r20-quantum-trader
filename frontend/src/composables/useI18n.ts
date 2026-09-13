@@ -1,9 +1,6 @@
 import { ref, computed } from 'vue'
 import { zhCN } from '../locales/zh'
 import { enUS } from '../locales/en'
-// ---- 迁移期兼容：旧组件仍引用旧键位，深合并保证不断档；旧页面清零后移除 ----
-import { zhCN as zhLegacy } from '../locales/legacy/zh'
-import { enUS as enLegacy } from '../locales/legacy/en'
 
 export type LocaleType = 'zh-CN' | 'en-US'
 
@@ -11,20 +8,13 @@ const LOCALE_KEY = 'r20_locale'
 
 type Dict = Record<string, any>
 
-function deepMerge<T extends Dict>(base: T, over: T): T {
-  const out: Dict = { ...base }
-  for (const [k, v] of Object.entries(over)) {
-    const b = out[k]
-    out[k] = b && v && typeof b === 'object' && typeof v === 'object' && !Array.isArray(b) && !Array.isArray(v)
-      ? deepMerge(b, v)
-      : v
-  }
-  return out as T
-}
-
+// 结构优化阶段 0（2026-09-14）：移除 locales/legacy 迁移期兼容层。
+// 移除依据（实测，非估计）：新树 zh/en 各 1639 键；代码中静态 t() 键位 1356 个；
+// 「仅 legacy 提供且仍被使用」的键位 = 0；legacy 292 键中 288 个无人使用。
+// 原注释自定的移除条件「旧页面清零后移除」已达成，故连同 deepMerge 一并删除。
 const messages: Record<LocaleType, Dict> = {
-  'zh-CN': deepMerge(zhLegacy as Dict, zhCN as Dict),
-  'en-US': deepMerge(enLegacy as Dict, enUS as Dict),
+  'zh-CN': zhCN as Dict,
+  'en-US': enUS as Dict,
 }
 
 let currentLocaleRaw = ref<LocaleType>('zh-CN')

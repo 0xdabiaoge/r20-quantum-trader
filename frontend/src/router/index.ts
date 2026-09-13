@@ -12,7 +12,7 @@ const routes: RouteRecordRaw[] = [
   { path: '/news', name: 'dashboard-news', component: () => import('../layouts/DashboardLayout.vue'), meta: { isPublic: true, tab: 'news' } },
   { path: '/lab', name: 'dashboard-lab', component: () => import('../layouts/DashboardLayout.vue'), meta: { isPublic: true, tab: 'lab' } },
   { path: '/history', name: 'dashboard-history', component: () => import('../layouts/DashboardLayout.vue'), meta: { isPublic: true, tab: 'history' } },
-  { path: '/docs', name: 'docs', component: () => import('../views/DocsView.vue'), meta: { isPublic: true } },
+  { path: '/docs', name: 'docs', component: () => import('../views/docs/DocsView.vue'), meta: { isPublic: true } },
   { path: '/doc', redirect: '/docs' },
   {
     path: '/admin',
