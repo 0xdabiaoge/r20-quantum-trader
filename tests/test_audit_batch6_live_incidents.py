@@ -97,7 +97,8 @@ class TestAuthErrorIsolation(unittest.TestCase):
         import scripts.ai_factor_trader as aft
         gate_err = type("GateAPIError", (Exception,), {})("Gate INVALID_KEY: Invalid key provided")
         gate = type("G", (), {"list_open_orders": lambda self, b: (_ for _ in ()).throw(gate_err)})()
-        with patch.object(aft, "okx_rest", self._okx_stub()), \
+        with patch.object(aft, "_BROKEN_VENUES", set()), \
+             patch.object(aft, "okx_rest", self._okx_stub()), \
              patch.object(aft, "current_environment", lambda: type("E", (), {"mode": "demo"})()), \
              patch.object(aft.venue_registry, "execution_open", lambda v, e: v == "gate"), \
              patch.object(aft.venue_registry, "get_adapter", lambda v, environment=None: gate), \
@@ -143,6 +144,31 @@ class TestAuthErrorIsolation(unittest.TestCase):
             ok, _ = aft.clean_stale_open_orders()
         self.assertTrue(ok)
         self.assertEqual(cancelled, [("BTC", "g1")], "gate 健康时必须照常撤超时孤儿")
+
+    def test_broken_key_venue_dropped_from_routing(self):
+        # 回收实证坏键 → 同进程路由必须否决该场（坏键以最低费率赢下评分后死在
+        # 下单阶段=白烧信号），并证明健康场不受牵连
+        import scripts.ai_factor_trader as aft
+        gate_err = type("GateAPIError", (Exception,), {})("Gate INVALID_KEY: Invalid key provided")
+        gate = type("G", (), {"list_open_orders": lambda self, b: (_ for _ in ()).throw(gate_err)})()
+        healthy_binance = type("B", (), {"open_orders": lambda self, symbol=None: []})()
+        with patch.object(aft, "_BROKEN_VENUES", set()), \
+             patch.object(aft, "okx_rest", type("O", (), {
+                 "pending_orders": staticmethod(lambda **k: []),
+                 "cancel_order": staticmethod(lambda *a, **k: None)})()), \
+             patch.object(aft, "current_environment", lambda: type("E", (), {"mode": "demo"})()), \
+             patch.object(aft.venue_registry, "execution_open", lambda v, e: True), \
+             patch.object(aft.venue_registry, "get_adapter",
+                          lambda v, environment=None: healthy_binance if v == "binance" else gate), \
+             patch.object(aft, "load_instruments", lambda: [{"instId": "BTC-USDT-SWAP"}]), \
+             redirect_stdout(io.StringIO()):
+            ok, _ = aft.clean_stale_open_orders()
+            self.assertIn("gate", aft._BROKEN_VENUES, "凭证实证失败必须入账")
+            self.assertTrue(ok)
+            self.assertFalse(aft.venue_execution_ready("gate", "demo"),
+                             "坏键场在本轮路由必须被摘除执行资格")
+            self.assertTrue(aft.venue_execution_ready("binance", "demo"),
+                            "未实证失败的场不受牵连")
 
 
 # --------------------------------------------- ③ 外所同向重复单收敛

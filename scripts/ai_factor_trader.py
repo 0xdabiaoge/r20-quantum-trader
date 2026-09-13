@@ -349,6 +349,12 @@ def _run_captured(script, label=None, timeout=15):
     return run_script(script, timeout=timeout, label=label)
 
 
+# 本进程内被回收枚举实证「凭证已死」的外所集合（审计 2026-09-13：坏键所自动摘除
+# 执行资格，防最低费率赢下评分后死在下单阶段白烧信号）。trader 每轮新进程=每轮
+# 重探，密钥修好后下一轮自动恢复，无需人工。
+_BROKEN_VENUES: set = set()
+
+
 def clean_stale_open_orders(keep_ord_ids: Optional[set] = None) -> Tuple[bool, str]:
     """Cancel stale entry orders; any inability to verify/cancel blocks the trading cycle.
 
@@ -423,6 +429,7 @@ def clean_stale_open_orders(keep_ord_ids: Optional[set] = None) -> Tuple[bool, s
             if any(m in _msg for m in _AUTH_MARKERS):
                 # 执行闸开着但凭证已死：该所**不可能再收到我们的新单**（router 同样
                 # 发不出去）→ 跳过回收不拦轮（审计#4教训：拿凭证错误拦全链=交易停摆）。
+                _BROKEN_VENUES.add(_v)   # 本轮路由同步摘除其执行资格（见 venue_execution_ready）
                 print(f"[挂单生命周期] CRITICAL {_v.upper()} 凭证无效但执行闸开启——本所生命周期"
                       f"管理跳过；请修复密钥或关闭 R20_{_v.upper()}_EXECUTION")
                 continue
@@ -941,6 +948,13 @@ def venue_execution_ready(venue: str, environment: str) -> bool:
         if key == "okx":
             env = current_environment()
             return bool(env.configured) and str(env.mode) == str(environment)
+        # 审计(2026-09-13)·坏键所自动摘除：execution_open 只看旗标——gate 旗开着
+        # 但密钥已死时仍会以最低费率赢下评分，信号派过去死在下单阶段白白烧掉
+        # （且外所回收侧只能吼 CRITICAL 跳过）。回收枚举在周期开头已实测凭证生死，
+        # 认证类失败当场记入 _BROKEN_VENUES（进程级=每轮重探，密钥修好自动恢复），
+        # 此处一并否决，让路由把单留给真实可执行的场。
+        if key in _BROKEN_VENUES:
+            return False
         return bool(venue_registry.execution_open(key, environment))
     except Exception as exc:
         print(f"[选所路由] warn 场所 {key} 能力表读取失败，按不可执行处理: {exc}")
@@ -2932,6 +2946,8 @@ def execute_portfolio():
         _gv_mode = ""
     for _gv in ("gate", "binance"):
         try:
+            if _gv in _BROKEN_VENUES:
+                continue   # 回收侧已实证凭证死，不再逐标的空转（每轮进程级重探）
             if not (_gv_mode and venue_registry.execution_open(_gv, _gv_mode)):
                 continue
             _gad = venue_registry.get_adapter(_gv, environment=_gv_mode)
