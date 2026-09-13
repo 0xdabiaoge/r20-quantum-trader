@@ -21,6 +21,14 @@ const { t } = useI18n();
 const tab = ref('macro');
 
 const c = computed(() => props.cycle || {});
+/** 提示词字数：默认载荷里与顶层同文的行内提示词只保留字数（缺失不得当 0 渲染） */
+function promptChars(row: any): number | null {
+  const text = row?.ai_last_prompt;
+  if (typeof text === 'string' && text.length > 0) return text.length;
+  const chars = row?.ai_last_prompt_chars;
+  return typeof chars === 'number' && chars > 0 ? chars : null;
+}
+
 const opps = computed<any[]>(() => c.value.top_opportunities || []);
 const posMgmt = computed<any[]>(() => c.value.position_management || []);
 const transcript = computed(() => c.value.council_transcript);
@@ -107,8 +115,9 @@ function dirOf(a: string): 'long' | 'short' | 'flat' {
       </p>
       <div class="card-flat p-3.5 text-sm leading-relaxed" style="color: var(--ink-1)">
         {{ c.macro_assessment || '--' }}
-        <p v-if="c.ai_last_prompt" class="num t-faint mt-3 border-t pt-2 text-xs" style="border-color: var(--line-1)">
-          {{ t('dash.shell.peek.chars', undefined, { n: (c.ai_last_prompt || '').length }) }} · {{ t('dash.shell.peek.title') }}
+        <p v-if="promptChars(c)" class="num t-faint mt-3 border-t pt-2 text-xs" style="border-color: var(--line-1)">
+          {{ t('dash.shell.peek.chars', undefined, { n: promptChars(c) ?? 0 }) }} · {{ t('dash.shell.peek.title') }}
+          <span v-if="c.ai_last_prompt_elided">（{{ t('dash.radar.detail.promptElided') }}）</span>
         </p>
       </div>
     </div>

@@ -34,6 +34,13 @@ export const enAdminPromptStudio = {
     tradingUser: 'Trading User',
     tradingUserDesc: 'Assembles live market data, dynamics and the decision task each round',
   },
+    source: {
+      base: 'Base',
+      legacy: 'Edited',
+      custom: 'Custom',
+      baseTip: 'identical to the code base — future code updates apply automatically',
+      otherTip: 'content has diverged from the code base (or is user-created): future code updates will not overwrite it',
+    },
   modules: {
     currentProfile: 'Current profile: ',
     moveUp: 'Move module up',

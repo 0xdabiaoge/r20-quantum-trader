@@ -39,6 +39,16 @@ const showVarRibbon = ref(false)
 const activeEditingIdx = ref<number>(0)
 const previewMode = ref<'rendered' | 'template'>('rendered')
 
+/** 模块来源徽标：base=跟随代码基座；legacy=已被改写（脱离基座，代码升级不会再自动同步）；
+ * custom=用户新增。三种来源的可信度由后端 update_profile 的逐模块对齐保证。 */
+function sourceBadge(m: any): { text: string; tone: 'base' | 'legacy' | 'custom' } | null {
+  const source = String(m?.source || '')
+  if (source === 'base') return { text: t('admin.promptStudio.source.base'), tone: 'base' }
+  if (source === 'legacy') return { text: t('admin.promptStudio.source.legacy'), tone: 'legacy' }
+  if (source === 'custom') return { text: t('admin.promptStudio.source.custom'), tone: 'custom' }
+  return null
+}
+
 const pipelines = computed(() => [
   { id: 'trading_system', label: t('admin.promptStudio.pipelines.tradingSystem'), desc: t('admin.promptStudio.pipelines.tradingSystemDesc') },
   { id: 'trading_user', label: t('admin.promptStudio.pipelines.tradingUser'), desc: t('admin.promptStudio.pipelines.tradingUserDesc') },
@@ -507,6 +517,18 @@ onMounted(loadLib)
               <div class="flex items-center space-x-2 min-w-0 flex-1">
                 <span class="w-5 h-5 rounded font-bold text-[11px] flex items-center justify-center shrink-0 border" style="background-color: var(--surface-2); border-color: var(--line-1); color: var(--ink-2);">
                   #{{ idx + 1 }}
+                </span>
+                <span
+                  v-if="sourceBadge(m)"
+                  class="px-1.5 py-0.5 rounded text-[10px] shrink-0 border whitespace-nowrap"
+                  :style="sourceBadge(m)!.tone === 'base'
+                    ? 'border-color: var(--line-1); color: var(--ink-3);'
+                    : sourceBadge(m)!.tone === 'legacy'
+                      ? 'border-color: var(--warn, #d97706); color: var(--warn, #d97706);'
+                      : 'border-color: var(--accent-line); color: var(--accent);'"
+                  :title="sourceBadge(m)!.tone === 'base' ? t('admin.promptStudio.source.baseTip') : t('admin.promptStudio.source.otherTip')"
+                >
+                  {{ sourceBadge(m)!.text }}
                 </span>
                 <button
                   @click.stop="moveModule(idx, -1)"

@@ -1738,6 +1738,115 @@ def update_cache_cycle():
     persist_dashboard_cache(CACHE_DATA)
     LAST_CACHE_TIME = time.time()
 
+# ── 载荷瘦身（审计「未完成清单」#1）────────────────────────────────────
+# 实测一次 /api/all 有 30 万字符量级，体积几乎全部来自三处**重复/历史**内容：
+#   · ai_brain_history 25 条，每条都带 top_opportunities / position_management /
+#     policy_snapshot（约 5.6KB/条），而首页时间线只需要近期明细；
+#   · review.ai_last_prompt 与顶层 ai_last_prompt 是同一段 3.6 万字符提示词的拷贝；
+#   · trades 31 行 / logs 60 行，明细页有专用接口。
+# 默认返回瘦身后的载荷，并对**每一处省略**显式留痕（`_trimmed` / `_meta.omitted`），
+# 让前端能说"本条为摘要，完整内容见 X"，而不是把缺失渲染成"无"（缺失≠0 红线）。
+# 需要完整载荷的调用方用 `/api/all?full=1`（行为与旧版逐字节一致）。
+SLIM_HISTORY_FULL_ENTRIES = 5      # 保留最近 N 条的完整明细
+SLIM_HISTORY_DROP_KEYS = ("top_opportunities", "position_management", "policy_snapshot")
+SLIM_TRADES = 20
+SLIM_LOGS = 20
+
+
+def slim_payload(data: dict[str, Any]) -> dict[str, Any]:
+    """对缓存快照做只读瘦身：不改动 CACHE_DATA 本身，返回新的顶层字典。"""
+    out = dict(data)
+    # 幂等：若传入的已是瘦身载荷（例如被二次缓存），必须**保留**上一轮的省略记录——
+    # 否则省略留痕会消失，前端会把被裁过的数据当完整数据渲染（正是本项要防的"UI 说谎"）。
+    prior_meta = out.get("_meta") if isinstance(out.get("_meta"), dict) else {}
+    omitted: dict[str, Any] = dict(prior_meta.get("omitted") or {})
+
+    history = out.get("ai_brain_history")
+    if isinstance(history, list) and len(history) > SLIM_HISTORY_FULL_ENTRIES:
+        trimmed_rows = 0
+        slimmed: list[Any] = []
+        for index, entry in enumerate(history):
+            if index < SLIM_HISTORY_FULL_ENTRIES or not isinstance(entry, dict):
+                slimmed.append(entry)
+                continue
+            row = dict(entry)
+            dropped = [key for key in SLIM_HISTORY_DROP_KEYS if key in row]
+            for key in dropped:
+                row.pop(key, None)
+            if dropped:
+                # 显式标记"本条被裁成摘要"，前端据此渲染提示，绝不假装明细为空
+                row["_trimmed"] = dropped
+                trimmed_rows += 1
+            slimmed.append(row)
+        # 行内整段提示词与顶层 ai_last_prompt 同文时只保留"字数 + 省略标记"：
+        # 顶层那份仍完整（白盒承诺），此处避免同段 3.6 万字符文本再发一遍。
+        top_prompt = str(out.get("ai_last_prompt") or "")
+        elided_prompts = 0
+        if top_prompt:
+            for row in slimmed:
+                if not isinstance(row, dict):
+                    continue
+                text = str(row.get("ai_last_prompt") or "")
+                if len(text) < 2000 or text[:200] != top_prompt[:200]:
+                    continue   # 短存根（210 字）与不同文的历史提示词原样保留
+                row.pop("ai_last_prompt", None)
+                row["ai_last_prompt_chars"] = len(text)
+                row["ai_last_prompt_elided"] = True
+                row["ai_last_prompt_ref"] = "top_level"
+                elided_prompts += 1
+        out["ai_brain_history"] = slimmed
+        if elided_prompts:
+            omitted["ai_brain_history.prompt_text"] = {
+                "entries": elided_prompts,
+                "reason": "与顶层 ai_last_prompt 同文，避免重复下发整段提示词",
+                "ref": "ai_last_prompt",
+            }
+        if trimmed_rows:
+            omitted["ai_brain_history"] = {
+                "kept_full": SLIM_HISTORY_FULL_ENTRIES,
+                "total": len(history),
+                "trimmed_entries": trimmed_rows,
+                "dropped_fields": list(SLIM_HISTORY_DROP_KEYS),
+                "full": "/api/v1/cache/brain-history",
+            }
+
+    review = out.get("review")
+    if isinstance(review, dict) and review.get("ai_last_prompt"):
+        top_prompt = str(out.get("ai_last_prompt") or "")
+        review_prompt = str(review.get("ai_last_prompt") or "")
+        if top_prompt and review_prompt[:200] == top_prompt[:200]:
+            review = dict(review)
+            review.pop("ai_last_prompt", None)
+            review["ai_last_prompt_chars"] = len(review_prompt)
+            review["ai_last_prompt_ref"] = "top_level"
+            out["review"] = review
+            omitted["review.ai_last_prompt"] = {
+                "chars": len(review_prompt),
+                "reason": "与顶层 ai_last_prompt 同文，避免同段提示词重复下发",
+                "ref": "ai_last_prompt",
+            }
+
+    trades = out.get("trades")
+    if isinstance(trades, list) and len(trades) > SLIM_TRADES:
+        out["trades"] = trades[-SLIM_TRADES:]
+        omitted["trades"] = {"kept": SLIM_TRADES, "total": len(trades), "full": "/api/v1/cache/ledger"}
+
+    logs = out.get("logs")
+    if isinstance(logs, list) and len(logs) > SLIM_LOGS:
+        out["logs"] = logs[-SLIM_LOGS:]
+        omitted["logs"] = {"kept": SLIM_LOGS, "total": len(logs)}
+
+    meta = dict(out.get("_meta") or {})
+    meta.update({
+        "slim": True,
+        "full_payload": "/api/all?full=1",
+        "omitted": omitted,
+        "note": "省略项均已显式留痕；缺失一律不用 0 或空值代填",
+    })
+    out["_meta"] = meta
+    return out
+
+
 async def refresh_cache_if_needed(ttl_seconds: float = 3.0):
     global LAST_CACHE_TIME, CACHE_DATA
     if time.time() - LAST_CACHE_TIME <= ttl_seconds and CACHE_DATA:
@@ -1905,16 +2014,18 @@ async def public_tab_spa_routes(request: Request):
 # --- Realtime Public Polling APIs (with Cloudflare Edge Micro-Caching) ---
 
 @app.get("/api/all")
-async def get_all_data():
+async def get_all_data(full: bool = False):
     global CACHE_DATA, LAST_CACHE_TIME
     # Return pre-warmed in-memory snapshot immediately (<1ms)
     if not CACHE_DATA or time.time() - LAST_CACHE_TIME > 5.0:
         data = await refresh_cache_if_needed(1.5)
     else:
         data = CACHE_DATA
+    # 审计#1：默认瘦身（省略项在 _meta.omitted 里逐项留痕）；full=1 与旧版逐字节一致
+    payload = data if full else slim_payload(data)
     # Realtime data: strictly never cache in browser (max-age=0), micro-cache at edge for 2s with fast revalidation
     return JSONResponse(
-        data,
+        payload,
         headers={"Cache-Control": "public, max-age=0, s-maxage=2, stale-while-revalidate=5"},
     )
 

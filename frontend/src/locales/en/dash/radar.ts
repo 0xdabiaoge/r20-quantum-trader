@@ -8,6 +8,7 @@ export const enRadar = {
   col: { time: 'Time', macro: 'Macro read', action: 'Action', symbols: 'Symbols' },
   detail: {
     title: 'Decision audit · {t}',
+    promptElided: 'identical to the top-level prompt; only the character count is shown here',
     macro: 'Macro read',
     quotes: 'Advisor quotes',
     verdict: 'Final verdict',

@@ -7,6 +7,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { useI18n } from '../../composables/useI18n'
 const { t } = useI18n()
 import { useApi } from '../../composables/useApi'
+import { useDashboardStore } from '../../stores/dashboard'
 import PageHeader from '../../components/admin/PageHeader.vue'
 import DangerZone from '../../components/admin/DangerZone.vue'
 import {ShieldAlert,
@@ -20,11 +21,24 @@ import {ShieldAlert,
   TrendingUp} from 'lucide-vue-next'
 
 const { api } = useApi()
+const store = useDashboardStore()
 
 const loading = ref(true)
 const busy = ref<'save' | 'reset' | ''>('')
 
-const schema = ref<{ groups: any[]; params: any[] } | null>(null)
+const schema = ref<{ groups: any[]; params: any[]; high_risk_phrase?: string } | null>(null)
+/** 引擎此刻的口径（审计未完成清单#3）：文件值 = 下一周期生效；进程内值 = 长驻进程正在用的 */
+const processValues = ref<Record<string, number>>({})
+const processFresh = ref<{ stale: boolean; note: string; env_file_mtime: number | null; loaded_at: number | null } | null>(null)
+const engineValues = ref<Record<string, any> | null>(null)
+const driftCount = computed(() => {
+  const keys = Object.keys(processValues.value || {})
+  return keys.filter((k) => {
+    const file = serverValues.value[k]
+    const proc = processValues.value[k]
+    return typeof file === 'number' && typeof proc === 'number' && Math.abs(file - proc) > 1e-9
+  })
+})
 const suites = ref<any[]>([])
 const effectText = ref('')
 const serverValues = ref<Record<string, number>>({})
@@ -95,10 +109,16 @@ function syncFromServer(values: Record<string, number>) {
 async function loadData() {
   loading.value = true
   try {
-    const res = await api('/api/v1/admin/risk')
+    // 带上页面上展示的可用权益，让后端派生"引擎此刻的口径"（权益未知时后端会如实标 None）
+    const eq = Number((store as any)?.data?.account?.avail_eq)
+    const query = Number.isFinite(eq) && eq > 0 ? `?equity=${eq}` : ''
+    const res = await api(`/api/v1/admin/risk${query}`)
     schema.value = res.schema
     suites.value = res.suites || []
     effectText.value = res.effect || ''
+    processValues.value = res.process_values || {}
+    processFresh.value = res.process_freshness || null
+    engineValues.value = res.engine_values || null
     syncFromServer(res.values)
   } catch (e: any) {
     toast.err(`加载失败: ${e.message}`)
@@ -233,7 +253,61 @@ onMounted(loadData)
       <Info class="w-3.5 h-3.5 shrink-0 mt-0.5" style="color: var(--accent, var(--info));" />
       <div class="space-y-1">
         <p>{{ effectText || t('admin.risk.effectHint') }}</p>
+        <p v-if="processFresh?.stale" style="color: var(--warn, #d97706);">
+          ⚠ {{ t('admin.risk.processStale') }}（{{ t('admin.risk.processDiffCount', undefined, { n: driftCount.length }) }}）
+        </p>
+        <p v-else-if="driftCount.length" style="color: var(--warn, #d97706);">
+          ⚠ {{ t('admin.risk.processDiffCount', undefined, { n: driftCount.length }) }}
+        </p>
       </div>
+    </div>
+
+    <!-- 引擎此刻的口径（审计未完成清单#3）：文件值 vs 进程内快照 vs 派生执行口径 -->
+    <div v-if="engineValues" class="rounded-xl border p-4 space-y-3" style="background-color: var(--surface-2); border-color: var(--line-1);">
+      <div class="flex items-center gap-2">
+        <Target class="w-4 h-4" style="color: var(--accent);" />
+        <span class="text-xs font-bold" style="color: var(--ink-1);">{{ t('admin.risk.engineNow') }}</span>
+        <span class="text-[10px] num" style="color: var(--ink-3);">{{ t('admin.risk.engineNowHint') }}</span>
+      </div>
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 text-[11px]">
+        <div class="card-flat p-2">
+          <div style="color: var(--ink-3);">{{ t('admin.risk.engineDailyLoss') }}</div>
+          <div class="num font-bold" style="color: var(--ink-1);">
+            {{ engineValues.daily_loss_limit_usdt == null ? '--' : `${engineValues.daily_loss_limit_usdt} U` }}
+          </div>
+        </div>
+        <div class="card-flat p-2">
+          <div style="color: var(--ink-3);">{{ t('admin.risk.engineSingleAsset') }}</div>
+          <div class="num font-bold" style="color: var(--ink-1);">
+            {{ engineValues.single_asset_margin_usdt == null ? '--' : `${engineValues.single_asset_margin_usdt} U` }}
+          </div>
+        </div>
+        <div class="card-flat p-2">
+          <div style="color: var(--ink-3);">{{ t('admin.risk.engineMaxPositions') }}</div>
+          <div class="num font-bold" style="color: var(--ink-1);">
+            {{ engineValues.max_positions == null ? '--' : `${engineValues.max_positions} / ${engineValues.max_same_direction}` }}
+          </div>
+        </div>
+        <div class="card-flat p-2">
+          <div style="color: var(--ink-3);">{{ t('admin.risk.engineTargetRR') }}</div>
+          <div class="num font-bold" style="color: var(--ink-1);">≥ {{ engineValues.target_rr }}</div>
+        </div>
+        <div class="card-flat p-2">
+          <div style="color: var(--ink-3);">{{ t('admin.risk.engineConfBand') }}</div>
+          <div class="num font-bold" style="color: var(--ink-1);">
+            {{ (engineValues.confidence_band || []).join('% ~ ') }}%
+          </div>
+        </div>
+        <div class="card-flat p-2">
+          <div style="color: var(--ink-3);">{{ t('admin.risk.engineEquityUsed') }}</div>
+          <div class="num font-bold" style="color: var(--ink-1);">
+            {{ engineValues.usdt_available_used == null ? t('admin.risk.engineEquityUnknown') : `${engineValues.usdt_available_used} U` }}
+          </div>
+        </div>
+      </div>
+      <p v-if="driftCount.length" class="text-[11px]" style="color: var(--warn, #d97706);">
+        {{ t('admin.risk.engineDrift') }}：{{ driftCount.map((k) => schema?.params.find((x: any) => x.key === k)?.label || k).join('、') }}
+      </p>
     </div>
 
     <div v-if="loading" class="flex items-center justify-center py-24">

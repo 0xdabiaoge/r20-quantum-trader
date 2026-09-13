@@ -21,8 +21,12 @@ _CANDLES_CACHE: dict[str, tuple[float, list[dict[str, Any]]]] = {}
 
 
 @router.get("/api/all")
-async def get_all_data():
-    return await dash_app.get_all_data()
+async def get_all_data(full: bool = Query(False, description="返回完整载荷（含全部历史明细/台账/日志）")):
+    """默认瘦身载荷（体积约为完整版的 1/2），省略项见响应里的 `_meta.omitted`。
+
+    需要旧版逐字节一致的行为时用 `?full=1`；历史明细走 `/api/v1/cache/brain-history`。
+    """
+    return await dash_app.get_all_data(full=full)
 
 
 @router.get("/api/overview")
@@ -38,6 +42,9 @@ def cache(resource: str, x_r20_admin_token: str | None = Header(default=None), x
         "ledger": "trading_ledger.json",
         "sentiment": "news_sentiment.json",
         "self-improvement": "self_improvement_report.json",
+        # 审计#1：/api/all 默认只带最近 8 条完整明细，完整历史由此端点按需取
+        # （与 /api/all 同级的公开面——该文件本就是首页时间线的数据源，不含密钥）
+        "brain-history": "ai_brain_history.json",
     }
     filename = allowed.get(resource)
     if not filename:

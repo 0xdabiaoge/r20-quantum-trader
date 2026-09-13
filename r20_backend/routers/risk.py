@@ -1,7 +1,7 @@
 """Risk constants, instrument pool, baseline capital, and position close routes."""
 from __future__ import annotations
 from typing import Any
-from fastapi import APIRouter, Body, Header, HTTPException
+from fastapi import APIRouter, Body, Header, HTTPException, Query
 
 from r20_backend.config import settings, refresh_settings
 from r20_backend.settings_store import update_env, remove_env
@@ -88,13 +88,20 @@ def _holdings_report(inst_id: str, trackers: dict[str, Any]) -> dict[str, Any]:
 
 
 @router.get("/api/v1/admin/risk")
-def admin_risk_get(x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
+def admin_risk_get(equity: float | None = Query(default=None, description="可用权益（USDT），用于派生引擎当前口径"),
+                   x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
     refresh_settings()
     require_admin_header(x_r20_session=x_r20_session)
     return {
         "schema": risk_config.schema(),
         "suites": risk_config.SUITES,
         "values": risk_config.current_values(),
+        # 审计未完成清单#3：把"引擎此刻真正在用什么"和"下一周期会用什么"并排给出——
+        # P0-2/P1-1 能长期隐身，正是因为页面上只有前者（文件值）没有后者（进程快照）。
+        "process_values": risk_config.process_values(),
+        "process_freshness": risk_config.process_freshness(),
+        "file_vs_process": risk_config.file_vs_process_diff(),
+        "engine_values": risk_config.effective_engine_values(equity),
         "effect": "交易引擎每 15 分钟一个巡检周期；子进程启动时重新读取 .env，保存后下一周期自动生效，无需重启后台。",
     }
 

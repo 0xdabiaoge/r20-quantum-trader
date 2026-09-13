@@ -34,6 +34,13 @@ export const zhAdminPromptStudio = {
     tradingUser: '交易 User',
     tradingUserDesc: '每轮拼装实时行情、动力学与决策任务',
   },
+    source: {
+      base: '基座',
+      legacy: '已改写',
+      custom: '新增',
+      baseTip: '与代码基座逐字相同：代码升级后会自动同步到本方案',
+      otherTip: '内容已偏离代码基座（或为自建模块）：代码升级不会再自动覆盖它',
+    },
   modules: {
     currentProfile: '当前方案：',
     moveUp: '上移模块',
