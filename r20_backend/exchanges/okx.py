@@ -183,7 +183,15 @@ class OKXAdapter(OKXPublicAdapter):
                 continue
             inst_id = p.get("instId", "")
             base = canonical_base(inst_id)
-            side = str(p.get("posSide") or ("long" if amt > 0 else "short")).lower()
+            # 审计②#2(2026-09-13)：净持仓模式 posSide="net" 旧实现直接透传 →
+            # side 越出 {long,short} 词表且 size_signed=-abs(amt) 把多头显示为负
+            # （全仓消费方以 size_signed 符号定方向 → 接线即整所反读）。
+            # 规则：仅双向持仓信 posSide；net/缺失一律用 pos 有符号数派生。
+            raw_side = str(p.get("posSide") or "").strip().lower()
+            if raw_side in ("long", "short"):
+                side = raw_side
+            else:
+                side = "long" if amt > 0 else "short"
             upl = float(p.get("upl", 0) or 0)
             out.append({
                 "venue": "okx",
@@ -237,13 +245,23 @@ class OKXAdapter(OKXPublicAdapter):
         from scripts import okx_rest
         env = self._get_okx_env()
         inst_id = self.native_symbol(symbol)
-        pos_s = (pos_side or ("long" if side.lower() == "buy" else "short")).lower()
+        # 审计②#3(2026-09-13)双缺陷修复：
+        # ①旧传 sz= —— okx_rest.place_order 形参名是 size，此前每次调用即 TypeError、
+        #   网络零发起（并被关闸掩护，与 orders_pending 同族）；
+        # ②旧默认 buy→long/sell→short —— 净持仓模式下恒发 posSide=long/short 会被
+        #   OKX 拒（51006 族）；双向持仓下「sell 平多」被默认成 posSide=short，等于
+        #   反向开新空仓。现规则：显式 pos_side 原样透传；未显式时不传 posSide（净
+        #   模式默认形态）——双向持仓的调用方必须显式传，绝不猜。
+        if pos_side:
+            pos_s = str(pos_side).strip().lower()
+            if pos_s not in ("long", "short", "net"):
+                raise ValueError(f"pos_side 仅允许 long/short/net，收到 {pos_side!r}")
+            kwargs["pos_side"] = None if pos_s == "net" else pos_s
         res = okx_rest.place_order(
             inst_id=inst_id,
             side=side.lower(),
-            pos_side=pos_s,
+            size=str(contracts),
             ord_type=order_type.lower(),
-            sz=str(contracts),
             px=str(price) if price else None,
             cl_ord_id=client_order_id,
             env=env,

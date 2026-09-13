@@ -76,7 +76,7 @@ class AdminApiTests(unittest.TestCase):
         self.assertIn("decisions", runtime.json())
         logs = self.client.get("/api/v1/admin/logs?source=backend&lines=30", headers=headers)
         self.assertEqual(logs.status_code, 200)
-        self.assertEqual(logs.json()["file"], "r20_backend.log")
+        self.assertEqual(logs.json()["file"], "uvicorn.log")  # 审计①#6：r20_backend.log 从无写入方（死文件），已指向真实日志
         self.assertEqual(self.client.get("/api/v1/admin/logs?source=../../etc/passwd", headers=headers).status_code, 400)
         library = self.client.get("/api/v1/admin/prompt-library", headers=headers)
         self.assertEqual(library.status_code, 200)

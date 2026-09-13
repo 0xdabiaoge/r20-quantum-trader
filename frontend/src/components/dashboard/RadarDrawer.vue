@@ -10,8 +10,10 @@ import BaseEmpty from '../base/BaseEmpty.vue';
 import DirTag from '../base/DirTag.vue';
 import ConfBadge from '../base/ConfBadge.vue';
 import { useI18n } from '../../composables/useI18n';
+import { useDashboardStore } from '../../stores/dashboard';
 import { fmtNum, fmtPrice } from '../../utils/format';
 
+const dash = useDashboardStore();
 const props = defineProps<{ cycle: any | null }>();
 const emit = defineEmits<{ (e: 'close'): void }>();
 
@@ -38,10 +40,15 @@ const modeLabel = computed(() => transcript.value?.consensus_mode === 'cross_exa
   ? t('dash.radar.council.cross') : t('dash.radar.council.standard'));
 
 const xvenueRows = computed(() => {
-  const byAsset = c.value?.cross_venue?.by_asset || {};
+  // 审计①#11(2026-09-13)：跨所对账数据源在 /api/all 顶层 cross_venue.symbols
+  // （okx 为 float），而 ai_brain_history 条目从不含 cross_venue.by_asset——
+  // 旧实现只读 cycle 内键位，页签永不渲染（纯漏接线，后端数据一直都在）。
+  // 现双兼容：条目自带（旧契约）优先，否则兜底顶层 store。
+  const byAsset: any = c.value?.cross_venue?.by_asset
+    || (dash.data as any)?.cross_venue?.symbols || {};
   return Object.entries(byAsset).map(([sym, data]: [string, any]) => ({
     symbol: sym,
-    okx_last: data?.okx_last,
+    okx_last: typeof data?.okx_last === 'number' ? data.okx_last : data?.okx,
     bin_last: data?.bin_last,
     bin_basis_pct: data?.bin_basis_pct,
     gate_last: data?.gate_last,

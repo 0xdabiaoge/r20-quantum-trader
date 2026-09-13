@@ -493,7 +493,11 @@ class BinanceExecutionAndProtectionTests(unittest.TestCase):
         self.assertFalse(res["ok"])
         self.assertEqual(res["stage"], "protective")
         self.assertIn("入场单已撤销", res["detail"])
-        ad.cancel_order.assert_called_once_with("BTC", "9999")
+        # 审计④#9：回滚须 best-effort 撤掉已挂成功的腿（本例 tp=801 挂成、sl 缺口）
+        # + 入场单，绝不留孤儿触发单。旧断言只认撤入场单一次，正是被修掉的缺陷。
+        legs = [c.args[1] for c in ad.cancel_order.call_args_list]
+        self.assertIn("801", legs, "已挂成功的 TP 腿必须回滚")
+        self.assertIn("9999", legs, "入场单必须回滚")
 
 
 if __name__ == "__main__":

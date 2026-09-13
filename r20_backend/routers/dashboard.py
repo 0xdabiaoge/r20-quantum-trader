@@ -110,7 +110,6 @@ def market_candles(inst_id: str, bar: str = "1H", limit: int = 150, response: Re
         return {"instId": inst_id, "bar": bar, "candles": [], "source": "error", "detail": str(exc)}
 
 
-@router.get("/health", include_in_schema=False)
 @router.get("/api/v1/equity_history")
 def equity_history(days: int = 14) -> dict[str, Any]:
     """权益迷你曲线（公开，与 /api/all 同级暴露）：
@@ -246,6 +245,18 @@ def serve_vue_spa_subroutes(subpath: str = "") -> Response:
 @router.get("/admin", include_in_schema=False)
 @router.get("/admin/{subpath:path}", include_in_schema=False)
 def admin_page(subpath: str = "") -> FileResponse:
+    # 审计⑤#6(2026-09-13)：旧实现对一切 /admin/* 无脑回 Vue 壳，把 mount 副本里
+    # 「真实文件优先」分支压死——LegacyRedirect.vue 专门跳转的 /admin/legacy.html
+    # （磁盘真实 126KB 文件）永远打不开且无 404 信号。现真实文件优先（含路径逃逸
+    # 校验），目录/未知子路径仍回 Vue 壳交给前端路由。
+    if subpath:
+        try:
+            admin_root = (VUE_DIST / "admin").resolve()
+            cand = (admin_root / subpath).resolve()
+            if cand.is_file() and cand.is_relative_to(admin_root):
+                return FileResponse(str(cand), headers={"Cache-Control": "no-cache"})
+        except (OSError, ValueError):
+            pass
     vue_index = VUE_DIST / "index.html"
     if vue_index.is_file():
         return FileResponse(str(vue_index), headers={"Cache-Control": "no-cache, no-store, must-revalidate"})

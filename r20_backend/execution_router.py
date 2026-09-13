@@ -160,6 +160,7 @@ def open_protected_position(decision: Dict[str, Any], *,
     order_id = str(placed.get("id") or placed.get("order_id") or placed.get("text") or "")
 
     # 云端 TP/SL 双腿 + 回读验证；任何缺口撤入场单回滚
+    legs: dict = {}
     try:
         try:
             legs = ad.attach_protective_orders(asset, side, tp_px=tp, sl_px=sl,
@@ -173,14 +174,47 @@ def open_protected_position(decision: Dict[str, Any], *,
         if str(legs.get("tp")) not in open_ids or str(legs.get("sl")) not in open_ids:
             raise RuntimeError("回读未见双腿触发单")
     except Exception as exc:
-        rollback_note = ""
+        # 审计④#9(2026-09-13)：铁律「任一步失败→已挂触发单回滚+撤入场单」旧实现只
+        # 撤入场单——tp 挂成、sl 失败时 tp 孤儿遗留至 expiration（无仓挂保护单不可对账）。
+        # 现双段清理：①已知 legs 逐腿 best-effort 撤；②枚举该资产残留触发单，只撤
+        # 带 r20 前缀的本系统单（用户手动保护单绝不触碰）；枚举失败如实标注。
+        rollback_notes = []
+        for _leg in ("tp", "sl"):
+            _lid = str((legs or {}).get(_leg) or "")
+            if not _lid or _lid in ("None", ""):
+                continue
+            try:
+                ad.cancel_order(asset, _lid)
+            except Exception as leg_exc:
+                rollback_notes.append(f"{_leg.upper()}腿 {_lid} 撤销失败({leg_exc})")
+        try:
+            residue = ad.list_protective_orders(asset) or []
+            for row in residue:
+                if not isinstance(row, dict):
+                    continue
+                _o = row.get("order") if isinstance(row.get("order"), dict) else row
+                _text = (str(_o.get("text") or "") + str(row.get("text") or "")).lower()
+                if "r20" not in _text:
+                    continue  # 只清本系统触发单
+                _rid = str(row.get("id") or row.get("algo_id") or row.get("order_id") or _o.get("id") or "")
+                if not _rid or _rid in ("None",):
+                    continue
+                try:
+                    ad.cancel_order(asset, _rid)
+                    rollback_notes.append(f"孤儿触发单 {_rid} 已撤")
+                except Exception as rexc:
+                    rollback_notes.append(f"孤儿触发单 {_rid} 撤销失败({rexc})")
+        except Exception as lexc:
+            rollback_notes.append(f"孤儿触发单未能枚举({lexc})——依赖交易所侧 OCO/到期/手动兜底")
         try:
             ad.cancel_order(asset, order_id)
-            rollback_note = "；入场单已撤销"
+            rollback_notes.append("入场单已撤销")
         except Exception as cexc:
-            rollback_note = f"；入场单撤销失败({cexc})——交易所侧 OCO/手动兜底"
-        return _fail("protective", f"保护单覆盖失败: {exc}{rollback_note}",
-                     venue=venue, order_id=order_id)
+            rollback_notes.append(f"入场单撤销失败({cexc})——交易所侧 OCO/手动兜底")
+        detail = f"保护单覆盖失败: {exc}"
+        if rollback_notes:
+            detail += "；回滚记录: " + "；".join(rollback_notes)
+        return _fail("protective", detail, venue=venue, order_id=order_id)
 
     return RouteResult(ok=True, venue=venue, stage="done", asset=asset,
                        action=action, order_id=order_id,

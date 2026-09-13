@@ -190,7 +190,23 @@ class GateAdapter(BaseExchangeAdapter):
         data = self._public_get("/api/v4/futures/usdt/order_book", {
             "contract": self.native_symbol(symbol), "limit": min(depth, 50)})
         if isinstance(data, dict) and data.get("bids"):
-            return {"venue": "gate", "bids": data["bids"], "asks": data.get("asks", [])}
+            # 审计②#5(2026-09-13)：Gate 期货深度官方形态是 [{"p":价,"s":量}] 对象数组
+            # （gateapi FuturesOrderBookItem），而 base.py 归一契约与 OKX/Binance 均为
+            # [[price, qty], ...]。旧实现原样透传——任何按统一形态写的消费代码
+            # （如本仓 binance.py 自家 bids[0][0] 写法）在 Gate 上 KeyError:0。归一壳
+            # 必须也归一核。
+            def _norm(levels):
+                out = []
+                for lv in (levels or []):
+                    if isinstance(lv, dict):
+                        try:
+                            out.append([str(lv["p"]), str(lv["s"])])
+                        except (KeyError, TypeError):
+                            continue
+                    elif isinstance(lv, (list, tuple)) and len(lv) >= 2:
+                        out.append([str(lv[0]), str(lv[1])])
+                return out
+            return {"venue": "gate", "bids": _norm(data["bids"]), "asks": _norm(data.get("asks"))}
         return None
 
     def fetch_top_trader_ratio(self, symbol: str) -> Optional[float]:

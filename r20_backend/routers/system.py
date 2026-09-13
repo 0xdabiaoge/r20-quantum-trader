@@ -31,7 +31,9 @@ router = APIRouter(tags=["system"])
 
 ADMIN_LOG_SOURCES = {
     "trader": "ai_factor_trader.log",
-    "backend": "r20_backend.log",
+    # 审计①#6(2026-09-13)：r20_backend.log 从无写入方（uvicorn 直起写 uvicorn.log，
+    # start.sh/systemd 亦然）——DecisionsPage「后台」页签因此永远空。指向真实文件。
+    "backend": "uvicorn.log",
     "scheduler": "r20_gateway.log",
     "gateway": "r20_gateway.log",
 }

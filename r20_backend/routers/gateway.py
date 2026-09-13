@@ -516,6 +516,13 @@ def simple_backup_config(x_r20_admin_token: str | None = Header(default=None)) -
     auth_mode = str((target or {}).get("auth_mode") or "")
     legacy_bypy = target_type == "baidu" and auth_mode != "oauth"
     destination = "baidu_oauth" if target_type == "baidu" and not legacy_bypy else target_type if target_type in {"local","s3","oss","webdav"} else "local"
+    # 审计①#5(2026-09-13)：configured 曾读 target.credential_status——该键只在
+    # GET /backup-jobs 处理器里读时注入（:683），list_jobs() 本体不带 → 本端点
+    # 恒判「未配置」。现按同款函数现算（已修系列的漏网兄弟端点）。
+    if target:
+        target = dict(target)
+        target.setdefault("credential_status",
+                          backup_credential_status(str(target.get("credential_ref") or "")))
     validation = validate_backup_job(job)
     latest = None
     manifests_dir = _get_root() / "backups" / "manifests"

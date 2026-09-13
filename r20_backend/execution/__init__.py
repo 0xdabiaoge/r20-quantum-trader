@@ -23,14 +23,11 @@ from .circuit_breaker import (
     add_stop_cooldown,
     load_stop_cooldowns,
 )
-from .reservation import (
-    route_and_reserve_signal,
-    build_venue_candidates,
-    reservation_manager,
-    reconcile_reservation_ledger,
-    release_signal_reservation,
-    fetch_other_venue_positions,
-)
+# 审计④#7(2026-09-13)：删除 execution/reservation.py 幻影孪生——它按不存在的 API 写
+# （mgr.reserve(venue=…, ttl_seconds=…) / res.ok / DEFAULT_RESERVATION_TTL_SECONDS /
+# list_active 均不存在），任何调用即 TypeError，却挂在包导出面上「谁接谁炸」。
+# 选所/预留的**活实现**在 scripts/ai_factor_trader.py（route_and_reserve_signal 等，
+# API 对齐、tests/test_venue_wiring 钉死）；未来单源迁移属结构工程批次，勿再复制副本。
 
 __all__ = [
     "calc_ema",
@@ -49,10 +46,4 @@ __all__ = [
     "is_in_stop_cooldown",
     "add_stop_cooldown",
     "load_stop_cooldowns",
-    "route_and_reserve_signal",
-    "build_venue_candidates",
-    "reservation_manager",
-    "reconcile_reservation_ledger",
-    "release_signal_reservation",
-    "fetch_other_venue_positions",
 ]

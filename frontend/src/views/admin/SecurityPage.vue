@@ -132,7 +132,9 @@ async function saveEnvironment() {
 async function saveManualClose() {
   try {
     const d = await api('/api/v1/admin/config', { method: 'PUT', body: JSON.stringify({ manual_close_enabled: manualClose.value }) })
-    manualClose.value = !!d.manual_close_enabled
+    // 审计①#4(2026-09-13)：PUT 复用 admin_config()，manual_close_enabled 嵌在
+    // editable 之下——旧读顶层恒 undefined → 保存后开关弹回 OFF + toast 谎报。
+    manualClose.value = !!(d?.editable?.manual_close_enabled ?? d?.manual_close_enabled)
     if (manualClose.value) toast.warn('后台手动平仓已启用'); else toast.ok('后台手动平仓已禁用')
   } catch (e: any) {
     toast.err(e.message)

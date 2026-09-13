@@ -33,13 +33,16 @@ async function checkUpdate() {
     if (about.value) {
       about.value.update = res
     }
-    updateResult.value = {
-      ok: true,
-      message: res.behind > 0
-        ? t('admin.about.checkBehind', undefined, { behind: res.behind, remote: res.remote })
-        : t('admin.about.checkUpToDate'),
-      data: res,
-    }
+    updateResult.value = res.error
+      // 模板以 .error 键判红（审计①#8）：git 失败回 HTTP 200+error 字段，必须走红分支
+      ? { error: `更新检查失败：${res.error}（无法确认是否落后，安全补丁可能静默脱班）`, data: res }
+      : {
+          ok: true,
+          message: res.behind > 0
+            ? t('admin.about.checkBehind', undefined, { behind: res.behind, remote: res.remote })
+            : t('admin.about.checkUpToDate'),
+          data: res,
+        }
   } catch (e: any) {
     updateResult.value = { error: e.message }
   } finally {
