@@ -29,6 +29,10 @@ DATA_DIR = os.path.join(WORKSPACE_DIR, "data")
 LOGS_DIR = os.path.join(WORKSPACE_DIR, "logs")
 
 LEDGER_JSON_FILE = os.path.join(DATA_DIR, "trading_ledger.json")
+# 批E(2026-09-13)：台账自动同步总闸（模块导入时快照，见 get_all_data 内的触发点）。
+# tests/__init__.py 会在任何测试模块导入本模块之前置 R20_LEDGER_SYNC_DISABLED=1，
+# 快照即成 False——此后个别测试 clear=True 清空环境也抹不掉该闸门。
+LEDGER_AUTOSYNC_ENABLED = str(os.environ.get("R20_LEDGER_SYNC_DISABLED", "")).strip().lower() not in ("1", "true", "yes")
 LOG_FILE = os.path.join(LOGS_DIR, "ai_factor_trader.log")
 NEWS_SENTIMENT_FILE = os.path.join(DATA_DIR, "news_sentiment.json")
 REVIEW_JOURNAL_FILE = os.path.join(DATA_DIR, "trade_review_journal.json")
@@ -1410,7 +1414,17 @@ def update_cache_cycle():
         except Exception:
             pass
 
-    if need_ledger_sync:
+    # 批E(2026-09-13)·测试封闭闸：本触发点会 spawn 真实同步子进程（打三所接口 +
+    # 重写 data/trading_ledger.json）。多个仪表盘测试走真实 DATA_DIR ⇒ 测试期间会
+    # 打真网络并改写生产台账（违反「测试不触生产文件」）。
+    # 注意：仅在调用时读 os.environ 不够——多个测试用 patch.dict(..., clear=True)
+    # 清空整个环境，会把标志一起抹掉。故以**模块导入时快照**为准（tests/__init__.py
+    # 在任何测试模块导入 dashboard.app 之前置位），生产不设该变量 → 行为不变。
+    _ledger_sync_disabled = (
+        not LEDGER_AUTOSYNC_ENABLED
+        or str(os.environ.get("R20_LEDGER_SYNC_DISABLED", "")).strip().lower() in ("1", "true", "yes")
+    )
+    if need_ledger_sync and not _ledger_sync_disabled:
         try:
             sync_script = os.path.join(WORKSPACE_DIR, "scripts", "sync_full_ledger.py")
             if os.path.exists(sync_script):

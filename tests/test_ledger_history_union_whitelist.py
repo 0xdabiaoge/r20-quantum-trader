@@ -135,6 +135,7 @@ class ClosedTradeSizeTests(unittest.TestCase):
                  patch.object(sfl, "INITIAL_STATE_FILE", os.path.join(tmp, "no_such_state.json")), \
                  patch.object(sfl, "fetch_binance_closed_trades", return_value=[]), \
                  patch.object(sfl, "fetch_gate_closed_trades", return_value=[]), \
+                 patch.object(sfl, "_other_venue_live_positions", lambda axis: ([], set())), \
                  patch.dict("sys.modules", {"qq_notifier": MagicMock()}):
                 trades = sfl.build_lifecycle_ledger()
             with open(ledger_path, encoding="utf-8") as f:

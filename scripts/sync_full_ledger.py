@@ -348,6 +348,147 @@ def _history_truncated_in_scope(truncated, oldest_ms, reset_time, tz_bj):
     return _t >= str(reset_time)
 
 
+def _other_venue_live_positions(env_axis):
+    """binance/gate 活动持仓，归一成与 OKX 同形的字段（与仪表盘同一事实源：
+    r20_backend.exchanges.get_adapter）。
+
+    批E(2026-09-13·用户报「台账和活动持仓对不上」)：台账 holding 行原本**只由
+    okx_rest.positions() 生成**（builder 全源 OKX V5），于是活动持仓面板显示 6 条
+    binance 持仓时，台账只有 1 条 OKX 的——用户在两个页面看到两个事实。
+
+    返回 (items, ok_venues)。ok_venues **只含真正取数成功的场所**：清理失效 holding
+    行必须以它为闸，取数失败时宁留旧行——「不知道」绝不能渲染成「已平仓」。
+    """
+    items: list = []
+    ok_venues: set = set()
+    try:
+        from r20_backend.exchanges import get_adapter
+    except Exception:
+        return items, ok_venues
+    for v_name in ("binance", "gate"):
+        try:
+            ad = get_adapter(v_name, environment=env_axis)
+            v_positions = ad.positions() if hasattr(ad, "positions") else []
+        except Exception as _e:
+            print(f"[sync_full_ledger] {v_name} 活动持仓取数失败（保守跳过，不清旧行）: {str(_e)[:120]}")
+            continue
+        ok_venues.add(v_name)
+        for vp in (v_positions or []):
+            try:
+                amt = float(vp.get("size_signed", 0) or 0)
+            except (TypeError, ValueError):
+                continue
+            if abs(amt) < 1e-12:
+                continue
+            base = str(vp.get("base") or vp.get("symbol", "")).replace("USDT", "").replace("_USDT", "").upper()
+            if not base:
+                continue
+            v_side = str(vp.get("side") or ("long" if amt > 0 else "short")).lower()
+            items.append({
+                "venue": v_name,
+                "instId": f"{base}-USDT-SWAP",
+                "posSide": v_side,
+                "pos": abs(amt),
+                "avgPx": float(vp.get("entry_price", 0) or 0),
+                "markPx": float(vp.get("mark_price", 0) or vp.get("entry_price", 0) or 0),
+                "upl": float(vp.get("unrealized_pnl", 0) or 0),
+                "lever": vp.get("leverage", 3) or 3,
+                "fee": 0.0,
+                "cTime": vp.get("open_time") or vp.get("cTime") or 0,
+            })
+    return items, ok_venues
+
+
+def _holding_row(p, venue, *, env, trackers, tz_bj, allowed, council_by_inst):
+    """活动持仓 → 台账 holding 行（OKX 与 binance/gate 共用同一构造器，字段语义一致）。
+
+    id 带场所：`holding_{venue}_{inst}_{side}`。旧式 `holding_{inst}_{side}` 不含场所，
+    多所同时持有同一标的即撞键（后写覆盖先写）。
+    """
+    pos_sz = float(p.get("pos", 0.0) or 0.0)
+    if pos_sz == 0.0:
+        return None
+    inst_id = p.get("instId", "")
+    if inst_id not in allowed:
+        return None
+    inst = inst_id.replace("-USDT-SWAP", "")
+    side_raw = str(p.get("posSide", p.get("side", ""))).lower()
+    # 审计 C8：net-mode 行 posSide="net"，旧式 `"long" in side_raw` 恒 False
+    # → 净模式多仓被系统性标成"空"（策略/追踪 join 全错位）。按符号回退判向，
+    # 符号不可判 → 诚实标"未知"，绝不猜。
+    if "long" in side_raw:
+        side = "多"
+    elif "short" in side_raw:
+        side = "空"
+    else:
+        try:
+            _signed = float(p.get("pos", 0) or 0)
+        except (TypeError, ValueError):
+            _signed = 0.0
+        side = "多" if _signed > 0 else ("空" if _signed < 0 else "未知")
+    avg_px = float(p.get("avgPx", 0) or 0)
+    mark_px = float(p.get("markPx", 0) or 0)
+    upl = float(p.get("upl", 0) or 0)
+    try:
+        lever = int(float(p.get("lever", "3") or 3))
+    except (TypeError, ValueError):
+        lever = 3
+    fee = float(p.get("fee", 0.0) or 0.0)
+    ct_val = get_ct_val(inst)
+
+    notional = pos_sz * ct_val * mark_px
+    margin_usdt = round(notional / lever, 2) if lever > 0 else round(notional, 2)
+    roi_pct = round((upl / margin_usdt * 100) if margin_usdt > 0 else 0.0, 2)
+
+    _c_raw = p.get("cTime", 0) or 0
+    try:
+        c_ts = float(_c_raw) / 1000.0
+    except (TypeError, ValueError):
+        c_ts = 0.0
+    open_time = datetime.datetime.fromtimestamp(c_ts, tz=tz_bj).strftime("%Y-%m-%d %H:%M:%S") if c_ts > 0 else "--"
+
+    pos_k = f"{inst_id}_{'long' if side == '多' else 'short'}"
+    t_info = trackers.get(pos_k, {})
+    strat_tag = t_info.get("strategy_tag") or ("🌊 低吸" if side == "多" else "⚡ 高空")
+
+    try:
+        t1 = datetime.datetime.strptime(open_time, "%Y-%m-%d %H:%M:%S")
+        now_dt = datetime.datetime.now(tz_bj)
+        dur_mins = int((now_dt - t1).total_seconds() / 60)
+        duration_str = f"{dur_mins}分钟" if dur_mins < 60 else f"{dur_mins//60}时{dur_mins%60}分"
+    except Exception:
+        duration_str = "--"
+
+    return {
+        "id": f"holding_{venue}_{inst}_{side}",
+        "inst": inst,
+        "side": side,
+        "venue": venue,
+        "account_mode": env.mode.upper(),
+        "environment": env.mode.lower(),
+        "lever": f"{lever}x",
+        "strategy": strat_tag,
+        "margin": margin_usdt,
+        "sz": pos_sz,
+        "open_time": open_time,
+        "open_px": avg_px,
+        "close_time": "持仓中...",
+        "close_px": mark_px,
+        "gross_pnl": round(upl, 2),
+        "open_fee": round(fee, 4),
+        "close_fee": 0.0,
+        "fee": round(fee, 2),
+        "funding_fee": 0.0,
+        "pnl": round(upl, 2),
+        "net_pnl": round(upl, 2),
+        "roi_pct": roi_pct,
+        "duration": duration_str,
+        "status": "holding",
+        "exit_reason": "⏳ 运行监控中",
+        "council": council_by_inst.get(inst),
+    }
+
+
 def build_lifecycle_ledger():
     reset_time = "1970-01-01 00:00:00"
     if os.path.exists(INITIAL_STATE_FILE):
@@ -403,6 +544,9 @@ def build_lifecycle_ledger():
     pos_history = []
     pos_data = []
     close_orders = []
+    # 批E：显式记录「活动持仓取数是否成功」——空列表既可能是「确无持仓」也可能是
+    # 「取数失败」，二者对清理幽灵持仓的含义完全相反（成功才允许清理）。
+    _okx_positions_ok = False
 
     try:
         # 批C(2026-09-13)：分页取尽。原单页 limit=100 即止 —— 平仓越 100 笔后更早记录
@@ -410,6 +554,7 @@ def build_lifecycle_ledger():
         # （取不尽才标），不再用 len>=100 反推。
         pos_history, _ph_trunc = _fetch_history_paged(okx_rest.positions_history, id_field="posId")
         pos_data = okx_rest.positions() or []
+        _okx_positions_ok = True
         orders_history, _oh_trunc = _fetch_history_paged(okx_rest.orders_history, id_field="ordId")
         close_orders = [o for o in orders_history if str(o.get('reduceOnly', '')).lower() == 'true' and o.get('state') == 'filled']
         # 截断判定按「在册窗口」收口：取到的最早记录若已早于 reset_time，未取尽的部分
@@ -428,84 +573,29 @@ def build_lifecycle_ledger():
 
     trades_lifecycle = []
 
-    # Process Active Holding Positions FIRST
+    # Process Active Holding Positions FIRST（批E·多所）
+    # 用户报「台账和活动持仓对不上」根因：本 builder 全源 OKX V5，holding 行只由
+    # okx_rest.positions() 生成——活动持仓面板显示 6 条 binance 持仓时台账只有 1 条
+    # OKX 的；而旧行靠 id 合并续命，OKX 平掉后那条 holding 行永不消失（幽灵持仓）。
+    _holding_rows = []
+    _queried_venues = set()
+    if _okx_positions_ok:
+        _queried_venues.add("okx")
     for p in pos_data:
-        pos_sz = float(p.get("pos", 0.0) or 0.0)
-        if pos_sz == 0.0:
-            continue
-        inst_id = p.get("instId", "")
-        if inst_id not in allowed:
-            continue
-        inst = inst_id.replace("-USDT-SWAP", "")
-        side_raw = p.get("posSide", p.get("side", "")).lower()
-        # 审计 C8：net-mode 行 posSide="net"，旧式 `"long" in side_raw` 恒 False
-        # → 净模式多仓被系统性标成"空"（策略/追踪 join 全错位）。按符号回退判向，
-        # 符号不可判 → 诚实标"未知"，绝不猜。
-        if "long" in side_raw:
-            side = "多"
-        elif "short" in side_raw:
-            side = "空"
-        else:
-            try:
-                _signed = float(p.get("pos", 0) or 0)
-            except (TypeError, ValueError):
-                _signed = 0.0
-            side = "多" if _signed > 0 else ("空" if _signed < 0 else "未知")
-        avg_px = float(p.get("avgPx", 0) or 0)
-        mark_px = float(p.get("markPx", 0) or 0)
-        upl = float(p.get("upl", 0) or 0)
-        lever = int(p.get("lever", "3") or 3)
-        fee = float(p.get("fee", 0.0) or 0.0)
-        ct_val = get_ct_val(inst)
+        _row = _holding_row(p, "okx", env=env, trackers=trackers, tz_bj=tz_bj,
+                            allowed=allowed, council_by_inst=council_by_inst)
+        if _row:
+            _holding_rows.append(_row)
 
-        notional = pos_sz * ct_val * mark_px
-        margin_usdt = round(notional / lever, 2)
-        roi_pct = round((upl / margin_usdt * 100) if margin_usdt > 0 else 0.0, 2)
+    _other_positions, _ok_venues = _other_venue_live_positions(env.mode)
+    _queried_venues |= _ok_venues
+    for p in _other_positions:
+        _row = _holding_row(p, str(p.get("venue") or ""), env=env, trackers=trackers, tz_bj=tz_bj,
+                            allowed=allowed, council_by_inst=council_by_inst)
+        if _row:
+            _holding_rows.append(_row)
 
-        # Time calculation
-        c_ts = int(p.get("cTime", 0) or 0) / 1000.0
-        open_time = datetime.datetime.fromtimestamp(c_ts, tz=tz_bj).strftime("%Y-%m-%d %H:%M:%S") if c_ts > 0 else "--"
-
-        pos_k = f"{inst_id}_{'long' if side=='多' else 'short'}"
-        t_info = trackers.get(pos_k, {})
-        strat_tag = t_info.get("strategy_tag") or ("🌊 低吸" if side == "多" else "⚡ 高空")
-
-        try:
-            t1 = datetime.datetime.strptime(open_time, "%Y-%m-%d %H:%M:%S")
-            now_dt = datetime.datetime.now(tz_bj)
-            dur_mins = int((now_dt - t1).total_seconds() / 60)
-            duration_str = f"{dur_mins}分钟" if dur_mins < 60 else f"{dur_mins//60}时{dur_mins%60}分"
-        except Exception:
-            duration_str = "--"
-
-        trades_lifecycle.append({
-            "id": f"holding_{inst}_{side}",
-            "inst": inst,
-            "side": side,
-            "venue": "okx",   # G10 读侧贯通：本 builder 全源 OKX V5，源头标注场所
-            "account_mode": env.mode.upper(),
-            "environment": env.mode.lower(),
-            "lever": f"{lever}x",
-            "strategy": strat_tag,
-            "margin": margin_usdt,
-            "sz": pos_sz,
-            "open_time": open_time,
-            "open_px": avg_px,
-            "close_time": "持仓中...",
-            "close_px": mark_px,
-            "gross_pnl": round(upl, 2),
-            "open_fee": round(fee, 4),
-            "close_fee": 0.0,
-            "fee": round(fee, 2),
-            "funding_fee": 0.0,
-            "pnl": round(upl, 2),
-            "net_pnl": round(upl, 2),
-            "roi_pct": roi_pct,
-            "duration": duration_str,
-            "status": "holding",
-            "exit_reason": "⏳ 运行监控中",
-            "council": council_by_inst.get(inst),
-        })
+    trades_lifecycle.extend(_holding_rows)
 
     # Process Official Closed Positions
     # 审计批7(2026-09-13)·同 posId 多轮往返吞腿修复：PEPE 当日两笔平仓（06:33→10:31
@@ -670,6 +760,22 @@ def build_lifecycle_ledger():
         if t.get("id"):
             trades_map[t["id"]] = t
 
+    # 批E·幽灵持仓清理：台账 holding 行必须以「本轮成功取数的场所的实时持仓」为准。
+    # 旧实现只按 id 覆盖新行、从不删除失效行 → 平仓后 holding 行永久留存（实测
+    # holding_ALGO_多 标 venue=okx 而 OKX 已零持仓，前台台账里挂着一条不存在的仓）。
+    # 仅对 _queried_venues 内的场所生效：取数失败的场所保守保留旧行（缺失≠已平仓）。
+    _live_holding_ids = {t["id"] for t in _holding_rows}
+    _purged_holdings = []
+    for _oid in [k for k, v in trades_map.items()
+                 if isinstance(v, dict) and v.get("status") == "holding"
+                 and str(v.get("venue") or "").lower() in _queried_venues
+                 and k not in _live_holding_ids]:
+        trades_map.pop(_oid)
+        _purged_holdings.append(_oid)
+    if _purged_holdings:
+        print(f"[sync_full_ledger] 清理失效持仓行 {len(_purged_holdings)} 条："
+              f"{', '.join(_purged_holdings[:8])}")
+
     combined_trades = sorted(
         trades_map.values(),
         key=lambda x: str(x.get("close_time") or x.get("time") or x.get("open_time") or ""),
@@ -706,7 +812,12 @@ def build_lifecycle_ledger():
     except Exception as e:
         print(f"[Ledger Sync Notify Warning] {e}")
 
-    print(f"✅ Authentic Multi-Venue Positions-History Ledger Generated: {len(combined_trades)} total trades (OKX: {len(trades_lifecycle)}, Binance: {len(binance_trades)}, Gate: {len(gate_trades)}).")
+    # 批E：trades_lifecycle 现含「OKX 平仓 + 全场所活动持仓」，输出必须分开报，
+    # 否则「OKX: 12」会把 binance 的 6 条持仓算进 OKX 业绩里（口径自欺）。
+    _okx_closed_n = sum(1 for t in trades_lifecycle if t.get("status") != "holding")
+    print(f"✅ Authentic Multi-Venue Ledger: {len(combined_trades)} total trades "
+          f"(OKX 平仓: {_okx_closed_n}, 活动持仓: {len(_holding_rows)}, "
+          f"Binance 平仓: {len(binance_trades)}, Gate 平仓: {len(gate_trades)}).")
     return combined_trades
 
 if __name__ == "__main__":

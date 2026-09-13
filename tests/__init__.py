@@ -20,6 +20,10 @@ import tempfile
 _TEST_SANDBOX = tempfile.mkdtemp(prefix="r20-tests-")
 os.environ.setdefault("R20_AUDIT_FILE", os.path.join(_TEST_SANDBOX, "r20_admin_audit.jsonl"))
 os.environ.setdefault("R20_SELF_IMPROVEMENT_LOG", os.path.join(_TEST_SANDBOX, "self_improvement.log"))
+# 批E(2026-09-13)：仪表盘载荷构建在台账 >60s 未更新时会 spawn 真实台账同步子进程
+# （打三所接口 + 重写 data/trading_ledger.json）。仪表盘相关测试走真实 DATA_DIR，
+# 于是测试会打真网络并改写生产台账——同款隔离：默认禁用该触发点。生产不设此变量。
+os.environ.setdefault("R20_LEDGER_SYNC_DISABLED", "1")
 
 import r20_backend.config as _config
 

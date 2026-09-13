@@ -92,6 +92,9 @@ DATA_DIR = os.path.join(WORKSPACE_DIR, "data")
 LOGS_DIR = os.path.join(WORKSPACE_DIR, "logs")
 
 LEDGER_JSON_FILE = os.path.join(DATA_DIR, "trading_ledger.json")
+# 批E(2026-09-13)：周期收尾的台账/DB spawn 总闸（模块导入时快照——测试用
+# patch.dict(clear=True) 清空环境也抹不掉）。生产不设 R20_LEDGER_SYNC_DISABLED。
+LEDGER_AUTOSYNC_ENABLED = str(os.environ.get("R20_LEDGER_SYNC_DISABLED", "")).strip().lower() not in ("1", "true", "yes")
 LOG_FILE = os.path.join(LOGS_DIR, "ai_factor_trader.log")
 POSITION_TRACKER_FILE = os.path.join(DATA_DIR, "position_trackers.json")
 SIGNAL_JOURNAL_FILE = os.path.join(DATA_DIR, "signal_journal.json")
@@ -3475,15 +3478,20 @@ def execute_portfolio():
     _atomic_write_json(os.path.join(DATA_DIR, "trading_state.json"), state_payload)
 
     # 6. Always Sync Full Lifecycle Ledger and SQLite DB in Realtime
-    try:
-        sync_script = os.path.join(WORKSPACE_DIR, "scripts", "sync_full_ledger.py")
-        if os.path.exists(sync_script):
-            _run_captured(sync_script)
-        db_script = os.path.join(WORKSPACE_DIR, "scripts", "db_manager.py")
-        if os.path.exists(db_script):
-            _run_captured(db_script)
-    except Exception as e:
-        print(f"[Ledger Sync Warning] {e}")
+    # 批E(2026-09-13)·测试封闭闸：这两条 spawn 会打三所接口并**重写生产台账/数据库**。
+    # 测试若在进程内跑一轮交易员巡检（多处如此），就会连带改写 data/trading_ledger.json
+    # 与 SQLite——违反「测试不触生产文件」。tests/__init__.py 在任何测试模块导入前置位
+    # R20_LEDGER_SYNC_DISABLED=1，下面的模块级快照即 False；生产不设 → 行为不变。
+    if LEDGER_AUTOSYNC_ENABLED:
+        try:
+            sync_script = os.path.join(WORKSPACE_DIR, "scripts", "sync_full_ledger.py")
+            if os.path.exists(sync_script):
+                _run_captured(sync_script)
+            db_script = os.path.join(WORKSPACE_DIR, "scripts", "db_manager.py")
+            if os.path.exists(db_script):
+                _run_captured(db_script)
+        except Exception as e:
+            print(f"[Ledger Sync Warning] {e}")
 
     log_entry = f"[{timestamp_full}] ⚡ R20 Quantum Trader v{__version__} 巡检完成 | 持仓 OKX {active_pos_count}/{MAX_CONCURRENT_POSITIONS} (多{long_count}/空{short_count})｜跨所 {_xv_total if _xv_total is not None else '未知'} 笔 | 动作: {', '.join(executed_actions) if executed_actions else '无开平仓操作'}\n"
     with open(LOG_FILE, "a", encoding="utf-8") as f:

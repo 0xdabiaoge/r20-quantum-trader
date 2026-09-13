@@ -126,6 +126,9 @@ class LedgerRestMigrationTests(unittest.TestCase):
         paths = self._sfl_paths()
         with patch.object(okx_rest, "urlopen", _transport(seen)), \
              patch.multiple(sfl, **paths), \
+             patch.object(sfl, "_other_venue_live_positions", lambda axis: ([], set())), \
+             patch.object(sfl, "fetch_binance_closed_trades", lambda *a, **k: []), \
+             patch.object(sfl, "fetch_gate_closed_trades", lambda *a, **k: []), \
              patch.object(sfl, "get_ct_val", lambda inst: 0.01):
             rows = sfl.build_lifecycle_ledger()
         self.assertTrue(rows)
