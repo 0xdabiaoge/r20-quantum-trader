@@ -7,7 +7,9 @@ import { useI18n } from '../../composables/useI18n'
 const { t } = useI18n()
 import { useApi } from '../../composables/useApi'
 import { useConfirm } from '../../composables/useConfirm'
+import { useToast } from '../../composables/useToast'
 const { ask } = useConfirm()
+const toast = useToast()
 import {Plus,
   Trash2,
   CheckCircle2,
@@ -321,7 +323,7 @@ async function toggleProviderQuick(p: any, e: Event) {
     p.enabled = res.enabled
     await loadConfig()
   } catch (err: any) {
-    alert(err.message)
+    toast.err(err.message)
   }
 }
 
@@ -336,7 +338,7 @@ async function saveProviderConfig() {
       method: 'POST',
       body: JSON.stringify(payload),
     })
-    alert('供应商配置已成功保存！')
+    toast.ok('供应商配置已成功保存！')
     await loadConfig()
     if (selectedProvider.value?.is_new) {
       const created = cfg.value.providers?.find((p: any) => p.id === payload.id)
@@ -345,7 +347,7 @@ async function saveProviderConfig() {
       }
     }
   } catch (err: any) {
-    alert(err.message)
+    toast.err(err.message)
   }
 }
 
@@ -358,10 +360,10 @@ async function clearCurrentProviderModels() {
     await api(`/api/v1/admin/llm/providers/${encodeURIComponent(selectedProvider.value.id)}/models`, {
       method: 'DELETE',
     })
-    alert('已清空该供应商所有模型！')
+    toast.ok('已清空该供应商所有模型！')
     await loadConfig()
   } catch (err: any) {
-    alert(err.message)
+    toast.err(err.message)
   }
 }
 
@@ -383,11 +385,11 @@ async function removeProvider() {
     await api(`/api/v1/admin/llm/providers/${encodeURIComponent(p.id)}`, {
       method: 'DELETE',
     })
-    alert(`供应商 ${p.name} 已删除`)
+    toast.ok(`供应商 ${p.name} 已删除`)
     goBackToList()
     await loadConfig()
   } catch (err: any) {
-    alert(err.message)
+    toast.err(err.message)
   }
 }
 
@@ -468,9 +470,9 @@ async function importRemoteModel(m: any, autoActivate = false) {
       })
     }
     await loadConfig()
-    alert(autoActivate ? `已收录并激活主脑为 ${m.id}！` : `已成功添加 ${m.id} 到模型列表！`)
+    toast.ok(autoActivate ? `已收录并激活主脑为 ${m.id}！` : `已成功添加 ${m.id} 到模型列表！`)
   } catch (err: any) {
-    alert(err.message)
+    toast.err(err.message)
   }
 }
 
@@ -503,7 +505,7 @@ async function importAllFilteredRemoteModels() {
     }
   }
   await loadConfig()
-  alert(`成功批量收录 ${successCount} 个模型到 ${selectedProvider.value.name}！`)
+  toast.ok(`成功批量收录 ${successCount} 个模型到 ${selectedProvider.value.name}！`)
 }
 
 // ----------------- Model Management -----------------
@@ -553,7 +555,7 @@ async function saveModelForm() {
     modelModalVisible.value = false
     await loadConfig()
   } catch (err: any) {
-    alert(err.message)
+    toast.err(err.message)
   }
 }
 
@@ -569,7 +571,7 @@ async function activateModel(m: any) {
     })
     await loadConfig()
   } catch (err: any) {
-    alert(err.message)
+    toast.err(err.message)
   }
 }
 
@@ -587,7 +589,7 @@ async function deleteSingleModel(m: any) {
     })
     await loadConfig()
   } catch (err: any) {
-    alert(err.message)
+    toast.err(err.message)
   }
 }
 

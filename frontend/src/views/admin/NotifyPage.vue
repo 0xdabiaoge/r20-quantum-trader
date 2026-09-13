@@ -111,7 +111,7 @@ async function startCapture() {
     captureStatus.value = res
     pollCapture(res.capture_id)
   } catch (e: any) {
-    alert(e.message)
+    toast.err(e.message)
   }
 }
 
@@ -165,7 +165,7 @@ async function startQqBind() {
         } else if (r.status === 'awaiting_message') {
           stopBindPolling()
           bindModal.value = false
-          alert('QQ 机器人授权成功，正在自动启动 OpenID 捕获…')
+          toast.ok('QQ 机器人授权成功，正在自动启动 OpenID 捕获…')
           startCapture()
         } else if (r.status === 'expired') {
           bindStatus.value = { ...bindStatus.value, text: t('admin.notify.qrExpired'), tone: 'amber' }
@@ -182,7 +182,7 @@ async function startQqBind() {
       }
     }, 2000)
   } catch (e: any) {
-    alert(e.message)
+    toast.err(e.message)
   }
 }
 
@@ -207,12 +207,12 @@ async function sendTest(channel: string) {
 
 async function saveSchedule() {
   const times = String(config.value._briefingTimes || '').split(/[,，\s]+/).filter(Boolean)
-  if (!times.length) { alert('请至少填写一个 HH:MM 时间'); return }
+  if (!times.length) { toast.warn('请至少填写一个 HH:MM 时间'); return }
   try {
     await api('/api/v1/admin/notifications/schedule', { method: 'PUT', body: JSON.stringify({ briefing_times: times }) })
-    alert('简报时间已保存')
+    toast.ok('简报时间已保存')
   } catch (e: any) {
-    alert(e.message)
+    toast.err(e.message)
   }
 }
 

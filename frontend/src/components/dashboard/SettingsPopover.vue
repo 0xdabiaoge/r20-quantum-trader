@@ -42,6 +42,7 @@ onBeforeUnmount(() => {
       ref="trigger"
       class="btn btn-quiet btn-icon"
       :aria-expanded="open"
+      :aria-label="t('dash.shell.settings.title')"
       :title="t('dash.shell.settings.title')"
       @click="open = !open"
     >

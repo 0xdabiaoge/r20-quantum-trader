@@ -220,7 +220,7 @@ async function triggerEvolutionNow() {
   const phrase = prompt('立即强制执行自进化复盘任务（对全天战绩穿透提炼并生成最新复盘心法），请输入确认短语：RUN EVOLUTION')
   if (!phrase) return
   if (phrase.trim().toUpperCase() !== 'RUN EVOLUTION') {
-    alert('确认短语错误，已取消执行')
+    toast.err('确认短语错误，已取消执行')
     return
   }
   busy.value = 'run'

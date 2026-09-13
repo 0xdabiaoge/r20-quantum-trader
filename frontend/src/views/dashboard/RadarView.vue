@@ -93,11 +93,14 @@ function actionsOf(c: any): { inst: string; dir: string; conf: number }[] {
       </template>
     </div>
 
-    <div class="card overflow-hidden">
+    <!-- 批D(2026-09-13)：卡片原为 overflow-hidden —— 它会**创建滚动容器**，其滚动口永不
+         滚动，于是内部 sticky 的日期头终生粘不住（写了个假的吸顶效果）。overflow-clip
+         同样裁切圆角/溢出，但按规范不建立滚动口，sticky 因此对页面滚动生效。 -->
+    <div class="card overflow-clip">
       <BaseEmpty v-if="!history.length" :text="t('dash.radar.empty')" />
       <div v-else>
         <template v-for="grp in grouped" :key="grp.day">
-          <p class="t-label sticky top-0 z-[1] border-b bg-[var(--surface-1)] px-4 py-1.5" style="border-color: var(--line-1)">{{ grp.day }}</p>
+          <p class="t-label sticky top-12 z-[1] border-b bg-[var(--surface-2)] px-4 py-1.5" style="border-color: var(--line-1)">{{ grp.day }}</p>
           <button
             v-for="c in grp.items"
             :key="c.time"

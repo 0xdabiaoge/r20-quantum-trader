@@ -68,17 +68,18 @@ function go(path: string) {
       <!-- 右侧动作区 -->
       <div class="ms-auto flex items-center gap-1">
         <BeijingClock class="mx-1 md:hidden min-[1200px]:block" />
-        <button class="btn btn-quiet btn-icon hidden md:inline-flex" :title="t('nav.actions.docs')" @click="go('/docs')">
+        <!-- 批D：图标按钮补 aria-label（title 在触屏/读屏下不可靠，且部分平台不朗读） -->
+        <button class="btn btn-quiet btn-icon hidden md:inline-flex" :title="t('nav.actions.docs')" :aria-label="t('nav.actions.docs')" @click="go('/docs')">
           <BookOpen class="h-4 w-4" />
         </button>
-        <button class="btn btn-quiet btn-icon hidden md:inline-flex" :title="t('nav.actions.console')" @click="go('/admin')">
+        <button class="btn btn-quiet btn-icon hidden md:inline-flex" :title="t('nav.actions.console')" :aria-label="t('nav.actions.console')" @click="go('/admin')">
           <LayoutDashboard class="h-4 w-4" />
         </button>
         <span class="mx-1 hidden h-5 w-px md:block" style="background-color: var(--line-2)" />
-        <button class="btn btn-quiet btn-icon hidden md:inline-flex" :title="t('nav.actions.promptPeek')" @click="peekOpen = true">
+        <button class="btn btn-quiet btn-icon hidden md:inline-flex" :title="t('nav.actions.promptPeek')" :aria-label="t('nav.actions.promptPeek')" @click="peekOpen = true">
           <Eye class="h-4 w-4" />
         </button>
-        <button class="btn btn-quiet btn-icon" :title="t('dash.shell.settings.theme')" @click="toggleTheme">
+        <button class="btn btn-quiet btn-icon" :title="t('dash.shell.settings.theme')" :aria-label="t('dash.shell.settings.theme')" @click="toggleTheme">
           <Sun v-if="isDark" class="h-4 w-4" />
           <Moon v-else class="h-4 w-4" />
         </button>

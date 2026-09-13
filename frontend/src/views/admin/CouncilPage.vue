@@ -241,7 +241,7 @@ async function removeRole(roleId: string) {
   if (!auth.isSuperadmin) return
   const role = councilConfig.value.roles[roleId]
   if (role?.is_arbitrator || roleId === 'cio') {
-    alert('首席投资官 (CIO) 负责终审收口与发单，不可删除！')
+    toast.warn('首席投资官 (CIO) 负责终审收口与发单，不可删除！')
     return
   }
   const _ok = await ask({ title: '移除交易员席位', desc: `【${role?.name || roleId}】席位将被移除`, danger: true, okText: '移除' })
