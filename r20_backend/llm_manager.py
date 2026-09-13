@@ -56,6 +56,14 @@ from r20_backend.llm.policy import (
     SUPPORTED_API_FORMATS,
 )
 from r20_backend.llm.store import (
+    activate_provider_model as _store_activate_provider_model,
+    update_llm_settings as _store_update_llm_settings,
+    upsert_model as _store_upsert_model,
+    delete_model as _store_delete_model,
+    upsert_provider as _store_upsert_provider,
+    toggle_provider as _store_toggle_provider,
+    clear_provider_models as _store_clear_provider_models,
+    delete_provider as _store_delete_provider,
     get_active_llm_runtime as _store_get_active_llm_runtime,
     init_llm_config as _store_init_llm_config,
     load_llm_config as _store_load_llm_config,
@@ -151,148 +159,10 @@ def recent_failover_events(limit: int = 30) -> List[Dict[str, Any]]:
 
 
 def activate_provider_model(provider_id: str, model_id: str, reasoning_effort: Optional[str] = None, thinking_timeout: Optional[float] = None) -> Dict[str, Any]:
-    """One-click switch to activate a model. Updates config, .env, and encrypted store."""
-    from .settings_store import update_env
-    from .config import refresh_settings
-    try:
-        from r20_gateway.secrets import save_secrets
-    except ImportError:
-        save_secrets = None
-
-    config = init_llm_config()
-    flat_model = next((m for m in config.get("models", []) if m["id"] == model_id), None)
-    target_model: Optional[Dict[str, Any]] = None
-    scoped_pid = str(provider_id or "").strip()
-    scoped_prov: Optional[Dict[str, Any]] = None
-
-    if scoped_pid and scoped_pid != "custom":
-        # 从指定供应商的「模型」页设为主脑：归属以本次调用的供应商为准，
-        # 解决多供应商挂同名模型时顶层缓存只按 model id 记录导致的混挂。
-        scoped_prov = next((p for p in config.get("providers", []) if p.get("id") == scoped_pid), None)
-        if scoped_prov is None:
-            raise ValueError(f"供应商 {scoped_pid} 未找到，无法激活")
-        nested = next((m for m in scoped_prov.get("models", []) if m.get("id") == model_id), None)
-        if nested is None and not (flat_model and str(flat_model.get("provider_id") or "") == scoped_pid):
-            raise ValueError(
-                f"供应商 {scoped_prov.get('name')} 名下没有模型 {model_id}；请先在该供应商下添加，再设为主脑。"
-            )
-        nested = nested or {}
-        target_model = {
-            "id": model_id,
-            "name": nested.get("name") or (flat_model or {}).get("name") or model_id,
-            "provider_id": scoped_prov.get("id"),
-            "provider_name": scoped_prov.get("name", scoped_pid),
-            "base_url": scoped_prov.get("base_url", "") or (flat_model or {}).get("base_url", ""),
-            "api_key": scoped_prov.get("api_key", ""),
-            "api_format": nested.get("api_format")
-            or (flat_model or {}).get("api_format")
-            or scoped_prov.get("api_format", "openai_chat"),
-            "reasoning_type": nested.get("reasoning_type")
-            or (flat_model or {}).get("reasoning_type")
-            or _detect_reasoning_type(model_id),
-            "reasoning_effort": nested.get("reasoning_effort")
-            or nested.get("default_effort")
-            or (flat_model or {}).get("reasoning_effort", "high"),
-            "capabilities": nested.get("capabilities") or (flat_model or {}).get("capabilities", []),
-            "context_length": nested.get("context_length") or (flat_model or {}).get("context_length"),
-            "description": nested.get("description") or (flat_model or {}).get("description", ""),
-        }
-        # 顶层扁平缓存钉到主脑供应商的凭据上，交易引擎与全局列表随之对齐
-        if flat_model is not None:
-            flat_model.update(target_model)
-        else:
-            config.setdefault("models", []).append(target_model)
-
-    if target_model is None:
-        target_model = flat_model
-    if not target_model:
-        # Check providers models
-        for p in config.get("providers", []):
-            m_found = next((m for m in p.get("models", []) if m.get("id") == model_id), None)
-            if m_found:
-                target_model = {
-                    "id": model_id,
-                    "name": m_found.get("name", model_id),
-                    "provider_id": p.get("id"),
-                    "provider_name": p.get("name"),
-                    "base_url": p.get("base_url"),
-                    "api_key": p.get("api_key"),
-                    "api_format": p.get("api_format", "openai_chat"),
-                    "reasoning_type": m_found.get("reasoning_type", _detect_reasoning_type(model_id)),
-                    "reasoning_effort": m_found.get("reasoning_effort", "high"),
-                    "description": m_found.get("description", ""),
-                }
-                config.setdefault("models", []).append(target_model)
-                break
-
-    if not target_model:
-        target_model = {
-            "id": model_id,
-            "name": model_id,
-            "provider_name": "自定义",
-            "base_url": os.getenv("LLM_BASE_URL") or os.getenv("OPENAI_BASE_URL") or "https://api.openai.com/v1",
-            "api_key": os.getenv("LLM_API_KEY", ""),
-            "api_format": "openai_chat",
-            "reasoning_type": _detect_reasoning_type(model_id),
-            "reasoning_effort": "high",
-            "description": "一键激活时自动收录",
-        }
-        config.setdefault("models", []).append(target_model)
-
-    effort = reasoning_effort or target_model.get("reasoning_effort") or "high"
-    if effort not in STANDARD_REASONING_EFFORTS:
-        effort = "auto"
-
-    config["active_model_id"] = model_id
-    config["active_provider_id"] = str(target_model.get("provider_id") or "")
-    config["active_reasoning_effort"] = effort
-    if thinking_timeout is not None:
-        timeout_val = max(5.0, min(float(thinking_timeout), 1800.0))
-        config["thinking_timeout"] = timeout_val
-    _atomic_write_json(LLM_CONFIG_FILE, config)
-
-    # Sync to .env and secrets
-    base_url = target_model.get("base_url", "")
-    api_key = target_model.get("api_key", "")
-    m_pid = target_model.get("provider_id")
-    if m_pid:
-        prov = next((p for p in config.get("providers", []) if p.get("id") == m_pid), None)
-        if prov:
-            if not api_key:
-                api_key = prov.get("api_key", "")
-            if not base_url:
-                base_url = prov.get("base_url", "")
-
-    base_url = (base_url or os.getenv("LLM_BASE_URL") or os.getenv("OPENAI_BASE_URL") or "https://api.openai.com/v1").rstrip("/")
-
-    env_values = {
-        "LLM_BASE_URL": base_url,
-        "LLM_MODEL": model_id,
-        "LLM_REASONING_EFFORT": effort,
-    }
-    if thinking_timeout is not None:
-        timeout_val = max(5.0, min(float(thinking_timeout), 1800.0))
-        env_values["LLM_THINKING_TIMEOUT"] = str(int(timeout_val) if timeout_val.is_integer() else timeout_val)
-    if api_key:
-        env_values["LLM_API_KEY"] = api_key
-        if save_secrets:
-            save_secrets({"LLM_API_KEY": api_key})
-
-    update_env(env_values)
-    refresh_settings()
-
-    return {
-        "success": True,
-        "active_model_id": model_id,
-        "active_model_name": target_model.get("name"),
-        "active_reasoning_effort": effort,
-        "thinking_timeout": config.get("thinking_timeout", 120.0),
-        "base_url": base_url,
-        "api_format": target_model.get("api_format", "openai_chat"),
-        "provider_name": target_model.get("provider_name", "自定义"),
-        "active_provider_id": target_model.get("provider_id", "openai"),
-        "active_provider_name": target_model.get("provider_name", "自定义"),
-    }
+    """薄壳：调用时解析 LLM_CONFIG_FILE 与 init_llm_config 模块全局，
+    使测试对二者的 patch / 直接赋值必然生效。实现已迁往 r20_backend.llm.store
+    （结构优化阶段 2 / B4）。"""
+    return _store_activate_provider_model(LLM_CONFIG_FILE, init_llm_config, provider_id, model_id, reasoning_effort, thinking_timeout)
 
 
 def update_llm_settings(
@@ -302,407 +172,52 @@ def update_llm_settings(
     request_attempts: Optional[int] = None,
     fallback_model_ids: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
-    """Update global LLM settings: model, reasoning effort, thinking timeout, retry attempts and fallback chain."""
-    from .settings_store import update_env
-    from .config import refresh_settings
-
-    config = init_llm_config()
-    env_values: Dict[str, Any] = {}
-
-    if active_model_id:
-        config["active_model_id"] = active_model_id
-        env_values["LLM_MODEL"] = active_model_id
-        # 主脑换了模型 → 供应商归属立即重判，防止 active_provider_id 悬在旧模型上
-        config["active_provider_id"] = _resolve_active_provider_id(config)
-
-    if reasoning_effort:
-        config["active_reasoning_effort"] = reasoning_effort
-        env_values["LLM_REASONING_EFFORT"] = reasoning_effort
-
-    if thinking_timeout is not None:
-        val = max(5.0, min(float(thinking_timeout), 1800.0))
-        config["thinking_timeout"] = val
-        env_values["LLM_THINKING_TIMEOUT"] = str(int(val) if val.is_integer() else val)
-
-    if request_attempts is not None:
-        try:
-            att = int(request_attempts)
-        except (TypeError, ValueError) as exc:
-            raise ValueError("请求次数必须是整数") from exc
-        if not (MIN_REQUEST_ATTEMPTS <= att <= MAX_REQUEST_ATTEMPTS):
-            raise ValueError(f"请求次数需在 {MIN_REQUEST_ATTEMPTS}~{MAX_REQUEST_ATTEMPTS} 之间")
-        config["request_attempts"] = att
-
-    if fallback_model_ids is not None:
-        known_ids = {m.get("id") for m in config.get("models", [])}
-        new_active = config.get("active_model_id", "")
-        cleaned: List[str] = []
-        for fid in fallback_model_ids:
-            fid = str(fid or "").strip()
-            if not fid:
-                continue
-            if fid == new_active:
-                continue  # 主脑模型不能同时是自己的回退
-            if fid not in known_ids:
-                raise ValueError(f"回退模型不存在：{fid}（请先在模型列表中添加）")
-            if fid not in cleaned:
-                cleaned.append(fid)
-        if len(cleaned) > MAX_FALLBACK_MODELS:
-            raise ValueError(f"回退模型最多 {MAX_FALLBACK_MODELS} 个，避免整轮推演超时")
-        config["fallback_model_ids"] = cleaned
-
-    _atomic_write_json(LLM_CONFIG_FILE, config)
-    if env_values:
-        update_env(env_values)
-        refresh_settings()
-
-    return {
-        "success": True,
-        "active_model_id": config.get("active_model_id"),
-        "active_reasoning_effort": config.get("active_reasoning_effort"),
-        "thinking_timeout": config.get("thinking_timeout", 120.0),
-        "request_attempts": config.get("request_attempts", DEFAULT_REQUEST_ATTEMPTS),
-        "fallback_model_ids": config.get("fallback_model_ids", []),
-    }
+    """薄壳：调用时解析 LLM_CONFIG_FILE 与 init_llm_config 模块全局，
+    使测试对二者的 patch / 直接赋值必然生效。实现已迁往 r20_backend.llm.store
+    （结构优化阶段 2 / B4）。"""
+    return _store_update_llm_settings(LLM_CONFIG_FILE, init_llm_config, active_model_id, reasoning_effort, thinking_timeout, request_attempts, fallback_model_ids)
 
 
 def upsert_model(provider_id: str, model_data: Dict[str, Any]) -> Dict[str, Any]:
-    """Add or update a custom model definition."""
-    mid = str(model_data.get("id", "")).strip()
-    provider_id = str(provider_id or "").strip()
-    # 旧全局路由 /llm/models 不带路径参数（provider_id 恒为 "custom"），
-    # 但前端 payload 一直携带归属供应商——尊重 payload，避免模型落错家。
-    payload_pid = str(model_data.get("provider_id", "") or "").strip()
-    if (not provider_id or provider_id == "custom") and payload_pid and payload_pid != "custom":
-        provider_id = payload_pid
-    name = str(model_data.get("name", "")).strip() or mid
-    base_url = str(model_data.get("base_url", "")).strip().rstrip("/")
-    api_key = str(model_data.get("api_key", "")).strip()
-    api_format = str(model_data.get("api_format", "openai_chat")).strip()
-    provider_name = str(model_data.get("provider_name", "")).strip()
-    reasoning_type = str(model_data.get("reasoning_type", "auto")).strip()
-    default_effort = str(model_data.get("default_effort") or model_data.get("reasoning_effort", "high")).strip()
-    desc = str(model_data.get("description", "")).strip()
-    caps = model_data.get("capabilities") or _detect_capabilities(mid)
-    ctx_len = model_data.get("context_length")
-
-    if not mid:
-        raise ValueError("模型 ID 不能为空")
-
-    config = init_llm_config()
-
-    prov = None
-    if provider_id and provider_id != "custom":
-        prov = next((p for p in config.get("providers", []) if p["id"] == provider_id), None)
-    if not prov and provider_name:
-        prov = next((p for p in config.get("providers", []) if p.get("name") == provider_name), None)
-
-    if prov:
-        if not base_url:
-            base_url = prov.get("base_url", "")
-        # 不再把供应商密钥快照进模型条目：密钥唯一存放处是供应商，
-        # 读取时由 init_llm_config 合并注入；轮换密钥即刻对全部模型生效
-        if not provider_name:
-            provider_name = prov.get("name", "自定义")
-        if not provider_id:
-            provider_id = prov.get("id", "openai")
-
-    if not base_url or not base_url.startswith(("http://", "https://")):
-        active = get_active_llm_runtime()
-        base_url = active.get("base_url", "https://api.openai.com/v1")
-
-    valid_formats = [f["id"] for f in SUPPORTED_API_FORMATS]
-    if api_format not in valid_formats:
-        api_format = _detect_api_format(base_url, mid)
-
-    models = config.setdefault("models", [])
-    existing = next((m for m in models if m["id"] == mid), None)
-
-    if existing:
-        existing["name"] = name
-        existing["provider_id"] = provider_id or existing.get("provider_id", "openai")
-        existing["provider_name"] = provider_name or existing.get("provider_name", "自定义")
-        existing["base_url"] = base_url
-        if api_key:
-            existing["api_key"] = api_key
-        existing["api_format"] = api_format
-        existing["reasoning_type"] = reasoning_type
-        existing["reasoning_effort"] = default_effort
-        existing["capabilities"] = caps
-        existing["context_length"] = ctx_len
-        existing["description"] = desc
-    else:
-        models.append({
-            "id": mid,
-            "name": name,
-            "provider_id": provider_id or "openai",
-            "provider_name": provider_name or "自定义",
-            "base_url": base_url,
-            "api_key": api_key,
-            "api_format": api_format,
-            "reasoning_type": reasoning_type,
-            "reasoning_effort": default_effort,
-            "capabilities": caps,
-            "context_length": ctx_len,
-            "description": desc,
-        })
-
-    # Also update provider's local models array
-    if prov:
-        prov_models = prov.setdefault("models", [])
-        p_existing = next((m for m in prov_models if m.get("id") == mid), None)
-        if p_existing:
-            p_existing["name"] = name
-            p_existing["capabilities"] = caps
-            p_existing["reasoning_type"] = reasoning_type
-            p_existing["reasoning_effort"] = default_effort
-            p_existing["context_length"] = ctx_len
-            p_existing["description"] = desc
-        else:
-            prov_models.append({
-                "id": mid,
-                "name": name,
-                "capabilities": caps,
-                "reasoning_type": reasoning_type,
-                "reasoning_effort": default_effort,
-                "context_length": ctx_len,
-                "description": desc,
-            })
-
-    _atomic_write_json(LLM_CONFIG_FILE, config)
-    return {
-        "model_id": mid,
-        "name": name,
-        "base_url": base_url,
-        "api_format": api_format,
-        "provider_id": provider_id or "openai",
-    }
+    """薄壳：调用时解析 LLM_CONFIG_FILE 与 init_llm_config 模块全局，
+    使测试对二者的 patch / 直接赋值必然生效。实现已迁往 r20_backend.llm.store
+    （结构优化阶段 2 / B4）。"""
+    return _store_upsert_model(LLM_CONFIG_FILE, init_llm_config, provider_id, model_data)
 
 
 def delete_model(provider_id: str, model_id: str) -> bool:
-    """Delete a custom model.
-
-    多供应商挂同名模型时的作用域规则：
-    - 只有「主脑所属供应商」名下的那份不可删，其他供应商的同名副本可正常删除；
-    - 顶层扁平缓存只按 (id, provider_id) 摘除对应条目，别家持有者由下次加载自动重挂；
-    - 不带供应商作用域的旧路由保持全量删除语义（各供应商一并移除）。
-    """
-    config = init_llm_config()
-    scoped = bool(provider_id) and provider_id != "custom"
-    active_mid = config.get("active_model_id", "")
-
-    if active_mid and model_id == active_mid:
-        active_pid = _resolve_active_provider_id(config)
-        if not scoped:
-            raise ValueError(
-                "不能删除当前正在使用的模型；请先切换到其他模型后再删除。"
-                "若只想删某家供应商名下的副本，请进入该供应商的模型页操作。"
-            )
-        if active_pid:
-            if active_pid == provider_id:
-                prov_name = next(
-                    (p.get("name", provider_id) for p in config.get("providers", []) if p.get("id") == provider_id),
-                    provider_id,
-                )
-                raise ValueError(
-                    f"{model_id} 是供应商「{prov_name}」名下正在使用的主脑模型；"
-                    "请先切换主脑或删除其他供应商名下的同名副本。"
-                )
-        else:
-            raise ValueError(
-                f"多个供应商名下挂有同名主脑模型 {model_id}，无法判定启用的是哪一家；"
-                "请先在该供应商的模型页点「设为主脑」明确归属，再执行删除。"
-            )
-
-    models = config.get("models", [])
-    providers = config.get("providers", [])
-
-    nested_removed = False
-    if scoped:
-        prov = next((p for p in providers if p.get("id") == provider_id), None)
-        if prov is None:
-            raise ValueError(f"供应商 {provider_id} 未找到")
-        before = len(prov.get("models", []))
-        prov["models"] = [m for m in prov.get("models", []) if m.get("id") != model_id]
-        nested_removed = len(prov["models"]) < before
-        # 顶层缓存只摘属于本供应商的条目；归属漂移挂在别家名下的条目留给 init 重建时自愈
-        filtered = [
-            m
-            for m in models
-            if not (m.get("id") == model_id and str(m.get("provider_id") or "") == provider_id)
-        ]
-    else:
-        for prov in providers:
-            before = len(prov.get("models", []))
-            prov["models"] = [m for m in prov.get("models", []) if m.get("id") != model_id]
-            nested_removed = nested_removed or len(prov["models"]) < before
-        filtered = [m for m in models if m["id"] != model_id]
-
-    if len(filtered) == len(models) and not nested_removed:
-        return False
-
-    config["models"] = filtered
-    _atomic_write_json(LLM_CONFIG_FILE, config)
-    return True
+    """薄壳：调用时解析 LLM_CONFIG_FILE 与 init_llm_config 模块全局，
+    使测试对二者的 patch / 直接赋值必然生效。实现已迁往 r20_backend.llm.store
+    （结构优化阶段 2 / B4）。"""
+    return _store_delete_model(LLM_CONFIG_FILE, init_llm_config, provider_id, model_id)
 
 
 def upsert_provider(provider_data: Dict[str, Any]) -> Dict[str, Any]:
-    """Add or update an LLM provider definition."""
-    pid = str(provider_data.get("id", "")).strip().lower()
-    name = str(provider_data.get("name", "")).strip() or pid
-    p_type = str(provider_data.get("type", "")).strip() or name
-    p_group = str(provider_data.get("group", "")).strip() or "其他"
-    enabled = bool(provider_data.get("enabled", False)) if "enabled" in provider_data else None
-    multi_key_enabled = bool(provider_data.get("multi_key_enabled", False))
-    response_api_enabled = bool(provider_data.get("response_api_enabled", False))
-    base_url = str(provider_data.get("base_url", "")).strip().rstrip("/")
-    api_key = str(provider_data.get("api_key", "")).strip()
-    api_format = str(provider_data.get("api_format", "openai_chat")).strip()
-    api_path = str(provider_data.get("api_path", "/chat/completions")).strip()
-    desc = str(provider_data.get("description", "")).strip()
-
-    if not api_format:
-        api_format = "claude_messages" if "claude" in pid or "anthropic" in base_url.lower() else "openai_chat"
-
-    # Automatically synchronize api_path with selected api_format if default was provided
-    if api_path in ["/chat/completions", "/messages", "/responses", ""]:
-        if api_format == "claude_messages":
-            api_path = "/messages"
-        elif api_format == "openai_responses":
-            api_path = "/responses"
-        else:
-            api_path = "/chat/completions"
-
-    response_api_enabled = (api_format == "openai_responses")
-
-    if not pid:
-        pid = re.sub(r"[^a-zA-Z0-9_\-]", "", name.lower()) or f"prov-{int(time.time())}"
-
-    if not base_url or not base_url.startswith(("http://", "https://")):
-        raise ValueError("供应商 Base URL 必须以 http:// 或 https:// 开头")
-
-    config = init_llm_config()
-    providers = config.setdefault("providers", [])
-    existing = next((p for p in providers if p["id"] == pid), None)
-    if existing:
-        existing["name"] = name
-        existing["type"] = p_type
-        existing["group"] = p_group
-        if enabled is not None:
-            existing["enabled"] = enabled
-        existing["multi_key_enabled"] = multi_key_enabled
-        existing["response_api_enabled"] = response_api_enabled
-        existing["base_url"] = base_url
-        if api_key:
-            existing["api_key"] = api_key
-        existing["api_format"] = api_format
-        existing["api_path"] = api_path
-        existing["description"] = desc
-    else:
-        providers.append({
-            "id": pid,
-            "name": name,
-            "type": p_type,
-            "group": p_group,
-            "enabled": enabled if enabled is not None else False,
-            "multi_key_enabled": multi_key_enabled,
-            "response_api_enabled": response_api_enabled,
-            "base_url": base_url,
-            "api_key": api_key,
-            "api_format": api_format,
-            "api_path": api_path,
-            "description": desc,
-            "models": [],
-        })
-
-    # ── 凭据轮换联动：供应商是密钥唯一权威源 ──
-    # 1) 刷新该供应商下扁平缓存中的历史快照键/地址，杜绝旧键粘住导致"改完密钥模型全连不上"；
-    # 2) 激活模型属于该供应商时，把新凭据回写全局 .env 与密钥库，交易引擎运行时同步对齐。
-    if existing:
-        affected = [m for m in config.get("models", []) if m.get("provider_id") == pid]
-        for mm in affected:
-            mm["base_url"] = base_url
-            if api_key:
-                mm["api_key"] = api_key
-        active_mid = config.get("active_model_id", "")
-        if affected and any(mm.get("id") == active_mid for mm in affected):
-            try:
-                from .settings_store import update_env
-                from .config import refresh_settings
-                try:
-                    from r20_gateway.secrets import save_secrets
-                except ImportError:
-                    save_secrets = None
-                env_values = {"LLM_BASE_URL": base_url}
-                if api_key:
-                    env_values["LLM_API_KEY"] = api_key
-                    if save_secrets:
-                        save_secrets({"LLM_API_KEY": api_key})
-                update_env(env_values)
-                refresh_settings()
-            except Exception:
-                pass
-
-    _atomic_write_json(LLM_CONFIG_FILE, config)
-    return {"id": pid, "name": name, "base_url": base_url}
+    """薄壳：调用时解析 LLM_CONFIG_FILE 与 init_llm_config 模块全局，
+    使测试对二者的 patch / 直接赋值必然生效。实现已迁往 r20_backend.llm.store
+    （结构优化阶段 2 / B4）。"""
+    return _store_upsert_provider(LLM_CONFIG_FILE, init_llm_config, provider_data)
 
 
 def toggle_provider(provider_id: str, enabled: Optional[bool] = None) -> Dict[str, Any]:
-    """Toggle a provider's enabled/disabled state."""
-    config = init_llm_config()
-    providers = config.get("providers", [])
-    p = next((x for x in providers if x["id"] == provider_id), None)
-    if not p:
-        raise ValueError(f"供应商 {provider_id} 未找到")
-    if enabled is None:
-        p["enabled"] = not p.get("enabled", False)
-    else:
-        p["enabled"] = bool(enabled)
-    _atomic_write_json(LLM_CONFIG_FILE, config)
-    return {"id": provider_id, "enabled": p["enabled"]}
+    """薄壳：调用时解析 LLM_CONFIG_FILE 与 init_llm_config 模块全局，
+    使测试对二者的 patch / 直接赋值必然生效。实现已迁往 r20_backend.llm.store
+    （结构优化阶段 2 / B4）。"""
+    return _store_toggle_provider(LLM_CONFIG_FILE, init_llm_config, provider_id, enabled)
 
 
 def clear_provider_models(provider_id: str) -> bool:
-    """Clear all models under a specific provider."""
-    config = init_llm_config()
-    providers = config.get("providers", [])
-    p = next((x for x in providers if x["id"] == provider_id), None)
-    if not p:
-        return False
-    active_mid = config.get("active_model_id", "")
-    if _provider_holds_active_model(config, provider_id):
-        raise ValueError(
-            f"供应商 {provider_id} 名下挂着当前激活模型 {active_mid}；请先切换主脑模型再清空。"
-        )
-    p["models"] = []
-    config["models"] = [m for m in config.get("models", []) if m.get("provider_id") != provider_id]
-    _atomic_write_json(LLM_CONFIG_FILE, config)
-    return True
+    """薄壳：调用时解析 LLM_CONFIG_FILE 与 init_llm_config 模块全局，
+    使测试对二者的 patch / 直接赋值必然生效。实现已迁往 r20_backend.llm.store
+    （结构优化阶段 2 / B4）。"""
+    return _store_clear_provider_models(LLM_CONFIG_FILE, init_llm_config, provider_id)
 
 
 def delete_provider(provider_id: str) -> bool:
-    """Delete a provider definition (cascades to its models).
-
-    保护：名下挂着当前激活模型（或顶层仍有其模型）的供应商不可删除，
-    避免主脑 active_model_id 悬空或顶层残留幽灵模型。
-    """
-    config = init_llm_config()
-    providers = config.get("providers", [])
-    target = next((p for p in providers if p.get("id") == provider_id), None)
-    if not target:
-        return False
-    active_mid = config.get("active_model_id", "")
-    if _provider_holds_active_model(config, provider_id):
-        raise ValueError(
-            f"供应商 {provider_id} 名下挂着当前激活模型 {active_mid}；请先切换主脑模型再删除。"
-        )
-    config["providers"] = [p for p in providers if p.get("id") != provider_id]
-    # 级联：顶层扁平列表里属于该供应商的模型一并移除，避免幽灵模型
-    config["models"] = [
-        m for m in config.get("models", []) if m.get("provider_id") != provider_id
-    ]
-    _atomic_write_json(LLM_CONFIG_FILE, config)
-    return True
+    """薄壳：调用时解析 LLM_CONFIG_FILE 与 init_llm_config 模块全局，
+    使测试对二者的 patch / 直接赋值必然生效。实现已迁往 r20_backend.llm.store
+    （结构优化阶段 2 / B4）。"""
+    return _store_delete_provider(LLM_CONFIG_FILE, init_llm_config, provider_id)
 
 
 def fetch_remote_models(
