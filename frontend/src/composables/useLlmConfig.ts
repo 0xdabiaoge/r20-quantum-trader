@@ -1,0 +1,686 @@
+/**
+ * `LlmPage` 的状态与动作（结构优化阶段 3·F3 抽离）。
+ *
+ * 原 `LlmPage.vue` 是 1762 行：script 636 行 + template 1124 行。这里把
+ * **状态与所有与服务端交互的动作**整体搬出来，页面只保留"模板 + 编排"。
+ *
+ * 抽离方式刻意选**整体搬迁**（不是拆成若干小组件）：这些动作彼此共享
+ * `cfg` / `providerForm` / `modelForm` 等状态，拆散会立刻产生大量参数传递；
+ * 而整体搬进一个 composable 后，闭包关系原地保留、行为零变化。
+ * 模板所需的绑定由页面解构取得（`<script setup>` 顶层绑定对模板可见）。
+ *
+ * 不在页面里直接写逻辑的收益：这段逻辑不再依赖模板上下文，可被
+ * `vue-tsc` 独立检查，也为后续按域再拆（provider / model / failover）留了位置。
+ */
+import { computed, onMounted, ref } from 'vue'
+import { useI18n } from './useI18n'
+import { useApi } from './useApi'
+import { useConfirm } from './useConfirm'
+import { useToast } from './useToast'
+
+export function useLlmConfig() {
+  const { t } = useI18n()
+  const { ask } = useConfirm()
+  const toast = useToast()
+
+const { api } = useApi()
+
+// State
+const cfg = ref<any>(null)
+const loading = ref(true)
+const searchQuery = ref('')
+
+// Navigation: 'list' (一级：供应商列表) | 'detail' (二级：供应商配置与模型详情)
+const currentView = ref<'list' | 'detail'>('list')
+const selectedProvider = ref<any>(null)
+const detailTab = ref<'config' | 'models'>('config')
+
+// Password visibility toggles
+const showApiKey = ref(false)
+
+// Edit / Add Provider Form
+const providerForm = ref<any>({
+  id: '',
+  name: '',
+  type: 'OpenAI',
+  group: '其他',
+  enabled: true,
+  multi_key_enabled: false,
+  response_api_enabled: false,
+  base_url: '',
+  api_key: '',
+  api_path: '/chat/completions',
+  description: '',
+})
+
+// Test Connection State
+const testResult = ref<any>(null)
+const testLoading = ref(false)
+const testingModelId = ref<string | null>(null)
+
+// Remote Fetch State & Modal
+const fetchModalVisible = ref(false)
+const fetchingRemote = ref(false)
+const remoteFetchResult = ref<any>(null)
+const remoteSearch = ref('')
+const customFetchUrl = ref('')
+const customFetchKey = ref('')
+
+// Add / Edit Single Model Modal
+const modelModalVisible = ref(false)
+const editingModel = ref<any>(null)
+const modelForm = ref<any>({
+  id: '',
+  name: '',
+  provider_id: '',
+  capabilities: ['chat'],
+  reasoning_effort: 'high',
+  context_length: 128000,
+  description: '',
+})
+
+// Copied feedback
+
+// Global Reasoning & Thinking Timeout State
+const thinkingTimeoutInput = ref<number>(120)
+const savingSettings = ref(false)
+const settingsResult = ref<any>(null)
+
+// ── LLM 韧性配置：单模型请求次数 + 回退模型链 ──
+const requestAttemptsInput = ref<number>(3)
+const fallbackIds = ref<string[]>([])
+const failoverEvents = ref<any[]>([])
+
+const fallbackOptions = computed(() =>
+  (cfg.value?.models || []).filter((m: any) => m.id !== cfg.value?.active_model_id),
+)
+
+function toggleFallback(id: string) {
+  const idx = fallbackIds.value.indexOf(id)
+  if (idx > -1) {
+    fallbackIds.value.splice(idx, 1)
+  } else {
+    if (fallbackIds.value.length >= (cfg.value?.max_fallback_models || 5)) {
+      settingsResult.value = { ok: false, error: t('admin.llm.fallbackLimitErr') }
+      setTimeout(() => { settingsResult.value = null }, 3500)
+      return
+    }
+    fallbackIds.value.push(id)
+  }
+}
+
+function moveFallback(idx: number, dir: -1 | 1) {
+  const target = idx + dir
+  if (target < 0 || target >= fallbackIds.value.length) return
+  const arr = fallbackIds.value
+  ;[arr[idx], arr[target]] = [arr[target], arr[idx]]
+}
+
+function modelNameOf(id: string) {
+  const m = (cfg.value?.models || []).find((x: any) => x.id === id)
+  return m ? `${m.name || m.id}${m.provider_name ? ` · ${m.provider_name}` : ''}` : id
+}
+
+async function loadFailoverEvents() {
+  try {
+    const res = await api('/api/v1/admin/llm/failover-events')
+    failoverEvents.value = res?.events || []
+  } catch {
+    failoverEvents.value = []
+  }
+}
+
+function setPresetTimeout(sec: number) {
+  thinkingTimeoutInput.value = sec
+}
+
+async function saveGlobalSettings() {
+  savingSettings.value = true
+  settingsResult.value = null
+  try {
+    await api('/api/v1/admin/llm/settings', {
+      method: 'POST',
+      body: JSON.stringify({
+        thinking_timeout: Number(thinkingTimeoutInput.value) || 120,
+        active_model_id: cfg.value?.active_model_id,
+        reasoning_effort: cfg.value?.active_reasoning_effort,
+        request_attempts: Number(requestAttemptsInput.value) || 3,
+        fallback_model_ids: fallbackIds.value,
+      }),
+    })
+    await loadConfig()
+    await loadFailoverEvents()
+    settingsResult.value = {
+      ok: true,
+      message: t(
+        'admin.llm.settingsSaved',
+        undefined,
+        { sec: thinkingTimeoutInput.value, n: requestAttemptsInput.value, m: fallbackIds.value.length },
+      ),
+    }
+    setTimeout(() => {
+      settingsResult.value = null
+    }, 3500)
+  } catch (err: any) {
+    settingsResult.value = { ok: false, error: err.message }
+  } finally {
+    savingSettings.value = false
+  }
+}
+
+// ----------------- Data Loading -----------------
+async function loadConfig() {
+  loading.value = true
+  try {
+    cfg.value = await api('/api/v1/admin/llm/models')
+    if (cfg.value?.thinking_timeout) {
+      thinkingTimeoutInput.value = Number(cfg.value.thinking_timeout)
+    }
+    if (cfg.value?.request_attempts) {
+      requestAttemptsInput.value = Number(cfg.value.request_attempts)
+    }
+    if (Array.isArray(cfg.value?.fallback_model_ids)) {
+      fallbackIds.value = [...cfg.value.fallback_model_ids]
+    }
+    if (selectedProvider.value) {
+      const updated = cfg.value.providers?.find((p: any) => p.id === selectedProvider.value.id)
+      if (updated) {
+        selectedProvider.value = updated
+      }
+    }
+  } catch (e: any) {
+    console.error('Failed to load LLM config:', e)
+  } finally {
+    loading.value = false
+  }
+}
+
+// Model Effort Options depending on model family
+const availableEffortOptions = computed(() => {
+  const mid = (modelForm.value.id || '').toLowerCase()
+  // 智能自适应：支持 GPT-6、GPT-5 以及未来全系前沿具备极值推演能力的旗舰模型
+  const supportsExtreme = mid.includes('gpt-6') || mid.includes('gpt-5') || mid.includes('o3') || mid.includes('o4') || mid.includes('ultra') || mid.includes('max')
+  
+  const options = [
+    { value: 'high', label: t('admin.llm.effortHigh') },
+    { value: 'medium', label: t('admin.llm.effortMedium') },
+    { value: 'low', label: t('admin.llm.effortLow') },
+    { value: 'minimal', label: t('admin.llm.effortMinimal') },
+    { value: 'none', label: t('admin.llm.effortNone') },
+    // 后端 STANDARD_REASONING_EFFORTS 含 auto/minimal：缺了会让已存 "auto" 的模型在下拉框中无法回显
+    { value: 'auto', label: t('admin.llm.effortAuto') },
+  ]
+  if (supportsExtreme) {
+    options.unshift(
+      { value: 'max', label: t('admin.llm.effortMax') },
+      { value: 'xhigh', label: t('admin.llm.effortXhigh') }
+    )
+  }
+  return options
+})
+
+// ----------------- Filtered Providers -----------------
+const filteredProviders = computed(() => {
+  if (!cfg.value?.providers) return []
+  const q = searchQuery.value.trim().toLowerCase()
+  if (!q) return cfg.value.providers
+  return cfg.value.providers.filter((p: any) =>
+    p.name.toLowerCase().includes(q) ||
+    (p.type && p.type.toLowerCase().includes(q)) ||
+    (p.group && p.group.toLowerCase().includes(q)) ||
+    (p.id && p.id.toLowerCase().includes(q))
+  )
+})
+
+// ----------------- Provider Actions -----------------
+function openAddProviderModal() {
+  selectedProvider.value = { id: '', name: t('admin.llm.newProviderName'), is_new: true }
+  providerForm.value = {
+    id: '',
+    name: '',
+    type: 'OpenAI 兼容',
+    group: '自定义',
+    enabled: true,
+    multi_key_enabled: false,
+    response_api_enabled: false,
+    api_format: 'openai_chat',
+    base_url: '',
+    api_key: '',
+    api_path: '/chat/completions',
+    description: '',
+  }
+  detailTab.value = 'config'
+  currentView.value = 'detail'
+  testResult.value = null
+  showApiKey.value = false
+}
+
+function selectProvider(p: any) {
+  selectedProvider.value = p
+  const format = p.api_format || (p.id === 'claude' ? 'claude_messages' : 'openai_chat')
+  providerForm.value = {
+    id: p.id,
+    name: p.name,
+    type: p.type || p.name,
+    group: p.group || '其他',
+    enabled: !!p.enabled,
+    multi_key_enabled: !!p.multi_key_enabled,
+    response_api_enabled: !!p.response_api_enabled,
+    api_format: format,
+    base_url: p.base_url || '',
+    api_key: '',
+    api_path: p.api_path || (format === 'claude_messages' ? '/messages' : (format === 'openai_responses' ? '/responses' : '/chat/completions')),
+    description: p.description || '',
+  }
+  detailTab.value = 'config'
+  currentView.value = 'detail'
+  testResult.value = null
+  showApiKey.value = false
+}
+
+function onApiFormatChange() {
+  const fmt = providerForm.value.api_format
+  if (fmt === 'claude_messages') {
+    if (!providerForm.value.api_path || providerForm.value.api_path === '/chat/completions' || providerForm.value.api_path === '/responses') {
+      providerForm.value.api_path = '/messages'
+    }
+    providerForm.value.response_api_enabled = false
+  } else if (fmt === 'openai_responses') {
+    if (!providerForm.value.api_path || providerForm.value.api_path === '/chat/completions' || providerForm.value.api_path === '/messages') {
+      providerForm.value.api_path = '/responses'
+    }
+    providerForm.value.response_api_enabled = true
+  } else {
+    if (!providerForm.value.api_path || providerForm.value.api_path === '/messages' || providerForm.value.api_path === '/responses') {
+      providerForm.value.api_path = '/chat/completions'
+    }
+    providerForm.value.response_api_enabled = false
+  }
+}
+
+function goBackToList() {
+  currentView.value = 'list'
+  selectedProvider.value = null
+  testResult.value = null
+}
+
+async function toggleProviderQuick(p: any, e: Event) {
+  e.stopPropagation()
+  try {
+    const res = await api(`/api/v1/admin/llm/providers/${encodeURIComponent(p.id)}/toggle`, {
+      method: 'POST',
+      body: JSON.stringify({ enabled: !p.enabled }),
+    })
+    p.enabled = res.enabled
+    await loadConfig()
+  } catch (err: any) {
+    toast.err(err.message)
+  }
+}
+
+async function saveProviderConfig() {
+  try {
+    const payload = { ...providerForm.value }
+    if (!payload.id) {
+      payload.id = payload.name.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_')
+    }
+    if (!payload.api_key) delete payload.api_key
+    await api('/api/v1/admin/llm/providers', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+    toast.ok('供应商配置已成功保存！')
+    await loadConfig()
+    if (selectedProvider.value?.is_new) {
+      const created = cfg.value.providers?.find((p: any) => p.id === payload.id)
+      if (created) {
+        selectedProvider.value = created
+      }
+    }
+  } catch (err: any) {
+    toast.err(err.message)
+  }
+}
+
+async function clearCurrentProviderModels() {
+  if (!selectedProvider.value) return
+  // 批C(2026-09-13)：破坏性操作统一走项目确认服务（原生 confirm 在移动端易误触）
+  const _ok = await ask({ title: '清空供应商模型', desc: `${selectedProvider.value.name} 旗下全部模型将被删除`, danger: true, okText: '清空' })
+  if (!_ok) return
+  try {
+    await api(`/api/v1/admin/llm/providers/${encodeURIComponent(selectedProvider.value.id)}/models`, {
+      method: 'DELETE',
+    })
+    toast.ok('已清空该供应商所有模型！')
+    await loadConfig()
+  } catch (err: any) {
+    toast.err(err.message)
+  }
+}
+
+async function removeProvider() {
+  const p = selectedProvider.value
+  if (!p || p.is_new) return
+  const n = p.models_count ?? p.models?.length ?? 0
+  // 批C(2026-09-13)：删供应商可能带走主脑激活模型 → danger + 提示先切换模型
+  // 批2(2026-09-13)：原先这里算出 warn 却从未使用（vue-tsc TS6133），模型联删提示形同丢失，
+  // 现直接并入确认文案，保证「删之前知道会带走什么」。
+  const cascade = n > 0 ? `，其名下 ${n} 个模型将一并删除` : ''
+  const _ok = await ask({
+    title: '删除 LLM 供应商',
+    desc: `「${p.name}」将被删除${cascade}`,
+    detail: '若它挂着当前主脑激活模型，请先切换模型再删除',
+    danger: true,
+    okText: '删除',
+  })
+  if (!_ok) return
+  try {
+    await api(`/api/v1/admin/llm/providers/${encodeURIComponent(p.id)}`, {
+      method: 'DELETE',
+    })
+    toast.ok(`供应商 ${p.name} 已删除`)
+    goBackToList()
+    await loadConfig()
+  } catch (err: any) {
+    toast.err(err.message)
+  }
+}
+
+// ----------------- Remote Fetch -----------------
+function openFetchDialog() {
+  if (!selectedProvider.value) return
+  customFetchUrl.value = selectedProvider.value.base_url || ''
+  customFetchKey.value = ''
+  remoteFetchResult.value = null
+  remoteSearch.value = ''
+  fetchModalVisible.value = true
+  // 优化：若当前供应商已配置好 Base URL，弹窗打开时自动发起探测拉取，免除重复输入与多次点击
+  executeRemoteFetch()
+}
+
+async function executeRemoteFetch() {
+  if (!selectedProvider.value) return
+  fetchingRemote.value = true
+  remoteFetchResult.value = null
+  try {
+    const payload: any = {
+      provider_id: selectedProvider.value.id,
+      base_url: customFetchUrl.value.trim() || selectedProvider.value.base_url,
+    }
+    if (customFetchKey.value.trim()) {
+      payload.api_key = customFetchKey.value.trim()
+    }
+    const res = await api('/api/v1/admin/llm/fetch-models', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+    remoteFetchResult.value = res
+  } catch (err: any) {
+    remoteFetchResult.value = { ok: false, error: err.message }
+  } finally {
+    fetchingRemote.value = false
+  }
+}
+
+const filteredRemoteModels = computed(() => {
+  if (!remoteFetchResult.value?.models) return []
+  const q = remoteSearch.value.trim().toLowerCase()
+  if (!q) return remoteFetchResult.value.models
+  return remoteFetchResult.value.models.filter((m: any) =>
+    m.id.toLowerCase().includes(q) ||
+    (m.name && m.name.toLowerCase().includes(q))
+  )
+})
+
+async function importRemoteModel(m: any, autoActivate = false) {
+  if (!selectedProvider.value) return
+  try {
+    const payload = {
+      id: m.id,
+      name: m.name || m.id,
+      provider_id: selectedProvider.value.id,
+      provider_name: selectedProvider.value.name,
+      base_url: selectedProvider.value.base_url,
+      api_format: m.api_format || selectedProvider.value.api_format || 'openai_chat',
+      reasoning_type: m.reasoning_type || 'auto',
+      reasoning_effort: m.default_effort || 'high',
+      capabilities: m.capabilities || ['chat'],
+      context_length: m.context_length,
+      description: m.description ? m.description.slice(0, 100) : '从远端一键自动收录',
+    }
+    await api('/api/v1/admin/llm/models', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+    if (autoActivate) {
+      await api('/api/v1/admin/llm/activate', {
+        method: 'POST',
+        body: JSON.stringify({
+          model_id: m.id,
+          provider_id: selectedProvider.value.id,
+          reasoning_effort: payload.reasoning_effort,
+        }),
+      })
+    }
+    await loadConfig()
+    toast.ok(autoActivate ? `已收录并激活主脑为 ${m.id}！` : `已成功添加 ${m.id} 到模型列表！`)
+  } catch (err: any) {
+    toast.err(err.message)
+  }
+}
+
+async function importAllFilteredRemoteModels() {
+  if (!selectedProvider.value || !filteredRemoteModels.value.length) return
+  const list = filteredRemoteModels.value
+  let successCount = 0
+  for (const m of list) {
+    try {
+      const payload = {
+        id: m.id,
+        name: m.name || m.id,
+        provider_id: selectedProvider.value.id,
+        provider_name: selectedProvider.value.name,
+        base_url: selectedProvider.value.base_url,
+        api_format: m.api_format || selectedProvider.value.api_format || 'openai_chat',
+        reasoning_type: m.reasoning_type || 'auto',
+        reasoning_effort: m.default_effort || 'high',
+        capabilities: m.capabilities || ['chat'],
+        context_length: m.context_length,
+        description: m.description ? m.description.slice(0, 100) : '从远端一键自动收录',
+      }
+      await api('/api/v1/admin/llm/models', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      })
+      successCount++
+    } catch (e) {
+      console.warn('Import model failed:', m.id, e)
+    }
+  }
+  await loadConfig()
+  toast.ok(`成功批量收录 ${successCount} 个模型到 ${selectedProvider.value.name}！`)
+}
+
+// ----------------- Model Management -----------------
+function openAddModelModal() {
+  if (!selectedProvider.value) return
+  editingModel.value = null
+  modelForm.value = {
+    id: '',
+    name: '',
+    provider_id: selectedProvider.value.id,
+    capabilities: ['chat'],
+    reasoning_effort: 'high',
+    context_length: 128000,
+    description: '',
+  }
+  modelModalVisible.value = true
+}
+
+function openEditModelModal(m: any) {
+  editingModel.value = m
+  modelForm.value = {
+    id: m.id,
+    name: m.name || m.id,
+    provider_id: selectedProvider.value?.id || m.provider_id,
+    capabilities: m.capabilities || ['chat'],
+    reasoning_effort: m.reasoning_effort || 'high',
+    context_length: m.context_length || 128000,
+    description: m.description || '',
+  }
+  modelModalVisible.value = true
+}
+
+async function saveModelForm() {
+  if (!selectedProvider.value) return
+  try {
+    const payload = {
+      ...modelForm.value,
+      provider_id: selectedProvider.value.id,
+      provider_name: selectedProvider.value.name,
+      base_url: selectedProvider.value.base_url,
+      api_format: selectedProvider.value.api_format || 'openai_chat',
+    }
+    await api('/api/v1/admin/llm/models', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+    modelModalVisible.value = false
+    await loadConfig()
+  } catch (err: any) {
+    toast.err(err.message)
+  }
+}
+
+async function activateModel(m: any) {
+  try {
+    await api('/api/v1/admin/llm/activate', {
+      method: 'POST',
+      body: JSON.stringify({
+        model_id: m.id,
+        provider_id: selectedProvider.value?.id || m.provider_id || 'custom',
+        reasoning_effort: m.reasoning_effort || 'high',
+      }),
+    })
+    await loadConfig()
+  } catch (err: any) {
+    toast.err(err.message)
+  }
+}
+
+async function deleteSingleModel(m: any) {
+  const pid = selectedProvider.value?.id
+  const pname = selectedProvider.value?.name || pid || ''
+  const _ok = await ask({ title: '删除模型', desc: `供应商「${pname}」名下的模型 ${m.id} 将被删除`, danger: true, okText: '删除' })
+  if (!_ok) return
+  try {
+    const url = pid
+      ? `/api/v1/admin/llm/providers/${encodeURIComponent(pid)}/models/${encodeURIComponent(m.id)}`
+      : `/api/v1/admin/llm/models/${encodeURIComponent(m.id)}`
+    await api(url, {
+      method: 'DELETE',
+    })
+    await loadConfig()
+  } catch (err: any) {
+    toast.err(err.message)
+  }
+}
+
+// ----------------- Test Connection -----------------
+async function runTestModel(m: any) {
+  testLoading.value = true
+  testingModelId.value = m.id
+  testResult.value = null
+  try {
+    const prov = selectedProvider.value || cfg.value?.providers?.find((p: any) => p.id === m.provider_id)
+    testResult.value = await api('/api/v1/admin/llm/test', {
+      method: 'POST',
+      body: JSON.stringify({
+        model: m.id,
+        base_url: prov?.base_url || m.base_url,
+        api_format: prov?.api_format || m.api_format || 'openai_chat',
+        reasoning_effort: m.reasoning_effort || 'auto',
+      }),
+    })
+  } catch (e: any) {
+    testResult.value = { ok: false, error: e.message }
+  } finally {
+    testLoading.value = false
+    testingModelId.value = null
+  }
+}
+
+function toggleCapability(cap: string) {
+  const caps = modelForm.value.capabilities
+  const idx = caps.indexOf(cap)
+  if (idx > -1) {
+    caps.splice(idx, 1)
+  } else {
+    caps.push(cap)
+  }
+}
+
+onMounted(() => {
+  loadConfig()
+  loadFailoverEvents()
+})
+
+  return {
+    activateModel,
+    availableEffortOptions,
+    cfg,
+    clearCurrentProviderModels,
+    currentView,
+    customFetchKey,
+    customFetchUrl,
+    deleteSingleModel,
+    detailTab,
+    editingModel,
+    executeRemoteFetch,
+    failoverEvents,
+    fallbackIds,
+    fallbackOptions,
+    fetchModalVisible,
+    fetchingRemote,
+    filteredProviders,
+    filteredRemoteModels,
+    goBackToList,
+    importAllFilteredRemoteModels,
+    importRemoteModel,
+    loadConfig,
+    loadFailoverEvents,
+    loading,
+    modelForm,
+    modelModalVisible,
+    modelNameOf,
+    moveFallback,
+    onApiFormatChange,
+    openAddModelModal,
+    openAddProviderModal,
+    openEditModelModal,
+    openFetchDialog,
+    providerForm,
+    remoteFetchResult,
+    remoteSearch,
+    removeProvider,
+    requestAttemptsInput,
+    runTestModel,
+    saveGlobalSettings,
+    saveModelForm,
+    saveProviderConfig,
+    savingSettings,
+    searchQuery,
+    selectProvider,
+    selectedProvider,
+    setPresetTimeout,
+    settingsResult,
+    showApiKey,
+    testLoading,
+    testResult,
+    testingModelId,
+    thinkingTimeoutInput,
+    toggleCapability,
+    toggleFallback,
+    toggleProviderQuick,
+  }
+}
