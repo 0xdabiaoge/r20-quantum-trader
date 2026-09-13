@@ -89,7 +89,10 @@ MIN_SCALE_IN_PROFIT_RATIO = _env_float("R20_MIN_SCALE_IN_PROFIT_RATIO", 0.008)
 # 加仓必须达到的最低 AI 置信度（%）。
 MIN_SCALE_IN_CONFIDENCE = _env_float("R20_MIN_SCALE_IN_CONFIDENCE", 75.0)
 
-# 组合风险总预算（USDT，0 = 自动跟随持仓上限 × 单标的保证金绝对封顶派生）。
+# 组合风险总预算（USDT，跨所合算的顶层总闸；0 = 不封顶）。
+# 审计⑫(2026-09-13) 注释正名：旧注释承诺「0=自动按持仓上限×单标的封顶派生」，但执行层
+# 从未实现该派生（裸 getenv，0→None→无顶）——派生公式只存在于 dashboard 的 UI 展示，
+# 属展示启发式而非引擎策略。现引擎侧 budget>0 时按 gross_exposure 跨所合算强制。
 PORTFOLIO_RISK_BUDGET_USDT = _env_float("R20_PORTFOLIO_RISK_BUDGET_USDT", 0.0)
 
 # ── 默认值表（供后台风控管理页 schema 引用，键 = 环境变量名） ────

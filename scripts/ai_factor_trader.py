@@ -516,16 +516,30 @@ def is_circuit_breaker_active(usdt_available: float = None):
 
     # 3. Daily Max Loss Limit Check from lifecycle ledger using Beijing close_time.
     if os.path.exists(LEDGER_JSON_FILE):
+        # 审计回马枪④2(2026-09-13)：上轮 A2 的「同步失败所→禁开仓」加固只进了
+        # r20_backend.execution.circuit_breaker 模块版，而活路径走本函数（孪生漂移），
+        # 等于闸装了死副本。现从模块导入同一实现，双进程单一事实源。
+        try:
+            from r20_backend.execution.circuit_breaker import (
+                _ledger_sync_failed_venues, ledger_daily_closed_pnl)
+            _failed_venues = _ledger_sync_failed_venues()
+            if _failed_venues:
+                return True, ("台账跨所同步不完整（失败所: " + ",".join(_failed_venues) +
+                              "），当日亏损求和不可判全，安全暂停开仓")
+        except Exception as e:
+            return True, f"台账同步旁车检查不可用，安全暂停开仓: {e}"
         try:
             with open(LEDGER_JSON_FILE, "r", encoding="utf-8") as f:
                 ledger = json.load(f)
             tz_bj = datetime.timezone(datetime.timedelta(hours=8))
             today_str = datetime.datetime.now(tz_bj).strftime("%Y-%m-%d")
-            today_pnl = sum(
-                float(t.get("pnl", 0) or 0)
-                for t in ledger
-                if t.get("status") == "closed" and beijing_day(t.get("close_time")) == today_str
-            )
+            # 审计④1：求和必须按 current_environment().mode 过滤环境（demo↔live 切换日
+            # 两环境盈亏互抵可致熔断假阴性），规则与模块版 ledger_daily_closed_pnl 同源。
+            try:
+                _mode = str(current_environment().mode or "")
+            except Exception:
+                _mode = ""  # 环境不可判 → 保守全计（宁停不漏）
+            today_pnl = ledger_daily_closed_pnl(ledger, _mode, today_str)
             _loss_cap = effective_daily_loss_limit(usdt_available)
             if today_pnl < -_loss_cap:
                 return True, f"今日累计回撤 ({today_pnl:.2f}U) 触及单日最大风控熔断限额 ({_loss_cap}U｜按可用余额自适应)"
@@ -1051,8 +1065,37 @@ def route_and_reserve_signal(inst_id: str, side: str, size: float, price: float,
         return {"ok": False, "error": "预算预留拒绝: 预留层不可用（fail-closed 不下单）",
                 "venue": venue, "decision": payload, "reservation": None}
 
+    # 审计③(2026-09-13)：「组合风险总预算」此前名不副实——reserve 的 sqlite 上限按
+    # (venue, env, fingerprint) 逐所求和，gross_exposure(environment) 跨所聚合只进证据
+    # payload 不参与裁决，三所全开闸时 1000U 预算实际可占用 3000U。现把跨所合算补成
+    # 真实总闸（各所子闸保留）。仅显式配置 budget>0 时生效（0=无顶语义不变）。
+    # 幂等豁免：同 (account_key, intent) 重提不是新增占用（reserve 底层本就幂等），
+    # 需从 gross_exposure 扣回该 intent 已占额，否则重试会被总闸误杀。
     intent = str(intent_id or f"{inst_id}:{side}:{int(time.time())}")
     account_key = (venue, environment, str(env.fingerprint))
+    _prior_same_intent = 0.0
+    if budget_total > 0:
+        try:
+            for _r in mgr.reservations(account_key):
+                if str(_r.get("intent_id") or "") == intent:
+                    _prior_same_intent = float(_r.get("amount_usdt") or 0.0)
+                    break
+        except Exception:
+            pass
+    _pb_err = portfolio_budget_guard(budget_total, budget_used - _prior_same_intent,
+                                     margin_est, environment)
+    if _pb_err:
+        payload["budget"] = {"limit_usdt": budget_total,
+                             "reserved_before_usdt": budget_used,
+                             "gross_exposure_before_usdt": budget_used,
+                             "margin_usdt": margin_est, "error": _pb_err}
+        payload["outcome"] = "portfolio_budget_exceeded"
+        payload["skip_reason"] = _pb_err
+        persist_venue_decision(inst_id, payload)
+        print(f"[预算预留] 本轮不下单 {inst_id}: {_pb_err}")
+        return {"ok": False, "error": _pb_err, "venue": venue,
+                "decision": payload, "reservation": None}
+
     try:
         record = mgr.reserve(account_key, intent, margin_est, state="pending")
     except risk_reservation.ReservationExceeded as exc:
@@ -1085,6 +1128,38 @@ def route_and_reserve_signal(inst_id: str, side: str, size: float, price: float,
     return {"ok": True, "error": None, "venue": venue, "decision": payload,
             "reservation": {"manager": mgr, "account_key": account_key,
                             "intent_id": intent, "amount_usdt": margin_est}}
+
+
+def confirm_signal_reservation(reservation: Dict[str, Any]) -> None:
+    """审计④6(2026-09-13)：成交后把预算预留 pending→confirmed（仍占预算直至终态）。
+    旧调用点用 except:pass 吞掉了「confirm 方法不存在」的 AttributeError——每次成交必
+    抛必吞、状态字段永远说谎。现方法已在 RiskReservationManager 补齐；失败仍不阻断
+    交易主流程，但必须可见（预算由 TTL/recovery 兜底对账）。"""
+    if not isinstance(reservation, dict):
+        return
+    try:
+        reservation["manager"].confirm(reservation["account_key"], reservation["intent_id"])
+    except Exception as exc:
+        print(f"[预算预留] warn confirmed 状态推进失败（预算仍占用，对账兜底）: {exc}")
+
+
+def portfolio_budget_guard(budget_total: float, budget_used: float, margin_est: float,
+                           environment: str = "") -> Optional[str]:
+    """审计③：跨所合算总闸的可测纯函数。返回 None=放行；返回 str=拒绝理由。
+    语义：budget_total<=0 → 不封顶（保持既有 0=无顶默认）；>0 时按 gross_exposure
+    已占用 + 本笔保证金估算 与总预算比较（1e-9 浮点容差）。"""
+    try:
+        bt = float(budget_total or 0.0)
+        bu = float(budget_used or 0.0)
+        me = float(margin_est or 0.0)
+    except (TypeError, ValueError):
+        return "预算数值不可解析，fail-closed 拒绝下单"
+    if bt <= 0:
+        return None
+    if me > 0 and bu + me > bt + 1e-9:
+        return (f"组合预算（跨所合算）用尽：已占 {bu:.2f}U + 本笔 {me:.2f}U "
+                f"> 总预算 {bt:.2f}U（环境 {environment}）")
+    return None
 
 
 def release_signal_reservation(reservation: Dict[str, Any], reason: str = "") -> None:
@@ -1243,17 +1318,27 @@ def submit_protected_limit_order(inst_id: str, side: str, pos_side: str, size: f
     effective_tp = tp_px
     effective_sl = sl_px
 
+    # 审计④(2026-09-13)：现价单次读取，demo rescale 与幻觉锚共用——两次读可互相
+    # 错位，且旧代码只有 simulated+okx 才取价，live/外所永远拿不到锚（裸奔真身）。
+    _tick_last_raw = None
+    _anchor_last = 0.0
+    try:
+        _tick_last_raw = (fetch_ticker(inst_id) or {}).get("last")
+        if _tick_last_raw:
+            _anchor_last = float(_tick_last_raw)
+    except Exception as _ae:
+        print(f"[价格锚定] warn 现价获取失败，本单跳过锚定/rescale: {_ae}")
+
     if env.simulated and target_venue == "okx":
         try:
-            demo_ticker = fetch_ticker(inst_id)
-            if demo_ticker and demo_ticker.get("last"):
-                demo_last = float(demo_ticker["last"])
+            demo_last = _anchor_last
+            if demo_last:
                 if demo_last > 0 and price > 0:
                     divergence = abs(price - demo_last) / demo_last
                     # If live market price diverged from demo sandbox by more than 5% (e.g. ASTER / illiquid demo pair)
                     if divergence > 0.05:
                         scale = demo_last / price
-                        prec = len(str(demo_ticker["last"]).split(".")[1]) if "." in str(demo_ticker["last"]) else 4
+                        prec = len(str(_tick_last_raw).split(".")[1]) if "." in str(_tick_last_raw) else 4
                         effective_px = round(price * scale, prec)
                         effective_tp = round(tp_px * scale, prec)
                         effective_sl = round(sl_px * scale, prec)
@@ -1279,6 +1364,31 @@ def submit_protected_limit_order(inst_id: str, side: str, pos_side: str, size: f
         print(f"[Order Rejected] 最终有效开仓报价未通过核心安全复验: {reason} (px={effective_px}, tp={effective_tp}, sl={effective_sl})")
         release_signal_reservation(_reservation, "核心安全复验拒绝")
         return False, f"最终订单核心安全复验拒绝: {reason}"
+
+    # 审计④(2026-09-13)：LLM 幻觉入场价锚定——几何/R:R 只验 entry/tp/sl 相互关系，
+    # 从不比对现价。危险形态是「穿价」：BUY 限价挂在现价上方 → 即时成交于意外价，
+    # 而配套 SL 触发价锚在幻觉 entry 上、相对真实成交价可能即刻触发 → 开-秒平循环
+    # 放血（demo+okx 有 5% rescale 兜底，live 与外所此前裸奔）。回踩方向的远挂单
+    # 是合法策略（不穿价即放行，OKX 侧 4 分钟超时撤兜底）。_anchor_last 来自上方
+    # 单次读价；取价失败不阻断（行情断时黑天鹅哨兵/熔断已另行 fail-closed），但必吼。
+    if _anchor_last > 0 and effective_px > 0:
+        _cross_pct = float(os.getenv("R20_MAX_PRICE_CROSS_PCT", "0.005") or 0.005)
+        _far_pct = float(os.getenv("R20_MAX_PRICE_FAR_PCT", "0.50") or 0.50)
+        if action_type == "BUY_LONG" and effective_px > _anchor_last * (1.0 + _cross_pct):
+            _rej = f"入场价穿价幻觉：BUY 限价 {effective_px:g} 高于现价 {_anchor_last:g} 超阈值({max(0.0,(effective_px/_anchor_last-1)*100):.2f}%>{_cross_pct*100:.1f}%)，将即时成交于意外价且 SL 锚点失真"
+            print(f"[价格锚定] 拒单 {inst_id}: {_rej}")
+            release_signal_reservation(_reservation, "价格锚定拒绝")
+            return False, f"价格锚定拒绝: {_rej}"
+        if action_type == "SELL_SHORT" and effective_px < _anchor_last * (1.0 - _cross_pct):
+            _rej = f"入场价穿价幻觉：SELL 限价 {effective_px:g} 低于现价 {_anchor_last:g} 超阈值({max(0.0,(1-effective_px/_anchor_last)*100):.2f}%>{_cross_pct*100:.1f}%)，将即时成交于意外价且 SL 锚点失真"
+            print(f"[价格锚定] 拒单 {inst_id}: {_rej}")
+            release_signal_reservation(_reservation, "价格锚定拒绝")
+            return False, f"价格锚定拒绝: {_rej}"
+        if abs(effective_px - _anchor_last) / _anchor_last > _far_pct:
+            _rej = f"入场价与现价距离 {abs(effective_px/_anchor_last-1)*100:.1f}% 超荒谬阈值 {_far_pct*100:.0f}%，判定为幻觉报价拒单"
+            print(f"[价格锚定] 拒单 {inst_id}: {_rej}")
+            release_signal_reservation(_reservation, "价格锚定拒绝")
+            return False, f"价格锚定拒绝: {_rej}"
 
     # 多所平权执行：若路由选定 Gate 或 Binance，走统一原生受保护执行路由
     if target_venue in ("gate", "binance"):
@@ -1308,11 +1418,7 @@ def submit_protected_limit_order(inst_id: str, side: str, pos_side: str, size: f
 
             order_id = str(res.get("order_id") or res.get("tp_id") or f"{target_venue}-ok")
             record_open_intent(inst_id, side)
-            if _reservation:
-                try:
-                    _reservation["manager"].confirm(_reservation["account_key"], _reservation["intent_id"])
-                except Exception:
-                    pass
+            confirm_signal_reservation(_reservation)
             return True, order_id
         except Exception as exc:
             release_signal_reservation(_reservation, f"多所执行异常: {exc}")
@@ -1336,11 +1442,7 @@ def submit_protected_limit_order(inst_id: str, side: str, pos_side: str, size: f
         release_signal_reservation(_reservation, "交易所未返回可核验订单号")
         return False, "exchange accepted response without a verifiable order id"
     record_open_intent(inst_id, side)
-    if _reservation:
-        try:
-            _reservation["manager"].confirm(_reservation["account_key"], _reservation["intent_id"])
-        except Exception:
-            pass
+    confirm_signal_reservation(_reservation)
     return True, str(order_id)
 
 

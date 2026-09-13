@@ -203,6 +203,13 @@ class RiskReservationManager:
             raise ReservationError(f"release 只接受终态 {sorted(TERMINAL_STATES)}")
         return self.reserve(account_key, intent_id, 0.0, state)
 
+    def confirm(self, account_key, intent_id: str) -> dict:
+        """审计④6(2026-09-13)：成交后 pending→confirmed 状态推进（语义糖，镜像
+        release）。confirmed 仍占预算直到终态——这是设计本意（§6 状态机）。
+        trader 旧调用点因本方法从未存在而每次抛 AttributeError 被 except:pass 吞掉，
+        台账状态字段永远说谎。amount 传 0.0 = 保持原预留额不变（见 reserve 差额逻辑）。"""
+        return self.reserve(account_key, intent_id, 0.0, STATE_CONFIRMED)
+
     # ---- 组合查询 ----
     def total_reserved(self, account_key) -> float:
         """单 AccountKey 维度的当前占用合计（released=0，含 pending_cleanup）。"""

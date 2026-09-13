@@ -34,6 +34,12 @@ class SubmitProtectedLimitOrderTests(unittest.TestCase):
         ip = patch.object(aft, "OPEN_INTENT_FILE", tmp.name)
         ip.start()
         self.addCleanup(ip.stop)
+        # 审计④后 submit 统一单次读现价（demo rescale+幻觉锚共用）——本文件封第三缝，
+        # 现价=被测价，锚恒平；divergence 用例自带 patch 会嵌套覆盖。
+        tp_ = patch.object(aft, "fetch_ticker",
+                           lambda inst_id=None, **kw: {"last": "100.0"})
+        tp_.start()
+        self.addCleanup(tp_.stop)
 
     @patch("scripts.ai_factor_trader.okx_rest")
     @patch("scripts.ai_factor_trader.current_environment")

@@ -49,6 +49,30 @@ def _ledger_sync_failed_venues(max_age_seconds: float = 2700.0) -> list[str]:
 STOP_COOLDOWN_FILE = DATA_DIR / "stop_cooldowns.json"
 
 
+def ledger_daily_closed_pnl(ledger, environment_mode: str, today_str: str) -> float:
+    """审计④1(2026-09-13) 单一事实源：当日已平仓盈亏求和必须带环境轴。
+    台账行自带 environment 标签（sync_full_ledger 写入），demo↔live 切换当天若不
+    过滤，两环境盈亏互相抵消/虚增可让熔断假阴性。规则：
+    - 行环境与当前环境明确不同 → 剔除；
+    - 行缺环境标签（历史旧行）或当前环境拿不到 → 保守计入（宁停不漏，与
+      本模块「不可判定=不放松」纪律一致，绝不静默放宽）。"""
+    want = str(environment_mode or "").strip().lower()
+    total = 0.0
+    for t in ledger:
+        try:
+            if t.get("status") != "closed":
+                continue
+            if beijing_day(t.get("close_time")) != today_str:
+                continue
+            row_env = str(t.get("environment") or "").strip().lower()
+            if row_env and want and row_env != want:
+                continue
+            total += float(t.get("pnl", 0) or 0)
+        except (TypeError, ValueError):
+            continue
+    return total
+
+
 def load_stop_cooldowns() -> Dict[str, Any]:
     if STOP_COOLDOWN_FILE.exists():
         try:
@@ -150,11 +174,12 @@ def is_circuit_breaker_active(usdt_available: Optional[float] = None, fetch_cand
                 ledger = json.load(f)
             tz_bj = datetime.timezone(datetime.timedelta(hours=8))
             today_str = datetime.datetime.now(tz_bj).strftime("%Y-%m-%d")
-            today_pnl = sum(
-                float(t.get("pnl", 0) or 0)
-                for t in ledger
-                if t.get("status") == "closed" and beijing_day(t.get("close_time")) == today_str
-            )
+            try:
+                from scripts.okx_runtime import current_environment
+                _mode = str(current_environment().mode or "")
+            except Exception:
+                _mode = ""  # 环境不可判 → ledger_daily_closed_pnl 保守全计
+            today_pnl = ledger_daily_closed_pnl(ledger, _mode, today_str)
             _loss_cap = effective_daily_loss_limit(usdt_available)
             if today_pnl < -_loss_cap:
                 return True, f"今日累计回撤 ({today_pnl:.2f}U) 触及单日最大风控熔断限额 ({_loss_cap}U｜按可用余额自适应)"

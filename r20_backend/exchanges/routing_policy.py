@@ -41,34 +41,42 @@ from .registry import (execution_open, gate_environment_axis,
 ROOT = Path(__file__).resolve().parents[2]
 ROUTING_FILE = ROOT / "data" / "venue_routing.json"
 
-DEFAULT_GATE_POOL: Dict[str, Any] = {
-    "assets": [],
-    "margin_per_trade_usdt": 50.0,
-    "max_open": 5,
-    "min_confidence": 72.0,
-    "dry_run": True,
-}
+# 审计②1(2026-09-13)：默认池数值不得再硬编码——与 global_risk_defaults 派生同源
+# （旧值 50/72 是 ImportError 静默 fallback 的化石，风控收紧对它无效）。
+# DEFAULT_GATE_POOL 在 global_risk_defaults() 定义后计算（见下方）。
 
 
 def global_risk_defaults() -> Dict[str, Any]:
     """单一事实源风控基线（来自 scripts/risk_constants.py 与 .env）。"""
     try:
+        # 审计②1(2026-09-13)：原名 MAX_CONCURRENT_POSITIONS 不存在（真名 *_CAP），
+        # ImportError 100% 发生却被宽 except 静默吞成硬编码值——「单一事实源」从未生效。
         from scripts.risk_constants import (
-            MAX_CONCURRENT_POSITIONS,
+            MAX_CONCURRENT_POSITIONS_CAP,
             MAX_SINGLE_ASSET_MARGIN,
             MIN_ENTRY_CONFIDENCE,
         )
         return {
             "margin_per_trade_usdt": float(MAX_SINGLE_ASSET_MARGIN or 50.0),
-            "max_open": int(MAX_CONCURRENT_POSITIONS or 5),
+            "max_open": int(MAX_CONCURRENT_POSITIONS_CAP or 5),
             "min_confidence": float(MIN_ENTRY_CONFIDENCE or 72.0),
         }
-    except Exception:
+    except Exception as exc:
+        # 兜底不再静默：外所池会退到保守硬编码（50U/5笔/72），必须吼出来。
+        print(f"[routing_policy] warn 风控单一事实源导入失败，外所池回退保守硬编码值: {exc!r}")
         return {
             "margin_per_trade_usdt": 50.0,
             "max_open": 5,
             "min_confidence": 72.0,
         }
+
+
+DEFAULT_GATE_POOL: Dict[str, Any] = {
+    "assets": [],
+    **{k: global_risk_defaults()[k]
+       for k in ("margin_per_trade_usdt", "max_open", "min_confidence")},
+    "dry_run": True,
+}
 
 
 def load_venue_pool(venue: str) -> Dict[str, Any]:

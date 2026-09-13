@@ -102,7 +102,7 @@ class _WiringSandbox(unittest.TestCase):
                 size=10.0, price=100.0, tp=115.0, sl=95.0, notional=300.0,
                 margin=60.0, intent="BTC:i1", limit=None, preferred="auto",
                 executable=None, env=None, health=None, mode="auto",
-                listing_check=None):
+                listing_check=None, anchor=True):
         """跑一次真实 submit_protected_limit_order；返回 (ok, ref)。"""
         if limit:
             # 总上限的单一事实源是 env（trader 读它建 manager）
@@ -126,6 +126,11 @@ class _WiringSandbox(unittest.TestCase):
             patch.object(trader, "reservation_manager", lambda: mgr),
             patch.object(listing_mod, "ensure_contract_listed", listing_check or _ok_listing),
             patch.object(trader.okx_rest, "place_order", self._on_place),
+            # 审计④后 submit 路径会读现价做幻觉锚校验；本文件用符号价（100/60U 等）
+            # 测试路由与预算，锚必须打平到被测价本身——同时恢复法① hermetic（旧版
+            # fetch_ticker 未 mock，靠网络失败被 try/except 吞掉才没炸测试）。
+            patch.object(trader, "fetch_ticker",
+                         lambda inst_id=None, **kw: ({"last": price} if anchor else None)),
         ]
         if executable is not None:
             patches.append(patch.object(trader, "venue_execution_ready",
@@ -312,14 +317,15 @@ class TestBudgetReservation(_WiringSandbox):
         ok2, ref2 = self._submit(inst_id="ETH-USDT-SWAP", intent="ETH:i2",
                                  margin=60.0, limit=100.0)
         self.assertFalse(ok2)
-        self.assertTrue(ref2.startswith("预算预留拒绝: "), ref2)
-        self.assertEqual(self.calls, [], "ReservationExceeded 必须不打下单端点")
+        # 审计③后跨所合算总闸先于 sqlite 逐所闸拦截（同限额下语义等价、消息更诚实）
+        self.assertTrue(ref2.startswith(("预算预留拒绝: ", "组合预算")), ref2)
+        self.assertEqual(self.calls, [], "预算拒绝必须不打下单端点")
         self.assertIn("本轮不下单", self.out)
         vd = self._venue_decision("ETH-USDT-SWAP")
-        self.assertEqual(vd["outcome"], "budget_rejected")
+        self.assertIn(vd["outcome"], ("budget_rejected", "portfolio_budget_exceeded"))
         self.assertEqual(vd["budget"]["limit_usdt"], 100.0)
         self.assertEqual(vd["budget"]["reserved_before_usdt"], 60.0)
-        self.assertIn("预算越界", vd["budget"]["error"])
+        self.assertIn("预算", vd["budget"]["error"])
         self.assertEqual(self.mgr.total_reserved(ACCOUNT_OKX_LIVE), 60.0,
                          "被拒的一笔不得占用预算")
 
@@ -331,8 +337,9 @@ class TestBudgetReservation(_WiringSandbox):
         self.assertEqual(self.mgr.total_reserved(ACCOUNT_OKX_LIVE), 60.0,
                          "同 intent_id 重投幂等，绝不二次占用")
         row = self.mgr.reservations()[0]
-        self.assertEqual(row["state"], risk_reservation.STATE_PENDING,
-                         "已受理未成交保持 pending 占用（不提前释放）")
+        self.assertEqual(row["state"], risk_reservation.STATE_CONFIRMED,
+                         "审计④6：confirm 状态机已真实接线（曾 AttributeError 被吞永远 pending）；"
+                         "confirmed 仍占预算，语义与「不提前释放」一致")
 
     def test_reservation_released_when_order_not_accepted(self):
         self._write_cache(["BTC-USDT-SWAP"])
@@ -349,6 +356,8 @@ class TestBudgetReservation(_WiringSandbox):
                 patch.object(trader, "selected_environment", lambda values=None: _FakeEnv()), \
                 patch.object(trader, "reservation_manager", lambda: mgr), \
                 patch.object(listing_mod, "ensure_contract_listed", _ok_listing), \
+                patch.object(trader, "fetch_ticker",
+                             lambda inst_id=None, **kw: {"last": 100.0}), \
                 patch.object(trader.okx_rest, "place_order", boom):
             buf = io.StringIO()
             with redirect_stdout(buf):
