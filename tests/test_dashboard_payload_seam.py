@@ -217,6 +217,40 @@ class ShellDisciplineTests(unittest.TestCase):
                               for v in vars(app).values())]
         self.assertEqual(missing, [], f"这些域模块未被 dashboard.app 导入，沙箱覆盖不到: {missing}")
 
+    # ── 4b. 迁移完整性：导入的 _core_* 别名必须真的被调用 ──────────
+    def test_every_core_alias_is_used(self):
+        """门面导入的每个 `_core_*` 别名，必须在 dashboard/app.py 里被**真正引用**。
+
+        来历：第九刀替换 Phase 2 段落时，替换区间误把夹在中间的
+        「2.5 Multi-Venue Parity」调用点一并删掉 —— 导入语句还在、函数也还在，
+        只是再也没人调用它。症状极其隐蔽：接口仍 200、载荷结构完整，
+        只有 binance/gate 的持仓**静默消失**（该段整体被 try/except 包着，
+        连异常都不会有）。
+
+        实测是靠"直调适配器返回 2 条仓位 vs 线上 payload 0 条"才坐实的，
+        故这里把它钉死：只导入不调用 = 迁移没做完。
+        """
+        src = (ROOT / "dashboard" / "app.py").read_text(encoding="utf-8")
+        # 按 AST 行号精确剔除导入语句本身（含括号多行形态），再数引用
+        tree = ast.parse(src)
+        drop: set[int] = set()
+        for node in tree.body:
+            if isinstance(node, ast.ImportFrom) and (node.module or "").startswith(
+                    "r20_backend.dashboard_payload"):
+                drop.update(range(node.lineno, (node.end_lineno or node.lineno) + 1))
+        body = "\n".join(
+            line for i, line in enumerate(src.splitlines(), 1) if i not in drop
+        )
+        unused = []
+        for alias in sorted(self.aliases):
+            if alias not in body:
+                unused.append(alias)
+        self.assertEqual(
+            unused, [],
+            "这些 _core_* 别名只被导入、在 dashboard/app.py 里从不引用 —— "
+            "很可能是替换段落时把调用点一起删掉了（静默丢失该域数据）: " + str(unused),
+        )
+
     # ── 5. 公开面 ─────────────────────────────────────────────
     def test_facade_surface_intact(self):
         missing = [n for n in FACADE_SURFACE if not hasattr(app, n)]

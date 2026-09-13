@@ -9,6 +9,12 @@ from r20_backend.dashboard_payload.cache import (  # noqa: E402
     persist_dashboard_cache as _core_persist_dashboard_cache,
     _inject_local_data_into_stale as _core__inject_local_data_into_stale,
 )
+from r20_backend.dashboard_payload.algo_protection import (  # noqa: E402
+    collect_algo_protection as _core_collect_algo_protection,
+)
+from r20_backend.dashboard_payload.reset_state import (  # noqa: E402
+    read_reset_initial_state as _core_read_reset_initial_state,
+)
 from r20_backend.dashboard_payload.factors_view import (  # noqa: E402
     build_factors_list as _core_build_factors_list,
 )
@@ -470,71 +476,15 @@ def update_cache_cycle():
         return
 
     # Parallel Phase 2: Exchange algo orders for live TP/SL protection
-    if positions:
-        with ThreadPoolExecutor(max_workers=min(len(positions), 6)) as pool:
-            futures = {
-                pos["instId"]: pool.submit(
-                    _fetch_json,
-                    okx_rest.pending_algo_orders,
-                    pos["instId"],
-                )
-                for pos in positions
-            }
-            algo_results = {inst_id: f.result() for inst_id, f in futures.items()}
-
-        for position in positions:
-            algo_ok, algo_orders, algo_error = algo_results.get(position["instId"], (False, [], "timeout"))
-            if not algo_ok:
-                source_errors.append(f"algo {position['instId']}: {algo_error}")
-                algo_orders = []
-            matching_algos = [
-                o for o in (algo_orders or [])
-                if str(o.get("state", "live")).lower() in {"live", "effective"}
-                and str(o.get("posSide", "net")).lower() in {position["posSide"], "net"}
-                and str(o.get("reduceOnly", "true")).lower() in {"true", "1", "yes"}
-            ]
-            protected_size = sum(float(o.get("sz", 0) or 0) for o in matching_algos if o.get("slTriggerPx"))
-            full_coverage = protected_size >= float(position["pos_sz"]) * 0.999
-            live_algo = next((o for o in matching_algos if o.get("slTriggerPx") and o.get("tpTriggerPx")), None)
-            if live_algo and full_coverage:
-                position["exchangeSl"] = float(live_algo.get("slTriggerPx", 0) or 0)
-                position["exchangeTp"] = float(live_algo.get("tpTriggerPx", 0) or 0)
-                position["protectionStatus"] = "fully_protected"
-                position["protectionCoveragePct"] = 100.0
-                position["protectionAlgoId"] = live_algo.get("algoId", "")
-            elif matching_algos:
-                sl_algo = next((o for o in matching_algos if o.get("slTriggerPx")), {})
-                position["exchangeSl"] = float(sl_algo.get("slTriggerPx", 0) or 0) or None
-                position["exchangeTp"] = float(sl_algo.get("tpTriggerPx", 0) or 0) or None
-                position["protectionStatus"] = "partially_protected"
-                position["protectionCoveragePct"] = round(min(100.0, protected_size / max(position["pos_sz"], 1e-12) * 100), 1)
-                position["protectionAlgoId"] = sl_algo.get("algoId", "")
-            else:
-                position["exchangeSl"] = None
-                position["exchangeTp"] = None
-                position["protectionStatus"] = "unprotected"
-                position["protectionCoveragePct"] = 0.0
-                position["protectionAlgoId"] = ""
-    else:
-        algo_results = {}
-
-    enrich_position_risk_fields(positions, trackers)
-
+    # （阶段 2·B2 第九刀：迁至 dashboard_payload/algo_protection.py）
+    _core_collect_algo_protection(positions, source_errors, _fetch_json,
+                                  enrich_position_risk_fields, trackers)
     # 2.5 Multi-Venue Parity: Aggregate active positions & open orders from Binance & Gate
     # （阶段 2·B2 第七刀：整段迁至 dashboard_payload/multi_venue.py）
     long_count, short_count, total_pos_upl = _core_collect_cross_venue_positions(
         positions, pending_orders_list, long_count, short_count, total_pos_upl)
-    # 3. Read Reset Initial State
-    account_init_file = os.path.join(DATA_DIR, "account_initial_state.json")
-    reset_time_str = "1970-01-01 00:00:00"
-    initial_capital_val = float(os.getenv("INITIAL_CAPITAL", "10000.0"))
-    acc_init = read_json(account_init_file, {})
-    try:
-        reset_time_str = acc_init.get("reset_time", "1970-01-01 00:00:00")
-        initial_capital_val = float(acc_init.get("initial_capital", 10000.0) or 10000.0)
-    except Exception:
-        pass
-
+    # 3. Read Reset Initial State（阶段 2·B2 第九刀：迁至 dashboard_payload/reset_state.py）
+    reset_time_str, initial_capital_val = _core_read_reset_initial_state(DATA_DIR)
     # 4. Load Bills and Real Order-Level Ledger
     bills_ok, bills_data, bills_error = _fetch_json(okx_rest.bills, limit=100)
     if not bills_ok:
