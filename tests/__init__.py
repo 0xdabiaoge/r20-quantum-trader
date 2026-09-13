@@ -46,3 +46,28 @@ from scripts.risk_constants import RISK_ENV_KEYS as _RISK_KEYS  # noqa: E402
 
 assert set(_RISK_KEYS) == set(_RISK_KEYS_STATIC), (
     "tests/__init__.py 的静态风控键表与 scripts/risk_constants.RISK_ENV_KEYS 漂移，请同步")
+
+# 律①续（批1 P0-2 配套，2026-09-13）：settings_store.ENV_FILE 默认指向仓库根 .env，
+# 而 config_sandbox.isolate_config 只重定向 data/ 下的路径——于是**任何**走
+# update_env/remove_env 的测试都会真实改写生产 .env（实测：test_policy_snapshot_isolated
+# 的 rollback 流程在 23:19 重写了根 .env，只是值恰好与线上相同才没出事故；
+# settings_store 加 flock 后还会在仓库根留下 ..env.lock）。
+# 这里上硬闸：测试进程内 ENV_FILE 仍指向仓库根 .env 时，写操作直接失败，
+# 逼调用方显式沙箱化（`patch.object(settings_store, "ENV_FILE", tmp)`）。
+import r20_backend.settings_store as _settings_store  # noqa: E402
+
+_REAL_ENV_FILE = _settings_store.ENV_FILE
+
+
+def _sandbox_required(original, name):
+    def guarded(*args, **kwargs):
+        if _settings_store.ENV_FILE == _REAL_ENV_FILE:
+            raise AssertionError(
+                f"测试禁止写生产配置 {_REAL_ENV_FILE}（{name}）——"
+                "请先把 settings_store.ENV_FILE 指向临时文件")
+        return original(*args, **kwargs)
+    return guarded
+
+
+_settings_store.update_env = _sandbox_required(_settings_store.update_env, "update_env")
+_settings_store.remove_env = _sandbox_required(_settings_store.remove_env, "remove_env")

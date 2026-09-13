@@ -64,6 +64,17 @@ class TestA1AdminRuntimeWhitelist(unittest.TestCase):
 
 
 class TestA2MaskedWriteback(unittest.TestCase):
+    def setUp(self) -> None:
+        # 批1 P0-2 配套：toggle_channel 会调 gwmod.update_env（真实 settings_store），
+        # 此前直接把测试 URL 写进生产 .env（tests/__init__ 的写闸现已拦下）→ 显式沙箱化。
+        import r20_backend.settings_store as settings_store
+        self._env_tmp = tempfile.TemporaryDirectory(prefix="r20-gwtest-")
+        self.addCleanup(self._env_tmp.cleanup)
+        self._env_patcher = patch.object(settings_store, "ENV_FILE",
+                                        Path(self._env_tmp.name) / ".env")
+        self._env_patcher.start()
+        self.addCleanup(self._env_patcher.stop)
+
     def test_is_masked_detects_both_shapes(self):
         self.assertTrue(is_masked(mask("abcdefg1234567")))
         self.assertTrue(is_masked(mask_url("https://x.example/hook?key=supersecret9")))

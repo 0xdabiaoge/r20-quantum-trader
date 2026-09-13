@@ -31,6 +31,9 @@ ENV/
 # Sensitive & Secret Credentials (CRITICAL)
 .env
 .env.local
+# file_locks.file_lock() 的锁文件：.env 的锁名是 ..env.lock（仓根会出现，属运行时产物）
+..env.lock
+.env.lock
 .okx/
 .agents/
 agent/

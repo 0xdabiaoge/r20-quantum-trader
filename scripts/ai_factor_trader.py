@@ -217,6 +217,49 @@ def max_size_within_margin(usdt_available: float, leverage: float, price: float,
     max_margin = float(usdt_available) * MAX_MARGIN_EQUITY_RATIO
     raw = (max_margin * max(1.0, float(leverage or 1.0))) / (float(price) * float(ct_val))
     return quantize_size(raw, min_sz)
+
+
+def order_margin_gate(planned_margin: float, *, size: float, price: float, ct_val: float,
+                      leverage: float, usdt_available: float) -> float:
+    """多所（gate/binance）下单保证金闸门 —— 与 OKX 路径同一把尺。
+
+    审计 P0-1(2026-09-13)：多所路径此前把 AI 原始 `margin_usdt` 直接透传
+    `execution_router.open_protected_position`，而该模块用 `notional = margin × leverage`
+    反推张数（execution_router.py:112），**全文件 0 处引用 risk_constants** →
+    OKX 路径那套「可用余额占比硬顶 / 单标的绝对封顶 / 已夹张数隐含额」在自家所
+    全部失效。实证：账本 `holding_binance_ALGO_多` margin=3011.1U（≈权益 60%），
+    而配置硬顶为 20%（≈997U）与单标的绝对封顶 600U。
+
+    生效口径 = min(AI 计划额, 执行层已夹张数隐含保证金, 权益×占比, 单标的绝对封顶)。
+    权益不可得（缺失≠0）时不臆造占比上限，但仍受绝对封顶与张数隐含额约束。
+    """
+    lev = max(1.0, float(leverage or 1.0))
+    try:
+        size_implied = max(0.0, float(size) * float(ct_val) * float(price)) / lev
+    except (TypeError, ValueError):
+        size_implied = 0.0
+    try:
+        planned = max(0.0, float(planned_margin or 0.0))
+    except (TypeError, ValueError):
+        planned = 0.0
+    caps = [c for c in (planned if planned > 0 else size_implied, size_implied,
+                        float(MAX_SINGLE_ASSET_MARGIN or 0.0)) if c > 0]
+    try:
+        equity = float(usdt_available or 0.0)
+    except (TypeError, ValueError):
+        equity = 0.0
+    if equity > 0:
+        caps.append(equity * MAX_MARGIN_EQUITY_RATIO)
+    return round(min(caps), 4) if caps else 0.0
+
+
+def equity_margin_cap(usdt_available: float) -> float:
+    """权益占比硬顶（0 = 权益不可得 → 不臆造上限，仅由绝对封顶兜底）。"""
+    try:
+        equity = float(usdt_available or 0.0)
+    except (TypeError, ValueError):
+        return 0.0
+    return round(equity * MAX_MARGIN_EQUITY_RATIO, 4) if equity > 0 else 0.0
 # MIN_SCALE_IN_CONFIDENCE (顺势加仓最低 AI 置信度) 由 risk_constants 单一事实源注入
 
 def is_tradfi_market_liquid(asset_type: str) -> bool:
@@ -1594,6 +1637,8 @@ def submit_protected_limit_order(inst_id: str, side: str, pos_side: str, size: f
                 "asset": asset_canonical,
                 "action": action_type,
                 "margin_usdt": margin_val,
+                # 审计 P0-1：把权益占比顶一并下传，router 侧再兜一层（本处已夹过）
+                "max_margin_usdt": float(venue_ctx.get("max_margin_usdt") or 0.0),
                 "leverage": lever_val,
                 "entry_price": effective_px,
                 "take_profit_price": effective_tp,
@@ -3284,10 +3329,15 @@ def execute_portfolio():
                     # US-003 决策面上下文：名义额（选所硬筛/深度需求）+ 保证金估算
                     # （预算预留额）+ 意图号（同一条 AI 决策重投幂等，不重复占预算）
                     _notional = actual_sz * ct_val * limit_px
+                    # 审计 P0-1：多所路径保证金与 OKX 同尺（AI 计划额 ∩ 张数隐含额 ∩ 权益占比 ∩ 单标的封顶）
+                    _order_margin = order_margin_gate(
+                        ai_margin, size=actual_sz, price=limit_px, ct_val=ct_val,
+                        leverage=ai_lever, usdt_available=usdt_available)
                     accepted, order_ref = submit_protected_limit_order(
                         inst_id, "buy", "long", actual_sz, limit_px, tp_px, sl_px,
                         venue_ctx={"notional_usdt": _notional,
-                                   "margin_usdt": ai_margin if ai_margin > 0 else (_notional / max(1.0, ai_lever)),
+                                   "margin_usdt": _order_margin,
+                                   "max_margin_usdt": equity_margin_cap(usdt_available),
                                    "leverage": ai_lever,
                                    "intent_id": f"{inst_id}:BUY_LONG:{int(ai_info.get('timestamp') or time.time())}"})
                     if accepted:
@@ -3392,10 +3442,15 @@ def execute_portfolio():
 
                     # US-003 决策面上下文（与多单同构：名义额/保证金估算/幂等意图号）
                     _notional = actual_sz * ct_val * limit_px
+                    # 审计 P0-1：与多单同尺（空单不允许绕过保证金闸门）
+                    _order_margin = order_margin_gate(
+                        ai_margin, size=actual_sz, price=limit_px, ct_val=ct_val,
+                        leverage=ai_lever, usdt_available=usdt_available)
                     accepted, order_ref = submit_protected_limit_order(
                         inst_id, "sell", "short", actual_sz, limit_px, tp_px, sl_px,
                         venue_ctx={"notional_usdt": _notional,
-                                   "margin_usdt": ai_margin if ai_margin > 0 else (_notional / max(1.0, ai_lever)),
+                                   "margin_usdt": _order_margin,
+                                   "max_margin_usdt": equity_margin_cap(usdt_available),
                                    "leverage": ai_lever,
                                    "intent_id": f"{inst_id}:SELL_SHORT:{int(ai_info.get('timestamp') or time.time())}"})
                     if accepted:

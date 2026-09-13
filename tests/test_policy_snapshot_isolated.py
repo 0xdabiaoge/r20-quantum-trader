@@ -32,6 +32,17 @@ class TestPolicySnapshotIsolated(unittest.TestCase):
     def setUp(self) -> None:
         from tests.config_sandbox import isolate_config
         isolate_config(self)
+        # 批1 P0-2 配套：本文件的 rollback 用例会经 _apply_package 恢复 risk_config →
+        # settings_store.update_env 写 .env，而 ENV_FILE 不在 data/ 下、isolate_config
+        # 不管它（实测会改写生产 .env）→ 必须显式沙箱化。
+        import tempfile
+        from unittest.mock import patch
+        import r20_backend.settings_store as settings_store
+        env_tmp = tempfile.TemporaryDirectory(prefix="r20-policytest-")
+        self.addCleanup(env_tmp.cleanup)
+        env_patcher = patch.object(settings_store, "ENV_FILE", Path(env_tmp.name) / ".env")
+        env_patcher.start()
+        self.addCleanup(env_patcher.stop)
         self.base_prompt_profile: Dict[str, Any] = {
             "id": "stable",
             "name": "全维度波段强化版",

@@ -21,7 +21,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Mapping, Optional
 
 try:
     import fcntl
@@ -365,6 +365,126 @@ def format_policy_snapshot_summary(snapshot: Dict[str, Any]) -> str:
 
 
 # =========================================================================
+# 归档包标识（审计 P0-3，2026-09-13）
+# =========================================================================
+# 病灶：policy_hash 只覆盖 4 个单元（提示词/心法/拦截器/委员会），而归档包实际装 6 个
+# （另含 risk_config 与 venue_routing），归档文件名却只用 policy_hash 命名 →
+# **仅风控/路由不同的两个版本被判为同一版本**，第二次归档静默覆盖第一次；
+# 回滚后的哈希校验也因此对风控/路由的恢复失败完全失明。
+# 修复：另算一个「整包标识」用于文件命名与恢复后校验，并对易变字段做规范化
+# （时间戳/评分/revision 每次写都会变，绝不能进标识，否则校验必然误报）。
+_PACKAGE_UNITS = ("prompt_config", "evolution_memory", "interceptor_config",
+                  "council_config", "risk_config", "venue_routing")
+_TEMPLATE_KEYS = ("trading_system", "trading_user", "evolution_system", "evolution_user")
+_PROFILE_IDENTITY_FIELDS = ("id", "name", "description", "enabled", "editor_mode",
+                            "simple_policy", "pipelines", *_TEMPLATE_KEYS)
+_COUNCIL_ROLE_FIELDS = ("id", "name", "role_title", "enabled", "is_arbitrator", "prompt",
+                        "weight", "temperature", "reasoning_effort", "model_id")
+
+
+def _canon_prompt_config(cfg: Any) -> Any:
+    if not isinstance(cfg, dict):
+        return cfg or {}
+    profiles = cfg.get("profiles") if isinstance(cfg.get("profiles"), dict) else {}
+    return {
+        "active_profile_id": cfg.get("active_profile_id"),
+        "active_style": cfg.get("active_style"),
+        "profiles": {
+            str(pid): {k: prof.get(k) for k in _PROFILE_IDENTITY_FIELDS}
+            for pid, prof in sorted(profiles.items()) if isinstance(prof, dict)
+        },
+    }
+
+
+def _canon_evolution_memory(mem: Any) -> Any:
+    lessons = mem
+    if isinstance(mem, dict):
+        lessons = mem.get("lessons") if isinstance(mem.get("lessons"), list) else []
+    elif not isinstance(mem, list):
+        return []
+    out = []
+    for item in lessons:
+        if isinstance(item, dict):
+            out.append({k: item.get(k) for k in ("id", "category", "rule_text", "enabled", "is_baseline")})
+        else:
+            out.append(str(item))
+    return out
+
+
+def _canon_council_config(cfg: Any) -> Any:
+    if not isinstance(cfg, dict):
+        return cfg or {}
+    roles = cfg.get("roles") if isinstance(cfg.get("roles"), dict) else {}
+    return {
+        "enabled": bool(cfg.get("enabled", False)),
+        "consensus_mode": cfg.get("consensus_mode"),
+        "timeout_seconds": cfg.get("timeout_seconds"),
+        "roles": {
+            str(rid): ({k: role.get(k) for k in _COUNCIL_ROLE_FIELDS} if isinstance(role, dict) else role)
+            for rid, role in sorted(roles.items())
+        },
+    }
+
+
+def canonical_package_projection(payload: Mapping[str, Any]) -> Dict[str, Any]:
+    """归档包的规范化投影：只保留「策略身份」字段，剔除每次写都会变的易变字段。"""
+    src = payload if isinstance(payload, Mapping) else {}
+    return {
+        "prompt_config": _canon_prompt_config(src.get("prompt_config")),
+        "evolution_memory": _canon_evolution_memory(src.get("evolution_memory")),
+        "interceptor_config": src.get("interceptor_config") or {},
+        "council_config": _canon_council_config(src.get("council_config")),
+        "risk_config": {str(k): v for k, v in sorted((src.get("risk_config") or {}).items())}
+        if isinstance(src.get("risk_config"), Mapping) else {},
+        "venue_routing": src.get("venue_routing") or {},
+    }
+
+
+def _projection_digest(projection: Mapping[str, Any]) -> str:
+    blob = json.dumps(projection, sort_keys=True, separators=(",", ":"),
+                      ensure_ascii=False, default=str).encode("utf-8")
+    return hashlib.sha256(blob).hexdigest()[:16]
+
+
+def package_identity(payload: Mapping[str, Any]) -> str:
+    """整包标识（16 hex）：用于归档文件命名，保证「只差风控/路由」的版本不再同名。"""
+    return _projection_digest(canonical_package_projection(payload))
+
+
+def package_restore_diff(archived_payload: Mapping[str, Any],
+                         current_payload: Mapping[str, Any]) -> List[str]:
+    """恢复后核对：返回「归档里承诺、但恢复后没对上」的单元名。
+
+    - 归档**没装**的单元（空/None）无从承诺，一律跳过——不能因为「当前有、归档没有」
+      就判恢复失败（旧包无法清空它诞生之后才出现的内容）；
+    - 已装的顺序性单元（提示词/心法/拦截器/委员会）要求全等；
+    - 已装的字典类单元（风控/路由）只核对归档里出现过的键；归档之后新增的键由
+      `restore_archived_policy` 以 `uncovered_risk_keys` 如实披露。
+    """
+    archived = canonical_package_projection(archived_payload)
+    current = canonical_package_projection(current_payload)
+    bad: List[str] = []
+    for unit in ("prompt_config", "evolution_memory", "interceptor_config", "council_config"):
+        want = archived.get(unit)
+        if not want:
+            continue
+        if want != current.get(unit):
+            bad.append(unit)
+    for unit in ("risk_config", "venue_routing"):
+        want, got = archived.get(unit) or {}, current.get(unit) or {}
+        if not want:
+            continue
+        if not isinstance(want, Mapping) or not isinstance(got, Mapping):
+            if want != got:
+                bad.append(unit)
+            continue
+        for key, value in want.items():
+            if got.get(key) != value:
+                bad.append(f"{unit}.{key}")
+    return bad
+
+
+# =========================================================================
 # Policy Version Workbench: Archive, Rollback, Export & Import
 # =========================================================================
 
@@ -619,27 +739,41 @@ def archive_current_policy(
         package = capture_full_strategy_package(root_dir=root_dir)
         policy_hash = package["policy_hash"]
         policy_version = package["policy_version"]
+        # 审计 P0-3：文件标识改用「整包标识」——policy_hash 看不到 risk_config/venue_routing，
+        # 只差风控的两个版本会同名互相覆盖。
+        package_hash = package_identity(package.get("package") or {})
 
         safe_name = name.strip() or f"策略归档-{policy_hash}"
-        archive_file = a_dir / f"policy_{policy_hash}.json"
+        archive_file = a_dir / f"policy_{package_hash or policy_hash}.json"
 
+        package["package_hash"] = package_hash
         package["metadata"] = {
             "name": safe_name,
             "description": description.strip(),
             "author": author,
             "archived_at": datetime.now(_BJ).isoformat(sep=" ", timespec="seconds"),
             "archive_file": archive_file.name,
+            "package_hash": package_hash,
         }
 
         _atomic_write_json(archive_file, package)
 
-        # Update index
+        # Update index：去重键 = 整包标识（同包重归档才替换）；无 package_hash 的历史
+        # 条目退回 policy_hash 判等，保持旧行为。
         index_data = load_archive_index(archive_dir=a_dir)
-        index_data = [item for item in index_data if item.get("policy_hash") != policy_hash]
+
+        def _same_archive(item: Dict[str, Any]) -> bool:
+            item_pkg = str(item.get("package_hash") or "")
+            if item_pkg:
+                return item_pkg == package_hash
+            return str(item.get("policy_hash") or "") == policy_hash
+
+        index_data = [item for item in index_data if not _same_archive(item)]
 
         entry = {
             "policy_version": policy_version,
             "policy_hash": policy_hash,
+            "package_hash": package_hash,
             "name": safe_name,
             "description": description.strip(),
             "author": author,
@@ -657,6 +791,24 @@ def archive_current_policy(
 archive_policy_snapshot = archive_current_policy
 
 
+def _resolve_archive_file(a_dir: Path, key: str) -> Path:
+    """按标识解析归档文件：键可以是整包标识（新命名）或四单元 policy_hash（历史命名）。
+
+    审计 P0-3 配套：文件名改由整包标识命名后，删除/回滚都必须经索引解析，否则会出现
+    「索引已删、文件还在」或反过来「文件在、却报 404」的半途状态。
+    """
+    direct = a_dir / f"policy_{key}.json"
+    if direct.is_file():
+        return direct
+    for item in load_archive_index(archive_dir=a_dir):
+        if str(item.get("policy_hash") or "") != key and str(item.get("package_hash") or "") != key:
+            continue
+        candidate = a_dir / str(item.get("archive_file") or "")
+        if candidate.is_file():
+            return candidate
+    return direct
+
+
 def restore_archived_policy(
     policy_hash: str,
     archive_dir: Optional[Path] = None,
@@ -671,7 +823,7 @@ def restore_archived_policy(
         raise ValueError(f"无效的策略哈希标识: {policy_hash}")
 
     a_dir = archive_dir or ARCHIVE_DIR
-    archive_file = a_dir / f"policy_{policy_hash}.json"
+    archive_file = _resolve_archive_file(a_dir, policy_hash)
     if not archive_file.is_file():
         raise FileNotFoundError(f"未找到归档的策略版本文件: {policy_hash}")
 
@@ -680,6 +832,11 @@ def restore_archived_policy(
 
     pkg_payload = package.get("package") or {}
     r_dir = root_dir or ROOT
+    archived_package_hash = str(
+        package.get("package_hash") or (package.get("metadata") or {}).get("package_hash") or "")
+    # 请求键可能是整包标识（新命名）或四单元 policy_hash（历史命名）：四单元校验必须
+    # 比对**归档自带的** policy_hash，否则新命名归档永远校验不过（审计 P0-3 修复配套）。
+    archived_policy_hash = str(package.get("policy_hash") or policy_hash)
 
     # Pre-restore safety snapshot to prevent partial state on failure
     pre_restore_package = capture_full_strategy_package(root_dir=r_dir)
@@ -753,30 +910,27 @@ def restore_archived_policy(
                 save_council_config(payload["council_config"])
 
             # 5. Restore Risk Config
+            # 审计 P0-3(2026-09-13)：此处曾宽 except → logger.warning，于是「旧归档含已
+            # 下架风控键 / 值越界」导致风控**整段没恢复**，接口仍返回 status=restored，
+            # 而审计与四单元哈希都看不见。现改为不吞：异常上抛 → 外层回滚 + 明确报错。
             if (
                 "risk_config" in payload
                 and isinstance(payload["risk_config"], dict)
                 and payload["risk_config"]
             ):
-                try:
-                    from r20_backend import risk_config
-                    from r20_backend.settings_store import update_env
-                    env_updates = risk_config.normalize(payload["risk_config"])
-                    update_env(env_updates)
-                except Exception as e:
-                    logger.warning("Failed to restore risk config: %s", e)
+                from r20_backend import risk_config
+                from r20_backend.settings_store import update_env
+                env_updates = risk_config.normalize(payload["risk_config"])
+                update_env(env_updates)
 
-            # 6. Restore Venue Routing
+            # 6. Restore Venue Routing（同 5：不再吞异常）
             if (
                 "venue_routing" in payload
                 and isinstance(payload["venue_routing"], dict)
                 and payload["venue_routing"]
             ):
-                try:
-                    from r20_backend.exchanges.routing_policy import ROUTING_FILE
-                    _atomic_write_json(ROUTING_FILE, payload["venue_routing"])
-                except Exception as e:
-                    logger.warning("Failed to restore venue routing: %s", e)
+                from r20_backend.exchanges.routing_policy import ROUTING_FILE
+                _atomic_write_json(ROUTING_FILE, payload["venue_routing"])
         finally:
             if sys_path_added and scripts_dir in sys.path:
                 try:
@@ -796,10 +950,10 @@ def restore_archived_policy(
 
     # Verify new restored snapshot
     new_snapshot = generate_policy_snapshot(root_dir=r_dir)
-    if new_snapshot["policy_hash"] != policy_hash:
+    if new_snapshot["policy_hash"] != archived_policy_hash:
         logger.error(
             "Restored snapshot hash mismatch: expected %s, got %s. Reverting to pre-restore state...",
-            policy_hash,
+            archived_policy_hash,
             new_snapshot["policy_hash"],
         )
         try:
@@ -807,12 +961,35 @@ def restore_archived_policy(
         except Exception as revert_exc:
             logger.critical("Failed to revert to pre-restore state after hash mismatch: %s", revert_exc)
         raise RuntimeError(
-            f"策略回滚失败且已恢复原状态: 恢复后哈希 {new_snapshot['policy_hash']} 与目标 {policy_hash} 不一致"
+            f"策略回滚失败且已恢复原状态: 恢复后哈希 {new_snapshot['policy_hash']} 与目标 {archived_policy_hash} 不一致"
         )
+
+    # 审计 P0-3：四单元哈希看不到风控/路由——它们恢复失败时上面的校验永远是绿的。
+    # 现按整包规范化投影逐单元核对，任何「归档里承诺、恢复后没对上」的单元一律判定
+    # 恢复失败并回滚（绝不留半套状态），并在报错里点名是哪个单元。
+    new_package = capture_full_strategy_package(root_dir=r_dir)
+    restore_gaps = package_restore_diff(pkg_payload, new_package.get("package") or {})
+    if restore_gaps:
+        logger.error("Restored package diff detected in units: %s. Reverting...", restore_gaps)
+        try:
+            _apply_package(pre_restore_package.get("package") or {})
+        except Exception as revert_exc:
+            logger.critical("Failed to revert to pre-restore state after unit diff: %s", revert_exc)
+        raise RuntimeError(
+            "策略回滚失败且已恢复原状态: 以下单元未恢复到归档值 — " + "、".join(restore_gaps)
+        )
+
+    # 归档未覆盖、但当前存在的键（旧包无法删除后加键）：如实披露，不谎报「全盘回滚」
+    archived_risk_keys = set((canonical_package_projection(pkg_payload).get("risk_config") or {}).keys())
+    current_risk_keys = set((canonical_package_projection(new_package.get("package") or {}).get("risk_config") or {}).keys())
+    extra_risk_keys = sorted(current_risk_keys - archived_risk_keys)
     return {
         "status": "restored",
-        "target_policy_hash": policy_hash,
+        "target_policy_hash": archived_policy_hash,
+        "target_package_hash": archived_package_hash or None,
         "restored_snapshot": new_snapshot,
+        "restored_units": [unit for unit in _PACKAGE_UNITS if pkg_payload.get(unit) not in (None, {}, [])],
+        "uncovered_risk_keys": extra_risk_keys,
     }
 
 
@@ -829,7 +1006,7 @@ def delete_archived_policy(
         raise ValueError(f"无效的策略哈希标识: {policy_hash}")
 
     a_dir = archive_dir or ARCHIVE_DIR
-    archive_file = a_dir / f"policy_{policy_hash}.json"
+    archive_file = _resolve_archive_file(a_dir, policy_hash)
 
     with _index_lock(a_dir, shared=False):
         deleted_file = False
@@ -839,7 +1016,9 @@ def delete_archived_policy(
 
         index_data = load_archive_index(archive_dir=a_dir)
         original_len = len(index_data)
-        new_index = [item for item in index_data if item.get("policy_hash") != policy_hash]
+        new_index = [item for item in index_data
+                     if str(item.get("policy_hash") or "") != policy_hash
+                     and str(item.get("package_hash") or "") != policy_hash]
 
         if len(new_index) < original_len or deleted_file:
             save_archive_index(new_index, archive_dir=a_dir)

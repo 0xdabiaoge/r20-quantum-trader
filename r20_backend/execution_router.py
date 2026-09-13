@@ -26,6 +26,14 @@ try:  # 单一事实源：几何 + R:R 底线（与执行层遗留链路同一�
 except ImportError:
     from order_risk import validate_quote_geometry_and_rr
 
+try:  # 单一事实源：全局保证金闸门（审计 P0-1 前本模块 0 处引用 risk_constants）
+    from scripts.risk_constants import MAX_MARGIN_EQUITY_RATIO, MAX_SINGLE_ASSET_MARGIN
+except ImportError:  # pragma: no cover - scripts/ 在 sys.path 时走上面分支
+    try:
+        from risk_constants import MAX_MARGIN_EQUITY_RATIO, MAX_SINGLE_ASSET_MARGIN
+    except ImportError:
+        MAX_MARGIN_EQUITY_RATIO, MAX_SINGLE_ASSET_MARGIN = 0.20, 0.0
+
 
 class RouteResult(Dict[str, Any]):
     """dict 子类型：{ok, venue, stage, detail, order_id, tp_id, sl_id, size_signed...}"""
@@ -43,13 +51,16 @@ def open_protected_position(decision: Dict[str, Any], *,
                             adapter: Any = None,
                             own_position: Optional[Dict[str, Any]] = None,
                             margin_mode: Optional[str] = None,
-                            environment: Optional[str] = None) -> RouteResult:
+                            environment: Optional[str] = None,
+                            max_margin_usdt: Optional[float] = None) -> RouteResult:
     """标准决策 → Gate/Binance 受保护开仓（US-005 多所对等）。全程 fail-closed：任何缺口先撤后抛。
 
     own_position：调用方（lab/trader）在该合约上的在管仓位记录（含 size_signed/side）；
     交易所既有仓与之一致视为己仓放行，否则视为外部连坐风险拒开（stage=precheck）。
     margin_mode：由账户实况推导传入（cross/isolated）；缺省维持历史行为 cross。
     environment：显式资金环境（demo/live），优先使用；缺省读 decision.get('environment')。
+    max_margin_usdt：调用方按权益算出的单笔保证金硬顶（权益×R20_MAX_MARGIN_EQUITY_RATIO）；
+    缺省 0/None = 不臆造占比上限，但仍强制单标的绝对封顶（审计 P0-1）。
     """
     env_name = str(environment or decision.get("environment") or "").strip().lower() or None
     venue = str(decision.get("venue") or getattr(getattr(adapter, "capabilities", None), "venue", "gate") or "gate").strip().lower()
@@ -71,6 +82,23 @@ def open_protected_position(decision: Dict[str, Any], *,
     for tag, v in (("margin", margin), ("leverage", leverage), ("entry", entry)):
         if not math.isfinite(v) or v <= 0:
             return _fail("validate", f"{tag} 必须为有限正数，收到 {v}", venue=venue)
+
+    # ── 全局保证金闸门（审计 P0-1，2026-09-13）──────────────────────────────
+    # 本模块曾把 decision["margin_usdt"] 原样 ×leverage 变成名义额（见下方 notional），
+    # 即 LLM 报多少就用多少：OKX 路径的「可用余额占比硬顶 / 单标的绝对封顶」在多所
+    # 路径完全不存在。现在双层兜底：调用方权益顶（缺失=0 → 不臆造）+ 单标的绝对封顶
+    # （真实 .env 配置值，恒生效）。夹住后写回 decision，后续 notional/回读同源。
+    margin_clamped_from = 0.0
+    _margin_caps = [c for c in (float(MAX_SINGLE_ASSET_MARGIN or 0.0),
+                                float(max_margin_usdt or decision.get("max_margin_usdt") or 0.0))
+                    if math.isfinite(c) and c > 0]
+    if _margin_caps and margin > min(_margin_caps):
+        margin_clamped_from = round(margin, 4)
+        margin = round(min(_margin_caps), 4)
+        decision = {**decision, "margin_usdt": margin}
+        print(f"[保证金闸门] {venue.upper()} {asset} 单笔保证金 {margin_clamped_from}U "
+              f"超上限 {margin}U（权益占比 {MAX_MARGIN_EQUITY_RATIO:.0%} / 单标的封顶 "
+              f"{float(MAX_SINGLE_ASSET_MARGIN or 0):.0f}U），已夹至上限")
     ok, reason, rr = validate_quote_geometry_and_rr(action, entry, tp, sl)
     if not ok:
         return _fail("risk_gate", f"物理风控拒绝: {reason}", venue=venue, rr=rr)
@@ -221,6 +249,8 @@ def open_protected_position(decision: Dict[str, Any], *,
                        tp_id=str(legs.get("tp")), sl_id=str(legs.get("sl")),
                        size_signed=signed,
                        contracts=contracts, notional_usdt=round(notional, 2),
+                       margin_usdt=round(margin, 4),
+                       margin_clamped_from_usdt=margin_clamped_from or None,
                        ref_price=ref_price, rr=round(rr, 3), leverage=leverage,
                        detail=f"{venue.upper()} 入场限价挂单 + TP/SL 双腿云端触发单已回读验证")
 

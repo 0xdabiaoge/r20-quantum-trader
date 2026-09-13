@@ -5,6 +5,7 @@ import tempfile
 from pathlib import Path
 from typing import Mapping
 from .config import ROOT, refresh_settings
+from .file_locks import file_lock
 
 ENV_FILE = ROOT / ".env"
 MANAGED_KEYS = {
@@ -93,56 +94,66 @@ def mask_url(url: str, visible_tail: int = 6) -> str:
 
 def remove_env(keys: set[str] | list[str] | tuple[str, ...]) -> None:
     targets = set(keys)
-    existing = ENV_FILE.read_text(encoding="utf-8").splitlines() if ENV_FILE.exists() else []
-    result = []
-    for line in existing:
-        stripped = line.strip()
-        if stripped and not stripped.startswith("#") and "=" in stripped and stripped.split("=", 1)[0].strip() in targets:
-            continue
-        result.append(line)
-    fd, temp_path = tempfile.mkstemp(prefix=".r20-env-", dir=ENV_FILE.parent)
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as handle:
-            handle.write("\n".join(result).rstrip() + "\n"); handle.flush(); os.fsync(handle.fileno())
-        os.chmod(temp_path, 0o600); os.replace(temp_path, ENV_FILE); os.chmod(ENV_FILE, 0o600)
-    finally:
-        if os.path.exists(temp_path): os.unlink(temp_path)
+    ENV_FILE.parent.mkdir(parents=True, exist_ok=True)
+    # 审计 P0-2(2026-09-13)：.env 是全站配置唯一写入口，此处读-改-写必须整体持锁。
+    # 旧实现无锁 → 两个并发保存（风控页 / 通知页 / LLM 页 / 密钥页 / 策略回滚）各自
+    # 基于同一份旧文本回写，后写者静默覆盖先写者；而两者都会改写本进程 os.environ，
+    # 于是接口双双返回「已保存」，磁盘却只剩一份。锁文件与被保护文件同目录（flock，
+    # 进程崩溃自动释放）。锁只覆盖 RMW，不覆盖 os.environ 同步（后者无 I/O）。
+    with file_lock(ENV_FILE):
+        existing = ENV_FILE.read_text(encoding="utf-8").splitlines() if ENV_FILE.exists() else []
+        result = []
+        for line in existing:
+            stripped = line.strip()
+            if stripped and not stripped.startswith("#") and "=" in stripped and stripped.split("=", 1)[0].strip() in targets:
+                continue
+            result.append(line)
+        fd, temp_path = tempfile.mkstemp(prefix=".r20-env-", dir=ENV_FILE.parent)
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                handle.write("\n".join(result).rstrip() + "\n"); handle.flush(); os.fsync(handle.fileno())
+            os.chmod(temp_path, 0o600); os.replace(temp_path, ENV_FILE); os.chmod(ENV_FILE, 0o600)
+        finally:
+            if os.path.exists(temp_path): os.unlink(temp_path)
     for key in targets: os.environ.pop(key, None)
 
 
 def update_env(values: Mapping[str, str | bool | None]) -> None:
     ENV_FILE.parent.mkdir(parents=True, exist_ok=True)
-    existing: list[str] = ENV_FILE.read_text(encoding="utf-8").splitlines() if ENV_FILE.exists() else []
-    remaining = {key: value for key, value in values.items() if key in MANAGED_KEYS and value is not None}
-    result: list[str] = []
-    for line in existing:
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#") or "=" not in stripped:
-            result.append(line)
-            continue
-        key = stripped.split("=", 1)[0].strip()
-        if key not in remaining:
-            result.append(line)
-            continue
-        value = remaining.pop(key)
-        result.append(f"{key}={str(value)}")
-    if remaining:
-        if result and result[-1]:
-            result.append("")
-        result.extend(f"{key}={str(value)}" for key, value in remaining.items())
+    # 审计 P0-2(2026-09-13)：同上，整个 RMW 持 file_lock；丢更新与「UI 显示已生效、
+    # 磁盘未生效」的谎报都源于此处无锁。绝不能只锁写那一半（会退化成另一种丢更新）。
+    with file_lock(ENV_FILE):
+        existing: list[str] = ENV_FILE.read_text(encoding="utf-8").splitlines() if ENV_FILE.exists() else []
+        remaining = {key: value for key, value in values.items() if key in MANAGED_KEYS and value is not None}
+        result: list[str] = []
+        for line in existing:
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#") or "=" not in stripped:
+                result.append(line)
+                continue
+            key = stripped.split("=", 1)[0].strip()
+            if key not in remaining:
+                result.append(line)
+                continue
+            value = remaining.pop(key)
+            result.append(f"{key}={str(value)}")
+        if remaining:
+            if result and result[-1]:
+                result.append("")
+            result.extend(f"{key}={str(value)}" for key, value in remaining.items())
 
-    fd, temp_path = tempfile.mkstemp(prefix=".r20-env-", dir=ENV_FILE.parent)
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as handle:
-            handle.write("\n".join(result) + "\n")
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.chmod(temp_path, 0o600)
-        os.replace(temp_path, ENV_FILE)
-        os.chmod(ENV_FILE, 0o600)
-    finally:
-        if os.path.exists(temp_path):
-            os.unlink(temp_path)
+        fd, temp_path = tempfile.mkstemp(prefix=".r20-env-", dir=ENV_FILE.parent)
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                handle.write("\n".join(result) + "\n")
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.chmod(temp_path, 0o600)
+            os.replace(temp_path, ENV_FILE)
+            os.chmod(ENV_FILE, 0o600)
+        finally:
+            if os.path.exists(temp_path):
+                os.unlink(temp_path)
     for key, value in values.items():
         if key in MANAGED_KEYS and value is not None:
             os.environ[key] = str(value)

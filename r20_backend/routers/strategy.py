@@ -285,13 +285,21 @@ def admin_get_policy_current_snapshot(
     x_r20_admin_token: str | None = Header(default=None)
 ) -> dict[str, Any]:
     require_admin_header(x_r20_admin_token, x_r20_session)
-    from r20_backend.policy_snapshot import generate_policy_snapshot
+    from r20_backend.policy_snapshot import capture_full_strategy_package, generate_policy_snapshot, package_identity
     try:
         snapshot = generate_policy_snapshot()
+        # 审计 P0-3：四单元 policy_hash 看不到风控/路由——只差风控的两个归档会同 hash，
+        # 「● 当前正在运行」若只比 policy_hash 就会同时点亮两个版本（UI 谎报）。
+        # 这里补一个整包标识，前端据此精确判定哪一份真的在运行。
+        try:
+            package_hash = package_identity(capture_full_strategy_package().get("package") or {})
+        except Exception:
+            package_hash = ""
         return {
             "ok": True,
             "policy_version": snapshot.get("policy_version"),
             "policy_hash": snapshot.get("policy_hash"),
+            "package_hash": package_hash,
             "snapshot": snapshot,
         }
     except Exception as exc:
@@ -323,7 +331,10 @@ def admin_archive_policy(
     author = actor.get("username", "admin")
     try:
         entry = archive_current_policy(name=payload.name, description=payload.description, author=author)
-        audit_record("policy.archive", "success", {"name": payload.name, "policy_hash": entry.get("policy_hash")})
+        audit_record("policy.archive", "success", {
+            "actor": actor["username"], "name": payload.name,
+            "policy_hash": entry.get("policy_hash"), "package_hash": entry.get("package_hash"),
+        })
         return {"ok": True, "entry": entry}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
@@ -337,12 +348,20 @@ def admin_restore_policy(
     x_r20_session: str | None = Header(default=None, alias="X-R20-Session"),
     x_r20_admin_token: str | None = Header(default=None)
 ) -> dict[str, Any]:
-    require_superadmin(x_r20_session)
+    actor = require_superadmin(x_r20_session)
     from r20_backend.policy_snapshot import restore_archived_policy
     try:
-        p_hash = payload.policy_hash or payload.hash or ""
+        # 审计 P0-4(2026-09-13)：此处原写 `payload` 的 hash 属性——PolicyRestoreRequest
+        # 只有 policy_hash 字段（pydantic 不产生该属性），于是**回滚已把 6 个存储全部
+        # 改完之后**在审计行抛 AttributeError，被下方 except 兜成 HTTP 500
+        # 「恢复策略版本失败」：管理员看到失败、系统实际已回滚、policy.restore 审计
+        # 永不落库。改用真实字段并按同族路由补 actor。
+        p_hash = payload.policy_hash or ""
         res = restore_archived_policy(policy_hash=p_hash)
-        audit_record("policy.restore", "success", {"policy_hash": payload.hash})
+        audit_record("policy.restore", "success", {
+            "actor": actor["username"], "policy_hash": p_hash,
+            "target_policy_hash": res.get("target_policy_hash", p_hash),
+        })
         return {"ok": True, **res}
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
@@ -358,13 +377,13 @@ def admin_delete_policy_archive(
     x_r20_session: str | None = Header(default=None, alias="X-R20-Session"),
     x_r20_admin_token: str | None = Header(default=None)
 ) -> dict[str, Any]:
-    require_superadmin(x_r20_session)
+    actor = require_superadmin(x_r20_session)
     if not policy_hash or not re.match(r"^[a-zA-Z0-9_-]+$", policy_hash):
         raise HTTPException(status_code=400, detail=f"无效的策略哈希标识: {policy_hash}")
     from r20_backend.policy_snapshot import delete_archived_policy
     try:
         res = delete_archived_policy(policy_hash=policy_hash)
-        audit_record("policy.delete", "success", {"policy_hash": policy_hash})
+        audit_record("policy.delete", "success", {"actor": actor["username"], "policy_hash": policy_hash})
         return {"ok": True, **res}
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))

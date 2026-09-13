@@ -122,13 +122,18 @@ def test_new_policy_archive_keeps_hash_and_writes_offset():
     mod = isolated("r20_backend/policy_snapshot.py", "archive_current_policy",
                    _index_lock=MagicMock(),
                    capture_full_strategy_package=MagicMock(return_value=package),
+                   # 审计 P0-3：归档文件改由「整包标识」命名（四单元哈希看不到风控/路由，
+                   # 只差风控的两个版本会同名互相覆盖），隔离执行需显式注入该依赖。
+                   package_identity=lambda payload: "pkg0000000000001",
                    _atomic_write_json=write, load_archive_index=lambda **kw: [],
                    save_archive_index=index_write)
     result = mod.archive_current_policy("mock archive", archive_dir=MagicMock())
     assert result["archived_at"] == EXPECTED
     assert result["policy_hash"] == "abc12345"
+    assert result["package_hash"] == "pkg0000000000001"
     assert result["policy_version"] == "v-test@abc12345"
     assert write.call_args.args[1]["metadata"]["archived_at"] == EXPECTED
+    assert write.call_args.args[1]["metadata"]["package_hash"] == "pkg0000000000001"
     assert index_write.call_args.args[0] == [result]
 
 

@@ -35,6 +35,20 @@ const deleting = ref<string | null>(null)
 
 const snapshotData = ref<any>(null)
 const archives = ref<any[]>([])
+
+/**
+ * 归档标识（批1 P0-3）：归档文件按「整包标识」命名，四单元 policy_hash 看不到
+ * 风控/路由 —— 只差风控的两个版本会同 policy_hash。展示/回滚/删除/「当前正在运行」
+ * 判定一律优先用 package_hash，历史归档（无该字段）退回 policy_hash。
+ */
+function arcKey(arc: any): string {
+  return String(arc?.package_hash || arc?.policy_hash || '')
+}
+function isCurrentArc(arc: any): boolean {
+  const pkg = String(snapshotData.value?.package_hash || '')
+  if (arc?.package_hash) return !!pkg && String(arc.package_hash) === pkg
+  return !!arc?.policy_hash && arc.policy_hash === snapshotData.value?.snapshot?.policy_hash
+}
 const errorMsg = ref<string | null>(null)
 
 // Archive Dialog State
@@ -83,7 +97,7 @@ async function saveArchive() {
       }),
     })
     if (res && res.ok) {
-      toast.ok(t('admin.policySnapshot.toast.archivedOk', undefined, { name: res.entry?.name, hash: res.entry?.policy_hash }))
+      toast.ok(t('admin.policySnapshot.toast.archivedOk', undefined, { name: res.entry?.name, hash: res.entry?.package_hash || res.entry?.policy_hash }))
       showArchiveModal.value = false
       archiveName.value = ''
       archiveDesc.value = ''
@@ -488,17 +502,17 @@ onMounted(() => {
         <div v-else class="divide-y" style="border-color: var(--line-1);">
           <div
             v-for="arc in archives"
-            :key="arc.policy_hash"
+            :key="arcKey(arc)"
             class="py-3 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs hover:bg-[var(--surface-3)] px-2 rounded-xl transition-colors"
           >
             <div class="space-y-1 flex-1 min-w-0">
               <div class="flex items-center space-x-2">
                 <span class="font-bold text-sm" style="color: var(--ink-1);">{{ arc.name }}</span>
                 <span class="text-[11px] px-2 py-0.5 rounded border text-cyan-400 border-cyan-500/30 bg-cyan-500/10">
-                  #{{ arc.policy_hash }}
+                  #{{ arcKey(arc) }}
                 </span>
                 <span
-                  v-if="arc.policy_hash === snapshotData.snapshot.policy_hash"
+                  v-if="isCurrentArc(arc)"
                   class="text-[11px] font-bold px-2 py-0.2 rounded border text-emerald-400 border-emerald-500/30 bg-emerald-500/10"
                 >
                   {{ t('admin.policySnapshot.archive.running') }}
@@ -516,24 +530,24 @@ onMounted(() => {
 
             <div class="flex items-center space-x-2 shrink-0">
               <button
-                @click="restorePolicy(arc.policy_hash, arc.name)"
-                :disabled="restoring || !auth.isSuperadmin || arc.policy_hash === snapshotData.snapshot.policy_hash"
+                @click="restorePolicy(arcKey(arc), arc.name)"
+                :disabled="restoring || !auth.isSuperadmin || isCurrentArc(arc)"
                 class="flex items-center space-x-1 px-3 py-1.5 rounded-xl border text-xs font-bold cursor-pointer disabled:opacity-40 transition-all shadow-xs"
-                :style="arc.policy_hash === snapshotData.snapshot.policy_hash
+                :style="isCurrentArc(arc)
                   ? { backgroundColor: 'var(--surface-1)', borderColor: 'var(--line-1)', color: 'var(--ink-3)' }
                   : { backgroundColor: 'var(--up-bg)', borderColor: 'var(--up-line)', color: 'var(--up)' }"
               >
                 <RotateCcw class="w-3.5 h-3.5" :class="{ 'animate-spin': restoring }" />
-                <span>{{ arc.policy_hash === snapshotData.snapshot.policy_hash ? t('admin.policySnapshot.archive.isCurrent') : t('admin.policySnapshot.archive.restore') }}</span>
+                <span>{{ isCurrentArc(arc) ? t('admin.policySnapshot.archive.isCurrent') : t('admin.policySnapshot.archive.restore') }}</span>
               </button>
 
               <button
-                @click="deleteArchive(arc.policy_hash, arc.name)"
-                :disabled="deleting === arc.policy_hash || !auth.isSuperadmin"
+                @click="deleteArchive(arcKey(arc), arc.name)"
+                :disabled="deleting === arcKey(arc) || !auth.isSuperadmin"
                 class="flex items-center space-x-1 px-2.5 py-1.5 rounded-xl border text-xs cursor-pointer transition-all hover:bg-rose-500/10 text-rose-400 border-rose-500/20"
                 :title="t('admin.policySnapshot.archive.deleteTitle')"
               >
-                <Trash2 class="w-3.5 h-3.5" :class="{ 'animate-pulse': deleting === arc.policy_hash }" />
+                <Trash2 class="w-3.5 h-3.5" :class="{ 'animate-pulse': deleting === arcKey(arc) }" />
                 <span>{{ t('admin.policySnapshot.archive.delete') }}</span>
               </button>
             </div>
