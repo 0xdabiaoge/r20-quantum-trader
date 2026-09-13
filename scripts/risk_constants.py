@@ -131,3 +131,25 @@ def effective_max_positions(pool_size: int) -> int:
     total = pool if cap <= 0 else max(1, min(cap, pool))
     same = max(1, min(MAX_SAME_DIRECTION_POSITIONS, total))
     return total, same
+
+
+# ── 两个「绝对封顶 ∩ 权益占比」的 min() 口径（审计 P1-1，2026-09-13）──────────
+# 病灶：同一组公式曾存在三份拷贝——ai_factor_trader 本地两份、r20_backend/execution/sizing
+# 两份、而提示词构建器（ai_brain_trader）压根没做 min()，只写「权益×5% / 权益×30%」，
+# 于是模型看到单标的 1496.82U、日亏 −249.47U，引擎实际执行 600U / −150U（虚高 2.49×/1.66×），
+# 而 SYSTEM PROMPT 却要求模型"一切金额以【本周期风险预算】小节为准"。
+# 现收敛到此：引擎、执行面、提示词共用同一函数，任何一处改动全链路同步。
+def effective_daily_loss_limit(usdt_available: float = None) -> float:
+    """单日亏损熔断线 = min(绝对封顶, 可用余额 5%)，小资金账户自动收紧。"""
+    cap = MAX_DAILY_LOSS_USDT
+    if usdt_available and usdt_available > 0:
+        cap = min(cap, max(round(float(usdt_available) * DAILY_LOSS_EQUITY_RATIO, 2), 1.0))
+    return cap
+
+
+def effective_single_asset_margin(usdt_available: float = None) -> float:
+    """单标的累计保证金上限 = min(绝对封顶, 可用余额 30%)，与提示词风险预算同口径。"""
+    cap = MAX_SINGLE_ASSET_MARGIN
+    if usdt_available and usdt_available > 0:
+        cap = min(cap, max(round(float(usdt_available) * SINGLE_ASSET_EQUITY_RATIO, 2), 1.0))
+    return cap

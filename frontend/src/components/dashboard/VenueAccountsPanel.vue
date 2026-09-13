@@ -39,6 +39,9 @@ const portfolio = computed(() => {
   return isPlainObj(raw) ? raw : null;
 });
 const pTotal = computed(() => (portfolio.value ? numOrNull(portfolio.value.total_budget_usdt) : null));
+/** 引擎不封顶（R20_PORTFOLIO_RISK_BUDGET_USDT=0）：不画占用率，只诚实标注 + 展示参考上限 */
+const pUncapped = computed(() => String(portfolio.value?.budget_mode || '') === 'uncapped');
+const pReferenceCap = computed(() => (portfolio.value ? numOrNull(portfolio.value.reference_cap_usdt) : null));
 const pReserved = computed(() => (portfolio.value ? numOrNull(portfolio.value.reserved_usdt) : null));
 const pAvailable = computed(() => {
   if (!portfolio.value) return null;
@@ -62,8 +65,9 @@ const pEnvMismatch = computed(() => {
   const env = String(portfolio.value?.environment || '').trim().toLowerCase();
   return !!env && !env.includes(store.environment);
 });
-function pMoney(v: number | null): string {
-  return v === null ? t('dash.venueAccounts.unknown') : fmtNum(v, 2);
+function pMoney(v: number | null | undefined): string {
+  // 未知（null/undefined）一律显「—」，绝不填 0（缺失≠0）
+  return v === null || v === undefined ? t('dash.venueAccounts.unknown') : fmtNum(v, 2);
 }
 
 onMounted(() => {
@@ -195,6 +199,10 @@ function refreshAll(): void {
         <div class="min-w-0">
           <p class="t-faint truncate">{{ t('dash.venueAccounts.portfolio.total') }}</p>
           <p class="num text-sm font-bold" style="color: var(--ink-strong)" data-test="portfolio-total">{{ pMoney(pTotal) }}</p>
+          <p v-if="pUncapped" class="text-[10px] leading-tight" style="color: var(--ink-3)" data-test="portfolio-uncapped">
+            {{ t('dash.venueAccounts.portfolio.uncapped') }}
+            <span v-if="pReferenceCap !== null" class="num">· {{ t('dash.venueAccounts.portfolio.uncappedRef', undefined, { cap: fmtNum(pReferenceCap, 0) }) }}</span>
+          </p>
         </div>
         <div class="min-w-0">
           <p class="t-faint truncate">{{ t('dash.venueAccounts.portfolio.reserved') }}</p>

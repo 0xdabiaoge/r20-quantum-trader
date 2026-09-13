@@ -46,6 +46,8 @@ export const zhVenueAccounts = {
     reserved: '已预留',
     available: '可用余量',
     usage: '预算占用 {pct}%',
+    uncapped: '引擎不封顶',
+    uncappedRef: '参考上限 {cap}',
     pending: '等待预留层数据接入',
     envMismatch: '数据环境与当前选择不一致',
     tip: '组合风险预算',

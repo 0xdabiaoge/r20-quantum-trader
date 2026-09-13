@@ -1,6 +1,6 @@
 /** Policy snapshot page copy */
 export const enAdminPolicySnapshot = {
-  desc: 'Immutable fingerprint aggregate of the four policy units (prompts, self-evolution, physical interceptors, model council), with named archives and one-click rollback',
+  desc: 'Package fingerprint across the four strategy units (prompt, evolution, interceptors, council) plus risk/routing; named archives and rollback with per-unit verification (auto-revert on mismatch)',
   loading: 'Computing and aggregating live fingerprints of the four policy units...',
   notRecorded: 'Not recorded',
   btn: {
@@ -37,7 +37,7 @@ export const enAdminPolicySnapshot = {
     interceptor: {
       title: 'Physical Interceptor Plugins',
       core: 'Core non-disableable floor:',
-      coreValue: 'Geometry / finiteness / 75% confidence / 2.0R',
+      coreValue: 'Data completeness / side collision / quote geometry & finiteness / R:R floor (thresholds from live risk config)',
       pluginsHash: 'Plugin pipeline fingerprint Plugins Hash:',
       enabled: 'Enabled optional plugins:',
       enabledValue: '{n} / {t} plugins',
@@ -63,7 +63,7 @@ export const enAdminPolicySnapshot = {
   archive: {
     title: 'Policy Archive Vault',
     count: '{n} archived policy packages',
-    hint: 'Restore prompts, doctrine, interceptors and council to any saved moment in one click',
+    hint: 'Restores prompt, memory, interceptors, council and risk/routing to the archived moment; verified per unit with auto-revert on failure',
     empty: 'No archived policy versions yet. Click "Archive as policy version" in the top-right corner to permanently freeze the current policy package.',
     running: '● Currently running',
     archivedAt: 'Archived at',

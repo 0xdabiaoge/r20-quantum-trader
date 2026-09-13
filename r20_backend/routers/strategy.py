@@ -662,14 +662,17 @@ def prompt_override(
     refresh_settings()
     require_admin_header(x_r20_admin_token, x_r20_session)
     try:
-        from scripts.ai_brain_trader import SYSTEM_PROMPT
+        from scripts.ai_brain_trader import SYSTEM_PROMPT, get_effective_system_prompt
         content = PROMPT_OVERRIDE_FILE.read_text(encoding="utf-8") if PROMPT_OVERRIDE_FILE.exists() else ""
-        effective = SYSTEM_PROMPT if not content.strip() else f"{SYSTEM_PROMPT}\n\n【管理员提示词覆盖层（同样必须遵守上述风控和 JSON 约束）】\n{content.strip()}"
+        # 审计 P1-3：这里必须与推演时**同一条代码路径**（模块布局 → 之后追加覆盖层）。
+        # 旧实现返回 SYSTEM_PROMPT + 覆盖层，而推演侧布局会把覆盖层丢掉 —— 接口在骗人。
+        effective = get_effective_system_prompt()
         return {
             "content": content,
             "enabled": bool(content.strip()),
             "base_prompt": SYSTEM_PROMPT,
             "effective_prompt": effective,
+            "override_applied": bool(content.strip()) and content.strip() in effective,
             "path": str(PROMPT_OVERRIDE_FILE),
         }
     except Exception as exc:

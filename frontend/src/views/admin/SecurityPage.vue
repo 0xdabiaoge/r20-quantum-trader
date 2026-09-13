@@ -11,7 +11,7 @@ import { useApi } from '../../composables/useApi'
 import { useAuthStore } from '../../stores/auth'
 import { fmtDateTime } from '../../utils/format'
 import VenueCredentialCard from '../../components/admin/VenueCredentialCard.vue'
-import { Wallet, Save, RefreshCw, Layers, Trash2, Zap } from 'lucide-vue-next'
+import { Save, RefreshCw, Layers, Trash2, Zap } from 'lucide-vue-next'
 
 const { api } = useApi()
 const auth = useAuthStore()
@@ -92,15 +92,8 @@ function applyRuntime(rt: any) {
   runtime.value = rt
 }
 
-async function rediagnose() {
-  try {
-    applyRuntime(await api('/api/v1/admin/okx/runtime?refresh=1'))
-    toast.ok('已刷新 OKX API Key 配置状态')
-  } catch (e: any) {
-    runtime.value = null
-    toast.err(`诊断失败：${e.message}`)
-  }
-}
+// 批2(2026-09-13)：原 rediagnose() 与 loadAll() 重复（后者已带 refresh=1 拉取运行态），
+// 且从未被模板调用（TS6133）→ 已删除，避免两套刷新口径。
 
 async function saveEnvironment() {
   const environment = config.value.editable.okx_environment
@@ -713,6 +706,27 @@ onMounted(() => { loadAll(); loadMx() })
 
       <!-- ============ 页签 2：标的池与初始本金 ============ -->
       <div v-if="activeTab === 'pool'" class="space-y-4">
+        <SettingsSection :title="t('admin.security.capitalTitle')" :description="t('admin.security.capitalDesc')">
+          <template #actions>
+            <button
+              class="btn btn-primary"
+              :disabled="savingCapital || !auth.isSuperadmin"
+              @click="saveCapital"
+            ><Save class="h-3.5 w-3.5" /> {{ savingCapital ? t('admin.security.capitalSaving') : t('admin.security.capitalSave') }}</button>
+          </template>
+          <div class="grid gap-3 md:grid-cols-2">
+            <label class="text-xs space-y-1">
+              <span style="color: var(--ink-2);">{{ t('admin.security.capitalAmount') }}</span>
+              <input v-model="newCapital" class="input w-full num" inputmode="decimal" />
+            </label>
+            <label class="text-xs space-y-1">
+              <span style="color: var(--ink-2);">{{ t('admin.security.capitalConfirmLabel') }}</span>
+              <input v-model="capitalConfirm" class="input w-full num" placeholder="UPDATE CAPITAL" />
+            </label>
+          </div>
+          <p class="pt-3 text-[11px]" style="color: var(--ink-3);">{{ t('admin.security.capitalFooter') }}</p>
+        </SettingsSection>
+
         <SettingsSection :title="t('admin.security.poolTitle')" :description="t('admin.security.poolDesc')">
           <template #actions>
             <input v-model="newInstId" :placeholder="t('admin.security.instPlaceholder')" class="input w-44" @keyup.enter="addInstrument" />

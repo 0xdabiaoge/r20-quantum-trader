@@ -565,18 +565,25 @@ def _load_portfolio_risk_data() -> dict:
         except ValueError:
             budget_val = 0.0
 
+        # 审计 P1-6(2026-09-13)：env=0 的语义是「引擎不封顶」（risk_constants 自注：派生
+        # 公式只存在于 UI 展示，属展示启发式而非引擎策略）。旧实现在这里编出
+        # max_pos × MAX_SINGLE_ASSET_MARGIN = 8×600 = 4800（异常还兜 5000），前端据此画
+        # 占用率进度条 —— 管理员"以为有 4800 的总闸，实际引擎没有总闸"。
+        # 现在：未配置 → total_budget_usdt/available/utilization 一律 null（前端显「—」），
+        # 派生值只作为展示参考单独返回，绝不冒充预算；Configured 时才给真实数值。
+        reference_cap = None
         if budget_val <= 0:
-            # 单一事实源派生：最高持仓数 × 单标的保证金绝对封顶
             try:
                 from scripts.risk_constants import MAX_CONCURRENT_POSITIONS_CAP, MAX_SINGLE_ASSET_MARGIN
                 from scripts.instrument_pool import load_instruments
                 pool_len = len(load_instruments() or []) or 8
                 max_pos = MAX_CONCURRENT_POSITIONS_CAP if MAX_CONCURRENT_POSITIONS_CAP > 0 else pool_len
-                budget_val = float(max_pos * (MAX_SINGLE_ASSET_MARGIN or 600.0))
+                reference_cap = round(float(max_pos) * float(MAX_SINGLE_ASSET_MARGIN or 0.0), 4)
             except Exception:
-                budget_val = 5000.0
+                reference_cap = None
 
-        total_budget = budget_val if budget_val > 0 else 5000.0
+        budget_mode = "configured" if budget_val > 0 else "uncapped"
+        total_budget = budget_val if budget_val > 0 else None
         env = _global_env_axis()
         from r20_backend.risk_reservation import get_manager
         mgr = get_manager()
@@ -587,7 +594,9 @@ def _load_portfolio_risk_data() -> dict:
         return {
             "environment": env,
             "status": "ok",
+            "budget_mode": budget_mode,
             "total_budget_usdt": round(total_budget, 4) if total_budget is not None else None,
+            "reference_cap_usdt": reference_cap,
             "reserved_usdt": round(reserved, 4),
             "available_usdt": avail,
             "utilization_pct": utilization,
@@ -598,7 +607,8 @@ def _load_portfolio_risk_data() -> dict:
         return {
             "environment": _global_env_axis(),
             "status": "unavailable",
-            "total_budget_usdt": None, "reserved_usdt": None,
+            "budget_mode": None,
+            "total_budget_usdt": None, "reference_cap_usdt": None, "reserved_usdt": None,
             "available_usdt": None, "utilization_pct": None, "by_venue": {},
             "error": str(exc)[:160],
         }

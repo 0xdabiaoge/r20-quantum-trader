@@ -371,11 +371,13 @@ async function removeProvider() {
   const p = selectedProvider.value
   if (!p || p.is_new) return
   const n = p.models_count ?? p.models?.length ?? 0
-  const warn = n > 0 ? `\n其名下 ${n} 个模型将一并删除！` : ''
   // 批C(2026-09-13)：删供应商可能带走主脑激活模型 → danger + 提示先切换模型
+  // 批2(2026-09-13)：原先这里算出 warn 却从未使用（vue-tsc TS6133），模型联删提示形同丢失，
+  // 现直接并入确认文案，保证「删之前知道会带走什么」。
+  const cascade = n > 0 ? `，其名下 ${n} 个模型将一并删除` : ''
   const _ok = await ask({
     title: '删除 LLM 供应商',
-    desc: `「${p.name}」将被删除${n > 0 ? `，其名下 ${n} 个模型一并删除` : ''}`,
+    desc: `「${p.name}」将被删除${cascade}`,
     detail: '若它挂着当前主脑激活模型，请先切换模型再删除',
     danger: true,
     okText: '删除',

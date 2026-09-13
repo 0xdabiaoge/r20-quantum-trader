@@ -17,8 +17,6 @@ const { t } = useI18n();
 const account = computed(() => store.data?.account || ({} as any));
 const today = computed(() => (store.data as any)?.today_stats || {});
 
-const equity = computed(() => fmtNum(Number(account.value.total_eq || 0), 2));
-
 /** 多所组合总权益与保证金占用 */
 const isLiveEnv = computed(() => venueStore.environment === 'live');
 const envBadgeText = computed(() => (isLiveEnv.value ? t('dash.venueAccounts.envLive') : t('dash.venueAccounts.envDemo')));

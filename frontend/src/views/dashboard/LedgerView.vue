@@ -92,8 +92,6 @@ const fundingIncome = computed(() => filtered.value.reduce((s, x) => s + Math.ma
 const fundingExpense = computed(() => filtered.value.reduce((s, x) => s + Math.abs(Math.min(0, Number(x.funding_fee) || 0)), 0));
 const wins = computed(() => filtered.value.filter((x) => Number(x.net_pnl) > 0).length);
 const winRate = computed(() => (filtered.value.length ? Math.round((wins.value / filtered.value.length) * 1000) / 10 : null));
-const best = computed(() => (perf.value.leaderboard || [])[0]);
-
 /* —— 详情 —— */
 const detail = ref<any>(null);
 

@@ -85,6 +85,8 @@ from risk_constants import (
     TIME_STOP_ATR_BAND,
     TIME_STOP_HOURS,
     effective_max_positions,
+    effective_daily_loss_limit,
+    effective_single_asset_margin,
 )
 
 WORKSPACE_DIR = str(_PROJECT_ROOT)
@@ -163,22 +165,8 @@ MAX_CONCURRENT_POSITIONS, MAX_SAME_DIRECTION_POSITIONS = effective_max_positions
 TAKER_FEE_RATE = 0.0005
 MAKER_FEE_RATE = 0.0002 # Limit Order Maker Fee (60% Lower Than Market Taker)
 # 日亏熔断/单标的保证金/金字塔加仓等阈值均由 risk_constants 单一事实源注入（.env 可配）。
-
-
-def effective_daily_loss_limit(usdt_available: float = None) -> float:
-    """单日亏损熔断线 = min(绝对封顶, 可用余额 5%)，小资金账户自动收紧。"""
-    cap = MAX_DAILY_LOSS_USDT
-    if usdt_available and usdt_available > 0:
-        cap = min(cap, max(round(float(usdt_available) * DAILY_LOSS_EQUITY_RATIO, 2), 1.0))
-    return cap
-
-
-def effective_single_asset_margin(usdt_available: float = None) -> float:
-    """单标的累计保证金上限 = min(绝对封顶, 可用余额 30%)，与提示词风险预算同口径。"""
-    cap = MAX_SINGLE_ASSET_MARGIN
-    if usdt_available and usdt_available > 0:
-        cap = min(cap, max(round(float(usdt_available) * SINGLE_ASSET_EQUITY_RATIO, 2), 1.0))
-    return cap
+# 审计 P1-1(2026-09-13)：两个 min() 口径（封顶 ∩ 权益占比）已上移 risk_constants，
+# 提示词构建器/执行面共用同一函数对象——此处不再保留本地拷贝（曾是三份拷贝漂移之源）。
 
 
 # 单笔 1R 风险额与单笔保证金占比 (RISK_PER_TRADE_EQUITY_RATIO / MAX_MARGIN_EQUITY_RATIO)

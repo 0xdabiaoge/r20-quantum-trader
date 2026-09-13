@@ -191,7 +191,10 @@ PRESETS: dict[str, dict[str, Any]] = {
             ],
             "trading_user": [
                 {"id": "base-ts-time", "title": "当前决策时间戳与市场时效", "locked": True, "enabled": True, "source": "base",
-                 "content": "======================= 【当前决策时间戳与市场时效】 =======================\n{{decision_timestamp}}\n{{account_balance}}"},
+                 # 审计 P1-1(2026-09-13)：代码预设此前漏了 {{risk_budget}}（线上库里有），
+                 # 一旦 load_library 回退到预设，模型就完全收不到【本周期风险预算】小节，
+                 # 而 SYSTEM PROMPT 却要求"一切金额类参数以该小节为准"——金额口径直接失锚。
+                 "content": "======================= 【当前决策时间戳与市场时效】 =======================\n{{decision_timestamp}}\n{{account_balance}}\n{{risk_budget}}"},
                 {"id": "base-ts-news", "title": "全网实时重大快讯与宏观情报", "locked": True, "enabled": True, "source": "base",
                  "content": "======================= 【全网实时重大快讯与宏观情报】 =======================\n{{news_intelligence}}"},
                 {"id": "base-ts-pos", "title": "账户当前持仓与风险敞口全景", "locked": True, "enabled": True, "source": "base",
@@ -330,11 +333,50 @@ def base_template_modules(text: str, pipeline: str) -> list[dict[str, Any]]:
     return modules
 
 
+def _inherit_module_tags(submitted: list[Any], stored: Any) -> list[Any]:
+    """提交的模块缺 source/locked 时，从同 id（或同标题）的已存模块继承。
+
+    审计 P1-2 同族：UI 的模块视图会把 base 模块的 locked 抹平；若再丢掉 source=base
+    标签，`apply_module_layout` 就会认为「这条管线没有 base 模块」→ 把整段 base 前置，
+    叠加已含同样内容的模块 = 提示词翻倍。显式传入的值永远优先。
+    """
+    if not isinstance(stored, list) or not stored:
+        return submitted
+    by_id = {str(m.get("id")): m for m in stored if isinstance(m, dict) and m.get("id")}
+    by_title = {str(m.get("title")): m for m in stored if isinstance(m, dict) and m.get("title")}
+    out: list[Any] = []
+    for item in submitted:
+        if not isinstance(item, dict):
+            out.append(item)
+            continue
+        ref = by_id.get(str(item.get("id"))) or by_title.get(str(item.get("title")))
+        if isinstance(ref, dict):
+            merged = dict(item)
+            for field in ("source", "locked"):
+                if field not in item and field in ref:
+                    merged[field] = ref[field]
+            out.append(merged)
+        else:
+            out.append(item)
+    return out
+
+
 def _clean_pipelines(raw: Any, legacy: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
     source=raw if isinstance(raw,dict) else {}
+    # 审计 P1-2(2026-09-13)：本次提交**没提到**的管线必须原样保留已存定义。
+    # 旧实现在这里用扁平文本 text_to_modules(..., "legacy") 重建 → source 从 base 变
+    # legacy → 下一轮 apply_module_layout 判定「无 base 模块」→ 把 base 整段前置，
+    # 于是「保存心法页」会让交易提示词 6452 → 12906 字符（×2.00，军规/JSON 契约各两遍）。
+    stored_pipelines = legacy.get("pipelines") if isinstance(legacy, dict) else None
+    stored_pipelines = stored_pipelines if isinstance(stored_pipelines, dict) else {}
     result={}
     for key in TEMPLATE_KEYS:
-        modules=source.get(key) if isinstance(source.get(key),list) else text_to_modules(str(legacy.get(key) or ""),"legacy")
+        if isinstance(source.get(key), list):
+            modules = _inherit_module_tags(source[key], stored_pipelines.get(key))
+        elif isinstance(stored_pipelines.get(key), list) and stored_pipelines.get(key):
+            modules = stored_pipelines[key]
+        else:
+            modules=text_to_modules(str(legacy.get(key) or ""),"legacy")
         result[key]=[_module(item,i) for i,item in enumerate(modules[:MAX_MODULES_PER_PIPELINE]) if isinstance(item,dict)]
     return result
 
@@ -555,7 +597,20 @@ def update_profile(profile_id: str, changes: dict[str, Any], note: str = "更新
     else:
         raise ValueError("提示词方案不存在")
     accepted = {k: v for k, v in changes.items() if k in {"name", "description", "enabled", "editor_mode", "simple_policy", "pipelines", *TEMPLATE_KEYS}}
+    # 审计 P1-2 关键修复：调用方可以只提交一条管线（如心法页只提交 evolution_system），
+    # 此时必须与**已存**管线逐键合并后再清理；否则未提到的管线会被扁平文本重建成
+    # legacy 模块（丢掉 source=base 标签），下一轮 apply_module_layout 判定「无 base 模块」
+    # 就把整段 base 前置 → 该管线提示词翻倍（实测保存心法页后交易提示词 ×2.00）。
+    submitted_keys = {k for k in TEMPLATE_KEYS if isinstance((changes.get("pipelines") or {}).get(k), list)}
+    if submitted_keys:
+        stored_pipelines = current.get("pipelines") if isinstance(current.get("pipelines"), dict) else {}
+        merged = copy.deepcopy(stored_pipelines)
+        for key in submitted_keys:
+            # 提交里漏了 source/locked 时从已存同 id/同标题模块继承（见 _inherit_module_tags）
+            merged[key] = _inherit_module_tags(accepted["pipelines"][key], stored_pipelines.get(key))
+        accepted["pipelines"] = merged
     flat_updates = [key for key in TEMPLATE_KEYS if key in accepted]
+    submitted_keys |= set(flat_updates)
     if "pipelines" not in accepted and flat_updates:
         accepted["pipelines"] = copy.deepcopy(current.get("pipelines") or {})
         for key in flat_updates: accepted["pipelines"][key] = text_to_modules(str(accepted[key] or ""), "legacy")
@@ -564,6 +619,16 @@ def update_profile(profile_id: str, changes: dict[str, Any], note: str = "更新
     updated = _clean_profile({**current, **accepted, "updated_at": _now()}, profile_id)
     check = validate_profile(updated)
     if not check["valid"]: raise ValueError("；".join(check["errors"]))
+    # 硬闸（审计 P1-2）：本次没提交的管线，保存后渲染文本必须逐字节不变——
+    # 任何「保存 A 页把 B 管线改了」都说明重建路径又复活了（旧实现在此把 B 管线
+    # 全部降级成 legacy，下一轮布局就把 base 前置导致整段翻倍）。
+    # submitted_keys 取自**原始请求**（上面的 merge 已把四条键补齐，不能拿合并后的判）。
+    for key in TEMPLATE_KEYS:
+        if key in submitted_keys: continue
+        before = compile_modules((current.get("pipelines") or {}).get(key) or [])
+        after = compile_modules((updated.get("pipelines") or {}).get(key) or [])
+        if before.strip() != after.strip():
+            raise ValueError(f"内部一致性错误：本次未提交 {key}，但其内容在保存过程中被改变（禁止静默改写其他管线）")
     library["profiles"][profile_id] = updated
     library["revisions"].append(_revision(updated, "update", note))
     library["revisions"] = library["revisions"][-MAX_REVISIONS:]

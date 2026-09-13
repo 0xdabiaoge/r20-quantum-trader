@@ -46,6 +46,8 @@ export const enVenueAccounts = {
     reserved: 'Reserved',
     available: 'Available',
     usage: 'Budget used {pct}%',
+    uncapped: 'No engine cap',
+    uncappedRef: 'Reference cap {cap}',
     pending: 'Awaiting reservation layer data',
     envMismatch: 'Data environment differs from current selection',
     tip: 'Portfolio risk budget',

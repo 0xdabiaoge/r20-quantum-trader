@@ -17,11 +17,15 @@ def isolate_config(test):
                  'r20_gateway.secrets'):
         importlib.import_module(name)
     # Patch every already-bound alias, not just the defining module (law 2).
+    # 白名单必须覆盖**顶层名**形式的兄弟模块：`scripts/` 在 sys.path 上，脚本以
+    # `import ai_brain_trader` 引入的是与 `scripts.ai_brain_trader` 不同的模块实例，
+    # 不在白名单里就完全不被重定向 → 测试会写生产 data/（如 ai_brain_last_prompt.txt、
+    # system_prompt_override.txt）。批2 P1-3 回归测试就是被这条断言抓出来的。
     for name, module in list(sys.modules.items()):
         if not module or name.startswith('tests'):
             continue
         if not (name.startswith(('r20_backend.', 'r20_gateway.', 'scripts.')) or
-                name in ('prompt_library', 'evolution_shield')):
+                name in ('prompt_library', 'evolution_shield', 'ai_brain_trader', 'ai_factor_trader')):
             continue
         for key, value in list(vars(module).items()):
             if not key.isupper() or not isinstance(value, (str, Path)):

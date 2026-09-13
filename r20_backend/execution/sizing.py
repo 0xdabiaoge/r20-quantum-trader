@@ -10,23 +10,12 @@ from scripts.risk_constants import (
     SINGLE_ASSET_EQUITY_RATIO,
     RISK_PER_TRADE_EQUITY_RATIO,
     MAX_MARGIN_EQUITY_RATIO,
+    # 审计 P1-1(2026-09-13)：这两条 min() 口径曾在本文件与 ai_factor_trader 各存一份拷贝，
+    # 而提示词构建器根本没做 min()（模型看到 1496.82U/日亏 −249.47U，引擎实际 600U/−150U）。
+    # 现统一从 risk_constants 复用同一函数对象，任何改动全链路同步。
+    effective_daily_loss_limit,
+    effective_single_asset_margin,
 )
-
-
-def effective_daily_loss_limit(usdt_available: Optional[float] = None) -> float:
-    """单日亏损熔断线 = min(绝对封顶, 可用余额 5%)，小资金账户自动收紧。"""
-    cap = MAX_DAILY_LOSS_USDT
-    if usdt_available and usdt_available > 0:
-        cap = min(cap, max(round(float(usdt_available) * DAILY_LOSS_EQUITY_RATIO, 2), 1.0))
-    return cap
-
-
-def effective_single_asset_margin(usdt_available: Optional[float] = None) -> float:
-    """单标的累计保证金上限 = min(绝对封顶, 可用余额 30%)，与提示词风险预算同口径。"""
-    cap = MAX_SINGLE_ASSET_MARGIN
-    if usdt_available and usdt_available > 0:
-        cap = min(cap, max(round(float(usdt_available) * SINGLE_ASSET_EQUITY_RATIO, 2), 1.0))
-    return cap
 
 
 def effective_risk_per_trade(pool_risk_usd: float, usdt_available: Optional[float] = None) -> float:

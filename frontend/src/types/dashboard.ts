@@ -179,7 +179,11 @@ export interface VenueDecisionEvidence {
 export interface PortfolioRiskRow {
   /** 该数据所属资金环境（如 demo-trading / live）；缺省不展示比对 */
   environment?: string
+  /** configured = 引擎按该总预算硬封顶；uncapped = 未配置（0）→ 引擎不封顶，预算相关字段一律 null */
+  budget_mode?: 'configured' | 'uncapped' | null
   total_budget_usdt?: number | null
+  /** 仅 uncapped 时给出的**展示参考**（最高持仓数×单标的封顶），绝不当作预算/占用率分母 */
+  reference_cap_usdt?: number | null
   reserved_usdt?: number | null
   available_usdt?: number | null
   updated_utc?: string

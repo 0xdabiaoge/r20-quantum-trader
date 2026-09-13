@@ -21,19 +21,26 @@ import scripts.okx_rest as okx_rest
 # 风控提示词与执行层共用单一事实源，防止「提示词口径 vs 代码口径」漂移
 from risk_constants import (
     DAILY_LOSS_EQUITY_RATIO,
+    MAX_CONCURRENT_POSITIONS_CAP,
+    MAX_DAILY_LOSS_USDT,
     MAX_LEVERAGE,
     MIN_LEVERAGE,
     MAX_MARGIN_EQUITY_RATIO,
     MAX_SAME_DIRECTION_POSITIONS,
     MAX_SCALE_IN_COUNT,
+    MAX_SINGLE_ASSET_MARGIN,
     MIN_ENTRY_CONFIDENCE,
     MIN_RISK_REWARD_RATIO,
     MIN_SCALE_IN_CONFIDENCE,
     MIN_SCALE_IN_PROFIT_RATIO,
+    PORTFOLIO_RISK_BUDGET_USDT,
     RISK_PER_TRADE_EQUITY_RATIO,
     SINGLE_ASSET_EQUITY_RATIO,
     STOP_COOLDOWN_MINUTES,
+    TIME_STOP_ATR_BAND,
     TIME_STOP_HOURS,
+    effective_daily_loss_limit,
+    effective_single_asset_margin,
 )
 import json
 import time
@@ -196,16 +203,35 @@ def get_cpa_client_config() -> Tuple[str, str]:
         os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY") or "",
     )
 
-def get_effective_system_prompt() -> str:
-    """Append a locally managed admin override without replacing audited safety rules."""
+def read_prompt_override() -> str:
+    """读取管理员提示词覆盖层（不存在/不可读 → 空串，绝不抛）。"""
     try:
         if os.path.exists(PROMPT_OVERRIDE_FILE):
-            override = open(PROMPT_OVERRIDE_FILE, "r", encoding="utf-8").read().strip()
-            if override:
-                return f"{SYSTEM_PROMPT}\n\n【管理员提示词覆盖层（同样必须遵守上述风控和 JSON 约束）】\n{override}"
+            with open(PROMPT_OVERRIDE_FILE, "r", encoding="utf-8") as handle:
+                return handle.read().strip()
     except OSError:
         pass
-    return SYSTEM_PROMPT
+    return ""
+
+
+def get_effective_system_prompt(profile: Dict[str, Any] = None, context: Dict[str, Any] = None) -> str:
+    """模型真正收到的 System Prompt = 模块布局(SYSTEM_PROMPT) → **之后**再追加管理员覆盖层。
+
+    审计 P1-3(2026-09-13)：旧实现把覆盖层拼在 SYSTEM_PROMPT 尾部再交给
+    `apply_module_layout(..., "trading_system", ...)`——而该布局只输出被列名的模块，
+    未列名的 base 段（正是这段覆盖层）被直接丢弃，且 fail-closed 只对 trading_user 生效。
+    于是 UI 承诺"下一次 AI 推演循环将自动叠加此提示词覆盖层"，模型却从未收到过。
+    现在覆盖层在布局**之后**拼接，顺序与 UI 呈现一致；接口侧同样调用本函数，
+    保证「看到的」= 「模型收到的」。
+    """
+    prof = profile if isinstance(profile, dict) and profile else active_profile()
+    effective = apply_module_layout(
+        SYSTEM_PROMPT, prof, "trading_system", f"{prof.get('name', '稳健')}交易系统提示词模板", context=context
+    )
+    override = read_prompt_override()
+    if override:
+        effective = f"{effective}\n\n【管理员提示词覆盖层（同样必须遵守上述风控和 JSON 约束）】\n{override}"
+    return effective
 
 
 def fetch_single_instrument_package(item: Dict[str, Any]) -> Dict[str, Any]:
@@ -828,6 +854,73 @@ def _xvenue_prompt_line(p: Dict[str, Any]) -> str:
 SYSTEM_PROMPT = _SYSTEM_CORE + _PYRAMID + "\n" + _SYSTEM_JSON_CONTRACT
 
 
+def build_risk_budget_text(usdt_available: float = None) -> str:
+    """【本周期风险预算】小节（审计 P1-1，2026-09-13）。
+
+    旧实现自己算「权益×5% / 权益×30%」，漏掉了绝对封顶，于是模型看到
+    单标的 1496.82U / 日亏 −249.47U，而引擎执行 `min(600, 1496.82)`=600U、
+    `min(150, 249.47)`=150U（虚高 2.49× / 1.66×）——偏偏 SYSTEM PROMPT 要求模型
+    "一切金额类参数一律以【本周期风险预算】小节为准"，模型据此规划的是不存在的空间。
+
+    现在两个封顶值直接取 `risk_constants.effective_*`（与执行层同一函数对象），
+    并把此前对模型完全不可见的 5 个旋钮一并披露：组合风险总预算、并发持仓上限、
+    单标的绝对封顶、日亏绝对封顶、时间止损带宽。
+    """
+    if usdt_available is None or usdt_available < 0:
+        return "[MISSING_CONTEXT:risk_budget]"
+    # 风险预算按「实际可用余额」自适应推导：预设绝不写死绝对金额，避免与小资金账户(如 80U)冲突。
+    _eq = float(usdt_available)
+    _m_lo = round(_eq * 0.03, 2)
+    _m_hi = round(_eq * min(0.12, MAX_MARGIN_EQUITY_RATIO), 2)
+    _m_strong = round(_eq * MAX_MARGIN_EQUITY_RATIO, 2)
+    # 单标的累计 = min(绝对封顶 600U, 权益×30%)；日亏熔断 = min(绝对封顶 150U, 权益×5%)
+    _asset_cap = effective_single_asset_margin(_eq)
+    _daily_stop = effective_daily_loss_limit(_eq)
+    # 单笔上限同样受单标的累计封顶约束（首笔即计入累计）：min(权益×20%, 单标的封顶)
+    _m_strong_cap = min(_m_strong, _asset_cap)
+    _asset_cap_note = (f"min({MAX_SINGLE_ASSET_MARGIN:g} 绝对封顶, 可用余额 {SINGLE_ASSET_EQUITY_RATIO:.0%})"
+                       if _asset_cap < round(_eq * SINGLE_ASSET_EQUITY_RATIO, 2) else f"可用余额 {SINGLE_ASSET_EQUITY_RATIO:.0%}")
+    _daily_stop_note = (f"min({MAX_DAILY_LOSS_USDT:g} 绝对封顶, 可用余额 {DAILY_LOSS_EQUITY_RATIO:.0%})"
+                        if _daily_stop < round(max(_eq * DAILY_LOSS_EQUITY_RATIO, 1.0), 2) else f"可用余额 {DAILY_LOSS_EQUITY_RATIO:.0%}")
+    text = (
+        f"【本周期风险预算｜按实际可用余额 {_eq:.2f} USDT 与后台风控配置自适应推导，严禁套用任何固定绝对金额】:\n"
+        f"- 常规单笔保证金: {_m_lo} ~ {_m_hi} USDT (可用余额 3%~{min(0.12, MAX_MARGIN_EQUITY_RATIO):.0%})\n"
+        f"- 强信号单笔保证金上限: {round(_m_strong_cap, 2)} USDT "
+        f"(min(权益 {MAX_MARGIN_EQUITY_RATIO:.0%}={_m_strong}, 单标的封顶 {round(_asset_cap, 2)})，执行层硬顶)\n"
+        f"- 单标的累计保证金上限(含金字塔加仓): {_asset_cap} USDT ({_asset_cap_note}，执行层已按同一 min() 硬夹)\n"
+        f"- 单笔最大可承受亏损: 以 1.0R 为基准，且不超过可用余额 {RISK_PER_TRADE_EQUITY_RATIO:.0%}\n"
+        f"- 当日累计亏损熔断线: -{_daily_stop} USDT ({_daily_stop_note}，执行层已按同一 min() 硬夹)\n"
+        f"- 全系统同向持仓上限: {MAX_SAME_DIRECTION_POSITIONS} 笔 (多/空各自封顶，执行层硬拦截)\n"
+        f"- 全系统并发持仓上限: "
+        + (f"{MAX_CONCURRENT_POSITIONS_CAP} 笔 (执行层硬拦截)\n" if MAX_CONCURRENT_POSITIONS_CAP > 0
+           else "未单独设限 (0=不额外收紧；实际受标的池容量与同向上限约束)\n")
+        + (
+            f"- 组合风险总预算(跨所合算): {PORTFOLIO_RISK_BUDGET_USDT:.2f} USDT (执行层按总名义敞口强制)\n"
+            if PORTFOLIO_RISK_BUDGET_USDT > 0 else
+            "- 组合风险总预算(跨所合算): 未设上限 (0=引擎不封顶，仅受单标的/同向/并发上限约束)\n"
+        )
+        + f"- 最长持仓时间: {TIME_STOP_HOURS:g} 小时 (超时且横盘无突破将被时间止损离场；横盘判定带宽 ±{TIME_STOP_ATR_BAND:.0%} ATR)\n"
+        f"- 单笔杠杆区间: {MIN_LEVERAGE:g}x ~ {MAX_LEVERAGE:g}x (在区间内按信号强度自主裁决；区间外执行层自动钳制)\n"
+        f"- 盈亏比 R:R 硬底线: {MIN_RISK_REWARD_RATIO:.1f} (低于此值的报价执行层物理拒绝)\n"
+        f"- 新开仓最低置信度门禁: {MIN_ENTRY_CONFIDENCE:g}% (低于此值禁止新开仓)\n"
+        + (
+            "- 金字塔加仓: 已禁用 (最大加仓次数 0，在途持仓仅可 HOLD/UPDATE_SL/CLOSE_MARKET)\n"
+            if MAX_SCALE_IN_COUNT <= 0 else
+            f"- 金字塔加仓门禁: 最多 {MAX_SCALE_IN_COUNT} 次 · 底仓浮盈 ≥ {MIN_SCALE_IN_PROFIT_RATIO:.1%} 且已保本 · 置信度 ≥ {MIN_SCALE_IN_CONFIDENCE:g}%\n"
+        )
+        + f"- 止损后同标的冷静期: {STOP_COOLDOWN_MINUTES} 分钟"
+    )
+    if _eq < 200.0:
+        text += (
+            "\n- ⚠️ 小资金账户提示: 可用余额偏小，按百分比推导的保证金可能低于部分永续合约的交易所最小下单名义价值"
+            "（如高单价币种 BTC 一张合约的名义价值就可能超过账户余额）。此时应当【减少同时持有的标的数量】、"
+            "优先选择最小名义价值与账户规模匹配的标的，或适度提高单笔保证金占比；"
+            "绝不允许通过压缩止损距离或降低盈亏比来迁就资金规模。"
+            "若某标的在当前余额下无法同时满足最小下单量、止损呼吸空间与 R:R≥2.0，该标的必须输出 WAIT 并说明资金不匹配。"
+        )
+    return text
+
+
 def construct_full_market_prompt(packages: List[Dict[str, Any]], pos_summary: str = "[MISSING_CONTEXT:account_positions]", active_positions_detail: List[Dict[str, Any]] = None, pending_orders_detail: List[Dict[str, Any]] = None, current_time_str: str = "", usdt_available: float = None, runtime_context_out: Dict[str, Any] = None, policy_snapshot: Dict[str, Any] = None) -> str:
     tz_bj = datetime.timezone(datetime.timedelta(hours=8))
     now_bj_str = current_time_str or datetime.datetime.now(tz_bj).strftime("%Y-%m-%d %H:%M:%S (北京时间)")
@@ -986,43 +1079,7 @@ def construct_full_market_prompt(packages: List[Dict[str, Any]], pos_summary: st
 
     avail_balance_str = f"{usdt_available:.2f} USDT" if usdt_available is not None and usdt_available >= 0 else "[MISSING_CONTEXT:account_balance]"
 
-    # 风险预算按「实际可用余额」自适应推导：预设绝不写死绝对金额，避免与小资金账户(如 80U)冲突。
-    if usdt_available is None or usdt_available < 0:
-        risk_budget_text = "[MISSING_CONTEXT:risk_budget]"
-    else:
-        _eq = float(usdt_available)
-        _m_lo = round(_eq * 0.03, 2)
-        _m_hi = round(_eq * min(0.12, MAX_MARGIN_EQUITY_RATIO), 2)
-        _m_strong = round(_eq * MAX_MARGIN_EQUITY_RATIO, 2)
-        _asset_cap = round(_eq * SINGLE_ASSET_EQUITY_RATIO, 2)
-        _daily_stop = round(max(_eq * DAILY_LOSS_EQUITY_RATIO, 1.0), 2)
-        risk_budget_text = (
-            f"【本周期风险预算｜按实际可用余额 {_eq:.2f} USDT 与后台风控配置自适应推导，严禁套用任何固定绝对金额】:\n"
-            f"- 常规单笔保证金: {_m_lo} ~ {_m_hi} USDT (可用余额 3%~{min(0.12, MAX_MARGIN_EQUITY_RATIO):.0%})\n"
-            f"- 强信号单笔保证金上限: {_m_strong} USDT ({MAX_MARGIN_EQUITY_RATIO:.0%}，执行层硬顶)\n"
-            f"- 单标的累计保证金上限(含金字塔加仓): {_asset_cap} USDT ({SINGLE_ASSET_EQUITY_RATIO:.0%})\n"
-            f"- 单笔最大可承受亏损: 以 1.0R 为基准，且不超过可用余额 {RISK_PER_TRADE_EQUITY_RATIO:.0%}\n"
-            f"- 当日累计亏损熔断线: -{_daily_stop} USDT (可用余额 {DAILY_LOSS_EQUITY_RATIO:.0%})\n"
-            f"- 全系统同向持仓上限: {MAX_SAME_DIRECTION_POSITIONS} 笔 (多/空各自封顶，执行层硬拦截)\n"
-            f"- 最长持仓时间: {TIME_STOP_HOURS:g} 小时 (超时且横盘无突破将被时间止损离场)\n"
-            f"- 单笔杠杆区间: {MIN_LEVERAGE:g}x ~ {MAX_LEVERAGE:g}x (在区间内按信号强度自主裁决；区间外执行层自动钳制)\n"
-            f"- 盈亏比 R:R 硬底线: {MIN_RISK_REWARD_RATIO:.1f} (低于此值的报价执行层物理拒绝)\n"
-            f"- 新开仓最低置信度门禁: {MIN_ENTRY_CONFIDENCE:g}% (低于此值禁止新开仓)\n"
-            + (
-                "- 金字塔加仓: 已禁用 (最大加仓次数 0，在途持仓仅可 HOLD/UPDATE_SL/CLOSE_MARKET)\n"
-                if MAX_SCALE_IN_COUNT <= 0 else
-                f"- 金字塔加仓门禁: 最多 {MAX_SCALE_IN_COUNT} 次 · 底仓浮盈 ≥ {MIN_SCALE_IN_PROFIT_RATIO:.1%} 且已保本 · 置信度 ≥ {MIN_SCALE_IN_CONFIDENCE:g}%\n"
-            )
-            + f"- 止损后同标的冷静期: {STOP_COOLDOWN_MINUTES} 分钟"
-        )
-        if _eq < 200.0:
-            risk_budget_text += (
-                "\n- ⚠️ 小资金账户提示: 可用余额偏小，按百分比推导的保证金可能低于部分永续合约的交易所最小下单名义价值"
-                "（如高单价币种 BTC 一张合约的名义价值就可能超过账户余额）。此时应当【减少同时持有的标的数量】、"
-                "优先选择最小名义价值与账户规模匹配的标的，或适度提高单笔保证金占比；"
-                "绝不允许通过压缩止损距离或降低盈亏比来迁就资金规模。"
-                "若某标的在当前余额下无法同时满足最小下单量、止损呼吸空间与 R:R≥2.0，该标的必须输出 WAIT 并说明资金不匹配。"
-            )
+    risk_budget_text = build_risk_budget_text(usdt_available)
 
     prompt = f"""======================= 【当前决策时间戳与市场时效】 =======================
 【推演基准时间】: {now_bj_str}
@@ -1412,9 +1469,8 @@ def execute_batch_ai_brain_cycle(
     prompt = construct_full_market_prompt(packages, pos_summary, positions_context, pending_orders_detail=pending_orders_list, current_time_str=time_str, usdt_available=usdt_available, runtime_context_out=runtime_context, policy_snapshot=policy_snapshot)
 
     profile = active_profile()
-    effective_system_prompt = apply_module_layout(
-        get_effective_system_prompt(), profile, "trading_system", f"{profile.get('name', '稳健')}交易系统提示词模板", context=runtime_context
-    )
+    # 审计 P1-3：覆盖层由 get_effective_system_prompt 在布局**之后**追加（此前被布局丢弃）
+    effective_system_prompt = get_effective_system_prompt(profile=profile, context=runtime_context)
 
     # Save Realtime Prompt Snapshot for Web Transparent Inspection
     try:

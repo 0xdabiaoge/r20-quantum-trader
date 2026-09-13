@@ -50,7 +50,6 @@ export const enCommon = {
     notConfigured: 'Not configured',
     none: 'None',
     total: 'Total',
-    all: 'All',
     reset: 'Reset',
     apply: 'Apply',
     applyAll: 'Apply all',

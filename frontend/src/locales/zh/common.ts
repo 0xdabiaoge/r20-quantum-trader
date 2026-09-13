@@ -51,7 +51,6 @@ export const zhCommon = {
     notConfigured: '未配置',
     none: '无',
     total: '合计',
-    all: '全部',
     reset: '重置',
     apply: '应用',
     applyAll: '一键应用',

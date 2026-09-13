@@ -1,6 +1,6 @@
 /** 策略版本快照页文案 */
 export const zhAdminPolicySnapshot = {
-  desc: '四大策略单元（提示词、自进化、物理拦截、模型委员会）的不可变指纹聚合，支持具名归档与一键回滚',
+  desc: '四大策略单元（提示词、自进化、物理拦截、模型委员会）+ 风控/路由的整包指纹聚合；支持具名归档与回滚（回滚后逐单元校验，任一单元未还原即自动退回原状态）',
   loading: '正在计算并聚合四大策略单元实时指纹...',
   notRecorded: '未记录',
   btn: {
@@ -37,7 +37,7 @@ export const zhAdminPolicySnapshot = {
     interceptor: {
       title: '物理拦截插件',
       core: '核心不可禁用底座:',
-      coreValue: '几何/有限性/75%置信/2.0R',
+      coreValue: '数据完整性/方向冲突/报价几何·有限性/盈亏比底线（阈值取实时风控配置）',
       pluginsHash: '插件管线指纹 Plugins Hash:',
       enabled: '启用可选插件:',
       enabledValue: '{n} / {t} 个插件',
@@ -63,7 +63,7 @@ export const zhAdminPolicySnapshot = {
   archive: {
     title: '历史策略版本库',
     count: '{n} 个已归档策略包',
-    hint: '可一键将提示词、心法、拦截器及委员会完整还原至指定瞬间',
+    hint: '可将提示词、心法、拦截器、委员会与风控/路由还原至归档瞬间；回滚后逐单元核对，失败自动回退',
     empty: '暂无已归档的策略版本。点击右上角「归档为策略版本」即可永久固化当前策略包。',
     running: '● 当前正在运行',
     archivedAt: '归档时间',

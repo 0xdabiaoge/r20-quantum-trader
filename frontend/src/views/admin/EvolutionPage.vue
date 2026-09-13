@@ -41,6 +41,8 @@ const workingModules = ref<any[]>([])
 // Structured White-Box Memory state
 const structuredLessons = ref<any[]>([])
 const memoryVersion = ref<string | null>(null)
+/** 结构化记忆是否启用（后端 legacy_read_only=False 表示走结构化 v1 护栏；缺失不猜） */
+const memoryStructured = ref<boolean | null>(null)
 const newMemoryText = ref('')
 const evolutionReport = ref<any>(null)
 
@@ -61,6 +63,7 @@ async function loadData() {
     selectedProfileId.value = libRes?.active_profile_id || 'stable'
     structuredLessons.value = memRes?.structured_lessons || []
     memoryVersion.value = memRes?.version || null
+    memoryStructured.value = memRes && 'legacy_read_only' in memRes ? !memRes.legacy_read_only : null
     evolutionReport.value = reportRes || null
     syncWorkingModules()
   } catch (e: any) {
@@ -92,6 +95,7 @@ async function refreshMemory() {
   const res = await api('/api/v1/admin/memory')
   structuredLessons.value = res.structured_lessons || []
   memoryVersion.value = res.version || null
+  memoryStructured.value = 'legacy_read_only' in res ? !res.legacy_read_only : null
 }
 
 async function reloadMemory() {
@@ -378,9 +382,16 @@ onMounted(loadData)
             <ShieldCheck class="w-3.5 h-3.5 text-emerald-400" />
             <span>{{ t('admin.evolution.guardrailStatus') }}</span>
           </div>
-          <div class="text-sm font-bold text-emerald-400">{{ t('admin.evolution.guardrailActive') }}</div>
+          <div
+            class="text-sm font-bold"
+            :style="{ color: memoryStructured === false ? 'var(--warn)' : memoryStructured === true ? 'var(--up, #34d399)' : 'var(--ink-3)' }"
+          >
+            {{ memoryStructured === true ? t('admin.evolution.guardrailActive')
+              : memoryStructured === false ? t('admin.evolution.guardrailLegacy')
+              : t('admin.evolution.unknown') }}
+          </div>
           <div class="text-[11px] mt-1" style="color: var(--ink-3);">
-            {{ t('admin.evolution.guardrailSub') }}
+            {{ memoryStructured === true ? t('admin.evolution.guardrailSub') : t('admin.evolution.guardrailSubLegacy') }}
           </div>
         </div>
 
@@ -537,10 +548,17 @@ onMounted(loadData)
 
               <!-- Footer Audit Line -->
               <div class="flex items-center justify-between text-[11px] pt-1 border-t" style="border-color: var(--line-1); color: var(--ink-3);">
-                <span>{{ t('admin.evolution.createdAt') }} {{ fmtDateTime(item.created_at) }} {{ t('admin.evolution.sampleSupport') }} {{ item.sample_size || 10 }} {{ t('admin.evolution.sampleUnit') }}</span>
-                <span class="text-emerald-500 flex items-center space-x-1">
+                <span>
+                  {{ t('admin.evolution.createdAt') }} {{ fmtDateTime(item.created_at) }}
+                  · {{ t('admin.evolution.sampleSupport') }}
+                  {{ typeof item.sample_size === 'number' ? `${item.sample_size} ${t('admin.evolution.sampleUnit')}` : t('admin.evolution.unknown') }}
+                </span>
+                <span
+                  class="flex items-center space-x-1"
+                  :style="{ color: typeof item.shield_status === 'string' && item.shield_status ? 'var(--up, #34d399)' : 'var(--ink-3)' }"
+                >
                   <ShieldCheck class="w-3 h-3" />
-                  <span>{{ t('admin.evolution.shieldAudit') }} {{ item.shield_status || 'PASSED' }}</span>
+                  <span>{{ t('admin.evolution.shieldAudit') }} {{ typeof item.shield_status === 'string' && item.shield_status ? item.shield_status : t('admin.evolution.unknown') }}</span>
                 </span>
               </div>
             </div>
