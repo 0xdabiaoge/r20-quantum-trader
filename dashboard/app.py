@@ -122,6 +122,33 @@ def _fetch_json(fn, *args, **kwargs):
     except Exception as exc:  # RuntimeError(OKX 码+msg)、网络错误等人话暴露
         return False, None, f"{type(exc).__name__}: {exc}"
 
+_TRADER_CYCLE_MINUTES_MEMO: list = []   # 非 None 才缓存（trader 周期是代码常量）
+
+
+def _trader_cycle_minutes():
+    """网关调度器 trader 作业的真实周期（分钟）；不可得返回 None。
+
+    批B(2026-09-13)：前台曾把「决策周期 15 分钟」写死当事实展示（后端降频/改周期后
+    照旧宣称）。单一事实源=调度器 JobSpec，此处读真值；任何异常一律 None，由前端
+    决定不渲染——宁缺勿假。
+    """
+    if _TRADER_CYCLE_MINUTES_MEMO:
+        return _TRADER_CYCLE_MINUTES_MEMO[0]
+    try:
+        from r20_gateway.scheduler import current_jobs
+        for _j in current_jobs():
+            if str(getattr(_j, "name", "")) == "trader":
+                _iv = getattr(_j, "interval_seconds", None)
+                if _iv:
+                    _m = max(1, int(round(int(_iv) / 60)))
+                    _TRADER_CYCLE_MINUTES_MEMO.append(_m)
+                    return _m
+                break
+    except Exception:
+        pass
+    return None
+
+
 def _safe_float(value, default=0.0):
     try:
         return float(value)
@@ -1585,7 +1612,11 @@ def update_cache_cycle():
             "cache_age_seconds": 0,
             "timezone": "Asia/Shanghai",
             "bills_complete": False,
-            "bills_coverage_note": "OKX latest 100 bills; NAV remains the cumulative equity source of truth"
+            "bills_coverage_note": "OKX latest 100 bills; NAV remains the cumulative equity source of truth",
+            # 批B(2026-09-13)·决策周期单一事实源：前端 DataStatus 曾 write 死 15 分钟
+            # 当事实读。此处从网关调度器 JobSpec 取真实周期，取不到给 None（前端不渲染，
+            # 宁缺勿假）。trader 周期为代码常量，进程内 memo 一次即可。
+            "cycle_minutes": _trader_cycle_minutes(),
         },
         "system": {
             "disk": {

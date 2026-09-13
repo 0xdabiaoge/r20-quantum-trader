@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useToast } from '../../composables/useToast'
 const toast = useToast()
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import PageHeader from '../../components/admin/PageHeader.vue'
 import { useI18n } from '../../composables/useI18n'
 const { t } = useI18n()
@@ -218,6 +218,14 @@ async function saveSchedule() {
 
 onMounted(() => {
   loadConfig()
+})
+
+// 批B(2026-09-13)·离场清理：旧实现仅在「终态/异常」清定时器，离开本页后 QQ
+// OpenID 捕获/扫码绑定仍每 1.5s 打一次管理接口（最长持续到服务端过期，失败还被
+// 静默吞）。组件卸载即停全部轮询。
+onBeforeUnmount(() => {
+  if (captureTimer) { clearInterval(captureTimer); captureTimer = null }
+  stopBindPolling()
 })
 </script>
 

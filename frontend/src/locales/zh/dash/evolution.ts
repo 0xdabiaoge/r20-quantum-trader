@@ -48,6 +48,7 @@ export const zhEvolution = {
   guard: {
     title: '防污染护栏',
     on: '生效中',
+    off: '未生效',
     desc: '样本不足、情绪化措辞与过拟合经验会被拒绝入库',
     snapshot: '数理快照可观测性',
     snapshotCounts: '动力学 {observed}/{total} · 仅价格 {priceOnly} · 无快照 {none}',

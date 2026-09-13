@@ -21,6 +21,13 @@ const engine = computed(() => {
   return { dot: 'dot-down', cls: '', label: t('status.offline') };
 });
 const updated = computed(() => store.lastUpdated);
+// 批B(2026-09-13)：决策周期改为后端调度器真值（data_health.cycle_minutes），
+// 此前写死 n:15 当事实展示——后端降频/改周期后界面照旧宣称，属 UI 谎报。
+// 取不到一律不渲染该 chip（宁缺勿假）。
+const cycleMinutes = computed<number | null>(() => {
+  const v = Number((health.value as any)?.cycle_minutes);
+  return Number.isFinite(v) && v > 0 ? v : null;
+});
 </script>
 
 <template>
@@ -33,7 +40,7 @@ const updated = computed(() => store.lastUpdated);
       <span class="dot" :class="engine.dot" />
       {{ engine.label }}
     </span>
-    <span class="chip hidden md:inline-flex">{{ t('dash.shell.cycle', undefined, { n: 15 }) }}</span>
+    <span v-if="cycleMinutes" class="chip hidden md:inline-flex">{{ t('dash.shell.cycle', undefined, { n: cycleMinutes }) }}</span>
     <span v-if="updated" class="chip hidden md:inline-flex">
       <span class="t-faint">{{ t('dash.shell.updatedLabel') }}</span>
       <TimeAgo :time="updated" />

@@ -48,10 +48,12 @@ onBeforeUnmount(() => {
       <SlidersHorizontal class="h-4 w-4" />
     </button>
     <Transition name="pop">
+      <!-- 批B(2026-09-13)：窄屏防溢出——固定 256px 且无上限高时，小屏横向可能被裁、
+           竖屏矮窗内容够不着。限宽到视口 -24px，并给纵向滚动（对齐 ToastHost 既有约定）。 -->
       <div
         v-if="open"
         ref="panel"
-        class="float-panel absolute end-0 top-10 w-64 p-3"
+        class="float-panel absolute end-0 top-10 w-64 max-w-[calc(100vw-24px)] max-h-[70vh] overflow-y-auto p-3"
         role="menu"
       >
         <div class="space-y-3">

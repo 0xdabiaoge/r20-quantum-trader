@@ -156,7 +156,7 @@ onUnmounted(() => {
       <!-- Left Sticky Sidebar (TOC) -->
       <aside
         class="w-64 shrink-0 fixed inset-y-12 left-0 z-50 sm:z-30 sm:bg-transparent p-4 sm:p-0 border-r sm:border-r-0 transition-transform duration-200 sm:translate-x-0 sm:sticky sm:top-16 sm:h-[calc(100vh-5rem)] overflow-y-auto"
-        :class="mobileMenuOpen ? 'translate-x-0 bg-[var(--surface-2)] shadow-2xl' : '-translate-x-full sm:translate-x-0'"
+        :class="mobileMenuOpen ? 'translate-x-0 bg-[var(--surface-2)] shadow-2xl' : '-translate-x-full sm:translate-x-0 invisible sm:visible'"
         style="border-color: var(--line-1);"
       >
         <div class="flex items-center justify-between mb-3 px-2">
@@ -208,7 +208,7 @@ onUnmounted(() => {
       <!-- Right Content Area -->
       <main class="min-w-0 flex-1 space-y-14 pb-24">
         <!-- 1. 系统概览与量化哲学 -->
-        <section id="overview" class="space-y-4 pt-2">
+        <section id="overview" class="space-y-4 pt-2 scroll-mt-14">
           <div class="flex items-center space-x-2">
             <span class="px-2.5 py-0.5 rounded text-[11px] font-bold border" style="background-color: var(--accent-bg); color: var(--accent); border-color: var(--accent-line);">CHAPTER 01</span>
             <h2 class="text-xl sm:text-2xl font-semibold tracking-wide" style="color: var(--ink-1);">系统架构与量化哲学</h2>
@@ -263,7 +263,7 @@ onUnmounted(() => {
         </section>
 
         <!-- 2. 双翼工作台与资产控制舱 -->
-        <section id="dashboard" class="space-y-4 pt-6 border-t" style="border-color: var(--line-1);">
+        <section id="dashboard" class="space-y-4 pt-6 border-t scroll-mt-14" style="border-color: var(--line-1);">
           <div class="flex items-center space-x-2">
             <span class="px-2.5 py-0.5 rounded text-[11px] font-bold border" style="background-color: var(--accent-bg); color: var(--accent); border-color: var(--accent-line);">CHAPTER 02</span>
             <h2 class="text-xl sm:text-2xl font-semibold tracking-wide" style="color: var(--ink-1);">双翼量化工作台与资产控制舱</h2>
@@ -321,7 +321,7 @@ onUnmounted(() => {
         </section>
 
         <!-- 3. 多模型决策委员会 -->
-        <section id="council" class="space-y-4 pt-6 border-t" style="border-color: var(--line-1);">
+        <section id="council" class="space-y-4 pt-6 border-t scroll-mt-14" style="border-color: var(--line-1);">
           <div class="flex items-center space-x-2">
             <span class="px-2.5 py-0.5 rounded text-[11px] font-bold border" style="background-color: var(--accent-bg); color: var(--accent); border-color: var(--accent-line);">CHAPTER 03</span>
             <h2 class="text-xl sm:text-2xl font-semibold tracking-wide" style="color: var(--ink-1);">多模型决策委员会 (Council Pro)</h2>

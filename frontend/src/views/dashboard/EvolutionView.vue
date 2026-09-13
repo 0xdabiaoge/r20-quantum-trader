@@ -216,7 +216,13 @@ const md = computed(() => (store.data as any)?.ai_trading_memory_md || '');
             <div class="min-w-0">
               <p class="text-sm font-semibold" style="color: var(--ink-strong)">
                 {{ t('dash.evolution.guard.title') }}
-                <span class="badge badge-up ms-1">{{ t('dash.evolution.guard.on') }}</span>
+                <!-- 批B(2026-09-13)：徽章与左侧盾牌同源派生——旧写法无条件 badge-up+
+                     「生效中」，心法未被保留（memory_preserved=false，盾牌已转黄警示）时
+                     徽章仍报绿「一切正常」，两个信号自相矛盾。 -->
+                <span
+                  class="badge ms-1"
+                  :class="review.memory_preserved !== false ? 'badge-up' : 'badge-warn'"
+                >{{ review.memory_preserved !== false ? t('dash.evolution.guard.on') : t('dash.evolution.guard.off') }}</span>
               </p>
               <p class="t-faint text-xs">{{ t('dash.evolution.guard.desc') }}</p>
               <p v-if="snapAudit" class="mt-1 text-xs" style="color: var(--ink-2)">
