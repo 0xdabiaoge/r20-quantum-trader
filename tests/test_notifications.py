@@ -61,7 +61,10 @@ class NotificationsTests(unittest.TestCase):
             self.assertEqual(args[1], {"content": "Discord消息"})
 
     def test_send_telegram_uses_custom_api_base(self):
-        with patch("r20_backend.notifications._post_json", return_value=(True, "HTTP 200", {"ok": True, "result": {"message_id": 999}})) as mock_post:
+        # 审计修复A6后 telegram 也过 validate_outbound_url（与 webhook/wechat 对齐）；
+        # 假域名按本文件既有惯例打恒等补丁，真实拒绝路径由批1审计回归测试覆盖。
+        with patch("r20_backend.notifications.validate_outbound_url", side_effect=lambda u, **k: u), \
+             patch("r20_backend.notifications._post_json", return_value=(True, "HTTP 200", {"ok": True, "result": {"message_id": 999}})) as mock_post:
             ok, detail = notifications.send_channel("telegram", "Telegram测试", self.env)
             self.assertTrue(ok)
             self.assertIn("accepted", detail)

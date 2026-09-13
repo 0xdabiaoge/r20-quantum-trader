@@ -12,7 +12,8 @@ from fastapi import APIRouter, Body, File, Header, HTTPException, Query, UploadF
 from fastapi.responses import FileResponse
 
 from r20_backend.config import settings, refresh_settings
-from r20_backend.settings_store import update_env, remove_env, mask, mask_url
+from r20_backend.settings_store import update_env, remove_env, mask, mask_url, is_masked
+from r20_gateway.secrets import save_secrets
 from r20_backend.audit import record as audit_record
 from r20_backend.notifications import _env as notification_env, diagnose_channel, test_channel
 from r20_backend.dependencies import (
@@ -74,18 +75,19 @@ def toggle_channel(channel: str, payload: ChannelToggleRequest, x_r20_session: s
         raise HTTPException(status_code=404, detail="未知频道")
 
     # If the user provided inputs while toggling, save them immediately
-    if channel == "wechat" and payload.wechat_webhook is not None:
+    # 审计修复A2：toggle 同样拒绝掩码回写（含 secrets 通道——优先级高于 .env，写坏即告警死亡）
+    if channel == "wechat" and payload.wechat_webhook is not None and not is_masked(payload.wechat_webhook):
         val = payload.wechat_webhook.strip()
         if val:
             save_secrets({"R20_WECHAT_WEBHOOK": val})
             remove_env({"R20_WECHAT_WEBHOOK"})
-    elif channel == "webhook" and payload.webhook_url is not None:
+    elif channel == "webhook" and payload.webhook_url is not None and not is_masked(payload.webhook_url):
         val = payload.webhook_url.strip()
         if val:
             save_secrets({"R20_NOTIFICATION_WEBHOOK": val})
             remove_env({"R20_NOTIFICATION_WEBHOOK"})
     elif channel == "telegram":
-        if payload.telegram_bot_token is not None and payload.telegram_bot_token.strip():
+        if payload.telegram_bot_token is not None and payload.telegram_bot_token.strip() and not is_masked(payload.telegram_bot_token):
             save_secrets({"R20_TELEGRAM_BOT_TOKEN": payload.telegram_bot_token.strip()})
             remove_env({"R20_TELEGRAM_BOT_TOKEN"})
         tg_env = {}
@@ -96,7 +98,7 @@ def toggle_channel(channel: str, payload: ChannelToggleRequest, x_r20_session: s
         if tg_env:
             update_env(tg_env)
     elif channel == "qq":
-        if payload.qq_client_secret is not None and payload.qq_client_secret.strip():
+        if payload.qq_client_secret is not None and payload.qq_client_secret.strip() and not is_masked(payload.qq_client_secret):
             save_secrets({"R20_QQ_CLIENT_SECRET": payload.qq_client_secret.strip()})
             remove_env({"R20_QQ_CLIENT_SECRET"})
         qq_env = {}
@@ -286,6 +288,13 @@ def admin_update_notifications(
     require_superadmin(x_r20_session)
     current_env = notification_env()
 
+    # 审计修复A2(2026-09-13)：GET 端返回 mask()/mask_url() 脱敏串，前端表单原样回传时
+    # 掩码值=「用户未改动」，一律置 None 跳过写回（readiness 自然回退 current_env）。
+    for _mf in ("webhook_url", "wechat_webhook", "telegram_bot_token", "qq_client_secret"):
+        _mv = getattr(payload, _mf, None)
+        if _mv is not None and is_masked(_mv):
+            setattr(payload, _mf, None)
+
     env_update = {}
     if payload.webhook_url is not None:
         env_update["R20_NOTIFICATION_WEBHOOK"] = payload.webhook_url.strip()
@@ -338,6 +347,25 @@ def admin_update_notifications(
         "R20_NOTIFY_TELEGRAM_ENABLED": "1" if eff_tg else "0",
         "R20_NOTIFY_QQ_ENABLED": "1" if eff_qq else "0",
     })
+
+    # 审计修复A2补充(2026-09-13)：对称性——toggle 把凭证写加密库(save_secrets)且 remove_env，
+    # 而整页 PUT 曾把含密钥 webhook URL/token 明文落 .env（update_env），形成第二落盘。
+    # 现同 toggle 一样分流：密钥性字段进密文库并从 env 拔除，env 只留开关与非敏感 ID。
+    _secrets_put = {}
+    for _attr, _key in (("webhook_url", "R20_NOTIFICATION_WEBHOOK"),
+                        ("wechat_webhook", "R20_WECHAT_WEBHOOK"),
+                        ("telegram_bot_token", "R20_TELEGRAM_BOT_TOKEN"),
+                        ("qq_client_secret", "R20_QQ_CLIENT_SECRET")):
+        _val = getattr(payload, _attr, None)
+        if _val:
+            _secrets_put[_key] = _val.strip()
+            env_update.pop(_key, None)
+    if _secrets_put:
+        save_secrets(_secrets_put)
+        remove_env(list(_secrets_put))
+    for _k in [k for k, v in env_update.items() if not v.strip()]:
+        remove_env({_k})
+        del env_update[_k]
 
     update_env(env_update)
     refresh_settings()

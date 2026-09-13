@@ -68,6 +68,15 @@ def mask(value: str, visible: int = 4) -> str:
     return f"{value[:visible]}{'*' * 8}{value[-visible:]}"
 
 
+def is_masked(value: str) -> bool:
+    """审计修复A2(2026-09-13)：识别 mask()/mask_url() 的产物（含连续8星或纯星串）。
+    脱敏读↔明文写回环防线：掩码串出现在写请求里一律视为『用户未改动』，绝不落盘。"""
+    if not value:
+        return False
+    v = value.strip()
+    return "*" * 8 in v or set(v) == {"*"}
+
+
 def mask_url(url: str, visible_tail: int = 6) -> str:
     """Mask token/key inside webhook URLs like https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxxx."""
     if not url:

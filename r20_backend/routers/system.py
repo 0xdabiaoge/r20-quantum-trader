@@ -188,6 +188,9 @@ def health() -> dict[str, Any]:
 
 @router.get("/api/v1/status")
 def status() -> dict[str, Any]:
+    # 审计修复B(2026-09-13)：此端点无鉴权（公开面），旧版整包吐出 position_trackers
+    # （全套止损/止盈/云端OCO参数）与 last_decisions，匿名 curl 即可读仓位底牌。
+    # 前端/脚本零消费者实证后仅保留无害外壳；决策与tracker走各自的鉴权admin面。
     return {
         "version": __version__,
         "mode": "read_only_control_plane",
@@ -198,8 +201,6 @@ def status() -> dict[str, Any]:
             script_state("self_improvement_engine.py"),
             script_state("nightly_backup_and_clean.py"),
         ],
-        "last_decisions": read_json("ai_brain_decisions.json", {}),
-        "position_trackers": read_json("position_trackers.json", {}),
     }
 
 
@@ -239,7 +240,18 @@ def admin_runtime(x_r20_admin_token: str | None = Header(default=None), x_r20_se
         payload["full_decisions"] = raw_decisions
     else:
         payload["full_decisions"] = []
-    payload["llm_runtime"] = get_active_llm_runtime()
+    # 审计修复A1(2026-09-13)：get_active_llm_runtime() 返回含明文 api_key/base_url，
+    # 禁止整包入响应——白名单四键（与 dashboard /api/all 同口径），未配置时兜底不 500。
+    try:
+        _rt = get_active_llm_runtime()
+        payload["llm_runtime"] = {
+            "model": _rt.get("model", ""),
+            "provider_name": _rt.get("provider_name", "默认"),
+            "reasoning_effort": _rt.get("reasoning_effort", "high"),
+            "api_format": _rt.get("api_format", "openai_chat"),
+        }
+    except Exception:
+        payload["llm_runtime"] = {"model": "", "provider_name": "默认", "reasoning_effort": "high", "api_format": "openai_chat"}
     return payload
 
 

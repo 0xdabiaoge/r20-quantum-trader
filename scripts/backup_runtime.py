@@ -28,8 +28,11 @@ MANIFEST_DIR = BACKUPS / "manifests"
 BJ_TZ = timezone(timedelta(hours=8))
 MAGIC = b"R20GCM2\x00"
 MANDATORY_EXCLUDES = (
-    ".git/**", ".env", ".okx/**", ".bypy/**", "backups/**", "logs/**",
-    "data/r20_admin.db*", "data/*.enc", "data/.*_key", "data/credentials/**",
+    ".git/**", ".env", ".okx/**", ".bypy/**", "backups/**", "*/backups/**", "logs/**",
+    "data/r20_admin.db*", "data/admin_auth.db*", "data/*.enc", "data/.*_key", "data/credentials/**",
+    # 审计修复A3(2026-09-13)：凭证的第二落盘——LLM 明文键嵌在业务 JSON 里，
+    # 旧名单（*.enc/.*_key 等文件名模式）挡不住。中期方案：键迁 secrets 后解禁。
+    "data/llm_models.json", "data/llm_providers.json",
     "data/*.db-wal", "data/*.db-shm", "**/__pycache__/**", "*.pyc",
 )
 SCOPE_PATHS = {
