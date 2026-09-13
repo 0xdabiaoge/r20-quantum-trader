@@ -37,6 +37,9 @@ except Exception:
 
 from r20_backend.time_utils import beijing_day
 
+# 结构优化阶段4·B3：纯信号逻辑已搬入 scripts/trader/signals.py，re-export 保持门面表面不变
+from scripts.trader.signals import clamp, evaluate_asset_signal as _evaluate_asset_signal  # noqa: F401
+
 # US-003 决策面接线：选所路由（US-002）与预算原子预留（US-001）以模块绑定名引用，
 # 接线级测试 patch 模块属性即可完全离线（零出网/零凭证/零真实预留库）。
 from r20_backend import risk_reservation
@@ -331,11 +334,6 @@ def is_in_stop_cooldown(inst_id: str, side: str) -> bool:
             return True
     return False
 
-def clamp(value, lower, upper, default):
-    try:
-        return max(lower, min(upper, float(value)))
-    except (TypeError, ValueError):
-        return default
 
 
 def instrument_profile(inst: dict[str, Any], asset_type: str = "crypto") -> dict[str, Any]:
@@ -2619,216 +2617,19 @@ def execute_ai_position_management(real_pos_dict, trackers, timestamp_full, exec
 # 🧠 R20 Quantum Trader v6.8.1 Multi-Factor Scoring & Strategy Setup Classifier
 # =============================================================================
 def evaluate_asset_signal(f):
+    """连续多因子量化评分（-5.0 ~ +5.0）。实现见 scripts/trader/signals.py。
+
+    门面保留同名壳：本函数在文件内的 3 处调用点（以及测试里的
+    `ai_factor_trader.evaluate_asset_signal(f)`）都按全局名查找，故调用点无需改动。
+    依赖在**调用时**注入，而不是被子模块 import 期烘焙 —— 详见该模块 docstring
+    （`pin_baseline_risk_env()` 的重载名单不含子模块，import 期绑定会让基线风控测试翻红）。
     """
-    Continuous Multi-Factor Quantitative Scoring Engine (-5.0 ~ +5.0).
-    Uses trend, volume, mean-reversion and sentiment sub-scores.
-    """
-    if not f.get("market_data_valid"):
-        return 0.0, "HOLD", ["关键行情数据缺失"], "⚪ 观望", "行情数据不完整，禁止生成交易信号"
-    inst_id = f["instId"]
-    inst_name = f["name"]
-    asset_type = f.get("type", "crypto")
-    profile = ASSET_CLASS_PROFILES.get(asset_type, ASSET_CLASS_PROFILES["crypto"])
-    
-    # 1. Hot-reload AI Evolution Config
-    adaptive_cfg = load_adaptive_config()
-    cooldown_assets = adaptive_cfg.get("cooldown_assets", [])
-    strat_weights = adaptive_cfg.get("strategy_weights", {})
-    strat_enabled = adaptive_cfg.get("strategy_enabled", {})
-    entry_threshold = float(adaptive_cfg.get("entry_threshold", profile.get("entry_threshold", 2.2)))
-
-    # Intervene 1: Cooldown Blacklist
-    if inst_name in cooldown_assets or inst_id in cooldown_assets:
-        return 0.0, "HOLD", ["⛔ 标的处于AI避险冷却池中，自进化系统禁止开仓"], "⚪ 避险冷却", f"【自进化干预】{inst_name} 胜率不足或连续止损，已被自动关入冷却池避险"
-
-    px = f["price"]
-    ema9 = f.get("ema9", px)
-    ema21 = f.get("ema21", px)
-    ema55 = f.get("ema55", px)
-    e21_slope = f.get("ema21_slope_pct", 0.0)
-    rsi = f.get("rsi", 50.0)
-    vwap_bias = f.get("vwap_bias", 0.0)
-    macd_hist = f.get("macd_hist", 0.0)
-    macd_accel = f.get("macd_accel", 0.0)
-    obv_flow = f.get("obv_flow", "NEUTRAL")
-    vol_ratio = f.get("vol_ratio", 1.0)
-    regime = f.get("market_regime", "CHOP")
-    struct_1h = f.get("structure_1h", "CHOP")
-
-    is_bull_c = f.get("is_bull_candle_15m", False)
-    is_bear_c = f.get("is_bear_candle_15m", False)
-    lower_wick = f.get("lower_wick_ratio", 0.0)
-    upper_wick = f.get("upper_wick_ratio", 0.0)
-
-    cooldown_long = is_in_stop_cooldown(inst_id, "long")
-    cooldown_short = is_in_stop_cooldown(inst_id, "short")
-
-    # -------------------------------------------------------------------------
-    # 📊 Sub-Factor 1: Trend & Slope Momentum (-1.5 ~ +1.5)
-    # -------------------------------------------------------------------------
-    score_trend = 0.0
-    if regime == "BULL_TREND" and e21_slope > 0.02:
-        score_trend = 1.2 + (0.3 if struct_1h == "HH_HL" else 0.0)
-    elif regime == "BEAR_TREND" and e21_slope < -0.02:
-        score_trend = -1.2 - (0.3 if struct_1h == "LH_LL" else 0.0)
-    elif ema9 > ema21 > ema55:
-        score_trend = 0.6
-    elif ema9 < ema21 < ema55:
-        score_trend = -0.6
-
-    # -------------------------------------------------------------------------
-    # 📊 Sub-Factor 2: Volume & MACD Acceleration (-1.5 ~ +1.5)
-    # -------------------------------------------------------------------------
-    score_vol = 0.0
-    if macd_accel > 0 and macd_hist > 0:
-        score_vol += 0.6
-    elif macd_accel < 0 and macd_hist < 0:
-        score_vol -= 0.6
-
-    if obv_flow in ["BULL_FLOW", "BULL_ACCUMULATION"]:
-        score_vol += 0.5
-    elif obv_flow in ["BEAR_FLOW", "BEAR_DISTRIBUTION"]:
-        score_vol -= 0.5
-
-    if vol_ratio >= 1.25 and is_bull_c:
-        score_vol += 0.4
-    elif vol_ratio >= 1.25 and is_bear_c:
-        score_vol -= 0.4
-
-    # -------------------------------------------------------------------------
-    # 📊 Sub-Factor 3: Mean Reversion & RSI Extremes (-1.2 ~ +1.2)
-    # -------------------------------------------------------------------------
-    score_mr = 0.0
-    if vwap_bias <= -0.75 and rsi <= 35.0:
-        score_mr = 1.2 # 超跌反弹多
-    elif vwap_bias >= 0.75 and rsi >= 65.0:
-        score_mr = -1.2 # 超买冲高空
-    elif 40.0 <= rsi <= 55.0 and regime == "BULL_TREND":
-        score_mr = 0.5 # 顺势健康区间
-    elif 45.0 <= rsi <= 60.0 and regime == "BEAR_TREND":
-        score_mr = -0.5 # 顺势空头区间
-
-    # -------------------------------------------------------------------------
-    # 📊 Sub-Factor 4: News & Sentiment (-0.8 ~ +0.8)
-    # -------------------------------------------------------------------------
-    sent_score = f.get("sentiment_score", 0.0)
-    score_sent = max(-0.8, min(0.8, sent_score * 1.5))
-
-    # -------------------------------------------------------------------------
-    # 📊 Sub-Factor 5: Causal Calculus, Definite Integrals & Probability (-1.5 ~ +1.5)
-    # -------------------------------------------------------------------------
-    score_calc = 0.0
-    c_dyn = f.get("calculus", {})
-    c_v = float(c_dyn.get("velocity", 0.0) or 0.0)
-    c_a = float(c_dyn.get("acceleration", 0.0) or 0.0)
-    c_i = float(c_dyn.get("impulse", 0.0) or 0.0)
-    c_j = abs(float(c_dyn.get("max_abs_jerk", 0.0) or 0.0))
-    c_regime = c_dyn.get("regime", "")
-
-    # 1. Calculus Dynamics
-    if c_regime == "BULL_ACCELERATING" or (c_v > 0.2 and c_a > 0.1 and c_i > 0):
-        score_calc += 0.6
-    elif c_regime == "BULL_DECELERATING" or (c_v > 0.2 and c_a < -0.3):
-        score_calc -= 0.5 # Anti-FOMO deceleration penalty
-    elif c_regime == "BEAR_ACCELERATING" or (c_v < -0.2 and c_a < -0.1 and c_i < 0):
-        score_calc -= 0.6
-    elif c_regime == "BEAR_DECELERATING" or (c_v < -0.2 and c_a > 0.3):
-        score_calc += 0.5 # Anti-bottom chasing penalty
-
-    # 2. Definite Integrals (Energy & Area Accumulation)
-    d_int = c_dyn.get("definite_integrals", {})
-    e_int = float(d_int.get("energy_integral", 0.0) or 0.0)
-    dev_area = float(d_int.get("deviation_area_integral", 0.0) or 0.0)
-    if e_int > 1.0 and dev_area > 0.6:
-        score_calc += 0.4 # Net positive kinetic work done
-    elif e_int < -1.0 and dev_area < -0.6:
-        score_calc -= 0.4 # Net negative depletion
-
-    # 3. Probability Theory & Stochastic Risk
-    p_th = c_dyn.get("probability_theory", {})
-    p_cont = float(p_th.get("continuation_prob_pct", 50.0) or 50.0)
-    p_break = float(p_th.get("breakdown_prob_pct", 50.0) or 50.0)
-    if p_cont >= 70.0:
-        score_calc += 0.4
-    elif p_break >= 70.0:
-        score_calc -= 0.4
-
-    score_calc = max(-1.5, min(1.5, score_calc))
-
-    # -------------------------------------------------------------------------
-    # 🎯 Continuous Synthesis Multi-Factor Alpha Score
-    # -------------------------------------------------------------------------
-    raw_alpha_score = round(score_trend + score_vol + score_mr + score_sent + score_calc, 2)
-    
-    # -------------------------------------------------------------------------
-    # 🏆 6 Institutional Quant Setups Recognition
-    # -------------------------------------------------------------------------
-    strategy_tag = "⚪ 观望"
-    strategy_desc = "因子分布中性，无高置信度共振信号"
-    reasons = []
-
-    # High Jerk Shock Filter: Shock market dampens high-risk breakout setups
-    is_high_jerk_shock = (c_j >= 1.8 or c_regime == "SHOCK_HIGH_JERK")
-
-    # Setup 1: 🌊 顺势机构回踩 (Institutional Pullback)
-    if regime == "BULL_TREND" and (px <= ema21 * 1.008 and px >= ema55 * 0.994) and (38.0 <= rsi <= 56.0) and (is_bull_c or lower_wick >= 0.20) and not cooldown_long and not is_high_jerk_shock:
-        strategy_tag = "🌊 顺势回踩"
-        raw_alpha_score = max(raw_alpha_score, 2.4)
-        strategy_desc = f"【1H机构顺势】回踩EMA21/55价值中枢止跌收阳(RSI={rsi:.1f}, 微积分速度={c_v:+.2f})，顺势低吸做多"
-        reasons = ["1H单边主升结构", "EMA价值区放量承接", "微积分动能企稳"]
-
-    # Setup 2: ⚡ 阻力抛压做空 (Resistance Exhaustion)
-    elif regime == "BEAR_TREND" and (px >= ema21 * 0.992 and px <= ema55 * 1.006) and (44.0 <= rsi <= 62.0) and (is_bear_c or upper_wick >= 0.20) and not cooldown_short and not is_high_jerk_shock:
-        strategy_tag = "⚡ 阻力抛压"
-        raw_alpha_score = min(raw_alpha_score, -2.4)
-        strategy_desc = f"【1H机构顺势】反弹测试EMA21/55阻力带右侧收阴遇阻(RSI={rsi:.1f}, 微积分速度={c_v:+.2f})，顺势做空"
-        reasons = ["1H单边主跌结构", "EMA阻力带量能衰竭遇阻", "微积分动能向下发散"]
-
-    # Setup 3: 🚀 动量挤压突破 (Momentum Squeeze Breakout)
-    elif (px > ema9) and (55.0 <= rsi <= 74.0) and vol_ratio >= 1.3 and macd_accel > 0 and is_bull_c and not cooldown_long and (c_a >= -0.2) and not is_high_jerk_shock:
-        strategy_tag = "🚀 动量突破"
-        raw_alpha_score = max(raw_alpha_score, 2.5)
-        strategy_desc = f"【动量爆发】放量突破前高动能发散(量能={vol_ratio}x, 微积分加速度={c_a:+.2f})，顺势追涨"
-        reasons = ["动量主升放量突破", f"成交量放大 {vol_ratio} 倍", "微积分正加速度扩张"]
-
-    # Setup 4: 🌪️ 破位放量追空 (Breakdown Acceleration)
-    elif (px < ema9) and (26.0 <= rsi <= 45.0) and vol_ratio >= 1.3 and macd_accel < 0 and is_bear_c and not cooldown_short and (c_a <= 0.2) and not is_high_jerk_shock:
-        strategy_tag = "🌪️ 破位追空"
-        raw_alpha_score = min(raw_alpha_score, -2.5)
-        strategy_desc = f"【空头加速】击穿前低关键支撑放量下泄(量能={vol_ratio}x, 微积分加速度={c_a:+.2f})，顺势破位做空"
-        reasons = ["空头破位下泄加速", f"放量破位 (量能 {vol_ratio}x)", "微积分负加速度下泄"]
-
-    # Setup 5: 💎 极值均值回归 (Extreme Mean Reversion)
-    elif vwap_bias <= -0.85 and rsi <= 30.0 and (is_bull_c or lower_wick >= 0.28) and not cooldown_long:
-        strategy_tag = "💎 极值回归"
-        raw_alpha_score = max(raw_alpha_score, 2.3)
-        strategy_desc = f"【VWAP极值偏离】量价严重负乖离({vwap_bias:+.2f}%)且RSI超卖({rsi:.1f})，微积分减速企稳收阳"
-        reasons = [f"VWAP严重负偏离 ({vwap_bias:+.2f}%)", "RSI极值超卖区间", "下引线止跌确认"]
-
-    # Setup 6: 🛡️ 流动性猎杀反转 (Liquidity Sweep Reversal)
-    elif vwap_bias >= 0.85 and rsi >= 70.0 and (is_bear_c or upper_wick >= 0.28) and not cooldown_short:
-        strategy_tag = "🛡️ 冲高反转"
-        raw_alpha_score = min(raw_alpha_score, -2.3)
-        strategy_desc = f"【冲高衰竭】刺破正乖离极值区({vwap_bias:+.2f}%)受阻长上影线回落(RSI={rsi:.1f})，微积分动能钝化反转"
-        reasons = [f"VWAP严重正偏离 ({vwap_bias:+.2f}%)", "RSI严重超买动能钝化", "上引线受阻承压"]
-
-    # Adaptive strategy enablement and bounded weighting are applied after classification.
-    if strategy_tag != "⚪ 观望":
-        if strat_enabled.get(strategy_tag, True) is False:
-            return 0.0, "HOLD", ["自进化配置已停用该策略"], "⚪ 观望", f"【自进化干预】{strategy_tag} 当前已停用"
-        strategy_weight = clamp(strat_weights.get(strategy_tag, 1.0), 0.7, 1.3, 1.0)
-        raw_alpha_score *= strategy_weight
-
-    final_score = round(raw_alpha_score, 1)
-
-    # Action Decision based on Adaptive Entry Threshold
-    action = "HOLD"
-    if final_score >= entry_threshold and not cooldown_long:
-        action = "BUY_LONG"
-    elif final_score <= -entry_threshold and not cooldown_short:
-        action = "SELL_SHORT"
-
-    return final_score, action, reasons, strategy_tag, strategy_desc
+    return _evaluate_asset_signal(
+        f,
+        asset_class_profiles=ASSET_CLASS_PROFILES,
+        is_in_stop_cooldown=is_in_stop_cooldown,
+        load_adaptive_config=load_adaptive_config,
+    )
 
 def single_trader_cycle(func):
     """Prevent cron/manual overlap across the complete order-management cycle."""
