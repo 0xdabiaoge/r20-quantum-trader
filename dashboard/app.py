@@ -9,6 +9,12 @@ from r20_backend.dashboard_payload.cache import (  # noqa: E402
     persist_dashboard_cache as _core_persist_dashboard_cache,
     _inject_local_data_into_stale as _core__inject_local_data_into_stale,
 )
+from r20_backend.dashboard_payload.factors_view import (  # noqa: E402
+    build_factors_list as _core_build_factors_list,
+)
+from r20_backend.dashboard_payload.ledger_view import (  # noqa: E402
+    load_ledger_lifecycle_trades as _core_load_ledger_lifecycle_trades,
+)
 from r20_backend.dashboard_payload.multi_venue import (  # noqa: E402
     collect_cross_venue_positions as _core_collect_cross_venue_positions,
 )
@@ -665,175 +671,12 @@ def update_cache_cycle():
     log_lines = read_text_lines(LOG_FILE, 60)
 
     # 6. Read Trading State & AI Brain LLM Decisions
-    state_data = {}
-    ai_decisions = read_json(AI_DECISIONS_FILE, {})
-
-    factors_list = []
-    pos_map = {p.get("instId"): p for p in positions} if isinstance(positions, list) else {}
-    active_pool = load_instruments()
-    inst_state_map = {}
-    state_data = read_json(STATE_JSON_FILE, {})
-    try:
-        for ins in state_data.get("instruments", []):
-            if isinstance(ins, dict) and ins.get("instId"):
-                inst_state_map[ins["instId"]] = ins
-    except Exception:
-        pass
-
-    factor_lib_map = {}
-    lib_data = read_json(FACTOR_LIBRARY_FILE, {})
-    try:
-        for item in lib_data.get("instruments", []):
-            if isinstance(item, dict) and item.get("instId"):
-                factor_lib_map[item["instId"]] = item
-    except Exception:
-        pass
-
-    for target in active_pool:
-        inst_id = target.get("instId")
-        ins = inst_state_map.get(inst_id) or {}
-        lib_item = factor_lib_map.get(inst_id) or {}
-        ai_info = ai_decisions.get(inst_id, {})
-        ai_dec = ai_info.get("decision", {})
-        ai_thought = ai_info.get("thought_process", {})
-
-        action_val = ai_dec.get("action", ins.get("action", "WAIT"))
-        confidence = ai_dec.get("confidence")
-        reason = ai_dec.get("summary_reason", ins.get("desc", "新组合标的，雷达与量化特征已接入"))
-
-        strategy_val = "🟢 建议做多" if action_val == "BUY_LONG" else ("🔴 建议做空" if action_val == "SELL_SHORT" else "⚪ AI观望")
-        score_val = 2.5 if action_val == "BUY_LONG" else (-2.5 if action_val == "SELL_SHORT" else 0.0)
-        vwap_b = float(ins.get("vwap_bias", 0.0) or 0.0)
-
-        m_struct = ai_thought.get("market_structure", f"{ins.get('market_regime', 'CHOP')} ({ins.get('trend_1h', '震荡')})")
-        v_oi = ai_thought.get("volume_and_oi", f"OBV: {ins.get('obv_flow', 'NEUTRAL')}, 量能: {ins.get('vol_ratio', 1.0)}x")
-        rr_ratio = ai_thought.get("risk_reward_evaluation", "盈亏比评估中")
-
-        raw_t = ai_info.get("raw_ticker", {})
-        funding_r = ai_info.get("raw_funding_rate") or (f"{lib_item.get('smart_money_derivatives', {}).get('funding_rate_pct', 0.0):.4f}%" if "funding_rate_pct" in lib_item.get("smart_money_derivatives", {}) else "--")
-        oi_str = ai_info.get("raw_oi") or lib_item.get("smart_money_derivatives", {}).get("oi_usd", "--")
-        taker_str = ai_info.get("raw_taker_vol") or lib_item.get("volume_money_flow", {}).get("taker_net_usd", "--")
-        ls_str = ai_info.get("raw_ls_ratio") or lib_item.get("smart_money_derivatives", {}).get("long_short_ratio", "--")
-
-        chg_val = raw_t.get("chg24h") if raw_t.get("chg24h") is not None else lib_item.get("chg24h")
-        raw_ticker_vol = raw_t.get("vol24h")
-        price_val = ins.get("price") if ins.get("price") not in (None, "--") else lib_item.get("price", "--")
-        rsi_val = ins.get("rsi") if ins.get("rsi") is not None else lib_item.get("trend_momentum", {}).get("rsi_14", 50.0)
-        adx_val = ai_info.get("adx_1h") if ai_info.get("adx_1h") not in (None, "--") else lib_item.get("trend_momentum", {}).get("adx_1h", "--")
-        sm_val = ai_info.get("smart_money") or lib_item.get("smart_money_derivatives", {})
-
-        factors_list.append({
-            "name": target.get("name") or ins.get("name"),
-            "instId": inst_id,
-            "position": pos_map.get(inst_id),
-            "type": target.get("type", "crypto"),
-            "price": price_val,
-            "score": score_val,
-            "change24h": chg_val,
-            "chg24h": chg_val,
-            "vol24h": raw_ticker_vol,
-            "bidPx": raw_t.get("bidPx", ins.get("price", lib_item.get("microstructure", {}).get("bid_px", "--"))),
-            "askPx": raw_t.get("askPx", ins.get("price", lib_item.get("microstructure", {}).get("ask_px", "--"))),
-            "fundingRate": funding_r,
-            "oiUsd": oi_str,
-            "takerNetUsd": taker_str,
-            "lsRatio": ls_str,
-            "rsi": rsi_val,
-            "rsi_7": ins.get("rsi_7", 50.0),
-            "vwap_bias": vwap_b,
-            "macd_hist": ins.get("macd_hist", 0.0),
-            "macd_accel": ins.get("macd_accel", 0.0),
-            "obv_flow": ins.get("obv_flow", lib_item.get("volume_money_flow", {}).get("obv_flow", "NEUTRAL")),
-            "bb_bandwidth": ins.get("bb_bandwidth", lib_item.get("volatility_channel", {}).get("bb_width_1h", 0.0)),
-            "vol_ratio": ins.get("vol_ratio", lib_item.get("volume_money_flow", {}).get("vol_ratio_15m", 1.0)),
-            "trend_1h": ins.get("trend_1h", "震荡"),
-            "trend_4h": ins.get("trend_4h", "震荡"),
-            "market_regime": ins.get("market_regime", "CHOP"),
-            "strategy_tag": strategy_val,
-            "action": action_val,
-            "confidence": confidence,
-            "smart_money": sm_val,
-            "adx_1h": adx_val,
-            "atr_1h": lib_item.get("volatility_channel", {}).get("atr_1h", 0.0),
-            "atr_pct": lib_item.get("volatility_channel", {}).get("atr_1h_pct", lib_item.get("volatility_channel", {}).get("atr_pct", 0.0)),
-            "calculus": {
-                "velocity_1h": lib_item.get("calculus_dynamics", {}).get("velocity"),
-                "accel_1h": lib_item.get("calculus_dynamics", {}).get("acceleration"),
-                "jerk_1h": lib_item.get("calculus_dynamics", {}).get("jerk"),
-                "impulse_1h": lib_item.get("calculus_dynamics", {}).get("impulse"),
-            },
-            "leverage": ai_dec.get("leverage", 3),
-            "margin_usdt": ai_dec.get("margin_usdt", 0.0),
-            "entry_price": ai_dec.get("entry_price", 0.0),
-            "take_profit_price": ai_dec.get("take_profit_price", 0.0),
-            "stop_loss_price": ai_dec.get("stop_loss_price", 0.0),
-            "risk_reward_ratio": ai_dec.get("risk_reward_ratio", "--"),
-            "reason": reason,
-            "market_structure": m_struct,
-            "volume_and_oi": v_oi,
-            "rr_ratio": rr_ratio,
-            "thought_process": ai_thought,
-            "venue_decision": ai_info.get("venue_decision") or ai_dec.get("venue_decision"),
-            "confluence_15m": m_struct,
-            "confluence_1h": v_oi,
-            "desc": reason,
-            "ai_last_prompt": ai_info.get("ai_last_prompt", ""),
-            "time_str": ai_info.get("time_str") or state_data.get("timestamp") or timestamp_full,
-            "timestamp": ai_info.get("timestamp"),
-        })
-
-    # 7. Read Ledger Lifecycle Trades for Table (Directly sync fresh ledger if stale > 60s)
-    ledger_trades = []
-    need_ledger_sync = True
-    if os.path.exists(LEDGER_JSON_FILE):
-        try:
-            mtime = os.path.getmtime(LEDGER_JSON_FILE)
-            if time.time() - mtime < 60:
-                need_ledger_sync = False
-        except Exception:
-            pass
-
-    # 批E(2026-09-13)·测试封闭闸：本触发点会 spawn 真实同步子进程（打三所接口 +
-    # 重写 data/trading_ledger.json）。多个仪表盘测试走真实 DATA_DIR ⇒ 测试期间会
-    # 打真网络并改写生产台账（违反「测试不触生产文件」）。
-    # 注意：仅在调用时读 os.environ 不够——多个测试用 patch.dict(..., clear=True)
-    # 清空整个环境，会把标志一起抹掉。故以**模块导入时快照**为准（tests/__init__.py
-    # 在任何测试模块导入 dashboard.app 之前置位），生产不设该变量 → 行为不变。
-    _ledger_sync_disabled = (
-        not LEDGER_AUTOSYNC_ENABLED
-        or str(os.environ.get("R20_LEDGER_SYNC_DISABLED", "")).strip().lower() in ("1", "true", "yes")
-    )
-    if need_ledger_sync and not _ledger_sync_disabled:
-        try:
-            sync_script = os.path.join(WORKSPACE_DIR, "scripts", "sync_full_ledger.py")
-            if os.path.exists(sync_script):
-                # 审计批7：旧 `python3` shell 串在这台主机根本不存在（rc=127 被
-                # capture_output 吞）→ 服务器侧台账刷新从未生效；且旧 timeout=10s
-                # 短于真实三所全史拉取（约20-30s）必然静默超时。改同解释器+吼。
-                from r20_backend.spawn import run_script
-                run_script(sync_script, timeout=45, label="sync_full_ledger")
-        except Exception:
-            pass
-
-    if os.path.exists(LEDGER_JSON_FILE):
-        try:
-            with open(LEDGER_JSON_FILE, "r", encoding="utf-8") as f:
-                ledger_trades = json.load(f)
-        except Exception:
-            pass
-    
-    # Filter lifecycle trades past reset_time
-    valid_ledger_trades = []
-    for t in ledger_trades:
-        # Check either close_time or open_time >= reset_time
-        c_time = beijing_text(t.get("close_time"))
-        o_time = beijing_text(t.get("open_time"))
-        t_time = beijing_text(t.get("time"))
-        if (c_time and c_time >= beijing_text(reset_time_str)) or (o_time and o_time >= beijing_text(reset_time_str)) or (t_time and t_time >= beijing_text(reset_time_str)) or t.get("status") == "holding":
-            valid_ledger_trades.append(t)
-
-    trades_table = valid_ledger_trades[:60]
-
+    # （阶段 2·B2 第八刀：迁至 dashboard_payload/factors_view.py）
+    factors_list, state_data = _core_build_factors_list(
+        AI_DECISIONS_FILE, STATE_JSON_FILE, FACTOR_LIBRARY_FILE, positions, timestamp_full)
+    # 7. Read Ledger Lifecycle Trades for Table (阶段 2·B2 第八刀：迁至 dashboard_payload/ledger_view.py)
+    valid_ledger_trades, trades_table = _core_load_ledger_lifecycle_trades(
+        LEDGER_JSON_FILE, WORKSPACE_DIR, LEDGER_AUTOSYNC_ENABLED, reset_time_str)
     # 8-10. 本地读取（结构优化阶段 2·B2 第六刀：迁至 dashboard_payload/local_reads.py）
     _local = _core_load_local_reads(
         REPORT_JSON_FILE, SNAPSHOTS_JSON_FILE, NEWS_SENTIMENT_FILE, AI_LAST_PROMPT_FILE,

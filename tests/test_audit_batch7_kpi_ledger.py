@@ -188,8 +188,20 @@ class TestLedgerTodayStats(unittest.TestCase):
 class TestDashboardKpiWiring(unittest.TestCase):
     """③防漂移钉：dashboard 必须走台账口径，且不再有裸 python3/短 timeout。"""
 
+    # 阶段 2·B2：dashboard 的域代码正被逐步拆到 r20_backend/dashboard_payload/。
+    # 这条锚点钉的是**语义**（dashboard 走台账口径、且不得有裸 python3/短 timeout），
+    # 不是"必须写在某一个文件里"—— 故定位方式升级为"该领域的运行时源码集合"：
+    # 搬家不再误报，覆盖面反而比原来只看一个文件更广，
+    # 负向断言（不许有裸 python3）也随之覆盖到全部已迁出的模块。
+    DASH_DOMAIN = [ROOT / "dashboard" / "app.py"] + sorted(
+        (ROOT / "r20_backend" / "dashboard_payload").glob("*.py"))
+
     def test_dashboard_sources_stats_from_ledger(self):
-        src = (ROOT / "dashboard" / "app.py").read_text(encoding="utf-8")
+        from tests import source_scan
+        src = source_scan.combined(*self.DASH_DOMAIN)
+        # 防空：assertNotIn 在"读到空/读错目录"时会假通过，故先确认领域确实读到了
+        source_scan.assert_area_looks_real(self, src, must_contain="ledger_today_stats",
+                                           min_chars=60000)
         self.assertIn("ledger_today_stats", src)
         self.assertIn('"source": _today_stats_source', src)
         self.assertNotIn('f"python3', src.replace("'", '"'),
