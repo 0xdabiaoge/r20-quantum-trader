@@ -1,7 +1,10 @@
 """策略指纹计算：文件/布局哈希、四单元指纹、规范化投影与整包标识。
 
-这些函数不读任何被测试重定向的路径常量（ROOT 不在 data/ 下、亦非沙箱目标），
-故门面**直接重导出**即可，无需薄壳。结构优化阶段 2（B6）。
+三个 extract_* 在未显式传 root_dir 时会回退到模块级 ROOT。原实现在
+policy_snapshot.py 里，测试用 `patch.object(policy_snapshot, "ROOT", 沙箱根)` 重定向它；
+搬家后若在导入期绑定 ROOT，该补丁就会**静默失效**并回落到真实项目根
+（回滚会写生产 data/）—— 故改为「门面薄壳注入 ROOT、核心以 root 参数接收」。
+结构优化阶段 2（B6）。
 """
 from __future__ import annotations
 
@@ -12,7 +15,6 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional
 
-from r20_backend.policy.paths import ROOT
 from r20_backend.policy.schema import (
     DEFAULT_BASE_VERSION,
     _COUNCIL_ROLE_FIELDS,
@@ -85,6 +87,7 @@ def compute_file_hash(file_path: Path) -> str:
 
 
 def extract_prompt_profile_fingerprint(
+    root: Path,
     profile: Optional[Dict[str, Any]] = None,
     root_dir: Optional[Path] = None,
 ) -> Dict[str, Any]:
@@ -92,7 +95,7 @@ def extract_prompt_profile_fingerprint(
     prof = profile
     if prof is None:
         sys_path_added = False
-        scripts_dir = str((root_dir or ROOT) / "scripts")
+        scripts_dir = str((root_dir or root) / "scripts")
         try:
             if scripts_dir not in sys.path:
                 sys.path.insert(0, scripts_dir)
@@ -131,6 +134,7 @@ def extract_prompt_profile_fingerprint(
 
 
 def extract_evolution_mind_fingerprint(
+    root: Path,
     memory_snapshot: Optional[Dict[str, Any]] = None,
     root_dir: Optional[Path] = None,
 ) -> Dict[str, Any]:
@@ -138,7 +142,7 @@ def extract_evolution_mind_fingerprint(
     snap = memory_snapshot
     if snap is None:
         sys_path_added = False
-        scripts_dir = str((root_dir or ROOT) / "scripts")
+        scripts_dir = str((root_dir or root) / "scripts")
         try:
             if scripts_dir not in sys.path:
                 sys.path.insert(0, scripts_dir)
@@ -170,12 +174,13 @@ def extract_evolution_mind_fingerprint(
 
 
 def extract_interceptors_fingerprint(
+    root: Path,
     interceptor_plugins: Optional[List[Dict[str, Any]]] = None,
     plugins_dir: Optional[Path] = None,
     root_dir: Optional[Path] = None,
 ) -> Dict[str, Any]:
     """Extracts immutable fingerprint of the physical interceptors pipeline."""
-    p_dir = plugins_dir or ((root_dir or ROOT) / "plugins" / "interceptors")
+    p_dir = plugins_dir or ((root_dir or root) / "plugins" / "interceptors")
     plugins = interceptor_plugins
 
     if plugins is None:
