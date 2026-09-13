@@ -348,6 +348,20 @@ kbd, .kbd {
 tr:hover .row-actions, .row-actions:focus-within { opacity: 1; }
 @media (hover: none) { .row-actions { opacity: 1; } }
 
+/* —— 批A(2026-09-13)·触屏专项（pointer:coarse，桌面零影响）——
+   审计实证：桌面密度沿袭令移动端体感崩坏——分段/图标按钮命中区仅 24~28px（主操作半数误触），
+   输入/下拉字号 12~13px 触发 iOS Safari「聚焦即整页放大且不复位」。仅触屏生效，桌面像素不变。 */
+@media (pointer: coarse) {
+  /* 命中区扩到 ≥40px，靠透明伪元素撑热区、视觉尺寸不动（避免邻键互吞：横向仅 -2px，纵向 -8px） */
+  .seg > button, .btn-icon.btn-sm, .btn-sm { position: relative; }
+  .seg > button::after, .btn-icon.btn-sm::after, .btn-sm::after {
+    content: ''; position: absolute; top: -8px; bottom: -8px; left: -2px; right: -2px; z-index: 1;
+  }
+  /* 输入类 16px 根治 iOS 自动缩放，并给足行高防裁切 */
+  .field, .field-sm, input, select, textarea { font-size: 16px; }
+  .field-sm { height: 40px; }
+}
+
 /* —— 文字语汇 —— */
 .t-label { font-size: var(--text-2xs); font-weight: 600; color: var(--ink-3); letter-spacing: 0.03em; }
 .t-muted { font-size: var(--text-xs); color: var(--ink-2); }

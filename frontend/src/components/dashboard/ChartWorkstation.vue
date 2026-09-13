@@ -1202,11 +1202,12 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <!-- 图表画布 -->
+    <!-- 图表画布：高度响应式。旧固定 560px 在移动端占满整屏，把持仓面板顶到首屏外
+         且自身吃满手势；改 dvh 自适应，全屏态仍走 calc(视口-顶栏)。 -->
     <div
       ref="chartContainer"
       class="relative w-full"
-      :style="{ height: isFullscreen ? 'calc(100vh - 108px)' : '560px' }"
+      :style="{ height: isFullscreen ? 'calc(100vh - 108px)' : 'clamp(320px, 60vw, 560px)' }"
     ></div>
 
     <!-- 试算控制台 -->

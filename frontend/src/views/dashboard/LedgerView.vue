@@ -4,7 +4,7 @@ import { fmtDate, fmtDateTime } from '../../utils/format';
  * 交易台账视图：汇总带 → 筛选条 → 明细表（行点击 → 生命周期抽屉）→ 巡检日志折叠区。
  * 事实源：/api/all trades（交易所持仓史双源交叉验证重建）。
  */
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { Download, ScrollText } from 'lucide-vue-next';
 import { useDashboardStore } from '../../stores/dashboard';
 import { useI18n } from '../../composables/useI18n';
@@ -65,7 +65,7 @@ const filtered = computed(() =>
     }
     if (fStatus.value === 'closed' && x.status === 'holding') return false;
     if (fStatus.value === 'holding' && x.status !== 'holding') return false;
-    if (fSide.value !== 'all' && (fSide.value === 'long' ? x.side !== '多' : x.side !== '空')) return false;
+    if (fSide.value !== 'all' && sideNorm(x.side) !== fSide.value) return false;
     if (fResult.value === 'win' && !(Number(x.net_pnl) > 0)) return false;
     if (fResult.value === 'loss' && !(Number(x.net_pnl) <= 0)) return false;
     if (fInst.value !== 'all' && x.inst !== fInst.value) return false;
@@ -77,6 +77,11 @@ const filtered = computed(() =>
 const page = ref(1);
 const PAGE = 20;
 const pageCount = computed(() => Math.max(1, Math.ceil(filtered.value.length / PAGE)));
+// 批A(2026-09-13)·翻页后改筛选必现「空壳表格」修复：三个 BaseSegmented 无 @change 复位，
+// 停在第 N 页换筛选 → rows 越界为空，而空态判据是 filtered 非空 → 既不显空态也无提示，
+// 用户以为单子被筛没了。统一 watch：任何筛选变更回到第 1 页；数据变少时页码 clamp 回收。
+watch([fVenue, fMode, fStatus, fSide, fResult, fInst], () => { page.value = 1; });
+watch(filtered, () => { if (page.value > pageCount.value) page.value = pageCount.value; });
 const rows = computed(() => filtered.value.slice((page.value - 1) * PAGE, page.value * PAGE));
 
 /* —— 汇总（US-009 包含资金费透视卡） —— */
@@ -108,8 +113,14 @@ function exportCsv() {
   toast.ok(t('dash.ledger.exported'));
 }
 
-function dirOf(side: string): 'long' | 'short' {
-  return side === '多' ? 'long' : 'short';
+// dirOf 已废：DirTag 现统一识别 多/空/long/buy/short/sell（批A），直传源头原值，
+// 不再各处自写 `=== '多'` 二值判定（非 '多' 一律压成 short 的方向反转隐患）。
+// 筛选侧同归一（与 DirTag.norm 语义一字不差）：
+function sideNorm(s: unknown): 'long' | 'short' | 'flat' {
+  const d = String(s || '').toUpperCase();
+  if (d === '多' || d.includes('LONG') || d === 'BUY' || d === 'B') return 'long';
+  if (d === '空' || d.includes('SHORT') || d === 'SELL' || d === 'S') return 'short';
+  return 'flat';
 }
 
 /** G10 场所徽章：行带 venue 才渲染；旧数据缺失不冒充（显示层不留假身份）。 */
@@ -211,7 +222,7 @@ function venueLabel(v: unknown): string {
                   <div class="flex items-center gap-1.5 flex-wrap">
                     <CryptoLogo :symbol="x.inst" :size="16" />
                     <span class="num font-semibold" style="color: var(--ink-strong)">{{ x.inst }}</span>
-                    <DirTag :dir="dirOf(x.side)" />
+                    <DirTag :dir="x.side" />
                     <span class="badge badge-mono hidden xl:inline-flex">{{ x.lever }}</span>
                     <!-- US-009: 交易所与账户环境徽章 -->
                     <span

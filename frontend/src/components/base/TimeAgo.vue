@@ -4,15 +4,35 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { fmtDateTime, parseTime } from '../../utils/format';
 import { useI18n } from '../../composables/useI18n';
 
+/** 批A(2026-09-13)·共享心跳：旧实现每个实例各起一个 30s interval——快讯列表实测
+ *  35 行即 35 个常驻定时器（+随条数线性增长，切走仍在跑），移动端纯浪费。改为
+ *  模块级单定时器 + 引用计数，最后一个实例卸载时才停表；对外 API 不变。 */
+const _subs = new Set<() => void>();
+let _shared: number | undefined;
+function subscribe(cb: () => void): () => void {
+  _subs.add(cb);
+  if (_shared === undefined) _shared = window.setInterval(() => { for (const f of _subs) f(); }, 30_000);
+  return () => {
+    _subs.delete(cb);
+    if (!_subs.size && _shared !== undefined) {
+      window.clearInterval(_shared);
+      _shared = undefined;
+    }
+  };
+}
+
 const props = defineProps<{ time: string | number | Date }>();
 const { t } = useI18n();
 const now = ref(Date.now());
-let timer = 0;
+let unsubscribe: (() => void) | null = null;
 
 onMounted(() => {
-  timer = window.setInterval(() => (now.value = Date.now()), 30_000);
+  unsubscribe = subscribe(() => (now.value = Date.now()));
 });
-onBeforeUnmount(() => window.clearInterval(timer));
+onBeforeUnmount(() => {
+  unsubscribe?.();
+  unsubscribe = null;
+});
 
 const text = computed(() => {
   const ts = parseTime(props.time);

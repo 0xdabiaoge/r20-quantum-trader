@@ -64,9 +64,11 @@ function symOf(x: { instId?: string; name?: string }): string {
 </script>
 
 <template>
-  <div class="card flex h-full flex-col overflow-hidden">
-    <!-- 面板头：分段 + 交易所筛选 -->
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b px-2.5 sm:px-3 py-2 sm:py-2.5" style="border-color: var(--line-1)">
+  <!-- 面板卡：移动端限高 58dvh 使滚动盒成立（配合子项 min-h-0；纯 auto 高会让
+       flex-basis:0 的滚动区塌陷为 0）；xl 起恢复与图表行等高的 h-full。 -->
+  <div class="card flex h-full max-h-[58dvh] flex-col overflow-hidden xl:max-h-none">
+    <!-- 面板头：分段 + 交易所筛选（flex-col 子项必须 shrink-0，否则被滚动区挤压变形） -->
+    <div class="flex shrink-0 flex-col sm:flex-row sm:items-center justify-between gap-2 border-b px-2.5 sm:px-3 py-2 sm:py-2.5" style="border-color: var(--line-1)">
       <div class="flex items-center justify-between sm:justify-start gap-2">
         <BaseSegmented
           v-model="tab"
@@ -99,8 +101,9 @@ function symOf(x: { instId?: string; name?: string }): string {
       </div>
     </div>
 
-    <!-- 持仓表 -->
-    <div v-if="tab === 'positions'" class="scroll-y flex-1 overflow-x-auto">
+    <!-- 持仓表。min-h-0：flex-1 子项默认 min-height:auto 会撑破父级 h-full+overflow-hidden，
+         导致底部行被裁且容器自身无滚动溢出——桌面滚轮/移动端划都「划不动」的根因 -->
+    <div v-if="tab === 'positions'" class="scroll-y flex-1 min-h-0 overflow-x-auto max-xl:overscroll-y-auto">
       <BaseEmpty v-if="!filteredPositions.length" :text="t('dash.matrix.positions.empty')" />
       <table v-else class="table">
         <thead>
@@ -169,7 +172,7 @@ function symOf(x: { instId?: string; name?: string }): string {
     </div>
 
     <!-- 挂单表 -->
-    <div v-else class="scroll-y flex-1 overflow-x-auto">
+    <div v-else class="scroll-y flex-1 min-h-0 overflow-x-auto max-xl:overscroll-y-auto">
       <BaseEmpty v-if="!filteredOrders.length" :text="t('dash.matrix.orders.empty')" />
       <table v-else class="table">
         <thead>

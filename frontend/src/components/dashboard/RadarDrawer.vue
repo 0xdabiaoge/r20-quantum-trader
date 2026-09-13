@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { fmtDateTime } from '../../utils/format';
 /** 决策审计抽屉：宏观研判 / 机会与持仓指令 / 委员会纪要 / 原始记录 */
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import BaseDrawer from '../base/BaseDrawer.vue';
 import BaseTabs from '../base/BaseTabs.vue';
 import BaseCollapse from '../base/BaseCollapse.vue';
@@ -69,6 +69,15 @@ const tabs = computed(() => {
   if (xvenueRows.value.length > 0) items.push({ key: 'xvenue', label: t('dash.radar.detail.xvenue'), count: xvenueRows.value.length });
   items.push({ key: 'raw', label: t('dash.radar.detail.raw') });
   return items;
+});
+
+// 批A(2026-09-13)·防「串页」：council/xvenue 页签按数据条件出现。连看两个周期时，
+// 上一个残留的 tab key 若在下一个周期不存在 → 不匹配任何 v-if 落到 v-else(原始 JSON)，
+// 而下划线仍停在旧页签，看似加载坏。切周期重置到 macro；并在页签集变化后兜底校正。
+watch(() => props.cycle, () => { tab.value = 'macro'; });
+watch(tabs, (items) => {
+  const keys = items.map((i) => i.key);
+  if (!keys.includes(tab.value)) tab.value = 'macro';
 });
 
 function dirOf(a: string): 'long' | 'short' | 'flat' {
@@ -179,7 +188,7 @@ function dirOf(a: string): 'long' | 'short' | 'flat' {
           <p class="text-xs font-bold" :style="{ color: a.status === 'error' ? 'var(--down)' : 'var(--ink-strong)' }">
             {{ a.role_name }}
             <span v-if="a.model_used" class="badge badge-mono ms-1 text-2xs">{{ a.model_used }}</span>
-            <span v-if="a.latency_ms" class="t-faint fw-normal ms-1">· {{ (a.latency_ms / 1000).toFixed(1) }}s</span>
+            <span v-if="a.latency_ms" class="t-faint font-normal ms-1">· {{ (a.latency_ms / 1000).toFixed(1) }}s</span>
           </p>
           <p class="mt-1 text-xs leading-relaxed whitespace-pre-wrap" style="color: var(--ink-2)">{{ String(a.content || '--').slice(0, 1200) }}<span v-if="String(a.content || '').length > 1200"> …</span></p>
         </div>
@@ -221,13 +230,13 @@ function dirOf(a: string): 'long' | 'short' | 'flat' {
               <td class="col-num">{{ row.okx_last ? fmtPrice(row.okx_last) : '--' }}</td>
               <td class="col-num">
                 <span>{{ row.bin_last ? fmtPrice(row.bin_last) : '--' }}</span>
-                <span v-if="row.bin_basis_pct !== undefined && row.bin_basis_pct !== null" :class="['ms-1 text-2xs font-mono', row.bin_basis_pct >= 0 ? 'color-up' : 'color-down']">
+                <span v-if="row.bin_basis_pct !== undefined && row.bin_basis_pct !== null" :class="['ms-1 text-2xs font-mono', row.bin_basis_pct >= 0 ? 'up' : 'down']">
                   ({{ row.bin_basis_pct >= 0 ? '+' : '' }}{{ row.bin_basis_pct }}%)
                 </span>
               </td>
               <td class="col-num">
                 <span>{{ row.gate_last ? fmtPrice(row.gate_last) : '--' }}</span>
-                <span v-if="row.gate_basis_pct !== undefined && row.gate_basis_pct !== null" :class="['ms-1 text-2xs font-mono', row.gate_basis_pct >= 0 ? 'color-up' : 'color-down']">
+                <span v-if="row.gate_basis_pct !== undefined && row.gate_basis_pct !== null" :class="['ms-1 text-2xs font-mono', row.gate_basis_pct >= 0 ? 'up' : 'down']">
                   ({{ row.gate_basis_pct >= 0 ? '+' : '' }}{{ row.gate_basis_pct }}%)
                 </span>
               </td>

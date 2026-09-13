@@ -75,7 +75,17 @@ export const useDashboardStore = defineStore('dashboard', () => {
   const isStale = computed(() => data.value?.is_stale ?? false)
 
   // Actions
+  // 批A(2026-09-13)·轮询竞态收口：/api/all 单次 ~387KB，移动弱网下 3s 一轮会堆积
+  // （上发未回又发）且**慢响应迟到可把快响应的新数据覆盖回几秒前**（行情倒跳）。
+  // 三重守卫：① in-flight 互斥——静默轮询遇忙直接跳过本轮；② 递增 seq——仅接受
+  // 发起序号最新的响应落盘；③ 页面隐藏（切后台）暂停轮询，回前台立即补一次。
+  let _inflight = false
+  let _seq = 0
+  let _lastAppliedSeq = 0
   async function fetchDashboard(silent = false) {
+    if (_inflight && silent) return
+    _inflight = true
+    const mySeq = ++_seq
     if (!silent) {
       isRefreshing.value = true
     }
@@ -89,15 +99,19 @@ export const useDashboardStore = defineStore('dashboard', () => {
         throw new Error(`HTTP ${resp.status}: ${resp.statusText}`)
       }
       const json: DashboardResponse = await resp.json()
+      if (mySeq < _lastAppliedSeq) return   // 陈旧响应：已被更新的发起覆盖，禁落盘
+      _lastAppliedSeq = mySeq
       data.value = json
       lastUpdated.value = new Date()
       isConnected.value = true
       error.value = null
     } catch (err: any) {
+      if (mySeq < _lastAppliedSeq) return
       console.error('[DashboardStore] fetch failed:', err)
       error.value = err.message || '获取数据失败'
       isConnected.value = false
     } finally {
+      _inflight = false
       loading.value = false
       if (!silent) {
         setTimeout(() => {
@@ -111,8 +125,16 @@ export const useDashboardStore = defineStore('dashboard', () => {
     stopPolling()
     fetchDashboard(false)
     pollingTimer.value = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return   // 后台页不烧流量，回前台见 _onVis
       fetchDashboard(true)
     }, intervalMs)
+    if (typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', _onVis)
+      document.addEventListener('visibilitychange', _onVis)
+    }
+  }
+  function _onVis() {
+    if (!document.hidden && pollingTimer.value) fetchDashboard(true)   // 回前台立即补一轮
   }
 
   function stopPolling() {
@@ -120,6 +142,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
       clearInterval(pollingTimer.value)
       pollingTimer.value = null
     }
+    if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', _onVis)
   }
 
   return {

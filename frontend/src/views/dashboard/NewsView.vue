@@ -47,7 +47,10 @@ const macro = computed(() => ni.value.macro_sentiment || '偏多震荡');
 const rawNews = computed<any[]>(() => ni.value.latest_news || []);
 const freshAt = computed(() => ni.value.news_fresh_at || ni.value.timestamp || '');
 const sourceReason = computed(() => ni.value.source_reason || 'OKX官方公告 + 金十数据宏观快讯');
-const isSourceActive = computed(() => ni.value.source_available !== false);
+// 批A(2026-09-13)·UI 谎报修复：旧 `!== false` 令「字段整个缺失」（后端整段抓取失败，
+// ni={} 时 undefined）恒判绿点+源名——链路死了前台还在报平安。真值必须显式 === true，
+// 缺字段按未知走灰/警示（与熔断「不可判定=不放松」同纪律）。
+const isSourceActive = computed(() => ni.value.source_available === true);
 
 // 黑天鹅熔断状态
 const circuitBreaker = computed<any>(() => {
@@ -144,7 +147,7 @@ async function refreshNews() {
           </span>
           <span class="font-medium" style="color: var(--ink-2)">{{ sourceReason }}</span>
           <span class="mx-1 text-[10px] opacity-30">|</span>
-          <span>{{ t('dash.news.freshness') }} <b class="num font-semibold" style="color: var(--ink-1)">{{ freshAt || t('dash.news.justNow') }}</b></span>
+          <span>{{ t('dash.news.freshness') }} <b class="num font-semibold" style="color: var(--ink-1)">{{ freshAt || '--' }}</b></span>
         </div>
 
         <button
@@ -292,7 +295,7 @@ async function refreshNews() {
                 <span class="up font-semibold flex items-center gap-0.5">
                   <TrendingUp class="h-2.5 w-2.5" /> {{ fmtNum(c.bull, 0) }}%
                 </span>
-                <span class="text-3xs" style="color: var(--ink-faint)">{{ t('dash.news.mentions', undefined, { n: c.mentions ?? 0 }) }}</span>
+                <span class="text-3xs t-faint">{{ t('dash.news.mentions', undefined, { n: c.mentions ?? 0 }) }}</span>
                 <span class="down font-semibold flex items-center gap-0.5">
                   {{ fmtNum(c.bear, 0) }}% <TrendingDown class="h-2.5 w-2.5" />
                 </span>

@@ -12,6 +12,8 @@
   --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
   /* —— 字阶（行高随附 1.45~1.6）—— */
+  --text-3xs: 9px;   /* 批A(2026-09-13)：全站 17 处 text-3xs 引用此档——此前无定义，
+                        Tailwind 不生成 utility，徽标/辅助文字静默回落 body 14px（移动端摘要条变形根因） */
   --text-2xs: 11px;
   --text-xs: 12px;
   --text-sm: 13px;
@@ -193,6 +195,8 @@
   --radius-card: var(--r-card);
   --radius-float: var(--r-float);
 
+  --text-3xs: var(--text-3xs);
+  --text-3xs--line-height: 1.45;
   --text-2xs: var(--text-2xs);
   --text-2xs--line-height: 1.5;
   --text-xs: var(--text-xs);
