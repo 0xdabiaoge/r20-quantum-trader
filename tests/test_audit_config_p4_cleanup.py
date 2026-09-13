@@ -460,5 +460,85 @@ class DocsAndExampleDriftTests(_Base):
         self.assertEqual(missing, [], f"可在后台写入但 env.example 未列出的风控键: {missing}")
 
 
+class ConfigEffectMatrixTests(_Base):
+    """结构性防复发（审计「优化建议」第 1 条）：每个风控旋钮都必须"四处一致"——
+    单一事实源有定义 / 引擎有执行者 / 提示词携带并等于 effective 值 / 风控页可配置。
+    这一条能同时拦住 P0-1（提示词虚高）、P1-1（双口径）、P2-1（装饰键）三类问题。"""
+
+    # key → 引擎执行点源码指纹（该键被真正消费的位置）
+    ENFORCERS = {
+        "R20_MAX_TOTAL_EXPOSURE_USDT": ("r20_backend/execution_router.py", "TOTAL_EXPOSURE_CAP"),
+        "R20_MAX_LEVERAGE": ("r20_backend/execution_router.py", "MAX_LEVERAGE"),
+        "R20_MIN_LEVERAGE": ("r20_backend/execution_router.py", "MIN_LEVERAGE"),
+        "R20_MAX_SINGLE_ASSET_MARGIN_USDT": ("r20_backend/execution_router.py", "MAX_SINGLE_ASSET_MARGIN"),
+        "R20_PORTFOLIO_RISK_BUDGET_USDT": ("scripts/ai_brain_trader.py", "PORTFOLIO_RISK_BUDGET_USDT"),
+        "R20_MAX_CONCURRENT_POSITIONS": ("scripts/risk_constants.py", "effective_max_positions"),
+        "R20_MAX_SAME_DIRECTION_POSITIONS": ("scripts/risk_constants.py", "MAX_SAME_DIRECTION_POSITIONS"),
+        "R20_MAX_MARGIN_EQUITY_RATIO": ("r20_backend/execution_router.py", "MAX_MARGIN_EQUITY_RATIO"),
+        "R20_SINGLE_ASSET_EQUITY_RATIO": ("scripts/risk_constants.py", "SINGLE_ASSET_EQUITY_RATIO"),
+        "R20_RISK_PER_TRADE_RATIO": ("scripts/risk_constants.py", "RISK_PER_TRADE_RATIO"),
+        "R20_MIN_RISK_REWARD": ("scripts/risk_constants.py", "MIN_RISK_REWARD_RATIO"),
+        "R20_MIN_ENTRY_CONFIDENCE": ("scripts/risk_constants.py", "MIN_ENTRY_CONFIDENCE"),
+        "R20_MAX_DAILY_LOSS_USDT": ("scripts/risk_constants.py", "effective_daily_loss_limit"),
+        "R20_DAILY_LOSS_EQUITY_RATIO": ("scripts/risk_constants.py", "DAILY_LOSS_EQUITY_RATIO"),
+        "R20_TIME_STOP_HOURS": ("scripts/risk_constants.py", "TIME_STOP_HOURS"),
+        "R20_TIME_STOP_ATR_BAND": ("scripts/risk_constants.py", "TIME_STOP_ATR_BAND"),
+        "R20_STOP_COOLDOWN_MINUTES": ("scripts/risk_constants.py", "STOP_COOLDOWN_MINUTES"),
+        "R20_MAX_SCALE_IN_COUNT": ("scripts/risk_constants.py", "MAX_SCALE_IN_COUNT"),
+        "R20_MIN_SCALE_IN_PROFIT_RATIO": ("scripts/risk_constants.py", "MIN_SCALE_IN_PROFIT_RATIO"),
+        "R20_MIN_SCALE_IN_CONFIDENCE": ("scripts/risk_constants.py", "MIN_SCALE_IN_CONFIDENCE"),
+    }
+
+    def test_every_knob_has_an_enforcer(self):
+        from scripts.risk_constants import RISK_ENV_KEYS
+        missing = sorted(set(RISK_ENV_KEYS) - set(self.ENFORCERS))
+        self.assertEqual(missing, [], f"这些旋钮没有登记执行者（装饰键风险）: {missing}")
+
+    def test_enforcer_fingerprints_exist_in_source(self):
+        for key, (relative, needle) in self.ENFORCERS.items():
+            source = (ROOT / relative).read_text(encoding="utf-8")
+            self.assertIn(needle, source, f"{key} 的执行点指纹 {needle} 未出现在 {relative}")
+
+    def test_every_knob_is_visible_in_the_prompt_section(self):
+        """提示词必须携带全部旋钮（值由 risk_constants 派生，禁止硬编码）。"""
+        import scripts.ai_brain_trader as abt
+        from scripts.risk_constants import RISK_ENV_KEYS
+        text = abt.build_risk_budget_text(4989.41)
+        # 旋钮以中文语义出现，这里用"配置值必须能在这段文本里找到"的方式断言
+        import scripts.risk_constants as rc
+        values = [
+            f"{rc.MAX_SINGLE_ASSET_MARGIN:g}", f"{rc.MAX_LEVERAGE:g}x", f"{rc.MIN_LEVERAGE:g}x",
+            f"{rc.MIN_RISK_REWARD_RATIO:.1f}", f"{rc.MIN_ENTRY_CONFIDENCE:g}%",
+            f"{rc.MAX_DAILY_LOSS_USDT:g}", f"{rc.MAX_SAME_DIRECTION_POSITIONS}", f"{rc.TIME_STOP_HOURS:g}",
+            f"{rc.STOP_COOLDOWN_MINUTES}", f"{rc.MIN_SCALE_IN_CONFIDENCE:g}%",
+        ]
+        missing = [v for v in values if v not in text]
+        self.assertEqual(missing, [], f"提示词小节缺这些生效值: {missing}")
+        self.assertEqual(len(self.ENFORCERS), len(set(RISK_ENV_KEYS)))
+
+    def test_no_hardcoded_conflicting_thresholds_in_constitution(self):
+        """P3-4：宪法里不得再出现与可配门禁冲突的硬编码 R:R / 置信度区间。"""
+        import scripts.ai_brain_trader as abt
+        text = abt.SYSTEM_PROMPT
+        for needle in ("78% ~ 88%", "R:R ≥ 2.2", "R:R ≥ 2.5", "5%~10%", "3%~12%"):
+            self.assertNotIn(needle, text, f"宪法残留硬编码阈值 {needle}（应与【本周期风险预算】同源）")
+        budget = abt.build_risk_budget_text(5000.0)
+        self.assertIn("目标盈亏比", budget, "目标 R:R 必须由风险预算小节派生")
+        self.assertIn("置信度标定带", budget)
+
+    def test_live_effective_prompt_has_no_stale_thresholds(self):
+        """生效提示词（含提示词方案库/profile/覆盖层）同样不得残留旧硬编码。"""
+        import scripts.ai_brain_trader as abt
+        text = abt.get_effective_system_prompt()
+        stale = [n for n in ("78% ~ 88%", "R:R ≥ 2.2", "R:R ≥ 2.5") if n in text]
+        self.assertEqual(stale, [], f"生效提示词残留旧硬编码: {stale}")
+
+    def test_risk_page_schema_covers_every_knob(self):
+        from r20_backend import risk_config
+        from scripts.risk_constants import RISK_ENV_KEYS
+        schema_keys = {p["key"] for p in risk_config.schema()["params"]}
+        self.assertEqual(sorted(set(RISK_ENV_KEYS) - schema_keys), [], "风控页缺可配置项")
+
+
 if __name__ == "__main__":
     unittest.main()

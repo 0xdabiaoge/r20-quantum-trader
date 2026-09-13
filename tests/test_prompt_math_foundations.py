@@ -64,7 +64,8 @@ class PromptMathFoundationsTests(unittest.TestCase):
         self.assertIn("P2/P3 的轻微分歧应通过减小保证金处理", prompt)
         self.assertIn("减速”不是永久禁令", prompt)
         self.assertIn("存在至少一个合法顺势候选时", prompt)
-        self.assertIn("目标 R:R ≥ 2.2", prompt)
+        # 批5 P3-4：目标 R:R 从硬编码改为指向【本周期风险预算】派生值（口径同源）
+        self.assertIn("目标 R:R 与绝对盈亏比底线一律以【本周期风险预算】", prompt)
 
     def test_user_prompt_injects_real_1h_math_values(self):
         missing = "/tmp/r20-test-file-does-not-exist"

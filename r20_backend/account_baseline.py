@@ -47,6 +47,14 @@ def update_initial_capital(initial_capital: float) -> dict[str, Any]:
     capital = round(float(initial_capital), 2)
     if not MIN_CAPITAL <= capital <= MAX_CAPITAL:
         raise ValueError(f"初始本金必须在 {MIN_CAPITAL:.2f} 到 {MAX_CAPITAL:.2f} USDT 之间")
+    from r20_backend.file_locks import file_lock
+
+    with file_lock(BASELINE_FILE):
+        return _write_baseline(capital)
+
+
+def _write_baseline(capital: float) -> dict[str, Any]:
+    """锁内完成 load → merge → 原子替换（审计 P3-6 家族收口）。"""
     previous = load_account_baseline()
     updated = {
         **previous,

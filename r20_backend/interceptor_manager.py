@@ -14,6 +14,7 @@ import importlib.util
 import json
 import logging
 import os
+import tempfile
 import re
 import sys
 import time
@@ -64,11 +65,25 @@ def load_config(create_if_missing: bool = True) -> dict[str, Any]:
 
 
 def save_config(config: dict[str, Any]) -> None:
+    """拦截器配置写入口（审计 P3-6 家族收口）。
+
+    旧实现无锁 + 固定 `.tmp` 名：两个并发保存（面板保存 / 插件启用 / 排序）会写同一个
+    临时文件，后写者覆盖先写者，甚至出现"临时文件已被对方 replace 掉"的丢失写入。
+    现在整段 RMW 持可重入 flock，临时文件用唯一名。"""
     ensure_plugins_dir()
-    tmp = CONFIG_FILE.with_suffix(".tmp")
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(config, f, ensure_ascii=False, indent=2)
-    os.replace(tmp, CONFIG_FILE)
+    from r20_backend.file_locks import file_lock
+
+    with file_lock(CONFIG_FILE):
+        fd, tmp = tempfile.mkstemp(prefix=".interceptors-", suffix=".tmp", dir=CONFIG_FILE.parent)
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                json.dump(config, f, ensure_ascii=False, indent=2)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp, CONFIG_FILE)
+        finally:
+            if os.path.exists(tmp):
+                os.unlink(tmp)
 
 
 def parse_plugin_metadata(file_path: Path) -> dict[str, Any]:

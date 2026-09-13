@@ -237,10 +237,15 @@ class PromptRiskContractTests(unittest.TestCase):
         import ai_brain_trader
         prompt = ai_brain_trader.SYSTEM_PROMPT
         self.assertIn("以每轮用户消息【本周期风险预算】的实时声明为准", prompt)
-        self.assertIn("目标 R:R ≥ 2.2", prompt)
+        # 批5 P3-4：目标 R:R 与置信度带不再写死在宪法里——写死会与可配的硬底线/门禁冲突
+        # （稳健套件门禁 85，而旧宪法的 78%~88% 一带有整片必拒值）。数值统一由
+        # build_risk_budget_text() 派生，宪法只做指向。
+        self.assertIn("目标 R:R 与绝对盈亏比底线一律以【本周期风险预算】", prompt)
+        self.assertIn("按【本周期风险预算】给出的置信度标定带给值", prompt)
         # 宪法不得内嵌任何具体风控数值字面量（防止快照固化过期口径）
         for forbidden in ("同向持仓上限 3 笔", "同向持仓上限 4 笔", "杠杆不超过 5x",
-                          "门禁为 80%", "绝对底线 2.0", "{same_dir}", "{rr_floor}"):
+                          "门禁为 80%", "绝对底线 2.0", "{same_dir}", "{rr_floor}",
+                          "目标 R:R ≥ 2.2", "目标 R:R ≥ 2.5", "78% ~ 88%", "5%~10%"):
             self.assertNotIn(forbidden, prompt, f"宪法内嵌了动态风控字面量: {forbidden}")
 
     def test_risk_budget_carries_live_values(self):
