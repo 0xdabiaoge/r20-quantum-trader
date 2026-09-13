@@ -370,11 +370,19 @@ def pending_orders(inst_id: str | None = None, *, inst_type: str = "SWAP", ord_t
 
 
 def orders_history(*, inst_type: str = "SWAP", inst_id: str | None = None, state: str | None = None,
-                   begin: Any = None, end: Any = None, limit: int = 100, env: OKXEnvironment | None = None) -> list[dict[str, Any]]:
+                   begin: Any = None, end: Any = None, limit: int = 100,
+                   after: str | None = None, before: str | None = None,
+                   env: OKXEnvironment | None = None) -> list[dict[str, Any]]:
     """Last-month filled/partially_filled orders. V5 defaults instType to SPOT,
-    hence the explicit SWAP default; for >1 month ranges use orders-history-archive."""
+    hence the explicit SWAP default; for >1 month ranges use orders-history-archive.
+
+    after=更早游标、before=更新游标，均为**毫秒时间戳**（同 positions_history 实测结论；
+    bills 用的是 billId，两者不要混）。批C(2026-09-13)：原实现只取单页 limit 条，
+    台账「触顶 limit=100」告警即源于此。
+    """
     return request("GET", "/api/v5/trade/orders-history", {
-        "instType": inst_type, "instId": inst_id, "state": state, "begin": begin, "end": end, "limit": limit,
+        "instType": inst_type, "instId": inst_id, "state": state, "begin": begin, "end": end,
+        "limit": limit, "after": after, "before": before,
     }, env=env)
 
 
@@ -421,9 +429,20 @@ def bills(*, inst_type: str | None = None, inst_id: str | None = None, mgn_mode:
     }, env=env)
 
 
-def positions_history(*, inst_type: str = "SWAP", inst_id: str | None = None, limit: int = 100, env: OKXEnvironment | None = None) -> list[dict[str, Any]]:
+def positions_history(*, inst_type: str = "SWAP", inst_id: str | None = None, limit: int = 100,
+                      after: str | None = None, before: str | None = None,
+                      env: OKXEnvironment | None = None) -> list[dict[str, Any]]:
+    """平仓历史。分页游标 after/before **只认毫秒时间戳**（实测 2026-09-13：传 posId 报
+    `51000 Parameter after error`，官方文档措辞 "earlier than the requested posId" 与实现
+    不符）；after=取更早（向历史回溯）、before=取更新的记录。
+
+    批C(2026-09-13)：原实现单页 limit 条即止，超过 100 笔平仓后更早的记录永久取不到
+    （台账只能靠旧文件合并续命，重算即丢）。消费端须分页+去重（见
+    scripts/sync_full_ledger._fetch_history_paged，边界有重叠）。
+    """
     return request("GET", "/api/v5/account/positions-history", {
         "instType": inst_type, "instId": inst_id, "limit": limit,
+        "after": after, "before": before,
     }, env=env)
 
 

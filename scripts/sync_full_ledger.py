@@ -34,6 +34,54 @@ def _mark(venue, status, **extra):
     _FETCH_STATUS[venue] = rec
 
 
+def _fetch_history_paged(fetch_fn, *, id_field="posId", cursor_field="uTime", limit=100, max_pages=5):
+    """OKX 历史接口分页取尽（after=取更早）。
+
+    批C(2026-09-13)：原实现单页 limit 条即止 —— 平仓笔数越 100 后更早记录永远取不到，
+    台账只能靠旧 JSON 合并续命（重算/迁移即静默丢历史），data_health 也只能挂一条
+    「触顶 limit=100，可能存在截断」的常驻告警。
+
+    ⚠️ 实测校正（demo 实号，2026-09-13）：positions-history 的 after/before **只认毫秒
+    时间戳**——传 posId 直接 `51000 Parameter after error`（官方文档措辞为 "earlier than
+    the requested posId"，与实现不符）。故游标取末条的 uTime，after=向更早回溯。
+
+    返回 (rows, truncated)：
+      · 防漏 —— 逐页累加，按 (id, uTime) 去重（实测分页边界有 4 条重叠）；
+      · 防死循环 —— 页未满即取尽；游标不再变旧/零新增（服务端忽略 after 时会把同一页
+        反复返回）立即停；页满且用尽 max_pages 也停；
+      · 诚实 —— 凡「停时仍未证取尽」一律 truncated=True，前台继续显式 PARTIAL，
+        绝不因为「多取了几页」就假称完整。
+    """
+    rows: list = []
+    seen: set = set()
+    cursor = None
+    prev_cursor = None
+    truncated = False
+    for _ in range(max(1, int(max_pages))):
+        page = fetch_fn(limit=limit, after=cursor) or []
+        if not page:
+            break
+        fresh = 0
+        for _r in page:
+            _k = (str(_r.get(id_field) or ""), str(_r.get(cursor_field) or ""))
+            if _k in seen:
+                continue
+            seen.add(_k)
+            rows.append(_r)
+            fresh += 1
+        _new_cursor = str(page[-1].get(cursor_field) or "")
+        if len(page) < limit:
+            break                      # 服务端已给尽
+        if fresh == 0 or not _new_cursor or _new_cursor == prev_cursor:
+            truncated = True           # 无法继续（游标无效/被忽略）→ 诚实标记
+            break
+        prev_cursor = _new_cursor
+        cursor = _new_cursor
+    else:
+        truncated = True               # 页页全满且用尽页数上限
+    return rows, truncated
+
+
 def _write_sync_status(env):
     """原子写旁车；读侧一律容错缺文件（旧版本无旁车=按 OK 不误伤）。
     路径按调用时 DATA_DIR 解析——测试 patch 模块 DATA_DIR 即封闭（律①）。"""
@@ -275,6 +323,31 @@ def fetch_gate_closed_trades(environment: str = "sandbox", tz_bj=None) -> list:
     return out
 
 
+def _history_truncated_in_scope(truncated, oldest_ms, reset_time, tz_bj):
+    """分页未取尽时，判断「是否仍可能漏掉在册记录」。
+
+    台账只收 `close_time >= reset_time` 的记录（build 内同判据，见 build_lifecycle_ledger）。
+    因此：取到的最早记录若已早于基线，未取尽的部分不可能含在册记录 → 不算截断。
+    批C(2026-09-13)：若无此判定，max_pages 上限会让 data_health 永久挂一条假 PARTIAL
+    （实测 500 条时最早到 05-15，而基线是 09-11，台账其实一条不漏），真正的取数失败
+    反而淹没在常驻噪声里。
+    取不到最早时间（oldest_ms<=0）时保守判为截断。
+    """
+    if not truncated:
+        return False
+    try:
+        _ms = int(oldest_ms or 0)
+    except Exception:
+        _ms = 0
+    if _ms <= 0:
+        return True
+    try:
+        _t = datetime.datetime.fromtimestamp(_ms / 1000.0, tz=tz_bj).strftime("%Y-%m-%d %H:%M:%S")
+    except Exception:
+        return True
+    return _t >= str(reset_time)
+
+
 def build_lifecycle_ledger():
     reset_time = "1970-01-01 00:00:00"
     if os.path.exists(INITIAL_STATE_FILE):
@@ -332,12 +405,23 @@ def build_lifecycle_ledger():
     close_orders = []
 
     try:
-        pos_history = okx_rest.positions_history(limit=100) or []
+        # 批C(2026-09-13)：分页取尽。原单页 limit=100 即止 —— 平仓越 100 笔后更早记录
+        # 永久取不到，且每轮都挂「触顶 limit=100」常驻告警。truncated 仍由分页器诚实给出
+        # （取不尽才标），不再用 len>=100 反推。
+        pos_history, _ph_trunc = _fetch_history_paged(okx_rest.positions_history, id_field="posId")
         pos_data = okx_rest.positions() or []
-        orders_history = okx_rest.orders_history(limit=100) or []
+        orders_history, _oh_trunc = _fetch_history_paged(okx_rest.orders_history, id_field="ordId")
         close_orders = [o for o in orders_history if str(o.get('reduceOnly', '')).lower() == 'true' and o.get('state') == 'filled']
-        _mark("okx", "partial" if (len(pos_history) >= 100 or len(orders_history) >= 100) else "ok",
-              **({"truncated_at": 100} if len(pos_history) >= 100 or len(orders_history) >= 100 else {}))
+        # 截断判定按「在册窗口」收口：取到的最早记录若已早于 reset_time，未取尽的部分
+        # 不可能含在册记录 → 不标截断（否则分页上限会让 data_health 永久假 PARTIAL）。
+        _ph_old = min((int(r.get("uTime") or 0) for r in pos_history), default=0)
+        _oh_old = min((int(r.get("uTime") or r.get("cTime") or 0) for r in orders_history), default=0)
+        _okx_trunc = bool(
+            _history_truncated_in_scope(_ph_trunc, _ph_old, reset_time, tz_bj)
+            or _history_truncated_in_scope(_oh_trunc, _oh_old, reset_time, tz_bj)
+        )
+        _mark("okx", "partial" if _okx_trunc else "ok",
+              **({"truncated_at": 100} if _okx_trunc else {}))
     except Exception as _okx_err:
         _mark("okx", "failed", reason=str(_okx_err)[:200])
         print(f"[sync_full_ledger] OKX 台账同步跳过: {_okx_err}")

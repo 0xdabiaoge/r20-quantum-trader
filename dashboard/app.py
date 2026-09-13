@@ -1560,7 +1560,9 @@ def update_cache_cycle():
                     if isinstance(_d, dict) and _d.get("status") == "failed":
                         source_errors.append(f"ledger-{_v}: 台账同步失败({str(_d.get('reason') or '')[:120]})，所盈亏/日亏数据不全")
                     elif isinstance(_d, dict) and (_d.get("truncated") or _d.get("truncated_at")):
-                        source_errors.append(f"ledger-{_v}: 平仓记录触顶 limit=100，可能存在截断")
+                        # 批C：分页化后该标记仅在「历史分页未取尽且仍停在基线窗口之内」时出现
+                        # （早期版本按单页 len>=100 反推，会把「已覆盖在册窗口」误报成截断）。
+                        source_errors.append(f"ledger-{_v}: 历史分页未取尽（仍在基线窗口内），可能存在截断")
     except Exception:
         pass
 
