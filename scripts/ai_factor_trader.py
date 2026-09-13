@@ -1632,6 +1632,8 @@ def submit_protected_limit_order(inst_id: str, side: str, pos_side: str, size: f
                 "take_profit_price": effective_tp,
                 "stop_loss_price": effective_sl,
                 "environment": str(env.mode),
+                # 审计 P1-7：per-venue min_confidence 生效所需的原始 AI 置信度（缺失=不做该检查）
+                "confidence": float(venue_ctx.get("confidence") or 0.0) if isinstance(venue_ctx, dict) else 0.0,
             }, environment=str(env.mode))
             if not res.get("ok"):
                 detail = res.get("detail") or "多所执行路由拒绝"
@@ -3327,6 +3329,8 @@ def execute_portfolio():
                                    "margin_usdt": _order_margin,
                                    "max_margin_usdt": equity_margin_cap(usdt_available),
                                    "leverage": ai_lever,
+                                   # 审计 P1-7：per-venue min_confidence 闸门需要原始置信度（决策载荷里本没有）
+                                   "confidence": ai_conf,
                                    "intent_id": f"{inst_id}:BUY_LONG:{int(ai_info.get('timestamp') or time.time())}"})
                     if accepted:
                         if is_scale_in:
@@ -3440,6 +3444,7 @@ def execute_portfolio():
                                    "margin_usdt": _order_margin,
                                    "max_margin_usdt": equity_margin_cap(usdt_available),
                                    "leverage": ai_lever,
+                                   "confidence": ai_conf,   # 审计 P1-7：per-venue 置信度门禁
                                    "intent_id": f"{inst_id}:SELL_SHORT:{int(ai_info.get('timestamp') or time.time())}"})
                     if accepted:
                         if is_scale_in:

@@ -1521,10 +1521,14 @@ def execute_batch_ai_brain_cycle(
             council_status = {"ran": False, "reason": "辩论未返回"}
             print("[AI Brain Council] 🏛️ 多模型委员会已开启，正在启动各专家参谋现场辩论与首席仲裁...")
             try:
+                # 审计 P1-4d：席位提示词里的 {{account_balance}}/{{market_matrix}}/{{trading_memory}}
+                # 等占位符此前从不渲染（render_variables 在委员会全文 0 次）→ 模型只看得到花括号。
+                # 这里把本轮真实运行上下文交给委员会，让席位提示词与交易提示词同源渲染。
                 brain_output, council_transcript = execute_council_debate(
                     market_prompt=prompt,
                     original_system_prompt=effective_system_prompt,
                     timeout=float(c_cfg.get("timeout_seconds", 240.0)),
+                    runtime_context=runtime_context,
                 )
                 council_status = {
                     "ran": True,

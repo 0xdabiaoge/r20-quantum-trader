@@ -809,6 +809,41 @@ def _resolve_archive_file(a_dir: Path, key: str) -> Path:
     return direct
 
 
+def _review_restored_lessons(lessons: Any) -> Dict[str, Any]:
+    """回滚落盘前的宪法复核（审计 P1-8b）。
+
+    旧实现只跑 `_validate`（schema），不跑 `audit_proposed_lesson` → 策略回滚是绕过
+    宪法门禁的稳定通道。回滚是管理员的显式恢复动作，不宜因某条心法不合规就整体失败，
+    但必须**留痕并披露**：违规条目一律改标 RESTORED_UNREVIEWED 并在结果里点名。
+    """
+    report: Dict[str, Any] = {"total": 0, "flagged": [], "marked": 0}
+    try:
+        from evolution_shield import audit_proposed_lesson
+    except Exception as exc:  # 复核器不可用 → 如实披露，绝不假装审过
+        report["reviewer_error"] = str(exc)[:160]
+        return report
+    for item in lessons or []:
+        if not isinstance(item, dict):
+            continue
+        report["total"] += 1
+        text = str(item.get("rule_text") or "").strip()
+        if not text:
+            continue
+        try:
+            passed, reason = audit_proposed_lesson(text, sample_size=int(item.get("sample_size") or 1))
+        except Exception as exc:
+            passed, reason = False, f"复核异常: {exc}"
+        if not passed:
+            report["flagged"].append({"id": item.get("id"), "reason": reason, "rule_text": text[:80]})
+            item["shield_status"] = "RESTORED_UNREVIEWED"
+            item["shield_reason"] = reason
+            report["marked"] += 1
+        elif not item.get("shield_status"):
+            item["shield_status"] = "RESTORED"
+            report["marked"] += 1
+    return report
+
+
 def restore_archived_policy(
     policy_hash: str,
     archive_dir: Optional[Path] = None,
@@ -840,6 +875,8 @@ def restore_archived_policy(
 
     # Pre-restore safety snapshot to prevent partial state on failure
     pre_restore_package = capture_full_strategy_package(root_dir=r_dir)
+
+    memory_review: Dict[str, Any] = {}
 
     def _apply_package(payload: Dict[str, Any]) -> None:
         sys_path_added = False
@@ -873,13 +910,19 @@ def restore_archived_policy(
                         parsed = json.loads(raw)
                         if isinstance(parsed, list):
                             _validate(parsed)
+                            memory_review.clear()
+                            memory_review.update(_review_restored_lessons(parsed))
                         elif isinstance(parsed, dict) and "lessons" in parsed:
                             if not isinstance(parsed["lessons"], list):
                                 raise ValueError("Invalid lessons in envelope: must be a list")
                             _validate(parsed["lessons"])
+                            memory_review.clear()
+                            memory_review.update(_review_restored_lessons(parsed["lessons"]))
                         STRUCTURED_MEMORY_FILE.write_text(raw, encoding="utf-8")
                     elif isinstance(evo_data, list):
                         _validate(evo_data)
+                        memory_review.clear()
+                        memory_review.update(_review_restored_lessons(evo_data))
                         _atomic_write_json(STRUCTURED_MEMORY_FILE, evo_data)
                     elif isinstance(evo_data, dict):
                         lessons = evo_data.get("lessons")
@@ -887,6 +930,8 @@ def restore_archived_policy(
                             if not isinstance(lessons, list):
                                 raise ValueError("Invalid lessons in evolution memory: must be a list")
                             _validate(lessons)
+                        memory_review.clear()
+                        memory_review.update(_review_restored_lessons(evo_data.get("lessons") or []))
                         _atomic_write_json(STRUCTURED_MEMORY_FILE, evo_data)
                     else:
                         raise ValueError(f"Unsupported evolution memory format: {type(evo_data)}")
@@ -990,6 +1035,8 @@ def restore_archived_policy(
         "restored_snapshot": new_snapshot,
         "restored_units": [unit for unit in _PACKAGE_UNITS if pkg_payload.get(unit) not in (None, {}, [])],
         "uncovered_risk_keys": extra_risk_keys,
+        # 审计 P1-8b：回滚落盘的心法也过了一遍宪法门禁，违规条目在此点名
+        "memory_review": memory_review or None,
     }
 
 

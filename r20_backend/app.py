@@ -172,7 +172,15 @@ def _memory_service_call(name: str, *args, **kwargs):
 def get_admin_memory(x_r20_admin_token: str | None = Header(default=None), x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
     refresh_settings()
     require_admin_header(x_r20_admin_token, x_r20_session)
-    return _memory_service_call("admin_memory_view")
+    payload = _memory_service_call("admin_memory_view")
+    # 审计 P1-8d：读侧只注入 top-8，但页面把超出的也算"生效中"、文案还写"实时透明注入主脑 Prompt"。
+    # 这里把注入实况摊开：active 多少、实际注入多少、哪些没进提示词。
+    try:
+        from scripts import evolution_shield as _shield
+        payload["injection"] = _shield.injection_report(payload.get("structured_lessons") or [])
+    except Exception as exc:
+        payload["injection"] = {"error": str(exc)[:160]}
+    return payload
 
 
 @app.post("/api/v1/admin/memory/toggle/{lesson_id}")

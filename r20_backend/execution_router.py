@@ -45,6 +45,17 @@ def _fail(stage: str, detail: str, venue: str = "gate", **extra: Any) -> RouteRe
     return r
 
 
+def _load_venue_pool_soft(venue: str) -> Dict[str, Any]:
+    """读取该所池配置；读取失败只告警返回 {}（池门禁是加固，不制造新的阻塞点）。"""
+    try:
+        from .exchanges.routing_policy import load_venue_pool
+        pool = load_venue_pool(venue)
+        return pool if isinstance(pool, dict) else {}
+    except Exception as exc:
+        print(f"[所池门禁] {venue.upper()} 池配置读取失败，按无限制继续（仅告警）: {exc}")
+        return {}
+
+
 def open_protected_position(decision: Dict[str, Any], *,
                             price_ref: Optional[float] = None,
                             trigger_expiration: int = 604800,
@@ -88,23 +99,54 @@ def open_protected_position(decision: Dict[str, Any], *,
     # 即 LLM 报多少就用多少：OKX 路径的「可用余额占比硬顶 / 单标的绝对封顶」在多所
     # 路径完全不存在。现在双层兜底：调用方权益顶（缺失=0 → 不臆造）+ 单标的绝对封顶
     # （真实 .env 配置值，恒生效）。夹住后写回 decision，后续 notional/回读同源。
+    # ── 每所池门禁（审计 P1-7，2026-09-13）────────────────────────────────
+    # data/venue_routing.json 一直承诺「默认空池 + dry_run=true —— 不开配置什么都不会
+    # 发生」，但 dry_run / assets / max_open / margin_per_trade_usdt / min_confidence
+    # 在 routing_policy.py 之外**零消费者**（全仓 grep 已核）→ 真正开闸的只有
+    # R20_*_EXECUTION，管理员以为设了 per-venue 闸门其实没有。现在发送前逐条落实。
+    pool = _load_venue_pool_soft(venue)
+
     margin_clamped_from = 0.0
-    _margin_caps = [c for c in (float(MAX_SINGLE_ASSET_MARGIN or 0.0),
-                                float(max_margin_usdt or decision.get("max_margin_usdt") or 0.0))
-                    if math.isfinite(c) and c > 0]
+    _caps = [float(MAX_SINGLE_ASSET_MARGIN or 0.0),
+             float(max_margin_usdt or decision.get("max_margin_usdt") or 0.0)]
+    # 语义：pool 为空 dict = 池配置读不到（加固层不可用）→ 不阻拦；有池则逐条落实。
+    if pool:
+        _caps.append(float(pool.get("margin_per_trade_usdt") or 0.0))
+    _margin_caps = [c for c in _caps if math.isfinite(c) and c > 0]
     if _margin_caps and margin > min(_margin_caps):
         margin_clamped_from = round(margin, 4)
         margin = round(min(_margin_caps), 4)
         decision = {**decision, "margin_usdt": margin}
         print(f"[保证金闸门] {venue.upper()} {asset} 单笔保证金 {margin_clamped_from}U "
               f"超上限 {margin}U（权益占比 {MAX_MARGIN_EQUITY_RATIO:.0%} / 单标的封顶 "
-              f"{float(MAX_SINGLE_ASSET_MARGIN or 0):.0f}U），已夹至上限")
+              f"{float(MAX_SINGLE_ASSET_MARGIN or 0):.0f}U / 该所预算 "
+              f"{float((pool or {}).get('margin_per_trade_usdt') or 0):.0f}U），已夹至上限")
     ok, reason, rr = validate_quote_geometry_and_rr(action, entry, tp, sl)
     if not ok:
         return _fail("risk_gate", f"物理风控拒绝: {reason}", venue=venue, rr=rr)
 
-    # 执行开闸（默认关；env 显式打开且凭证就绪前一切免谈）
+    # 执行开闸（默认关；env 显式打开且凭证就绪前一切免谈）——保持既有契约：
+    # 未开闸一律抛 ExchangeCapabilityError；下面才是「已开闸但该所池子仍不许发」的判定。
     require_execution(venue, environment=str(getattr(ad, "environment", "live") or "live"))
+
+    if pool:
+        if pool.get("dry_run"):
+            return _fail("venue_dry_run",
+                         f"{venue.upper()} 池配置 dry_run=true（本地演算不发单）；"
+                         f"如需真实发送请改 data/venue_routing.json 并确认执行开关", venue=venue)
+        pool_assets = [str(a).upper() for a in (pool.get("assets") or [])]
+        if not pool_assets:
+            return _fail("venue_pool", f"{venue.upper()} 准入币种清单为空（空池=不发单）", venue=venue)
+        if asset.upper() not in pool_assets:
+            return _fail("venue_pool", f"{asset} 不在 {venue.upper()} 准入币种清单（{', '.join(pool_assets)}）", venue=venue)
+        pool_conf = float(pool.get("min_confidence") or 0.0)
+        try:
+            decision_conf = float(decision.get("confidence") or 0.0)
+        except (TypeError, ValueError):
+            decision_conf = 0.0
+        if math.isfinite(pool_conf) and pool_conf > 0 and 0 < decision_conf < pool_conf:
+            return _fail("venue_pool",
+                         f"决策置信度 {decision_conf:g} 低于 {venue.upper()} 门禁 {pool_conf:g}", venue=venue)
 
     # 环境维合约存在性对账（US-007 扩展）：下单前核对**本环境**合约
     # 目录——已下架/未上市在发送前拦截（fail-closed 拒开）；目录拉不到 →
@@ -152,13 +194,23 @@ def open_protected_position(decision: Dict[str, Any], *,
 
     # —— 外部持仓前置体检（US-009）：同合约存在来源不明/尺寸不符既有仓 = 连坐风险 ——
     try:
-        existing = [p for p in ad.positions()
-                    if str(p.get("base") or "").upper() == asset
-                    and abs(float(p.get("size_signed") or 0)) > 1e-9]
+        _all_positions = ad.positions()
     except ExchangeCapabilityError:
         raise
     except Exception as exc:
         return _fail("precheck", f"{asset} 既有持仓探针失败，无法排除外部仓，拒开: {exc}", venue=venue)
+    existing = [p for p in _all_positions
+                if str(p.get("base") or "").upper() == asset
+                and abs(float(p.get("size_signed") or 0)) > 1e-9]
+    # 该所池上限（审计 P1-7）：复用上面这一次探针结果，不额外触网
+    if pool:
+        pool_max_open = int(pool.get("max_open") or 0)
+        if pool_max_open > 0:
+            _open_count = len([p for p in _all_positions
+                               if isinstance(p, dict) and abs(float(p.get("size_signed") or 0)) > 1e-9])
+            if _open_count >= pool_max_open:
+                return _fail("venue_pool",
+                             f"{venue.upper()} 当前持仓 {_open_count} 笔已达池上限 max_open={pool_max_open}", venue=venue)
     for p in existing:
         ex_signed = float(p.get("size_signed") or 0)
         own_signed = float(own_position.get("size_signed") or 0) if own_position else None

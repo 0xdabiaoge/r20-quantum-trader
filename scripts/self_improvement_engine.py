@@ -729,6 +729,7 @@ def run_self_evolution(force: bool = False):
         change_status, llm_review.get("ai_long_term_memory", []), existing_core_lessons
     )
 
+    retired_lessons: List[str] = []
     if not preserve_existing_memory:
         # Safe extraction: convert potential dicts {"rule_text": "..."} to string safely
         safe_long_term = []
@@ -744,6 +745,15 @@ def run_self_evolution(force: bool = False):
             change_status, safe_long_term, memory_snapshot.get("lessons") or [])
         if constitution_readded:
             log_msg(f"🛡️ 进化输出遗漏/试图删除 {len(constitution_readded)} 条基准心法，宿主已按宪法补回保留")
+        # 审计 P1-8c：被模型省略的**已学（非基准）**心法不再是"静默消失"，而是停用存档；
+        # 这里把条数写进日志，报告口径不再只统计基准补回。
+        _already = {t.strip() for t in safe_long_term}
+        _dropped = [str(l.get("rule_text") or "").strip() for l in (memory_snapshot.get("lessons") or [])
+                    if l.get("enabled") and not l.get("is_baseline")
+                    and str(l.get("rule_text") or "").strip() and str(l.get("rule_text") or "").strip() not in _already]
+        if _dropped:
+            retired_lessons = _dropped
+            log_msg(f"📦 {len(_dropped)} 条既学心法本轮未被复述：已按停用存档保留（不注入提示词，可在面板复核恢复）")
 
         try:
             published = memory_service.publish_review(
@@ -785,6 +795,8 @@ def run_self_evolution(force: bool = False):
         "profit_factor": profit_factor,
         "mode": "R20 Native Heuristic Memory (启发式长期记忆)",
         "change_status": change_status,
+        "retired_lessons": retired_lessons,
+        "retired_count": len(retired_lessons),
         "memory_preserved": preserve_existing_memory,
         "insights": insights,
         "diagnosis_insights": insights,

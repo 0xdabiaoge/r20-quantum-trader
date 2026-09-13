@@ -92,7 +92,13 @@ def test_council_save_export_and_backup_mocked():
                    COUNCIL_CONFIG_FILE=source, DATA_DIR=directory, _atomic_write_json=write,
                    DEFAULT_CONSENSUS_MODE="standard", VALID_CONSENSUS_MODES={"standard"},
                    COUNCIL_EXPORT_FORMAT="test", COUNCIL_EXPORT_VERSION=1,
-                   DEFAULT_COUNCIL_TIMEOUT=240, load_council_config=lambda: {})
+                   DEFAULT_COUNCIL_TIMEOUT=240, load_council_config=lambda: {},
+                   # 批3 P1-4a/4b：save_council_config 现在还会跑结构+模型绑定校验，
+                   # 隔离执行必须把这两个纯函数一并注入（否则 NameError）。
+                   validate_council_roles=lambda roles: "",
+                   validate_seat_model_bindings=lambda roles, previous=None: [],
+                   # save_council_config 用 Path 收敛"旧配置读取"（只认真路径，避免把 mock 当 fd 打开）
+                   Path=Path)
     assert mod.save_council_config({"roles": {"cio": {}}})["updated_at"] == EXPECTED
     assert write.call_count == 1
     assert mod.export_council_config()["exported_at"] == EXPECTED

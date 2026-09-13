@@ -44,6 +44,12 @@ const councilConfig = ref<any>({
 
 const availableSuites = ref<any[]>([])
 const availableModels = ref<any[]>([])
+/** 审计 P1-4b：席位绑定的 model_id 不在模型库 → 后端会静默回落主脑，UI 必须说出来 */
+function modelMissing(role: any): boolean {
+  const id = String(role?.model_id || '').trim()
+  if (!id) return false
+  return !availableModels.value.some((m: any) => String(m?.id) === id)
+}
 const expandedRole = ref<string>('trader_trend')
 const testResult = ref<any>(null)
 const expandedReasoning = ref<Record<string, boolean>>({})
@@ -63,12 +69,17 @@ const consensusModes = computed(() => [
   },
 ])
 
+/** 审计 P1-4d：插入槽位必须是 prompt_library.ALLOWED_VARIABLES 里的真变量。
+ *  旧列表 6 个里 5 个（macro_4h/calculus_1h/smart_money/orderbook_depth/sentiment）
+ *  不是合法变量 → 插进去只会渲染成 [UNKNOWN_VARIABLE:x]，模型永远拿不到值。 */
 const dataSlots = computed(() => [
-  { k: 'macro_4h', label: t('admin.council.slotMacro4h') },
-  { k: 'calculus_1h', label: t('admin.council.slotCalculus1h') },
-  { k: 'smart_money', label: t('admin.council.slotSmartMoney') },
-  { k: 'orderbook_depth', label: t('admin.council.slotOrderbook') },
-  { k: 'sentiment', label: t('admin.council.slotSentiment') },
+  { k: 'market_matrix', label: t('admin.council.slotMarketMatrix') },
+  { k: 'account_balance', label: t('admin.council.slotBalance') },
+  { k: 'account_positions', label: t('admin.council.slotPositions') },
+  { k: 'pending_orders', label: t('admin.council.slotOrders') },
+  { k: 'risk_budget', label: t('admin.council.slotRiskBudget') },
+  { k: 'active_instruments', label: t('admin.council.slotInstruments') },
+  { k: 'news_intelligence', label: t('admin.council.slotNews') },
   { k: 'trading_memory', label: t('admin.council.slotMemory') },
 ])
 
@@ -521,6 +532,9 @@ onMounted(loadData)
               <p class="text-[11px] mt-0.5 truncate" style="color: var(--ink-2);">
                 {{ role.description || t('admin.council.seatDescFallback') }}
               </p>
+              <p v-if="modelMissing(role)" class="text-[10px] mt-0.5" style="color: var(--warn);">
+                {{ t('admin.council.modelMissingHint') }}
+              </p>
             </div>
           </div>
 
@@ -528,14 +542,21 @@ onMounted(loadData)
           <div class="flex flex-wrap items-center justify-end gap-2 shrink-0">
             <!-- Bound Model -->
             <div class="flex items-center space-x-1">
-              <span class="text-[11px] text-[var(--ink-2)]">{{ t('admin.council.modelLabel') }}</span>
+              <span class="text-[11px]" :style="{ color: modelMissing(role) ? 'var(--warn)' : 'var(--ink-2)' }">
+                {{ t('admin.council.modelLabel') }}
+              </span>
               <select
                 v-model="role.model_id"
-                class="rounded-xl px-2 py-1 text-xs outline-none border cursor-pointer max-w-[150px]"
-                style="background-color: var(--surface-input); border-color: var(--line-1); color: var(--ink-1);"
+                class="rounded-xl px-2 py-1 text-xs outline-none border cursor-pointer max-w-[170px]"
+                :style="{ backgroundColor: 'var(--surface-input)', borderColor: modelMissing(role) ? 'var(--warn-line)' : 'var(--line-1)', color: modelMissing(role) ? 'var(--warn)' : 'var(--ink-1)' }"
                 :disabled="!auth.isSuperadmin"
               >
                 <option value="">{{ t('admin.council.inheritGlobalBrain') }}</option>
+                <!-- 审计 P1-4b：席位绑了模型库里没有的 id 时，旧下拉会显示成空白（等于骗人）；
+                     这里保留原值并显式标注"未登记 · 实际由主脑代答"。 -->
+                <option v-if="modelMissing(role)" :value="role.model_id" disabled>
+                  ⚠ {{ role.model_id }} · {{ t('admin.council.modelMissing') }}
+                </option>
                 <option v-for="m in availableModels" :key="m.id" :value="m.id">
                   {{ m.name || m.id }}
                 </option>
@@ -614,7 +635,7 @@ onMounted(loadData)
 
             <!-- Quick Data Slots Inserter -->
             <div class="flex flex-wrap items-center gap-1 text-[11px]">
-              <span class="text-[var(--ink-2)]">{{ t('admin.council.insertSlotLabel') }}</span>
+              <span class="text-[var(--ink-2)]" :title="t('admin.council.insertSlotHint')">{{ t('admin.council.insertSlotLabel') }}</span>
               <button
                 v-for="slot in dataSlots"
                 :key="slot.k"
@@ -662,6 +683,23 @@ onMounted(loadData)
           <span class="text-[11px] px-2 py-0.5 rounded border border-emerald-500/30 bg-emerald-500/10 text-emerald-400">
             {{ t('admin.council.totalDuration') }} {{ testResult.transcript?.total_duration_ms }}ms
           </span>
+          <!-- 审计 P1-4c：本轮辩论的行情/资金到底来自哪里、缺了什么 -->
+          <span
+            v-if="testResult.market_context"
+            class="text-[11px] px-2 py-0.5 rounded border"
+            :style="{
+              borderColor: (testResult.market_context.missing || []).length ? 'var(--warn-line)' : 'var(--line-1)',
+              color: (testResult.market_context.missing || []).length ? 'var(--warn)' : 'var(--ink-2)',
+            }"
+            :title="(testResult.market_context.missing || []).join('；')"
+          >
+            {{ testResult.market_context.source === 'manual_mock'
+              ? t('admin.council.ctxManualMock')
+              : t('admin.council.ctxLive', undefined, { n: testResult.market_context.instruments ?? 0 }) }}
+            <template v-if="(testResult.market_context.missing || []).length">
+              · {{ t('admin.council.ctxMissing', undefined, { n: testResult.market_context.missing.length }) }}
+            </template>
+          </span>
         </div>
         <button
           @click="testResult = null"
@@ -685,7 +723,13 @@ onMounted(loadData)
             <div class="space-y-1">
               <div class="flex items-center justify-between text-xs font-bold">
                 <span style="color: var(--ink-1);">{{ adv.role_name }}</span>
-                <span class="text-[11px] text-purple-400 truncate max-w-[120px]">{{ adv.model_used }}</span>
+                <span
+                  class="text-[11px] truncate max-w-[140px]"
+                  :style="{ color: adv.model_fallback ? 'var(--warn)' : 'var(--accent)' }"
+                  :title="adv.model_note || ''"
+                >
+                  {{ adv.model_fallback ? t('admin.council.modelFallbackTag', undefined, { model: adv.model_requested }) : adv.model_used }}
+                </span>
               </div>
               <div class="flex items-center justify-between text-[11px] text-[var(--ink-2)]">
                 <span>{{ t('admin.council.responseLabel') }} {{ adv.latency_ms }}ms</span>
@@ -745,7 +789,16 @@ onMounted(loadData)
         <div class="flex items-center justify-between">
           <div class="flex items-center space-x-2">
             <span class="text-xs font-bold text-purple-400">{{ t('admin.council.cioVerdictTitle') }}</span>
-            <span class="text-[11px] text-[var(--ink-2)]">{{ testResult.transcript?.arbitrator?.model_used }} · {{ t('admin.council.reviewDuration') }} {{ testResult.transcript?.arbitrator?.latency_ms }}ms</span>
+            <span
+              class="text-[11px]"
+              :style="{ color: testResult.transcript?.arbitrator?.model_fallback ? 'var(--warn)' : 'var(--ink-2)' }"
+              :title="testResult.transcript?.arbitrator?.model_note || ''"
+            >
+              {{ testResult.transcript?.arbitrator?.model_fallback
+                ? t('admin.council.modelFallbackTag', undefined, { model: testResult.transcript?.arbitrator?.model_requested })
+                : testResult.transcript?.arbitrator?.model_used }}
+              · {{ t('admin.council.reviewDuration') }} {{ testResult.transcript?.arbitrator?.latency_ms }}ms
+            </span>
           </div>
           <span class="text-[11px] font-bold px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
             {{ t('admin.council.adoptionBadge') }}

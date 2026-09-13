@@ -213,6 +213,10 @@ class RouterMarginClampTests(_SandboxBase):
         for k in self._ambient:
             os.environ.pop(k, None)
         self.addCleanup(lambda: os.environ.update(self._ambient))
+        # 本类只钉"保证金夹取链"：把每所池门禁（P1-7 新增的 dry_run/资产/上限/置信度）
+        # 置空，避免测试依赖生产 data/venue_routing.json 与 Gate 凭证就绪态。
+        p = patch.object(router, "_load_venue_pool_soft", lambda venue: {})
+        p.start(); self.addCleanup(p.stop)
 
     def _stub_adapter(self):
         from r20_backend.exchanges.gate import GateAdapter

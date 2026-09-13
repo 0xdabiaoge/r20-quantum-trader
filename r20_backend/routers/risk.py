@@ -26,6 +26,66 @@ from scripts.instrument_pool import from_okx_instrument, load_instruments, save_
 
 router = APIRouter(tags=["risk"])
 
+# 审计 P1-5(2026-09-13)：持仓快照由 dashboard 后台线程每 2s 刷新；超过此年龄视为"未知"，
+# 未知 ≠ 无持仓（缺失≠0 红线）→ 删除标的这种破坏性操作在未知态必须 fail-closed。
+HELD_SNAPSHOT_MAX_AGE_S = 90.0
+
+
+def _tracker_keys_for(inst_id: str, trackers: dict[str, Any]) -> list[str]:
+    """真实 tracker key 形如 `BTC-USDT-SWAP_long`（ai_factor_trader 写入）——精确等值永远命中不了。"""
+    coin = inst_id.split("-", 1)[0].upper()
+    hits = []
+    for key in trackers or {}:
+        k = str(key).strip().upper()
+        if k == inst_id or k.startswith(f"{inst_id}_") or k == coin or k.startswith(f"{coin}_"):
+            hits.append(str(key))
+    return sorted(hits)
+
+
+def _live_holdings(inst_id: str) -> tuple[bool, list[str], str]:
+    """多所合一实时持仓判定（只读 dashboard 缓存，零网络）。
+
+    返回 (是否持仓, 持仓场所列表, 未知原因)。未知原因非空 = 无法确认持仓，调用方须 fail-closed。
+    """
+    coin = inst_id.split("-", 1)[0].upper()
+    try:
+        import dashboard.app as dashboard_app
+        cache = getattr(dashboard_app, "CACHE_DATA", None)
+    except Exception as exc:  # 模块不可用/导入失败
+        return False, [], f"持仓快照模块不可用：{exc}"
+    if not isinstance(cache, dict):
+        return False, [], "持仓快照不可用"
+    positions = cache.get("positions")
+    if not isinstance(positions, list):
+        return False, [], "持仓快照缺失"
+    health = cache.get("data_health") if isinstance(cache.get("data_health"), dict) else {}
+    age = health.get("cache_age_seconds")
+    if isinstance(age, (int, float)) and float(age) > HELD_SNAPSHOT_MAX_AGE_S:
+        return False, [], f"持仓快照已过期 {float(age):.0f}s"
+    venues = set()
+    for item in positions:
+        if not isinstance(item, dict):
+            continue
+        held = str(item.get("instId") or "").strip().upper()
+        if not held:
+            continue
+        if held == inst_id or held.startswith(f"{coin}-") or held == coin:
+            venues.add(str(item.get("venue") or "okx").strip().lower())
+    return bool(venues), sorted(venues), ""
+
+
+def _holdings_report(inst_id: str, trackers: dict[str, Any]) -> dict[str, Any]:
+    keys = _tracker_keys_for(inst_id, trackers)
+    held_live, venues, unknown = _live_holdings(inst_id)
+    return {
+        "tracker_keys": keys,
+        "has_tracker": bool(keys),
+        "held_live": held_live,
+        "held_venues": venues,
+        "holdings_unknown": unknown or None,
+        "held": held_live or bool(keys),
+    }
+
 
 @router.get("/api/v1/admin/risk")
 def admin_risk_get(x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
@@ -118,10 +178,33 @@ def admin_instruments(x_r20_admin_token: str | None = Header(default=None)) -> d
     refresh_settings()
     require_admin_header(x_r20_admin_token)
     trackers = read_json("position_trackers.json", {})
-    active = set(trackers.keys()) if isinstance(trackers, dict) else set()
+    if not isinstance(trackers, dict):
+        trackers = {}
+    rows = []
+    for item in load_instruments():
+        report = _holdings_report(item["instId"], trackers)
+        rows.append({
+            **item,
+            "protected": item["instId"] == "BTC-USDT-SWAP",
+            # 审计 P1-5：旧实现在这里拿 inst_id 直接 in trackers（真实键带 _long/_short 后缀）
+            # → 恒 False，UI「存在持仓追踪记录，禁止删除」徽标与禁用态永不出现。
+            "has_tracker": report["has_tracker"],
+            "tracker_keys": report["tracker_keys"],
+            "held_live": report["held_live"],
+            "held_venues": report["held_venues"],
+            "holdings_unknown": report["holdings_unknown"],
+            "removable": item["instId"] != "BTC-USDT-SWAP" and not report["held"] and not report["holdings_unknown"],
+        })
+    stale = [row for row in rows if row["holdings_unknown"] and not row["protected"]]
     return {
-        "instruments": [{**item, "protected": item["instId"] == "BTC-USDT-SWAP", "has_tracker": item["instId"] in active or item["name"] in active} for item in load_instruments()],
+        "instruments": rows,
         "limits": {"minimum": MIN_POOL_SIZE, "maximum": MAX_POOL_SIZE, "btc_required": True},
+        "holdings_snapshot": {
+            "source": "dashboard 多所合一持仓快照（2s 刷新）",
+            "max_age_seconds": HELD_SNAPSHOT_MAX_AGE_S,
+            # 只统计"本可删除但因持仓未知而暂停"的标的（BTC 属保底标的，恒不可删，不计入）
+            "unknown_count": len(stale),
+        },
     }
 
 
@@ -160,8 +243,10 @@ def delete_admin_instrument(
     require_admin_header(x_r20_admin_token, x_r20_session)
     inst_id = inst_id.upper()
     conf = ((payload.confirmation if payload else None) or confirmation or "").strip().upper()
-    if conf and conf != f"REMOVE {inst_id}":
-        raise HTTPException(status_code=400, detail=f"确认短语必须精确为：REMOVE {inst_id}")
+    # 审计 P1-5：旧实现 `if conf and conf != ...` → 不传短语就免检，确认形同虚设。
+    if conf != f"REMOVE {inst_id}":
+        audit_record("instrument.remove", "rejected_phrase", {"instId": inst_id, "provided": bool(conf)})
+        raise HTTPException(status_code=400, detail=f"必须提供确认短语（精确为：REMOVE {inst_id}）")
     if inst_id == "BTC-USDT-SWAP":
         raise HTTPException(status_code=403, detail="BTC 是全局黑天鹅哨兵基准，不允许从交易池删除")
     current = load_instruments()
@@ -170,12 +255,22 @@ def delete_admin_instrument(
     if not any(item["instId"] == inst_id for item in current):
         raise HTTPException(status_code=404, detail="该币种不在交易池中")
     trackers = read_json("position_trackers.json", {})
-    coin = inst_id.split("-", 1)[0]
-    if isinstance(trackers, dict) and (inst_id in trackers or coin in trackers):
-        raise HTTPException(status_code=409, detail="该币种存在持仓追踪记录，为防止失去风控接管，禁止删除")
+    if not isinstance(trackers, dict):
+        trackers = {}
+    report = _holdings_report(inst_id, trackers)
+    if report["tracker_keys"]:
+        audit_record("instrument.remove", "rejected_tracker", {"instId": inst_id, "tracker_keys": report["tracker_keys"]})
+        raise HTTPException(status_code=409, detail=f"该币种存在持仓追踪记录（{', '.join(report['tracker_keys'])}），为防止失去风控接管，禁止删除")
+    if report["held_live"]:
+        audit_record("instrument.remove", "rejected_live_holdings", {"instId": inst_id, "venues": report["held_venues"]})
+        raise HTTPException(status_code=409, detail=f"该币种在 {', '.join(report['held_venues'])} 仍有实时持仓，删除后将失去移动止损/时间止损/AI 平仓接管，禁止删除")
+    if report["holdings_unknown"]:
+        # 未知 ≠ 无持仓：拒绝而不是放行（破坏性操作 fail-closed）
+        audit_record("instrument.remove", "rejected_unknown_holdings", {"instId": inst_id, "reason": report["holdings_unknown"]})
+        raise HTTPException(status_code=503, detail=f"无法确认实时持仓（{report['holdings_unknown']}），为防止删掉有持仓的标的而失去风控接管，已拒绝删除；请稍后重试")
     updated = [item for item in current if item["instId"] != inst_id]
     save_instruments(updated)
-    audit_record("instrument.remove", "success", {"instId": inst_id})
+    audit_record("instrument.remove", "success", {"instId": inst_id, "holdings_cleared": {"tracker_keys": [], "held_live": False}})
     return {"removed": inst_id, "count": len(updated), "effective": "immediate", "message": f"{inst_id} 已从交易池移除并实时同步全网大屏与因果雷达"}
 
 

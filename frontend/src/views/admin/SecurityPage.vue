@@ -177,13 +177,20 @@ async function addInstrument() {
 
 async function removeInstrument(item: any) {
   if (item.protected) { toast.warn('系统保底标的不可删除'); return }
+  // 审计 P1-5：后端已按实时持仓/追踪记录硬拒（删除会让该标的失去移动止损/时间止损/AI 平仓接管），
+  // 前端不再承诺"既有持仓不受影响"，而是在入口就把真实原因说清楚。
+  if (item.held_live || item.has_tracker) {
+    toast.warn(`该标的仍有持仓（${(item.held_venues || []).join('/') || '追踪记录'}），为防止失去风控接管，禁止移除`)
+    return
+  }
+  if (item.holdings_unknown) { toast.warn('当前无法确认实时持仓，删除已暂停；请稍后重试'); return }
   // 批C(2026-09-13)·危险操作确认收口：后端本就要求逐字短语 `REMOVE <instId>`，
   // 但前端把短语写死在请求体、只用原生 confirm() 小条挡一下——移动端随手一按就
   // 能把实盘标的移出交易池（同页平仓却要密码+短语双确认，强度不一致）。现将同一
   // 短语要求显式抬到 UI：必须逐字输入才可确认，前后端确认语义就此一致。
   const _ok = await ask({
     title: '从交易池移除标的',
-    desc: `${item.instId} 将不再参与选币与开仓（既有持仓不受影响）`,
+    desc: `${item.instId} 将不再参与选币与开仓（仅限当前无持仓、无追踪记录的标的）`,
     danger: true,
     confirmPhrase: `REMOVE ${item.instId}`,
     okText: '移除',
@@ -750,11 +757,19 @@ onMounted(() => { loadAll(); loadMx() })
                   <td class="py-2 px-3 num" style="color: var(--ink-3);">{{ item.ctType || 'SWAP' }}</td>
                   <td class="py-2 px-3">
                     <span v-if="item.protected" class="px-1.5 py-0.5 rounded-[3px] text-[11px] font-bold border" style="background-color: var(--warn-bg); border-color: var(--warn-line); color: var(--warn);">{{ t('admin.security.protectedBadge') }}</span>
+                    <span v-else-if="item.held_live" class="px-1.5 py-0.5 rounded-[3px] text-[11px] font-bold border" style="background-color: var(--accent-bg); border-color: var(--accent-line); color: var(--accent);">{{ t('admin.security.holdingLiveBadge', undefined, { venues: (item.held_venues || []).join('/') || '—' }) }}</span>
                     <span v-else-if="item.has_tracker" class="px-1.5 py-0.5 rounded-[3px] text-[11px] font-bold border" style="background-color: var(--accent-bg); border-color: var(--accent-line); color: var(--accent);">{{ t('admin.security.holdingBadge') }}</span>
+                    <span v-else-if="item.holdings_unknown" class="px-1.5 py-0.5 rounded-[3px] text-[11px] font-bold border" style="background-color: var(--surface-3); border-color: var(--warn-line); color: var(--warn);" :title="String(item.holdings_unknown)">{{ t('admin.security.holdingUnknownBadge') }}</span>
                     <span v-else class="text-[11px] px-1.5 py-0.5 rounded-[3px] border" style="background-color: var(--surface-3); border-color: var(--line-1); color: var(--ink-3);">{{ t('admin.security.removableBadge') }}</span>
                   </td>
                   <td class="py-2 px-4 text-right">
-                    <button :disabled="item.protected || item.has_tracker" class="p-1 rounded cursor-pointer transition-opacity hover:opacity-80 disabled:opacity-20" style="color: var(--down);" :title="t('admin.security.removeTitle')" @click="removeInstrument(item)">
+                    <button
+                      :disabled="item.protected || item.has_tracker || item.held_live || item.holdings_unknown"
+                      class="p-1 rounded cursor-pointer transition-opacity hover:opacity-80 disabled:opacity-20"
+                      style="color: var(--down);"
+                      :title="item.held_live ? t('admin.security.removeBlockedHoldings', undefined, { venues: (item.held_venues || []).join('/') || '—' }) : item.holdings_unknown ? t('admin.security.removeBlockedUnknown') : t('admin.security.removeTitle')"
+                      @click="removeInstrument(item)"
+                    >
                       <Trash2 class="h-3.5 w-3.5" />
                     </button>
                   </td>

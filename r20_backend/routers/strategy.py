@@ -50,10 +50,15 @@ router = APIRouter(tags=["strategy"])
 @router.get("/api/v1/admin/council/config")
 def admin_get_council_config(x_r20_session: str | None = Header(default=None, alias="X-R20-Session")) -> dict[str, Any]:
     require_admin_header(x_r20_session=x_r20_session)
-    from r20_backend.council_manager import load_council_config, get_available_presets, get_preset_suites
+    from r20_backend.council_manager import load_council_config, get_available_presets, get_preset_suites, seat_model_health
     cfg = load_council_config()
     cfg["available_presets"] = get_available_presets()
     cfg["available_suites"] = get_preset_suites()
+    # 审计 P1-4b：把"席位绑定的模型是否已登记"摊开给 UI（旧版静默回落主脑，页面照旧宣称多模型）
+    cfg["model_health"] = seat_model_health(cfg.get("roles"))
+    cfg["model_health_note"] = (
+        "席位绑定未登记模型时，该席位由主脑模型代答（载荷带 model_fallback 标记）"
+    )
     return cfg
 
 
@@ -127,44 +132,93 @@ def admin_test_council_debate(payload: CouncilTestRequest, x_r20_session: str | 
     from scripts.instrument_pool import load_instruments
     c_cfg = load_council_config()
 
+    context_meta = {"source": "live", "missing": []}
     if payload.mock_market_prompt:
         test_market = payload.mock_market_prompt
+        context_meta = {"source": "manual_mock", "missing": [], "note": "管理员显式提供的演练文本"}
     else:
-        active_insts = load_instruments()
-        symbols = [x.get("instId", "") for x in active_insts]
-        factor_snap_file = ROOT / "data" / "factor_library_snapshot.json"
-        factor_data = {}
-        if factor_snap_file.is_file():
-            try:
-                factor_data = json.loads(factor_snap_file.read_text(encoding="utf-8"))
-            except Exception:
-                pass
+        # 审计 P1-4c：旧实现在这里整套编造（固定时间 2026-09-05、可用资金 1450U、BTC 多单 77200、
+        # 挂单 ord_10283），且按 factor_data[sym] 取值——真实文件结构是
+        # {timestamp,time_str,instruments[]}，于是每个字段都落到 fallback：现价 $0、ADX 22.5、ATR 0。
+        # 而 UI 写着"投委会正在全息审阅资金与行情并组织交易员辩论"。现在只用真实快照，
+        # 缺什么就写"不可用"，不再编任何数字。
+        lines = ["======================= 【推演基准与资金持仓（真实快照）】 ======================="]
+        snap_ts = ""
+        instruments = []
+        try:
+            factor_snap_file = ROOT / "data" / "factor_library_snapshot.json"
+            if factor_snap_file.is_file():
+                payload_snap = json.loads(factor_snap_file.read_text(encoding="utf-8"))
+                if isinstance(payload_snap, dict):
+                    snap_ts = str(payload_snap.get("time_str") or payload_snap.get("timestamp") or "")
+                    instruments = [i for i in (payload_snap.get("instruments") or []) if isinstance(i, dict)]
+        except Exception as exc:
+            context_meta["missing"].append(f"因子快照读取失败: {str(exc)[:80]}")
+        lines.append(f"【推演基准时间】: {snap_ts or '—（因子快照不可用）'}")
 
-        lines = [
-            "======================= 【推演基准与资金持仓】 =======================",
-            "【推演基准时间】: 2026-09-05 08:30:00 (北京时间)",
-            "【当前账户可用资金】: 1,450.00 USDT (总资产 2,280.00 USDT)",
-            "【账户持仓概况】: 当前总持仓 1/6 (已占用保证金 150.00 USDT)",
-            "【当前活动在途持仓明细】:",
-            "- 标的: BTC-USDT-SWAP | 方向: BUY_LONG 3x | 开仓均价: 77200.0 | 当前标记价: 78250.0 | 持仓量: 10张 | 未结浮盈: +35.00 U (ROI: +23.3%) | 动态止损线: 76800.0",
-            "【当前在途挂单列表】:",
-            "- [挂单ID: ord_10283] SOL-USDT-SWAP | 限价买多 15张 @ 98.20 | 挂单时间: 2026-09-05 07:15:00 | 附带云端止盈: 105.0 / 止损: 94.5",
-            "",
-            "======================= 【市场全要素动力学与微结构实时快照 (6大主力标的)】 =======================",
-        ]
-        for sym in symbols:
-            f = factor_data.get(sym, {})
-            c_px = float(f.get("close") or f.get("price") or 0.0)
-            v_val = f.get("v_1h", 0.05)
-            a_val = f.get("a_1h", 0.12)
-            adx_val = f.get("adx_1h", 22.5)
-            cmf_val = f.get("cmf_1h", 0.08)
-            smart_val = f.get("smart_money_long_ratio", 68.0)
-            atr_val = f.get("atr_1h", c_px * 0.015)
+        account = positions = pending = None
+        try:
+            import dashboard.app as dashboard_app
+            cache = getattr(dashboard_app, "CACHE_DATA", None)
+            if isinstance(cache, dict):
+                account = cache.get("account") if isinstance(cache.get("account"), dict) else None
+                positions = cache.get("positions") if isinstance(cache.get("positions"), list) else None
+                pending = cache.get("pending_orders") if isinstance(cache.get("pending_orders"), list) else None
+            else:
+                context_meta["missing"].append("dashboard 缓存不可用")
+        except Exception as exc:
+            context_meta["missing"].append(f"dashboard 缓存读取失败: {str(exc)[:80]}")
+
+        if account:
+            lines.append(f"【当前账户可用资金】: {account.get('avail_eq', '—')} USDT"
+                         f"（总权益 {account.get('total_eq', '—')} USDT）")
+        else:
+            context_meta["missing"].append("账户快照")
+            lines.append("【当前账户可用资金】: —（账户快照不可用）")
+        if positions is None:
+            context_meta["missing"].append("持仓快照")
+            lines.append("【当前活动在途持仓明细】: —（持仓快照不可用）")
+        else:
+            lines.append(f"【当前活动在途持仓明细】(共 {len(positions)} 笔):")
+            for pos in positions[:8]:
+                if not isinstance(pos, dict):
+                    continue
+                lines.append(
+                    f"- 标的: {pos.get('instId', '—')} | 场所: {pos.get('venue', '—')} | 方向: {pos.get('posSide', '—')}"
+                    f" | 持仓量: {pos.get('pos', '—')} | 未结浮盈: {pos.get('upl', '—')}"
+                )
+            if not positions:
+                lines.append("- （当前无持仓）")
+        if pending is None:
+            context_meta["missing"].append("挂单快照")
+            lines.append("【当前在途挂单列表】: —（挂单快照不可用）")
+        else:
+            lines.append(f"【当前在途挂单列表】(共 {len(pending)} 笔):")
+            for od in pending[:8]:
+                if not isinstance(od, dict):
+                    continue
+                lines.append(f"- [挂单ID: {od.get('ordId') or od.get('id') or '—'}] {od.get('instId', '—')}"
+                             f" | 价格: {od.get('px', '—')} | 数量: {od.get('sz', '—')}")
+            if not pending:
+                lines.append("- （当前无挂单）")
+
+        lines.append("")
+        lines.append(f"======================= 【市场全要素动力学与微结构实时快照 ({len(instruments)} 大主力标的)】 =======================")
+        if not instruments:
+            lines.append("- —（因子快照不可用，禁止臆造行情）")
+        for item in instruments:
+            momentum = item.get("trend_momentum") if isinstance(item.get("trend_momentum"), dict) else {}
+            vol = item.get("volatility_channel") if isinstance(item.get("volatility_channel"), dict) else {}
+            flow = item.get("volume_money_flow") if isinstance(item.get("volume_money_flow"), dict) else {}
+            smart = item.get("smart_money_derivatives") if isinstance(item.get("smart_money_derivatives"), dict) else {}
             lines.append(
-                f"- {sym}: 现价 ${c_px}, 1H动能 v={v_val:+.4f}, a={a_val:+.4f}, ADX={adx_val:.1f}, "
-                f"1H ATR={atr_val:.4f}, CMF={cmf_val:+.2f}, 聪明钱多头={smart_val:.1f}%"
+                f"- {item.get('instId', '—')}: 现价 ${item.get('price', '—')} ({item.get('chg24h', '—')}%), "
+                f"ADX={momentum.get('adx_1h', '—')}, RSI={momentum.get('rsi_14', '—')}, 趋势={momentum.get('trend_regime', '—')}, "
+                f"1H ATR={vol.get('atr_1h', '—')}, CMF={flow.get('cmf_1h', '—')}, "
+                f"聪明钱多头={smart.get('weighted_long_pct', '—')}%"
             )
+        context_meta["factor_time"] = snap_ts or None
+        context_meta["instruments"] = len(instruments)
         test_market = "\n".join(lines)
 
     from scripts.prompt_library import active_profile, compile_modules, apply_module_layout
@@ -180,16 +234,25 @@ def admin_test_council_debate(payload: CouncilTestRequest, x_r20_session: str | 
             market_prompt=test_market,
             original_system_prompt=test_sys,
             timeout=float(c_cfg.get("timeout_seconds", 60.0)),
+            # 审计 P1-4d：席位提示词变量用与交易侧同名的上下文渲染（缺值标 MISSING，不吞）
+            runtime_context={
+                "market_matrix": test_market,
+                "profile_name": str((c_cfg.get("roles") or {}).get("cio", {}).get("name") or ""),
+                "trading_memory": "",
+            },
         )
         return {
             "status": "ok",
             "brain_output": brain_output,
             "transcript": transcript,
+            # 审计 P1-4c：本次辩论用的上下文到底来自哪里、缺了什么，一并如实返回
+            "market_context": context_meta,
         }
     except Exception as exc:
         return {
             "status": "error",
             "error": str(exc),
+            "market_context": context_meta,
         }
 
 

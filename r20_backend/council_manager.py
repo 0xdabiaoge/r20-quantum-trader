@@ -170,6 +170,92 @@ COUNCIL_PRESET_SUITES: Dict[str, Dict[str, Any]] = {
 }
 
 
+def seat_model_health(roles: Any) -> List[Dict[str, Any]]:
+    """逐席位核对 model_id 是否已在模型库登记（供 UI 标注"模型缺失"）。
+
+    审计 P1-4b：线上 4 席里 3 席绑了未登记 id（qwen3.8-flash / deepseek-v4-flash-0731），
+    引擎查不到就静默回落主脑 → 页面显示"多模型投委会"，实际只有一个模型在答。
+    """
+    from r20_backend.llm_manager import load_llm_config
+    try:
+        cfg = load_llm_config(mask_keys=False)
+        registered = {str(i.get("id")) for i in (cfg.get("models") or []) if isinstance(i, dict) and i.get("id")}
+    except Exception:
+        registered = set()
+    rows = []
+    for role_id, role in (roles or {}).items():
+        if not isinstance(role, dict):
+            continue
+        requested = str(role.get("model_id") or "").strip()
+        rows.append({
+            "role_id": str(role_id),
+            "model_id": requested,
+            "mode": "follow_main" if not requested else ("registered" if requested in registered else "missing"),
+            "registered": (not requested) or requested in registered,
+        })
+    return rows
+
+
+def resolve_seat_model(role_spec: Dict[str, Any]) -> Dict[str, Any]:
+    """把席位的 model_id 解析为可调用模型；**未登记必须显式暴露**，不再静默回落。
+
+    返回 requested / registered / fallback / registered_ids，调用方负责把这几个字段
+    透出到提案载荷（UI 与审计据此标注"该席位实际由主脑代答"）。
+    """
+    from r20_backend.llm_manager import load_llm_config
+    requested = str(role_spec.get("model_id") or "").strip()
+    effort = role_spec.get("reasoning_effort") or "medium"
+    try:
+        cfg = load_llm_config(mask_keys=False)
+    except Exception as exc:
+        return {"model": "", "base_url": None, "api_key": None, "api_format": None,
+                "effort": effort, "requested": requested, "registered": False,
+                "fallback": bool(requested), "reason": f"模型库读取失败：{exc}", "registered_ids": []}
+    models = [i for i in (cfg.get("models") or []) if isinstance(i, dict)]
+    if not requested:
+        return {"model": "", "base_url": None, "api_key": None, "api_format": None,
+                "effort": cfg.get("active_reasoning_effort", "medium"), "requested": "",
+                "registered": True, "fallback": False, "reason": "", "registered_ids": []}
+    for item in models:
+        if item.get("id") == requested:
+            return {"model": item.get("id"), "base_url": item.get("base_url"),
+                    "api_key": item.get("api_key"), "api_format": item.get("api_format"),
+                    "effort": item.get("reasoning_effort") or effort, "requested": requested,
+                    "registered": True, "fallback": False, "reason": "", "registered_ids": []}
+    return {"model": "", "base_url": None, "api_key": None, "api_format": None,
+            "effort": effort, "requested": requested, "registered": False, "fallback": True,
+            "reason": f"席位绑定的模型 {requested} 未在模型库登记，已回落主脑代答",
+            "registered_ids": sorted(str(i.get("id")) for i in models if i.get("id"))}
+
+
+def validate_seat_model_bindings(roles: Any, previous_roles: Any = None) -> List[str]:
+    """写闸：**新绑定**的未登记模型一律拒绝（沿用旧绑定的不算新错，避免堵死保存）。
+
+    返回问题列表（空 = 通过）。只比对 model_id 变化过的席位，管理员点保存不会被历史遗留挡住。
+    """
+    from r20_backend.llm_manager import load_llm_config
+    try:
+        cfg = load_llm_config(mask_keys=False)
+        registered = {str(i.get("id")) for i in (cfg.get("models") or []) if isinstance(i, dict) and i.get("id")}
+    except Exception:
+        return []  # 模型库读不到时不阻断保存（只读侧会标记）
+    if not registered:
+        return []
+    prev = previous_roles if isinstance(previous_roles, dict) else {}
+    problems = []
+    for role_id, role in (roles or {}).items():
+        if not isinstance(role, dict):
+            continue
+        requested = str(role.get("model_id") or "").strip()
+        if not requested or requested in registered:
+            continue
+        old = str((prev.get(role_id) or {}).get("model_id") or "").strip() if isinstance(prev.get(role_id), dict) else ""
+        if old == requested:
+            continue  # 历史遗留绑定：读侧标红由 UI 处理，不阻断本次保存
+        problems.append(f"席位 {role_id} 绑定的模型 {requested} 未在模型库登记（可选：{', '.join(sorted(registered))} 或留空=跟随主脑）")
+    return problems
+
+
 def _atomic_write_json(file_path: Path, data: Any) -> None:
     file_path.parent.mkdir(parents=True, exist_ok=True)
     temp_dir = file_path.parent
@@ -179,23 +265,60 @@ def _atomic_write_json(file_path: Path, data: Any) -> None:
     os.replace(temp_name, file_path)
 
 
+def validate_council_roles(roles: Any) -> str:
+    """读写两侧共用同一套结构校验，返回人话问题描述（"" = 通过）。
+
+    审计 P1-4a(2026-09-13)：旧读闸只认 `trader_trend`/`cio` 两个 id，而写闸认任意
+    `is_arbitrator` 席位 → 管理员把 CIO 改名/换成自定义仲裁官后，写入成功、接口返回 ok，
+    **下一次读取就把整份配置覆盖成工厂默认**（enabled=false、自写提示词全丢、无备份）。
+    现在两侧共用本函数：写闸拒绝、读闸只警告绝不覆盖用户数据。
+    """
+    if not isinstance(roles, dict) or not roles:
+        return "没有任何席位配置"
+    has_arbitrator = any(
+        (isinstance(r, dict) and r.get("is_arbitrator")) or str(k).lower() in {"cio", "arbitrator"}
+        for k, r in roles.items()
+    )
+    if not has_arbitrator:
+        return "缺少首席终审仲裁官/交易总监(CIO)席位"
+    return ""
+
+
 def load_council_config() -> Dict[str, Any]:
+    """读取委员会配置；**绝不**用工厂默认覆盖可解析的用户文件。
+
+    审计 P1-4a：旧实现两道静默覆盖（读闸白名单不匹配 / JSON 损坏）都是
+    `except: pass` → 落到 `_atomic_write_json(default)`，用户自写提示词无声蒸发。
+    现在：可解析 → 原样返回（结构问题只打警告标记，由写闸/UI 提示）；
+    损坏 → 先备份成 `council_config_corrupt_*.json` 再重建默认（留痕可恢复）。
+    """
     if COUNCIL_CONFIG_FILE.is_file():
         try:
             with open(COUNCIL_CONFIG_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
             if isinstance(data, dict) and "roles" in data:
-                roles = data.get("roles", {})
-                if "trader_trend" in roles or "cio" in roles:
-                    mode = str(data.get("consensus_mode", DEFAULT_CONSENSUS_MODE)).strip().lower()
-                    if mode not in VALID_CONSENSUS_MODES:
-                        data["consensus_mode"] = DEFAULT_CONSENSUS_MODE
-                    if _migrate_untouched_preset_prompts(data):
-                        data["updated_at"] = datetime.now(_BJ).isoformat(sep=" ", timespec="seconds")
-                        _atomic_write_json(COUNCIL_CONFIG_FILE, data)
-                    return data
-        except Exception:
-            pass
+                mode = str(data.get("consensus_mode", DEFAULT_CONSENSUS_MODE)).strip().lower()
+                if mode not in VALID_CONSENSUS_MODES:
+                    data["consensus_mode"] = DEFAULT_CONSENSUS_MODE
+                problem = validate_council_roles(data.get("roles"))
+                if problem:
+                    # 保留用户数据，只标记（旧实现在这里直接覆盖成工厂默认）
+                    data["config_warning"] = f"委员会配置结构异常：{problem}；已保留原文件，请在面板补齐仲裁官席位"
+                if _migrate_untouched_preset_prompts(data):
+                    data["updated_at"] = datetime.now(_BJ).isoformat(sep=" ", timespec="seconds")
+                    _atomic_write_json(COUNCIL_CONFIG_FILE, data)
+                return data
+            corrupt_reason = "缺少 roles 字段"
+        except (OSError, json.JSONDecodeError, ValueError, TypeError) as exc:
+            corrupt_reason = str(exc)[:160]
+        # 走到这里 = 文件存在但不可解析/结构不可用 → 先留备份再重建，绝不静默吞掉
+        try:
+            stamp = datetime.now(_BJ).strftime("%Y%m%d_%H%M%S")
+            rescue = DATA_DIR / f"council_config_corrupt_{stamp}.json"
+            rescue.write_bytes(COUNCIL_CONFIG_FILE.read_bytes())
+            print(f"[council] 委员会配置不可用（{corrupt_reason}），已备份为 {rescue.name} 并重建工厂默认", flush=True)
+        except OSError as exc:
+            print(f"[council] 委员会配置不可用且备份失败：{exc}", flush=True)
 
     default_config: Dict[str, Any] = {
         "enabled": False,
@@ -208,16 +331,48 @@ def load_council_config() -> Dict[str, Any]:
     return default_config
 
 
-def save_council_config(config: Dict[str, Any]) -> Dict[str, Any]:
+def save_council_config(config: Dict[str, Any], *, enforce_models: bool = True) -> Dict[str, Any]:
     if not isinstance(config, dict):
         raise ValueError("Council config must be a dict")
     roles = config.get("roles")
     if not isinstance(roles, dict) or not roles:
         raise ValueError("委员会至少需要包含角色配置")
 
-    has_arbitrator = any(r.get("is_arbitrator") or k in {"cio", "arbitrator"} for k, r in roles.items())
-    if not has_arbitrator:
-        raise ValueError("委员会必须保留至少一位首席终审仲裁官/交易总监(CIO)！")
+    # 审计 P1-4a：读写两侧共用同一校验，杜绝"写得进、读不回"的白名单漂移
+    problem = validate_council_roles(roles)
+    if problem:
+        if "仲裁官" in problem:
+            raise ValueError("委员会必须保留至少一位首席终审仲裁官/交易总监(CIO)！")
+        raise ValueError(f"委员会配置不合法：{problem}")
+    # 审计 P1-4b：不允许再写出"查不到就静默回落主脑"的席位绑定
+    previous: Dict[str, Any] = {}
+    try:
+        # 只用真路径读旧配置：隔离执行类测试会把 COUNCIL_CONFIG_FILE 换成 MagicMock，
+        # 而 MagicMock 既是 os.PathLike 又能被 open() 当**文件描述符**解释——直接 open() 会
+        # 打开并随后关闭 fd 1（把 stdout 关掉，套件退出码变 120）。这里显式限定 str/Path。
+        candidate = COUNCIL_CONFIG_FILE
+        config_path = Path(candidate) if isinstance(candidate, (str, Path)) else None
+        if config_path is not None and config_path.is_file():
+            with open(config_path, "r", encoding="utf-8") as handle:
+                previous = (json.load(handle) or {}).get("roles") or {}
+    except (OSError, json.JSONDecodeError, AttributeError, TypeError, ValueError):
+        previous = {}
+    model_problems = validate_seat_model_bindings(roles, previous)
+    if model_problems and enforce_models:
+        raise ValueError("；".join(model_problems))
+    if model_problems and not enforce_models:
+        # 导入/套用整包时不做整体拒绝：清空未登记绑定（=跟随主脑）并如实回报，
+        # 避免"跨机导入因本机没有某模型而整包失败"，同时绝不静默保留一个查不到的 id。
+        cleared = []
+        for role_id, role in roles.items():
+            if not isinstance(role, dict):
+                continue
+            requested = str(role.get("model_id") or "").strip()
+            if requested and any(f"席位 {role_id} " in p for p in model_problems):
+                role["model_id"] = ""
+                cleared.append({"role_id": role_id, "model_id": requested})
+        if cleared:
+            config["cleared_model_bindings"] = cleared
 
     for role_id, role in roles.items():
         if not isinstance(role, dict):
@@ -353,12 +508,14 @@ def import_council_config(payload: Dict[str, Any]) -> Dict[str, Any]:
         "consensus_mode": src.get("consensus_mode", DEFAULT_CONSENSUS_MODE),
         "timeout_seconds": timeout_seconds,
         "roles": clean_roles,
-    })
+    }, enforce_models=False)
     return {
         "roles": list(saved.get("roles", {}).keys()),
         "consensus_mode": saved.get("consensus_mode", DEFAULT_CONSENSUS_MODE),
         "timeout_seconds": saved.get("timeout_seconds", DEFAULT_COUNCIL_TIMEOUT),
         "backup_file": backup_file,
+        # 审计 P1-4b：跨机导入里本机没有的模型一律清空（=跟随主脑），并在此点名
+        "cleared_model_bindings": saved.get("cleared_model_bindings") or [],
     }
 
 
@@ -416,32 +573,21 @@ def _call_single_trader(
     market_prompt: str,
     master_constitutional_rules: str,
     timeout: float = 20.0,
+    runtime_context: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Invokes a senior trader role to pitch their complete trade proposal and account review."""
     from r20_backend.llm_manager import execute_llm_request, get_active_llm_runtime, load_llm_config
 
-    model_id = role_spec.get("model_id") or ""
-    override_model = None
-    override_url = None
-    override_key = None
-    override_format = None
-    override_effort = role_spec.get("reasoning_effort") or "medium"
+    # 审计 P1-4b：未登记模型不再静默回落（resolved 里带 registered/fallback 事实）
+    resolved = resolve_seat_model(role_spec)
+    override_model = resolved["model"] or None
+    override_url = resolved["base_url"]
+    override_key = resolved["api_key"]
+    override_format = resolved["api_format"]
+    override_effort = resolved["effort"]
     temperature = float(role_spec.get("temperature", 0.2))
 
-    cfg = load_llm_config(mask_keys=False)
-    if model_id:
-        for item in cfg.get("models", []):
-            if item.get("id") == model_id:
-                override_model = item.get("id")
-                override_url = item.get("base_url")
-                override_key = item.get("api_key")
-                override_format = item.get("api_format")
-                override_effort = item.get("reasoning_effort") or override_effort
-                break
-    else:
-        override_effort = cfg.get("active_reasoning_effort", "medium")
-
-    prompt_content = role_spec.get("prompt", "")
+    prompt_content = _render_seat_prompt(str(role_spec.get("prompt") or ""), runtime_context)
     role_name = role_spec.get("name", role_id)
     proposal_id = f"{role_id}_prop"
 
@@ -492,6 +638,10 @@ def _call_single_trader(
             "role_id": role_id,
             "role_name": role_name,
             "model_used": override_model or get_active_llm_runtime().get("model", "default"),
+            "model_requested": resolved["requested"],
+            "model_registered": resolved["registered"],
+            "model_fallback": resolved["fallback"],
+            "model_note": resolved["reason"],
             "status": "ok",
             "content": content.strip(),
             "reasoning": reasoning.strip() if reasoning else "",
@@ -504,6 +654,10 @@ def _call_single_trader(
             "role_id": role_id,
             "role_name": role_name,
             "model_used": override_model or "unknown",
+            "model_requested": resolved["requested"],
+            "model_registered": resolved["registered"],
+            "model_fallback": resolved["fallback"],
+            "model_note": resolved["reason"],
             "status": "error",
             "content": f"交易员方案提交异常/超时降级: {e}",
             "reasoning": "",
@@ -519,32 +673,21 @@ def _call_single_trader_critique(
     peer_proposals: str,
     master_constitutional_rules: str,
     timeout: float = 15.0,
+    runtime_context: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Invokes a senior trader role to cross-examine peer proposals for hidden risks, timing, or sizing flaws."""
     from r20_backend.llm_manager import execute_llm_request, get_active_llm_runtime, load_llm_config
 
-    model_id = role_spec.get("model_id") or ""
-    override_model = None
-    override_url = None
-    override_key = None
-    override_format = None
-    override_effort = role_spec.get("reasoning_effort") or "medium"
+    # 审计 P1-4b：未登记模型不再静默回落（resolved 里带 registered/fallback 事实）
+    resolved = resolve_seat_model(role_spec)
+    override_model = resolved["model"] or None
+    override_url = resolved["base_url"]
+    override_key = resolved["api_key"]
+    override_format = resolved["api_format"]
+    override_effort = resolved["effort"]
     temperature = float(role_spec.get("temperature", 0.2))
 
-    cfg = load_llm_config(mask_keys=False)
-    if model_id:
-        for item in cfg.get("models", []):
-            if item.get("id") == model_id:
-                override_model = item.get("id")
-                override_url = item.get("base_url")
-                override_key = item.get("api_key")
-                override_format = item.get("api_format")
-                override_effort = item.get("reasoning_effort") or override_effort
-                break
-    else:
-        override_effort = cfg.get("active_reasoning_effort", "medium")
-
-    prompt_content = role_spec.get("prompt", "")
+    prompt_content = _render_seat_prompt(str(role_spec.get("prompt") or ""), runtime_context)
     role_name = role_spec.get("name", role_id)
 
     critique_system_prompt = (
@@ -590,6 +733,10 @@ def _call_single_trader_critique(
             "role_id": role_id,
             "role_name": role_name,
             "model_used": override_model or get_active_llm_runtime().get("model", "default"),
+            "model_requested": resolved["requested"],
+            "model_registered": resolved["registered"],
+            "model_fallback": resolved["fallback"],
+            "model_note": resolved["reason"],
             "status": "ok",
             "content": content.strip(),
             "reasoning": reasoning.strip() if reasoning else "",
@@ -607,10 +754,33 @@ def _call_single_trader_critique(
         }
 
 
+def _render_seat_prompt(prompt: str, runtime_context: Optional[Dict[str, Any]]) -> str:
+    """席位提示词变量渲染（审计 P1-4d）。
+
+    旧实现把席位提示词原样塞进 system prompt，线上 4 个席位都带 `{{macro_4h}}` 之类
+    占位符——模型看到的是花括号字面量（render_variables 在委员会全文出现 0 次）。
+    现在走 prompt_library 的同一渲染器：context=None 保持模板原样（预览语义），
+    有 context 时未知变量标 [UNKNOWN_VARIABLE:x]、缺值标 [MISSING_CONTEXT:x]，绝不静默吞。
+    """
+    if not prompt:
+        return ""
+    try:
+        from prompt_library import render_variables
+    except Exception:
+        try:
+            from scripts.prompt_library import render_variables
+        except Exception:
+            return prompt
+    if runtime_context is None:
+        return prompt
+    return render_variables(prompt, runtime_context)
+
+
 def execute_council_debate(
     market_prompt: str,
     original_system_prompt: str,
     timeout: float = 240.0,
+    runtime_context: Optional[Dict[str, Any]] = None,
 ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     """Execute Hedge Fund Investment Committee Deliberation:
 
@@ -693,6 +863,7 @@ def execute_council_debate(
                     market_prompt,
                     original_system_prompt,
                     round1_budget,
+                    runtime_context,
                 ): key
                 for key in trader_keys
             }
@@ -747,6 +918,7 @@ def execute_council_debate(
                         peers_text,
                         original_system_prompt,
                         round2_budget,
+                        runtime_context,
                     )] = k
                 for fut in concurrent.futures.as_completed(critique_futures):
                     k = critique_futures[fut]
@@ -778,6 +950,7 @@ def execute_council_debate(
                     market_prompt,
                     original_system_prompt,
                     member_timeout,
+                    runtime_context,
                 ): key
                 for key in trader_keys
             }
@@ -802,7 +975,8 @@ def execute_council_debate(
         weight_str = f" [绩效权重: {res.get('weight', 1.0)}]" if res.get("weight") is not None else ""
         p_id = res.get("proposal_id", f"{k}_prop")
         transcript_blocks.append(
-            f"=== 【{res.get('role_name', k)}】实操审查与作战提案 [提案标识: {p_id}]（模型：{res.get('model_used', 'default')}{weight_str}）===\n"
+            f"=== 【{res.get('role_name', k)}】实操审查与作战提案 [提案标识: {p_id}]（模型：{res.get('model_used', 'default')}"
+            f"{'（⚠ 席位绑定模型未登记，本席由主脑代答）' if res.get('model_fallback') else ''}{weight_str}）===\n"
             f"{res.get('content', '（该交易员本轮未提交有效提案）')}\n"
         )
     compiled_proposals = "\n".join(transcript_blocks) if transcript_blocks else "（无其他交易员提交方案，首席投资官独立决策）"
@@ -831,32 +1005,20 @@ def execute_council_debate(
             f"Council deliberation timeout before CIO arbitration: {rem:.2f}s remaining is below safety threshold {MIN_SAFE_REASONING_TIME}s"
         )
 
-    cio_model_id = cio_spec.get("model_id") or ""
-    override_model = None
-    override_url = None
-    override_key = None
-    override_format = None
-    override_effort = "high"
+    # 审计 P1-4b：仲裁官席位同样不得静默回落（事实进裁决载荷，UI 可标注）
+    cio_resolved = resolve_seat_model({**cio_spec, "reasoning_effort": cio_spec.get("reasoning_effort") or "high"})
+    override_model = cio_resolved["model"] or None
+    override_url = cio_resolved["base_url"]
+    override_key = cio_resolved["api_key"]
+    override_format = cio_resolved["api_format"]
+    override_effort = cio_resolved["effort"] or "high"
     cio_temperature = float(cio_spec.get("temperature", 0.2))
-
-    cfg = load_llm_config(mask_keys=False)
-    if cio_model_id:
-        for item in cfg.get("models", []):
-            if item.get("id") == cio_model_id:
-                override_model = item.get("id")
-                override_url = item.get("base_url")
-                override_key = item.get("api_key")
-                override_format = item.get("api_format")
-                override_effort = item.get("reasoning_effort") or "high"
-                break
-    else:
-        override_effort = cfg.get("active_reasoning_effort", "high")
 
     cio_system_prompt = (
         f"{original_system_prompt}\n\n"
         "====================================================\n"
         f"【身份特别授权：你是对冲基金首席投资官 (CIO) 兼交易总监】\n"
-        f"{cio_spec.get('prompt', '')}\n\n"
+        f"{_render_seat_prompt(str(cio_spec.get('prompt') or ''), runtime_context)}\n\n"
         "====================================================\n"
         "【投委会终审发单契约强约束（全面落盘持仓处理、挂单撤留与新标的点位！）】\n"
         "你必须对全局资金、在途持仓、在途挂单及标的池全部标的做出终审裁决：\n"
@@ -972,6 +1134,10 @@ def execute_council_debate(
         "arbitrator": {
             "role_name": cio_spec.get("name", "首席投资官 (CIO)"),
             "model_used": override_model or get_active_llm_runtime().get("model", "default"),
+            "model_requested": cio_resolved["requested"],
+            "model_registered": cio_resolved["registered"],
+            "model_fallback": cio_resolved["fallback"],
+            "model_note": cio_resolved["reason"],
             "latency_ms": latency,
             "reasoning": reasoning,
         },
