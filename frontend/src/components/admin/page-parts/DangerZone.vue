@@ -4,7 +4,7 @@
  *  EXACTLY match `confirmPhrase` (the resource name) before the action unlocks.
  *  Reversible operations should NOT use this component (use an undo toast instead). */
 import { ref, watch } from 'vue'
-import { useI18n } from '../../composables/useI18n'
+import { useI18n } from '../../../composables/useI18n'
 import { ShieldAlert } from 'lucide-vue-next'
 
 const props = withDefaults(defineProps<{

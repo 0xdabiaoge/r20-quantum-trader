@@ -10,7 +10,7 @@ import { useApi } from '../../composables/useApi'
 import { useAsyncAction } from '../../composables/useAsyncAction'
 import { useDashboardStore } from '../../stores/dashboard'
 import PageHeader from '../../components/admin/PageHeader.vue'
-import DangerZone from '../../components/admin/DangerZone.vue'
+import DangerZone from '../../components/admin/page-parts/DangerZone.vue'
 import {ShieldAlert,
   Save,
   RotateCcw,

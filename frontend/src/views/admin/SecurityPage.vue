@@ -5,13 +5,13 @@ const toast = useToast()
 const { ask } = useConfirm()
 import { ref, computed, onMounted } from 'vue'
 import PageHeader from '../../components/admin/PageHeader.vue'
-import SettingsSection from '../../components/admin/SettingsSection.vue'
+import SettingsSection from '../../components/admin/page-parts/SettingsSection.vue'
 import DataTable from '../../components/admin/DataTable.vue'
 import { useI18n } from '../../composables/useI18n'
 import { useApi } from '../../composables/useApi'
 import { useAuthStore } from '../../stores/auth'
 import { fmtDateTime } from '../../utils/format'
-import VenueCredentialCard from '../../components/admin/VenueCredentialCard.vue'
+import VenueCredentialCard from '../../components/admin/page-parts/VenueCredentialCard.vue'
 import { Save, RefreshCw, Layers, Trash2, Zap } from 'lucide-vue-next'
 
 const { api } = useApi()
