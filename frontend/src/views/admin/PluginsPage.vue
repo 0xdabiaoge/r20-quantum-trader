@@ -1,28 +1,11 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
 import { useI18n } from '../../composables/useI18n'
 const { t } = useI18n()
-import { useApi } from '../../composables/useApi'
+import { useResource } from '../../composables/useResource'
 import { Blocks, ShieldAlert, RefreshCw } from 'lucide-vue-next'
 
-const { api } = useApi()
-const data = ref<any>(null)
-const loading = ref(true)
-const errText = ref('')
-
-async function load() {
-  loading.value = true
-  try {
-    data.value = await api('/api/v1/admin/plugins')
-    errText.value = ''
-  } catch (e: any) {
-    errText.value = e.message
-  } finally {
-    loading.value = false
-  }
-}
-
-onMounted(load)
+// F2：取数样板收成一行（loading / error / 重取由 composable 统一负责）
+const { data, loading, error, reload: load } = useResource<any>('/api/v1/admin/plugins')
 </script>
 
 <template>
@@ -37,7 +20,7 @@ onMounted(load)
       </span>
     </div>
 
-    <div v-if="errText" class="p-3 rounded-lg text-xs border" style="background-color: var(--down-bg); border-color: var(--down-line); color: var(--down);">{{ errText }}</div>
+    <div v-if="error" class="p-3 rounded-lg text-xs border" style="background-color: var(--down-bg); border-color: var(--down-line); color: var(--down);">{{ error }}</div>
     <div v-if="loading" class="py-12 text-center text-xs" style="color: var(--ink-2);"><RefreshCw class="w-5 h-5 animate-spin inline mr-1.5" style="color: var(--accent);" />{{ t('admin.plugins.loading') }}</div>
 
     <template v-else-if="data">

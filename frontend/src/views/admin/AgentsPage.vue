@@ -1,27 +1,12 @@
 <script setup lang="ts">
 import { fmtDateTime } from '../../utils/format';
-import { ref, onMounted } from 'vue'
 import { useI18n } from '../../composables/useI18n'
 const { t } = useI18n()
-import { useApi } from '../../composables/useApi'
+import { useResource } from '../../composables/useResource'
 import { Package, Cpu, KeyRound, RefreshCw } from 'lucide-vue-next'
 
-const { api } = useApi()
-const data = ref<any>(null)
-const loading = ref(true)
-const errText = ref('')
-
-async function load() {
-  loading.value = true
-  try {
-    data.value = await api('/api/v1/admin/agents')
-    errText.value = ''
-  } catch (e: any) {
-    errText.value = e.message
-  } finally {
-    loading.value = false
-  }
-}
+// F2：取数样板收成一行
+const { data, loading, error, reload: load } = useResource<any>('/api/v1/admin/agents')
 
 function statusColor(s: string) {
   if (['success', 'running', 'online', 'idle'].includes(s)) return 'text-emerald-400'
@@ -29,7 +14,6 @@ function statusColor(s: string) {
   return 'text-amber-400'
 }
 
-onMounted(load)
 </script>
 
 <template>
@@ -39,7 +23,7 @@ onMounted(load)
       <span class="text-[11px] text-blue-400 bg-blue-500/10 px-2 py-1 rounded border border-blue-500/20">{{ t('admin.agents.policyChip') }}</span>
     </div>
 
-    <div v-if="errText" class="p-3 rounded-lg text-xs bg-rose-500/10 border border-rose-500/20 text-rose-400">{{ errText }}</div>
+    <div v-if="error" class="p-3 rounded-lg text-xs bg-rose-500/10 border border-rose-500/20 text-rose-400">{{ error }}</div>
     <div v-if="loading" class="py-12 text-center text-xs text-[var(--ink-3)]"><RefreshCw class="w-5 h-5 animate-spin inline mr-1.5 text-blue-400" />{{ t('admin.agents.loading') }}</div>
 
     <template v-else-if="data">

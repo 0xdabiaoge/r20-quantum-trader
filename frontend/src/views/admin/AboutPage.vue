@@ -1,90 +1,68 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref } from 'vue'
 import { useI18n } from '../../composables/useI18n'
 const { t } = useI18n()
 import { useApi } from '../../composables/useApi'
+import { useResource } from '../../composables/useResource'
+import { useAsyncAction } from '../../composables/useAsyncAction'
 import { Info, GitBranch, Download, RefreshCw, CheckCircle2, AlertTriangle, ShieldCheck, Terminal } from 'lucide-vue-next'
 
 const { api } = useApi()
-const about = ref<any>(null)
-const loading = ref(true)
-const updateChecking = ref(false)
-const updateRunning = ref(false)
+
+// F2：取数样板收成一行。原实现出错只 console.error（页面不显示），
+// 这里保持同样的可见性（页面无错误位），错误仍可从 error 取。
+const { data: about, loading } = useResource<any>('/api/v1/admin/about', {
+  onError: (e) => console.error(e),
+})
+
 const updateResult = ref<any>(null)
 const showConfirmModal = ref(false)
 const confirmPhrase = ref('')
 
-async function loadAbout() {
-  loading.value = true
-  try {
-    about.value = await api('/api/v1/admin/about')
-  } catch (e: any) {
-    console.error(e)
-  } finally {
-    loading.value = false
-  }
-}
-
-async function checkUpdate() {
-  updateChecking.value = true
+// F2：动作类样板（busy + 统一错误出口）。原实现的错误出口是写进 updateResult，
+// 故用 onError 一对一保留，不弹 toast、不改变页面表现。
+const { run: checkUpdate, busy: updateChecking } = useAsyncAction(async () => {
   updateResult.value = null
-  try {
-    const res = await api('/api/v1/admin/update/check', { method: 'POST' })
-    if (about.value) {
-      about.value.update = res
-    }
-    updateResult.value = res.error
-      // 模板以 .error 键判红（审计①#8）：git 失败回 HTTP 200+error 字段，必须走红分支
-      ? { error: `更新检查失败：${res.error}（无法确认是否落后，安全补丁可能静默脱班）`, data: res }
-      : {
-          ok: true,
-          message: res.behind > 0
-            ? t('admin.about.checkBehind', undefined, { behind: res.behind, remote: res.remote })
-            : t('admin.about.checkUpToDate'),
-          data: res,
-        }
-  } catch (e: any) {
-    updateResult.value = { error: e.message }
-  } finally {
-    updateChecking.value = false
+  const res = await api<any>('/api/v1/admin/update/check', { method: 'POST' })
+  if (about.value) {
+    about.value.update = res
   }
-}
+  updateResult.value = res.error
+    // 模板以 .error 键判红（审计①#8）：git 失败回 HTTP 200+error 字段，必须走红分支
+    ? { error: `更新检查失败：${res.error}（无法确认是否落后，安全补丁可能静默脱班）`, data: res }
+    : {
+        ok: true,
+        message: res.behind > 0
+          ? t('admin.about.checkBehind', undefined, { behind: res.behind, remote: res.remote })
+          : t('admin.about.checkUpToDate'),
+        data: res,
+      }
+}, { onError: (e) => { updateResult.value = { error: e.message } } })
 
 function openUpdateModal() {
   confirmPhrase.value = ''
   showConfirmModal.value = true
 }
 
-async function executeUpdate() {
+const { run: executeUpdate, busy: updateRunning } = useAsyncAction(async () => {
   if (confirmPhrase.value.trim().toUpperCase() !== 'UPDATE R20') return
-  updateRunning.value = true
   updateResult.value = null
-  try {
-    const res = await api('/api/v1/admin/update', {
-      method: 'POST',
-      body: JSON.stringify({ confirmation: 'UPDATE R20' }),
-    })
-    showConfirmModal.value = false
-    updateResult.value = {
-      ok: true,
-      updated: res.updated,
-      message: res.updated ? t('admin.about.updateSuccess') : t('admin.about.updateNoop'),
-      git_output: res.git_output,
-      restart_note: res.restart_note,
-    }
-    if (about.value && res.after) {
-      about.value.update = res.after
-    }
-  } catch (e: any) {
-    updateResult.value = { error: e.message }
-  } finally {
-    updateRunning.value = false
+  const res = await api<any>('/api/v1/admin/update', {
+    method: 'POST',
+    body: JSON.stringify({ confirmation: 'UPDATE R20' }),
+  })
+  showConfirmModal.value = false
+  updateResult.value = {
+    ok: true,
+    updated: res.updated,
+    message: res.updated ? t('admin.about.updateSuccess') : t('admin.about.updateNoop'),
+    git_output: res.git_output,
+    restart_note: res.restart_note,
   }
-}
-
-onMounted(() => {
-  loadAbout()
-})
+  if (about.value && res.after) {
+    about.value.update = res.after
+  }
+}, { onError: (e) => { updateResult.value = { error: e.message } } })
 </script>
 
 <template>
