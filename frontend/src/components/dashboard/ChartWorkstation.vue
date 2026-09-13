@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { chartStyles } from './chartStyles'
+import { computeRiskReward, symbolPrecision } from './chartMath'
 import { fmtDate, fmtHM, fmtClock } from '../../utils/format';
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useDashboardStore } from '../../stores/dashboard'
@@ -350,71 +352,20 @@ function resetSimulation() {
 }
 
 // 真实数学风控测算模型
-const riskRewardMetrics = computed(() => {
-  const entry = effectiveEntry.value
-  const sl = effectiveSL.value
-  const tp = effectiveTP.value
-  const side = liveSide.value
-  const atr = currentAtr.value
-
-  let riskDist = 0
-  let rewardDist = 0
-
-  if (side === 'long') {
-    riskDist = Math.max(0, entry - sl)
-    rewardDist = Math.max(0, tp - entry)
-  } else {
-    riskDist = Math.max(0, sl - entry)
-    rewardDist = Math.max(0, entry - tp)
-  }
-
-  const riskPct = entry > 0 ? (riskDist / entry) * 100 : 0
-  const rewardPct = entry > 0 ? (rewardDist / entry) * 100 : 0
-  const rrRatio = riskDist > 0 ? rewardDist / riskDist : 0
-  const atrMultiple = atr > 0 ? riskDist / atr : 0
-
-  const isRrCompliant = rrRatio >= 2.0
-  const isAtrOptimal = atrMultiple >= 1.8 && atrMultiple <= 2.2
-
-  const hasRealPosition = !!activePosition.value
-  // 未持仓时按「可用余额 × 20%」估算单笔保证金（与执行层 R20_MAX_MARGIN_EQUITY_RATIO 同口径），
-  // 不再写死 100U —— 那会让小资金账户看到与真实风险完全不符的预估盈亏。
-  const availEq = Number(store.account?.avail_eq || store.account?.total_eq || 0)
-  let activeMargin = availEq > 0 ? Math.round(availEq * 0.20 * 100) / 100 : 0
-  let activeLeverage = 3.0
-
-  if (hasRealPosition && activePosition.value) {
-    const rawMargin = Number(activePosition.value.margin_usdt ?? activePosition.value.margin ?? 0)
-    if (rawMargin > 0) activeMargin = rawMargin
-    const rawLever = Number(activePosition.value.lever ?? 3)
-    if (rawLever > 0) activeLeverage = rawLever
-  }
-
-  const estProfitUsd = activeMargin * activeLeverage * (rewardPct / 100)
-  const estRiskUsd = activeMargin * activeLeverage * (riskPct / 100)
-
-  return {
-    riskDist,
-    rewardDist,
-    riskPct,
-    rewardPct,
-    rrRatio,
-    atrMultiple,
-    isRrCompliant,
-    isAtrOptimal,
-    hasRealPosition,
-    estProfitUsd,
-    estRiskUsd,
-  }
-})
+const riskRewardMetrics = computed(() => computeRiskReward({
+  entry: effectiveEntry.value,
+  sl: effectiveSL.value,
+  tp: effectiveTP.value,
+  side: liveSide.value,
+  atr: currentAtr.value,
+  activePosition: activePosition.value,
+  // 可用权益在**调用点**读取：仍在 computed 求值期间发生，响应式追踪不变
+  availEq: Number(store.account?.avail_eq || store.account?.total_eq || 0),
+}))
 
 // 价格精度自适应
 function getSymbolPrecision(price: number): number {
-  if (price >= 10000) return 1
-  if (price >= 100) return 2
-  if (price >= 10) return 3
-  if (price >= 1) return 3
-  return 4
+  return symbolPrecision(price)
 }
 
 // ==========================================
@@ -430,193 +381,7 @@ let slOverlayId: string | null = null
 let tpOverlayId: string | null = null
 
 function getChartStyles(): any {
-  const dark = isDark.value
-  return {
-    grid: {
-      show: true,
-      horizontal: {
-        show: true,
-        size: 1,
-        color: dark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)',
-        style: 'solid',
-      },
-      vertical: {
-        show: false, // 隐藏垂直杂乱网格
-      },
-    },
-    candle: {
-      type: 'candle_solid',
-      bar: {
-        upColor: tok('--up'),
-        downColor: tok('--down'),
-        noChangeColor: tok('--ink-3'),
-        upBorderColor: tok('--up'),
-        downBorderColor: tok('--down'),
-        noChangeBorderColor: tok('--ink-3'),
-        upWickColor: tok('--up'),
-        downWickColor: tok('--down'),
-        noChangeWickColor: tok('--ink-3'),
-      },
-      priceMark: {
-        show: true,
-        high: {
-          show: false,
-          color: tok('--ink-2'),
-          textOffset: 4,
-          textSize: 10,
-        },
-        low: {
-          show: false,
-          color: tok('--ink-2'),
-          textOffset: 4,
-          textSize: 10,
-        },
-        last: {
-          show: true,
-          upColor: tok('--up'),
-          downColor: tok('--down'),
-          noChangeColor: tok('--ink-3'),
-          line: {
-            show: true,
-            style: 'dashed',
-            dashedValue: [4, 4],
-            size: 1,
-          },
-          text: {
-            show: true,
-            size: 11,
-            paddingLeft: 4,
-            paddingTop: 2,
-            paddingRight: 4,
-            paddingBottom: 2,
-            color: tok('--ink-1'),
-          },
-        },
-      },
-      tooltip: {
-        showRule: legendRule(),
-        showType: 'standard',
-        text: {
-          size: 11,
-          family: 'JetBrains Mono, monospace',
-          color: tok('--ink-2'),
-        },
-      },
-    },
-    indicator: {
-      tooltip: {
-        showRule: legendRule(),
-        showType: 'standard',
-      },
-      ohlc: {
-        upColor: tok('--up'),
-        downColor: tok('--down'),
-        noChangeColor: tok('--ink-3'),
-      },
-      lines: [
-        { style: 'solid', smooth: false, size: 1.5, color: '#F59E0B' }, // MA5 / 黄
-        { style: 'solid', smooth: false, size: 1.5, color: '#38BDF8' }, // MA10 / 蓝
-        { style: 'solid', smooth: false, size: 1.5, color: '#A855F7' }, // MA20 / 紫
-        { style: 'solid', smooth: false, size: 1.5, color: tok('--down') },
-        { style: 'solid', smooth: false, size: 1.5, color: tok('--up') },
-      ],
-      lastValueMark: {
-        show: true,
-        text: {
-          show: true,
-          size: 10,
-          paddingLeft: 3,
-          paddingTop: 1,
-          paddingRight: 3,
-          paddingBottom: 1,
-          color: tok('--ink-1'),
-        },
-      },
-    },
-    xAxis: {
-      show: true,
-      size: 'auto',
-      axisLine: {
-        show: true,
-        color: tok('--surface-3'),
-        size: 1,
-      },
-      tickText: {
-        show: true,
-        color: tok('--ink-3'),
-        family: 'JetBrains Mono, monospace',
-        size: 10,
-      },
-      tickLine: {
-        show: true,
-        size: 1,
-        length: 3,
-        color: tok('--surface-3'),
-      },
-    },
-    yAxis: {
-      show: true,
-      size: 'auto',
-      position: 'right',
-      type: 'normal',
-      inside: false,
-      axisLine: {
-        show: true,
-        color: tok('--surface-3'),
-        size: 1,
-      },
-      tickText: {
-        show: true,
-        color: tok('--ink-2'),
-        family: 'JetBrains Mono, monospace',
-        size: 11,
-      },
-      tickLine: {
-        show: false,
-      },
-    },
-    separator: {
-      size: 1,
-      color: tok('--surface-3'),
-      fill: true,
-      activeBackgroundColor: dark ? '#334155' : '#CBD5E1',
-    },
-    crosshair: {
-      show: true,
-      horizontal: {
-        show: true,
-        line: {
-          style: 'dashed',
-          dashedValue: [4, 4],
-          size: 1,
-          color: tok('--ink-3'),
-        },
-        text: {
-          show: true,
-          color: tok('--ink-1'),
-          size: 11,
-          family: 'JetBrains Mono, monospace',
-          backgroundColor: '#3B82F6',
-        },
-      },
-      vertical: {
-        show: true,
-        line: {
-          style: 'dashed',
-          dashedValue: [4, 4],
-          size: 1,
-          color: tok('--ink-3'),
-        },
-        text: {
-          show: true,
-          color: tok('--ink-1'),
-          size: 10,
-          family: 'JetBrains Mono, monospace',
-          backgroundColor: '#475569',
-        },
-      },
-    },
-  }
+  return chartStyles(isDark.value, legendRule, tok)
 }
 
 // 统一根据 activeIndicators 渲染与挂载指标

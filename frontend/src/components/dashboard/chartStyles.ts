@@ -1,0 +1,208 @@
+/**
+ * K 线样式表（结构优化阶段 3·F4 抽离）。
+ *
+ * 这是 `ChartWorkstation.vue`（原 1285 行）里最大的一块**纯**逻辑：189 行、
+ * 只有 3 个自由变量（`isDark` / `legendRule` / `tok`）。抽出来后既不碰生命周期、
+ * 也不碰图表实例，行为可证不变。
+ *
+ * 刻意**不**连同 `initChart` / `updatePriceLines` / `loadCandles` / `syncIndicators`
+ * 一起抽成 `useChartRenderer.ts` / `useChartOverlays.ts`：那条路径持有图表实例，
+ * 与 `onMounted`/`onUnmounted`/`watch` 时序强耦合，而前端没有测试、渲染结果
+ * 无法自动验证。研究文档 F4 自己也标注了"需人工过一遍 K 线工位" ——
+ * 在有人目视验证之前，不动渲染路径。
+ */
+
+/** 图表网格/蜡烛/指标线的配色与形态，随明暗主题切换 */
+export function chartStyles(
+  isDark: boolean,
+  legendRule: () => 'always',
+  tok: (name: string) => string,
+): any {
+  const dark = isDark
+  return {
+    grid: {
+      show: true,
+      horizontal: {
+        show: true,
+        size: 1,
+        color: dark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)',
+        style: 'solid',
+      },
+      vertical: {
+        show: false, // 隐藏垂直杂乱网格
+      },
+    },
+    candle: {
+      type: 'candle_solid',
+      bar: {
+        upColor: tok('--up'),
+        downColor: tok('--down'),
+        noChangeColor: tok('--ink-3'),
+        upBorderColor: tok('--up'),
+        downBorderColor: tok('--down'),
+        noChangeBorderColor: tok('--ink-3'),
+        upWickColor: tok('--up'),
+        downWickColor: tok('--down'),
+        noChangeWickColor: tok('--ink-3'),
+      },
+      priceMark: {
+        show: true,
+        high: {
+          show: false,
+          color: tok('--ink-2'),
+          textOffset: 4,
+          textSize: 10,
+        },
+        low: {
+          show: false,
+          color: tok('--ink-2'),
+          textOffset: 4,
+          textSize: 10,
+        },
+        last: {
+          show: true,
+          upColor: tok('--up'),
+          downColor: tok('--down'),
+          noChangeColor: tok('--ink-3'),
+          line: {
+            show: true,
+            style: 'dashed',
+            dashedValue: [4, 4],
+            size: 1,
+          },
+          text: {
+            show: true,
+            size: 11,
+            paddingLeft: 4,
+            paddingTop: 2,
+            paddingRight: 4,
+            paddingBottom: 2,
+            color: tok('--ink-1'),
+          },
+        },
+      },
+      tooltip: {
+        showRule: legendRule(),
+        showType: 'standard',
+        text: {
+          size: 11,
+          family: 'JetBrains Mono, monospace',
+          color: tok('--ink-2'),
+        },
+      },
+    },
+    indicator: {
+      tooltip: {
+        showRule: legendRule(),
+        showType: 'standard',
+      },
+      ohlc: {
+        upColor: tok('--up'),
+        downColor: tok('--down'),
+        noChangeColor: tok('--ink-3'),
+      },
+      lines: [
+        { style: 'solid', smooth: false, size: 1.5, color: '#F59E0B' }, // MA5 / 黄
+        { style: 'solid', smooth: false, size: 1.5, color: '#38BDF8' }, // MA10 / 蓝
+        { style: 'solid', smooth: false, size: 1.5, color: '#A855F7' }, // MA20 / 紫
+        { style: 'solid', smooth: false, size: 1.5, color: tok('--down') },
+        { style: 'solid', smooth: false, size: 1.5, color: tok('--up') },
+      ],
+      lastValueMark: {
+        show: true,
+        text: {
+          show: true,
+          size: 10,
+          paddingLeft: 3,
+          paddingTop: 1,
+          paddingRight: 3,
+          paddingBottom: 1,
+          color: tok('--ink-1'),
+        },
+      },
+    },
+    xAxis: {
+      show: true,
+      size: 'auto',
+      axisLine: {
+        show: true,
+        color: tok('--surface-3'),
+        size: 1,
+      },
+      tickText: {
+        show: true,
+        color: tok('--ink-3'),
+        family: 'JetBrains Mono, monospace',
+        size: 10,
+      },
+      tickLine: {
+        show: true,
+        size: 1,
+        length: 3,
+        color: tok('--surface-3'),
+      },
+    },
+    yAxis: {
+      show: true,
+      size: 'auto',
+      position: 'right',
+      type: 'normal',
+      inside: false,
+      axisLine: {
+        show: true,
+        color: tok('--surface-3'),
+        size: 1,
+      },
+      tickText: {
+        show: true,
+        color: tok('--ink-2'),
+        family: 'JetBrains Mono, monospace',
+        size: 11,
+      },
+      tickLine: {
+        show: false,
+      },
+    },
+    separator: {
+      size: 1,
+      color: tok('--surface-3'),
+      fill: true,
+      activeBackgroundColor: dark ? '#334155' : '#CBD5E1',
+    },
+    crosshair: {
+      show: true,
+      horizontal: {
+        show: true,
+        line: {
+          style: 'dashed',
+          dashedValue: [4, 4],
+          size: 1,
+          color: tok('--ink-3'),
+        },
+        text: {
+          show: true,
+          color: tok('--ink-1'),
+          size: 11,
+          family: 'JetBrains Mono, monospace',
+          backgroundColor: '#3B82F6',
+        },
+      },
+      vertical: {
+        show: true,
+        line: {
+          style: 'dashed',
+          dashedValue: [4, 4],
+          size: 1,
+          color: tok('--ink-3'),
+        },
+        text: {
+          show: true,
+          color: tok('--ink-1'),
+          size: 10,
+          family: 'JetBrains Mono, monospace',
+          backgroundColor: '#475569',
+        },
+      },
+    },
+  }
+}
