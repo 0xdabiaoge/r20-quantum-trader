@@ -100,8 +100,22 @@ def _memory_freshness_note() -> str:
 DASHBOARD_CACHE_FILE = os.path.join(DATA_DIR, "dashboard_last_good.json")
 
 
-def get_target_instruments() -> list[dict[str, Any]]:
-    return load_instruments()
+from r20_backend.dashboard_payload.market import (  # noqa: E402
+    get_target_instruments,
+    _TRADER_CYCLE_MINUTES_MEMO,
+    _trader_cycle_minutes,
+    _safe_float,
+    _is_meaningful_dashboard_snapshot,
+    _global_env_axis,
+    _load_portfolio_risk_data,
+    _load_multi_venue_portfolio,
+)
+from r20_backend.dashboard_payload.factors import (  # noqa: E402
+    _build_factors_from_local_files as _core__build_factors_from_local_files,
+    _load_local_factor_library as _core__load_local_factor_library,
+    enrich_position_risk_fields as _core_enrich_position_risk_fields,
+    load_position_trackers as _core_load_position_trackers,
+)
 
 
 TARGET_INSTRUMENTS = load_instruments()
@@ -126,226 +140,34 @@ def _fetch_json(fn, *args, **kwargs):
     except Exception as exc:  # RuntimeError(OKX 码+msg)、网络错误等人话暴露
         return False, None, f"{type(exc).__name__}: {exc}"
 
-_TRADER_CYCLE_MINUTES_MEMO: list = []   # 非 None 才缓存（trader 周期是代码常量）
 
 
-def _trader_cycle_minutes():
-    """网关调度器 trader 作业的真实周期（分钟）；不可得返回 None。
-
-    批B(2026-09-13)：前台曾把「决策周期 15 分钟」写死当事实展示（后端降频/改周期后
-    照旧宣称）。单一事实源=调度器 JobSpec，此处读真值；任何异常一律 None，由前端
-    决定不渲染——宁缺勿假。
-    """
-    if _TRADER_CYCLE_MINUTES_MEMO:
-        return _TRADER_CYCLE_MINUTES_MEMO[0]
-    try:
-        from r20_gateway.scheduler import current_jobs
-        for _j in current_jobs():
-            if str(getattr(_j, "name", "")) == "trader":
-                _iv = getattr(_j, "interval_seconds", None)
-                if _iv:
-                    _m = max(1, int(round(int(_iv) / 60)))
-                    _TRADER_CYCLE_MINUTES_MEMO.append(_m)
-                    return _m
-                break
-    except Exception:
-        pass
-    return None
 
 
-def _safe_float(value, default=0.0):
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return default
 
 
 def load_position_trackers():
-    try:
-        with open(POSITION_TRACKER_FILE, "r", encoding="utf-8") as handle:
-            data = json.load(handle)
-        return data if isinstance(data, dict) else {}
-    except Exception:
-        return {}
+
+    """薄壳：调用时解析门面全局路径常量（结构优化阶段 2 / B2 第三刀）。"""
+    return _core_load_position_trackers(POSITION_TRACKER_FILE)
 
 
 def enrich_position_risk_fields(positions, trackers=None):
-    """Add margin and stop-line fields even when OKX protection lookup is unavailable."""
-    trackers = trackers if isinstance(trackers, dict) else load_position_trackers()
-    contract_values = {item.get("instId"): _safe_float(item.get("ctVal"), 1.0) for item in load_instruments()}
-    for position in positions or []:
-        inst_id = str(position.get("instId") or "")
-        side = str(position.get("posSide") or position.get("side") or "net").lower()
-        position["posSide"] = side
-        tracker = trackers.get(f"{inst_id}_{side}", {})
-        size = abs(_safe_float(position.get("pos_sz", position.get("pos"))))
-        price = _safe_float(position.get("markPx")) or _safe_float(position.get("avgPx"))
-        notional = abs(_safe_float(position.get("notional_usdt"))) or round(size * contract_values.get(inst_id, 1.0) * price, 2)
-        leverage = abs(_safe_float(position.get("lever"), 1.0)) or 1.0
-        exchange_margin = abs(_safe_float(position.get("imr")))
-        existing_margin = abs(_safe_float(position.get("margin_usdt")))
-        if exchange_margin > 0:
-            margin = exchange_margin
-            margin_source = "exchange_imr"
-        elif existing_margin > 0:
-            margin = existing_margin
-            margin_source = str(position.get("marginSource") or "cached")
-        else:
-            margin = round(notional / leverage, 2) if notional > 0 else 0.0
-            margin_source = "notional_div_leverage"
-        exchange_stop = _safe_float(position.get("exchangeSl"))
-        tracker_stop = _safe_float(position.get("trailingSl")) or _safe_float(tracker.get("trailingStopPx"))
-        exchange_tp = _safe_float(position.get("exchangeTp"))
-        tracker_tp = _safe_float(tracker.get("takeProfitPx"))
-        position.update({
-            "pos_sz": size,
-            "notional_usdt": round(notional, 2),
-            "margin_usdt": round(margin, 2) if margin > 0 else None,
-            "marginSource": margin_source,
-            "trailingSl": tracker_stop or None,
-            "displayStop": exchange_stop or tracker_stop or None,
-            "stopSource": "exchange_cloud" if exchange_stop else ("local_tracker" if tracker_stop else "unavailable"),
-            "displayTakeProfit": exchange_tp or tracker_tp or None,
-            "stageDesc": position.get("stageDesc") or tracker.get("stage_desc") or "持有监控中",
-            "strategyTag": position.get("strategyTag") or tracker.get("strategy_tag") or ("顺势做多" if "long" in side else "逢高做空"),
-            "cloudProtectionLastVerified": (tracker.get("cloudProtection") or {}).get("verifiedAt"),
-            "cloudProtectionLastDetail": (tracker.get("cloudProtection") or {}).get("detail"),
-        })
-        if position.get("protectionStatus") in {None, "unknown_stale"} and position["cloudProtectionLastVerified"]:
-            position["protectionStatus"] = "verification_stale"
-    return positions
+
+    """薄壳：调用时解析门面全局路径常量（结构优化阶段 2 / B2 第三刀）。"""
+    return _core_enrich_position_risk_fields(POSITION_TRACKER_FILE, positions, trackers)
 
 
 def _load_local_factor_library():
-    """Load factor_library_snapshot.json — a local file independent of OKX private API."""
-    if os.path.exists(FACTOR_LIBRARY_FILE):
-        try:
-            with open(FACTOR_LIBRARY_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
-            pass
-    return {}
+
+    """薄壳：调用时解析门面全局路径常量（结构优化阶段 2 / B2 第三刀）。"""
+    return _core__load_local_factor_library(FACTOR_LIBRARY_FILE)
 
 
 def _build_factors_from_local_files(positions, timestamp_full):
-    """Build factors_list from trading_state.json + ai_brain_decisions.json.
 
-    These local files do not depend on OKX private endpoints, so they are
-    available even when the dashboard is in STALE/OFFLINE degraded mode.
-    """
-    factors_list = []
-    pos_map = {p.get("instId"): p for p in positions} if isinstance(positions, list) else {}
-    state_data = {}
-    ai_decisions = {}
-    factor_lib_map = {}
-    active_pool = load_instruments()
-
-    if os.path.exists(FACTOR_LIBRARY_FILE):
-        try:
-            with open(FACTOR_LIBRARY_FILE, "r", encoding="utf-8") as f_lib:
-                lib_data = json.load(f_lib)
-                for item in lib_data.get("instruments", []):
-                    if isinstance(item, dict) and item.get("instId"):
-                        factor_lib_map[item["instId"]] = item
-        except Exception:
-            pass
-
-    if os.path.exists(AI_DECISIONS_FILE):
-        try:
-            with open(AI_DECISIONS_FILE, "r", encoding="utf-8") as f:
-                ai_decisions = json.load(f)
-        except Exception:
-            pass
-
-    inst_map = {}
-    if os.path.exists(STATE_JSON_FILE):
-        try:
-            with open(STATE_JSON_FILE, "r", encoding="utf-8") as f:
-                state_data = json.load(f)
-                for ins in state_data.get("instruments", []):
-                    if isinstance(ins, dict) and ins.get("instId"):
-                        inst_map[ins["instId"]] = ins
-        except Exception:
-            pass
-
-    for target in active_pool:
-        inst_id = target.get("instId")
-        ins = inst_map.get(inst_id) or {}
-        lib_item = factor_lib_map.get(inst_id) or {}
-        ai_info = ai_decisions.get(inst_id, {})
-        ai_dec = ai_info.get("decision", {})
-        ai_thought = ai_info.get("thought_process", {})
-        action_val = ai_dec.get("action", ins.get("action", "WAIT"))
-        confidence = ai_dec.get("confidence")
-        reason = ai_dec.get("summary_reason", ins.get("desc", "新组合标的，雷达与量化特征已接入"))
-        v_decision = ai_info.get("venue_decision") or ai_dec.get("venue_decision")
-        strategy_val = "🟢 建议做多" if action_val == "BUY_LONG" else ("🔴 建议做空" if action_val == "SELL_SHORT" else "⚪ AI观望")
-        score_val = 2.5 if action_val == "BUY_LONG" else (-2.5 if action_val == "SELL_SHORT" else 0.0)
-        m_struct = ai_thought.get("market_structure", f"{ins.get('market_regime', 'CHOP')} ({ins.get('trend_1h', '震荡')})")
-        v_oi = ai_thought.get("volume_and_oi", f"OBV: {ins.get('obv_flow', 'NEUTRAL')}, 量能: {ins.get('vol_ratio', 1.0)}x")
-        rr_ratio = ai_thought.get("risk_reward_evaluation", "盈亏比评估中")
-        raw_t = ai_info.get("raw_ticker", {})
-        chg_val = raw_t.get("chg24h") if raw_t.get("chg24h") is not None else lib_item.get("chg24h")
-        raw_ticker_vol = raw_t.get("vol24h")
-        price_val = ins.get("price") if ins.get("price") not in (None, "--") else lib_item.get("price", "--")
-        rsi_val = ins.get("rsi") if ins.get("rsi") is not None else lib_item.get("trend_momentum", {}).get("rsi_14", 50.0)
-        adx_val = ai_info.get("adx_1h") if ai_info.get("adx_1h") not in (None, "--") else lib_item.get("trend_momentum", {}).get("adx_1h", "--")
-        sm_val = ai_info.get("smart_money") or lib_item.get("smart_money_derivatives", {})
-        factors_list.append({
-            "name": target.get("name") or ins.get("name"),
-            "instId": inst_id,
-            "position": pos_map.get(inst_id),
-            "type": target.get("type", "crypto"),
-            "price": price_val,
-            "score": score_val,
-            "chg24h": chg_val,
-            "bidPx": raw_t.get("bidPx", ins.get("price", lib_item.get("microstructure", {}).get("bid_px", "--"))),
-            "askPx": raw_t.get("askPx", ins.get("price", lib_item.get("microstructure", {}).get("ask_px", "--"))),
-            "fundingRate": ai_info.get("raw_funding_rate") or (f"{lib_item.get('smart_money_derivatives', {}).get('funding_rate_pct', 0.0):.4f}%" if "funding_rate_pct" in lib_item.get("smart_money_derivatives", {}) else "--"),
-            "oiUsd": ai_info.get("raw_oi") or lib_item.get("smart_money_derivatives", {}).get("oi_usd", "--"),
-            "takerNetUsd": ai_info.get("raw_taker_vol") or lib_item.get("volume_money_flow", {}).get("taker_net_usd", "--"),
-            "lsRatio": ai_info.get("raw_ls_ratio") or lib_item.get("smart_money_derivatives", {}).get("long_short_ratio", "--"),
-            "rsi": rsi_val,
-            "rsi_7": ins.get("rsi_7", 50.0),
-            "vwap_bias": ins.get("vwap_bias", 0.0),
-            "macd_hist": ins.get("macd_hist", 0.0),
-            "macd_accel": ins.get("macd_accel", 0.0),
-            "obv_flow": ins.get("obv_flow", lib_item.get("volume_money_flow", {}).get("obv_flow", "NEUTRAL")),
-            "bb_bandwidth": ins.get("bb_bandwidth", lib_item.get("volatility_channel", {}).get("bb_width_1h", 0.0)),
-            "vol_ratio": ins.get("vol_ratio", lib_item.get("volume_money_flow", {}).get("vol_ratio_15m", 1.0)),
-            "trend_1h": ins.get("trend_1h", "震荡"),
-            "trend_4h": ins.get("trend_4h", "震荡"),
-            "market_regime": ins.get("market_regime", "CHOP"),
-            "strategy_tag": strategy_val,
-            "action": action_val,
-            "confidence": confidence,
-            "smart_money": sm_val,
-            "adx_1h": adx_val,
-            "atr_1h": lib_item.get("volatility_channel", {}).get("atr_1h", 0.0),
-            "atr_pct": lib_item.get("volatility_channel", {}).get("atr_1h_pct", lib_item.get("volatility_channel", {}).get("atr_pct", 0.0)),
-            "calculus": {
-                "velocity_1h": lib_item.get("calculus_dynamics", {}).get("velocity"),
-                "accel_1h": lib_item.get("calculus_dynamics", {}).get("acceleration"),
-                "jerk_1h": lib_item.get("calculus_dynamics", {}).get("jerk"),
-                "impulse_1h": lib_item.get("calculus_dynamics", {}).get("impulse"),
-            },
-            "leverage": ai_dec.get("leverage", 3),
-            "margin_usdt": ai_dec.get("margin_usdt", 0.0),
-            "entry_price": ai_dec.get("entry_price", 0.0),
-            "take_profit_price": ai_dec.get("take_profit_price", 0.0),
-            "stop_loss_price": ai_dec.get("stop_loss_price", 0.0),
-            "risk_reward_ratio": ai_dec.get("risk_reward_ratio", "--"),
-            "reason": reason,
-            "market_structure": m_struct,
-            "volume_and_oi": v_oi,
-            "rr_ratio": rr_ratio,
-            "thought_process": ai_thought,
-            "venue_decision": v_decision,
-            "desc": reason,
-            "time_str": ai_info.get("time_str") or state_data.get("timestamp") or timestamp_full,
-            "timestamp": ai_info.get("timestamp"),
-        })
-    return factors_list, state_data
+    """薄壳：调用时解析门面全局路径常量（结构优化阶段 2 / B2 第三刀）。"""
+    return _core__build_factors_from_local_files(FACTOR_LIBRARY_FILE, AI_DECISIONS_FILE, STATE_JSON_FILE, positions, timestamp_full)
 
 
 def build_ai_health(ai_history_list):
@@ -463,8 +285,6 @@ def _inject_local_data_into_stale(stale, positions, timestamp_full):
     return stale
 
 
-def _is_meaningful_dashboard_snapshot(data):
-    return isinstance(data, dict) and isinstance(data.get("account"), dict) and bool(data.get("account")) and "total_eq" in data["account"]
 
 
 def load_persisted_dashboard_cache():
@@ -536,118 +356,9 @@ def get_cache_lock():
         CACHE_LOCK = asyncio.Lock()
     return CACHE_LOCK
 
-def _global_env_axis() -> str:
-    """审计 B2：资金/行情环境轴统一走全站唯一事实源（R20_OKX_ENV → okx_runtime），
-    不再私读遗留 OKX_IS_SIMULATED——两轴失同步时曾把 LIVE 所数据并进 DEMO 板。
-    解析失败保守取 demo（与 okx_runtime 未知档默认一致，绝不抬到 live）。"""
-    try:
-        from scripts.okx_runtime import current_environment
-        return str(current_environment().mode)
-    except Exception:
-        return "demo"
-
-def _load_portfolio_risk_data() -> dict:
-    """透传组合风险预留层状态给前台三所面板（零网络，纯本地只读）。
-
-    契约对齐（2026-09-11 修复面板恒显「—」）：
-    - 字段名对齐前端 PortfolioRiskRow：total_budget_usdt / reserved_usdt /
-      available_usdt / environment / updated_utc；
-    - 资金环境轴与 _load_multi_venue_portfolio 同源（_global_env_axis →
-      okx_runtime 单源，2026-09-13 审计 B2 起不再读遗留 OKX_IS_SIMULATED）；
-    - 总预算单源 R20_PORTFOLIO_RISK_BUDGET_USDT（与 trader 同口径）；未配置
-      = 无上限模式 → 诚实 None（前端显「—」），绝不编 10000 假预算；
-    - 读层异常不再裸吞成 {}：返回 status=unavailable + 空值结构，error 留痕。
-    """
-    try:
-        budget_raw = str(os.environ.get("R20_PORTFOLIO_RISK_BUDGET_USDT") or "").strip()
-        try:
-            budget_val = float(budget_raw) if budget_raw else 0.0
-        except ValueError:
-            budget_val = 0.0
-
-        # 审计 P1-6(2026-09-13)：env=0 的语义是「引擎不封顶」（risk_constants 自注：派生
-        # 公式只存在于 UI 展示，属展示启发式而非引擎策略）。旧实现在这里编出
-        # max_pos × MAX_SINGLE_ASSET_MARGIN = 8×600 = 4800（异常还兜 5000），前端据此画
-        # 占用率进度条 —— 管理员"以为有 4800 的总闸，实际引擎没有总闸"。
-        # 现在：未配置 → total_budget_usdt/available/utilization 一律 null（前端显「—」），
-        # 派生值只作为展示参考单独返回，绝不冒充预算；Configured 时才给真实数值。
-        reference_cap = None
-        if budget_val <= 0:
-            try:
-                from scripts.risk_constants import MAX_CONCURRENT_POSITIONS_CAP, MAX_SINGLE_ASSET_MARGIN
-                from scripts.instrument_pool import load_instruments
-                pool_len = len(load_instruments() or []) or 8
-                max_pos = MAX_CONCURRENT_POSITIONS_CAP if MAX_CONCURRENT_POSITIONS_CAP > 0 else pool_len
-                reference_cap = round(float(max_pos) * float(MAX_SINGLE_ASSET_MARGIN or 0.0), 4)
-            except Exception:
-                reference_cap = None
-
-        budget_mode = "configured" if budget_val > 0 else "uncapped"
-        total_budget = budget_val if budget_val > 0 else None
-        env = _global_env_axis()
-        from r20_backend.risk_reservation import get_manager
-        mgr = get_manager()
-        reserved = float(mgr.gross_exposure(env) or 0.0)
-        by_venue = mgr.total_reserved_by_venue(env)
-        avail = round(max(0.0, total_budget - reserved), 4) if total_budget is not None else None
-        utilization = round((reserved / total_budget) * 100.0, 1) if total_budget else None
-        return {
-            "environment": env,
-            "status": "ok",
-            "budget_mode": budget_mode,
-            "total_budget_usdt": round(total_budget, 4) if total_budget is not None else None,
-            "reference_cap_usdt": reference_cap,
-            "reserved_usdt": round(reserved, 4),
-            "available_usdt": avail,
-            "utilization_pct": utilization,
-            "by_venue": {str(k): round(float(v), 4) for k, v in by_venue.items()},
-            "updated_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        }
-    except Exception as exc:
-        return {
-            "environment": _global_env_axis(),
-            "status": "unavailable",
-            "budget_mode": None,
-            "total_budget_usdt": None, "reference_cap_usdt": None, "reserved_usdt": None,
-            "available_usdt": None, "utilization_pct": None, "by_venue": {},
-            "error": str(exc)[:160],
-        }
 
 
-def _load_multi_venue_portfolio(total_eq: float, avail_eq: float, positions: list, orders: list) -> dict:
-    """US-006/US-007：dashboard /api/all 组合多所资产与权益快照（OKX + Gate + Binance 全量对账）。"""
-    try:
-        from r20_backend.portfolio_aggregator import aggregate_venue_accounts
-        env = _global_env_axis()
-        venues_map = {
-            "okx": {
-                "status": "ready" if total_eq > 0 else "unavailable",
-                "equity": total_eq,
-                "available": avail_eq,
-                "positions_count": len(positions) if isinstance(positions, list) else 0,
-                "open_orders_count": len(orders) if isinstance(orders, list) else 0,
-            },
-        }
-        try:
-            # 审计 A1：33cc95d 拆分把两函数移入 routers/exchanges.py，此处旧引用
-            # ImportError 被吞 → gate/binance 永远伪报 unavailable。改指真源。
-            from r20_backend.routers.exchanges import _venue_accounts_gate, _venue_accounts_binance
-        except Exception as exc:
-            venues_map["gate"] = {"status": "unavailable", "equity": None, "reason": f"账户模块缺失: {exc}"}
-            venues_map["binance"] = {"status": "unavailable", "equity": None, "reason": f"账户模块缺失: {exc}"}
-        else:
-            try:
-                venues_map["gate"] = _venue_accounts_gate(env)
-            except Exception as exc:
-                venues_map["gate"] = {"status": "unavailable", "equity": None, "reason": f"Gate 账户面异常: {str(exc)[:180]}"}
-            try:
-                venues_map["binance"] = _venue_accounts_binance(env)
-            except Exception as exc:
-                venues_map["binance"] = {"status": "unavailable", "equity": None, "reason": f"Binance 账户面异常: {str(exc)[:180]}"}
 
-        return aggregate_venue_accounts(venues_map, env)
-    except Exception:
-        return {}
 
 
 def _load_cross_venue_data() -> dict:
@@ -1698,104 +1409,13 @@ def update_cache_cycle():
 # 默认返回瘦身后的载荷，并对**每一处省略**显式留痕（`_trimmed` / `_meta.omitted`），
 # 让前端能说"本条为摘要，完整内容见 X"，而不是把缺失渲染成"无"（缺失≠0 红线）。
 # 需要完整载荷的调用方用 `/api/all?full=1`（行为与旧版逐字节一致）。
-SLIM_HISTORY_FULL_ENTRIES = 5      # 保留最近 N 条的完整明细
-SLIM_HISTORY_DROP_KEYS = ("top_opportunities", "position_management", "policy_snapshot")
-SLIM_TRADES = 20
-SLIM_LOGS = 20
-
-
-def slim_payload(data: dict[str, Any]) -> dict[str, Any]:
-    """对缓存快照做只读瘦身：不改动 CACHE_DATA 本身，返回新的顶层字典。"""
-    out = dict(data)
-    # 幂等：若传入的已是瘦身载荷（例如被二次缓存），必须**保留**上一轮的省略记录——
-    # 否则省略留痕会消失，前端会把被裁过的数据当完整数据渲染（正是本项要防的"UI 说谎"）。
-    prior_meta = out.get("_meta") if isinstance(out.get("_meta"), dict) else {}
-    omitted: dict[str, Any] = dict(prior_meta.get("omitted") or {})
-
-    history = out.get("ai_brain_history")
-    if isinstance(history, list) and len(history) > SLIM_HISTORY_FULL_ENTRIES:
-        trimmed_rows = 0
-        slimmed: list[Any] = []
-        for index, entry in enumerate(history):
-            if index < SLIM_HISTORY_FULL_ENTRIES or not isinstance(entry, dict):
-                slimmed.append(entry)
-                continue
-            row = dict(entry)
-            dropped = [key for key in SLIM_HISTORY_DROP_KEYS if key in row]
-            for key in dropped:
-                row.pop(key, None)
-            if dropped:
-                # 显式标记"本条被裁成摘要"，前端据此渲染提示，绝不假装明细为空
-                row["_trimmed"] = dropped
-                trimmed_rows += 1
-            slimmed.append(row)
-        # 行内整段提示词与顶层 ai_last_prompt 同文时只保留"字数 + 省略标记"：
-        # 顶层那份仍完整（白盒承诺），此处避免同段 3.6 万字符文本再发一遍。
-        top_prompt = str(out.get("ai_last_prompt") or "")
-        elided_prompts = 0
-        if top_prompt:
-            for row in slimmed:
-                if not isinstance(row, dict):
-                    continue
-                text = str(row.get("ai_last_prompt") or "")
-                if len(text) < 2000 or text[:200] != top_prompt[:200]:
-                    continue   # 短存根（210 字）与不同文的历史提示词原样保留
-                row.pop("ai_last_prompt", None)
-                row["ai_last_prompt_chars"] = len(text)
-                row["ai_last_prompt_elided"] = True
-                row["ai_last_prompt_ref"] = "top_level"
-                elided_prompts += 1
-        out["ai_brain_history"] = slimmed
-        if elided_prompts:
-            omitted["ai_brain_history.prompt_text"] = {
-                "entries": elided_prompts,
-                "reason": "与顶层 ai_last_prompt 同文，避免重复下发整段提示词",
-                "ref": "ai_last_prompt",
-            }
-        if trimmed_rows:
-            omitted["ai_brain_history"] = {
-                "kept_full": SLIM_HISTORY_FULL_ENTRIES,
-                "total": len(history),
-                "trimmed_entries": trimmed_rows,
-                "dropped_fields": list(SLIM_HISTORY_DROP_KEYS),
-                "full": "/api/v1/cache/brain-history",
-            }
-
-    review = out.get("review")
-    if isinstance(review, dict) and review.get("ai_last_prompt"):
-        top_prompt = str(out.get("ai_last_prompt") or "")
-        review_prompt = str(review.get("ai_last_prompt") or "")
-        if top_prompt and review_prompt[:200] == top_prompt[:200]:
-            review = dict(review)
-            review.pop("ai_last_prompt", None)
-            review["ai_last_prompt_chars"] = len(review_prompt)
-            review["ai_last_prompt_ref"] = "top_level"
-            out["review"] = review
-            omitted["review.ai_last_prompt"] = {
-                "chars": len(review_prompt),
-                "reason": "与顶层 ai_last_prompt 同文，避免同段提示词重复下发",
-                "ref": "ai_last_prompt",
-            }
-
-    trades = out.get("trades")
-    if isinstance(trades, list) and len(trades) > SLIM_TRADES:
-        out["trades"] = trades[-SLIM_TRADES:]
-        omitted["trades"] = {"kept": SLIM_TRADES, "total": len(trades), "full": "/api/v1/cache/ledger"}
-
-    logs = out.get("logs")
-    if isinstance(logs, list) and len(logs) > SLIM_LOGS:
-        out["logs"] = logs[-SLIM_LOGS:]
-        omitted["logs"] = {"kept": SLIM_LOGS, "total": len(logs)}
-
-    meta = dict(out.get("_meta") or {})
-    meta.update({
-        "slim": True,
-        "full_payload": "/api/all?full=1",
-        "omitted": omitted,
-        "note": "省略项均已显式留痕；缺失一律不用 0 或空值代填",
-    })
-    out["_meta"] = meta
-    return out
+from r20_backend.dashboard_payload.slim import (  # noqa: E402
+    SLIM_HISTORY_DROP_KEYS,
+    SLIM_HISTORY_FULL_ENTRIES,
+    SLIM_LOGS,
+    SLIM_TRADES,
+    slim_payload,
+)
 
 
 async def refresh_cache_if_needed(ttl_seconds: float = 3.0):
