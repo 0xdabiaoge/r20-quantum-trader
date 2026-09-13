@@ -218,16 +218,16 @@ class TestExternalVenueReclaim(unittest.TestCase):
         gate_cancelled, bin_cancelled = [], []
         gate = type("G", (), {
             "list_open_orders": lambda self, base: [
-                {"id": "g-old", "contract": f"{base}_USDT", "create_time": old_s},
-                {"id": "g-young", "contract": f"{base}_USDT", "create_time": time.time()},
-                {"id": "g-keep", "contract": f"{base}_USDT", "create_time": old_s},
+                {"id": "g-old", "contract": f"{base}_USDT", "side": "buy", "create_time": old_s},
+                {"id": "g-young", "contract": f"{base}_USDT", "side": "buy", "create_time": time.time()},
+                {"id": "g-keep", "contract": f"{base}_USDT", "side": "buy", "create_time": old_s},
             ],
             "cancel_order": lambda self, base, oid: gate_cancelled.append((base, oid)),
         })()
         binance = type("B", (), {
             "open_orders": lambda self, symbol=None: [
-                {"order_id": "b-old", "inst_id": "ETHUSDT", "base": "ETH", "raw": {"time": old_ms}},
-                {"order_id": "b-young", "inst_id": "ETHUSDT", "base": "ETH", "raw": {"time": now_ts}},
+                {"order_id": "b-old", "inst_id": "ETHUSDT", "base": "ETH", "side": "sell", "raw": {"time": old_ms}},
+                {"order_id": "b-young", "inst_id": "ETHUSDT", "base": "ETH", "side": "sell", "raw": {"time": now_ts}},
             ],
             "cancel_order": lambda self, base, oid: bin_cancelled.append((base, oid)),
         })()
@@ -240,6 +240,7 @@ class TestExternalVenueReclaim(unittest.TestCase):
              patch.object(aft.venue_registry, "execution_open", lambda v, e: True), \
              patch.object(aft.venue_registry, "get_adapter", lambda v, environment=None: ad_map[v]), \
              patch.object(aft, "load_instruments", lambda: [{"instId": "BTC-USDT-SWAP"}, {"instId": "ETH-USDT-SWAP"}]), \
+             patch.object(aft, "load_open_intents", lambda: []), \
              redirect_stdout(io.StringIO()):
             ok, msg = aft.clean_stale_open_orders(keep_ord_ids={"g-keep"})
         self.assertTrue(ok, msg)

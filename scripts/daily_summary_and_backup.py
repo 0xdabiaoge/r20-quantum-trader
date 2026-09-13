@@ -26,6 +26,12 @@ try:
 except Exception:
     notify_daily_summary = None
 
+def _run_captured(script, label=None, timeout=15):
+    """审计(2026-09-13)：同解释器子进程 + 非零必吼（旧裸 python3 shell 串=静默死亡）。"""
+    from r20_backend.spawn import run_script
+    return run_script(script, timeout=timeout, label=label)
+
+
 def generate_daily_briefing_and_backup():
     tz_bj = datetime.timezone(datetime.timedelta(hours=8))
     now_bj = datetime.datetime.now(tz_bj)
@@ -47,7 +53,7 @@ def generate_daily_briefing_and_backup():
     try:
         sync_script = os.path.join(WORKSPACE_DIR, "scripts", "sync_full_ledger.py")
         if os.path.exists(sync_script):
-            subprocess.run(f"python3 {sync_script}", shell=True, capture_output=True, text=True, timeout=15)
+            _run_captured(sync_script)
     except Exception:
         pass
 

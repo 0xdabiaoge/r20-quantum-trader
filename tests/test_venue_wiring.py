@@ -538,7 +538,10 @@ class TestCrossVenueCap(_WiringSandbox):
         self.assertTrue(ok, err)
         self.assertEqual(len(snap["gate"]), 1)
         self.assertEqual(len(snap["binance"]), 1)
-        self.assertIn("纳入本周期仓位配额", out)
+        # 审计(2026-09-13)：fetch_other_venue_positions 现**只回快照、不打印**——
+        # 它一周期内被多处复用（1a 封顶 / 平仓回读×6 / 预留对账），逐次打印=日志成倍
+        # 且重复出网。归属打印移交主周期唯一权威点 1a（源码钉见 batch6）。
+        self.assertNotIn("纳入本周期仓位配额", out)
 
     def test_zero_size_rows_excluded(self):
         ok, snap, err, _ = self._fetch(

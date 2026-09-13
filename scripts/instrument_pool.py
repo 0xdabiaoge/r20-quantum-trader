@@ -175,6 +175,12 @@ def _write_json_atomic(path, payload: Any) -> None:
         raise
 
 
+def _run_captured(script, label=None, timeout=45):
+    """审计(2026-09-13)：同解释器子进程 + 非零必吼（旧裸 python3 shell 串=静默死亡）。"""
+    from r20_backend.spawn import run_script
+    return run_script(script, timeout=timeout, label=label)
+
+
 def sync_instruments_state() -> None:
     """Synchronize trading_state.json, factor_library_snapshot.json, news_sentiment.json,
     and dashboard cache when the trading instrument pool changes."""
@@ -289,10 +295,10 @@ def sync_instruments_state() -> None:
         try:
             fl_script = ROOT / "scripts" / "factor_library.py"
             if fl_script.exists():
-                subprocess.run(f"python3 {fl_script}", shell=True, capture_output=True, timeout=45)
+                _run_captured(fl_script)
             nh_script = ROOT / "scripts" / "news_sentiment_harvester.py"
             if nh_script.exists():
-                subprocess.run(f"python3 {nh_script}", shell=True, capture_output=True, timeout=45)
+                _run_captured(nh_script)
         except Exception:
             pass
     threading.Thread(target=_run_bg, daemon=True).start()

@@ -1,0 +1,234 @@
+"""批6 现场事故修复回归钉（2026-09-13 下午·用户报「挂单重复/台账停更」）。
+
+四条根因、四条钉：
+① PEPE 挂单纯永动机：对账意图匹配 next() 取**最老**意图 + 意图只增不清 →
+   当日首笔意图过 TTL 后每轮撤掉上一轮新单再重挂。修：max-ts 匹配 + 写侧清理。
+② 交易全链停摆（我自己批5 引入）：gate 执行闸开但凭证坏，回收枚举异常被当
+   fail-closed 拦轮 → 每 15 分钟 Abort，台账/开平仓全停。修：凭证类错误按所
+   隔离跳过 + CRITICAL，只有真不可核验才拦轮。
+③ 外所单守卫盲区：pending 去重/配额只数 OKX → binance demo BTC/SUI 成对重复。
+   修：回收接管同尺（新鲜意图保留 + 同向只保最新一条，其余收敛撤销）。
+④ 台账 sync 静默死亡：subprocess "python3 …" shell 串（主机无裸 python3，
+   rc=127 被 capture_output 吞）→ 台账 sync_full_ledger/db_manager 从不执行。
+   修：r20_backend/spawn.run_script（sys.executable + 非零必吼）六点接入。
+"""
+from __future__ import annotations
+
+import io
+import json
+import os
+import sys
+import tempfile
+import time
+import unittest
+from contextlib import redirect_stdout
+from pathlib import Path
+from unittest.mock import patch
+
+ROOT = Path(__file__).resolve().parent.parent
+for _p in (str(ROOT), str(ROOT / "scripts")):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+
+
+# ------------------------------------------------ ① 意图匹配 max-ts 与写侧清理
+
+
+class TestIntentPerpetualFix(unittest.TestCase):
+    def test_max_ts_intent_takeover(self):
+        import scripts.ai_factor_trader as aft
+        now = int(time.time() * 1000)
+        pending = [{"instId": "PEPE-USDT-SWAP", "ordId": "o1", "side": "buy",
+                    "state": "live", "posSide": "net", "cTime": now - 60_000}]
+        with patch.object(aft, "load_open_intents", lambda: [
+                {"instId": "PEPE-USDT-SWAP", "side": "buy", "ts": now - 8 * 3600_000},   # 老（超TTL）
+                {"instId": "PEPE-USDT-SWAP", "side": "buy", "ts": now - 10 * 60_000}]):   # 新
+            with redirect_stdout(io.StringIO()) as buf:
+                ok, kept = aft.reconcile_pending_orders(trackers={}, now_ms=now, pending=pending)
+        self.assertTrue(ok)
+        self.assertEqual(kept, {"o1"}, "存在新鲜意图时最老过期意图不得再判死新挂单")
+        self.assertIn("意图归属", buf.getvalue())
+
+    def test_only_stale_intent_correctly_cancels(self):
+        import scripts.ai_factor_trader as aft
+        now = int(time.time() * 1000)
+        pending = [{"instId": "PEPE-USDT-SWAP", "ordId": "o1", "side": "buy",
+                    "state": "live", "posSide": "net", "cTime": now - 8 * 3600_000}]
+        cancelled: list = []
+        with patch.object(aft, "load_open_intents", lambda: [
+                {"instId": "PEPE-USDT-SWAP", "side": "buy", "ts": now - 8 * 3600_000}]), \
+             patch.object(aft, "okx_rest", type("O", (), {
+                 "cancel_order": staticmethod(lambda i, o: cancelled.append(o)),
+                 "pending_orders": staticmethod(lambda **k: [])})()):
+            ok, kept = aft.reconcile_pending_orders(trackers={}, now_ms=now, pending=pending)
+        self.assertTrue(ok)
+        self.assertEqual(kept, set())
+        self.assertEqual(cancelled, ["o1"], "全部意图过期时撤销语义照旧正确")
+
+    def test_record_intent_purges_and_dedupes(self):
+        import scripts.ai_factor_trader as aft
+        d = tempfile.mkdtemp(prefix="r20-b6-int-")
+        f = os.path.join(d, "intents.json")
+        now = int(time.time() * 1000)
+        Path(f).write_text(json.dumps([   # 过期→清 / 保留 / 同键旧条目→被替换
+            {"instId": "PEPE-USDT-SWAP", "side": "buy", "ts": now - 9 * 3600_000},
+            {"instId": "BTC-USDT-SWAP", "side": "buy", "ts": now - 3600_000},
+            {"instId": "PEPE-USDT-SWAP", "side": "buy", "ts": now - 2 * 3600_000},
+        ]))
+        with patch.object(aft, "OPEN_INTENT_FILE", f):
+            aft.record_open_intent("PEPE-USDT-SWAP", "buy", ts_ms=now)
+        rows = json.loads(Path(f).read_text())
+        self.assertFalse(any(now - int(r["ts"]) > 6 * 3600_000 for r in rows), "过期条目必须清")
+        pepe = [r for r in rows if r["instId"] == "PEPE-USDT-SWAP" and r["side"] == "buy"]
+        self.assertEqual(len(pepe), 1, "同标的同方向只留最新")
+        self.assertEqual(pepe[0]["ts"], now)
+        self.assertEqual(len(rows), 2)
+
+
+# ----------------------------------------- ② gate 凭证错误不再拦全链
+
+
+class TestAuthErrorIsolation(unittest.TestCase):
+    def _okx_stub(self):
+        return type("O", (), {"pending_orders": staticmethod(lambda **k: []),
+                              "cancel_order": staticmethod(lambda *a, **k: None)})()
+
+    def test_gate_bad_key_skips_not_blocks(self):
+        import scripts.ai_factor_trader as aft
+        gate_err = type("GateAPIError", (Exception,), {})("Gate INVALID_KEY: Invalid key provided")
+        gate = type("G", (), {"list_open_orders": lambda self, b: (_ for _ in ()).throw(gate_err)})()
+        with patch.object(aft, "okx_rest", self._okx_stub()), \
+             patch.object(aft, "current_environment", lambda: type("E", (), {"mode": "demo"})()), \
+             patch.object(aft.venue_registry, "execution_open", lambda v, e: v == "gate"), \
+             patch.object(aft.venue_registry, "get_adapter", lambda v, environment=None: gate), \
+             patch.object(aft, "load_instruments", lambda: [{"instId": "BTC-USDT-SWAP"}]):
+            buf = io.StringIO()
+            with redirect_stdout(buf):
+                ok, msg = aft.clean_stale_open_orders()
+        self.assertTrue(ok, f"凭证坏所应跳过而非拦轮: {msg}")
+        self.assertIn("CRITICAL", buf.getvalue())
+
+    def test_network_error_still_blocks_fail_closed(self):
+        import scripts.ai_factor_trader as aft
+        boom = ConnectionResetError("connection reset by peer")
+        gate = type("G", (), {"list_open_orders": lambda self, b: (_ for _ in ()).throw(boom)})()
+        with patch.object(aft, "okx_rest", self._okx_stub()), \
+             patch.object(aft, "current_environment", lambda: type("E", (), {"mode": "demo"})()), \
+             patch.object(aft.venue_registry, "execution_open", lambda v, e: v == "gate"), \
+             patch.object(aft.venue_registry, "get_adapter", lambda v, environment=None: gate), \
+             patch.object(aft, "load_instruments", lambda: [{"instId": "BTC-USDT-SWAP"}]), \
+             redirect_stdout(io.StringIO()):
+            ok, msg = aft.clean_stale_open_orders()
+        self.assertFalse(ok, "非凭证类不可核验仍须 fail-closed")
+        self.assertIn("gate", msg)
+
+    def test_healthy_gate_still_gets_reclaimed(self):
+        # 反证：gate 正常时回收仍必须工作（凭证隔离不得变成 gate 免检）
+        import scripts.ai_factor_trader as aft
+        now_ts = int(time.time() * 1000)
+        cancelled = []
+        gate = type("G", (), {
+            "list_open_orders": lambda self, b: [
+                {"id": "g1", "contract": "BTC_USDT", "side": "buy",
+                 "create_time": (now_ts - 400_000) / 1000}],
+            "cancel_order": lambda self, b, oid: cancelled.append((b, oid)),
+        })()
+        with patch.object(aft, "okx_rest", self._okx_stub()), \
+             patch.object(aft, "current_environment", lambda: type("E", (), {"mode": "demo"})()), \
+             patch.object(aft.venue_registry, "execution_open", lambda v, e: v == "gate"), \
+             patch.object(aft.venue_registry, "get_adapter", lambda v, environment=None: gate), \
+             patch.object(aft, "load_instruments", lambda: [{"instId": "BTC-USDT-SWAP"}]), \
+             patch.object(aft, "load_open_intents", lambda: []), \
+             redirect_stdout(io.StringIO()):
+            ok, _ = aft.clean_stale_open_orders()
+        self.assertTrue(ok)
+        self.assertEqual(cancelled, [("BTC", "g1")], "gate 健康时必须照常撤超时孤儿")
+
+
+# --------------------------------------------- ③ 外所同向重复单收敛
+
+
+class TestExternalDedupeConvergence(unittest.TestCase):
+    def test_same_direction_pair_converges_to_latest(self):
+        import scripts.ai_factor_trader as aft
+        now_ts = int(time.time() * 1000)
+        cancelled = []
+        binance = type("B", (), {
+            "open_orders": lambda self, symbol=None: [
+                {"order_id": "old", "inst_id": "SUIUSDT", "base": "SUI", "side": "sell",
+                 "raw": {"time": now_ts - 900_000}},
+                {"order_id": "new", "inst_id": "SUIUSDT", "base": "SUI", "side": "sell",
+                 "raw": {"time": now_ts - 300_500}},
+            ],
+            "cancel_order": lambda self, b, oid: cancelled.append((b, oid)),
+        })()
+        with patch.object(aft, "okx_rest", type("O", (), {
+                "pending_orders": staticmethod(lambda **k: []),
+                "cancel_order": staticmethod(lambda *a, **k: None)})()), \
+             patch.object(aft, "current_environment", lambda: type("E", (), {"mode": "demo"})()), \
+             patch.object(aft.venue_registry, "execution_open", lambda v, e: v == "binance"), \
+             patch.object(aft.venue_registry, "get_adapter", lambda v, environment=None: binance), \
+             patch.object(aft, "load_open_intents", lambda: [
+                {"instId": "SUI-USDT-SWAP", "side": "sell", "ts": now_ts - 10 * 60_000}]), \
+             redirect_stdout(io.StringIO()) as buf:
+            ok, _ = aft.clean_stale_open_orders()
+        self.assertTrue(ok)
+        self.assertEqual(cancelled, [("SUI", "old")], "同向重复只撤旧留新（新单有新鲜意图归属）")
+        self.assertIn("重复单收敛", buf.getvalue())
+
+
+# --------------------------------------------- ④ spawn 子进程卫生
+
+
+class TestSpawnHygiene(unittest.TestCase):
+    def test_run_script_same_interpreter_and_noisy(self):
+        from r20_backend.spawn import run_script
+        d = tempfile.mkdtemp(prefix="r20-b6-sp-")
+        good = os.path.join(d, "good.py")
+        bad = os.path.join(d, "bad.py")
+        Path(good).write_text("import sys; print(sys.executable)")
+        Path(bad).write_text("import sys\nprint('boom', file=sys.stderr)\nsys.exit(3)\n")
+        cp = run_script(good, timeout=15)
+        self.assertEqual(cp.returncode, 0)
+        self.assertIn("python", cp.stdout)
+        self.assertTrue(Path(cp.stdout.strip()).exists(), "sys.executable 路径必须真实")
+        with redirect_stdout(io.StringIO()) as buf:
+            cp2 = run_script(bad, timeout=15, label="wreck")
+        self.assertEqual(cp2.returncode, 3)
+        out = buf.getvalue()
+        self.assertIn("wreck", out)
+        self.assertIn("boom", out, "非零退出的 stderr 必须吼出来，不再静默")
+
+    def test_no_bare_python3_shell_remains(self):
+        import re
+        bad = []
+        for f in list((ROOT / "scripts").glob("*.py")) + list((ROOT / "r20_backend").rglob("*.py")):
+            src = f.read_text(encoding="utf-8", errors="ignore")
+            for m in re.finditer(r'subprocess\.run\(\s*f["\']python3 ', src):
+                line = src[:m.start()].count("\n") + 1
+                bad.append(f"{f.name}:{line}")
+        self.assertEqual(bad, [], "裸 python3 shell 串复活:\n" + "\n".join(bad))
+
+
+# ------------------------------------ 跨所快照单点化（打印归位 + 复用不出网）
+
+
+class TestVenueSnapshotSingleSource(unittest.TestCase):
+    def test_fetch_is_silent_and_owner_prints(self):
+        src = (ROOT / "scripts" / "ai_factor_trader.py").read_text(encoding="utf-8")
+        fetch_body = src.split("def fetch_other_venue_positions")[1].split("\ndef ")[0]
+        self.assertNotIn("纳入本周期仓位配额", fetch_body,
+                         "fetcher 复活逐仓打印=多点复用日志成倍的老病")
+        owner = src.split("# 1a. 跨所封顶")[1].split("# 1b.")[0]
+        self.assertIn("纳入本周期仓位配额", owner, "唯一归属打印必须在主周期 1a 块")
+
+    def test_panorama_reuses_frozen_snapshot(self):
+        src = (ROOT / "scripts" / "ai_factor_trader.py").read_text(encoding="utf-8")
+        pano = src.split("# 汇入多所（Binance / Gate）在管持仓")[1].split("except Exception as _xv_e")[0]
+        self.assertIn("_xv_snap = xv_positions_by_venue", pano,
+                      "全景块复活现拉=同周期两次外所读取撕裂的老病")
+        self.assertNotIn("fetch_other_venue_positions(", pano)
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)

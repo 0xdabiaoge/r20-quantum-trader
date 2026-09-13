@@ -343,6 +343,12 @@ def load_adaptive_config():
     """Fallback config reader maintaining compatibility."""
     return {}
 
+def _run_captured(script, label=None, timeout=15):
+    """审计(2026-09-13)：同解释器子进程 + 非零必吼（旧裸 python3 shell 串=静默死亡）。"""
+    from r20_backend.spawn import run_script
+    return run_script(script, timeout=timeout, label=label)
+
+
 def clean_stale_open_orders(keep_ord_ids: Optional[set] = None) -> Tuple[bool, str]:
     """Cancel stale entry orders; any inability to verify/cancel blocks the trading cycle.
 
@@ -378,12 +384,28 @@ def clean_stale_open_orders(keep_ord_ids: Optional[set] = None) -> Tuple[bool, s
         _env_mode = str(current_environment().mode or "demo")
     except Exception:
         _env_mode = ""
+    # 外所接管判定用活意图集（与 OKX 对账同一把尺：新鲜意图归属 → 保留）
+    try:
+        _live_intents = [i for i in load_open_intents()
+                         if isinstance(i, dict) and now_ts - int(i.get("ts", 0) or 0) <= OPEN_INTENT_TTL_MS]
+    except Exception:
+        _live_intents = []
+
+    def _intent_covers(venue_base: str, dir_word: str) -> bool:
+        _tgt = f"{venue_base}-USDT-SWAP"
+        _letter = "buy" if dir_word == "long" else "sell"
+        return any(str(i.get("instId")) == _tgt and str(i.get("side", "")).lower() == _letter
+                   for i in _live_intents)
+
+    _AUTH_MARKERS = ("INVALID_KEY", "Invalid key", "Invalid API-key", "-2015", "50111",
+                     "signature", "Signature", "not exist", "invalid timestamp")
     for _v in ("gate", "binance"):
+        _ad = None
+        _rows: List[Dict[str, Any]] = []
         try:
             if not (_env_mode and venue_registry.execution_open(_v, _env_mode)):
                 continue
             _ad = venue_registry.get_adapter(_v, environment=_env_mode)
-            _rows: List[Dict[str, Any]] = []
             if _v == "binance":
                 _rows = _ad.open_orders() or []          # 全合约在途普通单
             else:
@@ -395,34 +417,69 @@ def clean_stale_open_orders(keep_ord_ids: Optional[set] = None) -> Tuple[bool, s
                     _base = str(_ins.get("instId") or "").split("-")[0].upper()
                     if not _base:
                         continue
-                    try:
-                        _rows.extend(_ad.list_open_orders(_base) or [])
-                    except Exception as cexc:
-                        return False, f"gate 挂单枚举失败 {_base}: {cexc}"
-            for o in _rows:
-                if not isinstance(o, dict):
-                    continue
-                _raw = o.get("raw") if isinstance(o.get("raw"), dict) else {}
-                order_id = str(o.get("order_id") or o.get("id") or _raw.get("id") or "")
-                if order_id and order_id in keep_ord_ids:
-                    continue
-                if _v == "binance":
-                    inst_disp = str(o.get("inst_id") or _raw.get("symbol") or "")
-                    created_ms = float(_raw.get("time") or _raw.get("updateTime") or now_ts)
-                else:
-                    inst_disp = str(o.get("contract") or _raw.get("contract") or "")
-                    created_ms = float(o.get("create_time") or _raw.get("create_time") or (now_ts / 1000)) * 1000
-                if not order_id or now_ts - int(created_ms) <= STALE_MS:
-                    continue
-                _base = str(o.get("base") or "").upper() or str(inst_disp).split("_")[0].split("-")[0].upper() or inst_disp
-                try:
-                    _ad.cancel_order(_base, order_id)
-                except Exception as exc:
-                    return False, f"failed to cancel stale order {_v} {inst_disp}/{order_id}: {exc}"
-                print(f"[挂单生命周期管理] 自动撤销超时挂单({_v.upper()}): {inst_disp} (id={order_id})")
+                    _rows.extend(_ad.list_open_orders(_base) or [])
         except Exception as exc:
-            # 枚举/适配器故障与 OKX 同尺：不可核验 = 拦本轮（宁可不交易，不带未知孤儿单继续开新仓）
-            return False, f"{_v} 挂单回收不可用: {type(exc).__name__}: {exc}"
+            _msg = str(exc)
+            if any(m in _msg for m in _AUTH_MARKERS):
+                # 执行闸开着但凭证已死：该所**不可能再收到我们的新单**（router 同样
+                # 发不出去）→ 跳过回收不拦轮（审计#4教训：拿凭证错误拦全链=交易停摆）。
+                print(f"[挂单生命周期] CRITICAL {_v.upper()} 凭证无效但执行闸开启——本所生命周期"
+                      f"管理跳过；请修复密钥或关闭 R20_{_v.upper()}_EXECUTION")
+                continue
+            # 其余不可核验（网络/未知）：与 OKX 同尺 fail-closed 拦本轮
+            return False, f"{_v} 挂单回收不可用: {type(exc).__name__}: {_msg[:120]}"
+        # 归一 (base, dir) → 按创建时间**只保最新**一条为候选存活单，其余降级为重复单；
+        # 存活候选再按新鲜意图归属决定保留/超时撤销（修复：外所单此前既无人回收也无
+        # 接管语义，每轮重挂造成 BTC/SUI 成对重复）。
+        best: Dict[tuple, tuple] = {}
+        dupes: List[tuple] = []
+        for o in _rows:
+            if not isinstance(o, dict):
+                continue
+            _raw = o.get("raw") if isinstance(o.get("raw"), dict) else {}
+            order_id = str(o.get("order_id") or o.get("id") or _raw.get("id") or "")
+            if not order_id or order_id in keep_ord_ids:
+                continue
+            _side = str(o.get("side") or _raw.get("side") or "").lower()
+            _ro = o.get("reduce_only") if o.get("reduce_only") is not None else _raw.get("reduce_only")
+            if _ro in (True, "true", "1"):
+                continue          # 减仓/保护族不属入场生命周期管辖
+            if _v == "binance":
+                inst_disp = str(o.get("inst_id") or _raw.get("symbol") or "")
+                created_ms = int(float(_raw.get("time") or _raw.get("updateTime") or now_ts))
+            else:
+                inst_disp = str(o.get("contract") or _raw.get("contract") or "")
+                created_ms = int(float(o.get("create_time") or _raw.get("create_time") or (now_ts / 1000)) * 1000)
+            _b = str(o.get("base") or "").upper() or inst_disp.split("_")[0].split("-")[0].upper()
+            if not _b or _side not in ("buy", "sell"):
+                continue
+            entry = (created_ms, order_id, inst_disp)
+            key = (_b, "long" if _side == "buy" else "short")
+            if key in best and best[key][0] >= created_ms:
+                dupes.append(entry)
+            else:
+                if key in best:
+                    dupes.append(best[key])
+                best[key] = entry
+        for created_ms, order_id, inst_disp in dupes:
+            if now_ts - created_ms <= STALE_MS:
+                continue  # 宽限期内不动手
+            _b0 = inst_disp.replace("_USDT", "").replace("USDT", "").split("-")[0].upper()
+            try:
+                _ad.cancel_order(_b0, order_id)
+                print(f"[挂单生命周期管理] 同向重复单收敛撤销({_v.upper()}): {inst_disp} (id={order_id})")
+            except Exception as exc:
+                return False, f"failed to cancel duplicate order {_v} {inst_disp}/{order_id}: {exc}"
+        for (venue_base, dir_word), (created_ms, order_id, inst_disp) in best.items():
+            if now_ts - created_ms <= STALE_MS:
+                continue
+            if _intent_covers(venue_base, dir_word):
+                continue  # 新鲜意图归属 → 保留（与 OKX kept 同语义）
+            try:
+                _ad.cancel_order(venue_base, order_id)
+                print(f"[挂单生命周期管理] 自动撤销超时挂单({_v.upper()}): {inst_disp} (id={order_id})")
+            except Exception as exc:
+                return False, f"failed to cancel stale order {_v} {inst_disp}/{order_id}: {exc}"
     return True, "open orders verified"
 
 
@@ -438,7 +495,11 @@ RECONCILE_REASON_INTENT_STALE = "周期意图已失效"
 
 
 def record_open_intent(inst_id: str, side: str, ts_ms: int = None) -> None:
-    """下单成功后记录本地开仓意图，供重启后挂单对账归属（US-006）。"""
+    """下单成功后记录本地开仓意图，供重启后挂单对账归属（US-006）。
+
+    审计(2026-09-13)·PEPE 永动机修复之二：写入时**清理**——过期(TTL 6h)条目丢弃、
+    同标的同方向只保留最新一条。旧实现只 append（上限 200 条 FIFO），意图文件里
+    永远躺着全天最老的一条，配合对账端 next() 取最老匹配 = 每轮误撤自己刚挂的单。"""
     try:
         intents = []
         if os.path.exists(OPEN_INTENT_FILE):
@@ -449,7 +510,13 @@ def record_open_intent(inst_id: str, side: str, ts_ms: int = None) -> None:
                     intents = raw
             except (ValueError, OSError):
                 intents = []  # 空文件/损坏文件：从空重建，不影响本单交易
-        intents.append({"instId": inst_id, "side": side, "ts": int(ts_ms or time.time() * 1000)})
+        _now_ms = int(time.time() * 1000)
+        intents = [i for i in intents
+                   if isinstance(i, dict) and _now_ms - int(i.get("ts", 0) or 0) <= OPEN_INTENT_TTL_MS]
+        _side_l = str(side).lower()
+        intents = [i for i in intents
+                   if not (str(i.get("instId")) == inst_id and str(i.get("side", "")).lower() == _side_l)]
+        intents.append({"instId": inst_id, "side": side, "ts": int(ts_ms or _now_ms)})
         with open(OPEN_INTENT_FILE, "w", encoding="utf-8") as f:
             json.dump(intents[-200:], f, ensure_ascii=False, indent=2)
     except Exception as e:
@@ -527,8 +594,13 @@ def reconcile_pending_orders(trackers: Dict[str, Any] = None, now_ms: int = None
             print(f"[挂单对账] 接管挂单 instId={inst_id} ordId={ord_id} side={side} 原因=追踪器归属")
             kept.add(ord_id)
             continue
-        # 2) 本地开仓意图（决策历史）归属
-        intent = next((i for i in intents if str(i.get("instId")) == inst_id), None)
+        # 2) 本地开仓意图（决策历史）归属。
+        #    审计(2026-09-13)·PEPE 永动机修复之一：旧 `next(...)` 取**最老**匹配意图——
+        #    当日该标的第一笔意图越过 TTL 后，之后每一轮的新挂单都被误判「周期意图已
+        #    失效」撤销、再被下一轮重新提交（撤旧挂新无限循环，实测 PEPE 10:45~15:15
+        #    六连撤）。现按同标的**最新**意图判归属。
+        _same_inst = [i for i in intents if str(i.get("instId")) == inst_id]
+        intent = max(_same_inst, key=lambda i: int(i.get("ts", 0) or 0), default=None)
         if intent is not None:
             if str(intent.get("side", "")).lower() != side:
                 if not _cancel_orphan(RECONCILE_REASON_SIDE_MISMATCH):
@@ -908,9 +980,8 @@ def fetch_other_venue_positions(environment: str) -> Tuple[bool, Dict[str, List[
             rows = ad.positions() or []
             live = [p for p in rows if abs(float(p.get("size_signed") or 0)) > 1e-12]
             snapshot[name] = live
-            for p in live:
-                print(f"[跨所封顶] {name} {p.get('inst_id')} {p.get('side')} "
-                      f"size={p.get('size_signed')} 纳入本周期仓位配额（只计数不处置）")
+            # 审计(2026-09-13)：快照函数被主周期/关闭回读/对账 fallback 多点复用，
+            # 逐仓打印移交给唯一语义拥有者——主周期 1a 封顶块（此处静默=日志不再成倍）。
         except Exception as exc:
             return False, {}, f"{name} 持仓读取失败: {exc}"
     return True, snapshot, ""
@@ -2797,7 +2868,7 @@ def execute_portfolio():
     try:
         harvester_script = os.path.join(WORKSPACE_DIR, "scripts", "news_sentiment_harvester.py")
         if os.path.exists(harvester_script):
-            subprocess.run(f"python3 {harvester_script}", shell=True, capture_output=True, text=True, timeout=25)
+            _run_captured(harvester_script, label="news_harvester", timeout=25)
     except Exception as e:
         print(f"News Harvester sync warning: {e}")
 
@@ -2849,6 +2920,49 @@ def execute_portfolio():
                 pending_long_count += 1
             elif pos_side == "short":
                 pending_short_count += 1
+    # 审计(2026-09-13)·外所挂单盲区修复：本守卫此前只数 OKX 在途单，路由派往
+    # binance/gate 的单对周期不可见 → 同信号逐轮在外所重复挂单（实锤：binance
+    # demo BTC/SUI 各成对）。执行闸开的场并入同一把尺；凭证已死的场收侧已吼
+    # CRITICAL 且 router 同样发不出单，此处静默跳过不重复报警。
+    _auth_markers = ("INVALID_KEY", "Invalid key", "Invalid API-key", "-2015", "50111",
+                     "signature", "Signature", "not exist", "invalid timestamp")
+    try:
+        _gv_mode = str(current_environment().mode or "")
+    except Exception:
+        _gv_mode = ""
+    for _gv in ("gate", "binance"):
+        try:
+            if not (_gv_mode and venue_registry.execution_open(_gv, _gv_mode)):
+                continue
+            _gad = venue_registry.get_adapter(_gv, environment=_gv_mode)
+            if _gv == "binance":
+                _grows = _gad.open_orders() or []
+            else:
+                _grows = []
+                for _ins in load_instruments():
+                    _gb = str(_ins.get("instId") or "").split("-")[0].upper()
+                    if _gb:
+                        _grows.extend(_gad.list_open_orders(_gb) or [])
+            for o in _grows:
+                if not isinstance(o, dict):
+                    continue
+                _graw = o.get("raw") if isinstance(o.get("raw"), dict) else {}
+                _gs = str(o.get("side") or _graw.get("side") or "").lower()
+                _gro = o.get("reduce_only") if o.get("reduce_only") is not None else _graw.get("reduce_only")
+                if _gs not in ("buy", "sell") or _gro in (True, "true", "1"):
+                    continue
+                _ginst = str(o.get("inst_id") or o.get("contract") or _graw.get("contract") or _graw.get("symbol") or "")
+                _gbase = str(o.get("base") or "").upper() or _ginst.split("_")[0].split("-")[0].upper()
+                if not _gbase:
+                    continue
+                pending_inst_ids.add(f"{_gbase}-USDT-SWAP")
+                if _gs == "buy":
+                    pending_long_count += 1
+                else:
+                    pending_short_count += 1
+        except Exception as _gexc:
+            if not any(m in str(_gexc) for m in _auth_markers):
+                print(f"[周期快照] warn 外所 {_gv} 挂单枚举失败（去重计数从缺，回收侧已另行把关）: {str(_gexc)[:80]}")
     reserved_slot_count = active_pos_count + len(pending_inst_ids)
     reserved_long_count = long_count + pending_long_count
     reserved_short_count = short_count + pending_short_count
@@ -2874,6 +2988,8 @@ def execute_portfolio():
     else:
         for _v, _rows in (xv_positions_by_venue or {}).items():
             for _p in _rows:
+                print(f"[跨所封顶] {_v} {_p.get('inst_id')} {_p.get('side')} "
+                      f"size={_p.get('size_signed')} 纳入本周期仓位配额（只计数不处置）")
                 reserved_slot_count += 1
                 if str(_p.get("side", "")).lower() == "long":
                     reserved_long_count += 1
@@ -2943,9 +3059,12 @@ def execute_portfolio():
                 active_pos_list.append(position_payload)
 
             # 汇入多所（Binance / Gate）在管持仓，形成三所平权持仓全景
+            # 审计(2026-09-13)：旧此处在主循环内**重新拉取**外所快照——同一周期两次
+            # 读取既重复出网又可在瞬时不一致里撕裂展示（18:00 实锤日志双份打印）。
+            # 现复用 1a 已冻结的周期快照（与预留对账「零重复出网」同一意图）。
             try:
-                _xv_ok, _xv_snap, _ = fetch_other_venue_positions(str(current_environment().mode))
-                if _xv_ok and _xv_snap:
+                _xv_snap = xv_positions_by_venue
+                if _xv_snap:
                     for v_name, v_rows in _xv_snap.items():
                         for p in v_rows:
                             base = str(p.get("base") or "").upper()
@@ -3343,10 +3462,10 @@ def execute_portfolio():
     try:
         sync_script = os.path.join(WORKSPACE_DIR, "scripts", "sync_full_ledger.py")
         if os.path.exists(sync_script):
-            subprocess.run(f"python3 {sync_script}", shell=True, capture_output=True, text=True, timeout=15)
+            _run_captured(sync_script)
         db_script = os.path.join(WORKSPACE_DIR, "scripts", "db_manager.py")
         if os.path.exists(db_script):
-            subprocess.run(f"python3 {db_script}", shell=True, capture_output=True, text=True, timeout=15)
+            _run_captured(db_script)
     except Exception as e:
         print(f"[Ledger Sync Warning] {e}")
 
