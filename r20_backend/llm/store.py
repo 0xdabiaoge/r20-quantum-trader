@@ -10,18 +10,24 @@ import copy
 import json
 import os
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
-from r20_backend.llm.capabilities import _detect_capabilities, _detect_reasoning_type
+from r20_backend.llm.capabilities import (
+    _detect_api_format,
+    _detect_capabilities,
+    _detect_reasoning_type,
+)
 from r20_backend.llm.policy import (
     DEFAULT_PROVIDERS,
     DEFAULT_REQUEST_ATTEMPTS,
     MAX_FALLBACK_MODELS,
     MAX_REQUEST_ATTEMPTS,
     MIN_REQUEST_ATTEMPTS,
+    STANDARD_REASONING_EFFORTS,
+    SUPPORTED_API_FORMATS,
 )
 from r20_backend.llm.providers import _resolve_active_provider_id
-from r20_backend.llm.util import _atomic_write_json
+from r20_backend.llm.util import _atomic_write_json, mask_secret
 
 
 def init_llm_config(config_file: Path) -> Dict[str, Any]:
@@ -226,3 +232,209 @@ def init_llm_config(config_file: Path) -> Dict[str, Any]:
     }
     _atomic_write_json(config_file, config)
     return config
+
+
+def load_llm_config(config: Dict[str, Any], mask_keys: bool = True) -> Dict[str, Any]:
+    """Return clean model configurations and configured providers matching modern client architecture."""
+    providers_list = config.get("providers", [])
+    active_mid = config.get("active_model_id", "")
+    active_pid = _resolve_active_provider_id(config)
+    active_effort = config.get("active_reasoning_effort", "high")
+
+    res: Dict[str, Any] = {
+        "version": config.get("version", "3.2"),
+        "active_model_id": active_mid,
+        "active_reasoning_effort": active_effort,
+        "thinking_timeout": config.get("thinking_timeout", 120.0),
+        "request_attempts": config.get("request_attempts", DEFAULT_REQUEST_ATTEMPTS),
+        "fallback_model_ids": config.get("fallback_model_ids", []),
+        "max_request_attempts": MAX_REQUEST_ATTEMPTS,
+        "max_fallback_models": MAX_FALLBACK_MODELS,
+        "standard_reasoning_efforts": STANDARD_REASONING_EFFORTS,
+        "supported_api_formats": SUPPORTED_API_FORMATS,
+        "providers": [],
+        "models": [],
+        "active_provider_id": active_pid or (config.get("active_provider_id") or ""),
+    }
+
+    for p in providers_list:
+        pid = p.get("id", "")
+        # ONLY return models that are explicitly registered under this specific provider
+        models_in_p = list(p.get("models", []))
+        formatted_p_models = []
+        for m in models_in_p:
+            m_id = m.get("id", "")
+            formatted_p_models.append({
+                "id": m_id,
+                "name": m.get("name") or m_id,
+                "capabilities": m.get("capabilities") or _detect_capabilities(m_id),
+                "reasoning_type": m.get("reasoning_type") or _detect_reasoning_type(m_id),
+                "reasoning_effort": m.get("reasoning_effort") or "high",
+                "context_length": m.get("context_length"),
+                "description": m.get("description", ""),
+                # 同名模型挂多家供应商时，主脑徽标只打给归属供应商的那一份；
+                # 归属无法判定（active_pid 为空）时保留全打，避免误导为"没启用"
+                "is_active": bool(m_id == active_mid and (not active_pid or pid == active_pid)),
+            })
+
+        p_copy = {
+            "id": pid,
+            "name": p.get("name", pid),
+            "type": p.get("type", p.get("name", pid)),
+            "group": p.get("group", "其他"),
+            "enabled": bool(p.get("enabled", False)),
+            "multi_key_enabled": bool(p.get("multi_key_enabled", False)),
+            "response_api_enabled": bool(p.get("response_api_enabled", False)),
+            "base_url": p.get("base_url", ""),
+            "api_format": p.get("api_format", "openai_chat"),
+            "api_path": p.get("api_path", "/chat/completions"),
+            "description": p.get("description", ""),
+            "has_key": bool(p.get("api_key")),
+            "models_count": len(models_in_p),
+            "models": formatted_p_models,
+        }
+        if mask_keys:
+            p_copy["api_key_masked"] = mask_secret(p.get("api_key", ""))
+        else:
+            p_copy["api_key"] = p.get("api_key", "")
+        res["providers"].append(p_copy)
+
+    # Flattened models for backward compatibility
+    for m in config.get("models", []):
+        m_pid = m.get("provider_id", "openai")
+        p_entry = next((p for p in providers_list if p.get("id") == m_pid), None)
+        m_key = m.get("api_key", "")
+        has_key = bool(m_key or (p_entry and p_entry.get("api_key")))
+
+        m_copy = {
+            "id": m["id"],
+            "name": m.get("name", m["id"]),
+            "provider_id": m_pid,
+            "provider_name": m.get("provider_name") or (p_entry.get("name") if p_entry else "自定义"),
+            "base_url": m.get("base_url", "") or (p_entry.get("base_url", "") if p_entry else ""),
+            "api_format": m.get("api_format", "openai_chat"),
+            "reasoning_type": m.get("reasoning_type", "auto"),
+            "reasoning_effort": m.get("reasoning_effort", "high"),
+            "capabilities": m.get("capabilities") or _detect_capabilities(m["id"]),
+            "context_length": m.get("context_length"),
+            "description": m.get("description", ""),
+            "has_key": has_key,
+            "is_active": m["id"] == active_mid,
+        }
+        if mask_keys:
+            m_copy["api_key_masked"] = mask_secret(m_key) if m_key else (mask_secret(p_entry.get("api_key", "")) if p_entry and p_entry.get("api_key") else "")
+        else:
+            m_copy["api_key"] = m_key
+        res["models"].append(m_copy)
+
+    return res
+
+
+def get_active_llm_runtime(config: Dict[str, Any]) -> Dict[str, Any]:
+    """Retrieve active LLM credentials and configuration for runtime execution."""
+    from ..config import settings
+    active_mid = config.get("active_model_id", "")
+    active_effort = config.get("active_reasoning_effort", "high")
+
+    target_model = next((m for m in config.get("models", []) if m["id"] == active_mid), None)
+
+    base_url = target_model.get("base_url") if target_model else getattr(settings, "llm_base_url", "")
+    api_key = target_model.get("api_key") if target_model else getattr(settings, "llm_api_key", "")
+    provider_id = target_model.get("provider_id", "") if target_model else ""
+    provider_name = target_model.get("provider_name", "") if target_model else "默认"
+    prov_api_path = str((target_model or {}).get("api_path", "") or "")
+
+    if target_model:
+        t_base = target_model.get("base_url", "").rstrip("/")
+        prov = next(
+            (
+                p for p in config.get("providers", [])
+                if p.get("id") == provider_id or (t_base and p.get("base_url", "").rstrip("/") == t_base)
+            ),
+            None,
+        )
+        if prov:
+            if not api_key:
+                api_key = prov.get("api_key", "")
+            if not base_url:
+                base_url = prov.get("base_url", "")
+            if not provider_name or provider_name == "自定义":
+                provider_name = prov.get("name", provider_name)
+            if not provider_id:
+                provider_id = prov.get("id", "openai")
+            if not prov_api_path:
+                prov_api_path = str(prov.get("api_path", "") or "")
+
+    base_url = (base_url or os.getenv("LLM_BASE_URL", "")).rstrip("/")
+    if not base_url:
+        raise RuntimeError(
+            "LLM 出口未配置：请在 .env 设置 LLM_BASE_URL，或在后台「LLM Providers」中选择/新建供应商。"
+            "出于数据流向透明要求，系统不再内置任何默认第三方中继网关。"
+        )
+    api_key = api_key or os.getenv("LLM_API_KEY", "")
+
+    model_name = active_mid or getattr(settings, "llm_model", "") or os.getenv("LLM_MODEL", "")
+    api_format = target_model.get("api_format") if target_model else _detect_api_format(base_url, model_name)
+    reasoning_type = target_model.get("reasoning_type", "auto") if target_model else _detect_reasoning_type(model_name)
+    thinking_timeout = float(
+        target_model.get("thinking_timeout")
+        if target_model and target_model.get("thinking_timeout")
+        else config.get("thinking_timeout")
+        or os.getenv("LLM_THINKING_TIMEOUT")
+        or os.getenv("LLM_TIMEOUT_SECONDS")
+        or getattr(settings, "llm_thinking_timeout", 120.0)
+    )
+
+    return {
+        "model": model_name,
+        "name": target_model.get("name", model_name) if target_model else model_name,
+        "provider_name": provider_name or "默认",
+        "provider_id": provider_id or "openai",
+        "base_url": base_url,
+        "api_key": api_key,
+        "api_format": api_format,
+        "api_path": prov_api_path,
+        "reasoning_effort": active_effort,
+        "reasoning_type": reasoning_type,
+        "thinking_timeout": thinking_timeout,
+        "request_attempts": config.get("request_attempts", DEFAULT_REQUEST_ATTEMPTS),
+        "fallback_model_ids": config.get("fallback_model_ids", []),
+    }
+
+
+def resolve_model_runtime(config: Dict[str, Any], model_id: str) -> Optional[Dict[str, Any]]:
+    """Resolve a configured model (e.g. a fallback) into a callable runtime spec.
+    Returns None when the model is unknown or has no usable endpoint."""
+    target = next((m for m in config.get("models", []) if m.get("id") == model_id), None)
+    if not target:
+        return None
+    base_url = (target.get("base_url") or "").rstrip("/")
+    api_key = target.get("api_key") or ""
+    if not api_key or not base_url:
+        prov = next((p for p in config.get("providers", []) if p.get("id") == target.get("provider_id")), None)
+        if prov:
+            base_url = base_url or (prov.get("base_url") or "").rstrip("/")
+            api_key = api_key or prov.get("api_key", "")
+    if not base_url:
+        return None
+    mid = target.get("id", model_id)
+    api_format = target.get("api_format") or _detect_api_format(base_url, mid)
+    reasoning_type = target.get("reasoning_type") or _detect_reasoning_type(mid)
+    effort = target.get("reasoning_effort") or target.get("default_effort") or "high"
+    try:
+        thinking_timeout = float(target.get("thinking_timeout") or config.get("thinking_timeout") or 120.0)
+    except (TypeError, ValueError):
+        thinking_timeout = float(config.get("thinking_timeout") or 120.0)
+    return {
+        "model": mid,
+        "name": target.get("name", mid),
+        "provider_id": target.get("provider_id", ""),
+        "provider_name": target.get("provider_name", "自定义"),
+        "base_url": base_url,
+        "api_key": api_key,
+        "api_format": api_format,
+        "api_path": str(target.get("api_path", "") or ""),
+        "reasoning_effort": effort if effort in STANDARD_REASONING_EFFORTS else "high",
+        "reasoning_type": reasoning_type,
+        "thinking_timeout": thinking_timeout,
+    }
