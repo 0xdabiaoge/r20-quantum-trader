@@ -21,6 +21,31 @@ from urllib.parse import urlparse
 
 from .file_locks import file_lock
 
+# ── 结构优化阶段2（B4）─────────────────────────────────────────────
+# 下列实现已迁往 r20_backend.llm.*，此处保留**同名重导出**，使所有既有导入路径、
+# 属性访问（含测试对 _join_api_path / build_request_spec / _atomic_write_json 等
+# 私有名的直接访问）全部不变。迁移只选「不引用模块常量、也不调用读常量兄弟函数」
+# 的部分，因此不会打断测试以模块常量做注入的接缝。
+from r20_backend.llm.capabilities import _detect_api_format, _detect_capabilities, _detect_reasoning_type
+from r20_backend.llm.providers import (
+    _join_api_path,
+    _model_holder_pids,
+    _provider_holds_active_model,
+    _resolve_active_provider_id,
+    _url_path_of,
+)
+from r20_backend.llm.transport import (
+    TRANSIENT_MARKERS,
+    _LLMHardError,
+    _LLMTransientError,
+    _attempt_llm_call,
+    _is_transient_http,
+    _parse_llm_response,
+    build_chat_payload,
+    build_request_spec,
+)
+from r20_backend.llm.util import _atomic_write_json, mask_secret
+
 _BJ = timezone(timedelta(hours=8))
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -49,84 +74,14 @@ SUPPORTED_API_FORMATS = [
 STANDARD_REASONING_EFFORTS = ["max", "xhigh", "high", "medium", "low", "minimal", "none", "auto"]
 
 
-def _atomic_write_json(path: Path, data: Any) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, temp_path = tempfile.mkstemp(prefix=f".{path.name}-", dir=path.parent)
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
-            f.flush()
-            os.fsync(f.fileno())
-        os.replace(temp_path, path)
-    finally:
-        if os.path.exists(temp_path):
-            try:
-                os.unlink(temp_path)
-            except OSError:
-                pass
 
 
-def mask_secret(value: str, visible: int = 4) -> str:
-    if not value:
-        return ""
-    if len(value) <= visible * 2:
-        return "*" * len(value)
-    return f"{value[:visible]}{'*' * 8}{value[-visible:]}"
 
 
-def _detect_reasoning_type(model_id: str) -> str:
-    m = model_id.lower()
-    if "deepseek-reasoner" in m or "deepseek-r1" in m or "-r1" in m:
-        return "deepseek_reasoner"
-    if (
-        m.startswith(("o1", "o3", "o4"))
-        or "/o1" in m or "/o3" in m or "/o4" in m
-        or "gemini" in m
-        or "claude-3-7" in m
-        or "claude-3.7" in m
-        or "qwq" in m
-        # qwen3 全系（qwen3.x、qwen-3.x、qwen3-vl 等）为思考模型：
-        # 旧规则把所有含 "qwen" 的模型判为 none，导致 qwen3.x 的
-        # reasoning_effort 参数在运行时被静默丢弃（2026-09 用户反馈）。
-        or "qwen3" in m or "qwen-3" in m
-    ):
-        return "standard_effort"
-    if "chat" in m or "gpt-4o" in m or "gpt-3" in m or "qwen" in m or "llama" in m:
-        return "none"
-    return "auto"
 
 
-def _detect_capabilities(model_id: str) -> List[str]:
-    m = model_id.lower()
-    caps = ["chat"]
-    # 视觉能力按「显式多模态标记 ∪ 家族默认」判定，而非靠 flash 这类词——
-    # 历史版本把 "flash" 当视觉关键词，会误标 deepseek-v4-flash 等纯文本模型。
-    # 该网关下 qwen / glm / gemini / claude / gpt / grok 家族的新式模型普遍多模态，
-    # 归为视觉家族；deepseek 归纯文本家族，除非名字带显式 vision 标记。
-    vision_markers = ["vision", "image", "omni", "multimodal", "vl-", "-vl", "_vl", ".vl"]
-    vision_families = ["gemini", "claude", "gpt-4o", "gpt-5", "gpt-6", "grok", "muse", "qwen", "glm"]
-    text_only_families = ["deepseek"]
-    tokens = {t for t in re.split(r"[^a-z0-9]+", m) if t}
-    has_vision_marker = any(k in m for k in vision_markers) or bool(tokens & {"vl", "4v", "5v", "6v"})
-    in_vision_family = any(f in m for f in vision_families)
-    in_text_family = any(f in m for f in text_only_families)
-    if has_vision_marker or (in_vision_family and not in_text_family):
-        caps.append("vision")
-    if not ("-r1-distill" in m or "-thinking" in m):
-        caps.append("tools")
-    if any(k in m for k in ["reasoner", "r1", "o1", "o3", "o4", "gpt-5", "gpt-6", "high", "thinking", "qwq", "deepseek-r1"]):
-        caps.append("reasoning")
-    return caps
 
 
-def _detect_api_format(url: str, model_id: str) -> str:
-    u = url.lower()
-    m = model_id.lower()
-    if "anthropic.com" in u or "claude" in u or "claude" in m and "messages" in u:
-        return "claude_messages"
-    if "responses" in u:
-        return "openai_responses"
-    return "openai_chat"
 
 
 DEFAULT_PROVIDERS = [
@@ -197,80 +152,14 @@ DEFAULT_PROVIDERS = [
 ]
 
 
-# ── Base URL 拼接：以用户显式输入的路径为准，不再强插 /v1 ──
-# 历史缺陷：所有请求端点构造都在 base_url 不以 /v1 结尾时硬拼 "/v1/..."，
-# 导致智谱（https://open.bigmodel.cn/api/paas/v4）、Gemini（.../v1beta）这类
-# 带版本路径的供应商被拼成 /v4/v1/chat/completions 而 404/401。
-# 规则：base 含任何显式路径 → 直接拼接协议后缀；裸域名（无路径）→ 兼容补 /v1。
-def _url_path_of(base: str) -> str:
-    try:
-        return urlparse(base).path or ""
-    except Exception:
-        return "/unparseable"  # 解析失败按“有路径”处理，不做任何自动填充
 
 
-def _join_api_path(base: str, suffix: str) -> str:
-    """把协议后缀（/chat/completions、/messages、/responses、/models）拼到 Base URL 上。"""
-    cleaned = str(base or "").strip().rstrip("/")
-    if cleaned.endswith(suffix):
-        return cleaned
-    if _url_path_of(cleaned) in ("", "/"):
-        return f"{cleaned}/v1{suffix}"
-    return f"{cleaned}{suffix}"
 
 
-def _model_holder_pids(providers: List[Dict[str, Any]], model_id: str) -> List[str]:
-    """列出嵌套模型清单里持有该模型 id 的所有供应商 id。"""
-    return [
-        str(p.get("id", ""))
-        for p in providers
-        if any(m.get("id") == model_id for m in p.get("models", []))
-    ]
 
 
-def _resolve_active_provider_id(config: Dict[str, Any]) -> str:
-    """判定主脑模型归属的供应商。
-
-    优先级：显式 active_provider_id > 唯一持有者 > 顶层扁平缓存归属。
-    多个供应商挂同名模型且无法判定时返回空串——调用方据此保守处理（宁可拦，不可放错）。
-    """
-    mid = config.get("active_model_id", "")
-    if not mid:
-        return ""
-    providers = config.get("providers", [])
-    holders = _model_holder_pids(providers, mid)
-    if not holders:
-        # 模型不嵌套在任何供应商名下（仅顶层注册）→ 没有归属可言，
-        # 绝不能沿用陈旧的 active_provider_id，否则会被误重挂到该供应商凭据上
-        return ""
-    pid = str(config.get("active_provider_id") or "").strip()
-    if pid and pid in holders:
-        return pid
-    if len(set(holders)) == 1:
-        return holders[0]
-    flat_pid = next(
-        (str(m.get("provider_id") or "") for m in config.get("models", []) if m.get("id") == mid),
-        "",
-    )
-    if flat_pid and flat_pid in holders:
-        return flat_pid
-    return ""
 
 
-def _provider_holds_active_model(config: Dict[str, Any], provider_id: str) -> bool:
-    """该供应商是否持有当前主脑模型。
-
-    多供应商挂同名模型时按归属精确判定，不再让未启用的那份副本被误伤；
-    归属无法判定（多持有者且无记录）时保守视为持有，防止主脑悬空。
-    """
-    mid = config.get("active_model_id", "")
-    if not mid:
-        return False
-    prov = next((p for p in config.get("providers", []) if p.get("id") == provider_id), None)
-    if not prov or not any(m.get("id") == mid for m in prov.get("models", [])):
-        return False
-    active_pid = _resolve_active_provider_id(config)
-    return (not active_pid) or active_pid == provider_id
 
 
 
@@ -1438,330 +1327,22 @@ def fetch_remote_models(
 
 
 
-def build_request_spec(
-    model: str,
-    messages: List[Dict[str, str]],
-    base_url: str,
-    api_key: str = "",
-    api_format: str = "openai_chat",
-    reasoning_effort: str = "high",
-    temperature: Optional[float] = 0.2,
-    response_format: Optional[Dict[str, Any]] = None,
-    reasoning_type: str = "auto",
-    max_tokens: int = 4096,
-    api_path: str = "",
-) -> Tuple[str, Dict[str, str], Dict[str, Any]]:
-    """Build endpoint URL, headers, and request payload according to the specific API protocol format."""
-    cleaned_url = base_url.rstrip("/")
-    # 「API 路径」字段生效：标准路径由协议格式决定；仅非标准自定义路径覆盖之。
-    custom_path = str(api_path or "").strip()
-    if custom_path and not custom_path.startswith("/"):
-        custom_path = "/" + custom_path
-    if custom_path in ("/chat/completions", "/messages", "/responses", "/v1/chat/completions", "/v1/messages", "/v1/responses"):
-        custom_path = ""
-    m_lower = model.lower()
-    rtype = reasoning_type if reasoning_type != "auto" else _detect_reasoning_type(model)
-    effort = (reasoning_effort or "auto").strip().lower()
-
-    # Protocol 1: Anthropic Claude Messages API
-    if api_format == "claude_messages":
-        endpoint = _join_api_path(cleaned_url, custom_path or "/messages")
-
-        headers = {
-            "Content-Type": "application/json",
-            "User-Agent": "R20-Quantum-Trader/5.4 (Claude-Messages)",
-            "anthropic-version": "2023-06-01",
-        }
-        if api_key:
-            headers["x-api-key"] = api_key
-
-        # Separate system message
-        system_chunks = [m["content"] for m in messages if m.get("role") == "system"]
-        chat_messages = [{"role": m["role"], "content": m["content"]} for m in messages if m.get("role") != "system"]
-
-        payload: Dict[str, Any] = {
-            "model": model,
-            "max_tokens": max_tokens,
-            "messages": chat_messages,
-        }
-        if system_chunks:
-            payload["system"] = "\n\n".join(system_chunks)
-
-        if effort in ("max", "xhigh", "high", "medium", "low"):
-            budget_map = {
-                "max": 64000,
-                "xhigh": 32000,
-                "high": 16000,
-                "medium": 8000,
-                "low": 2048,
-            }
-            budget = budget_map[effort]
-            payload["thinking"] = {"type": "enabled", "budget_tokens": budget}
-            payload["max_tokens"] = budget + max_tokens
-        elif effort == "none":
-            payload["thinking"] = {"type": "disabled"}
-            if temperature is not None:
-                payload["temperature"] = temperature
-        else:
-            if temperature is not None:
-                payload["temperature"] = temperature
-
-        return endpoint, headers, payload
-
-    # Protocol 2: OpenAI Responses API (/responses)
-    elif api_format == "openai_responses":
-        endpoint = _join_api_path(cleaned_url, custom_path or "/responses")
-
-        headers = {
-            "Content-Type": "application/json",
-            "User-Agent": "R20-Quantum-Trader/5.4 (OpenAI-Responses)",
-        }
-        if api_key:
-            headers["Authorization"] = f"Bearer {api_key}"
-
-        payload: Dict[str, Any] = {
-            "model": model,
-            "input": messages,
-        }
-        if response_format and response_format.get("type") == "json_object":
-            payload["text"] = {"format": {"type": "json_object"}}
-        if effort in ("max", "xhigh", "high", "medium", "low", "minimal"):
-            payload["reasoning"] = {"effort": effort}
-
-        return endpoint, headers, payload
-
-    # Protocol 3: OpenAI Chat Completions (/chat/completions, Default)
-    else:
-        endpoint = _join_api_path(cleaned_url, custom_path or "/chat/completions")
-
-        headers = {
-            "Content-Type": "application/json",
-            "User-Agent": "R20-Quantum-Trader/5.4 (OpenAI-Chat)",
-        }
-        if api_key:
-            headers["Authorization"] = f"Bearer {api_key}"
-
-        payload: Dict[str, Any] = {
-            "model": model,
-            "messages": messages,
-        }
-
-        # Temperature handling for reasoning models vs normal models
-        is_reasoning_model = (
-            rtype in ("deepseek_reasoner", "standard_effort")
-            or m_lower.startswith(("o1", "o3", "o4"))
-            or "reasoner" in m_lower
-            or "-r1" in m_lower
-            or "qwen3" in m_lower or "qwen-3" in m_lower or "qwq" in m_lower
-        )
-        if not is_reasoning_model:
-            if temperature is not None:
-                payload["temperature"] = temperature
-        else:
-            if "gemini" in m_lower and temperature is not None:
-                payload["temperature"] = temperature
-
-        # Standard reasoning effort parameter (supports max, xhigh, high, medium, low, minimal, none)
-        if rtype == "standard_effort" or (rtype == "auto" and ("gemini" in m_lower or "qwen3" in m_lower or "qwen-3" in m_lower or "qwq" in m_lower or m_lower.startswith(("o1", "o3", "o4", "gpt-5", "gpt-6")) or "gpt-5" in m_lower or "gpt-6" in m_lower)):
-            if effort in ("max", "xhigh", "high", "medium", "low", "minimal"):
-                payload["reasoning_effort"] = effort
-            elif effort == "none" and ("gemini" in m_lower or "gpt" in m_lower):
-                payload["reasoning_effort"] = "none"
-
-        if response_format and rtype != "deepseek_reasoner":
-            payload["response_format"] = response_format
-
-        return endpoint, headers, payload
 
 
-def build_chat_payload(
-    model: str,
-    messages: List[Dict[str, str]],
-    reasoning_effort: str = "high",
-    temperature: Optional[float] = 0.2,
-    response_format: Optional[Dict[str, Any]] = None,
-    reasoning_type: str = "auto",
-) -> Dict[str, Any]:
-    """Compatibility wrapper for standard chat payload generation."""
-    _, _, payload = build_request_spec(
-        model=model,
-        messages=messages,
-        base_url="https://api.openai.com/v1",
-        api_format="openai_chat",
-        reasoning_effort=reasoning_effort,
-        temperature=temperature,
-        response_format=response_format,
-        reasoning_type=reasoning_type,
-    )
-    return payload
 
 
 # ── LLM 韧性调用链：模型内重试 + 跨模型回退 ──
 
-# Transient upstream faults (gateway route flaps, bot/rate shields, 5xx) must not
-# silently degrade a trading or self-evolution cycle into NO_CHANGE. Retry with backoff.
-# 注：unknown provider / model_not_found 已移出瞬时名单（2026-09-09 事件复盘）——
-# 网关不认识该模型是轮内持续故障，原地重试只会白白烧掉请求窗口，按硬故障立即换模型。
-TRANSIENT_MARKERS = (
-    "upstream", "temporarily unavailable", "overloaded", "rate limit",
-    "too many requests", "capacity", "busy", "bad gateway", "gateway timeout",
-)
 
 
-def _is_transient_http(code: int, body: str) -> bool:
-    low = (body or "").lower()
-    if code in (408, 409, 425, 429, 500, 502, 503, 504):
-        return True
-    if code in (400, 401, 402, 403) and any(m in low for m in TRANSIENT_MARKERS):
-        return True
-    return False
 
 
-class _LLMTransientError(Exception):
-    """可重试错误：瞬时 HTTP、超时、连接层异常（拒绝/重置/DNS/TLS）、坏响应体、空正文。
-
-    fail_over_now=True：错误本身可再试（末位模型仍会重试），但链上还有下一个模型时
-    立即切换——504/思考超时属"慢故障"，同一轮内原地重试大概率再烧满一个超时窗口。"""
-
-    def __init__(self, message: str, timed_out: bool = False, fail_over_now: bool = False):
-        super().__init__(message)
-        self.timed_out = timed_out
-        self.fail_over_now = fail_over_now
 
 
-class _LLMHardError(Exception):
-    """不可重试错误（对该模型）：认证失败、404、参数被拒等——直接切换下一个回退模型。"""
 
 
-def _parse_llm_response(target_format: str, res_json: Dict[str, Any]) -> Tuple[str, str, Dict[str, Any]]:
-    content = ""
-    reasoning_content = ""
-    usage = res_json.get("usage", {}) if isinstance(res_json, dict) else {}
-
-    # Protocol 1: Claude Messages Response
-    if target_format == "claude_messages":
-        text_chunks = [c.get("text", "") for c in res_json.get("content", []) if c.get("type") == "text"]
-        thinking_chunks = [c.get("thinking", "") for c in res_json.get("content", []) if c.get("type") == "thinking"]
-        content = "".join(text_chunks).strip()
-        reasoning_content = "\n".join(thinking_chunks).strip()
-        if not usage:
-            usage = {
-                "total_tokens": res_json.get("usage", {}).get("input_tokens", 0) + res_json.get("usage", {}).get("output_tokens", 0)
-            }
-
-    # Protocol 2: OpenAI Responses Response
-    elif target_format == "openai_responses":
-        content = str(res_json.get("output_text") or "").strip()
-        if not content:
-            for item in res_json.get("output", []):
-                if item.get("type") == "message":
-                    for part in item.get("content", []):
-                        if part.get("type") == "output_text" or "text" in part:
-                            content += str(part.get("text", ""))
-                elif item.get("type") == "reasoning":
-                    reasoning_content += str(item.get("content") or item.get("summary") or "")
-        content = content.strip()
-        reasoning_content = reasoning_content.strip()
-
-    # Protocol 3: OpenAI Chat Completions Response
-    else:
-        msg = res_json.get("choices", [{}])[0].get("message", {})
-        content = str(msg.get("content", "")).strip()
-        reasoning_content = str(msg.get("reasoning_content") or "").strip()
-
-    return content, reasoning_content, usage
 
 
-def _attempt_llm_call(
-    cand: Dict[str, Any],
-    messages: List[Dict[str, str]],
-    temperature: Optional[float],
-    response_format: Optional[Dict[str, Any]],
-    effective_timeout: float,
-) -> Tuple[str, str, Dict[str, Any], int]:
-    """单次请求一个模型；失败时抛 _LLMTransientError（可重试）或 _LLMHardError（换模型）。"""
-    endpoint, headers, payload = build_request_spec(
-        model=cand["model"],
-        messages=messages,
-        base_url=cand["base_url"],
-        api_key=cand.get("api_key", ""),
-        api_format=cand.get("api_format", "openai_chat"),
-        reasoning_effort=cand.get("reasoning_effort", "high"),
-        temperature=temperature,
-        response_format=response_format,
-        reasoning_type=cand.get("reasoning_type", "auto"),
-        api_path=cand.get("api_path", ""),
-    )
-
-    t0 = time.perf_counter()
-    req = urllib.request.Request(endpoint, data=json.dumps(payload).encode("utf-8"), headers=headers)
-    try:
-        resp_handle = urllib.request.urlopen(req, timeout=effective_timeout)
-    except urllib.error.HTTPError as exc:
-        err_b = ""
-        try:
-            err_b = exc.read().decode("utf-8", errors="replace")
-        except Exception:
-            pass
-        # Adaptive fallback retry on rejected parameter (400: reasoning_effort/temperature/response_format)
-        if (
-            exc.code == 400
-            and cand.get("api_format", "openai_chat") == "openai_chat"
-            and any(kw in err_b.lower() for kw in ["reasoning_effort", "temperature", "response_format", "invalid parameter"])
-        ):
-            fb_payload = {"model": cand["model"], "messages": messages}
-            fb_req = urllib.request.Request(endpoint, data=json.dumps(fb_payload).encode("utf-8"), headers=headers)
-            try:
-                with urllib.request.urlopen(fb_req, timeout=effective_timeout) as fb_resp:
-                    latency_ms = int((time.perf_counter() - t0) * 1000)
-                    fb_json = json.loads(fb_resp.read().decode("utf-8", errors="replace"))
-                content, reasoning, usage = _parse_llm_response(cand.get("api_format", "openai_chat"), fb_json)
-                if not content and not reasoning:
-                    raise _LLMTransientError(f"模型 {cand['model']} 返回空正文（已自适应去参数重试）")
-                return content, reasoning, usage, latency_ms
-            except (urllib.error.URLError, TimeoutError, socket.timeout, ValueError) as fb_exc:
-                fb_code = getattr(fb_exc, "code", 0) or 0
-                if fb_code and not _is_transient_http(fb_code, str(getattr(fb_exc, "msg", "") or fb_exc)):
-                    raise _LLMHardError(f"LLM 网关返回 HTTP {fb_code}（模型 {cand['model']}）：{str(fb_exc)[:280]}") from fb_exc
-                raise _LLMTransientError(f"LLM 网关返回 HTTP {exc.code}（模型 {cand['model']}）：{(err_b or '')[:280]}") from fb_exc
-        if _is_transient_http(exc.code, err_b):
-            raise _LLMTransientError(
-                f"LLM 网关返回 HTTP {exc.code}（模型 {cand['model']}）：{(err_b or '')[:280]}",
-                fail_over_now=(exc.code == 504),  # 504=上游已超时：链上有下一个模型则立即切换
-            ) from exc
-        raise _LLMHardError(f"LLM 网关返回 HTTP {exc.code}（模型 {cand['model']}）：{(err_b or '')[:280]}") from exc
-    except (TimeoutError, socket.timeout) as exc:
-        raise _LLMTransientError(
-            f"LLM 推演超时（已达到思考上限时间 {effective_timeout:.0f}s）：模型思考链过长未在时限内完成响应，可前往后台 AI 模型设置中调大思考上限时间",
-            timed_out=True,
-            fail_over_now=True,  # 慢故障：有回退链时立即切换，不再原地烧第二个超时窗口
-        ) from exc
-    except urllib.error.URLError as exc:
-        # 连接层异常（拒绝/重置/DNS/TLS/断线）与超时包装同样属于瞬时故障：
-        # 旧版在此处直接 raise，导致「失败一次就不再请求」——现在纳入重试与回退。
-        reason = getattr(exc, "reason", None)
-        timed_out = isinstance(reason, (socket.timeout, TimeoutError))
-        raise _LLMTransientError(
-            f"LLM 连接层异常（模型 {cand['model']}）：{type(reason).__name__ if reason is not None else type(exc).__name__}: {str(reason or exc)[:220]}",
-            timed_out=timed_out,
-            fail_over_now=timed_out,  # 连接层包装的超时同样按慢故障快速换模型
-        ) from exc
-    except (ValueError, OSError) as exc:
-        # 响应体非 JSON（如反代 HTML 错误页）、读取中断等：可重试
-        raise _LLMTransientError(f"LLM 响应体解析失败（模型 {cand['model']}）：{str(exc)[:200]}") from exc
-
-    with resp_handle as resp:
-        latency_ms = int((time.perf_counter() - t0) * 1000)
-        body_bytes = resp.read()
-        try:
-            res_json = json.loads(body_bytes.decode("utf-8", errors="replace"))
-        except ValueError as exc:
-            raise _LLMTransientError(f"LLM 响应体非 JSON（模型 {cand['model']}）：{str(body_bytes[:160])!r}") from exc
-
-    content, reasoning, usage = _parse_llm_response(cand.get("api_format", "openai_chat"), res_json)
-    if not content and not reasoning:
-        raise _LLMTransientError(f"模型 {cand['model']} 返回空正文（HTTP 200 但无 content/reasoning，疑似上游静默失败）")
-    return content, reasoning, usage, latency_ms
 
 
 def execute_llm_request(
