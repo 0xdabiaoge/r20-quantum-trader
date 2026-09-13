@@ -92,9 +92,6 @@ from r20_backend.dashboard_payload.factors import (  # noqa: E402
 
 TARGET_INSTRUMENTS = load_instruments()
 
-app = FastAPI(title="R20 AI Quantitative Matrix", docs_url=None, redoc_url=None)
-templates = Jinja2Templates(directory=os.path.join(DASHBOARD_DIR, "templates"))
-app.mount("/static", StaticFiles(directory=os.path.join(DASHBOARD_DIR, "static")), name="static")
 
 _NOT_READY_TEXT = "OKX API Key 未配置（NOT READY）：交易与账户查询已禁用"
 
@@ -1208,47 +1205,6 @@ async def refresh_cache_if_needed(ttl_seconds: float = 3.0):
 # Auto-start background worker to keep in-memory cache pre-warmed
 start_dashboard_background_worker()
 
-VUE_DIST_DIR = os.path.join(WORKSPACE_DIR, "frontend", "dist")
-VUE_ASSETS_DIR = os.path.join(VUE_DIST_DIR, "assets")
-DOCS_IMAGES_DIR = os.path.join(WORKSPACE_DIR, "docs", "images")
-
-
-class CachedStaticFiles(StaticFiles):
-    """Custom static files handler that injects Cloudflare/browser long-term caching headers."""
-    def __init__(self, *args, cache_control: str = "public, max-age=31536000, immutable", **kwargs):
-        self.cache_control = cache_control
-        super().__init__(*args, **kwargs)
-
-    def file_response(self, *args, **kwargs) -> Response:
-        resp = super().file_response(*args, **kwargs)
-        resp.headers["Cache-Control"] = self.cache_control
-        return resp
-
-
-if os.path.isdir(VUE_ASSETS_DIR):
-    app.mount("/assets", CachedStaticFiles(directory=VUE_ASSETS_DIR, cache_control="public, max-age=31536000, immutable"), name="vue_assets")
-
-if os.path.isdir(DOCS_IMAGES_DIR):
-    app.mount("/docs/images", CachedStaticFiles(directory=DOCS_IMAGES_DIR, cache_control="public, max-age=604800, stale-while-revalidate=86400"), name="docs_images")
-    app.mount("/images", CachedStaticFiles(directory=DOCS_IMAGES_DIR, cache_control="public, max-age=604800, stale-while-revalidate=86400"), name="images")
-
-VUE_ADMIN_DIST_DIR = VUE_DIST_DIR  # Same SPA build handles both / and /admin/*
-VUE_ADMIN_LEGACY_FILE = os.path.join(VUE_DIST_DIR, "admin", "legacy.html")
-
-
-def _serve_vue_spa(html_path: str, is_public: bool = True) -> HTMLResponse:
-    with open(html_path, "r", encoding="utf-8") as f:
-        content = f.read()
-    # HTML shell strictly never cached in browser or edge to ensure users always load latest Vite bundle immediately
-    cache_header = "no-cache, no-store, must-revalidate, max-age=0"
-    return HTMLResponse(
-        content=content,
-        headers={
-            "Cache-Control": cache_header,
-            "Pragma": "no-cache",
-            "Expires": "0",
-        },
-    )
 
 
 # --- SEO Endpoints ---
@@ -1265,71 +1221,15 @@ def _serve_vue_spa(html_path: str, is_public: bool = True) -> HTMLResponse:
 #
 # /favicon.svg：只在本文件定义（路由器没有同名路由）→ 真实生效，保留。
 
-@app.get("/favicon.svg", include_in_schema=False)
-async def favicon_svg():
-    f = os.path.join(VUE_DIST_DIR, "favicon.svg")
-    if os.path.isfile(f):
-        return FileResponse(f, media_type="image/svg+xml", headers={"Cache-Control": "public, max-age=86400, s-maxage=2592000, immutable"})
-    pf = os.path.join(WORKSPACE_DIR, "frontend", "public", "favicon.svg")
-    if os.path.isfile(pf):
-        return FileResponse(pf, media_type="image/svg+xml", headers={"Cache-Control": "public, max-age=86400, s-maxage=2592000, immutable"})
-    return Response(status_code=404)
 
 
-# --- HTML Page Handlers ---
-
-@app.api_route("/", methods=["GET", "HEAD"], response_class=HTMLResponse)
-async def index(request: Request):
-    vue_index_file = os.path.join(VUE_DIST_DIR, "index.html")
-    if os.path.isfile(vue_index_file):
-        return _serve_vue_spa(vue_index_file, is_public=True)
-    return templates.TemplateResponse(
-        request=request,
-        name="index.html",
-        headers={"Cache-Control": "public, max-age=0, s-maxage=60, stale-while-revalidate=300"},
-    )
-
-
-# --- /admin/* 路由 ---
+# --- 实时公开轮询 API ---
 #
-# 阶段 1 拆除：/admin、/admin/、/admin/{subpath:path} 三条原先在本文件就地实现，
-# 但 r20_backend/routers/dashboard.py 已注册同路径（admin_page）且先注册 →
-# 本文件这三份永不执行，已删除。
-# 生效实现在 r20_backend/routers/dashboard.py 的 admin_page()，含 batch7 审计⑤#6
-# 的「dist/admin 真实文件优先」逻辑（/admin/legacy.html 依赖它）。
-
-
-# 阶段 1 拆除：/docs、/docs/、/docs/{subpath:path} 三条被
-# r20_backend/routers/dashboard.py 的 serve_vue_spa_subroutes 遮蔽，已移除。
-# 本函数的 /doc 装饰器保留 —— 路由器只注册了 /docs，没有 /doc，
-# 所以 /doc 是「仅此处生效」的真实路由（线上实测 200）。
-@app.get("/doc", response_class=HTMLResponse, include_in_schema=False)
-async def docs_spa_root(request: Request, subpath: str = ""):
-    """Serve the public system documentation page in Vue SPA."""
-    vue_index_file = os.path.join(VUE_DIST_DIR, "index.html")
-    if os.path.isfile(vue_index_file):
-        return _serve_vue_spa(vue_index_file, is_public=True)
-    return HTMLResponse("Vue build not found. Run `npm run build` in frontend/.", status_code=503)
-
-
-# 阶段 1 拆除：/trading、/factors、/news、/lab、/history 五条被
-# r20_backend/routers/dashboard.py 的 serve_vue_spa_subroutes 遮蔽，已移除。
-# 保留 /login —— 路由器没有这条，前端 router 里 /login 也不是公开 tab，
-# 实际是跳后台登录页（线上实测 307 → /admin/login）。
-@app.get("/login", include_in_schema=False)
-async def login_redirect(request: Request):
-    from starlette.responses import RedirectResponse
-    return RedirectResponse(url="/admin/login")
-
-
-# --- Realtime Public Polling APIs (with Cloudflare Edge Micro-Caching) ---
-#
-# 阶段 1：拆除本文件里 @app.get("/api/all") 与 @app.get("/api/overview") 两个
-# 装饰器 —— 同路径已由 r20_backend/routers/dashboard.py 先注册，本文件的注册
-# 永不命中。但**函数体必须保留**：routers/dashboard.py 的对应路由是薄委托，
-# 反过来调用 dash_app.get_all_data / dash_app.get_overview（实现在此、路由在彼）。
-# 这正是「路由层与实现层分离」的半成品状态，删除装饰器后语义变清晰：
-# 本文件提供实现，routers 提供路由。
+# 阶段 1 已删除本文件里 @app.get("/api/all") 与 @app.get("/api/overview") 两个装饰器
+# （同路径由 r20_backend/routers/dashboard.py 先注册，本文件注册永不命中）；
+# 阶段 2·B2 收尾又把整个 FastAPI 外壳（app 实例、静态挂载、/ /doc /login
+# /favicon.svg 四条路由）搬到 r20_backend/web_shell.py 与 routers/dashboard.py。
+# 本文件自此是**纯库**：提供实现，不持有 app。
 
 async def get_all_data(full: bool = False):
     global CACHE_DATA, LAST_CACHE_TIME
@@ -1358,6 +1258,3 @@ async def get_overview():
         headers={"Cache-Control": "public, max-age=1, s-maxage=3, stale-while-revalidate=5"},
     )
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8080)

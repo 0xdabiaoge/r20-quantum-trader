@@ -257,9 +257,13 @@ app.include_router(llm_router)
 app.include_router(gateway_router)
 app.include_router(dashboard_router)
 
-# Mount legacy dashboard app for static files and complete fallback
-from dashboard.app import app as dashboard_app
-app.mount("/", dashboard_app)
+# 静态资源与 SPA 壳（结构优化阶段 2·B2 收尾）：原先是 "
+# from dashboard.app import app as dashboard_app; app.mount("/", dashboard_app)"
+# 的双层路由。dashboard/app.py 已降为纯库（不再持有 FastAPI 实例），
+# 故静态目录直接挂到真正的应用对象上。
+from r20_backend.web_shell import mount_static_assets  # noqa: E402
+
+mount_static_assets(app)
 
 
 if __name__ == "__main__":

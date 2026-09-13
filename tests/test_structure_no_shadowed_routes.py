@@ -1,13 +1,21 @@
 """路由遮蔽（shadowed route）回归闸：钉住"改哪份才有效"。
 
-背景（结构优化阶段 1，commit 68254e9）：
-本项目有两套路由层 —— r20_backend/routers/*（模块化）与 dashboard/app.py（legacy 整包）。
-r20_backend/app.py 是「先 include_router(...) 再 mount("/", dashboard_app)」，
+背景（结构优化阶段 1，commit 68254e9；阶段 2·B2 收尾继续）：
+本项目曾有两套路由层 —— r20_backend/routers/*（模块化）与 dashboard/app.py（legacy 整包）。
+r20_backend/app.py 曾是「先 include_router(...) 再 mount("/", dashboard_app)」，
 Starlette 按注册顺序匹配，因此凡两边同路径同方法者一律 routers 生效，
 dashboard/app.py 的同名 handler **函数体永不执行** —— 改它没有任何效果、也不报错。
 
-阶段 1 已拆除 15 条这类影子注册。本测试把它固化为自动闸，防止今后再次踩进
-"改了没效果"的坑（这类缺陷最贵的地方不是报错，而是静默无效）。
+阶段 1 拆除了 15 条这类影子注册；阶段 2·B2 收尾把**剩下的整个外壳**（FastAPI 实例、
+4 个静态挂载、/ /doc /login /favicon.svg 四条路由）也搬出了 dashboard/app.py：
+外壳件去了 r20_backend/web_shell.py，路由进了 routers/dashboard.py，
+dashboard/app.py 自此是**纯库（0 条路由）**。本闸随之升级为两条更强的断言：
+
+  ① dashboard/app.py 路由数必须为 **0**（纯库，任何 @app. 注册都是架构回退）；
+  ② 原先「仅此处生效」的 4 条路径必须仍在 router 层（删掉任何一条都会线上 404）。
+
+本测试把它固化为自动闸，防止今后再次踩进"改了没效果"的坑
+（这类缺陷最贵的地方不是报错，而是静默无效）。
 
 判定不做肉眼推断：用 AST 解析两条路由表（含 include 顺序与
 `from r20_backend.routers import (a_router, ...)` 括号多名称导入形态），
@@ -32,9 +40,9 @@ APP_MAIN = ROOT / "r20_backend" / "app.py"
 DASH_APP = ROOT / "dashboard" / "app.py"
 ROUTER_DIR = ROOT / "r20_backend" / "routers"
 
-# dashboard/app.py 里「仅此处定义、真实生效」的路由。删掉任何一条都会造成线上 404，
-# 故显式钉住（阶段 1 已逐条实测：/favicon.svg、/、/doc 返回 200，
-# /login 返回 307 → /admin/login）。
+# 原先「仅 dashboard/app.py 定义、真实生效」的路由，B2 收尾后移入 routers/dashboard.py。
+# 删掉任何一条都会造成线上 404，故显式钉住（阶段 1 已逐条实测：/favicon.svg、/、/doc
+# 返回 200，/login 返回 307 → /admin/login；迁移后由 ShellRouteTests 再实测一次）。
 DASHBOARD_ONLY_LIVE = {
     "/favicon.svg",
     "/",
@@ -135,9 +143,24 @@ class NoShadowedRouteTests(unittest.TestCase):
         front = _front_routes()
         self.assertGreater(len(front), 50, f"前台路由仅 {len(front)} 条，疑似解析失败")
         dash = _routes(DASH_APP, "app")
-        self.assertGreaterEqual(len(dash), 4, f"dashboard/app.py 路由仅 {len(dash)} 条")
+        # B2 收尾后 dashboard/app.py 是纯库：0 条路由。若有人在这里重新注册 @app.*，
+        # 说明外壳又被绑回了库文件（会重新引入双层路由），故钉死为 0。
+        self.assertEqual(
+            len(dash), 0,
+            f"dashboard/app.py 应为纯库（0 条路由），实际 {len(dash)} 条："
+            f"{[p for _, _, p in dash]}",
+        )
+        # 那 4 条路径不能消失，只是换了归属（现由 routers/dashboard.py 注册）
+        shell_paths = {pattern for _, _, pattern in _routes(ROUTER_DIR / "dashboard.py", "router")}
+        missing_shell = sorted(DASHBOARD_ONLY_LIVE - shell_paths)
+        self.assertEqual(
+            missing_shell, [],
+            f"routers/dashboard.py 缺少外壳路由（会线上 404）: {missing_shell}",
+        )
 
     def test_dashboard_app_has_no_shadowed_route(self):
+        # B2 收尾后本文件 0 条路由，此断言恒真；保留它是为了让"把路由加回库文件"这个
+        # 动作立刻失败（一旦加回，若与 router 同路径就会被这里抓住）。
         hits = _shadow_hits(_routes(DASH_APP, "app"), _front_routes())
         self.assertEqual(
             hits,
@@ -150,13 +173,30 @@ class NoShadowedRouteTests(unittest.TestCase):
         )
 
     def test_dashboard_only_live_routes_are_kept(self):
-        """这 4 条只在 dashboard/app.py 定义，是真实生效路由，不能被误删。"""
-        paths = {pattern for _, _, pattern in _routes(DASH_APP, "app")}
+        """这 4 条是真实生效路由，不能被误删（B2 收尾后归属 routers/dashboard.py）。
+
+        与 test_front_route_table_is_parsed 里的同名检查互补：这里额外排除
+        「router 内部被更早注册的同路径路由遮蔽」的情况 —— 搬过来但排在被遮蔽的位置，
+        路径虽然还在、却依然不可达。
+        """
+        router_routes = _routes(ROUTER_DIR / "dashboard.py", "router")
+        paths = {pattern for _, _, pattern in router_routes}
         missing = sorted(DASHBOARD_ONLY_LIVE - paths)
         self.assertEqual(
             missing, [],
-            f"dashboard/app.py 缺少这些仅此处生效的真实路由（会线上 404）: {missing}",
+            f"routers/dashboard.py 缺少这些真实路由（会线上 404）: {missing}",
         )
+        # 逐条确认它们在 dashboard.py 内部**未被更早注册的同路径同方法路由**遮蔽
+        seen: list[tuple[int, frozenset[str], str, object]] = []
+        hits: list[str] = []
+        for line, methods, pattern in router_routes:
+            if pattern in DASHBOARD_ONLY_LIVE:
+                for p_line, p_methods, p_pattern, p_regex in seen:
+                    if (methods & p_methods) and p_regex.match(pattern):
+                        hits.append(f"  {pattern} ← 同文件第 {p_line} 行的 {p_pattern}")
+                        break
+            seen.append((line, methods, pattern, compile_path(pattern)[0]))
+        self.assertEqual(hits, [], "外壳路由在 routers/dashboard.py 内部被遮蔽:\n" + "\n".join(hits))
 
     def test_no_dashboard_route_is_also_defined_in_routers(self):
         """更强的表述：两边不应再出现任何同路径同方法的路由对。

@@ -14,6 +14,7 @@ from r20_backend.dependencies import (
     ROOT, DATA_DIR, VUE_DIST, okx, read_json, require_admin_header,
 )
 import dashboard.app as dash_app
+from r20_backend.web_shell import serve_vue_spa, templates
 
 router = APIRouter(tags=["dashboard"])
 
@@ -269,3 +270,55 @@ def admin_page(subpath: str = "") -> FileResponse:
         return FileResponse(str(vue_index), headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
     fallback_index = ROOT / "frontend" / "index.html"
     return FileResponse(str(fallback_index), headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Web 外壳路由（结构优化阶段 2·B2 收尾，从 dashboard/app.py 迁入）
+#
+# 这四条是阶段 1 拆除 15 条「被本 router 遮蔽、永不命中」的重复注册后，**仅存于
+# dashboard/app.py** 的真实路由。现随外壳一起搬到 router：
+#   /favicon.svg  仅此处实现
+#   /             仅此处实现（先给 Vue 壳，dist 缺失时回退 Jinja 模板）
+#   /doc          路由器只注册了 /docs，没有 /doc（线上实测 200），故保留
+#   /login        前端 router 里 /login 不是公开 tab，实际跳后台登录页
+#                 （线上实测 307 → /admin/login）
+# 注册顺序不变：本 router 在主应用里最后 include，故 / 仍落在所有其他路由之后
+# （与原先 `mount("/", dashboard_app)` 的位置语义一致）。
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.get("/favicon.svg", include_in_schema=False)
+async def favicon_svg():
+    f = os.path.join(str(VUE_DIST), "favicon.svg")
+    if os.path.isfile(f):
+        return FileResponse(f, media_type="image/svg+xml", headers={"Cache-Control": "public, max-age=86400, s-maxage=2592000, immutable"})
+    pf = os.path.join(str(ROOT), "frontend", "public", "favicon.svg")
+    if os.path.isfile(pf):
+        return FileResponse(pf, media_type="image/svg+xml", headers={"Cache-Control": "public, max-age=86400, s-maxage=2592000, immutable"})
+    return Response(status_code=404)
+
+
+@router.api_route("/", methods=["GET", "HEAD"], response_class=HTMLResponse)
+async def index(request: Request):
+    vue_index_file = os.path.join(str(VUE_DIST), "index.html")
+    if os.path.isfile(vue_index_file):
+        return serve_vue_spa(vue_index_file, is_public=True)
+    return templates.TemplateResponse(
+        request=request,
+        name="index.html",
+        headers={"Cache-Control": "public, max-age=0, s-maxage=60, stale-while-revalidate=300"},
+    )
+
+
+@router.get("/doc", response_class=HTMLResponse, include_in_schema=False)
+async def docs_spa_root(request: Request, subpath: str = ""):
+    """Serve the public system documentation page in Vue SPA."""
+    vue_index_file = os.path.join(str(VUE_DIST), "index.html")
+    if os.path.isfile(vue_index_file):
+        return serve_vue_spa(vue_index_file, is_public=True)
+    return HTMLResponse("Vue build not found. Run `npm run build` in frontend/.", status_code=503)
+
+
+@router.get("/login", include_in_schema=False)
+async def login_redirect(request: Request):
+    from starlette.responses import RedirectResponse
+    return RedirectResponse(url="/admin/login")
