@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { fmtDate } from '../../utils/format';
 import { useToast } from '../../composables/useToast'
+import { useConfirm } from '../../composables/useConfirm'
 const toast = useToast()
+const { ask } = useConfirm()
 import { computed, ref, onMounted } from 'vue'
 import PageHeader from '../../components/admin/PageHeader.vue'
 import { useI18n } from '../../composables/useI18n'
@@ -196,7 +198,8 @@ async function doImportConfig() {
 
 async function applySuite(suiteId: string) {
   if (!auth.isSuperadmin) return
-  if (!confirm('确定载入对冲基金标准投委会套件吗？将恢复标准交易员阵容。')) return
+  const _ok = await ask({ title: '载入标准投委会套件', desc: '将恢复标准交易员阵容，当前席位配置被覆盖', danger: true, okText: '载入' })
+  if (!_ok) return
   try {
     const res = await api('/api/v1/admin/council/apply-suite', {
       method: 'POST',
@@ -234,20 +237,22 @@ function addNewCustomTrader() {
   toast.ok('已添加自定义交易员席位，可直接编辑提示词与参数')
 }
 
-function removeRole(roleId: string) {
+async function removeRole(roleId: string) {
   if (!auth.isSuperadmin) return
   const role = councilConfig.value.roles[roleId]
   if (role?.is_arbitrator || roleId === 'cio') {
     alert('首席投资官 (CIO) 负责终审收口与发单，不可删除！')
     return
   }
-  if (!confirm(`确定移除交易员【${role?.name || roleId}】席位吗？`)) return
+  const _ok = await ask({ title: '移除交易员席位', desc: `【${role?.name || roleId}】席位将被移除`, danger: true, okText: '移除' })
+  if (!_ok) return
   delete councilConfig.value.roles[roleId]
   toast.warn('已移除席位，点击右上角「保存配置」后生效')
 }
 
 async function resetRole(roleId: string) {
-  if (!confirm(`确定将【${councilConfig.value.roles[roleId]?.name || roleId}】恢复出厂提示词吗？`)) return
+  const _ok = await ask({ title: '恢复出厂提示词', desc: `【${councilConfig.value.roles[roleId]?.name || roleId}】的自定义提示词将被覆盖`, danger: true, okText: '恢复' })
+  if (!_ok) return
   try {
     const res = await api('/api/v1/admin/council/reset-role', {
       method: 'POST',

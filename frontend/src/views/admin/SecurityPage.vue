@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { useToast } from '../../composables/useToast'
+import { useConfirm } from '../../composables/useConfirm'
 const toast = useToast()
+const { ask } = useConfirm()
 import { ref, computed, onMounted } from 'vue'
 import PageHeader from '../../components/admin/PageHeader.vue'
 import SettingsSection from '../../components/admin/SettingsSection.vue'
@@ -103,9 +105,19 @@ async function rediagnose() {
 async function saveEnvironment() {
   const environment = config.value.editable.okx_environment
   if (environment === 'live') {
-    const approved = prompt('切换到 LIVE 实盘环境\n输入 LIVE 确认已核对实盘 Key 权限与 IP 白名单')
-    if (approved?.trim().toUpperCase() !== 'LIVE') {
-      toast.warn('未输入 LIVE，环境未切换')
+    // 批C(2026-09-13)：切 LIVE 是全站最高风险动作（真实资金），原先用 prompt() 收短语
+    // ——移动端 prompt 常被弱化，且样式/焦点不可控。改用项目危险操作确认框，
+    // 要求逐字输入 LIVE（与其余危险操作同一套门禁语义）。
+    const _ok = await ask({
+      title: '切换到 LIVE 实盘环境',
+      desc: '切换后所有交易将以真实资金执行',
+      detail: '请先核对实盘 Key 权限与 IP 白名单已配置正确',
+      danger: true,
+      confirmPhrase: 'LIVE',
+      okText: '切换实盘',
+    })
+    if (!_ok) {
+      toast.warn('未确认 LIVE，环境未切换')
       return
     }
   }
@@ -172,7 +184,18 @@ async function addInstrument() {
 
 async function removeInstrument(item: any) {
   if (item.protected) { toast.warn('系统保底标的不可删除'); return }
-  if (!confirm(`确定将 ${item.instId} 从交易池移除？`)) return
+  // 批C(2026-09-13)·危险操作确认收口：后端本就要求逐字短语 `REMOVE <instId>`，
+  // 但前端把短语写死在请求体、只用原生 confirm() 小条挡一下——移动端随手一按就
+  // 能把实盘标的移出交易池（同页平仓却要密码+短语双确认，强度不一致）。现将同一
+  // 短语要求显式抬到 UI：必须逐字输入才可确认，前后端确认语义就此一致。
+  const _ok = await ask({
+    title: '从交易池移除标的',
+    desc: `${item.instId} 将不再参与选币与开仓（既有持仓不受影响）`,
+    danger: true,
+    confirmPhrase: `REMOVE ${item.instId}`,
+    okText: '移除',
+  })
+  if (!_ok) return
   try {
     const res = await api(`/api/v1/admin/instruments/${encodeURIComponent(item.instId)}`, {
       method: 'DELETE',
@@ -792,7 +815,7 @@ onMounted(() => { loadAll(); loadMx() })
     </template>
 
     <!-- 平仓双确认弹窗 -->
-    <div v-if="closeModal?.show" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4" @click.self="closeModal = null">
+    <div v-if="closeModal?.show" class="fixed inset-0 z-[var(--z-dialog)] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4" @click.self="closeModal = null">
       <div class="rounded-xl border p-5 sm:p-6 w-full max-w-[460px] max-h-[88dvh] overflow-y-auto shadow-2xl" style="background-color: var(--surface-2); border-color: var(--line-1);">
         <h3 class="text-sm font-bold mb-2" style="color: var(--down);">{{ t('admin.security.closeModalTitle') }}</h3>
         <p class="text-[11px] leading-relaxed mb-3" style="color: var(--ink-2);">

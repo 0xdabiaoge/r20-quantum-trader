@@ -6,6 +6,8 @@ import PageHeader from '../../components/admin/PageHeader.vue'
 import { useI18n } from '../../composables/useI18n'
 const { t } = useI18n()
 import { useApi } from '../../composables/useApi'
+import { useConfirm } from '../../composables/useConfirm'
+const { ask } = useConfirm()
 import {Plus,
   Trash2,
   CheckCircle2,
@@ -349,7 +351,9 @@ async function saveProviderConfig() {
 
 async function clearCurrentProviderModels() {
   if (!selectedProvider.value) return
-  if (!confirm(`确定要清空 ${selectedProvider.value.name} 旗下的全部模型吗？`)) return
+  // 批C(2026-09-13)：破坏性操作统一走项目确认服务（原生 confirm 在移动端易误触）
+  const _ok = await ask({ title: '清空供应商模型', desc: `${selectedProvider.value.name} 旗下全部模型将被删除`, danger: true, okText: '清空' })
+  if (!_ok) return
   try {
     await api(`/api/v1/admin/llm/providers/${encodeURIComponent(selectedProvider.value.id)}/models`, {
       method: 'DELETE',
@@ -366,7 +370,15 @@ async function removeProvider() {
   if (!p || p.is_new) return
   const n = p.models_count ?? p.models?.length ?? 0
   const warn = n > 0 ? `\n其名下 ${n} 个模型将一并删除！` : ''
-  if (!confirm(`确定要删除供应商「${p.name}」吗？${warn}\n（若它挂着当前主脑激活模型，需先切换模型）`)) return
+  // 批C(2026-09-13)：删供应商可能带走主脑激活模型 → danger + 提示先切换模型
+  const _ok = await ask({
+    title: '删除 LLM 供应商',
+    desc: `「${p.name}」将被删除${n > 0 ? `，其名下 ${n} 个模型一并删除` : ''}`,
+    detail: '若它挂着当前主脑激活模型，请先切换模型再删除',
+    danger: true,
+    okText: '删除',
+  })
+  if (!_ok) return
   try {
     await api(`/api/v1/admin/llm/providers/${encodeURIComponent(p.id)}`, {
       method: 'DELETE',
@@ -564,7 +576,8 @@ async function activateModel(m: any) {
 async function deleteSingleModel(m: any) {
   const pid = selectedProvider.value?.id
   const pname = selectedProvider.value?.name || pid || ''
-  if (!confirm(`确定删除供应商「${pname}」名下的模型 ${m.id} 吗？`)) return
+  const _ok = await ask({ title: '删除模型', desc: `供应商「${pname}」名下的模型 ${m.id} 将被删除`, danger: true, okText: '删除' })
+  if (!_ok) return
   try {
     const url = pid
       ? `/api/v1/admin/llm/providers/${encodeURIComponent(pid)}/models/${encodeURIComponent(m.id)}`
@@ -1485,7 +1498,7 @@ onMounted(() => {
     <!-- MODAL A: 远端一键获取模型抽屉/弹窗 -->
     <div
       v-if="fetchModalVisible"
-      class="fixed inset-0 z-50 bg-black/60 backdrop-blur-md flex items-center justify-center p-4"
+      class="fixed inset-0 z-[var(--z-dialog)] bg-black/60 backdrop-blur-md flex items-center justify-center p-4"
       @click.self="fetchModalVisible = false"
     >
       <div
@@ -1617,7 +1630,7 @@ onMounted(() => {
     <!-- MODAL B: 手动添加 / 编辑单模型弹窗 -->
     <div
       v-if="modelModalVisible"
-      class="fixed inset-0 z-50 bg-black/60 backdrop-blur-md flex items-center justify-center p-4"
+      class="fixed inset-0 z-[var(--z-dialog)] bg-black/60 backdrop-blur-md flex items-center justify-center p-4"
       @click.self="modelModalVisible = false"
     >
       <div

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { useToast } from '../../composables/useToast'
+import { useConfirm } from '../../composables/useConfirm'
 const toast = useToast()
+const { ask } = useConfirm()
 import { ref, onMounted } from 'vue'
 import PageHeader from '../../components/admin/PageHeader.vue'
 import { useI18n } from '../../composables/useI18n'
@@ -125,7 +127,16 @@ function exportPluginCode(filename: string, code: string) {
 }
 
 async function deletePlugin(p: any) {
-  if (!confirm(`确定删除拦截插件「${p.name || p.filename}」？\n文件将被从磁盘彻底移除。`)) return
+  // 批C(2026-09-13)·不可逆操作收口：插件文件从磁盘彻底移除，原生 confirm 小条在
+  // 移动端极易误触；改逐字短语确认（与项目危险操作约定一致）。
+  const _ok = await ask({
+    title: '删除拦截插件',
+    desc: `「${p.name || p.filename}」的文件将被从磁盘彻底移除，不可恢复`,
+    danger: true,
+    confirmPhrase: 'DELETE',
+    okText: '删除',
+  })
+  if (!_ok) return
   try {
     await api(`/api/v1/admin/interceptors/${encodeURIComponent(p.filename)}`, { method: 'DELETE' })
     toast.ok(`已删除插件「${p.filename}」`)
@@ -356,7 +367,7 @@ onMounted(loadPlugins)
     <!-- Code Editor Modal -->
     <div
       v-if="editorVisible"
-      class="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-2.5 sm:p-4"
+      class="fixed inset-0 z-[var(--z-dialog)] bg-black/70 backdrop-blur-xs flex items-center justify-center p-2.5 sm:p-4"
       @click.self="editorVisible = false"
     >
       <div class="border rounded-2xl p-4 sm:p-6 w-full max-w-4xl max-h-[94dvh] flex flex-col shadow-2xl space-y-3 sm:space-y-4 transition-colors" style="background-color: var(--surface-2); border-color: var(--line-1);">
@@ -438,7 +449,7 @@ onMounted(loadPlugins)
     <!-- Create Modal -->
     <div
       v-if="createModalVisible"
-      class="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-2.5 sm:p-4"
+      class="fixed inset-0 z-[var(--z-dialog)] bg-black/70 backdrop-blur-xs flex items-center justify-center p-2.5 sm:p-4"
       @click.self="createModalVisible = false"
     >
       <div class="border rounded-2xl p-4 sm:p-6 w-full max-w-2xl max-h-[94dvh] overflow-y-auto flex flex-col shadow-2xl space-y-3 sm:space-y-4 transition-colors" style="background-color: var(--surface-2); border-color: var(--line-1);">
@@ -504,7 +515,7 @@ onMounted(loadPlugins)
     <!-- Sandbox Test Results Modal -->
     <div
       v-if="testModalVisible && testResults"
-      class="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-2.5 sm:p-4"
+      class="fixed inset-0 z-[var(--z-dialog)] bg-black/70 backdrop-blur-xs flex items-center justify-center p-2.5 sm:p-4"
       @click.self="testModalVisible = false"
     >
       <div class="border rounded-2xl p-4 sm:p-6 w-full max-w-3xl max-h-[92dvh] overflow-y-auto shadow-2xl space-y-3 sm:space-y-4 transition-colors" style="background-color: var(--surface-2); border-color: var(--line-1);">

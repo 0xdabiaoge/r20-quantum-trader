@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { fmtDateTime } from '../../utils/format';
 import { useToast } from '../../composables/useToast'
+import { useConfirm } from '../../composables/useConfirm'
 const toast = useToast()
+const { ask } = useConfirm()
 import { ref, computed, onMounted } from 'vue'
 import PageHeader from '../../components/admin/PageHeader.vue'
 import { useI18n } from '../../composables/useI18n'
@@ -120,7 +122,16 @@ async function toggleLessonStatus(lessonId: string) {
 }
 
 async function rollbackToBaseline() {
-  if (!confirm('【防污染紧急回滚】确定要清除非基准的过期或被污染心法，重置回官方基准黄金心法库吗？')) return
+  // 批C(2026-09-13)·破坏性操作收口：本操作清除非基准心法（含当日自进化成果），
+  // 原生 confirm 在移动端易误触；改逐字短语确认。
+  const _ok = await ask({
+    title: '防污染紧急回滚',
+    desc: '清除非基准的过期/被污染心法，重置回官方基准黄金心法库（当日自进化成果将被丢弃）',
+    danger: true,
+    confirmPhrase: 'ROLLBACK',
+    okText: '执行回滚',
+  })
+  if (!_ok) return
   if (busy.value || loading.value) return
   busy.value = 'rollback'
   try {
@@ -158,7 +169,8 @@ async function addMemoryItem() {
 }
 
 async function deleteMemoryItem(idx: number, lessonId: string) {
-  if (!confirm('确定删除此条自进化心法吗？')) return
+  const _ok = await ask({ title: '删除自进化心法', desc: '该条心法将从认知库移除', danger: true, okText: '删除' })
+  if (!_ok) return
   if (busy.value || loading.value) return
   busy.value = 'delete'
   try {

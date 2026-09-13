@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { fmtDate, fmtDateTime } from '../../utils/format';
 import { useToast } from '../../composables/useToast'
+import { useConfirm } from '../../composables/useConfirm'
 const toast = useToast()
+const { ask } = useConfirm()
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from '../../composables/useI18n'
 import PageHeader from '../../components/admin/PageHeader.vue'
@@ -209,8 +211,9 @@ function addModule() {
   dirty.value = true
 }
 
-function removeModule(idx: number) {
-  if (!confirm('确定删除该模块？')) return
+async function removeModule(idx: number) {
+  const _ok = await ask({ title: '删除该模块', desc: '模块将从当前方案中移除（保存后生效）', danger: true, okText: '删除' })
+  if (!_ok) return
   workingModules.value.splice(idx, 1)
   if (activeEditingIdx.value >= workingModules.value.length) {
     activeEditingIdx.value = Math.max(0, workingModules.value.length - 1)
@@ -233,7 +236,8 @@ function duplicateModule(idx: number) {
 }
 
 async function deleteProfile() {
-  if (!confirm(`确定删除方案「${selectedProfile.value?.name}」？`)) return
+  const _ok = await ask({ title: '删除方案', desc: `方案「${selectedProfile.value?.name}」将被删除`, danger: true, okText: '删除' })
+  if (!_ok) return
   try {
     await api(`/api/v1/admin/prompt-profiles/${encodeURIComponent(selectedProfileId.value)}`, { method: 'DELETE' })
     selectedProfileId.value = ''
@@ -254,7 +258,8 @@ async function showHistory() {
 }
 
 async function rollback(revId: string) {
-  if (!confirm('回滚将覆盖当前方案内容，确定？')) return
+  const _ok = await ask({ title: '回滚到该版本', desc: '回滚将覆盖当前方案内容', danger: true, okText: '回滚' })
+  if (!_ok) return
   try {
     await api(`/api/v1/admin/prompt-profiles/${encodeURIComponent(selectedProfileId.value)}/rollback`, {
       method: 'POST',
@@ -682,7 +687,7 @@ onMounted(loadLib)
     <!-- Template Variables Guide Modal -->
     <div
       v-if="variableGuideVisible"
-      class="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4"
+      class="fixed inset-0 z-[var(--z-dialog)] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4"
       @click.self="variableGuideVisible = false"
     >
       <div class="border rounded-2xl p-5 sm:p-6 w-full max-w-2xl max-h-[90dvh] overflow-y-auto space-y-4 shadow-2xl transition-colors" style="background-color: var(--surface-2); border-color: var(--line-1);">
@@ -748,7 +753,7 @@ onMounted(loadLib)
     <!-- Import Modal -->
     <div
       v-if="importVisible"
-      class="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4"
+      class="fixed inset-0 z-[var(--z-dialog)] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4"
       @click.self="importVisible = false"
     >
       <div class="border rounded-2xl p-5 sm:p-6 w-full max-w-xl max-h-[90dvh] overflow-y-auto space-y-4 shadow-2xl transition-colors" style="background-color: var(--surface-2); border-color: var(--line-1);">
@@ -826,7 +831,7 @@ onMounted(loadLib)
     <!-- History Modal -->
     <div
       v-if="historyVisible"
-      class="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4"
+      class="fixed inset-0 z-[var(--z-dialog)] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4"
       @click.self="historyVisible = false"
     >
       <div class="border rounded-2xl p-5 sm:p-6 w-full max-w-[560px] max-h-[85dvh] overflow-y-auto shadow-2xl transition-colors" style="background-color: var(--surface-2); border-color: var(--line-1);">

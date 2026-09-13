@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { fmtDateTime } from '../../utils/format';
 import { useToast } from '../../composables/useToast'
+import { useConfirm } from '../../composables/useConfirm'
 const toast = useToast()
+const { ask } = useConfirm()
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from '../../composables/useI18n'
 const { t } = useI18n()
@@ -107,11 +109,19 @@ async function save() {
 }
 
 async function runNow() {
-  const phrase = prompt('立即执行完整灾备（打包并按已启用目标上传）需输入确认短语：BACKUP R20')
-  if (!phrase) return
+  // 批C(2026-09-13)：prompt() → 项目确认服务（移动端 prompt 常被浏览器弱化/难用），
+  // 短语仍由用户逐字输入，与后端 `BACKUP R20` 契约一致。
+  const _ok = await ask({
+    title: '立即执行完整灾备',
+    desc: '打包当前系统并按已启用目标上传',
+    danger: true,
+    confirmPhrase: 'BACKUP R20',
+    okText: '执行',
+  })
+  if (!_ok) return
   busy.value = 'run'
   try {
-    const res = await api('/api/v1/admin/backups/run', { method: 'POST', body: JSON.stringify({ confirmation: phrase.trim().toUpperCase() }) })
+    const res = await api('/api/v1/admin/backups/run', { method: 'POST', body: JSON.stringify({ confirmation: 'BACKUP R20' }) })
     toast.ok(`灾备执行完成（${(res.output || '').length} 字符输出已记录）`)
     await load()
   } catch (e: any) {
@@ -215,12 +225,16 @@ async function onFileSelected(e: Event) {
 
 async function restoreArchive(archiveName: string) {
   const clean = archiveName.split('/').pop() || archiveName
-  const phrase = prompt(`警告：恢复备份将解压覆盖当前系统配置、历史数据与策略。\n如确认恢复归档【${clean}】，请输入确认短语：RESTORE R20`)
-  if (!phrase) return
-  if (phrase.trim().toUpperCase() !== 'RESTORE R20') {
-    alert('确认短语不正确，已取消恢复！')
-    return
-  }
+  // 批C(2026-09-13)：prompt+alert → 项目确认服务。恢复备份是覆盖式破坏操作
+  // （解压覆盖当前配置/历史数据/策略），短语逐字输入，与后端 `RESTORE R20` 契约一致。
+  const _ok = await ask({
+    title: '恢复备份（覆盖式，不可撤销）',
+    desc: `归档【${clean}】将解压覆盖当前系统配置、历史数据与策略`,
+    danger: true,
+    confirmPhrase: 'RESTORE R20',
+    okText: '覆盖恢复',
+  })
+  if (!_ok) return
   busy.value = 'restore'
   try {
     const res = await api('/api/v1/admin/backups/restore', {

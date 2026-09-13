@@ -229,7 +229,7 @@ onMounted(() => {
     <!-- Confirmation Modal -->
     <div
       v-if="showConfirmModal"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4"
+      class="fixed inset-0 z-[var(--z-dialog)] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4"
     >
       <div
         class="w-full max-w-md rounded-2xl border p-5 shadow-2xl space-y-4"

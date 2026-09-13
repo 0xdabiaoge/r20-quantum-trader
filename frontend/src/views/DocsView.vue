@@ -155,7 +155,7 @@ onUnmounted(() => {
     <div class="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 flex gap-8">
       <!-- Left Sticky Sidebar (TOC) -->
       <aside
-        class="w-64 shrink-0 fixed inset-y-12 left-0 z-50 sm:z-30 sm:bg-transparent p-4 sm:p-0 border-r sm:border-r-0 transition-transform duration-200 sm:translate-x-0 sm:sticky sm:top-16 sm:h-[calc(100vh-5rem)] overflow-y-auto"
+        class="w-64 shrink-0 fixed inset-y-12 left-0 z-[var(--z-drawer)] sm:z-30 sm:bg-transparent p-4 sm:p-0 border-r sm:border-r-0 transition-transform duration-200 sm:translate-x-0 sm:sticky sm:top-16 sm:h-[calc(100vh-5rem)] overflow-y-auto"
         :class="mobileMenuOpen ? 'translate-x-0 bg-[var(--surface-2)] shadow-2xl' : '-translate-x-full sm:translate-x-0 invisible sm:visible'"
         style="border-color: var(--line-1);"
       >
@@ -744,7 +744,7 @@ pip install -r requirements.txt
     <!-- Image Zoom Modal -->
     <div
       v-if="zoomImage"
-      class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 cursor-zoom-out"
+      class="fixed inset-0 z-[var(--z-dialog)] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 cursor-zoom-out"
       @click="zoomImage = null"
     >
       <div class="relative max-w-6xl max-h-[92dvh]">

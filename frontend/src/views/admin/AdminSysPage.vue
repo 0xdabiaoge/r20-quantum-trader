@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { fmtDateTime } from '../../utils/format';
 import { useToast } from '../../composables/useToast'
+import { useConfirm } from '../../composables/useConfirm'
 const toast = useToast()
+const { ask } = useConfirm()
 import { ref, onMounted } from 'vue'
 import { useI18n } from '../../composables/useI18n'
 const { t } = useI18n()
@@ -94,10 +96,16 @@ async function toggleEnabled(u: any) {
 }
 
 async function unlockUser(u: any) {
-  const phrase = prompt(t('admin.adminsys.msgs.unlockPrompt', undefined, { name: u.username, id: u.id }))
-  if (!phrase) return
+  // 批C(2026-09-13)：prompt() → 项目确认服务，短语逐字输入（对齐后端 `UNLOCK ADMIN {user_id}`）
+  const _ok = await ask({
+    title: t('admin.adminsys.msgs.unlockPrompt', undefined, { name: u.username, id: u.id }),
+    danger: true,
+    confirmPhrase: `UNLOCK ADMIN ${u.id}`,
+    okText: '解锁',
+  })
+  if (!_ok) return
   try {
-    await api(`/api/v1/admin/users/${u.id}/unlock`, { method: 'POST', body: JSON.stringify({ confirmation: phrase.trim().toUpperCase() }) })
+    await api(`/api/v1/admin/users/${u.id}/unlock`, { method: 'POST', body: JSON.stringify({ confirmation: `UNLOCK ADMIN ${u.id}` }) })
     toast.ok(t('admin.adminsys.msgs.unlocked', undefined, { name: u.username }))
     await load()
   } catch (e: any) {
@@ -198,7 +206,7 @@ onMounted(load)
     </div>
 
     <!-- Create Modal -->
-    <div v-if="createVisible" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4" @click.self="createVisible = false">
+    <div v-if="createVisible" class="fixed inset-0 z-[var(--z-dialog)] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4" @click.self="createVisible = false">
       <div class="rounded-xl border p-5 sm:p-6 w-full max-w-[420px] max-h-[88dvh] overflow-y-auto shadow-2xl transition-colors" style="background-color: var(--surface-2); border-color: var(--line-1);">
         <h3 class="text-sm font-bold mb-4" style="color: var(--ink-1);">{{ t('admin.adminsys.users.create') }}</h3>
         <label class="block text-[11px] mb-1" style="color: var(--ink-2);">{{ t('admin.adminsys.create.account') }}</label>

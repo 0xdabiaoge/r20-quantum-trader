@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { fmtDateTime, utcStrToBj } from '../../utils/format';
 import { useToast } from '../../composables/useToast'
+import { useConfirm } from '../../composables/useConfirm'
 const toast = useToast()
+const { ask } = useConfirm()
 import { ref, onMounted } from 'vue'
 import { useI18n } from '../../composables/useI18n'
 const { t } = useI18n()
@@ -96,9 +98,9 @@ async function saveArchive() {
 
 async function restorePolicy(hash: string, name: string) {
   if (!auth.isSuperadmin) return
-  if (!confirm(t('admin.policySnapshot.confirm.restore', undefined, { name, hash }))) {
-    return
-  }
+  // 批C: 原生 confirm → 项目确认服务（恢复快照会覆盖当前生效策略）
+  const _ok = await ask({ title: t('admin.policySnapshot.confirm.restore', undefined, { name, hash }), danger: true, okText: '恢复' })
+  if (!_ok) return
   restoring.value = true
   try {
     const res = await api('/api/v1/admin/policy/restore', {
@@ -118,9 +120,8 @@ async function restorePolicy(hash: string, name: string) {
 
 async function deleteArchive(hash: string, name: string) {
   if (!auth.isSuperadmin) return
-  if (!confirm(t('admin.policySnapshot.confirm.delete', undefined, { name, hash }))) {
-    return
-  }
+  const _ok = await ask({ title: t('admin.policySnapshot.confirm.delete', undefined, { name, hash }), danger: true, okText: '删除' })
+  if (!_ok) return
   deleting.value = hash
   try {
     const res = await api(`/api/v1/admin/policy/archive/${hash}`, {
@@ -544,7 +545,7 @@ onMounted(() => {
     <!-- Archive Dialog Modal -->
     <div
       v-if="showArchiveModal"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs"
+      class="fixed inset-0 z-[var(--z-dialog)] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs"
     >
       <div
         class="w-full max-w-md rounded-2xl border p-5 shadow-2xl space-y-4"

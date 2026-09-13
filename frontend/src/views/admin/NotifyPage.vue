@@ -487,7 +487,7 @@ onBeforeUnmount(() => {
     </template>
 
     <!-- Capture Modal -->
-    <div v-if="captureModal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4" @click.self="captureModal = false">
+    <div v-if="captureModal" class="fixed inset-0 z-[var(--z-dialog)] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4" @click.self="captureModal = false">
       <div class="rounded-xl border p-6 w-full max-w-[520px] max-h-[88dvh] overflow-y-auto text-center shadow-2xl transition-colors" style="background-color: var(--surface-2); border-color: var(--line-1);">
         <h3 class="text-sm font-bold mb-3" style="color: var(--ink-1);">{{ t('admin.notify.captureTitle') }}</h3>
         <div class="text-4xl mb-3">📱 💬 🤖</div>
@@ -505,7 +505,7 @@ onBeforeUnmount(() => {
     </div>
 
     <!-- QQ Bind QR Modal -->
-    <div v-if="bindModal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4" @click.self="closeBindModal">
+    <div v-if="bindModal" class="fixed inset-0 z-[var(--z-dialog)] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4" @click.self="closeBindModal">
       <div class="rounded-xl border p-5 sm:p-6 w-full max-w-[380px] max-h-[88dvh] overflow-y-auto text-center shadow-2xl transition-colors" style="background-color: var(--surface-2); border-color: var(--line-1);">
         <h3 class="text-sm font-bold mb-2" style="color: var(--ink-1);">{{ t('admin.notify.bindTitle') }}</h3>
         <p class="text-[11px] mb-3" style="color: var(--ink-2);">{{ t('admin.notify.bindGuide') }}</p>

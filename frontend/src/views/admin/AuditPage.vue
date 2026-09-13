@@ -110,7 +110,7 @@ onMounted(load)
     </div>
 
     <!-- Detail Modal -->
-    <div v-if="detailRec" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4" @click.self="detailRec = null">
+    <div v-if="detailRec" class="fixed inset-0 z-[var(--z-dialog)] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4" @click.self="detailRec = null">
       <div class="rounded-xl border p-5 sm:p-6 w-full max-w-[640px] max-h-[88dvh] overflow-y-auto shadow-2xl transition-colors" style="background-color: var(--surface-2); border-color: var(--line-1);">
         <h3 class="text-sm font-bold mb-3" style="color: var(--ink-1);">{{ t('admin.audit.detailTitle') }} · {{ detailRec.action }}</h3>
         <pre class="border rounded-lg p-3 text-xs whitespace-pre-wrap max-h-[400px] overflow-y-auto select-text" style="background-color: var(--surface-1); border-color: var(--line-1); color: var(--ink-1);">{{ JSON.stringify(detailRec, null, 2) }}</pre>

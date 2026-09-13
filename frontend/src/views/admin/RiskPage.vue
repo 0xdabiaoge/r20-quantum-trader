@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { useToast } from '../../composables/useToast'
+import { useConfirm } from '../../composables/useConfirm'
 const toast = useToast()
+const { ask } = useConfirm()
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useI18n } from '../../composables/useI18n'
 const { t } = useI18n()
@@ -162,6 +164,17 @@ async function saveChanges() {
 }
 
 async function resetAll() {
+  // 批C(2026-09-13)·补门禁：本操作把全部风控参数恢复代码默认基线（含仓位/日亏上限），
+  // 此前**零确认**一次点击即执行，而后端本就要求逐字短语 `RESET RISK`（前端把短语写死
+  // 在请求体里，等于保险被旁路）。移动端误触即放松风控，风险极高——现要求逐字确认。
+  const _ok = await ask({
+    title: '重置全部风控参数',
+    desc: '所有风控阈值将恢复为代码默认基线（含单笔仓位上限、日亏上限、杠杆上限等）',
+    danger: true,
+    confirmPhrase: 'RESET RISK',
+    okText: '重置基线',
+  })
+  if (!_ok) return
   busy.value = 'reset'
   try {
     const res = await api('/api/v1/admin/risk/reset', { method: 'POST', body: JSON.stringify({ confirmation: 'RESET RISK' }) })
