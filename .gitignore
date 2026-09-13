@@ -137,3 +137,7 @@ state/
 promo_local/
 .archive/
 plan_local/
+
+# 网关运行态数据库（本地运行产物，永不入库）
+data/r20_gateway.sqlite3*
+data/*.sqlite3
