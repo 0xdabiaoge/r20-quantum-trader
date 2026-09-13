@@ -2,9 +2,12 @@
 from __future__ import annotations
 import copy
 import functools
+import hashlib
+import importlib
 import json
 import os
 import re
+import sys
 import tempfile
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -304,8 +307,86 @@ def _default() -> dict[str, Any]:
     return {"version": 2, "active_profile_id": "stable", "profiles": {}, "revisions": []}
 
 
+def stable_base_module_id(title: str) -> str:
+    """基座模块的**确定性** id（由标题派生）。
+
+    旧实现给每个模块随机 uuid：同一段基座文本每次重建都换 id，于是
+    「同 id/同标题继承来源」只能靠标题兜底，方案库里 base 模块 id 每存一次就翻新一遍
+    （P1-2/批5 同族）。基座模块内容由代码决定，id 派生自标题即可稳定。
+    """
+    digest = hashlib.sha1(f"r20-base-module::{title}".encode("utf-8")).hexdigest()[:10]
+    return f"module-base-{digest}"
+
+
 def _module(module: dict[str, Any], index: int = 0) -> dict[str, Any]:
-    return {"id":str(module.get("id") or f"module-{uuid.uuid4().hex[:10]}")[:80],"title":str(module.get("title") or f"模块 {index+1}").strip()[:100],"content":str(module.get("content") or "").strip()[:MAX_TEMPLATE_CHARS],"enabled":bool(module.get("enabled",True)),"locked":bool(module.get("locked",False)),"source":str(module.get("source") or "custom")[:40]}
+    title = str(module.get("title") or f"模块 {index+1}").strip()[:100]
+    source = str(module.get("source") or "custom")[:40]
+    fallback_id = stable_base_module_id(title) if source == "base" else f"module-{uuid.uuid4().hex[:10]}"
+    return {"id":str(module.get("id") or fallback_id)[:80],"title":title,"content":str(module.get("content") or "").strip()[:MAX_TEMPLATE_CHARS],"enabled":bool(module.get("enabled",True)),"locked":bool(module.get("locked",False)),"source":source}
+
+
+# ── 管线 → 代码基座文本（审计批5 新发现：update_profile 的来源判定缺陷）──────────
+# 旧行为：用扁平文本更新管线时无条件 `text_to_modules(text, "legacy")`——即使提交文本
+# 与代码基座**逐字相同**，8 个模块也会全变成 legacy；下一轮 apply_module_layout 判定
+# "无 base 模块"就把基座整段前置 → 线上提示词翻倍（实测 6454 → 12910 字符）。
+# 这里提供「管线 → 基座文本」注册表 + 逐模块来源对齐：内容与基座逐字相同的模块
+# 恢复 `source="base"`（连同基座 id 与 locked），只有真正被改写的模块才留在 legacy。
+# 同一份代码在两种导入形态下都存在（`scripts.X` 与裸 `X`，见 risk_constants 的同族问题），
+# 这里按「已导入的实例优先 → 点号形态 → 裸名」依次尝试，避免再引入第三份副本。
+_BASE_TEMPLATE_SOURCES: dict[str, tuple[str, tuple[str, ...]]] = {
+    "trading_system": ("SYSTEM_PROMPT", ("scripts.ai_brain_trader", "ai_brain_trader")),
+    "trading_user": ("TRADING_USER_TEMPLATE", ("r20_backend.prompt_views",)),
+    "evolution_system": ("EVOLUTION_SYSTEM_PROMPT",
+                         ("scripts.self_improvement_engine", "self_improvement_engine")),
+    "evolution_user": ("EVOLUTION_USER_TEMPLATE", ("r20_backend.prompt_views",)),
+}
+_BASE_TEMPLATE_CACHE: dict[str, str] = {}
+
+
+def register_base_template(pipeline: str, text: str) -> None:
+    """显式登记某条管线的代码基座文本（懒加载失败时的兜底入口）。"""
+    if pipeline in TEMPLATE_KEYS:
+        _BASE_TEMPLATE_CACHE[pipeline] = str(text or "")
+
+
+def base_template_text(pipeline: str) -> str:
+    """取代码基座文本；取不到时返回空串（调用方必须退化为"不改来源"，绝不臆造）。"""
+    if pipeline in _BASE_TEMPLATE_CACHE:
+        return _BASE_TEMPLATE_CACHE[pipeline]
+    entry = _BASE_TEMPLATE_SOURCES.get(pipeline)
+    if not entry:
+        return ""
+    attribute, candidates = entry
+    module = next((sys.modules[name] for name in candidates if name in sys.modules), None)
+    if module is None:
+        for name in candidates:
+            try:
+                module = importlib.import_module(name)
+                break
+            except Exception:
+                continue
+    if module is None:
+        return ""
+    text = str(getattr(module, attribute, "") or "")
+    if text:
+        _BASE_TEMPLATE_CACHE[pipeline] = text
+    return text
+
+
+def align_pipeline_sources(modules: list[dict[str, Any]], pipeline: str) -> list[dict[str, Any]]:
+    """把重建出来的模块与代码基座对齐（只按**逐字相同**判定，避免误认亲）。"""
+    base_text = base_template_text(pipeline)
+    if not base_text or not modules:
+        return modules
+    base_by_title = {m["title"]: m for m in text_to_modules(base_text, "base")}
+    aligned: list[dict[str, Any]] = []
+    for module in modules:
+        candidate = base_by_title.get(str(module.get("title") or ""))
+        if candidate and candidate.get("content") == module.get("content"):
+            aligned.append({**candidate, "enabled": bool(module.get("enabled", True))})
+        else:
+            aligned.append(module)
+    return aligned
 
 
 def text_to_modules(text: str, source: str = "legacy", locked: bool = False) -> list[dict[str, Any]]:
@@ -377,7 +458,7 @@ def _clean_pipelines(raw: Any, legacy: dict[str, Any]) -> dict[str, list[dict[st
         elif isinstance(stored_pipelines.get(key), list) and stored_pipelines.get(key):
             modules = stored_pipelines[key]
         else:
-            modules=text_to_modules(str(legacy.get(key) or ""),"legacy")
+            modules=align_pipeline_sources(text_to_modules(str(legacy.get(key) or ""),"legacy"), key)
         result[key]=[_module(item,i) for i,item in enumerate(modules[:MAX_MODULES_PER_PIPELINE]) if isinstance(item,dict)]
     return result
 
@@ -652,7 +733,11 @@ def update_profile(profile_id: str, changes: dict[str, Any], note: str = "更新
     submitted_keys |= set(flat_updates)
     if "pipelines" not in accepted and flat_updates:
         accepted["pipelines"] = copy.deepcopy(current.get("pipelines") or {})
-        for key in flat_updates: accepted["pipelines"][key] = text_to_modules(str(accepted[key] or ""), "legacy")
+        for key in flat_updates:
+            # 批5：不再无条件标 legacy——与基座逐字相同的模块保留 source=base，
+            # 否则下一次渲染会把基座整段前置（提示词翻倍）。
+            accepted["pipelines"][key] = align_pipeline_sources(
+                text_to_modules(str(accepted[key] or ""), "legacy"), key)
         accepted["editor_mode"] = "modules"
     elif "editor_mode" not in accepted and any(str(accepted.get(key) or "").strip() for key in TEMPLATE_KEYS): accepted["editor_mode"] = "advanced"
     updated = _clean_profile({**current, **accepted, "updated_at": _now()}, profile_id)
