@@ -43,7 +43,9 @@ sys.path.insert(0, str(ROOT))
 
 import dashboard.app as app  # noqa: E402
 from r20_backend import dashboard_payload as payload_pkg  # noqa: E402
-from r20_backend.dashboard_payload import cache, factors, health, market, slim  # noqa: E402
+from r20_backend.dashboard_payload import (  # noqa: E402
+    cache, factors, health, local_reads, market, slim,
+)
 
 PAYLOAD_DIR = ROOT / "r20_backend" / "dashboard_payload"
 
@@ -67,7 +69,7 @@ FACADE_SURFACE = [
 ]
 
 # 核心模块白名单：新迁出的域模块都应在此，且必须被门面导入（否则 sandbox 覆盖不到）
-CORE_MODULES = (slim, market, factors, health, cache)
+CORE_MODULES = (slim, market, factors, health, cache, local_reads)
 
 
 def _core_aliases() -> dict[str, object]:
@@ -95,6 +97,28 @@ class ShellDisciplineTests(unittest.TestCase):
         self.assertTrue(self.aliases, "dashboard.app 里找不到任何 _core_* 薄壳别名")
 
     # ── 1/2/3. 薄壳调用形态 ────────────────────────────────────
+    @staticmethod
+    def _is_thin_shell(node: ast.AST, aliases: dict) -> ast.Call | None:
+        """「薄壳」= 函数体只有一条 `return _core_xxx(...)`（可带 docstring）。
+
+        纪律只钉薄壳：普通调用方（如 update_cache_cycle）会把**自己算出来的局部变量**
+        传进核心，那是正常调用，不该按"注入门面全局"的规则要求它。
+        """
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            return None
+        body = list(node.body)
+        if body and isinstance(body[0], ast.Expr) and isinstance(body[0].value, ast.Constant) \
+                and isinstance(body[0].value.value, str):
+            body = body[1:]
+        if len(body) != 1 or not isinstance(body[0], ast.Return):
+            return None
+        call = body[0].value
+        if not isinstance(call, ast.Call):
+            return None
+        if not (isinstance(call.func, ast.Name) and call.func.id in aliases):
+            return None
+        return call
+
     def test_every_shell_forwards_correctly(self):
         problems: list[str] = []
         checked = 0
@@ -114,44 +138,58 @@ class ShellDisciplineTests(unittest.TestCase):
                 continue
             if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 continue
+
             shell_params = [a.arg for a in node.args.args]
-            # 1) 自递归必须在**别名过滤之前**检查 —— 薄壳写成 `return <同名函数>(...)`
-            #    时它根本不带 _core_ 前缀，若放在下面就会被整段跳过（负向验证抓到过）。
+
+            # 1) 自递归必须在**薄壳判定之前**检查 —— 薄壳若写成 `return <同名函数>(...)`，
+            #    它根本不带 _core_ 前缀，放在下面就会被整段跳过（负向验证抓到过）。
             for call in [n for n in ast.walk(node) if isinstance(n, ast.Call)]:
                 if isinstance(call.func, ast.Name) and call.func.id == fname:
-                    problems.append(f"{fname}: 薄壳调用了自己（无限递归）")
-            for call in [n for n in ast.walk(node) if isinstance(n, ast.Call)]:
-                if not (isinstance(call.func, ast.Name) and call.func.id in self.aliases):
+                    problems.append(f"{fname}: 调用了自己（无限递归）")
+
+            call = self._is_thin_shell(node, self.aliases)
+            if call is None:
+                continue
+            checked += 1
+            core = self.aliases[call.func.id]
+            sig_params = list(inspect.signature(core).parameters.values())
+            core_params = [p.name for p in sig_params]
+
+            # 2) 实参个数：有默认值的形参可以合法省略（如 disk_path="/"），
+            #    故区间是「必填数 ≤ 实参数 ≤ 全部参数」。
+            required = [
+                p for p in sig_params
+                if p.default is inspect.Parameter.empty
+                and p.kind in (inspect.Parameter.POSITIONAL_ONLY,
+                               inspect.Parameter.POSITIONAL_OR_KEYWORD)
+            ]
+            if not (len(required) <= len(call.args) <= len(core_params)):
+                problems.append(
+                    f"{fname}: 实参 {len(call.args)} 个，核心 {call.func.id} "
+                    f"必填 {len(required)} / 全部 {len(core_params)} 个 {core_params}")
+                continue
+
+            # 3) 顺序：门面自身参数必须**按原顺序**出现在实参尾部
+            tail = [a.id for a in call.args[-len(shell_params):] if isinstance(a, ast.Name)] \
+                if shell_params else []
+            if shell_params and tail != shell_params:
+                problems.append(
+                    f"{fname}: 透传参数顺序 {tail} != 门面形参顺序 {shell_params}")
+
+            # 3b) 注入项必须与核心形参名逐位对应
+            for arg, pname in zip(call.args, core_params):
+                if not isinstance(arg, ast.Name):
+                    problems.append(f"{fname}: 实参 {ast.unparse(arg)} 非简单名字，无法核对")
                     continue
-                checked += 1
-                core = self.aliases[call.func.id]
-                core_params = list(inspect.signature(core).parameters)
-                # 2) 实参个数
-                if len(call.args) != len(core_params):
-                    problems.append(
-                        f"{fname}: 实参 {len(call.args)} 个，核心 {call.func.id}"
-                        f" 形参 {len(core_params)} 个 {core_params}")
+                if arg.id in shell_params:
                     continue
-                # 3) 顺序：门面自身参数必须**按原顺序**出现在实参尾部
-                tail = [a.id for a in call.args[-len(shell_params):] if isinstance(a, ast.Name)] \
-                    if shell_params else []
-                if shell_params and tail != shell_params:
+                if not hasattr(app, arg.id) and not arg.id.isupper():
                     problems.append(
-                        f"{fname}: 透传参数顺序 {tail} != 门面形参顺序 {shell_params}")
-                # 3b) 注入项必须与核心形参名逐位对应（前缀部分应为门面模块级名字）
-                for arg, pname in zip(call.args, core_params):
-                    if not isinstance(arg, ast.Name):
-                        problems.append(f"{fname}: 实参 {ast.unparse(arg)} 非简单名字，无法核对")
-                        continue
-                    if arg.id in shell_params:
-                        continue
-                    if not hasattr(app, arg.id) and not arg.id.isupper():
-                        problems.append(
-                            f"{fname}: 注入项 {arg.id}（对应核心形参 {pname}）在门面不存在")
-                    if not (_tokens(arg.id) & _tokens(pname)):
-                        problems.append(
-                            f"{fname}: 注入项 {arg.id} 与核心形参 {pname} 名称不相干 —— "
-                            f"很可能是实参顺序错位（本阶段第三刀就是被这个坑到的）")
+                        f"{fname}: 注入项 {arg.id}（对应核心形参 {pname}）在门面不存在")
+                if not (_tokens(arg.id) & _tokens(pname)):
+                    problems.append(
+                        f"{fname}: 注入项 {arg.id} 与核心形参 {pname} 名称不相干 —— "
+                        f"很可能是实参顺序错位（本阶段第三刀就是被这个坑到的）")
         self.assertGreater(checked, 0, "未找到任何薄壳调用，检查器失效")
         self.assertEqual(problems, [], "薄壳转发不合规：\n  " + "\n  ".join(problems))
 
@@ -218,6 +256,41 @@ class ShellDisciplineTests(unittest.TestCase):
                          "AI_DECISIONS_FILE 未传导（实参顺序错位？）")
         self.assertEqual(btc.get("chg24h"), 42.5,
                          "FACTOR_LIBRARY_FILE 未传导（实参顺序错位？）")
+
+    def test_local_reads_paths_are_injected(self):
+        """`load_local_reads`（B2 第六刀）读 6 个路径，必须全部由门面在调用时注入。"""
+        import json
+        import tempfile
+        tmp = Path(tempfile.mkdtemp(prefix="r20-dash-localreads-"))
+        (tmp / "report.json").write_text(json.dumps({"marker": "REPORT"}), encoding="utf-8")
+        (tmp / "snaps.json").write_text(json.dumps([{"time": "2026-01-01 00:00:00", "total_eq": 200.0}]),
+                                        encoding="utf-8")
+        (tmp / "news.json").write_text(json.dumps({"marker": "NEWS"}), encoding="utf-8")
+        (tmp / "prompt.txt").write_text("PROMPT", encoding="utf-8")
+        (tmp / "hist.json").write_text(json.dumps([{"time": "T1"}]), encoding="utf-8")
+        (tmp / "factor.json").write_text(json.dumps({"instruments": [{"instId": "SEAM"}]}),
+                                         encoding="utf-8")
+        pin = ("REPORT_JSON_FILE", "SNAPSHOTS_JSON_FILE", "NEWS_SENTIMENT_FILE",
+               "AI_LAST_PROMPT_FILE", "AI_HISTORY_FILE", "FACTOR_LIBRARY_FILE")
+        files = ("report.json", "snaps.json", "news.json", "prompt.txt", "hist.json", "factor.json")
+        with patch.object(app, pin[0], str(tmp / files[0])), \
+             patch.object(app, pin[1], str(tmp / files[1])), \
+             patch.object(app, pin[2], str(tmp / files[2])), \
+             patch.object(app, pin[3], str(tmp / files[3])), \
+             patch.object(app, pin[4], str(tmp / files[4])), \
+             patch.object(app, pin[5], str(tmp / files[5])):
+            out = app._core_load_local_reads(
+                app.REPORT_JSON_FILE, app.SNAPSHOTS_JSON_FILE, app.NEWS_SENTIMENT_FILE,
+                app.AI_LAST_PROMPT_FILE, app.AI_HISTORY_FILE, app.FACTOR_LIBRARY_FILE,
+                app.load_trading_memory_md, "2025-01-01 00:00:00", 100.0, 150.0, "NOW")
+        self.assertEqual(out["review_data"].get("marker"), "REPORT", "REPORT_JSON_FILE 未传导")
+        self.assertEqual(out["news_data"].get("marker"), "NEWS", "NEWS_SENTIMENT_FILE 未传导")
+        self.assertEqual(out["factor_lib_snapshot"]["instruments"][0]["instId"], "SEAM",
+                         "FACTOR_LIBRARY_FILE 未传导")
+        self.assertEqual(out["ai_last_prompt_text"], "PROMPT", "AI_LAST_PROMPT_FILE 未传导")
+        self.assertEqual(len(out["ai_history_list"]), 1, "AI_HISTORY_FILE 未传导")
+        # 快照过滤：沙箱里那条 2026 年快照 + 追加的实时点 = 2
+        self.assertEqual(len(out["snapshots_list"]), 2, "SNAPSHOTS_JSON_FILE 未传导")
 
     def test_missing_production_write_guard(self):
         """沙箱外的真实路径必须是生产 data/ —— 若核心持有自己的副本，写盘会落到生产。"""

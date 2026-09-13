@@ -9,6 +9,9 @@ from r20_backend.dashboard_payload.cache import (  # noqa: E402
     persist_dashboard_cache as _core_persist_dashboard_cache,
     _inject_local_data_into_stale as _core__inject_local_data_into_stale,
 )
+from r20_backend.dashboard_payload.local_reads import (  # noqa: E402
+    load_local_reads as _core_load_local_reads,
+)
 from r20_backend.dashboard_payload.health import (  # noqa: E402
     load_trading_memory_md as _core_load_trading_memory_md,
     _memory_freshness_note as _core__memory_freshness_note,
@@ -929,75 +932,21 @@ def update_cache_cycle():
 
     trades_table = valid_ledger_trades[:60]
 
-    # 8. Read Review & Adaptive Config
-    review_data = read_json(REPORT_JSON_FILE, {})
-
-    adaptive_cfg = {}
-
-    # 9. Read Snapshots
-    snapshots_list = []
-    if os.path.exists(SNAPSHOTS_JSON_FILE):
-        try:
-            with open(SNAPSHOTS_JSON_FILE, "r", encoding="utf-8") as f:
-                snaps = json.load(f)
-                if isinstance(snaps, list):
-                    # Filter strictly >= reset_time
-                    for s in snaps:
-                        s_time = beijing_text(s.get("time"))
-                        if s_time and s_time >= beijing_text(reset_time_str):
-                            t_eq = float(s.get("total_eq", s.get("equity", initial_capital_val)) or initial_capital_val)
-                            pnl_v = round(t_eq - initial_capital_val, 2)
-                            roi_v = round((pnl_v / initial_capital_val * 100), 2)
-                            snapshots_list.append({
-                                "time": s_time,
-                                "total_eq": round(t_eq, 2),
-                                "pnl": pnl_v,
-                                "roi": roi_v
-                            })
-                    snapshots_list = snapshots_list[-60:]
-        except Exception:
-            pass
-
-    # Append live current point
-    snapshots_list.append({
-        "time": timestamp_full.replace(" (北京时间)", ""),
-        "total_eq": round(total_eq, 2),
-        "pnl": round(total_eq - initial_capital_val, 2),
-        "roi": round((total_eq - initial_capital_val) / initial_capital_val * 100, 2)
-    })
-
-    # 10. Read News & AI Decisions History
-    news_data = read_json(NEWS_SENTIMENT_FILE, {})
-
-    ai_last_prompt_text = read_text(AI_LAST_PROMPT_FILE)
-
-    ai_history_list = []
-    if os.path.exists(AI_HISTORY_FILE):
-        try:
-            with open(AI_HISTORY_FILE, "r", encoding="utf-8") as f:
-                raw_history = json.load(f)
-                # Keep up to 25 records and trim heavy repeated prompts in older history
-                for idx, item in enumerate(raw_history[:25]):
-                    c = dict(item)
-                    if idx > 0 and "ai_last_prompt" in c and len(str(c["ai_last_prompt"])) > 500:
-                        c["ai_last_prompt"] = str(c["ai_last_prompt"])[:200] + "...(历史已收敛)"
-                    ai_history_list.append(c)
-        except Exception:
-            pass
-
-    # Inject latest prompt into review payload if running under older worker
-    if isinstance(review_data, dict):
-        review_data["ai_last_prompt"] = ai_last_prompt_text
-
-    factor_lib_snapshot = read_json(FACTOR_LIBRARY_FILE, {})
-
-    ai_memory_md_content = load_trading_memory_md()
-
-    ai_last_prompt_text = read_text(AI_LAST_PROMPT_FILE)
-
-    # System Disk info
-    total_b, used_b, free_b = shutil.disk_usage("/")
-    disk_free_gb = round(free_b / (1024 ** 3), 1)
+    # 8-10. 本地读取（结构优化阶段 2·B2 第六刀：迁至 dashboard_payload/local_reads.py）
+    _local = _core_load_local_reads(
+        REPORT_JSON_FILE, SNAPSHOTS_JSON_FILE, NEWS_SENTIMENT_FILE, AI_LAST_PROMPT_FILE,
+        AI_HISTORY_FILE, FACTOR_LIBRARY_FILE, load_trading_memory_md,
+        reset_time_str, initial_capital_val, total_eq, timestamp_full,
+    )
+    adaptive_cfg = _local["adaptive_cfg"]
+    ai_history_list = _local["ai_history_list"]
+    ai_last_prompt_text = _local["ai_last_prompt_text"]
+    ai_memory_md_content = _local["ai_memory_md_content"]
+    disk_free_gb = _local["disk_free_gb"]
+    factor_lib_snapshot = _local["factor_lib_snapshot"]
+    news_data = _local["news_data"]
+    review_data = _local["review_data"]
+    snapshots_list = _local["snapshots_list"]
 
     # 审计 A2：台账逐所同步状态旁车并入 source_errors——binance/gate 拉取失败
     # 时数据不再以「完整」示人（PARTIAL），并携带失败原因。旁车缺失/过旧=跳过
