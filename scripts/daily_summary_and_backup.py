@@ -52,12 +52,18 @@ def generate_daily_briefing_and_backup():
         pass
 
     trades = []
+    _ledger_unreadable = False
     if os.path.exists(LEDGER_JSON_FILE):
         try:
             with open(LEDGER_JSON_FILE, "r", encoding="utf-8") as f:
                 trades = json.load(f)
-        except Exception:
-            pass
+            if not isinstance(trades, list):
+                _ledger_unreadable = True
+                trades = []
+        except (json.JSONDecodeError, OSError):
+            # 审计③(2026-09-13)：损坏≠「确实没有交易」。旧实现 except:pass 后照发
+            # 「0胜0负 +0.00U」假研报——把数据事故渲染成事实主动推送。
+            _ledger_unreadable = True
 
     closed_today = [t for t in trades if t.get("status") == "closed" and beijing_day(t.get("close_time")) == date_str]
     total_trades = len(closed_today)
@@ -95,6 +101,11 @@ def generate_daily_briefing_and_backup():
         f"• 市场舆情环境：{macro_env}\n"
         f"• 策略状态：多周期趋势共振滤网已激活，黑天鹅熔断哨兵全天候巡检中。"
     )
+
+    if _ledger_unreadable:
+        briefing_text = ("⚠️ 台账文件损坏/不可读，今日战绩与净盈亏不可信（宁报故障，不发假 0）；"
+                         "请尽快人工检查 data/trading_ledger.json。\n" + briefing_text)
+        print("[daily_briefing] CRITICAL 台账不可解析，研报已改为故障警示。")
 
     if notify_daily_summary:
         notify_daily_summary(briefing_text)

@@ -46,7 +46,10 @@ def _ledger_sync_failed_venues(max_age_seconds: float = 2700.0) -> list[str]:
                 if isinstance(d, dict) and d.get("status") == "failed"]
     except Exception:
         return []
-STOP_COOLDOWN_FILE = DATA_DIR / "stop_cooldowns.json"
+# 审计③(2026-09-13)：文件名分裂修复——旧值（复数 .json）与 trader 活文件
+# stop_cooldown.json（单数）互不可见；若后端接平仓写复数而 trader 消费单数，冷却
+# 静默失效。归一到既成事实文件名（两边 key/schema 本就同构）。
+STOP_COOLDOWN_FILE = DATA_DIR / "stop_cooldown.json"
 
 
 def ledger_daily_closed_pnl(ledger, environment_mode: str, today_str: str) -> float:
@@ -73,18 +76,49 @@ def ledger_daily_closed_pnl(ledger, environment_mode: str, today_str: str) -> fl
     return total
 
 
+def _read_stop_cooldowns_state() -> Tuple[Dict[str, Any], bool]:
+    """(data, corrupt)。损坏≠缺失：corrupt 时 is_in_stop_cooldown fail-closed。"""
+    if not STOP_COOLDOWN_FILE.exists():
+        return {}, False
+    try:
+        with open(STOP_COOLDOWN_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if not isinstance(data, dict):
+            return {}, True
+        return data, False
+    except Exception:
+        return {}, True
+
+
 def load_stop_cooldowns() -> Dict[str, Any]:
-    if STOP_COOLDOWN_FILE.exists():
+    return _read_stop_cooldowns_state()[0]
+
+
+def _atomic_write_json(path, payload) -> None:
+    """审计③：与 trader._atomic_write_json / secrets 同路数（mkstemp+fsync+replace）。"""
+    import tempfile
+    d = str(Path(path).parent)
+    fd, tmp = tempfile.mkstemp(prefix="." + Path(path).name + "-", dir=d)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(payload, f, ensure_ascii=False, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
+        os.chmod(tmp, 0o600)
+        os.replace(tmp, path)
+    except Exception:
         try:
-            with open(STOP_COOLDOWN_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
+            os.unlink(tmp)
+        except OSError:
             pass
-    return {}
+        raise
 
 
 def add_stop_cooldown(inst_id: str, side: str, reason: str = "止损冷却") -> None:
-    cooldowns = load_stop_cooldowns()
+    cooldowns, corrupt = _read_stop_cooldowns_state()
+    if corrupt:
+        print(f"[止损冷却] CRITICAL 状态文件损坏，拒绝合并写回保全现场: {STOP_COOLDOWN_FILE}")
+        return
     key = f"{inst_id}_{side}"
     cooldowns[key] = {
         "instId": inst_id,
@@ -93,14 +127,15 @@ def add_stop_cooldown(inst_id: str, side: str, reason: str = "止损冷却") -> 
         "reason": reason,
     }
     try:
-        with open(STOP_COOLDOWN_FILE, "w", encoding="utf-8") as f:
-            json.dump(cooldowns, f, ensure_ascii=False, indent=2)
-    except Exception:
-        pass
+        _atomic_write_json(STOP_COOLDOWN_FILE, cooldowns)
+    except Exception as e:
+        print(f"[止损冷却] warn 落盘失败: {e}")
 
 
 def is_in_stop_cooldown(inst_id: str, side: str) -> bool:
-    cooldowns = load_stop_cooldowns()
+    cooldowns, corrupt = _read_stop_cooldowns_state()
+    if corrupt:
+        return True  # 不可判定=不放松：损坏按仍在冷却处理
     key = f"{inst_id}_{side}"
     if key in cooldowns:
         rem_sec = STOP_COOLDOWN_MINUTES * 60 - (int(time.time()) - cooldowns[key].get("ts", 0))

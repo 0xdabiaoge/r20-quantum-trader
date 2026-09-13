@@ -93,7 +93,16 @@ def read_json(filename: str, default: Any) -> Any:
     path = DATA_DIR / filename
     try:
         return json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+    except FileNotFoundError:
+        return default
+    except json.JSONDecodeError as exc:
+        # 审计③(2026-09-13)：损坏与缺失从此不同权——返回 default 保持服务不炸，
+        # 但必须在日志吼出来（旧实现同路静默，前端把「数据损坏」渲染成「确实没有」）。
+        print(f"[read_json] CRITICAL data/{filename} 损坏不可解析，已按默认值降级展示: {exc}",
+              file=sys.stderr)
+        return default
+    except OSError as exc:
+        print(f"[read_json] warn data/{filename} 读取失败: {exc}", file=sys.stderr)
         return default
 
 

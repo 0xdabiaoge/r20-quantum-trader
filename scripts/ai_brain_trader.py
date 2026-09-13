@@ -672,8 +672,9 @@ def _xv_flush_health(packages: List[Dict[str, Any]]) -> None:
             "venues": venues,
             "symbols": symbols,
         }
-        with open(VENUE_HEALTH_FILE, "w", encoding="utf-8") as f:
-            json.dump(out, f, ensure_ascii=False, indent=1)
+        # 审计③(2026-09-13)：同文件 :130 就有 fsync 版 atomic_write_json，这里却是
+        # 裸 open("w")——读者全在开仓执行链（reservation/选所/面板），撕裂窗=选所失真。
+        atomic_write_json(VENUE_HEALTH_FILE, out)
     except Exception:
         pass
 
@@ -1592,7 +1593,11 @@ def execute_batch_ai_brain_cycle(
             council_status=council_status,
         )
 
-        atomic_write_json(AI_DECISION_CACHE_FILE, standard_cache)
+        # 审计③(2026-09-13)：整档覆盖与 trader 的 venue-decision 读-改-写互斥
+        # （r20_backend.file_locks，同锁文件路径即同临界区），防互相回退。
+        from r20_backend.file_locks import file_lock
+        with file_lock(AI_DECISION_CACHE_FILE):
+            atomic_write_json(AI_DECISION_CACHE_FILE, standard_cache)
         atomic_write_json(AI_POSITION_MANAGEMENT_FILE, {
             "timestamp": int(time.time()),
             "time_str": time_str,

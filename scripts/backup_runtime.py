@@ -56,7 +56,10 @@ def clean_stale_staging(max_age_seconds: int = 3600) -> int:
     now_ts = time.time()
     for item in staging.glob("r20_backup_*"):
         try:
-            if item.is_file() and ((now_ts - item.stat().st_mtime > max_age_seconds) or item.stat().st_size == 0):
+            # 审计③(2026-09-13)：旧条件 `size==0 或 过期` 会把并发另一个备份任务
+            # 「刚 mkstemp、还在写」的在途归档当垃圾 unlink。只按年龄清理，
+            # 空文件过期后自然被回收，误删窗口关闭。
+            if item.is_file() and (now_ts - item.stat().st_mtime > max_age_seconds):
                 item.unlink(missing_ok=True)
                 cleaned += 1
         except OSError:
@@ -90,7 +93,12 @@ def retain_local_archive(source: Path, retention: int, destination_dir: Path | N
     destination_dir.mkdir(parents=True, exist_ok=True)
     destination = destination_dir / source.name
     shutil.copy2(source, destination)
-    prune((p for p in destination_dir.glob("r20_backup_*") if p.is_file()), retention)
+    # 审计③(2026-09-13)：prune 必须按 job 隔离——旧实现对整个目录的 r20_backup_*
+    # 排序截断，任务 B（retention=1）一跑就把任务 A 刚生成的最新归档裁掉，
+    # manifest 还报 success（灾备覆盖静默塌陷）。归档名 r20_backup_{safe_id}_{日期}_{时间}，
+    # 取前三段作本 job 专属前缀。
+    _prefix = "_".join(source.name.split("_")[:3])
+    prune((p for p in destination_dir.glob(f"{_prefix}_*") if p.is_file()), retention)
     return destination
 
 

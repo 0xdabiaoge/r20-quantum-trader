@@ -12,6 +12,7 @@ Features:
 
 import os
 import sys
+import tempfile
 from pathlib import Path
 
 _THIS_DIR = Path(__file__).resolve().parent
@@ -35,6 +36,27 @@ WORKSPACE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(WORKSPACE_DIR, "data")
 NEWS_CACHE_FILE = os.path.join(DATA_DIR, "news_sentiment.json")
 CIRCUIT_BREAKER_FILE = os.path.join(DATA_DIR, "circuit_breaker.json")
+
+
+def _atomic_write_json(path, payload):
+    """审计③(2026-09-13)：与 trader/sync_full_ledger 同路数（mkstemp+fsync+replace）。
+    熔断/状态类文件绝不直 open("w")——读者撞半截 JSON 会误停开仓且不自愈。"""
+    fd, tmp = tempfile.mkstemp(prefix="." + os.path.basename(path) + "-", dir=os.path.dirname(path))
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(payload, f, ensure_ascii=False, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
+        os.chmod(tmp, 0o600)
+        os.replace(tmp, path)
+    except Exception:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
 from instrument_pool import load_instruments
 TARGET_COINS = [item["name"] for item in load_instruments()]
 
@@ -65,8 +87,9 @@ def trigger_circuit_breaker(headline: str, keyword: str):
         "action": "暂停新开仓 30 分钟，启动存量持仓保本防御"
     }
     
-    with open(CIRCUIT_BREAKER_FILE, "w", encoding="utf-8") as f:
-        json.dump(cb_data, f, ensure_ascii=False, indent=2)
+    # 审计③(2026-09-13)：原子替换——本文件是全系统熔断写者，读者（trader/后端）
+    # 撞半截 JSON 即每轮误停开仓。
+    _atomic_write_json(CIRCUIT_BREAKER_FILE, cb_data)
         
     try:
         from qq_notifier import notify_circuit_breaker
@@ -359,10 +382,21 @@ def fetch_and_analyze_news_sentiment():
                     cb_data = json.load(f)
                 if cb_data.get("active") and time.time() >= cb_data.get("expires_at_ts", 0):
                     cb_data["active"] = False
-                    with open(CIRCUIT_BREAKER_FILE, "w", encoding="utf-8") as f:
-                        json.dump(cb_data, f, ensure_ascii=False, indent=2)
-            except Exception:
-                pass
+                    _atomic_write_json(CIRCUIT_BREAKER_FILE, cb_data)
+            except Exception as _ce:
+                # 审计③(2026-09-13)：旧实现整段 except:pass——文件一旦撕裂，清除路径
+                # 永远解析失败永远无法重写，读者每轮「熔断文件损坏，暂停开仓」直到人工
+                # 删文件（无限期停摆+不自愈）。现损坏直接原子重写为 inactive 自愈：
+                # 能走到这里说明本轮无真实黑天鹅（triggered_threat 为空），清除是安全方向。
+                print(f"[熔断自愈] circuit_breaker.json 不可解析({_ce!r})，本轮无威胁 → 重写为 inactive")
+                try:
+                    _atomic_write_json(CIRCUIT_BREAKER_FILE, {
+                        "active": False,
+                        "self_healed_at": int(time.time()),
+                        "note": "损坏自愈重写：见 r20 审计批3（news_sentiment_harvester）",
+                    })
+                except Exception as _we:
+                    print(f"[熔断自愈] warn 重写失败: {_we}")
 
     # 2. Multi-Coin Sentiment：直连 OKX Rubik 官方多空账户比，真实反映全网多空力量
     active_instruments = load_instruments()

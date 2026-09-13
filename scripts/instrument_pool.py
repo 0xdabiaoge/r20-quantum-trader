@@ -154,6 +154,27 @@ def save_instruments(instruments: list[dict[str, Any]]) -> None:
         pass
 
 
+def _write_json_atomic(path, payload: Any) -> None:
+    """审计③(2026-09-13)：同步扇出的三个下游文件曾直 write_text——与 trader 周期
+    整档写者并存时，并发读者（面板等）可撞半截 JSON。统一 mkstemp+fsync+replace
+    （与 save_instruments 同款路数）。双写者『丢更新』的单写者协议属批4结构收口。"""
+    p = Path(path)
+    fd, temp_path = tempfile.mkstemp(prefix="." + p.name + "-", dir=str(p.parent))
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            json.dump(payload, handle, ensure_ascii=False, indent=2)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.chmod(temp_path, 0o600)
+        os.replace(temp_path, p)
+    except Exception:
+        try:
+            os.unlink(temp_path)
+        except OSError:
+            pass
+        raise
+
+
 def sync_instruments_state() -> None:
     """Synchronize trading_state.json, factor_library_snapshot.json, news_sentiment.json,
     and dashboard cache when the trading instrument pool changes."""
@@ -206,7 +227,7 @@ def sync_instruments_state() -> None:
     state_data["instruments"] = new_insts
     state_data["max_positions"] = len(active_pool)
     try:
-        state_file.write_text(json.dumps(state_data, ensure_ascii=False, indent=2), encoding="utf-8")
+        _write_json_atomic(state_file, state_data)
     except Exception:
         pass
 
@@ -220,7 +241,7 @@ def sync_instruments_state() -> None:
                     item for item in factor_data["instruments"]
                     if isinstance(item, dict) and item.get("instId") in active_ids
                 ]
-                factor_file.write_text(json.dumps(factor_data, ensure_ascii=False, indent=2), encoding="utf-8")
+                _write_json_atomic(factor_file, factor_data)
         except Exception:
             pass
 
@@ -249,7 +270,7 @@ def sync_instruments_state() -> None:
                             "sentiment_factor_score": 0.0,
                         }
                 news_data["coins_sentiment"] = cleaned_coins
-                news_file.write_text(json.dumps(news_data, ensure_ascii=False, indent=2), encoding="utf-8")
+                _write_json_atomic(news_file, news_data)
         except Exception:
             pass
 

@@ -261,17 +261,54 @@ def save_trackers(trackers):
     except Exception:
         pass
 
-def load_stop_cooldowns():
-    if os.path.exists(STOP_COOLDOWN_FILE):
+def _atomic_write_json(path, payload):
+    """审计③(2026-09-13)：常驻写者统一原子路数（mkstemp+fsync+os.replace，对齐
+    sync_full_ledger / r20_gateway.secrets）。此前台账/状态/冷却直 open("w") 覆写，
+    并发读者（熔断/日报/备份/面板）可读到半截 JSON：误停开仓、推「0胜0负」假研报、
+    止损冷却静默解除。失败时旧文件原样保全（绝不撕裂）。"""
+    _dir = os.path.dirname(os.path.abspath(path))
+    fd, tmp = tempfile.mkstemp(prefix="." + os.path.basename(path) + "-", dir=_dir)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(payload, f, ensure_ascii=False, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
+        os.chmod(tmp, 0o600)
+        os.replace(tmp, path)
+    except Exception:
         try:
-            with open(STOP_COOLDOWN_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
+            os.unlink(tmp)
+        except OSError:
             pass
-    return {}
+        raise
+
+
+def _read_stop_cooldowns_state():
+    """审计③(2026-09-13)：返回 (data, corrupt)。损坏与缺失从此不同权——
+    corrupt=True 时 is_in_stop_cooldown 按「在冷却」fail-closed（旧实现损坏→{}
+    等价于「无冷却」，硬止损后可立即同向重进）；add 拒做 RMW 防覆盖现场。"""
+    if not os.path.exists(STOP_COOLDOWN_FILE):
+        return {}, False
+    try:
+        with open(STOP_COOLDOWN_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if not isinstance(data, dict):
+            return {}, True
+        return data, False
+    except Exception:
+        return {}, True
+
+
+def load_stop_cooldowns():
+    # 兼容旧契约（只读展示面）；风控判断路径一律走 _read_stop_cooldowns_state
+    return _read_stop_cooldowns_state()[0]
 
 def add_stop_cooldown(inst_id: str, side: str, reason: str = "止损冷却"):
-    cooldowns = load_stop_cooldowns()
+    cooldowns, corrupt = _read_stop_cooldowns_state()
+    if corrupt:
+        print(f"[止损冷却] CRITICAL 状态文件损坏，拒绝合并写回以保全现场"
+              f"（期间所有标的按『仍在冷却』fail-closed）: {STOP_COOLDOWN_FILE}")
+        return
     key = f"{inst_id}_{side}"
     cooldowns[key] = {
         "instId": inst_id,
@@ -280,13 +317,14 @@ def add_stop_cooldown(inst_id: str, side: str, reason: str = "止损冷却"):
         "reason": reason
     }
     try:
-        with open(STOP_COOLDOWN_FILE, "w", encoding="utf-8") as f:
-            json.dump(cooldowns, f, ensure_ascii=False, indent=2)
-    except Exception:
-        pass
+        _atomic_write_json(STOP_COOLDOWN_FILE, cooldowns)
+    except Exception as e:
+        print(f"[止损冷却] warn 落盘失败（本笔冷却丢失，依赖云端SL兜底）: {e}")
 
 def is_in_stop_cooldown(inst_id: str, side: str) -> bool:
-    cooldowns = load_stop_cooldowns()
+    cooldowns, corrupt = _read_stop_cooldowns_state()
+    if corrupt:
+        return True  # 不可判定=不放松：损坏按仍在冷却处理
     key = f"{inst_id}_{side}"
     if key in cooldowns:
         rem_sec = STOP_COOLDOWN_MINUTES * 60 - (int(time.time()) - cooldowns[key].get("ts", 0))
@@ -938,23 +976,28 @@ def persist_venue_decision(inst_id: str, venue_decision: Dict[str, Any]) -> bool
     ——直接跳过并 warn（没有主脑决策就没有可附着的决策 JSON）。
     """
     try:
-        with open(AI_DECISION_CACHE_FILE, "r", encoding="utf-8") as handle:
-            cache = json.load(handle)
-        if not isinstance(cache, dict) or not isinstance(cache.get(inst_id), dict):
-            print(f"[选所证据] warn {inst_id} 不在决策缓存中，本轮证据不落盘")
-            return False
-        cache[inst_id]["venue_decision"] = venue_decision
-        fd, tmp_path = tempfile.mkstemp(prefix=".venue-decision-", suffix=".tmp",
-                                        dir=os.path.dirname(AI_DECISION_CACHE_FILE))
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as handle:
-                json.dump(cache, handle, ensure_ascii=False, indent=2)
-                handle.flush()
-                os.fsync(handle.fileno())
-            os.replace(tmp_path, AI_DECISION_CACHE_FILE)
-        finally:
-            if os.path.exists(tmp_path):
-                os.unlink(tmp_path)
+        # 审计③(2026-09-13)：本函数与主脑（ai_brain_trader 整档覆盖写）是同一文件的
+        # 两路常驻写者——每次写虽原子，但 读→merge→写 之间可被对方插队（lost update，
+        # 证据回退/整轮决策被旧副本覆盖）。RMW 外包 flock 互斥（同 evolution_shield 路数）。
+        from r20_backend.file_locks import file_lock
+        with file_lock(AI_DECISION_CACHE_FILE):
+            with open(AI_DECISION_CACHE_FILE, "r", encoding="utf-8") as handle:
+                cache = json.load(handle)
+            if not isinstance(cache, dict) or not isinstance(cache.get(inst_id), dict):
+                print(f"[选所证据] warn {inst_id} 不在决策缓存中，本轮证据不落盘")
+                return False
+            cache[inst_id]["venue_decision"] = venue_decision
+            fd, tmp_path = tempfile.mkstemp(prefix=".venue-decision-", suffix=".tmp",
+                                            dir=os.path.dirname(AI_DECISION_CACHE_FILE))
+            try:
+                with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                    json.dump(cache, handle, ensure_ascii=False, indent=2)
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                os.replace(tmp_path, AI_DECISION_CACHE_FILE)
+            finally:
+                if os.path.exists(tmp_path):
+                    os.unlink(tmp_path)
         return True
     except Exception as exc:
         print(f"[选所证据] warn 落盘失败（不影响本轮交易）: {exc}")
@@ -1626,8 +1669,9 @@ def record_trade(trade_data):
             with open(LEDGER_JSON_FILE, "r", encoding="utf-8") as f:
                 ledger = json.load(f)
         ledger.append(trade_data)
-        with open(LEDGER_JSON_FILE, "w", encoding="utf-8") as f:
-            json.dump(ledger, f, ensure_ascii=False, indent=2)
+        # 审计③(2026-09-13)：生产台账直 open("w") 覆写 → 原子替换。读者（熔断/
+        # 日报/备份/面板）不再可能撞见半截 JSON。
+        _atomic_write_json(LEDGER_JSON_FILE, ledger)
     except Exception as e:
         print(f"Failed to record trade to JSON: {e}")
 
@@ -3215,8 +3259,8 @@ def execute_portfolio():
             "position": f["position"]
         })
 
-    with open(os.path.join(DATA_DIR, "trading_state.json"), "w", encoding="utf-8") as f:
-        json.dump(state_payload, f, ensure_ascii=False, indent=2)
+    # 审计③：原子替换（读者=面板/巡检；旧直写有撕裂窗）。异常语义不变：照旧上抛。
+    _atomic_write_json(os.path.join(DATA_DIR, "trading_state.json"), state_payload)
 
     # 6. Always Sync Full Lifecycle Ledger and SQLite DB in Realtime
     try:
