@@ -228,7 +228,9 @@ class TestSpawnHygiene(unittest.TestCase):
     def test_no_bare_python3_shell_remains(self):
         import re
         bad = []
-        for f in list((ROOT / "scripts").glob("*.py")) + list((ROOT / "r20_backend").rglob("*.py")):
+        # 批7 教训：dashboard/ 曾被漏扫，其触发的台账 sync 同为裸 python3 静默死亡
+        for f in (list((ROOT / "scripts").glob("*.py")) + list((ROOT / "r20_backend").rglob("*.py"))
+                  + list((ROOT / "dashboard").glob("*.py"))):
             src = f.read_text(encoding="utf-8", errors="ignore")
             for m in re.finditer(r'subprocess\.run\(\s*f["\']python3 ', src):
                 line = src[:m.start()].count("\n") + 1

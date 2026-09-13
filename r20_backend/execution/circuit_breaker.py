@@ -76,6 +76,49 @@ def ledger_daily_closed_pnl(ledger, environment_mode: str, today_str: str) -> fl
     return total
 
 
+def ledger_today_stats(ledger, environment_mode: str, today_str: str) -> Dict[str, Any]:
+    """审计批7(2026-09-13)·前台「今日已实现」三所口径：前台 KPI 曾从 OKX bills 单所
+    聚合，而台账/熔断早已是三所合并——用户实锤「今日已实现和台账对不上」（binance
+    SUI +27.63 前台不可见，且彼时台账又吞过一条腿）。单一事实源：KPI 与熔断共用
+    本函数——net_realized=Σ行pnl 与 ledger_daily_closed_pnl **逐字同式**（fees 已含
+    于行内，funding 单列展示不混入净值，两数从此不可能打架）。行筛选规则与熔断逐字
+    同款（环境轴保守计入、status=closed、北京日）；win/loss 计数沿仪表盘旧口径
+    剔除 |net|<0.01 且 |gross|<0.01 的摩擦尘单。environment_mode 传 "" = 保守全计
+    （与熔断不可判定时纪律一致）。"""
+    want = str(environment_mode or "").strip().lower()
+    out = {"realized_gross": 0.0, "fees_paid": 0.0, "funding_paid": 0.0,
+           "net_realized": 0.0, "win_trades": 0, "loss_trades": 0, "win_rate": 0.0,
+           "source": "ledger"}
+    for t in ledger:
+        try:
+            if t.get("status") != "closed":
+                continue
+            if beijing_day(t.get("close_time")) != today_str:
+                continue
+            row_env = str(t.get("environment") or "").strip().lower()
+            if row_env and want and row_env != want:
+                continue
+            net = float(t.get("pnl", 0) or 0)
+            gross = float(t.get("gross_pnl", 0) or 0)
+            out["realized_gross"] += gross
+            out["fees_paid"] += float(t.get("fee", 0) or 0)
+            out["funding_paid"] += float(t.get("funding_fee", 0) or 0)
+            out["net_realized"] += net
+            if abs(net) < 0.01 and abs(gross) < 0.01:
+                continue
+            if net > 0:
+                out["win_trades"] += 1
+            elif net < 0:
+                out["loss_trades"] += 1
+        except (TypeError, ValueError):
+            continue
+    closed_n = out["win_trades"] + out["loss_trades"]
+    out["win_rate"] = round(out["win_trades"] / closed_n * 100, 1) if closed_n else 0.0
+    for k in ("realized_gross", "fees_paid", "funding_paid", "net_realized"):
+        out[k] = round(out[k], 2)
+    return out
+
+
 def _read_stop_cooldowns_state() -> Tuple[Dict[str, Any], bool]:
     """(data, corrupt)。损坏≠缺失：corrupt 时 is_in_stop_cooldown fail-closed。"""
     if not STOP_COOLDOWN_FILE.exists():

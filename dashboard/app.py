@@ -1387,7 +1387,11 @@ def update_cache_cycle():
         try:
             sync_script = os.path.join(WORKSPACE_DIR, "scripts", "sync_full_ledger.py")
             if os.path.exists(sync_script):
-                subprocess.run(f"python3 {sync_script}", shell=True, capture_output=True, text=True, timeout=10)
+                # 审计批7：旧 `python3` shell 串在这台主机根本不存在（rc=127 被
+                # capture_output 吞）→ 服务器侧台账刷新从未生效；且旧 timeout=10s
+                # 短于真实三所全史拉取（约20-30s）必然静默超时。改同解释器+吼。
+                from r20_backend.spawn import run_script
+                run_script(sync_script, timeout=45, label="sync_full_ledger")
         except Exception:
             pass
 
@@ -1546,6 +1550,30 @@ def update_cache_cycle():
     except Exception:
         pass
 
+    # 审计批7(2026-09-13)·「今日已实现」单一事实源：上方 bills 聚合是 OKX 单所视野
+    # ——binance/gate 当日平仓（实锤：SUI +27.63）前台永远看不见，与三所合并的台账/
+    # 熔断对不上。台账可用时以 ledger_today_stats 覆盖（与熔断锚点逐字同式：
+    # net=Σ行pnl，fees 已含行内；funding 单列不混净值），bills 口径退化为
+    # 台账缺失/损坏时的单所降级兜底。
+    _today_stats_source = "okx_bills_degraded"
+    if valid_ledger_trades:
+        try:
+            from r20_backend.execution.circuit_breaker import ledger_today_stats
+            try:
+                _kpi_env = _global_env_axis()
+            except Exception:
+                _kpi_env = ""
+            _ts_led = ledger_today_stats(valid_ledger_trades, _kpi_env, today_bj_str)
+            today_realized_gross = _ts_led["realized_gross"]
+            today_fees = _ts_led["fees_paid"]
+            today_net_realized_pnl = _ts_led["net_realized"]
+            today_win_trades = _ts_led["win_trades"]
+            today_loss_trades = _ts_led["loss_trades"]
+            today_win_rate = _ts_led["win_rate"]
+            _today_stats_source = "ledger_multi_venue"
+        except Exception as _ts_exc:
+            print(f"[KPI] warn 今日统计台账口径失败，回退 OKX bills: {_ts_exc}")
+
     CACHE_DATA = {
         "timestamp": timestamp_full,
         "date": today_bj_str,
@@ -1586,7 +1614,8 @@ def update_cache_cycle():
             "total_pnl": round(today_net_realized_pnl + total_pos_upl, 2),
             "win_trades": today_win_trades,
             "loss_trades": today_loss_trades,
-            "win_rate": today_win_rate
+            "win_rate": today_win_rate,
+            "source": _today_stats_source,
         },
         "performance": {
             "all_trades": all_closed,

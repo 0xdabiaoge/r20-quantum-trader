@@ -424,6 +424,12 @@ def build_lifecycle_ledger():
         })
 
     # Process Official Closed Positions
+    # 审计批7(2026-09-13)·同 posId 多轮往返吞腿修复：PEPE 当日两笔平仓（06:33→10:31
+    # +7.89、15:37→16:30 -18.18）在 OKX positions-history 里**共享同一 posId**
+    # (391748010248)——旧 `id=pos_hist_{posId}_{inst}` 撞键，合并进 trades_map 时后者
+    # 覆盖前者，一条真实亏损从台账蒸发（前台与台账对不上的根因之一）。id 追加开仓
+    # 时刻 c_ts + 同键自增序号，保证「每一笔平仓」有唯一稳定身份。
+    _pos_id_seen: dict = {}
     for h in pos_history:
         c_ts = int(h.get("cTime", 0) or 0) / 1000.0
         u_ts = int(h.get("uTime", 0) or 0) / 1000.0
@@ -515,8 +521,14 @@ def build_lifecycle_ledger():
         # uTime（如补算资金费/结算修正）时 id 漂移，与旧行按 id 去重失败 → 同笔
         # 重复计入台账/日亏。改用不可变 posId，缺失时退回开仓时刻 c_ts（同样稳定）。
         _stable = str(h.get("posId") or "").strip() or (str(int(c_ts)) if c_ts > 0 else str(int(u_ts)))
+        # 审计批7：posId 会在多轮往返间复用（见上方注释），故 id 追加开仓时刻 c_ts
+        # 区分同 posId 的不同轮；同 (posId,c_ts) 仍多笔时再挂自增序号兜底，绝不再撞键。
+        _key = f"{_stable}|{int(c_ts)}"
+        _seq = _pos_id_seen.get(_key, 0)
+        _pos_id_seen[_key] = _seq + 1
+        _id_suffix = f"_{int(c_ts)}" + (f"#{_seq}" if _seq else "")
         trades_lifecycle.append({
-            "id": f"pos_hist_{_stable}_{inst}",
+            "id": f"pos_hist_{_stable}_{inst}{_id_suffix}",
             "inst": inst,
             "side": side,
             "venue": "okx",   # G10：同上，OKX 历史行源头标注
