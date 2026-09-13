@@ -164,48 +164,13 @@ ASSET_CLASS_PROFILES = {
 MAX_CONCURRENT_POSITIONS, MAX_SAME_DIRECTION_POSITIONS = effective_max_positions(len(TARGET_INSTRUMENTS))
 TAKER_FEE_RATE = 0.0005
 MAKER_FEE_RATE = 0.0002 # Limit Order Maker Fee (60% Lower Than Market Taker)
-# 日亏熔断/单标的保证金/金字塔加仓等阈值均由 risk_constants 单一事实源注入（.env 可配）。
-# 审计 P1-1(2026-09-13)：两个 min() 口径（封顶 ∩ 权益占比）已上移 risk_constants，
-# 提示词构建器/执行面共用同一函数对象——此处不再保留本地拷贝（曾是三份拷贝漂移之源）。
-
-
-# 单笔 1R 风险额与单笔保证金占比 (RISK_PER_TRADE_EQUITY_RATIO / MAX_MARGIN_EQUITY_RATIO)
-# 由 risk_constants 单一事实源注入，与提示词 {{risk_budget}} 保持同口径。
-
-
-def effective_risk_per_trade(pool_risk_usd: float, usdt_available: float = None) -> float:
-    """单笔基准风险额 = min(池内配置绝对值, 可用余额 × 2%)，避免 20U 账户被要求押 15U。"""
-    cap = float(pool_risk_usd or 0.0)
-    if usdt_available and usdt_available > 0:
-        cap = min(cap, max(round(float(usdt_available) * RISK_PER_TRADE_EQUITY_RATIO, 4), 0.05))
-    return cap
-
-
-def quantize_size(raw_sz: float, min_sz: float) -> float:
-    """按交易所最小下单步长(minSz)向下量化张数。
-
-    关键修正：历史实现把数量强制取整并抬到「至少 1 张」，而 OKX 多数永续的 minSz 实为 0.01 张，
-    导致小资金账户仓位被向上放大最多 100 倍(如 BTC 0.01 张=7.92U 名义被抬成 1 张=792U)。
-    现在低于最小步长时返回 0.0 由上层跳过该标的，而不是放大成 1 张。
-    """
-    step = float(min_sz or 0) or 1.0
-    try:
-        raw = float(raw_sz or 0.0)
-    except (TypeError, ValueError):
-        return 0.0
-    if raw <= 0:
-        return 0.0
-    return round(math.floor(raw / step + 1e-9) * step, 10)
-
-
-def max_size_within_margin(usdt_available: float, leverage: float, price: float, ct_val: float, min_sz: float) -> float:
-    """可用余额硬顶：单笔保证金不得超过可用余额的 MAX_MARGIN_EQUITY_RATIO，超出部分直接砍掉。"""
-    if not usdt_available or usdt_available <= 0 or price <= 0 or ct_val <= 0:
-        return float("inf")
-    max_margin = float(usdt_available) * MAX_MARGIN_EQUITY_RATIO
-    raw = (max_margin * max(1.0, float(leverage or 1.0))) / (float(price) * float(ct_val))
-    return quantize_size(raw, min_sz)
-
+# 单笔 1R 风险额 / 数量量化 / 可用余额硬顶：**不再本地孪生**（审计批6）。
+# 曾与 r20_backend/execution/sizing.py 逐字重复两份，是「改一处漏一处」的漂移源。
+from r20_backend.execution import (
+    effective_risk_per_trade,
+    max_size_within_margin,
+    quantize_size,
+)
 
 def order_margin_gate(planned_margin: float, *, size: float, price: float, ct_val: float,
                       leverage: float, usdt_available: float) -> float:

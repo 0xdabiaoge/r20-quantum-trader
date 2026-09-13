@@ -161,3 +161,15 @@ def effective_single_asset_margin(usdt_available: float = None) -> float:
     if usdt_available and usdt_available > 0:
         cap = min(cap, max(round(float(usdt_available) * SINGLE_ASSET_EQUITY_RATIO, 2), 1.0))
     return cap
+
+
+# ── 单一实例（审计批6）─────────────────────────────────────────────────
+# 本文件既能被 `import risk_constants`（scripts/ 在 sys.path 上，交易脚本走这条）
+# 也能被 `import scripts.risk_constants`（仓库根在 sys.path 上，后端/测试走这条）导入。
+# Python 对这两个名字会创建**两个模块对象**，各自独立读一次 .env，于是"单一事实源"
+# 名不副实：测试 `importlib.reload(risk_constants)` 之后，`scripts.risk_constants` 里
+# 仍是旧值（反向亦然），而 sizing/execution 引用的是后者。
+# 这里把自己同时登记到两个名字下：先执行者胜出，后来者直接命中 sys.modules，不再二次执行。
+for _alias in ("risk_constants", "scripts.risk_constants"):
+    sys.modules.setdefault(_alias, sys.modules[__name__])
+del _alias

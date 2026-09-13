@@ -131,9 +131,9 @@ class PromptRiskBudgetAlignmentTests(_SandboxBase):
     def test_engine_prompt_and_execution_share_one_definition(self):
         """反漂移：公式只能定义在 risk_constants 一处，sizing/trader 都只是引用。
 
-        注意 `risk_constants` 与 `scripts.risk_constants` 在当前代码库里是**两个模块实例**
-        （scripts/ 与仓库根都在 sys.path 上），所以对象同一性(assertIs)并不成立；这里改为
-        断言「定义位置同一个模块 + 函数源码逐字节相同 + 本地无拷贝」，同样能钉住漂移。
+        批6 起 `risk_constants` 与 `scripts.risk_constants` 已是**同一个模块对象**
+        （模块内把自己登记到两个名字下，先导入者胜出），所以这里可以直接断言对象同一性；
+        同时钉住仓位规模三件套不再有本地孪生实现。
         """
         import inspect
         import ai_factor_trader as trader
@@ -155,6 +155,17 @@ class PromptRiskBudgetAlignmentTests(_SandboxBase):
                          "本地拷贝复活 → 又是两份 min() 公式漂移之源")
         sizing_src = (ROOT / "r20_backend" / "execution" / "sizing.py").read_text(encoding="utf-8")
         self.assertNotIn("def effective_daily_loss_limit", sizing_src)
+
+        # 批6：两个导入名必须是同一个模块对象（曾经是两个各自读一次 .env 的实例）
+        import risk_constants as bare_rc
+        import scripts.risk_constants as dotted_rc
+        self.assertIs(bare_rc, dotted_rc, "risk_constants 又裂成两个实例：单一事实源名不副实")
+
+        # 批6：仓位规模三件套只有一份实现（曾与 sizing.py 逐字重复两份）
+        for name in ("quantize_size", "max_size_within_margin", "effective_risk_per_trade"):
+            self.assertIs(getattr(trader, name), getattr(sizing, name),
+                          f"trader.{name} 不是共享实现，本地孪生复活")
+            self.assertNotIn(f"def {name}", trader_src, f"ai_factor_trader 又自带 {name} 实现")
 
     def test_final_prompt_carries_the_same_capped_values(self):
         """端到端：真正发给模型的整段 prompt 里就是 min() 后的值。"""
