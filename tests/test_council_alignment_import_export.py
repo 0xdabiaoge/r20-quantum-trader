@@ -40,13 +40,31 @@ class CouncilPresetAlignmentTests(unittest.TestCase):
             self.assertIn(kw, cio)
 
     def test_runtime_prompts_enforce_quote_sheet_format(self):
-        """参谋报价单格式强制在运行时模板(代码层)，任何定制/导入的角色提示词都绕不开。"""
-        src = Path(cm.__file__).read_text(encoding="utf-8")
-        self.assertIn("提案输出格式（强制）", src)
-        self.assertIn("标的 | 倾向 | 限价 | 止损 | 止盈 | 拟用保证金(USDT) | 置信度(0-100) | 一句话依据", src)
-        self.assertIn("标准报价单", src)                      # CIO 侧逐项对比与偏离说明指令
-        self.assertNotIn("2.0x ATR 止损 stop_loss", src)      # 运行时旧写死数字已清除
-        self.assertIn("1.8~2.2x 1H ATR 分层止损", src)
+        """参谋报价单格式强制在运行时模板(代码层)，任何定制/导入的角色提示词都绕不开。
+
+        定位方式说明（结构优化阶段 2 / B5）：这些运行时模板原在 council_manager.py，
+        拆分后随辩论引擎迁到 r20_backend/council/debate.py。断言强度保持不变，
+        改为在整个 **council 运行时源码** 里检索 —— 比钉单一文件更稳（代码再搬家也不会
+        让本用例误报），并加防空断言避免"读空文件也算通过"。
+        """
+        sources = {Path(cm.__file__): Path(cm.__file__).read_text(encoding="utf-8")}
+        for extra in sorted((Path(cm.__file__).parent / "council").glob("*.py")):
+            sources[extra] = extra.read_text(encoding="utf-8")
+        combined = "\n".join(sources.values())
+
+        # 防空：确实读到了辩论引擎，否则下面的 assertIn 可能因"空内容"而假通过
+        self.assertIn("execute_council_debate", combined, "未读到 council 运行时源码")
+        self.assertGreater(len(combined), 20000, "council 运行时源码过短，疑似读错路径")
+
+        for needle in ("提案输出格式（强制）",
+                       "标的 | 倾向 | 限价 | 止损 | 止盈 | 拟用保证金(USDT) | 置信度(0-100) | 一句话依据",
+                       "标准报价单",                      # CIO 侧逐项对比与偏离说明指令
+                       "1.8~2.2x 1H ATR 分层止损"):
+            where = [str(f) for f, s in sources.items() if needle in s]
+            self.assertTrue(where, f"运行时模板缺少强制片段：{needle}")
+        # 运行时旧写死数字必须已清除
+        stale = [str(f) for f, s in sources.items() if "2.0x ATR 止损 stop_loss" in s]
+        self.assertEqual(stale, [], f"运行时仍残留旧写死止损数字：{stale}")
 
 
 class CouncilPresetMigrationTests(unittest.TestCase):

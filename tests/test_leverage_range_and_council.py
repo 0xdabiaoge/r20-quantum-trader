@@ -152,17 +152,30 @@ class CouncilBudgetTests(unittest.TestCase):
         self.assertEqual(cm.load_council_config()["timeout_seconds"], cfg["timeout_seconds"])
 
     def test_cio_contract_no_static_3_anchor(self):
+        """杠杆上下限必须取自 risk_constants 的单一事实源，不得写死 3。
+
+        定位说明（结构优化阶段 2 / B5）：契约渲染逻辑随辩论引擎迁到
+        r20_backend/council/debate.py，故改为扫 council 运行时源码整体；
+        断言强度不变，并加防空断言（否则 assertNotIn 会因读空内容假通过）。
+        """
+        from tests.source_scan import assert_area_looks_real, combined
         import r20_backend.council_manager as cm
-        src = Path(cm.__file__).read_text(encoding="utf-8")
+        src = combined(Path(cm.__file__))
+        assert_area_looks_real(self, src, must_contain="execute_council_debate")
         self.assertNotIn("int(min(3, _R20_MAX_LEVERAGE))", src)
         self.assertIn("_R20_MIN_LEVERAGE", src)
 
     def test_debate_stage_budgets_have_90s_floor(self):
         """思考型模型单席提案实测需 60~180s：0.35/0.50 纯比例切分在中低预算下
-        会压出 53s 级必死窗口（09-10 05:15 实测），两段预算都必须有 90s 地板。"""
+        会压出 53s 级必死窗口（09-10 05:15 实测），两段预算都必须有 90s 地板。
+
+        定位说明（结构优化阶段 2 / B5）：预算切分随辩论引擎迁到
+        r20_backend/council/debate.py，故扫 council 运行时源码整体。"""
         import re
+        from tests.source_scan import assert_area_looks_real, combined
         import r20_backend.council_manager as cm
-        src = Path(cm.__file__).read_text(encoding="utf-8")
+        src = combined(Path(cm.__file__))
+        assert_area_looks_real(self, src, must_contain="execute_council_debate")
         self.assertNotIn("min(rem * 0.50,", src)
         self.assertGreaterEqual(src.count("max(rem * 0.55, 90.0)"), 2)
         # P2-14 起比例只允许出现在「CIO 预留」的有界表达式里（min(CIO_MIN_ARBITRATION_TIME, ...)），

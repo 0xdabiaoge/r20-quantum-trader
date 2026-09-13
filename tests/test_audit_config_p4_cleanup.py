@@ -420,8 +420,12 @@ class CouncilBudgetTests(_Base):
         self.assertEqual(float(bounds["Le"].le), self.cm.MAX_COUNCIL_TIMEOUT)
 
     def test_cio_reserve_exists_in_both_modes(self):
-        import inspect
-        src = inspect.getsource(self.cm.execute_council_debate)
+        """定位说明（结构优化阶段 2 / B5）：原先用 inspect.getsource(门面函数)，
+        拆分后门面只剩转发薄壳，取到的源码不含预算逻辑；改为扫 council 运行时源码整体。
+        断言强度不变。"""
+        from tests.source_scan import assert_area_looks_real, combined
+        src = combined(Path(self.cm.__file__))
+        assert_area_looks_real(self, src, must_contain="cio_reserve")
         self.assertGreaterEqual(src.count("cio_reserve"), 2, "两种共识模式都要给 CIO 留预算")
         self.assertIn("CIO_MIN_ARBITRATION_TIME", src)
 
