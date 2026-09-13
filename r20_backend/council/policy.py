@@ -124,3 +124,19 @@ DEFAULT_PRESET_TEMPLATES: Dict[str, Dict[str, Any]] = {
 MAX_COUNCIL_TIMEOUT: float = 420.0  # 留出余量：调度器 600s 硬杀，主脑与委员会同一进程
 
 MIN_SAFE_REASONING_TIME: float = 5.0
+
+MIN_COUNCIL_TIMEOUT: float = 30.0
+
+DEFAULT_COUNCIL_TIMEOUT: float = 240.0
+
+ALL_AVAILABLE_PRESETS = dict(DEFAULT_PRESET_TEMPLATES)
+
+COUNCIL_PRESET_SUITES: Dict[str, Dict[str, Any]] = {
+    "hedge_fund_desk": {
+        "id": "hedge_fund_desk",
+        "name": "对冲基金投委会标准台 (Hedge Fund Desk)",
+        "desc": "全息审阅账户资金、持仓与挂单，Trader A/B/C 提案与 CIO 终审查决",
+        "consensus_mode": "standard",
+        "roles": ["trader_trend", "trader_momentum", "trader_quant", "cio"],
+    },
+}

@@ -25,11 +25,28 @@ from r20_backend.council.debate import (
     _render_seat_prompt,
     execute_council_debate as _core_execute_council_debate,
 )
+from r20_backend.council.presets import (
+    apply_preset_suite as _core_apply_preset_suite,
+    get_available_presets,
+    get_preset_suites,
+    reset_role_template as _core_reset_role_template,
+)
+from r20_backend.council.roster import (
+    clamp_council_timeout,
+    resolve_seat_model,
+    seat_model_health,
+    validate_council_roles,
+    validate_seat_model_bindings,
+)
 from r20_backend.council.policy import (
     DEFAULT_CONSENSUS_MODE,
+    ALL_AVAILABLE_PRESETS,
     CIO_MIN_ARBITRATION_TIME,
+    COUNCIL_PRESET_SUITES,
+    DEFAULT_COUNCIL_TIMEOUT,
     DEFAULT_PRESET_TEMPLATES,
     MAX_COUNCIL_TIMEOUT,
+    MIN_COUNCIL_TIMEOUT,
     MIN_SAFE_REASONING_TIME,
     VALID_CONSENSUS_MODES,
 )
@@ -58,117 +75,17 @@ COUNCIL_CONFIG_FILE = DATA_DIR / "council_config.json"
 # 超时静默降级（50 周期 0 成功实测，2026-09-10）；240s 兼顾决策时效与调度器 600s 硬超时。
 # 审计 P2-13：超时预算单一事实源。旧实现三套默认（schemas 60 / 本模块 240 / 前端 240）
 # 且只有导入路径夹取 → 手改配置文件写 5000 会被原样当预算用，撞上调度器 600s 击杀。
-MIN_COUNCIL_TIMEOUT: float = 30.0
-DEFAULT_COUNCIL_TIMEOUT: float = 240.0
 
 
-def clamp_council_timeout(value: Any) -> float:
-    try:
-        num = float(value)
-    except (TypeError, ValueError):
-        return DEFAULT_COUNCIL_TIMEOUT
-    if num != num or num in (float("inf"), float("-inf")):
-        return DEFAULT_COUNCIL_TIMEOUT
-    return min(MAX_COUNCIL_TIMEOUT, max(MIN_COUNCIL_TIMEOUT, round(num, 1)))
 
 
-ALL_AVAILABLE_PRESETS = dict(DEFAULT_PRESET_TEMPLATES)
-
-COUNCIL_PRESET_SUITES: Dict[str, Dict[str, Any]] = {
-    "hedge_fund_desk": {
-        "id": "hedge_fund_desk",
-        "name": "对冲基金投委会标准台 (Hedge Fund Desk)",
-        "desc": "全息审阅账户资金、持仓与挂单，Trader A/B/C 提案与 CIO 终审查决",
-        "consensus_mode": "standard",
-        "roles": ["trader_trend", "trader_momentum", "trader_quant", "cio"],
-    },
-}
 
 
-def seat_model_health(roles: Any) -> List[Dict[str, Any]]:
-    """逐席位核对 model_id 是否已在模型库登记（供 UI 标注"模型缺失"）。
-
-    审计 P1-4b：线上 4 席里 3 席绑了未登记 id（qwen3.8-flash / deepseek-v4-flash-0731），
-    引擎查不到就静默回落主脑 → 页面显示"多模型投委会"，实际只有一个模型在答。
-    """
-    from r20_backend.llm_manager import load_llm_config
-    try:
-        cfg = load_llm_config(mask_keys=False)
-        registered = {str(i.get("id")) for i in (cfg.get("models") or []) if isinstance(i, dict) and i.get("id")}
-    except Exception:
-        registered = set()
-    rows = []
-    for role_id, role in (roles or {}).items():
-        if not isinstance(role, dict):
-            continue
-        requested = str(role.get("model_id") or "").strip()
-        rows.append({
-            "role_id": str(role_id),
-            "model_id": requested,
-            "mode": "follow_main" if not requested else ("registered" if requested in registered else "missing"),
-            "registered": (not requested) or requested in registered,
-        })
-    return rows
 
 
-def resolve_seat_model(role_spec: Dict[str, Any]) -> Dict[str, Any]:
-    """把席位的 model_id 解析为可调用模型；**未登记必须显式暴露**，不再静默回落。
-
-    返回 requested / registered / fallback / registered_ids，调用方负责把这几个字段
-    透出到提案载荷（UI 与审计据此标注"该席位实际由主脑代答"）。
-    """
-    from r20_backend.llm_manager import load_llm_config
-    requested = str(role_spec.get("model_id") or "").strip()
-    effort = role_spec.get("reasoning_effort") or "medium"
-    try:
-        cfg = load_llm_config(mask_keys=False)
-    except Exception as exc:
-        return {"model": "", "base_url": None, "api_key": None, "api_format": None,
-                "effort": effort, "requested": requested, "registered": False,
-                "fallback": bool(requested), "reason": f"模型库读取失败：{exc}", "registered_ids": []}
-    models = [i for i in (cfg.get("models") or []) if isinstance(i, dict)]
-    if not requested:
-        return {"model": "", "base_url": None, "api_key": None, "api_format": None,
-                "effort": cfg.get("active_reasoning_effort", "medium"), "requested": "",
-                "registered": True, "fallback": False, "reason": "", "registered_ids": []}
-    for item in models:
-        if item.get("id") == requested:
-            return {"model": item.get("id"), "base_url": item.get("base_url"),
-                    "api_key": item.get("api_key"), "api_format": item.get("api_format"),
-                    "effort": item.get("reasoning_effort") or effort, "requested": requested,
-                    "registered": True, "fallback": False, "reason": "", "registered_ids": []}
-    return {"model": "", "base_url": None, "api_key": None, "api_format": None,
-            "effort": effort, "requested": requested, "registered": False, "fallback": True,
-            "reason": f"席位绑定的模型 {requested} 未在模型库登记，已回落主脑代答",
-            "registered_ids": sorted(str(i.get("id")) for i in models if i.get("id"))}
 
 
-def validate_seat_model_bindings(roles: Any, previous_roles: Any = None) -> List[str]:
-    """写闸：**新绑定**的未登记模型一律拒绝（沿用旧绑定的不算新错，避免堵死保存）。
 
-    返回问题列表（空 = 通过）。只比对 model_id 变化过的席位，管理员点保存不会被历史遗留挡住。
-    """
-    from r20_backend.llm_manager import load_llm_config
-    try:
-        cfg = load_llm_config(mask_keys=False)
-        registered = {str(i.get("id")) for i in (cfg.get("models") or []) if isinstance(i, dict) and i.get("id")}
-    except Exception:
-        return []  # 模型库读不到时不阻断保存（只读侧会标记）
-    if not registered:
-        return []
-    prev = previous_roles if isinstance(previous_roles, dict) else {}
-    problems = []
-    for role_id, role in (roles or {}).items():
-        if not isinstance(role, dict):
-            continue
-        requested = str(role.get("model_id") or "").strip()
-        if not requested or requested in registered:
-            continue
-        old = str((prev.get(role_id) or {}).get("model_id") or "").strip() if isinstance(prev.get(role_id), dict) else ""
-        if old == requested:
-            continue  # 历史遗留绑定：读侧标红由 UI 处理，不阻断本次保存
-        problems.append(f"席位 {role_id} 绑定的模型 {requested} 未在模型库登记（可选：{', '.join(sorted(registered))} 或留空=跟随主脑）")
-    return problems
 
 
 def _locked_council(fn):
@@ -191,23 +108,6 @@ def _atomic_write_json(file_path: Path, data: Any) -> None:
     os.replace(temp_name, file_path)
 
 
-def validate_council_roles(roles: Any) -> str:
-    """读写两侧共用同一套结构校验，返回人话问题描述（"" = 通过）。
-
-    审计 P1-4a(2026-09-13)：旧读闸只认 `trader_trend`/`cio` 两个 id，而写闸认任意
-    `is_arbitrator` 席位 → 管理员把 CIO 改名/换成自定义仲裁官后，写入成功、接口返回 ok，
-    **下一次读取就把整份配置覆盖成工厂默认**（enabled=false、自写提示词全丢、无备份）。
-    现在两侧共用本函数：写闸拒绝、读闸只警告绝不覆盖用户数据。
-    """
-    if not isinstance(roles, dict) or not roles:
-        return "没有任何席位配置"
-    has_arbitrator = any(
-        (isinstance(r, dict) and r.get("is_arbitrator")) or str(k).lower() in {"cio", "arbitrator"}
-        for k, r in roles.items()
-    )
-    if not has_arbitrator:
-        return "缺少首席终审仲裁官/交易总监(CIO)席位"
-    return ""
 
 
 @_locked_council
@@ -450,54 +350,26 @@ def import_council_config(payload: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def get_available_presets() -> List[Dict[str, Any]]:
-    return list(ALL_AVAILABLE_PRESETS.values())
 
 
-def get_preset_suites() -> List[Dict[str, Any]]:
-    return list(COUNCIL_PRESET_SUITES.values())
 
 
 @_locked_council
 def apply_preset_suite(suite_id: str) -> Dict[str, Any]:
-    suite = COUNCIL_PRESET_SUITES.get(suite_id)
-    if not suite:
-        suite = list(COUNCIL_PRESET_SUITES.values())[0]
+    """薄壳：调用时解析门面模块全局，使测试的 patch / 直接赋值生效。
 
-    config = load_council_config()
-    new_roles: Dict[str, Any] = {}
-    for r_id in suite["roles"]:
-        if r_id in ALL_AVAILABLE_PRESETS:
-            preset = dict(ALL_AVAILABLE_PRESETS[r_id])
-            old_model = config.get("roles", {}).get(r_id, {}).get("model_id", "")
-            preset["model_id"] = old_model
-            new_roles[r_id] = preset
-
-    config["consensus_mode"] = suite.get("consensus_mode", DEFAULT_CONSENSUS_MODE)
-    config["roles"] = new_roles
-    return save_council_config(config)
+    实现已迁往 r20_backend.council.presets（结构优化阶段 2 / B5 第二刀）。
+    """
+    return _core_apply_preset_suite(load_council_config, save_council_config, suite_id)
 
 
 @_locked_council
 def reset_role_template(role_id: str) -> Dict[str, Any]:
-    config = load_council_config()
-    roles = config.get("roles", {})
-    if role_id not in roles:
-        raise ValueError(f"未找到角色 ID: {role_id}")
+    """薄壳：调用时解析门面模块全局，使测试的 patch / 直接赋值生效。
 
-    preset = ALL_AVAILABLE_PRESETS.get(role_id)
-    if not preset:
-        if role_id in {"cio", "arbitrator"} or roles[role_id].get("is_arbitrator"):
-            preset = DEFAULT_PRESET_TEMPLATES["cio"]
-        else:
-            raise ValueError(f"该角色无内置出厂模板: {role_id}")
-
-    old_model = roles[role_id].get("model_id", "")
-    new_role = dict(preset)
-    new_role["model_id"] = old_model
-    roles[role_id] = new_role
-    config["roles"] = roles
-    return save_council_config(config)
+    实现已迁往 r20_backend.council.presets（结构优化阶段 2 / B5 第二刀）。
+    """
+    return _core_reset_role_template(load_council_config, save_council_config, role_id)
 
 
 def _call_single_trader(
