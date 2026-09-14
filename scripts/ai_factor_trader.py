@@ -69,6 +69,10 @@ from scripts.trader.gates import (
     is_tradfi_market_liquid as _is_tradfi_market_liquid_impl,
 )
 from scripts.trader.factors import fetch_single_instrument_data as _fetch_single_instrument_data
+from scripts.trader.position_universe import (
+    collect_okx_position_payloads as _collect_okx_position_payloads,
+    merge_cross_venue_positions as _merge_cross_venue_positions,
+)
 from scripts.trader.protection import (
     protection_signals,
     ratcheted_trailing_stop,
@@ -2457,50 +2461,11 @@ def execute_portfolio():
     if not cb_active and execute_batch_ai_brain_cycle:
         try:
             pos_desc = f"当前系统总持仓 OKX {active_pos_count}/{MAX_CONCURRENT_POSITIONS} (多{long_count}/空{short_count})｜跨所持仓 {_xv_total if _xv_total is not None else '未知(拉取失败)'} 笔"
-            active_pos_list = []
-            for f in all_factors:
-                position = f.get("position")
-                if not position:
-                    continue
-                position_payload = dict(position)
-                position_payload.setdefault("venue", "okx")
-                tracker = trackers.get(f"{f['instId']}_{position.get('side', '')}", {})
-                position_payload["trailingStopPx"] = tracker.get("trailingStopPx")
-                position_payload["highWaterMark"] = tracker.get("highWaterMark")
-                position_payload["lowWaterMark"] = tracker.get("lowWaterMark")
-                position_payload["takeProfitPx"] = tracker.get("takeProfitPx")
-                position_payload["stage_desc"] = tracker.get("stage_desc", "")
-                position_payload["atr"] = f.get("atr", 0.0)
-                active_pos_list.append(position_payload)
-
-            # 汇入多所（Binance / Gate）在管持仓，形成三所平权持仓全景
-            # 审计(2026-09-13)：旧此处在主循环内**重新拉取**外所快照——同一周期两次
-            # 读取既重复出网又可在瞬时不一致里撕裂展示（18:00 实锤日志双份打印）。
-            # 现复用 1a 已冻结的周期快照（与预留对账「零重复出网」同一意图）。
-            try:
-                _xv_snap = xv_positions_by_venue
-                if _xv_snap:
-                    for v_name, v_rows in _xv_snap.items():
-                        for p in v_rows:
-                            base = str(p.get("base") or "").upper()
-                            inst = str(p.get("inst_id") or base)
-                            side = str(p.get("side") or "net").lower()
-                            match_f = next((x for x in all_factors if x.get("name") == base), {})
-                            active_pos_list.append({
-                                "venue": v_name,
-                                "instId": f"{v_name.upper()}:{inst}",
-                                "name": base,
-                                "side": side,
-                                "pos": abs(float(p.get("size_signed") or 0)),
-                                "avgPx": float(p.get("entry_price") or 0),
-                                "markPx": float(p.get("mark_price") or 0),
-                                "margin": float(p.get("margin") or 0),
-                                "upl": float(p.get("unrealized_pnl") or 0),
-                                "atr": match_f.get("atr", 0.0),
-                                "leverage": float(p.get("leverage") or 0),
-                            })
-            except Exception as _xv_e:
-                print(f"[三所持仓全景] 外所持仓汇入异常: {_xv_e}")
+            # 持仓全景装配（阶段 4·B3 第三十一刀：迁至 scripts/trader/position_universe.py）
+            active_pos_list = _collect_okx_position_payloads(all_factors, trackers)
+            # 汇入多所（Binance / Gate）在管持仓，形成三所平权持仓全景。
+            # 审计(2026-09-13)：必须复用 1a 已冻结的周期快照（零重复出网）。
+            _merge_cross_venue_positions(active_pos_list, xv_positions_by_venue, all_factors)
             brain_cache = execute_batch_ai_brain_cycle(pos_desc, active_pos_list, usdt_available=usdt_available) or {}
             if brain_cache:
                 refreshed_ok, refreshed_positions, refreshed_error = query_positions()

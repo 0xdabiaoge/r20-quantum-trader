@@ -81,16 +81,34 @@ class _TmpDir(unittest.TestCase):
 
 
 class LedgerFreshnessTest(_TmpDir):
+    NOW = datetime.datetime(2026, 9, 14, 16, 0, tzinfo=BJ)
+
     def _now(self):
-        return datetime.datetime(2026, 9, 14, 16, 0, tzinfo=BJ)
+        return self.NOW
+
+    def _dt(self):
+        """冻结的 `datetime` 替身。**所有**用例都该用它 —— 用真实 datetime 会让
+        用例随时间变红（本文件实测过：16:0x 绿、16:5x 红）。"""
+        return _FrozenDatetime(self.NOW)
 
     def test_fresh_status_is_merged(self):
+        """⚠️ 必须**冻住时间**，不能依赖真实 `datetime`。
+
+        我第一版写的是「`generated_at = self._now()`（固定的 16:00）+ 真实
+        `datetime`」。那么这条用例在 **16:45 之前跑是绿的、之后变红** ——
+        因为固定的 16:00 会超出 2700 秒（45 分钟）窗口。
+
+        它当时确实绿着通过了（我跑那次是 16:0x），随后在 16:5x 的全量套件里翻红。
+        **一条随墙上时钟变色的测试，比没有测试更糟**：它会让人怀疑无关的改动。
+        故改为注入 `_FrozenDatetime`，与该类其他用例一致。
+        """
         self._write("ledger_sync_status.json", {
             "generated_at": _iso(self._now()),
             "venues": {"binance": {"status": "failed", "reason": "boom"}},
         })
         errs: list[str] = []
-        merge_ledger_sync_status(errs, self.dir, datetime=datetime)
+        merge_ledger_sync_status(errs, self.dir,
+                                 datetime=_FrozenDatetime(self._now()))
         self.assertEqual(len(errs), 1)
         self.assertIn("ledger-binance", errs[0])
         self.assertIn("台账同步失败", errs[0])
@@ -144,30 +162,39 @@ class LedgerFreshnessTest(_TmpDir):
             "venues": {"binance": {"status": "failed", "reason": "x"}},
         })
         errs: list[str] = []
-        merge_ledger_sync_status(errs, self.dir, datetime=datetime)
+        merge_ledger_sync_status(errs, self.dir,
+                                 datetime=_FrozenDatetime(self._now()))
         self.assertEqual(errs, [], "generated_at 解析失败 → 整段跳过（_fresh=False）")
 
     def test_missing_generated_at_skips(self):
         self._write("ledger_sync_status.json",
                     {"venues": {"binance": {"status": "failed", "reason": "x"}}})
         errs: list[str] = []
-        merge_ledger_sync_status(errs, self.dir, datetime=datetime)
+        merge_ledger_sync_status(errs, self.dir,
+                                 datetime=_FrozenDatetime(self._now()))
         self.assertEqual(errs, [])
 
 
 class LedgerVenueSemanticsTest(_TmpDir):
+    #: 冻住的时刻 —— 别用真实 `datetime.now()`：那会让这些用例随时间变红（见
+    #: LedgerFreshnessTest.test_fresh_status_is_merged 的教训）。
+    NOW = datetime.datetime(2026, 9, 14, 16, 0, tzinfo=BJ)
+
     def _fresh(self, venues):
         self._write("ledger_sync_status.json", {
-            "generated_at": _iso(datetime.datetime.now(BJ)),
+            "generated_at": _iso(self.NOW),
             "venues": venues,
         })
+
+    def _dt(self):
+        return _FrozenDatetime(self.NOW)
 
     def test_failed_and_truncated_are_elif(self):
         """同一所同时标 failed 与 truncated 时**只报一条**（failed 优先）。"""
         self._fresh({"binance": {"status": "failed", "reason": "r",
                                  "truncated": True}})
         errs: list[str] = []
-        merge_ledger_sync_status(errs, self.dir, datetime=datetime)
+        merge_ledger_sync_status(errs, self.dir, datetime=self._dt())
         self.assertEqual(len(errs), 1, "不得报两条")
         self.assertIn("台账同步失败", errs[0])
         self.assertNotIn("分页未取尽", errs[0])
@@ -175,7 +202,7 @@ class LedgerVenueSemanticsTest(_TmpDir):
     def test_truncated_flag_reported(self):
         self._fresh({"gate": {"status": "ok", "truncated": True}})
         errs: list[str] = []
-        merge_ledger_sync_status(errs, self.dir, datetime=datetime)
+        merge_ledger_sync_status(errs, self.dir, datetime=self._dt())
         self.assertEqual(len(errs), 1)
         self.assertIn("ledger-gate", errs[0])
         self.assertIn("历史分页未取尽", errs[0])
@@ -183,27 +210,27 @@ class LedgerVenueSemanticsTest(_TmpDir):
     def test_truncated_at_also_triggers(self):
         self._fresh({"gate": {"status": "ok", "truncated_at": "2026-09-14"}})
         errs: list[str] = []
-        merge_ledger_sync_status(errs, self.dir, datetime=datetime)
+        merge_ledger_sync_status(errs, self.dir, datetime=self._dt())
         self.assertEqual(len(errs), 1)
         self.assertIn("历史分页未取尽", errs[0])
 
     def test_ok_venue_reports_nothing(self):
         self._fresh({"gate": {"status": "ok"}})
         errs: list[str] = []
-        merge_ledger_sync_status(errs, self.dir, datetime=datetime)
+        merge_ledger_sync_status(errs, self.dir, datetime=self._dt())
         self.assertEqual(errs, [])
 
     def test_non_dict_venue_entry_is_skipped(self):
         self._fresh({"gate": "not-a-dict", "binance": None})
         errs: list[str] = []
-        merge_ledger_sync_status(errs, self.dir, datetime=datetime)
+        merge_ledger_sync_status(errs, self.dir, datetime=self._dt())
         self.assertEqual(errs, [])
 
     def test_multiple_failed_venues_all_reported(self):
         self._fresh({"binance": {"status": "failed", "reason": "b"},
                      "gate": {"status": "failed", "reason": "g"}})
         errs: list[str] = []
-        merge_ledger_sync_status(errs, self.dir, datetime=datetime)
+        merge_ledger_sync_status(errs, self.dir, datetime=self._dt())
         self.assertEqual(len(errs), 2)
         self.assertTrue(any("ledger-binance" in e for e in errs))
         self.assertTrue(any("ledger-gate" in e for e in errs))
@@ -212,7 +239,7 @@ class LedgerVenueSemanticsTest(_TmpDir):
         self._write("ledger_sync_status.json",
                     {"generated_at": _iso(datetime.datetime.now(BJ))})
         errs: list[str] = []
-        merge_ledger_sync_status(errs, self.dir, datetime=datetime)
+        merge_ledger_sync_status(errs, self.dir, datetime=self._dt())
         self.assertEqual(errs, [])
 
 
