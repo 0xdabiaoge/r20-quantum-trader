@@ -236,6 +236,35 @@ v7.6.0 起，全部执行层硬风控参数从 py 源码中彻底剥离，收敛
 
 ---
 
+## 🗂️ 代码结构入口（给开发者 / 接手的 Agent）
+
+> ⚠️ 本仓库的 `AGENTS.md` 长期指向一份 **`OPENCODE.md`** 作为"工程交接入口"，
+> 但该文件**在全仓历史上从未存在过**（`git log --diff-filter=D` 无记录，
+> 也未被 gitignore）。为避免继续把人引到空路径，
+> 下面给出**真实存在**的结构文档入口（第六十七刀补）。
+
+| 想了解 | 看这里 |
+|---|---|
+| 后端分层（L0 门面 / L1 装配 / L2 路由 / L3 领域 / L4 子包）、新文件该放哪、抽取约定 | `r20_backend/README.md` |
+| 运行时脚本：**哪个是入口/守护、多久跑一次**、33 个根层模块各干什么、双拼写 import 铁律 | `scripts/README.md` |
+| 前端组件与 composable 的职责划分 | `frontend/src/components/admin/README.md` |
+| 部署、环境变量、依赖 | 本文档下方「极速部署指南」与 `STANDALONE.md` |
+| 故障恢复 | `RECOVERY_GUIDE.md` |
+
+**本阶段（结构优化 4·B3）建立的三道自动门禁**——它们会在以下情况翻红：
+
+1. **子包模块漏登记**：`tests/test_directory_docs_current.py` 要求
+   13 个受管子包的每个模块都写进各自的 `__init__.py` 清单；
+2. **根层模块漏登记**：同上，`r20_backend/*.py`（38 个）与
+   `scripts/*.py`（33 个）必须出现在对应 README 的表格/列举里，
+   反向也查（文档提到的 `.py` 必须真实存在，防死引用）；
+3. **文档数字腐烂**：`tests/test_readme_baseline_numbers.py` 要求
+   `r20_backend/README.md` 里的测试基线数字与仓内用例数同量级（±10%）。
+
+判绿命令与当前基线见 `r20_backend/README.md` §6。
+
+---
+
 ## 🚀 极速部署指南
 
 ### 源码直接部署（Python 3.10+；前端源码构建另需 Node.js/npm）
