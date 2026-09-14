@@ -76,11 +76,23 @@ class DashboardPersistentCacheTests(unittest.TestCase):
         self.assertEqual(stale["factor_library"]["instruments"][0]["calculus_dynamics"]["velocity"], -0.78)
         # factors should be rebuilt from local trading_state + ai_brain_decisions
         self.assertTrue(len(stale["factors"]) > 0)
-        f0 = stale["factors"][0]
-        self.assertEqual(f0["name"], "BTC")
-        self.assertEqual(f0["rsi"], 58.2)
-        self.assertEqual(f0["smart_money"]["weighted_long_pct"], 65.4)
-        self.assertEqual(f0["adx_1h"], 31.7)
+        # ⚠️ 必须**按 instId 查找**，不能用 `factors[0]`。
+        #
+        # `_build_factors_from_local_files` 遍历的是 `load_instruments()`（**活池**），
+        # 逐项按 instId 去 fixture 里取值 —— 所以：
+        #   ① `factors` 是"每个活池标的一条"，顺序由活池决定，**不是** fixture 顺序；
+        #   ② 本用例通过 patch 注入的只是**值**，池成员仍来自实盘
+        #      `data/instrument_pool.json`（本仓池里含 BTC，故 fixture 命中）。
+        # 原断言写死 `factors[0]["name"] == "BTC"`，只有当 BTC 恰为活池第一项时才成立。
+        # 池扩到 10 个并重排后（第四十八刀恢复池时暴露）它就一直失败 ——
+        # 这是**测试与实盘数据耦合**的既有缺陷，不是代码缺陷。
+        by_id = {f.get("instId"): f for f in stale["factors"] if isinstance(f, dict)}
+        self.assertIn("BTC-USDT-SWAP", by_id, "活池里应有 BTC，否则本 fixture 无法命中")
+        btc = by_id["BTC-USDT-SWAP"]
+        self.assertEqual(btc["name"], "BTC")
+        self.assertEqual(btc["rsi"], 58.2)
+        self.assertEqual(btc["smart_money"]["weighted_long_pct"], 65.4)
+        self.assertEqual(btc["adx_1h"], 31.7)
         shutil.rmtree(temp_dir, ignore_errors=True)
 
 

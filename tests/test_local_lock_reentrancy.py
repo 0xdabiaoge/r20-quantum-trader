@@ -274,26 +274,64 @@ class FacadeWiringTest(unittest.TestCase):
             self.assertIn("except Exception:", src)
 
     def test_both_facades_fall_back_reentrantly(self):
-        """强制走兜底分支，验证两个门面的锁可嵌套。"""
-        for path in FACADES:
-            modname = path.stem
-            spec_ok = False
-            with patch.dict(sys.modules, {"r20_backend.file_locks": None}):
-                import importlib
-                mod = importlib.import_module(modname)
-                importlib.reload(mod)
-                lockfn = getattr(mod, "_library_lock", None) or getattr(mod, "_pool_lock")
-                target = getattr(mod, "LIBRARY_FILE", None) or getattr(mod, "POOL_FILE")
-                with tempfile.TemporaryDirectory() as d:
-                    fake = Path(d) / target.name
-                    with patch.object(mod, target.name if False else
-                                      ("LIBRARY_FILE" if hasattr(mod, "LIBRARY_FILE") else "POOL_FILE"),
-                                      fake):
-                        with lockfn():
-                            with lockfn():
-                                spec_ok = True
-                importlib.reload(mod)
-            self.assertTrue(spec_ok, f"{path.name} 兜底路径不可重入")
+        """强制走兜底分支，验证两个门面的锁可嵌套。
+
+        ⚠️⚠️ **必须在子进程 + 临时数据目录里跑**。第四十八刀我在临时验证里
+        直接调了 `mutate_instruments` 并把它写到了**真实**
+        `data/instrument_pool.json`（写进 `[{'name':'BTC'},{'name':'ETH'}]`）——
+        实盘池被写坏，20:30 周期起 fail-safe「标的池不可信，禁止开新仓」。
+
+        `tests/config_sandbox.isolate_config` 只重定向**大写路径常量**，
+        对"调用时传入的函数/参数覆盖"无效，所以那次没被拦下。
+        故这里用子进程 + `TempDirectory`，并把 `LIBRARY_FILE`/`POOL_FILE`
+        一并指向临时目录 —— **绝不触碰真实 `data/`**。
+        """
+        probe = """
+import sys, tempfile, pathlib
+sys.path.insert(0, %r)
+sys.path.insert(0, %r)
+sys.modules['r20_backend.file_locks'] = None      # 逼出 ImportError → 兜底分支
+
+d = pathlib.Path(tempfile.mkdtemp(prefix='r20-lock-probe-'))
+import prompt_library, instrument_pool
+for mod, const in ((prompt_library, 'LIBRARY_FILE'), (instrument_pool, 'POOL_FILE')):
+    object.__setattr__(mod, const, d / (const.lower() + '.json'))
+    lockfn = getattr(mod, '_library_lock', None) or getattr(mod, '_pool_lock')
+    with lockfn():
+        with lockfn():
+            pass
+print('FALLBACK-REENTRANT-OK')
+assert (d / '.library_file.json.lock').exists() or (d / '.pool_file.json.lock').exists()
+""" % (str(SCRIPTS), str(ROOT))
+        r = subprocess.run([sys.executable, "-c", probe],
+                           capture_output=True, text=True, timeout=60, cwd=str(ROOT))
+        self.assertEqual(r.returncode, 0, r.stderr[-1500:])
+        self.assertIn("FALLBACK-REENTRANT-OK", r.stdout)
+
+    def test_probe_would_have_caught_the_incident(self):
+        """回归：确认"兜底分支"确实被逼出来了（否则上面的用例是空跑）。
+
+        做法：同一探针里断言 `local_file_lock` 被真的调到 ——
+        通过检查锁文件是否落在临时目录（后端锁不会创建它）。
+        """
+        probe = """
+import sys, tempfile, pathlib
+sys.path.insert(0, %r)
+sys.path.insert(0, %r)
+sys.modules['r20_backend.file_locks'] = None
+d = pathlib.Path(tempfile.mkdtemp(prefix='r20-lock-probe2-'))
+import instrument_pool
+instrument_pool.POOL_FILE = d / 'pool.json'
+with instrument_pool._pool_lock():
+    pass
+created = sorted(p.name for p in d.iterdir())
+print('CREATED=' + ','.join(created))
+assert created == ['.pool.json.lock'], created
+""" % (str(SCRIPTS), str(ROOT))
+        r = subprocess.run([sys.executable, "-c", probe],
+                           capture_output=True, text=True, timeout=60, cwd=str(ROOT))
+        self.assertEqual(r.returncode, 0, r.stderr[-1500:])
+        self.assertIn("CREATED=.pool.json.lock", r.stdout)
 
     def test_dual_import_under_both_path_layouts(self):
         """⚠️ `local_lock` 的导入必须能在**两种**布局下成功。
