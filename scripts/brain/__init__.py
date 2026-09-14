@@ -15,15 +15,21 @@
 |---|---|---|
 | `packages.py` | `fetch_single_instrument_package` 单标的数据包装配（254 行） | 门面 L303-556 |
 | `xvenue.py` | 跨所矩阵采集 / 场所健康度落盘 / 分歧标注与提示词证据行（231 行） | 门面 L446-676 |
+| `decisions.py` | `validate_and_filter_decision` + `assemble_decision_cache` 决策校验与缓存装配（148 行） | 门面 L915-1062 |
 
-## 注入面速查（改这两块前先看）
+## 注入面速查（改这些前先看）
 
 | 模块 | 需要在调用期注入的门面名 | 原因 |
 |---|---|---|
 | `packages.py` | `fetch_candles` / `fetch_single_indicator` | 门面重载后 import 期绑定会失配；且测试可能 patch 门面名 |
 | `xvenue.py` | `get_adapter`（门面 `_get_xvenue_adapter`）/ `safe_float` / `atomic_write_json` / `venue_health_file` / `health`（门面 `_XV_HEALTH`） | 前四个都是既有测试缝；`_XV_HEALTH` 被 `tests/test_xvenue_prompt.py:120` 直接断言，状态必须留在门面 |
+| `decisions.py` | `data_dir`（门面 `DATA_DIR`）/ `max_leverage` / `min_leverage` / `safe_float` / `get_system_version_tag` / `validate` | 前三个都是既有测试缝（`test_ai_health_sidecar`、`test_leverage_range_and_council`）；`validate` 的契约是 **4 个位置参数**，由门面 curry 进 `safe_float` |
 
-**`xvenue.py` 是本子包里注入面最宽的一块** —— 它的每个依赖都对应一条既有测试缝。
-改动它时请先看 `tests/test_brain_xvenue_extraction.py`：那里的 `InjectionContractTest`
+**`xvenue.py` 是注入面最宽、`decisions.py` 是契约最容易写错的一块。**
+改动它们前请先看对应的 `tests/test_brain_*_extraction.py`：那里的 `InjectionContractTest`
 就是为"搬走时把测试缝一起搬没了"这种情况写的。
+
+> 实战教训（`decisions.py`）：`assemble_decision_cache` 调用注入的 `validate` 时
+> 少传了 `safe_float`，**全量测试仍全绿** —— 因为门面壳把 `safe_float` 填好了，
+> 只有"注入契约"测试（哨兵函数）才抓得到。跨文件互调的参数形状必须显式钉住。
 """

@@ -74,6 +74,10 @@ from scripts.brain.packages import fetch_single_instrument_package as _fetch_sin
 # 结构优化阶段4·B3 第二块：跨所采集/健康度/提示词组装已搬入 scripts/brain/xvenue.py。
 # 依赖面较宽（适配器缝、safe_float、VENUE_HEALTH_FILE、atomic_write_json、_XV_HEALTH），
 # 全部走**调用期注入**，理由见该模块 docstring 与 r20_backend/README.md §5。
+from scripts.brain.decisions import (
+    validate_and_filter_decision as _validate_and_filter_decision_impl,
+    assemble_decision_cache as _assemble_decision_cache_impl,
+)
 from scripts.brain.xvenue import (
     _xvenue_enabled as _xvenue_enabled_impl,
     _xv_record as _xv_record_impl,
@@ -912,33 +916,15 @@ def construct_full_market_prompt(packages: List[Dict[str, Any]], pos_summary: st
             runtime_context_out["policy_snapshot"] = policy_snapshot
     return apply_module_layout(prompt, profile, "trading_user", f"{profile.get('name', '稳健')}交易用户提示词模板", context=runtime_vars)
 
-def validate_and_filter_decision(p: Dict[str, Any], d_item: Dict[str, Any], active_inst_ids: set, active_position_sides: Dict[str, str]) -> tuple[str, str, float]:
+def validate_and_filter_decision(p: Dict[str, Any], d_item: Dict[str, Any],
+                                 active_inst_ids: set,
+                                 active_position_sides: Dict[str, str]) -> tuple[str, str, float]:
+    """单条决策校验。实现见 scripts/brain/decisions.py。
+
+    `safe_float` 在调用时注入（它定义在本门面，不是共享叶子函数）。
     """
-    Fail-closed execution layer gatekeeper powered by pluggable interceptors.
-    1. Base pre-checks: data completeness & opposing position collision
-    2. Dynamic interceptor pipeline: runs all enabled Python interceptor plugins
-    """
-    context = {
-        "active_inst_ids": active_inst_ids,
-        "active_position_sides": active_position_sides,
-    }
-    try:
-        from r20_backend.interceptor_manager import run_interceptor_pipeline
-        return run_interceptor_pipeline(p, d_item, context)
-    except Exception as exc:
-        # Fail-closed fallback in case interceptor manager cannot be reached
-        raw_action = str((d_item or {}).get("action", "WAIT")).upper()
-        if raw_action not in {"BUY_LONG", "SELL_SHORT", "WAIT"}:
-            raw_action = "WAIT"
-        entry = safe_float((d_item or {}).get("entry_price"))
-        take_profit = safe_float((d_item or {}).get("take_profit_price"))
-        stop_loss = safe_float((d_item or {}).get("stop_loss_price"))
-        rr = 0.0
-        if raw_action == "BUY_LONG" and entry > stop_loss > 0 and take_profit > entry:
-            rr = (take_profit - entry) / (entry - stop_loss)
-        elif raw_action == "SELL_SHORT" and stop_loss > entry > take_profit > 0:
-            rr = (entry - take_profit) / (stop_loss - entry)
-        return "WAIT", f"拦截插件管线调用异常: {exc}，安全降级为 WAIT", rr
+    return _validate_and_filter_decision_impl(
+        p, d_item, active_inst_ids, active_position_sides, safe_float=safe_float)
 
 
 def assemble_decision_cache(
@@ -951,115 +937,31 @@ def assemble_decision_cache(
     policy_snapshot: Optional[Dict[str, Any]] = None,
     council_status: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """Pure assembly of validated decisions into the standard cache contract, bound to policy snapshot."""
-    policy_snapshot = policy_snapshot or {}
-    p_ver = policy_snapshot.get("policy_version", f"{_get_system_version_tag()}@unknown")
-    p_hash = policy_snapshot.get("policy_hash", "unknown")
-    p_summary = policy_snapshot.get("summary", "")
+    """把已验证决策装配成标准缓存契约。实现见 scripts/brain/decisions.py。
 
-    standard_cache = {}
-    # Load dynamic asset multipliers from self-improvement review if present
-    asset_multipliers = {}
-    try:
-        mult_file = os.path.join(DATA_DIR, "asset_multipliers.json")
-        if os.path.isfile(mult_file):
-            with open(mult_file, "r", encoding="utf-8") as f:
-                mult_data = json.load(f)
-            asset_multipliers = mult_data.get("multipliers") or {}
-    except Exception:
-        pass
+    依赖一律在**调用时**从门面全局取名，以便既有测试缝继续生效：
+    - `patch.object(abt, "DATA_DIR", …)`（test_ai_health_sidecar）
+    - `patch.object(abt, "MAX_LEVERAGE"/"MIN_LEVERAGE", …)`（test_leverage_range_and_council
+      断言"模型给 3 被下限抬到 5"，夹取必须读到补丁值）
+    - `safe_float` / `_get_system_version_tag` 定义在本门面。
 
-    for p in packages:
-        inst_id = p["instId"]
-        d_item = decisions_dict.get(inst_id, {})
-        if not isinstance(d_item, dict):
-            d_item = {}
-        # Smooth field alias normalization (support both standard contract and council desk outputs)
-        entry = safe_float(d_item.get("entry_price") or d_item.get("limit_price"))
-        take_profit = safe_float(d_item.get("take_profit_price") or d_item.get("take_profit"))
-        stop_loss = safe_float(d_item.get("stop_loss_price") or d_item.get("stop_loss"))
-        confidence = max(0.0, min(100.0, safe_float(d_item.get("confidence"))))
-        # 杠杆钳制与后台风控页杠杆区间 [MIN, MAX] 联动（2026-09-10：
-        # 旧版下限钉死 2 且提示词示例 min(3,MAX) 锚定，导致上限配 7 仍单单一律 3x）
-        lev_hi = max(1, int(round(MAX_LEVERAGE)))
-        lev_lo = max(1, min(int(round(MIN_LEVERAGE)), lev_hi))
-        ai_leverage = int(max(lev_lo, min(lev_hi, round(safe_float(d_item.get("leverage", lev_lo))))))
-        raw_margin = safe_float(d_item.get("margin_usdt") or d_item.get("margin_usd", 0.0))
+    注：不要把默认值写成同名形参 —— 那会让函数体里的裸名解析到形参、
+    静默关掉补丁缝（详见 scripts/brain/xvenue.py 同名教训）。
+    """
+    return _assemble_decision_cache_impl(
+        packages, decisions_dict, active_inst_ids, active_position_sides,
+        time_str, macro_summary,
+        policy_snapshot=policy_snapshot, council_status=council_status,
+        data_dir=DATA_DIR,
+        max_leverage=MAX_LEVERAGE,
+        min_leverage=MIN_LEVERAGE,
+        safe_float=safe_float,
+        get_system_version_tag=_get_system_version_tag,
+        validate=lambda p_, d_, ids_, sides_: _validate_and_filter_decision_impl(
+            p_, d_, ids_, sides_, safe_float=safe_float),
+    )
 
-        # Dynamically apply self-improvement asset multiplier (e.g. BTC 1.2x, DOGE 0.8x)
-        sym_key = inst_id.split("-")[0] if "-" in inst_id else inst_id
-        mult = float(asset_multipliers.get(sym_key, asset_multipliers.get(inst_id, 1.0)))
-        mult = max(0.5, min(1.5, mult))
-        ai_margin = round(raw_margin * mult, 2) if raw_margin > 0 else 0.0
 
-        # Ensure normalized keys exist for downstream interceptors
-        normalized_d_item = dict(d_item)
-        normalized_d_item["entry_price"] = entry
-        normalized_d_item["take_profit_price"] = take_profit
-        normalized_d_item["stop_loss_price"] = stop_loss
-        normalized_d_item["margin_usdt"] = ai_margin
-        normalized_d_item["leverage"] = ai_leverage
-
-        final_action, rejection_reason, rr = validate_and_filter_decision(
-            p, normalized_d_item, active_inst_ids, active_position_sides
-        )
-
-        standard_cache[inst_id] = {
-            "instId": inst_id,
-            "name": p["name"],
-            "timestamp": int(time.time()),
-            "time_str": time_str,
-            "policy_version": p_ver,
-            "policy_hash": p_hash,
-            "policy_snapshot": {
-                "policy_version": p_ver,
-                "policy_hash": p_hash,
-                "summary": p_summary,
-            },
-            "macro_assessment": macro_summary,
-            # 投委会溯源（2026-09-10 前台适配数据契约）：ran/reason + CIO 采纳席位
-            "council": {
-                **(council_status or {"ran": False}),
-                "adopted_role": (d_item or {}).get("adopted_role"),
-            },
-            "thought_process": {
-                "market_structure": d_item.get("market_structure", "多周期结构中性"),
-                "calculus_dynamics": d_item.get("calculus_dynamics", "模型未提供具体微积分证据"),
-                "math_prob_rationale": d_item.get("math_prob_rationale", "模型未提供具体定积分与概率证据"),
-                "volume_and_oi": d_item.get("volume_and_oi", f"OI: {p.get('oiUsd', '--')}, Taker: {p.get('takerNetUsd', '--')}"),
-                "risk_reward_evaluation": "目标盈亏比与硬底线以【本周期风险预算】为准"
-            },
-            "smart_money": p.get("smart_money", {}),
-            "adx_1h": p.get("adx_1h", "--"),
-            "decision": {
-                "action": final_action,
-                "confidence": confidence,
-                "leverage": ai_leverage,
-                "margin_usdt": ai_margin,
-                "entry_price": entry,
-                "take_profit_price": take_profit,
-                "stop_loss_price": stop_loss,
-                "risk_reward_ratio": f"{rr:.2f} : 1" if rr > 0 else "--",
-                "summary_reason": rejection_reason or str(d_item.get("summary_reason", "全市场矩阵综合评估中"))[:120]
-            },
-            "data_quality": p.get("data_quality", "invalid"),
-            "raw_ticker": {
-                "last": p.get("price"),
-                "bidPx": p.get("bidPx"),
-                "askPx": p.get("askPx"),
-                "chg24h": p.get("chg24h"),
-                "vol24h": p.get("vol24h", 0.0)
-            },
-            "raw_funding_rate": f"{p['fundingRate']}%" if p.get('fundingRate') else "--",
-            "raw_oi": p.get('oiUsd') or "--",
-            "raw_taker_vol": p.get('takerNetUsd') or "--",
-            "raw_ls_ratio": str(p.get('lsRatio')) if p.get('lsRatio') is not None else "--",
-            # US-007 数据通路：把跨所比对矩阵随决策缓存持久化，供 /api/all 透传前台；
-            # 纯附加键，既有消费方忽略未知键，缺数据时为空 dict
-            "xvenue": p.get("xvenue") or {}
-        }
-
-    return standard_cache
 
 
 @single_brain_cycle

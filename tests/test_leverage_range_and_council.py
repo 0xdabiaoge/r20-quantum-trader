@@ -190,8 +190,15 @@ class CouncilBudgetTests(unittest.TestCase):
 
 class BrainCouncilTransparencyTests(unittest.TestCase):
     def test_cache_and_history_contract(self):
-        import ai_brain_trader as abt
-        src = Path(abt.__file__).read_text(encoding="utf-8")
+        # 阶段4·B3 把 assemble_decision_cache 搬进了 scripts/brain/decisions.py
+        # （门面只留薄壳）。原先按 `abt.__file__` 单文件定位，搬走后
+        # `'"council": {'` 这条会翻红、其它三条仍绿 —— 说明该锚点钉的其实是
+        # 「主脑域」而不是某一个文件。改为按领域源码集定位：needle 与数量不变，
+        # 覆盖面更广（门面或子包任一处置回/丢失该契约都会响）。
+        from tests import source_scan
+        src = source_scan.combined("scripts/ai_brain_trader.py", pkg_name="brain")
+        source_scan.assert_area_looks_real(
+            self, src, must_contain="def construct_full_market_prompt", min_chars=60000)
         self.assertIn("council_status", src)                 # 降级原因透明
         self.assertIn('"council": {', src)                    # per-symbol 缓存契约
         self.assertIn("council_status=council_status", src)  # 组装调用透传
