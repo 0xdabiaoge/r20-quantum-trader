@@ -12,6 +12,9 @@ from r20_backend.dashboard_payload.cache import (  # noqa: E402
 from r20_backend.dashboard_payload.position_view import (  # noqa: E402
     collect_position_rows as _core_collect_position_rows,
 )
+from r20_backend.dashboard_payload.order_view import (  # noqa: E402
+    collect_pending_order_rows as _core_collect_pending_order_rows,
+)
 from r20_backend.dashboard_payload.bills import (  # noqa: E402
     aggregate_bills as _core_aggregate_bills,
 )
@@ -306,77 +309,8 @@ def update_cache_cycle():
 
     # Parse Pending Maker Orders
     pending_orders_list = []
-    if isinstance(orders_data, list):
-        for o in orders_data:
-            c_ts = int(o.get("cTime", 0) or 0) / 1000.0
-            c_time_str = datetime.datetime.fromtimestamp(c_ts, tz=tz_beijing).strftime("%m-%d %H:%M:%S") if c_ts > 0 else "--"
-            inst_id = o.get("instId", "")
-            inst_clean = inst_id.replace("-USDT-SWAP", "").replace("-SWAP", "")
-            side_raw = str(o.get("side", "")).lower()
-            pos_side = str(o.get("posSide", "net")).lower()
-            reduce_only = str(o.get("reduceOnly", "false")).lower() == "true"
-            ord_type = str(o.get("ordType", "limit")).lower()
-            raw_px = str(o.get("px") or "").strip()
-
-            if reduce_only:
-                if side_raw == "sell":
-                    side_label = "市价平多" if ord_type == "market" else "限价平多"
-                    is_long = False
-                    side_color = "rose"
-                else:
-                    side_label = "市价平空" if ord_type == "market" else "限价平空"
-                    is_long = True
-                    side_color = "emerald"
-            else:
-                if side_raw == "buy":
-                    side_label = "市价买多" if ord_type == "market" else "限价买多"
-                    is_long = True
-                    side_color = "emerald"
-                else:
-                    side_label = "市价卖空" if ord_type == "market" else "限价卖空"
-                    is_long = False
-                    side_color = "rose"
-
-            if not raw_px or raw_px == "0":
-                px_display = "市价" if ord_type == "market" else "--"
-            else:
-                try:
-                    px_float = float(raw_px)
-                    px_display = f"{px_float:g}"
-                except ValueError:
-                    px_display = raw_px
-            
-            attach_list = o.get("attachAlgoOrds", [])
-            tp_px = "--"
-            sl_px = "--"
-            if attach_list and len(attach_list) > 0:
-                att = attach_list[0]
-                tp_px = str(att.get("tpTriggerPx") or "--")
-                sl_px = str(att.get("slTriggerPx") or "--")
-
-            pending_orders_list.append({
-                "venue": "okx",
-                "exchange": "okx",
-                "ordId": str(o.get("ordId", "")),
-                "name": inst_clean,
-                "inst": inst_clean,
-                "instId": inst_id,
-                "side": "buy" if side_raw == "buy" else "sell",
-                "side_label": side_label,
-                "side_raw": side_raw,
-                "posSide": pos_side,
-                "is_long": is_long,
-                "side_color": side_color,
-                "ord_type": ord_type,
-                "lever": f"{o.get('lever', '3')}x",
-                "px": px_display,
-                "sz": str(o.get("sz", "--")),
-                "cTime": str(o.get("cTime", "")),
-                "time": c_time_str,
-                "state": str(o.get("state", "live")),
-                "tp_px": tp_px,
-                "sl_px": sl_px
-            })
+    _core_collect_pending_order_rows(
+        orders_data, pending_orders_list, tz_beijing=tz_beijing, datetime=datetime)
 
     # A failed core account query must never overwrite last-known-good data with zeros.
     if not balance_ok or not positions_ok:
