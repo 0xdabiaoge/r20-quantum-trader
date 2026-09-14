@@ -25,6 +25,7 @@ if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
 import scripts.ai_factor_trader as trader
+import shutil
 from r20_backend import risk_reservation
 
 
@@ -36,6 +37,7 @@ def _utc_stamp(seconds_ago: float) -> str:
 class ReservationReconcileTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.mkdtemp(prefix="us010-")
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
         self.db = os.path.join(self.tmp, "res.db")
         self.mgr = risk_reservation.get_manager(db_path=self.db)
         self.out = ""

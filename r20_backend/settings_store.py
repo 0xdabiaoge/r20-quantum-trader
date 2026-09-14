@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Mapping
 from .config import ROOT, refresh_settings
 from .file_locks import file_lock
+from .redact import mask as _redact_mask
 
 ENV_FILE = ROOT / ".env"
 MANAGED_KEYS = {
@@ -63,11 +64,18 @@ except Exception:
 
 
 def mask(value: str, visible: int = 4) -> str:
-    if not value:
-        return ""
-    if len(value) <= visible * 2:
-        return "*" * len(value)
-    return f"{value[:visible]}{'*' * 8}{value[-visible:]}"
+    """凭证脱敏 —— **转发到单一事实源** `r20_backend.redact.mask`。
+
+    结构优化阶段 4·B3 第四十九刀：本函数与 `r20_backend.llm.util.mask_secret`
+    原先各有一份**逐字节相同**的实现（`settings_store` 面向后台设置页、
+    `llm.util` 面向 LLM 配置页）。两份都在决定"密钥能露出几个字符"，
+    任何一处改动都会让两侧脱敏强度不一致，故收敛到同一实现。
+
+    ⚠️ 名字**必须**保留在本模块：`tests/test_audit_batch1_credentials_trust_boundary.py`
+    直接 `from r20_backend.settings_store import mask`，且
+    `r20_backend/routers/gateway.py` 也从这里导入。
+    """
+    return _redact_mask(value, visible)
 
 
 def is_masked(value: str) -> bool:

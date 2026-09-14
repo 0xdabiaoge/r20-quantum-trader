@@ -38,6 +38,7 @@ if str(_PROJECT_ROOT) not in sys.path:
 import scripts.ai_factor_trader as trader
 from r20_backend import risk_reservation
 from r20_backend.exchanges import listing as listing_mod
+import shutil
 from r20_backend.exchanges import routing_policy
 
 FP = "fp-test-1234"
@@ -72,6 +73,7 @@ class _WiringSandbox(unittest.TestCase):
 
     def setUp(self):
         self.tmp = tempfile.mkdtemp(prefix="us003-")
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
         self.cache_file = os.path.join(self.tmp, "ai_brain_decisions.json")
         self.calls = []
         self.out = ""
@@ -422,6 +424,7 @@ class TestPreferredVenueConfigCompatibility(unittest.TestCase):
 
     def setUp(self):
         self.tmp = tempfile.mkdtemp(prefix="us003-cfg-")
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
         self.file = Path(self.tmp) / "venue_routing.json"
 
     def _load(self, payload):

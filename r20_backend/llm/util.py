@@ -11,6 +11,8 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+from r20_backend.redact import mask as _redact_mask
+
 
 def _atomic_write_json(path: Path, data: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -30,8 +32,13 @@ def _atomic_write_json(path: Path, data: Any) -> None:
 
 
 def mask_secret(value: str, visible: int = 4) -> str:
-    if not value:
-        return ""
-    if len(value) <= visible * 2:
-        return "*" * len(value)
-    return f"{value[:visible]}{'*' * 8}{value[-visible:]}"
+    """凭证脱敏 —— **转发到单一事实源** `r20_backend.redact.mask`。
+
+    结构优化阶段 4·B3 第四十九刀：与 `r20_backend.settings_store.mask`
+    原先各有一份逐字节相同的实现，现已收敛。
+
+    ⚠️ 名字**必须**保留在 `r20_backend/llm/util.py` 并继续被
+    `llm_manager` 再导出：`tests/test_llm_seam_discipline.py` 的公开面清单里
+    钉着 `"mask_secret"`（它按门面导出名断言）。
+    """
+    return _redact_mask(value, visible)
