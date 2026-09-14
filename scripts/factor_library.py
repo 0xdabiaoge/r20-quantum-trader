@@ -35,7 +35,11 @@ from concurrent.futures import ThreadPoolExecutor
 _BJ = timezone(timedelta(hours=8))
 
 WORKSPACE_DIR = str(_PROJECT_ROOT)
-DATA_DIR = os.path.join(WORKSPACE_DIR, "data")
+#: ⚠️ `R20_DATA_DIR` 是**测试沙箱专用环境变量**（由 tests/config_sandbox.isolate_config
+#: 设置、由 `run_script` 拉起的子进程继承）：跑测试时把 data/ 写入重定向到沙箱，
+#: **生产从不设置该变量 → 取值与原先逐位相同**。修复"测试经子进程写生产文件"
+#: 的泄漏（§88/§91.6），不改任何业务行为。
+DATA_DIR = os.environ.get("R20_DATA_DIR") or os.path.join(WORKSPACE_DIR, "data")
 FACTOR_LIB_CACHE_FILE = os.path.join(DATA_DIR, "factor_library_snapshot.json")
 
 from instrument_pool import load_instruments

@@ -11,6 +11,23 @@ def isolate_config(test):
     test.addCleanup(temp.cleanup)
     root = Path(temp.name)
     project = Path(__file__).resolve().parents[1]
+    # ⚠️ 第七十六刀：让**子进程**也被沙箱接管。
+    # `run_script`（r20_backend/spawn.py）不传 env → 子进程继承父进程 os.environ。
+    # 设置 R20_DATA_DIR 后，尊重它的脚本（factor_library / news_sentiment_harvester /
+    # sync_full_ledger，均实测为被测试拉起的 data/ 写入者）把写入指向沙箱。
+    # **生产从不设置该变量** ⇒ 行为逐位不变（见各脚本注释）。
+    # 修复的是 §88/§91.6 登记的"测试经后台子进程写生产文件"泄漏。
+    import os as _os
+    _env_key = "R20_DATA_DIR"
+    _prev = _os.environ.get(_env_key)
+    _os.environ[_env_key] = str(root / "data")
+
+    def _restore_env():
+        if _prev is None:
+            _os.environ.pop(_env_key, None)
+        else:
+            _os.environ[_env_key] = _prev
+    test.addCleanup(_restore_env)
     for name in ('r20_backend.llm_manager', 'r20_backend.council_manager',
                  'r20_backend.policy_snapshot', 'r20_backend.interceptor_manager',
                  'scripts.prompt_library', 'scripts.evolution_shield',

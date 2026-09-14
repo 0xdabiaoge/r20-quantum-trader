@@ -298,10 +298,10 @@ def _write_json_atomic(path, payload: Any) -> None:
         raise
 
 
-def _run_captured(script, label=None, timeout=45):
+def _run_captured(script, label=None, timeout=45, env=None):
     """审计(2026-09-13)：同解释器子进程 + 非零必吼（旧裸 python3 shell 串=静默死亡）。"""
     from r20_backend.spawn import run_script
-    return run_script(script, timeout=timeout, label=label)
+    return run_script(script, timeout=timeout, label=label, env=env)
 
 
 def sync_instruments_state() -> None:
@@ -410,14 +410,20 @@ def sync_instruments_state() -> None:
     # 5. Run factor_library and news_sentiment in a non-blocking background thread
     import subprocess
     import threading
+    # ⚠️ 第七十六刀：**线程启动前**抓环境快照。
+    # 测试沙箱（isolate_config）的 cleanup 只保证在测试方法结束时还原 ——
+    # 后台线程真正走到 spawn 可能在那之后，"继承当前环境"就会拿到
+    # **已还原的干净环境** ⇒ 子进程写生产 data/（§88 实测窗口）。
+    # 快照在调用线程前同步抓取，生产里快照=真实环境（行为不变）。
+    _env_snapshot = dict(os.environ)
     def _run_bg() -> None:
         try:
             fl_script = ROOT / "scripts" / "factor_library.py"
             if fl_script.exists():
-                _run_captured(fl_script)
+                _run_captured(fl_script, env=_env_snapshot)
             nh_script = ROOT / "scripts" / "news_sentiment_harvester.py"
             if nh_script.exists():
-                _run_captured(nh_script)
+                _run_captured(nh_script, env=_env_snapshot)
         except Exception:
             pass
     threading.Thread(target=_run_bg, daemon=True).start()

@@ -14,10 +14,18 @@ import sys
 from typing import Any, Optional
 
 
-def run_script(script: Any, *, timeout: int = 20, label: Optional[str] = None) -> subprocess.CompletedProcess:
-    """跑一个 python 脚本；返回 CompletedProcess（异常照抛，调用方定夺）。"""
+def run_script(script: Any, *, timeout: int = 20, label: Optional[str] = None,
+               env: Optional[dict] = None) -> subprocess.CompletedProcess:
+    """跑一个 python 脚本；返回 CompletedProcess（异常照抛，调用方定夺）。
+
+    `env`（第七十六刀新增，默认 None = 继承当前进程环境，**行为逐位不变**）：
+    后台线程里 spawn 的子进程若靠"继承"拿环境，会踩沙箱时序竞态 ——
+    线程创建点还在测试沙箱内、真正 spawn 时 `isolate_config` 的 cleanup
+    可能已还原 `R20_DATA_DIR` ⇒ 子进程带着干净环境**写生产**（实测 03:22 窗口）。
+    调用方在**线程创建前**同步抓 `dict(os.environ)` 快照经此传入。
+    """
     cp = subprocess.run([sys.executable, str(script)],
-                        capture_output=True, text=True, timeout=timeout)
+                        capture_output=True, text=True, timeout=timeout, env=env)
     if cp.returncode != 0:
         err = (cp.stderr or cp.stdout or "").strip().replace("\n", " / ")[:200]
         print(f"[spawn] {label or script} 退出码 {cp.returncode}：{err or '无输出'}")
