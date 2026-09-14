@@ -30,6 +30,9 @@ from r20_backend.dashboard_payload.bills import (  # noqa: E402
 from r20_backend.dashboard_payload.algo_protection import (  # noqa: E402
     collect_algo_protection as _core_collect_algo_protection,
 )
+from r20_backend.dashboard_payload.cache_payload import (  # noqa: E402
+    build_live_cache_payload as _core_build_live_cache_payload,
+)
 from r20_backend.dashboard_payload.reset_state import (  # noqa: E402
     read_reset_initial_state as _core_read_reset_initial_state,
 )
@@ -472,98 +475,27 @@ def update_cache_cycle():
         except Exception as _ts_exc:
             print(f"[KPI] warn 今日统计台账口径失败，回退 OKX bills: {_ts_exc}")
 
-    CACHE_DATA = {
-        "timestamp": timestamp_full,
-        "date": today_bj_str,
-        "data_health": {
-            "status": "LIVE" if not source_errors else "PARTIAL",
-            "partial": bool(source_errors),
-            "errors": source_errors,
-            "last_success_at": timestamp_full,
-            "cache_age_seconds": 0,
-            "timezone": "Asia/Shanghai",
-            "bills_complete": False,
-            "bills_coverage_note": "OKX latest 100 bills; NAV remains the cumulative equity source of truth",
-            # 批B(2026-09-13)·决策周期单一事实源：前端 DataStatus 曾 write 死 15 分钟
-            # 当事实读。此处从网关调度器 JobSpec 取真实周期，取不到给 None（前端不渲染，
-            # 宁缺勿假）。trader 周期为代码常量，进程内 memo 一次即可。
-            "cycle_minutes": _trader_cycle_minutes(),
-        },
-        "system": {
-            "disk": {
-                "free_gb": disk_free_gb
-            }
-        },
-        "account": {
-            "initial_capital": round(initial_capital_val, 2),
-            "total_eq": round(total_eq, 2),
-            "avail_eq": round(avail_eq, 2),
-            "cash_bal": round(cash_bal, 2),
-            "upl": round(upl_acc, 2),
-            "pos_upl_total": round(total_pos_upl, 2),
-            "cum_realized_pnl": round(total_cum_realized_pnl, 2),
-            "cum_net_pnl": round(total_cum_net_pnl, 2),
-            "cum_roi_pct": cum_roi_pct,
-            "cum_total_fees": round(cum_total_fees, 2),
-            "total_pos_margin": round(sum(float(p.get("margin_usdt") or 0.0) for p in positions), 2),
-            "margin_usage_pct": round(((sum(float(p.get("margin_usdt") or 0.0) for p in positions)) / total_eq * 100) if total_eq > 0 else 0, 1)
-        },
-        "today_stats": {
-            "realized_gross": round(today_realized_gross, 2),
-            "fees_paid": round(today_fees, 2),
-            "funding_paid": round(today_funding, 2),
-            "net_realized": round(today_net_realized_pnl, 2),
-            "total_pnl": round(today_net_realized_pnl + total_pos_upl, 2),
-            "win_trades": today_win_trades,
-            "loss_trades": today_loss_trades,
-            "win_rate": today_win_rate,
-            "source": _today_stats_source,
-        },
-        "performance": {
-            "all_trades": all_closed,
-            "win_trades": all_win_trades,
-            "loss_trades": all_loss_trades,
-            "win_rate": all_win_rate,
-            "profit_factor": profit_factor,
-            "total_win_amt": round(all_win_amt, 2),
-            "total_loss_amt": round(all_loss_amt, 2),
-            "avg_win": avg_win,
-            "avg_loss": avg_loss,
-            "leaderboard": inst_leaderboard
-        },
-        "positions": positions,
-        "positions_summary": {
-            "total": len(positions),
-            "active_count": len(positions),
-            "max": len(load_instruments()),
-            "max_positions": len(load_instruments()),
-            "long_count": long_count,
-            "short_count": short_count,
-            "total_upl": round(total_pos_upl, 2),
-            "items": positions
-        },
-        "pending_orders": pending_orders_list,
-        "factors": factors_list,
-        "funding_settlements": {
-            "total_funding_pnl": round(today_funding, 4),
-            "items": sorted(funding_history_list, key=lambda x: x["time"], reverse=True)[:30]
-        },
-        "adaptive_config": adaptive_cfg,
-        "review": review_data,
-        "ai_trading_memory_md": ai_memory_md_content,
-        "ai_last_prompt": ai_last_prompt_text,
-        "snapshots": snapshots_list,
-        "state_snapshot": state_data,
-        "logs": log_lines,
-        "trades": trades_table,
-        "news_intelligence": news_data,
-        "ai_brain_history": ai_history_list,
-        "ai_health": build_ai_health(ai_history_list),
-        "factor_library": factor_lib_snapshot,
-        "cross_venue": _load_cross_venue_data(),
-        "portfolio_risk": _load_portfolio_risk_data(),
-        "multi_venue_portfolio": _load_multi_venue_portfolio(total_eq, avail_eq, positions, orders_data)
-    }
+    CACHE_DATA = _core_build_live_cache_payload(
+        _load_cross_venue_data=_load_cross_venue_data, _load_multi_venue_portfolio=_load_multi_venue_portfolio, _load_portfolio_risk_data=_load_portfolio_risk_data,
+        _today_stats_source=_today_stats_source, _trader_cycle_minutes=_trader_cycle_minutes, adaptive_cfg=adaptive_cfg,
+        ai_history_list=ai_history_list, ai_last_prompt_text=ai_last_prompt_text, ai_memory_md_content=ai_memory_md_content,
+        all_closed=all_closed, all_loss_amt=all_loss_amt, all_loss_trades=all_loss_trades,
+        all_win_amt=all_win_amt, all_win_rate=all_win_rate, all_win_trades=all_win_trades,
+        avail_eq=avail_eq, avg_loss=avg_loss, avg_win=avg_win,
+        build_ai_health=build_ai_health, cash_bal=cash_bal, cum_roi_pct=cum_roi_pct,
+        cum_total_fees=cum_total_fees, disk_free_gb=disk_free_gb, factor_lib_snapshot=factor_lib_snapshot,
+        factors_list=factors_list, funding_history_list=funding_history_list, initial_capital_val=initial_capital_val,
+        inst_leaderboard=inst_leaderboard, load_instruments=load_instruments, log_lines=log_lines,
+        long_count=long_count, news_data=news_data, orders_data=orders_data,
+        pending_orders_list=pending_orders_list, positions=positions, profit_factor=profit_factor,
+        review_data=review_data, short_count=short_count, snapshots_list=snapshots_list,
+        source_errors=source_errors, state_data=state_data, timestamp_full=timestamp_full,
+        today_bj_str=today_bj_str, today_fees=today_fees, today_funding=today_funding,
+        today_loss_trades=today_loss_trades, today_net_realized_pnl=today_net_realized_pnl, today_realized_gross=today_realized_gross,
+        today_win_rate=today_win_rate, today_win_trades=today_win_trades, total_cum_net_pnl=total_cum_net_pnl,
+        total_cum_realized_pnl=total_cum_realized_pnl, total_eq=total_eq, total_pos_upl=total_pos_upl,
+        trades_table=trades_table, upl_acc=upl_acc,
+    )
     try:
         from r20_backend.llm_manager import get_active_llm_runtime
         active_llm_info = get_active_llm_runtime()

@@ -275,9 +275,26 @@ class WiringTest(unittest.TestCase):
             self.assertNotIn(gone, app_src, f"门面仍残留内联片段 {gone!r}")
 
     def test_payload_key_still_present(self):
-        """接口不变：载荷里仍要有 leaderboard 键。"""
-        app_src = APP.read_text(encoding="utf-8")
-        self.assertIn('"leaderboard": inst_leaderboard', app_src)
+        """接口不变：载荷里仍要有 `leaderboard` 键。
+
+        ⚠️ 这段字面量**已经没有**在 `dashboard/app.py` 里了 ——
+        阶段 4·B3 第三十六刀把整个 `CACHE_DATA` 字面量（92 行）搬进了
+        `r20_backend/dashboard_payload/cache_payload.py`。
+        故断言必须**同时**接受"在载荷装配模块里"这个位置，
+        否则测试会把一次**等价搬迁**误报成接口变更。
+
+        改这条时我保留了原意（键仍在、且仍取自 `inst_leaderboard`），
+        只是承认它的**位置**变了。
+        """
+        sources = {
+            "门面": APP.read_text(encoding="utf-8"),
+            "载荷装配模块": (ROOT / "r20_backend" / "dashboard_payload"
+                             / "cache_payload.py").read_text(encoding="utf-8"),
+        }
+        hits = [name for name, src in sources.items()
+                if '"leaderboard": inst_leaderboard' in src]
+        self.assertEqual(hits, ["载荷装配模块"],
+                         "`leaderboard` 键应恰好出现在载荷装配模块里一处")
 
     def test_module_is_pure(self):
         """函数体只读入参，不读模块级/全局。

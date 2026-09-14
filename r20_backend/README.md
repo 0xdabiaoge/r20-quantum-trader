@@ -80,6 +80,7 @@
 
 | 模块 | 内容 |
 |---|---|
+| `cache_payload.py` | `build_live_cache_payload(...)` —— LIVE 载荷装配（27 顶层字段，56 入参**显式**列在签名里） |
 | `slim.py` | 瘦身载荷（默认返回；`?full=1` 才给全量） |
 | `market.py` | 行情/盘口片段 |
 | `factors.py` | 因子库快照片段 |
