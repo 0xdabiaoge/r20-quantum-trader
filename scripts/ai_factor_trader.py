@@ -40,6 +40,7 @@ from r20_backend.time_utils import beijing_day
 # 结构优化阶段4·B3：纯信号逻辑已搬入 scripts/trader/signals.py，re-export 保持门面表面不变
 from scripts.trader.signals import clamp, evaluate_asset_signal as _evaluate_asset_signal  # noqa: F401
 from scripts.trader.factors import fetch_single_instrument_data as _fetch_single_instrument_data
+from scripts.trader.protection import protection_signals, ratcheted_trailing_stop
 
 # US-003 决策面接线：选所路由（US-002）与预算原子预留（US-001）以模块绑定名引用，
 # 接线级测试 patch 模块属性即可完全离线（零出网/零凭证/零真实预留库）。
@@ -2002,8 +2003,9 @@ def manage_position_tp_and_trailing(f, curr_pos, trackers, timestamp_full, execu
     # The tracker stop is the exchange-protection source of truth; if a legacy or
     # partially migrated position has no live cloud OCO, the local 15-minute
     # fail-safe still closes it once the stop is breached.
+    # 判定见 scripts/trader/protection.py（长空方向合一）。
     hard_stop_px = float(t.get("trailingStopPx", 0.0) or 0.0)
-    hard_stop_hit = hard_stop_px > 0 and ((is_long and cur_px <= hard_stop_px) or (not is_long and cur_px >= hard_stop_px))
+    hard_stop_hit = protection_signals(is_long=is_long, cur_px=cur_px, hard_stop_px=hard_stop_px)
     if hard_stop_hit:
         closed, close_detail = close_position_confirmed(inst_id, "long" if is_long else "short", pos_sz)
         if not closed:
@@ -2103,15 +2105,16 @@ def manage_position_tp_and_trailing(f, curr_pos, trackers, timestamp_full, execu
     momentum_pullback_buffer = 0.75 * atr
     
     if is_long:
-        # Dynamic Ratchet Stop Calculation for Long
+        # Dynamic Ratchet Stop Calculation for Long（数学见 scripts/trader/protection.py）
         old_sl = float(t.get("trailingStopPx", 0.0) or 0.0)
-        dynamic_floor_sl = old_sl
-        if peak_profit_px >= tier2_lock_trigger:
-            dynamic_floor_sl = max(dynamic_floor_sl, round(entry_px + 1.0 * atr, prec))
-            t["stage_desc"] = f"锁定大波段利润 (保底止损 {dynamic_floor_sl})"
-        elif peak_profit_px >= tier1_breakeven_trigger:
-            dynamic_floor_sl = max(dynamic_floor_sl, round(entry_px + 0.0020 * entry_px, prec))
-            t["stage_desc"] = f"已推保本无风险 (保底止损 {dynamic_floor_sl})"
+        dynamic_floor_sl, stage_desc = ratcheted_trailing_stop(
+            is_long=True, entry_px=entry_px, atr=atr, prec=prec,
+            peak_profit_px=peak_profit_px, old_sl=old_sl,
+            tier1_breakeven_trigger=tier1_breakeven_trigger,
+            tier2_lock_trigger=tier2_lock_trigger,
+        )
+        if stage_desc:
+            t["stage_desc"] = stage_desc
         
         # If dynamic floor stop ratcheted up, commit and sync to cloud OCO
         if dynamic_floor_sl > old_sl and old_sl > 0:
@@ -2181,15 +2184,16 @@ def manage_position_tp_and_trailing(f, curr_pos, trackers, timestamp_full, execu
             return True, "已移动止盈"
 
     else:
-        # Dynamic Ratchet Stop Calculation for Short
+        # Dynamic Ratchet Stop Calculation for Short（数学见 scripts/trader/protection.py）
         old_sl = float(t.get("trailingStopPx", 0.0) or 0.0)
-        dynamic_floor_sl = old_sl
-        if peak_profit_px >= tier2_lock_trigger:
-            dynamic_floor_sl = min(dynamic_floor_sl, round(entry_px - 1.0 * atr, prec))
-            t["stage_desc"] = f"锁定大波段利润 (保底止损 {dynamic_floor_sl})"
-        elif peak_profit_px >= tier1_breakeven_trigger:
-            dynamic_floor_sl = min(dynamic_floor_sl, round(entry_px - 0.0020 * entry_px, prec))
-            t["stage_desc"] = f"已推保本无风险 (保底止损 {dynamic_floor_sl})"
+        dynamic_floor_sl, stage_desc = ratcheted_trailing_stop(
+            is_long=False, entry_px=entry_px, atr=atr, prec=prec,
+            peak_profit_px=peak_profit_px, old_sl=old_sl,
+            tier1_breakeven_trigger=tier1_breakeven_trigger,
+            tier2_lock_trigger=tier2_lock_trigger,
+        )
+        if stage_desc:
+            t["stage_desc"] = stage_desc
         
         # If dynamic floor stop ratcheted down (tightened for short), commit and sync to cloud OCO
         if dynamic_floor_sl < old_sl and old_sl > 0:

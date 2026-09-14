@@ -1,0 +1,133 @@
+# `r20_backend/` 分层与归档约定
+
+> 本文是**约定文档，不是目录搬迁计划**。结构优化研究（`plan_local/R20_STRUCTURE_OPTIMIZATION_20260914.md`
+> §2 B7 / §10.5）得出的结论是：**不为目录整齐去搬已上线的启动路径模块**，
+> 而是把"哪个模块属于哪一层、新文件该进哪个子包"固化成文字约定。
+> 读完这一页，你应该能在 30 秒内回答"我这个新文件该放哪"。
+
+## 1. 为什么这里不是"一个包一个域"的整齐目录
+
+根层 35 个模块 + 9 个子包**看起来**扁平，但那是**有代价的取舍**，不是没整理：
+
+1. **路径锚点会被踩。** 仓里有一批审计测试按**文件路径**钉死读取
+   （`r20_backend/execution_router.py` 5 处、`policy_snapshot.py` 3 处、
+   `qq_gateway_daemon.py` 2 处、`llm_manager.py` 2 处、`council_manager.py` 2 处、
+   `app.py` 2 处、`scheduler.py` 1 处）。为目录整齐去改 17 处锚点，
+   正是研究文档 §4 明确反对的方向（"先设计抽取边界去迁就锚点，而不是反过来"）。
+2. **import 面很宽。** 例如 `llm_manager` 有 16 处引用、`time_utils` 12 处、
+   `notifications` 10 处、`council_manager` 10 处 —— 搬迁是 30+ 个 import 点的
+   纯机械改动，功能收益为零。
+3. **都是线上启动路径模块。** `app.py` / `scheduler.py` / worker 在启动时导入它们。
+   对一个正在跑实盘的进程做强搬迁，风险与收益不成比例。
+4. **B7 的实质收益已提前拿到。** 四个真正膨胀的巨型模块已经拆成子包，
+   根文件从 2105 / 1194 / 1101 / 1968 行降到 281 / 416 / 295 / 904 行
+   （`llm_manager.py` / `council_manager.py` / `policy_snapshot.py` / `dashboard/app.py`）。
+   **"根目录不再膨胀、新代码进子包"这条实质目标已经实现。**
+
+## 2. 分层（按职责，不按目录）
+
+### L0 门面 / 兼容表面 — 保持文件名与位置不变
+
+这些模块**故意**留在根层，且**只做转发**。它们的存在就是为了让老 import 路径与
+测试锚点继续成立。**不要往门面里加新逻辑。**
+
+| 门面模块 | 行数 | 真实实现位置 |
+|---|---|---|
+| `llm_manager.py` | ~281 | `llm/`（util / capabilities / providers / transport / policy / store / failover / call） |
+| `council_manager.py` | ~416 | `council/`（debate / policy / roster / presets） |
+| `policy_snapshot.py` | ~295 | `policy/`（paths / schema / fingerprints / io / capture / restore / archive） |
+| `dashboard/app.py` | ~904 | `dashboard_payload/`（12 模块）；**0 条路由**（纯库，路由在 `routers/dashboard.py`） |
+
+**判据**：一个模块如果"只剩转发/薄壳"，它就是门面，新逻辑一律进它对应的子包。
+
+### L1 启动与装配
+
+`app.py`（FastAPI 装配，`include_router` 8 个路由）、`scheduler.py`、
+`spawn.py`、`web_shell.py`、`config.py`、`settings_store.py`、`version.py`、
+`dependencies.py`、`routers/`。
+
+**这一层不要拆。** 它们是进程入口，改动收益低、回归面是整个服务。
+
+### L2 HTTP 边界 — `routers/`
+
+`auth` / `system` / `exchanges` / `risk` / `strategy` / `llm` / `gateway` /
+`dashboard`。**路由层只做参数校验与调用编排，不放业务逻辑。**
+`gateway.py`（977 行）与 `strategy.py`（775 行）是当前最大的两个 —— 若要继续瘦身，
+正确做法是把业务下沉到 `exchanges/`、`execution/`、`dashboard_payload/`，
+路由保留薄壳（与 `dashboard/app.py` 降为纯库同一手法）。
+
+### L3 领域服务（根层，按域成组）
+
+| 域 | 模块 |
+|---|---|
+| 交易执行 | `execution_router.py`、`okx_trade_service.py`、`okx_client.py`、`close_intent.py`、`risk_reservation.py`、`venue_router.py`、`exchanges/`、`execution/`、`sandbox/` |
+| 风控与安全 | `risk_config.py`、`net_security.py`、`login_guard.py`、`client_ip.py`、`admin_auth.py`、`interceptor_manager.py` |
+| 通知与外部通道 | `notifications.py`、`qq_bind.py`、`qq_gateway_daemon.py` |
+| 审计与备份 | `audit.py`、`backup_store.py`、`backup_secrets.py`、`file_locks.py` |
+| 组合与账户 | `portfolio_aggregator.py`、`account_baseline.py` |
+| 提示词 | `prompt_views.py`、`dashboard_payload/prompts*` |
+| 通用 | `time_utils.py`、`schemas.py`、`schedule_store.py` |
+
+### L4 纯计算/载荷子包（新代码的默认去处）
+
+`llm/`、`council/`、`policy/`、`dashboard_payload/`、`execution/`、`exchanges/`、
+`routers/`、`sandbox/`。
+
+## 3. 新文件该放哪：决策树
+
+```
+新代码要做什么？
+├─ 纯计算 / 无 I/O / 无模块状态        → 对应子包的独立模块（L4）
+├─ 组装 HTTP 响应载荷                  → dashboard_payload/
+├─ 新增一个 HTTP 端点                  → routers/<域>.py（薄壳，逻辑下沉）
+├─ 新增交易所适配                     → exchanges/<venue>.py
+└─ 已有模块太长，想拆
+   ├─ 该模块是 L0 门面                → 拆进它的子包，门面只留转发
+   ├─ 该模块在 L1 启动层              → 不要拆
+   └─ 该模块在 L3 领域层              → 新建同名子包（见 §4）
+```
+
+## 4. 门面 + 子包的抽取约定（本仓既定手法）
+
+阶段 2 起，所有大文件拆分都遵循同一套动作，照抄即可：
+
+1. **子包名 ≠ 门面名时**，在 `tests/source_scan.py::source_area()` 里用
+   `pkg_name=` 显式指定（例如 `source_area("scripts/ai_factor_trader.py", pkg_name="trader")`），
+   这样**后续再往该子包搬文件时，源码锚点断言自动覆盖**，不用回来改测试。
+2. **被测试 patch 的全局（路径、配置、可替换函数）一律走调用期注入**，
+   绝不在子模块 import 期烘焙。原因见 §5。
+3. **门面保留同名薄壳**（若调用点走全局名查找，调用点可以一行都不改）。
+4. **搬完必须**：全量离线套件绿 + 旧实现差分对拍（见 §6）。
+
+## 5. 铁律：子模块不得 import 期烘焙任何可被 patch / 可重载的值
+
+`tests/risk_test_env.py::pin_baseline_risk_env()` 的**原地 reload 名单只有**
+`risk_constants` / `ai_factor_trader` / `ai_brain_trader` —— **不含任何子模块**。
+
+因此：**子模块在 import 期绑定的任何风控/配置值都不会被刷新**，
+会让基线风控用例随机翻红。凡读配置、读被 patch 路径的东西，**一律走调用期注入**。
+
+## 6. 每次拆分后必须过的两道闸
+
+```bash
+# 1) 全量离线套件（当前基线：1333 例 OK, skipped=1）
+.venv/bin/python -m unittest discover -s tests -t .
+
+# 2) 纯逻辑搬家：旧实现差分对拍（抽到哪块，就为哪块写一条）
+#    参考 tests/test_trader_protection_extraction.py（把旧代码内联为 _legacy_* 逐值对拍）
+```
+
+> 注意 `python -m tests.offline_suite` 会**主动拦截 `git` / `python` 子进程**，
+> 因此在该守卫下会有约 5 个 "Offline suite blocked external child process" 报错 ——
+> 那是守卫本身的产物，不是回归。判绿请用上面的 `unittest discover`。
+
+## 7. 源码锚点的三类陷阱（搬文件前必查）
+
+搬任何函数之前，把这三类都查一遍，缺一类都会翻车：
+
+1. **结构性 split**：`src.split("def X")[1].split("\ndef ")[0]` —— 函数搬走即 `IndexError`，
+   且**紧随其后的那个顶层 `def` 也不能搬**（窗口会延伸，断言结果改变）。
+2. **函数名文本锚点**：`assertIn("def X", src)`。
+3. **函数体内的字符串锚点**（最隐蔽）：不出现函数名，例如
+   `assertIn('item.get("minSz"', src)`。查法：把该函数体里所有字符串字面量
+   拿去 `grep` 一遍 `tests/`。
