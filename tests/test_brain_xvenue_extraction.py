@@ -130,7 +130,13 @@ class InjectionContractTest(unittest.TestCase):
 
         before = dict(abt._XV_HEALTH)
         self.addCleanup(lambda: (abt._XV_HEALTH.clear(), abt._XV_HEALTH.update(before)))
-        with patch.object(abt, "_get_xvenue_adapter", boom):
+        # ⚠️ 第七十七刀：矩阵收尾必调 `_xv_flush_health`（fail-soft 也 flush），
+        # 原先只 patch 适配器 → 本次"失败健康"被**写进生产 venue_health.json**
+        # （离线守护实测 1 次；同文件上方用例自己就示范了正确 patch）。
+        with tempfile.TemporaryDirectory() as td, \
+                patch.object(abt, "_get_xvenue_adapter", boom), \
+                patch.object(abt, "VENUE_HEALTH_FILE",
+                             os.path.join(td, "vh.json")):
             abt.fetch_cross_venue_matrix([{"name": "BTC", "price": 100.0}])  # 不得抛
 
     def test_xvenue_disabled_short_circuits(self):

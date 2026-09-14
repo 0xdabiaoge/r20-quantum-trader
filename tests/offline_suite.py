@@ -102,6 +102,11 @@ class OfflineGuard:
         for target, dir_fd in targets:
             if self.protected(target, dir_fd):
                 self.writes.append(str(target))
+                # ⚠️ 第七十七刀：写拦截原先是**归因盲区** —— 网络/spawn 拦截都
+                # 过 `_log_diagnostics` 记栈，唯独这里直接 raise。实测 17 个
+                # `.llm_models.json-*` 尝试被 raise 后又被调用方 try/except
+                # 吞掉 ⇒ 套件零报错、只在汇总里露一次，永远查不到"是谁写的"。
+                self._log_diagnostics('protected-write', args[:2])
                 raise RuntimeError('Offline suite blocked real resource mutation')
 
     DIAG_LOG = '/tmp/offline_guard_diagnostics.log'

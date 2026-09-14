@@ -122,10 +122,21 @@ class CouncilImportExportTests(unittest.TestCase):
         self._orig_dir = cm.DATA_DIR
         cm.DATA_DIR = Path(self._tmp.name)
         cm.COUNCIL_CONFIG_FILE = Path(self._tmp.name) / "council_config.json"
+        # ⚠️ 第七十七刀：`save_council_config → validate_seat_model_bindings →
+        # load_llm_config → init_llm_config` 会**连带回写生产 llm_models.json**
+        # （离线守护实测 17 次写尝试；非离线时是真写）。只 patch council 自己的
+        # 两个常量罩不住副作用链 —— `llm_manager.init_llm_config` 是**调用期**
+        # 解析模块全局（薄壳注释自己写着"patch / 直接赋值必然生效"），
+        # 所以这里必须把它一起换掉。
+        import r20_backend.llm_manager as lm
+        self._lm = lm
+        self._orig_llm_file = lm.LLM_CONFIG_FILE
+        lm.LLM_CONFIG_FILE = Path(self._tmp.name) / "llm_models.json"
 
     def tearDown(self):
         cm.COUNCIL_CONFIG_FILE = self._orig_file
         cm.DATA_DIR = self._orig_dir
+        self._lm.LLM_CONFIG_FILE = self._orig_llm_file
         self._tmp.cleanup()
 
     def test_export_import_roundtrip_with_backup(self):
