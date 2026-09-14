@@ -15,6 +15,9 @@ from r20_backend.dashboard_payload.position_view import (  # noqa: E402
 from r20_backend.dashboard_payload.order_view import (  # noqa: E402
     collect_pending_order_rows as _core_collect_pending_order_rows,
 )
+from r20_backend.dashboard_payload.trade_stats import (  # noqa: E402
+    aggregate_trade_stats as _core_aggregate_trade_stats,
+)
 from r20_backend.dashboard_payload.bills import (  # noqa: E402
     aggregate_bills as _core_aggregate_bills,
 )
@@ -379,43 +382,15 @@ def update_cache_cycle():
     today_funding = _bills["today_funding"]
     funding_history_list = _bills["funding_history_list"]
 
-    today_win_trades = 0
-    today_loss_trades = 0
-    all_win_trades = 0
-    all_loss_trades = 0
-    all_win_amt = 0.0
-    all_loss_amt = 0.0
-    by_inst = {}
-
-    for agg_k, o in orders_by_key.items():
-        net = o["pnl"]
-        inst = o["inst"]
-        t_time = o["time"]
-
-        if inst not in by_inst:
-            by_inst[inst] = {"trades": 0, "wins": 0, "losses": 0, "pnl": 0.0}
-        by_inst[inst]["trades"] += 1
-        by_inst[inst]["pnl"] += net
-
-        # Exclude friction dust / zero-margin test orders (< 0.01 USDT absolute PnL) from win/loss trade count
-        if abs(net) < 0.01 and abs(o.get("gross_pnl", 0.0)) < 0.01:
-            continue
-
-        if net > 0:
-            all_win_trades += 1
-            all_win_amt += net
-            by_inst[inst]["wins"] += 1
-            if today_bj_str in t_time:
-                today_win_trades += 1
-        elif net < 0:
-            all_loss_trades += 1
-            all_loss_amt += abs(net)
-            by_inst[inst]["losses"] += 1
-            if today_bj_str in t_time:
-                today_loss_trades += 1
-
-        if today_bj_str in t_time:
-            today_realized_gross += o["gross_pnl"]
+    _stats = _core_aggregate_trade_stats(orders_by_key, today_bj_str=today_bj_str)
+    by_inst = _stats["by_inst"]
+    today_realized_gross += _stats["today_realized_gross"]
+    today_win_trades = _stats["today_win_trades"]
+    today_loss_trades = _stats["today_loss_trades"]
+    all_win_trades = _stats["all_win_trades"]
+    all_loss_trades = _stats["all_loss_trades"]
+    all_win_amt = _stats["all_win_amt"]
+    all_loss_amt = _stats["all_loss_amt"]
 
     today_closed = today_win_trades + today_loss_trades
     today_win_rate = round((today_win_trades / today_closed) * 100, 1) if today_closed > 0 else 0.0
