@@ -88,6 +88,36 @@ def domain_trees(module_file: str | Path, *, pkg_name: str | None = None) -> lis
     return [ast.parse(text) for text in source_area(module_file, pkg_name=pkg_name).values()]
 
 
+def count_name_references(module_file: str | Path, name: str, *,
+                          pkg_name: str | None = None) -> dict:
+    """在「门面 + 同名字包」领域里统计标识符 `name` 的**定义数**与**引用数**。
+
+    为什么需要它（而不是 `text.count("name(")`）：**文本计数会被文档污染**。
+    实测 `order_margin_gate` 在领域文本里出现 7 次，但实际只有 1 处定义 +
+    2 处调用 —— 其余 4 次全在 `gates.py` / `__init__.py` 的注释与 docstring 里
+    （它们解释的正是这条锚点本身）。用文本数字当断言，等于把"文档写得多细"
+    变成了测试条件。
+
+    改为走 AST：注释与 docstring **天然不计入**，留下的就是真正的代码结构。
+
+    返回 `{"defs": n, "refs": m}`：
+    - `defs`：顶层 `def name`（门面壳与子包实现会各算一次，这是有意的）；
+    - `refs`：所有 `ast.Name` 读取（`Load` 语境）的出现次数，调用点即在此列。
+    """
+    import ast
+    defs = 0
+    refs = 0
+    for text in source_area(module_file, pkg_name=pkg_name).values():
+        tree = ast.parse(text)
+        for node in tree.body:
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == name:
+                defs += 1
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Name) and node.id == name and isinstance(node.ctx, ast.Load):
+                refs += 1
+    return {"defs": defs, "refs": refs}
+
+
 def find_function_node(module_file: str | Path, name: str, *, pkg_name: str | None = None,
                        node_only: bool = False):
     """在「门面 + 同名字包」全领域里按名字找顶层函数节点。

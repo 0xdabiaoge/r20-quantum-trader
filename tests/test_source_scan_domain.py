@@ -107,6 +107,73 @@ class FindFunctionNodeTest(unittest.TestCase):
                 source_scan.find_function_node(root / "scripts" / "facade.py", "copied", pkg_name="pkg")
 
 
+class CountNameReferencesTest(unittest.TestCase):
+    """`count_name_references` 走 AST，**注释与 docstring 天然不计入**。
+
+    这是它相对 `text.count("name(")` 的全部意义：真实项目里，解释某条锚点的文档
+    会把该标识符又写上几遍。实测 `order_margin_gate` 在领域**文本**里出现 7 次，
+    而代码里只有 1 定义 + 2 调用。用文本数字当断言，等于把"文档写得多细"变成了
+    测试条件。本文件把这个差异钉住。
+    """
+
+    def _mktree(self, td, facade_body, pkg_body=None):
+        root = Path(td)
+        _write(root, "scripts/facade.py", facade_body)
+        if pkg_body is not None:
+            _write(root, "scripts/pkg/mod.py", pkg_body)
+        return root / "scripts" / "facade.py"
+
+    def test_comments_and_docstrings_are_not_counted(self):
+        with tempfile.TemporaryDirectory() as td:
+            facade = self._mktree(td, '''
+                # 注释里提到 gate( 不应被计入
+                """docstring 里也提到 gate( 同样不计。"""
+                def gate(x):
+                    return x
+
+                def use():
+                    return gate(1)
+            ''')
+            counts = source_scan.count_name_references(facade, "gate")
+            self.assertEqual(counts, {"defs": 1, "refs": 1},
+                             "注释/docstring 里的提及不应计入 defs/refs")
+
+    def test_text_count_would_be_inflated(self):
+        """同一个文件：文本计数 > AST 计数 —— 证明为什么必须走 AST。"""
+        with tempfile.TemporaryDirectory() as td:
+            facade = self._mktree(td, '''
+                """解释这条锚点：gate( 出现 3 次、gate( 是定义。"""
+                # 这里又提一次 gate(
+                def gate(x):
+                    return x
+                y = gate(2)
+            ''')
+            text = source_scan.combined(facade)
+            counts = source_scan.count_name_references(facade, "gate")
+            self.assertGreater(text.count("gate("), counts["refs"] + counts["defs"],
+                               "文本计数应被文档抬高，否则这个测试没有意义")
+
+    def test_defs_count_shell_and_implementation_separately(self):
+        """门面薄壳 + 子包实现 → defs == 2（这是**有意**的，代表"一份壳一份实现"）。"""
+        with tempfile.TemporaryDirectory() as td:
+            facade = self._mktree(
+                td,
+                "def gate(x):\n    return _impl(x)\n",
+                "def gate(x):\n    return x * 2\n")
+            counts = source_scan.count_name_references(facade, "gate", pkg_name="pkg")
+            self.assertEqual(counts["defs"], 2)
+            self.assertEqual(counts["refs"], 0)
+
+    def test_refs_counts_every_call_site_across_domain(self):
+        with tempfile.TemporaryDirectory() as td:
+            facade = self._mktree(
+                td,
+                "def gate(x):\n    return x\n\n\ndef a():\n    return gate(1)\n",
+                "def b():\n    return gate(2)\n")
+            counts = source_scan.count_name_references(facade, "gate", pkg_name="pkg")
+            self.assertEqual(counts["refs"], 2, "子包里的调用点也必须计入")
+
+
 class DomainTreesAndCombinedTest(unittest.TestCase):
     def test_domain_trees_returns_one_tree_per_file(self):
         with tempfile.TemporaryDirectory() as td:

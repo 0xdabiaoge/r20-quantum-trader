@@ -181,11 +181,50 @@ class OrderMarginGateTests(_SandboxBase):
         self.assertAlmostEqual(got, 100.0, places=4)
 
     def test_both_call_sites_pass_gate_and_equity_cap(self):
-        """反漂移：多空两条开仓路径都要带闸门与权益顶（漏一条就是裸奔）。"""
-        source = (ROOT / "scripts" / "ai_factor_trader.py").read_text(encoding="utf-8")
-        self.assertEqual(source.count("order_margin_gate("), 3,  # 1 定义 + 开多 + 开空
-                         "开多/开空必须各自经过 order_margin_gate")
-        self.assertEqual(source.count('"max_margin_usdt": equity_margin_cap(usdt_available)'), 2)
+        """反漂移：多空两条开仓路径都要带闸门与权益顶（漏一条就是裸奔）。
+
+        ## 为什么不是"门面单文件里 `order_margin_gate(` 恰 3 次"
+
+        原来的写法是 `source.count("order_margin_gate(") == 3  # 1 定义 + 开多 + 开空`。
+        它把**三件不同的事**压进了一个数字：闸门有定义、开多过闸、开空过闸。
+        后果是：只要有人把长/空开仓块抽进子包，计数立刻变 1 → 翻红，而那**恰恰是
+        结构优化想要的**（`scripts/trader/` 已按 B3 抽取）。一条把"可维护性改进"
+        误判为"风控回归"的锚点，会逼着后人别去拆 —— 这就是它一直在挡路的原因。
+
+        现改为把三件事**分别**断言，各自用最贴切的定位：
+
+        | 断言 | 定位 | 表达的不变量 |
+        |---|---|---|
+        | 门面里恰有 1 个 `def order_margin_gate(` | 门面文本 | 门面仍暴露该闸门（调用点按全局名解析） |
+        | 门面里恰有 2 处 `_order_margin = order_margin_gate(` | 门面文本 | 开多/开空都在**门面主执行路径**上过闸 |
+        | 领域 AST：`defs == 2` 且 `refs == 2` | 领域（含 `scripts/trader/`） | 恰"一份薄壳 + 一份实现"、"开多 + 开空"两次调用 |
+
+        最后一行是关键：它把"搬家"变成**允许**（定义搬进子包 → defs 仍是 2），
+        同时仍能抓住"漏了一条路径"（refs 变 1）或"又写了一份本地孪生"（defs 变 3）。
+
+        **为什么不直接文本计数**：实测 `order_margin_gate` 在领域文本里出现 7 次，
+        而代码里只有 1 定义 + 2 调用 —— 其余 4 次全在 `gates.py` / `__init__.py` 的
+        注释与 docstring 里（它们解释的正是这条锚点本身）。文本数字会把
+        "文档写得多细"变成测试条件，所以领域侧一律走 AST。
+        """
+        from tests.source_scan import count_name_references
+
+        facade = (ROOT / "scripts" / "ai_factor_trader.py").read_text(encoding="utf-8")
+        self.assertEqual(facade.count("def order_margin_gate("), 1,
+                         "门面必须恰有一处 def order_margin_gate（否则全局名解析不到）")
+        self.assertEqual(facade.count("_order_margin = order_margin_gate("), 2,
+                         "开多/开空必须各自在门面主执行路径上经过 order_margin_gate")
+        self.assertEqual(facade.count('"max_margin_usdt": equity_margin_cap(usdt_available)'), 2,
+                         "开多/开空必须各自携带权益顶")
+
+        counts = count_name_references("scripts/ai_factor_trader.py", "order_margin_gate",
+                                       pkg_name="trader")
+        self.assertEqual(counts["defs"], 2,
+                         "全交易层领域必须恰有 2 个 order_margin_gate 定义"
+                         "（门面薄壳 + 子包实现）；多了是本地孪生")
+        self.assertEqual(counts["refs"], 2,
+                         "全交易层领域必须恰有 2 次 order_margin_gate 调用"
+                         "（开多 + 开空）；少了说明有条路径被绕过")
 
 
 class RouterMarginClampTests(_SandboxBase):
