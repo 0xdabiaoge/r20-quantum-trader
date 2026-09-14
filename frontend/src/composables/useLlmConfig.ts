@@ -17,6 +17,20 @@ import { useI18n } from './useI18n'
 import { useApi } from './useApi'
 import { useConfirm } from './useConfirm'
 import { useToast } from './useToast'
+import {
+  apiFormatEffect,
+  buildActivatePayload,
+  buildRemoteModelPayload,
+  effortOptions,
+  fallbackOptionsFor,
+  filterProviders,
+  filterRemoteModels,
+  modelDisplayName,
+  moveInArray,
+  providerDeleteCascadeHint,
+  providerIdFromName,
+  toggleInArray,
+} from './llmLogic'
 
 export function useLlmConfig() {
   const { t } = useI18n()
@@ -91,34 +105,26 @@ const requestAttemptsInput = ref<number>(3)
 const fallbackIds = ref<string[]>([])
 const failoverEvents = ref<any[]>([])
 
-const fallbackOptions = computed(() =>
-  (cfg.value?.models || []).filter((m: any) => m.id !== cfg.value?.active_model_id),
-)
+const fallbackOptions = computed(() => fallbackOptionsFor(cfg.value))
 
 function toggleFallback(id: string) {
+  // 上限判定留在门面：它要写 settingsResult + 起定时器，属"编排"不是纯逻辑。
+  // 数组增删本身走纯函数（`toggleInArray` 原地改，vue 仍能追踪）。
   const idx = fallbackIds.value.indexOf(id)
-  if (idx > -1) {
-    fallbackIds.value.splice(idx, 1)
-  } else {
-    if (fallbackIds.value.length >= (cfg.value?.max_fallback_models || 5)) {
-      settingsResult.value = { ok: false, error: t('admin.llm.fallbackLimitErr') }
-      setTimeout(() => { settingsResult.value = null }, 3500)
-      return
-    }
-    fallbackIds.value.push(id)
+  if (idx === -1 && fallbackIds.value.length >= (cfg.value?.max_fallback_models || 5)) {
+    settingsResult.value = { ok: false, error: t('admin.llm.fallbackLimitErr') }
+    setTimeout(() => { settingsResult.value = null }, 3500)
+    return
   }
+  toggleInArray(fallbackIds.value, id)
 }
 
 function moveFallback(idx: number, dir: -1 | 1) {
-  const target = idx + dir
-  if (target < 0 || target >= fallbackIds.value.length) return
-  const arr = fallbackIds.value
-  ;[arr[idx], arr[target]] = [arr[target], arr[idx]]
+  moveInArray(fallbackIds.value, idx, dir)
 }
 
 function modelNameOf(id: string) {
-  const m = (cfg.value?.models || []).find((x: any) => x.id === id)
-  return m ? `${m.name || m.id}${m.provider_name ? ` · ${m.provider_name}` : ''}` : id
+  return modelDisplayName(cfg.value?.models, id)
 }
 
 async function loadFailoverEvents() {
@@ -196,41 +202,10 @@ async function loadConfig() {
 }
 
 // Model Effort Options depending on model family
-const availableEffortOptions = computed(() => {
-  const mid = (modelForm.value.id || '').toLowerCase()
-  // 智能自适应：支持 GPT-6、GPT-5 以及未来全系前沿具备极值推演能力的旗舰模型
-  const supportsExtreme = mid.includes('gpt-6') || mid.includes('gpt-5') || mid.includes('o3') || mid.includes('o4') || mid.includes('ultra') || mid.includes('max')
-  
-  const options = [
-    { value: 'high', label: t('admin.llm.effortHigh') },
-    { value: 'medium', label: t('admin.llm.effortMedium') },
-    { value: 'low', label: t('admin.llm.effortLow') },
-    { value: 'minimal', label: t('admin.llm.effortMinimal') },
-    { value: 'none', label: t('admin.llm.effortNone') },
-    // 后端 STANDARD_REASONING_EFFORTS 含 auto/minimal：缺了会让已存 "auto" 的模型在下拉框中无法回显
-    { value: 'auto', label: t('admin.llm.effortAuto') },
-  ]
-  if (supportsExtreme) {
-    options.unshift(
-      { value: 'max', label: t('admin.llm.effortMax') },
-      { value: 'xhigh', label: t('admin.llm.effortXhigh') }
-    )
-  }
-  return options
-})
+const availableEffortOptions = computed(() => effortOptions(modelForm.value.id, t))
 
 // ----------------- Filtered Providers -----------------
-const filteredProviders = computed(() => {
-  if (!cfg.value?.providers) return []
-  const q = searchQuery.value.trim().toLowerCase()
-  if (!q) return cfg.value.providers
-  return cfg.value.providers.filter((p: any) =>
-    p.name.toLowerCase().includes(q) ||
-    (p.type && p.type.toLowerCase().includes(q)) ||
-    (p.group && p.group.toLowerCase().includes(q)) ||
-    (p.id && p.id.toLowerCase().includes(q))
-  )
-})
+const filteredProviders = computed(() => filterProviders(cfg.value?.providers, searchQuery.value))
 
 // ----------------- Provider Actions -----------------
 function openAddProviderModal() {
@@ -279,23 +254,9 @@ function selectProvider(p: any) {
 }
 
 function onApiFormatChange() {
-  const fmt = providerForm.value.api_format
-  if (fmt === 'claude_messages') {
-    if (!providerForm.value.api_path || providerForm.value.api_path === '/chat/completions' || providerForm.value.api_path === '/responses') {
-      providerForm.value.api_path = '/messages'
-    }
-    providerForm.value.response_api_enabled = false
-  } else if (fmt === 'openai_responses') {
-    if (!providerForm.value.api_path || providerForm.value.api_path === '/chat/completions' || providerForm.value.api_path === '/messages') {
-      providerForm.value.api_path = '/responses'
-    }
-    providerForm.value.response_api_enabled = true
-  } else {
-    if (!providerForm.value.api_path || providerForm.value.api_path === '/messages' || providerForm.value.api_path === '/responses') {
-      providerForm.value.api_path = '/chat/completions'
-    }
-    providerForm.value.response_api_enabled = false
-  }
+  const effect = apiFormatEffect(providerForm.value.api_format, providerForm.value.api_path)
+  providerForm.value.api_path = effect.apiPath
+  providerForm.value.response_api_enabled = effect.responseApiEnabled
 }
 
 function goBackToList() {
@@ -322,7 +283,7 @@ async function saveProviderConfig() {
   try {
     const payload = { ...providerForm.value }
     if (!payload.id) {
-      payload.id = payload.name.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_')
+      payload.id = providerIdFromName(payload.name)
     }
     if (!payload.api_key) delete payload.api_key
     await api('/api/v1/admin/llm/providers', {
@@ -361,11 +322,11 @@ async function clearCurrentProviderModels() {
 async function removeProvider() {
   const p = selectedProvider.value
   if (!p || p.is_new) return
-  const n = p.models_count ?? p.models?.length ?? 0
+  // 级联提示文案由纯函数 providerDeleteCascadeHint 产出
   // 批C(2026-09-13)：删供应商可能带走主脑激活模型 → danger + 提示先切换模型
   // 批2(2026-09-13)：原先这里算出 warn 却从未使用（vue-tsc TS6133），模型联删提示形同丢失，
   // 现直接并入确认文案，保证「删之前知道会带走什么」。
-  const cascade = n > 0 ? `，其名下 ${n} 个模型将一并删除` : ''
+  const cascade = providerDeleteCascadeHint(p)
   const _ok = await ask({
     title: '删除 LLM 供应商',
     desc: `「${p.name}」将被删除${cascade}`,
@@ -422,32 +383,14 @@ async function executeRemoteFetch() {
   }
 }
 
-const filteredRemoteModels = computed(() => {
-  if (!remoteFetchResult.value?.models) return []
-  const q = remoteSearch.value.trim().toLowerCase()
-  if (!q) return remoteFetchResult.value.models
-  return remoteFetchResult.value.models.filter((m: any) =>
-    m.id.toLowerCase().includes(q) ||
-    (m.name && m.name.toLowerCase().includes(q))
-  )
-})
+const filteredRemoteModels = computed(() =>
+  filterRemoteModels(remoteFetchResult.value?.models, remoteSearch.value),
+)
 
 async function importRemoteModel(m: any, autoActivate = false) {
   if (!selectedProvider.value) return
   try {
-    const payload = {
-      id: m.id,
-      name: m.name || m.id,
-      provider_id: selectedProvider.value.id,
-      provider_name: selectedProvider.value.name,
-      base_url: selectedProvider.value.base_url,
-      api_format: m.api_format || selectedProvider.value.api_format || 'openai_chat',
-      reasoning_type: m.reasoning_type || 'auto',
-      reasoning_effort: m.default_effort || 'high',
-      capabilities: m.capabilities || ['chat'],
-      context_length: m.context_length,
-      description: m.description ? m.description.slice(0, 100) : '从远端一键自动收录',
-    }
+    const payload = buildRemoteModelPayload(m, selectedProvider.value)
     await api('/api/v1/admin/llm/models', {
       method: 'POST',
       body: JSON.stringify(payload),
@@ -455,11 +398,9 @@ async function importRemoteModel(m: any, autoActivate = false) {
     if (autoActivate) {
       await api('/api/v1/admin/llm/activate', {
         method: 'POST',
-        body: JSON.stringify({
-          model_id: m.id,
-          provider_id: selectedProvider.value.id,
-          reasoning_effort: payload.reasoning_effort,
-        }),
+        body: JSON.stringify(buildActivatePayload(
+          m.id, selectedProvider.value.id, payload.reasoning_effort,
+        )),
       })
     }
     await loadConfig()
@@ -475,19 +416,9 @@ async function importAllFilteredRemoteModels() {
   let successCount = 0
   for (const m of list) {
     try {
-      const payload = {
-        id: m.id,
-        name: m.name || m.id,
-        provider_id: selectedProvider.value.id,
-        provider_name: selectedProvider.value.name,
-        base_url: selectedProvider.value.base_url,
-        api_format: m.api_format || selectedProvider.value.api_format || 'openai_chat',
-        reasoning_type: m.reasoning_type || 'auto',
-        reasoning_effort: m.default_effort || 'high',
-        capabilities: m.capabilities || ['chat'],
-        context_length: m.context_length,
-        description: m.description ? m.description.slice(0, 100) : '从远端一键自动收录',
-      }
+      // ⚠️ 本刀之前这里与 importRemoteModel 各写了一份**逐字相同**的 payload
+      //    字面量（11 个字段的回落链）。现统一走 buildRemoteModelPayload。
+      const payload = buildRemoteModelPayload(m, selectedProvider.value)
       await api('/api/v1/admin/llm/models', {
         method: 'POST',
         body: JSON.stringify(payload),
