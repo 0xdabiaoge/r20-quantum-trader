@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import {
+  renderSourceBadge, cloneModulesForEditing, compileWorkingModules,
+  buildTemplatePreview, computeInsertTarget, appendVariableSlot, deriveImportName,
+} from './promptStudioLogic'
 import { fmtDate, fmtDateTime } from '../../utils/format';
 import { useToast } from '../../composables/useToast'
 import { useConfirm } from '../../composables/useConfirm'
@@ -39,14 +43,10 @@ const showVarRibbon = ref(false)
 const activeEditingIdx = ref<number>(0)
 const previewMode = ref<'rendered' | 'template'>('rendered')
 
-/** 模块来源徽标：base=跟随代码基座；legacy=已被改写（脱离基座，代码升级不会再自动同步）；
- * custom=用户新增。三种来源的可信度由后端 update_profile 的逐模块对齐保证。 */
-function sourceBadge(m: any): { text: string; tone: 'base' | 'legacy' | 'custom' } | null {
-  const source = String(m?.source || '')
-  if (source === 'base') return { text: t('admin.promptStudio.source.base'), tone: 'base' }
-  if (source === 'legacy') return { text: t('admin.promptStudio.source.legacy'), tone: 'legacy' }
-  if (source === 'custom') return { text: t('admin.promptStudio.source.custom'), tone: 'custom' }
-  return null
+/** 模块来源徽标。三种来源的可信度由后端 update_profile 的逐模块对齐保证。
+ * 纯逻辑见 ./promptStudioLogic.ts（阶段 4·B3 第三十五刀）。 */
+function sourceBadge(m: any) {
+  return renderSourceBadge(m, t)
 }
 
 const pipelines = computed(() => [
@@ -59,20 +59,15 @@ const templateVariables = computed(() => lib.value?.template_variables || [])
 
 const compiledPreview = computed(() => {
   if (previewMode.value === 'template') {
-    return workingModules.value
-      .filter((m) => m.enabled && String(m.content || '').trim())
-      .map((m) => `======================= 【${m.title}】 =======================\n${String(m.content).trim()}`)
-      .join('\n\n')
+    return buildTemplatePreview(workingModules.value)
   }
+  // 无 pipeline_views 时回退到后端给的生效模板（**不**本地编译）
   if (!selectedProfile.value?.pipeline_views) return lib.value?.effective_templates?.[activePipeline.value] || ''
   return compileLocal()
 })
 
 function compileLocal(): string {
-  return workingModules.value
-    .filter((m) => m.enabled && String(m.content || '').trim())
-    .map((m) => String(m.content).trim())
-    .join('\n\n')
+  return compileWorkingModules(workingModules.value)
 }
 
 async function loadLib() {
@@ -92,10 +87,7 @@ async function loadLib() {
 
 function loadWorkingModules() {
   const views = selectedProfile.value?.pipeline_views?.[activePipeline.value] || []
-  workingModules.value = JSON.parse(JSON.stringify(views)).map((m: any) => ({
-    ...m,
-    locked: false, // 全量解锁，支持自由修改
-  }))
+  workingModules.value = cloneModulesForEditing(views)
   dirty.value = false
 }
 
@@ -127,15 +119,15 @@ function toggleModule(m: any) {
 
 // 在当前激活模块中一键插入变量占位符
 function insertVarIntoActiveModule(key: string) {
-  if (workingModules.value.length === 0) return
-  const idx = Math.min(Math.max(0, activeEditingIdx.value), workingModules.value.length - 1)
+  const idx = computeInsertTarget(workingModules.value, activeEditingIdx.value)
+  if (idx === null) return
   const m = workingModules.value[idx]
-  const tag = `{{${key}}}`
-  if (m.content && m.content.includes(tag)) {
+  const { content, duplicate, tag } = appendVariableSlot(m.content, key)
+  if (duplicate) {
     toast.warn(`模块「${m.title}」已包含变量 ${tag}`)
     return
   }
-  m.content = m.content ? `${m.content.trim()}\n\n${tag}` : tag
+  m.content = content
   dirty.value = true
   toast.ok(`已插入变量插槽 ${tag} 到模块「${m.title}」`)
 }
@@ -313,7 +305,7 @@ function handleFileSelect(event: Event) {
       importRawJson.value = text
       importFileError.value = ''
       if (!importNameOverride.value && file.name) {
-        importNameOverride.value = file.name.replace(/\.json$/i, '').replace(/^r20-strategy-/, '')
+        importNameOverride.value = deriveImportName(file.name)
       }
     } catch {
       importFileError.value = '文件内容不是合法的 JSON 格式'
