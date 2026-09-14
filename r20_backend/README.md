@@ -147,16 +147,29 @@
 ## 6. 每次拆分后必须过的两道闸
 
 ```bash
-# 1) 全量离线套件（当前基线：1333 例 OK, skipped=1）
+# 1) 全量套件（当前基线：2761 例 OK, skipped=1）
+#    ⚠️ 这个数字由 tests/test_readme_baseline_numbers.py 钉住：
+#    它用 AST 数出仓里 test_* 方法数，再要求本行数字与之同量级。
+#    超过 ±10% 就会翻红 —— 忘了更新这里会当场被抓住，不会静默漂移。
 .venv/bin/python -m unittest discover -s tests -t .
 
 # 2) 纯逻辑搬家：旧实现差分对拍（抽到哪块，就为哪块写一条）
 #    参考 tests/test_trader_protection_extraction.py（把旧代码内联为 _legacy_* 逐值对拍）
 ```
 
-> 注意 `python -m tests.offline_suite` 会**主动拦截 `git` / `python` 子进程**，
-> 因此在该守卫下会有约 5 个 "Offline suite blocked external child process" 报错 ——
-> 那是守卫本身的产物，不是回归。判绿请用上面的 `unittest discover`。
+> 注意 `python -m tests.offline_suite` 会**主动拦截 `git` / `python` / `node`
+> 等未白名单的外部子进程**，因此在该守卫下会有相当数量的
+> "Offline suite blocked external child process" 报错 ——
+> 那是守卫本身的产物，**不是回归**（2026-09-15 实测：`git` 16 次、
+> `python` 55 次，`node` 0 次）。判绿请用上面的 `unittest discover`。
+>
+> ⚠️ 由此派生一条**测试编写规矩**：凡测试会 spawn 子进程
+> （`node` / `vite` / `vue-tsc` / 独立 `python` 探针）的，
+> 必须在 spawn **之前**调 `_guard_offline()`（判据为套件预设的
+> `OFFLINE_SUITE_RUNNING`），否则会污染离线基线、让人误判回归。
+> 参考第六十一刀：新增的 5 个 node 套件漏了这道守卫，
+> 使 `external child process: node` 计数从 0 变回 5。
+> 已知**尚未**补齐的存量文件另见台账 §75（刻意不动，避免无谓改动面）。
 
 ## 7. 源码锚点的三类陷阱（搬文件前必查）
 
