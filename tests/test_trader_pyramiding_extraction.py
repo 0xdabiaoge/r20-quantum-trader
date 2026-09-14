@@ -141,30 +141,98 @@ class ImplementationMovedTest(unittest.TestCase):
         self.assertIn("is_long=False,", facade)
 
     def test_both_call_sites_define_every_local_the_gate_needs(self):
-        """调用点必须自己备好 `c_dyn` / `c_accel` / `p_th`。
+        """调用点必须在自己**这一支**里备好传给门禁的每一个名字。
 
         **这条是本块最重要的回归。** 抽取时替换 facade 代码块，把做空分支的
         `c_dyn` / `c_accel` / `p_th` 三行一起吞掉了 —— 做空加仓一旦触发就
         `NameError`，而**全量 1456 个测试当时全绿**（没有测试走那条分支）。
+
+        ## 为什么这个判据要写两遍才对
+
+        前两版都**漏报**了，两次都是同一个根因：把"兄弟分支"当成了"本支"。
+
+        - 第 1 版收集"函数里出现过该赋值"，于是开多分支的 `c_accel = ...`
+          覆盖了开空分支的调用 —— 两条分支同属一个函数，`ast.walk` 看得见彼此。
+        - 第 2 版加了行号顺序，但仍用 `ast.walk(祖先块)`：祖先块若是外层的
+          `if action == "SELL_SHORT":`，`walk` 会**下钻进开多分支**，
+          于是又看见了开多那行。
+
+        正确判据：**只沿到达该调用的唯一路径**收集定义 ——
+        从函数体逐层下沉，每层只看「该层内、位于通往调用那条语句之前」的语句，
+        **绝不下钻进兄弟分支**。这样开多分支的赋值对开空调用不可见。
         """
         import ast
         tree = ast.parse(FACADE.read_text(encoding="utf-8"))
+        func = next(n for n in ast.walk(tree)
+                    if isinstance(n, ast.FunctionDef) and n.name == "execute_portfolio")
+
+        params = {a.arg for a in func.args.args + func.args.kwonlyargs}
+        module_names = set()
+        for node in tree.body:
+            if isinstance(node, (ast.Import, ast.ImportFrom)):
+                for al in node.names:
+                    module_names.add(al.asname or al.name.split(".")[0])
+            elif isinstance(node, ast.Assign):
+                for t in node.targets:
+                    for nm in ast.walk(t):
+                        if isinstance(nm, ast.Name):
+                            module_names.add(nm.id)
+
+        parent = {}
+        for n in ast.walk(func):
+            for child in ast.iter_child_nodes(n):
+                parent[child] = n
+
+        def names_assigned(stmt):
+            out = set()
+            if isinstance(stmt, ast.Assign):
+                for t in stmt.targets:
+                    for nm in ast.walk(t):
+                        if isinstance(nm, ast.Name):
+                            out.add(nm.id)
+            elif isinstance(stmt, ast.For) and isinstance(stmt.target, ast.Name):
+                out.add(stmt.target.id)
+            return out
+
+        def defines_before(call):
+            """沿「到达调用的唯一路径」收集在其之前完成的赋值。"""
+            defined = set()
+            node = call
+            while node is not None:
+                par = parent.get(node)
+                if par is None:
+                    break
+                body = getattr(par, "body", None) or []
+                # 只看同层、且排在通往 node 的那条语句之前的兄弟语句
+                for stmt in body:
+                    if stmt is node:
+                        break
+                    defined |= names_assigned(stmt)
+                node = par
+            return defined
+
         checked = 0
-        for node in ast.walk(tree):
-            if not isinstance(node, ast.If):
+        for node in ast.walk(func):
+            if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+                    and node.func.id == "pyramiding_gate"):
                 continue
-            test_src = ast.unparse(node.test)
-            if "pending_inst_ids" not in test_src or "side" not in test_src:
-                continue
-            assigned = {t.id for st in node.body if isinstance(st, ast.Assign)
-                        for t in st.targets if isinstance(t, ast.Name)}
-            for need in ("c_dyn", "c_accel", "p_th", "pos_upl", "pos_upl_ratio",
-                         "pos_avg_px", "curr_margin", "scale_count", "trailing_sl"):
-                self.assertIn(need, assigned,
-                              f"scale-in 分支（L{node.lineno}）缺少局部变量 {need}，"
-                              f"实盘触发该分支时必 NameError")
+            passed = set()
+            for arg in node.args:
+                for nm in ast.walk(arg):
+                    if isinstance(nm, ast.Name):
+                        passed.add(nm.id)
+            for kw in node.keywords:
+                for nm in ast.walk(kw.value):
+                    if isinstance(nm, ast.Name):
+                        passed.add(nm.id)
+            # 调用自己的实参绑定也算：c_accel=c_accel 之类左右同名，取右值
+            available = params | module_names | defines_before(node)
+            missing = sorted(n for n in passed if n not in available)
+            self.assertEqual(missing, [],
+                             f"gate 调用（L{node.lineno}）所在分支引用了未定义的名字 "
+                             f"{missing}；实盘走到该分支时会 NameError")
             checked += 1
-        self.assertEqual(checked, 2, f"应找到开多/开空两个 scale-in 分支，实际 {checked}")
+        self.assertEqual(checked, 2, f"应找到开多/开空两个 gate 调用，实际 {checked}")
 
 
 class ParityTest(unittest.TestCase):
