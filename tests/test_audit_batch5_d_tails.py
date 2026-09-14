@@ -309,7 +309,19 @@ class TestLeverageLanding(unittest.TestCase):
                                    "leverage", value_must_contain="int(ai_lever)",
                                    pkg_name="trader"), 4,
             "四处开仓通知必须携带钳制后的真实杠杆（AST 计数，不受文档/换行影响）")
-        submit_src = trader_src.split("def submit_protected_limit_order")[1].split("\ndef ")[0]
+        # 第八十八刀：submit_protected_limit_order 已搬入
+        # `scripts/trader/order_submit.py`。原先的 `trader_src.split("def ...")[1]`
+        # 在**域合并文本**里会先撞上门面的**转发薄壳**（壳里没有 set_leverage），
+        # 故改用 `source_scan.find_function_node`（优先实现体、忽略薄壳）取原文片段。
+        import ast as _ast
+        from tests.source_scan import find_function_node
+        _node, _path = find_function_node(
+            "scripts/ai_factor_trader.py", "submit_protected_limit_order",
+            pkg_name="trader")
+        self.assertEqual(_path.name, "order_submit.py",
+                         f"发单主路径应住在子包实现里，实际 {_path.name}")
+        submit_src = _ast.get_source_segment(_path.read_text(encoding="utf-8"), _node)
+        self.assertIsNotNone(submit_src)
         self.assertIn("okx_rest.set_leverage(", submit_src,
                       "OKX 直下路径发单前必须落 AI 杠杆档位")
         self.assertIn('"leverage": ai_lever,', trader_src.split("def run_trading_cycle")[1]

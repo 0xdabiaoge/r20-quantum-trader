@@ -233,16 +233,34 @@ class TestPriceSanityAnchor(unittest.TestCase):
     """④：穿价幻觉拒单 / 回踩远挂放行（打在 trader 源码函数上）。"""
 
     def test_guard_code_landed_in_submit_path(self):
+        # 第八十八刀：submit_protected_limit_order 已搬入
+        # `scripts/trader/order_submit.py`。锚点改用 `tests/source_scan`
+        # 的**函数级域定位**（优先实现体、忽略门面薄壳）—— 三段文本的
+        # "先后顺序"判据因此在**同一函数体内**继续成立（比合并整域更精确）：
+        # 几何复验之后（不绕过）、多所分支分发之前（三所平权）。
+        import ast as _ast
         import inspect
-        src = inspect.getsource(aft)
+        from tests import source_scan
+        node, path = source_scan.find_function_node(
+            "scripts/ai_factor_trader.py", "submit_protected_limit_order",
+            pkg_name="trader")
+        self.assertEqual(path.name, "order_submit.py",
+                         f"下单主路径应住在子包实现里，实际取到 {path.name}")
+        # ⚠️ 必须用**原文片段**而不是 ast.unparse：`多所平权执行` 是注释，
+        # unparse 会把注释剥掉（首版改法就是这样把顺序判据弄成 -1 的）。
+        src = _ast.get_source_segment(path.read_text(encoding="utf-8"), node)
+        self.assertIsNotNone(src, "取不到实现体原文片段")
         self.assertIn("入场价穿价幻觉", src)
         self.assertIn("R20_MAX_PRICE_CROSS_PCT", src)
-        # 位于几何复验之后（不绕过）、多所分支分发之前（三所平权）
         i_geo = src.find("validate_quote_geometry_and_rr")
         i_anchor = src.find("R20_MAX_PRICE_CROSS_PCT")
         i_multi = src.find("多所平权执行")
         self.assertLess(i_geo, i_anchor)
         self.assertLess(i_anchor, i_multi)
+        # 反证：门面壳里不得出现这三段（否则上面的定位可能虚 Hits）
+        shell = inspect.getsource(aft.submit_protected_limit_order)
+        for frag in ("入场价穿价幻觉", "R20_MAX_PRICE_CROSS_PCT", "多所平权执行"):
+            self.assertNotIn(frag, shell, f"门面壳残留 {frag} 会虚 Hits 本断言")
 
     def test_semantic_matrix_via_env_thresholds(self):
         # 用真实 fetch 路径跑单元语义：直接构造锚定判断不可拆——这里以阈值配置钉行为面
