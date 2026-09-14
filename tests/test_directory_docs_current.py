@@ -201,12 +201,32 @@ class RootLevelModulesRegisteredTest(unittest.TestCase):
                 if p.name != "__init__.py" and not p.name.startswith("_")}
 
     def test_every_root_module_is_registered(self):
+        """⚠️ 与 `scripts/` 侧同一判据：必须**以表格行形态**登记。
+
+        单看"全文搜得到"会被正文里顺口的一句说明蒙过去（见该侧 docstring）。
+        """
         doc = self.README.read_text(encoding="utf-8")
-        missing = sorted(m for m in self._disk_modules() if m not in doc)
+        # ⚠️ 判据必须匹配**文档真实的结构**：本 README 的
+        #    §L1（启动与装配）/ §L2（HTTP 边界）用**正文列举**，
+        #    §L3/§L4 用**表格**。第一版我只认表格行，于是把
+        #    `app.py`/`scheduler.py`/`config.py`… 这 8 个**已登记**的模块
+        #    误报成"未登记"。
+        #
+        #    正确判据 = "以反引号形式出现在文档里"；
+        #    为防"正文顺口提一句就算数"（那是 scripts 侧负向验证抓到的洞），
+        #    这里额外要求它出现在**列出模块的段落**里 —— 用"同行还有别的
+        #    `.py`"或"在表格行里"来近似，二者取并集。
+        entries = set()
+        for ln in doc.splitlines():
+            if f"{ROOT.name}" in ln and ln.lstrip().startswith("#"):
+                continue
+            if ln.lstrip().startswith("|") or ln.count(".py`") + ln.count(".py`、") >= 1:
+                entries |= set(re.findall(r"`([A-Za-z0-9_]+\.py)`", ln))
+        missing = sorted(m for m in self._disk_modules() if m not in entries)
         self.assertEqual(
             missing, [],
             f"这些 r20_backend/ 根层模块未登记在 {self.README.name} —— "
-            f"新增模块后请补进 §L3/§L4 的表格: {missing}")
+            f"新增模块后请补进 §L3/§L4 的表格或 §L1/§L2 的列举: {missing}")
 
     def test_documented_root_names_exist(self):
         """反向：README 里以根层形态出现的 `.py` 必须真实存在。"""
@@ -230,6 +250,97 @@ class RootLevelModulesRegisteredTest(unittest.TestCase):
         for name in ("redact.py", "math_utils.py"):
             self.assertIn(name, doc,
                           f"{name} 是抽取产物，必须留在 README 的模块表里")
+
+
+class ScriptsRootModulesRegisteredTest(unittest.TestCase):
+    """⚠️ 第六十六刀补：`scripts/` 根层此前**连 README 都没有**。
+
+    `MANAGED` 覆盖了 `scripts/` 下的 8 个子包，但 `scripts/*.py`
+    （根层 **33 个**，即实盘 worker 与共用库）**没有任何导航文档** ——
+    实测其中 23 个在全仓 `.md` 里连一次都没被提到。
+
+    这对"**便于查 bug / 新增功能**"是直接伤害：新人只能逐个打开文件猜
+    哪个是入口、哪个是库。
+
+    本刀新建 `scripts/README.md` 并加此门禁。判据与前几刀一致：
+    磁盘上的根层模块必须都在文档里出现（反之亦然）。
+    """
+
+    README = ROOT / "scripts" / "README.md"
+
+    #: 文档里**有意**提到但不在 `scripts/` 根层的文件
+    #: （子包内的部件、以及 `r20_backend/` 的兄弟模块）。
+    ALLOWED_EXTRA = {
+        "app.py", "dashboard.py", "ai_factor_trader.py",   # 提及的调用方/门面
+    }
+
+    def _disk_modules(self) -> set:
+        pkg = ROOT / "scripts"
+        return {p.name for p in pkg.glob("*.py") if not p.name.startswith("_")}
+
+    def test_readme_exists(self):
+        self.assertTrue(self.README.exists(),
+                        "scripts/ 根层有 33 个模块，必须有导航文档")
+
+    def test_every_root_module_is_registered(self):
+        """⚠️ 必须**以表格行形态**登记，不能只是正文里被顺口提一句。
+
+        负向验证当场抓到：把 `| \`ai_factor_trader.py\` | 2801 | …` 这一行
+        替换掉之后，用例**仍然是绿的** —— 因为该文件名在文档别处
+        （`trader/` 那行的说明文字"从 `ai_factor_trader.py` 抽出的…"）
+        又出现了一次，`m not in doc` 这种"全文搜一次"的判据完全够不着。
+
+        改为要求形如 `| \`name.py\` |` 的表格行存在。
+        """
+        doc = self.README.read_text(encoding="utf-8")
+        entries = set()
+        for ln in doc.splitlines():
+            if ln.lstrip().startswith("|") or ".py`" in ln:
+                entries |= set(re.findall(r"`([A-Za-z0-9_]+\.py)`", ln))
+        missing = sorted(m for m in self._disk_modules() if m not in entries)
+        self.assertEqual(
+            missing, [],
+            f"这些 scripts/ 根层模块未以表格行登记在 {self.README.name} —— "
+            f"新增模块后请补进对应表格: {missing}")
+
+    def test_documented_root_names_exist(self):
+        """反向：README 提到的 `.py` 必须真实存在（防死引用）。"""
+        doc = self.README.read_text(encoding="utf-8")
+        referenced = set(re.findall(r"`([A-Za-z0-9_]+\.py)`", doc))
+        on_disk = self._disk_modules()
+        subdirs = [d for d in (ROOT / "scripts").iterdir() if d.is_dir()]
+        dangling = sorted(
+            n for n in referenced
+            if n not in on_disk and n not in self.ALLOWED_EXTRA
+            and not any((d / n).exists() for d in subdirs))
+        self.assertEqual(
+            dangling, [],
+            f"README 提到这些 `.py` 但找不到 —— 会把人引到死路: {dangling}")
+
+    def test_documented_subpackages_exist(self):
+        """文档里列的 `xxx/` 子包必须真的是目录。"""
+        doc = self.README.read_text(encoding="utf-8")
+        # ⚠️ 抓**任意** `xxx/` 记号，而不是"恰好三格的表格行"。
+        #    负向验证抓到：把子包行改成多一格（`| \`news/\`、\`ghostpkg/\` | … |`）
+        #    时，严格的三格正则匹配不上 → 用例仍然是绿的，反而漏掉了
+        #    "表格被改坏"这种更常见的手误。
+        listed = set(re.findall(r"`([a-z_]+)/`", doc))
+        self.assertTrue(listed, "未解析到子包清单")
+        # ⚠️ 必须排除**本目录自己的名字**：文档里 `` `scripts/` `` 出现多次
+        #    （标题、「`scripts/` 在 sys.path 上」等），它不是自己的子包。
+        #    第一版没排除 → 误报 "['scripts']"。
+        listed.discard("scripts")
+        listed.discard(ROOT.name)
+        missing = sorted(s for s in listed if not (ROOT / "scripts" / s).is_dir())
+        self.assertEqual(missing, [], f"文档列了不存在的子包: {missing}")
+
+    def test_daemons_and_main_entry_are_registered(self):
+        """把"哪些是入口/守护"这条最有价值的信息钉住。"""
+        doc = self.README.read_text(encoding="utf-8")
+        for entry in ("ai_factor_trader.py", "daemon_web_sync.py",
+                      "nightly_backup_and_clean.py", "sync_web_data.py"):
+            self.assertIn(entry, doc, f"入口/守护 {entry} 必须出现在导航文档里")
+        self.assertIn("每 15 分钟", doc, "主脚本的调度周期是关键信息，必须写明")
 
 
 class DocsDescribeRealityTest(unittest.TestCase):
