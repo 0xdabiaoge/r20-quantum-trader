@@ -211,10 +211,22 @@ class TestPortfolioBudgetGuard(unittest.TestCase):
         self.assertIn("fail-closed", aft.portfolio_budget_guard("abc", 1.0, 2.0))
 
     def test_route_and_reserve_wires_guard(self):
-        # 活线化证明：route_and_reserve_signal 源码必须调用 guard（防再次漂移）
+        # 活线化证明：route_and_reserve_signal 源码必须调用 guard（防再次漂移）。
+        # 第八十七刀：该函数已搬入 `scripts/trader/routing_policy.py`，门面只剩
+        # 转发薄壳 —— 用 `tests/source_scan` 的**域定位**取实现体（它优先实现、
+        # 显式忽略薄壳），断言对象跟随搬家、意图不变；并加反证锁死虚 Hits 通道
+        # （门面壳文本若残留该调用，会掩盖"实现里其实没调用"）。
+        import ast as _ast
         import inspect
-        src = inspect.getsource(aft.route_and_reserve_signal)
-        self.assertIn("portfolio_budget_guard(", src)
+        from tests import source_scan
+        node, path = source_scan.find_function_node(
+            "scripts/ai_factor_trader.py", "route_and_reserve_signal", pkg_name="trader")
+        self.assertEqual(path.name, "routing_policy.py",
+                         f"路由主流程应住在子包实现里，实际取到 {path.name}")
+        self.assertIn("portfolio_budget_guard(", _ast.unparse(node))
+        self.assertNotIn("portfolio_budget_guard(",
+                         inspect.getsource(aft.route_and_reserve_signal),
+                         "门面壳里出现该调用会虚 Hits 上面的断言")
 
 
 class TestPriceSanityAnchor(unittest.TestCase):
