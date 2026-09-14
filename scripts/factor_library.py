@@ -29,6 +29,7 @@ from typing import Dict, Any, List, Optional
 
 from scripts.factors.defaults import build_default_factors
 from scripts.factors.scoring import score_composite_alpha
+from scripts.factors.candles_15m import compute_15m_indicators
 from concurrent.futures import ThreadPoolExecutor
 
 _BJ = timezone(timedelta(hours=8))
@@ -48,6 +49,35 @@ def safe_float(val: Any, default: float = 0.0) -> float:
         return f if f == f and abs(f) != float("inf") else default
     except (TypeError, ValueError):
         return default
+
+def _resolve_calculate_calculus():
+    """按需（并缓存）解析微积分引擎。
+
+    原实现在 `compute_instrument_factors` 的**循环体内**每次
+    `sys.path.append(...)` + `from calculus_engine import calculate_calculus` ——
+    8 个标的就重复 8 次路径追加与导入查找。这里改为**模块内 memo 一次**：
+    行为等价（返回同一个函数对象），只是不再每个标的重复做。
+
+    取不到时返回 `None` —— `compute_15m_indicators` 会跳过 Pillar 6
+    而保留前面算好的 ATR/RSI/VWAP/OBV（与原来"内层 try: pass"的语义一致）。
+    """
+    global _CALCULUS_ENGINE_FN
+    if _CALCULUS_ENGINE_FN is not _UNRESOLVED:
+        return _CALCULUS_ENGINE_FN
+    fn = None
+    try:
+        sys.path.append(os.path.join(WORKSPACE_DIR, "scripts"))
+        from calculus_engine import calculate_calculus
+        fn = calculate_calculus
+    except Exception:
+        fn = None
+    _CALCULUS_ENGINE_FN = fn
+    return fn
+
+
+_UNRESOLVED = object()
+_CALCULUS_ENGINE_FN = _UNRESOLVED
+
 
 def compute_instrument_factors(item: Dict[str, Any], smart_money_pool: Dict[str, Any]) -> Dict[str, Any]:
     inst_id = item["instId"]
@@ -100,89 +130,12 @@ def compute_instrument_factors(item: Dict[str, Any], smart_money_pool: Dict[str,
         d = {"data": fetch_candles(inst_id, bar="15m", limit=24)}
         if d["data"] and len(d["data"]) >= 15:
             raw_candles = d["data"]
-            closes = [safe_float(c[4]) for c in reversed(raw_candles)]
-            highs = [safe_float(c[2]) for c in reversed(raw_candles)]
-            lows = [safe_float(c[3]) for c in reversed(raw_candles)]
-            vols = [safe_float(c[5]) for c in reversed(raw_candles)]
-
-            # ATR 14
-            tr_list = []
-            for i in range(1, len(closes)):
-                tr = max(highs[i] - lows[i], abs(highs[i] - closes[i-1]), abs(lows[i] - closes[i-1]))
-                tr_list.append(tr)
-            if len(tr_list) >= 14:
-                atr = sum(tr_list[-14:]) / 14
-                factors["volatility_channel"]["atr_14"] = round(atr, 4)
-                if factors["price"] > 0:
-                    factors["volatility_channel"]["atr_pct"] = round(atr / factors["price"] * 100, 2)
-
-            # RSI 14
-            diffs = [closes[i] - closes[i-1] for i in range(1, len(closes))]
-            gains = [d if d > 0 else 0 for d in diffs]
-            losses = [-d if d < 0 else 0 for d in diffs]
-            if len(gains) >= 14:
-                avg_g = sum(gains[-14:]) / 14
-                avg_l = sum(losses[-14:]) / 14
-                rs = (avg_g / avg_l) if avg_l > 0 else 100.0
-                factors["trend_momentum"]["rsi_14"] = round(100.0 - (100.0 / (1.0 + rs)), 1)
-
-            # VWAP Bias
-            pv_sum = sum(closes[i] * vols[i] for i in range(len(closes)))
-            v_sum = sum(vols)
-            if v_sum > 0:
-                vwap = pv_sum / v_sum
-                factors["trend_momentum"]["vwap_bias_pct"] = round((factors["price"] - vwap) / vwap * 100, 2)
-
-            # Vol Ratio
-            if len(vols) >= 6:
-                avg_v5 = sum(vols[-6:-1]) / 5
-                if avg_v5 > 0:
-                    factors["volume_money_flow"]["vol_ratio_15m"] = round(vols[-1] / avg_v5, 2)
-
-            # OBV
-            obv = 0
-            for i in range(1, len(closes)):
-                if closes[i] > closes[i-1]: obv += vols[i]
-                elif closes[i] < closes[i-1]: obv -= vols[i]
-            factors["volume_money_flow"]["obv_flow"] = "BULL_FLOW" if obv > 0 else ("BEAR_FLOW" if obv < 0 else "NEUTRAL")
-
-            # Pillar 6: Calculus, Definite Integrals & Probability Theory (15M High-Resolution)
-            try:
-                sys.path.append(os.path.join(WORKSPACE_DIR, "scripts"))
-                from calculus_engine import calculate_calculus
-                c_res = calculate_calculus(closes, highs, lows, vols)
-                if c_res.get("valid"):
-                    # Calculus Dynamics
-                    factors["calculus_dynamics"]["velocity"] = c_res.get("velocity", 0.0)
-                    factors["calculus_dynamics"]["acceleration"] = c_res.get("acceleration", 0.0)
-                    factors["calculus_dynamics"]["impulse"] = c_res.get("impulse", 0.0)
-                    factors["calculus_dynamics"]["jerk"] = c_res.get("jerk", 0.0)
-                    factors["calculus_dynamics"]["curvature"] = c_res.get("curvature", 0.0)
-                    factors["calculus_dynamics"]["power"] = c_res.get("power", 0.0)
-                    factors["calculus_dynamics"]["power_regime"] = c_res.get("power_regime", "STEADY_FLUX")
-                    factors["calculus_dynamics"]["regime"] = c_res.get("regime", "RANGE_LOW_VELOCITY")
-                    factors["calculus_dynamics"]["quality"] = c_res.get("quality", 0.0)
-                    factors["calculus_dynamics"]["direction"] = c_res.get("direction", 0)
-
-                    # Definite Integrals
-                    d_int = c_res.get("definite_integrals", {})
-                    factors["definite_integrals"]["energy_integral"] = d_int.get("energy_integral", 0.0)
-                    factors["definite_integrals"]["deviation_area_integral"] = d_int.get("deviation_area_integral", 0.0)
-                    factors["definite_integrals"]["volume_action_integral"] = d_int.get("volume_action_integral", 0.0)
-                    factors["definite_integrals"]["integral_regime"] = d_int.get("integral_regime", "BALANCED_ENERGY")
-
-                    # Probability Theory & Stochastic Modeling
-                    p_th = c_res.get("probability_theory", {})
-                    factors["probability_theory"]["skewness"] = p_th.get("skewness", 0.0)
-                    factors["probability_theory"]["kurtosis"] = p_th.get("kurtosis", 0.0)
-                    factors["probability_theory"]["continuation_prob_pct"] = p_th.get("continuation_prob_pct", 50.0)
-                    factors["probability_theory"]["breakdown_prob_pct"] = p_th.get("breakdown_prob_pct", 50.0)
-                    factors["probability_theory"]["var_95_pct"] = p_th.get("var_95_pct", 1.5)
-                    factors["probability_theory"]["cvar_95_pct"] = p_th.get("cvar_95_pct", 2.2)
-                    factors["probability_theory"]["prob_regime"] = p_th.get("prob_regime", "GAUSSIAN_BALANCED")
-                    factors["probability_theory"]["is_fat_tail"] = p_th.get("is_fat_tail", False)
-            except Exception:
-                pass
+            # 15M 派生序列 + 指标 + Pillar 6（阶段 4·B3 第三十二刀：
+            # 迁至 scripts/factors/candles_15m.py）。取数仍在本门面内，
+            # 故对 fetch_candles 的 patch.object 缝不受影响。
+            closes, highs, lows, vols = compute_15m_indicators(
+                raw_candles, factors, safe_float=safe_float,
+                calculate_calculus=_resolve_calculate_calculus())
         else:
             print(f"[Factor] ⚠️ {inst_id} 15m K线获取不足15根（www/aws/CLI 三级容灾均未取回），15M 因子降级缺省")
     except Exception as exc:
