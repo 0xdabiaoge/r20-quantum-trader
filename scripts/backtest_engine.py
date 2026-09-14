@@ -22,6 +22,16 @@ import math
 import os
 import sys
 import urllib.request
+
+# ⚠️ 第七十九刀（bootstrap 门抓到的同类真雷）：顶层 import `scripts.` 但
+# 此前**无任何仓库根 bootstrap**（下方 L9x 的 insert 只是函数内给
+# `market_data_service` 的 fallback，且目录不是 repo 根）——
+# `python scripts/backtest_engine.py` 直跑必 ModuleNotFoundError。
+# 补 factor_library 同款（幂等）。
+_BT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _BT_ROOT not in sys.path:
+    sys.path.insert(0, _BT_ROOT)
+
 from scripts.backtest.lifecycle import evaluate_position_exit, settle_exit
 from scripts.backtest.metrics import (
     aggregate_portfolio,

@@ -186,3 +186,21 @@ if not _ALLOW_REAL_WRITES:
     os.replace = _guarded_replace
     os.remove = _guarded_remove
     os.unlink = _guarded_remove
+
+# ⚠️ 第八十刀：import 时机静默 dashboard 的 **2 秒缓存外呼循环**。
+# `dashboard/app.py` 模块**顶层末尾**就 `start_dashboard_background_worker()`
+# （web_shell 降格为纯库的历史残留，但删不得——`dashboard/start.sh:45` 的
+# `uvicorn dashboard.app:app` 独立部署模式全靠它）。后果：任何 import 过
+# dashboard.app 的测试进程里，都有一个 daemon 线程**每 2s 真外呼
+# www.okx.com**（balances/positions/pending_orders）——11+ 个路由测试文件
+# 的共同泄漏源，连完全不碰 dashboard 的用例都被波及（探针逐文件实测）。
+# 测试进程不是 web 宿主：这里（tests 包最早加载点）先 import 再立即 stop。
+# 模块顶层只执行一次；此后唯一重启者是 `with TestClient` 的 lifespan
+# （r20_backend/app.py:139），那种用例必在 isolate_config 窗口内，
+# 外呼已被 `_fetch_json` 压制（见 config_sandbox）。
+try:
+    import dashboard.app as _dashboard_app
+    _dashboard_app.stop_dashboard_background_worker()
+    del _dashboard_app
+except Exception:      # pragma: no cover — 导入失败不阻断测试收集
+    pass

@@ -41,6 +41,34 @@ def isolate_config(test):
         else:
             _os.environ[_env_key] = _prev
     test.addCleanup(_restore_env)
+    # ⚠️⚠️ 第八十刀（顺序即 bug）：必须发生在**下面的白名单 import 之前** ——
+    # `dashboard/app.py` 模块**顶层末尾**就有 `start_dashboard_background_worker()`
+    # （L549，实测），于是"import dashboard.app"这个动作本身就点起
+    # **每 2 秒跑一次 `update_cache_cycle()` 的 daemon worker**：
+    #   · 非离线：worker 在**任何测试的 patch 窗口之外**真外呼
+    #     www.okx.com（balances/positions/pending_orders ×每 2s）——
+    #     这是 11+ 个路由测试文件"按文件扫全泄漏"的共同源头，
+    #     连不碰 dashboard 的用例（如 test_config_sandbox）都被波及；
+    #   · 离线：socket 守护把它拦成 fail-soft ⇒ 多年无人察觉。
+    # 压制 `_fetch_json` 只盖住 patch 存活的窗口；**根治 = 关掉 worker 循环**
+    # （`_BG_WORKER_RUNNING` 每轮检查，stop 后 ≤2s 线程自然退出）。
+    # 生产不受影响：web 进程经 r20_backend/app.py 的 lifespan 启动它，
+    # 且测试进程里这个 worker 从来不是被测对象。
+    # 要真测 fetch 的文件自己再 patch.object 覆盖（mock 栈 LIFO，后装优先）。
+    try:
+        import dashboard.app as _dash_mod
+    except Exception:
+        _dash_mod = None
+    if _dash_mod is not None:
+        try:
+            _dash_mod.stop_dashboard_background_worker()
+        except Exception:
+            pass
+        if callable(getattr(_dash_mod, "_fetch_json", None)):
+            _p_fetch = patch.object(
+                _dash_mod, "_fetch_json",
+                lambda *a, **k: (False, None, "tests 沙箱已压制出站取数（isolate_config）"))
+            _p_fetch.start(); test.addCleanup(_p_fetch.stop)
     for name in ('r20_backend.llm_manager', 'r20_backend.council_manager',
                  'r20_backend.policy_snapshot', 'r20_backend.interceptor_manager',
                  'scripts.prompt_library', 'scripts.evolution_shield',

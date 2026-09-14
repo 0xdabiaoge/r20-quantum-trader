@@ -3,6 +3,7 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 import r20_backend.app as app_module
@@ -14,6 +15,8 @@ class AdminApiTests(unittest.TestCase):
     def setUp(self):
         from tests.config_sandbox import isolate_config
         isolate_config(self)
+        # （第七十九刀曾在此自建 _fetch_json 压制；第八十刀已收编进
+        #   isolate_config 统一机制 —— 见 tests/config_sandbox.py。）
         self.temp = tempfile.TemporaryDirectory()
         self.original = app_module.admin_auth
         app_module.admin_auth = AdminAuthStore(Path(self.temp.name) / "admin.db")

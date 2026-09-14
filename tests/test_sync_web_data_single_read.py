@@ -192,11 +192,12 @@ class EndToEndSingleReadTest(unittest.TestCase):
     """
 
     def test_generate_reads_each_data_file_exactly_once(self):
-        # 第七十八刀：generate 的**读取深度**依赖真实网络失败走到哪层
-        # fail-soft（离线守护拦 socket 后根本到不了这两个文件的读取点）
-        # —— 本用例验证的是真网络环境下的端到端行为，离线如实 skip。
-        from tests.config_sandbox import skip_if_offline_suite
-        skip_if_offline_suite(self, '读取深度依赖真实网络失败路径，离线无法复现该深度')
+        # ⚠️ 第七十九刀：本用例原先**隐式依赖真实凭证** —— 非离线时
+        # `env.configured=True` ⇒ generate **拿 .env 真 key 打 www.okx.com
+        # ×4/次**（探针实测），真实失败才 fail-soft 走到文件读取；
+        # 离线时 NotConfigured 提前 raise ⇒ 读 0（上轮的 skip 是权宜）。
+        # 现在把 fetch 层显式压成 None：fail-soft 语义下流程**确定地**
+        # 抵达 L215/L221 的读取点 ⇒ 非离线零外呼、离线也从 skip 变真测。
         prod = pathlib.Path(sync_web_data.DATA_DIR).resolve()
         snaps = str(pathlib.Path(sync_web_data.SNAPSHOTS_JSON_FILE))
         led = str(pathlib.Path(sync_web_data.LEDGER_JSON_FILE))
@@ -218,7 +219,17 @@ class EndToEndSingleReadTest(unittest.TestCase):
 
         sync_web_data._JSON_CACHE.clear()
         self.addCleanup(sync_web_data._JSON_CACHE.clear)
-        with patch.object(sync_web_data, "open", guard_open, create=True):
+        # fetch 层压成 None（fail-soft 语义下继续走到文件读取），
+        # 环境标成 configured（不走 NotConfigured 提前 raise）——零外呼。
+        import types
+        _env = types.SimpleNamespace(configured=True)
+        with patch.object(sync_web_data, "open", guard_open, create=True), \
+             patch.object(sync_web_data.okx_runtime, "current_environment", lambda: _env), \
+             patch.object(sync_web_data.okx_rest, "balances", lambda *a, **k: None), \
+             patch.object(sync_web_data.okx_rest, "positions", lambda *a, **k: None), \
+             patch.object(sync_web_data.okx_rest, "pending_orders", lambda *a, **k: None), \
+             patch.object(sync_web_data.okx_rest, "bills", lambda *a, **k: None), \
+             patch.object(sync_web_data, "fetch_tickers_bulk", lambda *a, **k: []):
             try:
                 sync_web_data.generate_trading_data()
             except PermissionError:

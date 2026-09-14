@@ -25,7 +25,11 @@ for _p in (str(ROOT), str(ROOT / "scripts")):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
-import ai_brain_trader
+# ⚠️ 第七十九刀：bare-name `import ai_brain_trader` 改为**点号名** ——
+# `tests/config_sandbox.isolate_config` 按 `scripts.` 前缀遍历 sys.modules
+# 重定向数据常量；bare-name 实例在部分加载顺序下不受管辖，
+# 本文件曾把**生产** `data/.ai_brain_cycle.lock` 写掉（探针实测）。
+import scripts.ai_brain_trader as ai_brain_trader
 import scripts.okx_rest as okx_rest
 from scripts.okx_runtime import freeze_environment, unfreeze_environment
 
@@ -60,6 +64,9 @@ class _EnvFreezeMixin:
     env = DEMO_ENV
 
     def setUp(self):
+        # 沙箱接管 ai_brain_trader 的 data/ 常量（lock/decisions 等，第七十九刀）。
+        from tests.config_sandbox import isolate_config
+        isolate_config(self)
         freeze_environment(dict(self.env))
         self.addCleanup(unfreeze_environment)
 

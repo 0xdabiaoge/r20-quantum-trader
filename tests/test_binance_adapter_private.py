@@ -296,7 +296,11 @@ class BinanceExecutionAndProtectionTests(unittest.TestCase):
             return _FakeResp(json.dumps(resp_data).encode("utf-8"))
 
         with patch("r20_backend.exchanges.registry.venue_credentials", return_value=(api_key, secret_key)), \
-             patch("r20_backend.exchanges.binance.urlopen", mock_urlopen):
+             patch("r20_backend.exchanges.binance.urlopen", mock_urlopen), \
+             patch.object(type(self.adapter), "_public_get", lambda *a, **k: None):
+             # 第七十九刀：spec 路径走 requests.Session 不是 urlopen，
+             # 探针实测非离线时**真打 fapi.binance.com**；离线时它被拦后
+             # fail-soft 返 None 也绿 ⇒ patch 成 None = 与离线行为等价。
             # 1. 限价单
             res_limit = self.adapter.place_order(
                 symbol="BTC", side="buy", contracts=0.25, price=60123.45, text="r20_cid_01"
@@ -357,7 +361,11 @@ class BinanceExecutionAndProtectionTests(unittest.TestCase):
             return _FakeResp(json.dumps({"algoId": algo_id, "code": "200"}).encode("utf-8"))
 
         with patch("r20_backend.exchanges.registry.venue_credentials", return_value=(api_key, secret_key)), \
-             patch("r20_backend.exchanges.binance.urlopen", mock_urlopen):
+             patch("r20_backend.exchanges.binance.urlopen", mock_urlopen), \
+             patch.object(type(self.adapter), "_public_get", lambda *a, **k: None):
+             # 第七十九刀：spec 路径走 requests.Session 不是 urlopen，
+             # 探针实测非离线时**真打 fapi.binance.com**；离线时它被拦后
+             # fail-soft 返 None 也绿 ⇒ patch 成 None = 与离线行为等价。
             # 多头持仓 -> 平仓方向为反向 SELL，closePosition=true 全平
             legs = self.adapter.attach_protective_orders(
                 symbol="BTC", side="long", tp_px=65000.0, sl_px=58000.0, working_type="CONTRACT_PRICE"
