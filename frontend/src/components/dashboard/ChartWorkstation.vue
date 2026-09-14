@@ -2,6 +2,8 @@
 import { chartStyles } from './chartStyles'
 import { computeRiskReward, symbolPrecision } from './chartMath'
 import { planPriceLines } from './chartOverlays'
+import { countdownLabel } from './chartCountdown'
+import { mainIndicators, subIndicators, DEFAULT_ACTIVE_INDICATORS } from './chartIndicators'
 import { fmtDate, fmtHM, fmtClock } from '../../utils/format';
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useDashboardStore } from '../../stores/dashboard'
@@ -169,52 +171,8 @@ const holdingSet = computed(() => {
   store.pendingOrders.forEach((o: any) => { const n = String(o.name || o.instId || '').split('-')[0].toUpperCase(); if (n) s.add(n) })
   return s
 })
+const activeIndicators = ref<Record<string, boolean>>({ ...DEFAULT_ACTIVE_INDICATORS })
 
-// 主图叠加指标 (Overlay on Main Candle Pane)
-interface IndicatorOption {
-  key: string
-  name: string
-  label: string
-  desc: string
-  color: string
-  defaultParams?: any[]
-  isSub: boolean
-}
-
-const mainIndicators: IndicatorOption[] = [
-  { key: 'VWAP', name: 'VWAP', label: 'VWAP', desc: '成交量加权均价线', color: '#06B6D4', isSub: false },
-  { key: 'MA', name: 'MA', label: 'MA', desc: '均线 (5, 10, 20)', color: '#F59E0B', defaultParams: [5, 10, 20], isSub: false },
-  { key: 'EMA', name: 'EMA', label: 'EMA', desc: '指数均线 (12, 26, 50)', color: '#38BDF8', defaultParams: [12, 26, 50], isSub: false },
-  { key: 'BOLL', name: 'BOLL', label: 'BOLL', desc: '布林带轨道 (20, 2)', color: '#818CF8', defaultParams: [20, 2], isSub: false },
-  { key: 'SAR', name: 'SAR', label: 'SAR', desc: '抛物线转向', color: '#EC4899', isSub: false },
-]
-
-// 副图独立窗格指标 (Sub Panes)
-const subIndicators: IndicatorOption[] = [
-  { key: 'VOL', name: 'VOL', label: 'VOL', desc: '成交量与柱形量能', color: '#10B981', isSub: true },
-  { key: 'MACD', name: 'MACD', label: 'MACD', desc: '异同移动平均线', color: '#3B82F6', defaultParams: [12, 26, 9], isSub: true },
-  { key: 'RSI', name: 'RSI', label: 'RSI', desc: '相对强弱动量 (6, 12, 24)', color: '#F97316', defaultParams: [6, 12, 24], isSub: true },
-  { key: 'KDJ', name: 'KDJ', label: 'KDJ', desc: '随机摆动指标 (9, 3, 3)', color: '#A855F7', defaultParams: [9, 3, 3], isSub: true },
-  { key: 'OBV', name: 'OBV', label: 'OBV', desc: '能量潮累积线', color: '#EAB308', isSub: true },
-  { key: 'WR', name: 'WR', label: 'WR', desc: '威廉超买超卖 (14)', color: '#6366F1', defaultParams: [14], isSub: true },
-]
-
-// 默认激活指标：默认开启 VOL 与 VWAP
-const activeIndicators = ref<Record<string, boolean>>({
-  VWAP: true,
-  VOL: true,
-  MA: false,
-  EMA: false,
-  BOLL: false,
-  SAR: false,
-  MACD: false,
-  RSI: false,
-  KDJ: false,
-  OBV: false,
-  WR: false,
-})
-
-// 记录已挂载的指标 Pane ID，以便精准开关
 
 // 当前标的计算
 const currentInstId = computed(() => instIdOf(currentSymbol.value))
@@ -586,22 +544,10 @@ function updatePriceLines() {
 
 // 倒计时
 function updateCountdown() {
+  // 阶段 3·F4：纯算术抽到 chartCountdown.ts。时区仍由本处解析（时间契约留在调用点）。
   const now = new Date()
   const [hr = 0, min = 0, sec = 0] = fmtClock(now).split(':').map(Number)
-  let remainSec = 0
-  if (currentPeriod.value === '15m') {
-    remainSec = (15 - (min % 15)) * 60 - sec
-  } else if (currentPeriod.value === '1H') {
-    remainSec = (60 - min) * 60 - sec
-  } else if (currentPeriod.value === '4H') {
-    remainSec = (4 - (hr % 4)) * 3600 - min * 60 - sec
-  } else {
-    remainSec = 86400 - (hr * 3600 + min * 60 + sec)
-  }
-  remainSec = Math.max(0, remainSec)
-  const m = Math.floor((remainSec % 3600) / 60)
-  const s = remainSec % 60
-  candleCountdown.value = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+  candleCountdown.value = countdownLabel(currentPeriod.value, { hr, min, sec })
 }
 
 // 拉取行情蜡烛数据 (供定时静默刷新使用)
