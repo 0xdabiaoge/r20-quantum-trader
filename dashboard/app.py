@@ -21,6 +21,9 @@ from r20_backend.dashboard_payload.trade_stats import (  # noqa: E402
 from r20_backend.dashboard_payload.trader_leaderboard import (  # noqa: E402
     build_inst_leaderboard as _core_build_inst_leaderboard,
 )
+from r20_backend.dashboard_payload.integrity_sidecars import (  # noqa: E402
+    merge_all_integrity_sidecars as _core_merge_all_integrity_sidecars,
+)
 from r20_backend.dashboard_payload.bills import (  # noqa: E402
     aggregate_bills as _core_aggregate_bills,
 )
@@ -440,43 +443,10 @@ def update_cache_cycle():
     review_data = _local["review_data"]
     snapshots_list = _local["snapshots_list"]
 
-    # 审计 A2：台账逐所同步状态旁车并入 source_errors——binance/gate 拉取失败
-    # 时数据不再以「完整」示人（PARTIAL），并携带失败原因。旁车缺失/过旧=跳过
-    # （过旧由 trading_ledger 文件新鲜度通道兜底 STALE）。
-    try:
-        _lss = os.path.join(DATA_DIR, "ledger_sync_status.json")
-        if os.path.exists(_lss):
-            with open(_lss, "r", encoding="utf-8") as _f:
-                _ls = json.load(_f)
-            _fresh = True
-            try:
-                _gen = datetime.datetime.fromisoformat(str(_ls.get("generated_at") or ""))
-                _fresh = (datetime.datetime.now(_gen.tzinfo) - _gen).total_seconds() <= 2700
-            except Exception:
-                _fresh = False
-            if _fresh:
-                for _v, _d in (_ls.get("venues") or {}).items():
-                    if isinstance(_d, dict) and _d.get("status") == "failed":
-                        source_errors.append(f"ledger-{_v}: 台账同步失败({str(_d.get('reason') or '')[:120]})，所盈亏/日亏数据不全")
-                    elif isinstance(_d, dict) and (_d.get("truncated") or _d.get("truncated_at")):
-                        # 批C：分页化后该标记仅在「历史分页未取尽且仍停在基线窗口之内」时出现
-                        # （早期版本按单页 len>=100 反推，会把「已覆盖在册窗口」误报成截断）。
-                        source_errors.append(f"ledger-{_v}: 历史分页未取尽（仍在基线窗口内），可能存在截断")
-    except Exception:
-        pass
-
-    # 审计监控面：AI 批次决策连续失败并入 source_errors——04:45 起 14 轮停摆
-    # 时巡检「全绿」的根因是失败终态对面板不可见；≥2 连续即降 PARTIAL。
-    try:
-        _ah_path = os.path.join(DATA_DIR, "ai_health.json")
-        if os.path.exists(_ah_path):
-            with open(_ah_path, "r", encoding="utf-8") as _f:
-                _ah = json.load(_f)
-            _cf = int(_ah.get("consecutive_failures", 0) or 0)
-            if _cf >= 2:
-                source_errors.append(f"ai-inference: AI决策链连续{_cf}轮失败({str(_ah.get('last_error') or '')[:120]})，本轮无新指令")
-    except Exception:
-        pass
+    # 审计 A2 + 审计监控面（阶段 4·B3 第二十七刀：两段旁车并入迁至
+    # dashboard_payload/integrity_sidecars.py）。顺序保持原样：先台账同步状态，
+    # 再 AI 连续失败 —— source_errors 的条目顺序即前端展示顺序。
+    _core_merge_all_integrity_sidecars(source_errors, DATA_DIR, datetime=datetime)
 
     # 审计批7(2026-09-13)·「今日已实现」单一事实源：上方 bills 聚合是 OKX 单所视野
     # ——binance/gate 当日平仓（实锤：SUI +27.63）前台永远看不见，与三所合并的台账/
