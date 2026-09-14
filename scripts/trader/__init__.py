@@ -3,7 +3,6 @@
 `scripts/ai_factor_trader.py` 是实盘主脚本（由 worker 每 15 分钟 respawn），
 按研究文档 B3 采用**门面保留式抽取**：只把不依赖模块状态的纯逻辑搬进来，
 门面保留同名壳与全部被测试钉住的字面量。
-"""
 
 ## 模块清单
 
@@ -22,3 +21,13 @@
 2. **门面壳必须是 `def name(...)`，不能是 `name = impl` 别名**。计数锚点
    （如 `ai_factor_trader.py` 里 `order_margin_gate(` 恰 3 次）与
    `inspect.getsource(trader.xxx)` 都依赖"门面里有一个真正的 def"。
+
+## 本包是实盘进程的 import 根之一 —— 改完必须做语法校验
+
+`scripts/ai_factor_trader.py` 第 41 行起就 `from scripts.trader.xxx import ...`。
+本包任何文件只要有 **SyntaxError**，交易员整个周期会在 import 阶段直接死掉：
+`logs/ai_factor_trader.log` **不会**新增任何行（含 traceback），表现为"周期静默消失"。
+2026-09-14 10:00 那次事故就是这么来的（往本文件尾部追加文档时漏了 docstring 闭合）。
+所以：**改本包任何文件后，务必 `python -c "import scripts.trader"` 或至少
+`ast.parse(...)` 验证一次**，不要只看测试是否绿。
+"""
