@@ -14,7 +14,26 @@ except ImportError:  # scripts/ 在 sys.path
     from local_lock import local_file_lock  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
-POOL_FILE = ROOT / "data" / "instrument_pool.json"
+#: ⚠️ 这些路径**必须**是模块级常量，不能写成函数内 `ROOT / "data" / …` 内联拼法。
+#:
+#: 原因（结构优化阶段 4·B3 第七十三刀实测确认）：测试沙箱
+#: `tests/config_sandbox.py::isolate_config` 的重定向**只对模块级 UPPERCASE 常量
+#: 生效**，而且要求该常量能 `relative_to(project / "data")` 成功。
+#: 于是 `ROOT`（指向**仓库根**）本身永远不被重定向，而函数内的
+#: `state_file = ROOT / "data" / "trading_state.json"` 又因是**局部变量**
+#: 根本不在 `vars(module)` 里 —— 两者叠加的结果是：
+#: **跑测试套件会直接覆盖生产 `data/trading_state.json`**（实测 mtime 落在
+#: 套件运行窗口内，且当时无任何 trader 周期）。
+#:
+#: 这与第四十八刀那次事故（`instrument_pool.json` 被写成缺 `instId`/`ctVal`
+#: 导致实盘周期 fail-safe）是**同一机制**。`POOL_FILE` 当初就是模块级常量，
+#: 所以它一直是安全的；其余四个是内联拼法，一直漏。本刀把它们统一提上来。
+DATA_DIR = ROOT / "data"
+POOL_FILE = DATA_DIR / "instrument_pool.json"
+TRADING_STATE_FILE = DATA_DIR / "trading_state.json"
+FACTOR_LIBRARY_FILE = DATA_DIR / "factor_library_snapshot.json"
+NEWS_SENTIMENT_FILE = DATA_DIR / "news_sentiment.json"
+DASHBOARD_CACHE_FILE = DATA_DIR / "dashboard_last_good.json"
 
 TIER_PROFILES = {
     "tier_1_bluechip": {
@@ -293,11 +312,10 @@ def sync_instruments_state() -> None:
     active_names = {item["name"] for item in active_pool}
 
     # 1. Update data/trading_state.json
-    state_file = ROOT / "data" / "trading_state.json"
     state_data: dict[str, Any] = {}
-    if state_file.exists():
+    if TRADING_STATE_FILE.exists():
         try:
-            state_data = json.loads(state_file.read_text(encoding="utf-8"))
+            state_data = json.loads(TRADING_STATE_FILE.read_text(encoding="utf-8"))
         except Exception:
             state_data = {}
 
@@ -337,29 +355,27 @@ def sync_instruments_state() -> None:
     state_data["instruments"] = new_insts
     state_data["max_positions"] = len(active_pool)
     try:
-        _write_json_atomic(state_file, state_data)
+        _write_json_atomic(TRADING_STATE_FILE, state_data)
     except Exception:
         pass
 
     # 2. Update data/factor_library_snapshot.json to prune deleted coins
-    factor_file = ROOT / "data" / "factor_library_snapshot.json"
-    if factor_file.exists():
+    if FACTOR_LIBRARY_FILE.exists():
         try:
-            factor_data = json.loads(factor_file.read_text(encoding="utf-8"))
+            factor_data = json.loads(FACTOR_LIBRARY_FILE.read_text(encoding="utf-8"))
             if isinstance(factor_data, dict) and "instruments" in factor_data:
                 factor_data["instruments"] = [
                     item for item in factor_data["instruments"]
                     if isinstance(item, dict) and item.get("instId") in active_ids
                 ]
-                _write_json_atomic(factor_file, factor_data)
+                _write_json_atomic(FACTOR_LIBRARY_FILE, factor_data)
         except Exception:
             pass
 
     # 3. Update data/news_sentiment.json to prune deleted coins and ensure active coins
-    news_file = ROOT / "data" / "news_sentiment.json"
-    if news_file.exists():
+    if NEWS_SENTIMENT_FILE.exists():
         try:
-            news_data = json.loads(news_file.read_text(encoding="utf-8"))
+            news_data = json.loads(NEWS_SENTIMENT_FILE.read_text(encoding="utf-8"))
             if isinstance(news_data, dict) and "coins_sentiment" in news_data:
                 coins_dict = news_data["coins_sentiment"]
                 cleaned_coins = {c: s for c, s in coins_dict.items() if c in active_names}
@@ -380,15 +396,14 @@ def sync_instruments_state() -> None:
                             "sentiment_factor_score": 0.0,
                         }
                 news_data["coins_sentiment"] = cleaned_coins
-                _write_json_atomic(news_file, news_data)
+                _write_json_atomic(NEWS_SENTIMENT_FILE, news_data)
         except Exception:
             pass
 
     # 4. Invalidate dashboard cache file so next fetch generates fresh state
-    dashboard_cache = ROOT / "data" / "dashboard_last_good.json"
-    if dashboard_cache.exists():
+    if DASHBOARD_CACHE_FILE.exists():
         try:
-            dashboard_cache.unlink(missing_ok=True)
+            DASHBOARD_CACHE_FILE.unlink(missing_ok=True)
         except Exception:
             pass
 

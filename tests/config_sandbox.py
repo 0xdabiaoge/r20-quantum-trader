@@ -21,7 +21,32 @@ def isolate_config(test):
                  # `data/dashboard_last_good.json`（实测有告警但无人处理）。
                  # 它内部会调 `load_persisted_dashboard_cache()`，但那只是读一个
                  # JSON，且所有跑过仪表盘的测试本来就会 import 它。
-                 'dashboard.app'):
+                 'dashboard.app',
+                 # ---- 第七十三刀补：下面 15 个模块用内联 `ROOT / "data" / …`
+                 # 拼生产路径。**沙箱只 patch 已 import 模块的大写常量**，
+                 # 所以"模块不在这个白名单里"就等于"它的路径常量不受管辖"
+                 # —— 无论写法多规范都一样漏（实测 `scripts/instrument_pool.py`
+                 # 的 `TRADING_STATE_FILE` 提成模块级常量后，
+                 # 不 import 它依然不被重定向）。
+                 #
+                 # 逐个确认过：15 个都能在**零副作用**下 import
+                 # （无网络、无起进程、无端口绑定），与既有白名单同性质。
+                 # 对应回归测试：`tests/test_production_data_isolation.py`。
+                 'r20_backend.account_baseline',
+                 'r20_backend.admin_auth',
+                 'r20_backend.backup_secrets',
+                 'r20_backend.backup_store',
+                 'r20_backend.exchanges.env_profiles',
+                 'r20_backend.exchanges.routing_policy',
+                 'r20_backend.qq_gateway_daemon',
+                 'r20_backend.routers.dashboard',
+                 'r20_backend.routers.strategy',
+                 'r20_backend.schedule_store',
+                 'scripts.archive_ledger',
+                 'r20_gateway.agents',
+                 'r20_gateway.publisher',
+                 'r20_gateway.supervisor',
+                 'r20_gateway.worker'):
         importlib.import_module(name)
     # Patch every already-bound alias, not just the defining module (law 2).
     # 白名单必须覆盖**顶层名**形式的兄弟模块：`scripts/` 在 sys.path 上，脚本以
