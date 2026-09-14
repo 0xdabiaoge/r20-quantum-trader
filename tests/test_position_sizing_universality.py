@@ -20,7 +20,8 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "scripts"))
 
 import ai_factor_trader as aft  # noqa: E402
-from tests.risk_test_env import pin_baseline_risk_env  # noqa: E402
+from tests.risk_test_env import pin_baseline_risk_env
+from tests import source_scan  # noqa: E402
 
 
 def setUpModule():
@@ -102,8 +103,28 @@ class MarginHardCapTests(unittest.TestCase):
 
 
 class NoIntegerFloorLeftInSourceTests(unittest.TestCase):
+    """B3（结构优化阶段 4）把 `fetch_single_instrument_data` 搬进 `scripts/trader/factors.py`。
+
+    这两条测试断言的是**语义**（执行层不得留整数仓位下限 / `minSz` 必须被真实读取），
+    原先却钉死在 `ai_factor_trader.py` 一个文件上，搬家即误报。现按
+    「交易员域运行时源码集」定位（门面 + `scripts/trader/` 全包）——断言强度不变，
+    覆盖面反而更广，且后续再往该子包搬文件会自动被覆盖。
+    """
+
+    TRADER_DOMAIN = dict(pkg_name="trader")
+
+    def _trader_source(self):
+        text = source_scan.combined("scripts/ai_factor_trader.py", **self.TRADER_DOMAIN)
+        # 防空哨刻意用**只存在于子包**的签名（门面薄壳的签名是 3 参数版本）——
+        # 否则门面自己就能满足 must_contain，等于没验证子包有没有被纳入。
+        source_scan.assert_area_looks_real(
+            self, text,
+            must_contain="def fetch_single_instrument_data(item, all_positions, usdt_available, *,",
+            min_chars=80000)
+        return text
+
     def test_sizing_path_has_no_max_1_int_pattern(self):
-        src = (ROOT / "scripts" / "ai_factor_trader.py").read_text(encoding="utf-8")
+        src = self._trader_source()
         offenders = [
             line.strip() for line in src.splitlines()
             if "max(1, int(" in line.replace(" ", "") or "max(1,int(" in line.replace(" ", "")
@@ -111,7 +132,7 @@ class NoIntegerFloorLeftInSourceTests(unittest.TestCase):
         self.assertEqual(offenders, [], f"整数仓位下限回归: {offenders}")
 
     def test_minSz_is_actually_consumed(self):
-        src = (ROOT / "scripts" / "ai_factor_trader.py").read_text(encoding="utf-8")
+        src = self._trader_source()
         self.assertIn('item.get("minSz"', src, "minSz 必须被执行层实际读取，不能只存在池配置里")
 
 

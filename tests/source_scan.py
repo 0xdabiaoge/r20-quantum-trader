@@ -27,22 +27,27 @@ from __future__ import annotations
 from pathlib import Path
 
 
-def source_area(module_file: str | Path) -> dict[Path, str]:
+def source_area(module_file: str | Path, *, pkg_name: str | None = None) -> dict[Path, str]:
     """返回「该模块文件 + 同目录下的同名包目录」的全部 .py 源码。
 
     例：`source_area(r20_backend/council_manager.py)`
         → {council_manager.py, council/__init__.py, council/debate.py, council/policy.py}
+        `source_area("scripts/ai_factor_trader.py", pkg_name="trader")`
+        → {ai_factor_trader.py, trader/__init__.py, trader/signals.py, trader/factors.py, …}
 
-    约定：包目录名 = 模块文件名去掉 `_manager` 后缀与 `.py` 后缀
-    （`council_manager.py` → `council/`）。找不到包目录时只返回模块文件本身，
-    由调用方的防空断言决定是否可接受。
+    约定：包目录名默认 = 模块文件名去掉 `_manager` 后缀与 `.py` 后缀
+    （`council_manager.py` → `council/`）。当门面与子包**不同名**时（如
+    `ai_factor_trader.py` 的抽取子包叫 `trader/`），用 `pkg_name` 显式指定 ——
+    这样后续再往该子包搬文件时，断言面**自动覆盖**，不用回来改测试。
+    找不到包目录时只返回模块文件本身，由调用方的防空断言决定是否可接受。
     """
     module = Path(module_file)
     if not module.is_absolute():
         module = Path(__file__).resolve().parents[1] / module
     sources = {module: module.read_text(encoding="utf-8")}
     stem = module.stem
-    pkg_name = stem[:-len("_manager")] if stem.endswith("_manager") else stem
+    if pkg_name is None:
+        pkg_name = stem[:-len("_manager")] if stem.endswith("_manager") else stem
     pkg_dir = module.parent / pkg_name
     if pkg_dir.is_dir():
         for extra in sorted(pkg_dir.glob("*.py")):
@@ -50,11 +55,14 @@ def source_area(module_file: str | Path) -> dict[Path, str]:
     return sources
 
 
-def combined(*module_files: str | Path) -> str:
-    """把若干领域源码拼成一段文本，供 assertIn / assertNotIn / str.count 使用。"""
+def combined(*module_files: str | Path, pkg_name: str | None = None) -> str:
+    """把若干领域源码拼成一段文本，供 assertIn / assertNotIn / str.count 使用。
+
+    `pkg_name` 会透传给每一个 `source_area()`（见其文档：门面与子包不同名时用）。
+    """
     parts: list[str] = []
     for module_file in module_files:
-        parts.extend(source_area(module_file).values())
+        parts.extend(source_area(module_file, pkg_name=pkg_name).values())
     return "\n".join(parts)
 
 
