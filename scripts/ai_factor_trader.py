@@ -42,6 +42,7 @@ from scripts.trader.signals import clamp, evaluate_asset_signal as _evaluate_ass
 from scripts.trader.position_mgmt import (
     execute_ai_position_management as _execute_ai_position_management_impl,
 )
+from scripts.trader.leverage import clamp_ai_leverage
 from scripts.trader.cycle_snapshot import (
     build_state_payload,
     collect_pending_inst_ids,
@@ -2596,16 +2597,19 @@ def execute_portfolio():
             ai_lever = float(ai_decision.get("leverage", 3) or 3)
             # 杠杆硬钳制：无论 AI 裁决多激进，执行层都夹在后台风控页配置的区间内
             # （审计 P2-8：旧实现下限写死 1.0，风控页的 MIN_LEVERAGE 在单所路径不成立）
-            ai_lever = min(max(ai_lever, float(MIN_LEVERAGE or 0.0) or 1.0), float(MAX_LEVERAGE or 20.0))
             # 审计 P2-5：池条目的 per-instrument max_leverage（tier 派生 3x/5x）此前无人读；
             # 现在它是该标的的硬上限（与全局上限取更严者），并透传给多所路由。
+            # 具体夹取顺序见 scripts/trader/leverage.py。
             try:
                 _inst_lever_cap = float(f.get("max_leverage") or 0.0)
             except (TypeError, ValueError):
                 _inst_lever_cap = 0.0
-            if _inst_lever_cap > 0 and ai_lever > _inst_lever_cap:
-                print(f"[杠杆闸门] {f['name']} 池内单标的杠杆上限 {_inst_lever_cap:g}x < 全局 {ai_lever:g}x，已按池值收紧")
-                ai_lever = _inst_lever_cap
+            _ai_lever_raw = ai_lever
+            ai_lever, _lever_tightened = clamp_ai_leverage(
+                ai_lever, min_leverage=MIN_LEVERAGE, max_leverage=MAX_LEVERAGE,
+                inst_lever_cap=_inst_lever_cap)
+            if _lever_tightened:
+                print(f"[杠杆闸门] {f['name']} 池内单标的杠杆上限 {_inst_lever_cap:g}x < 全局 {_ai_lever_raw:g}x，已按池值收紧")
             if abs(ai_lever - float(ai_decision.get("leverage", 3) or 3)) > 1e-9:
                 print(f"[杠杆闸门] {f['name']} AI 裁决杠杆 {ai_decision.get('leverage')}x "
                       f"超出配置区间 [{float(MIN_LEVERAGE or 0):g}x, {float(MAX_LEVERAGE or 0):g}x]，"
