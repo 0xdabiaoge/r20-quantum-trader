@@ -415,14 +415,32 @@ class TraderFacadeWiringTest(unittest.TestCase):
             self.assertIn(name, self.src, f"门面未导入 {name}")
 
     def test_facade_calls_new_helpers(self):
-        self.assertIn("hard_stop_hit = protection_signals(", self.src)
-        self.assertEqual(self.src.count("ratcheted_trailing_stop("), 2,
+        """这些调用点原在 `manage_position_tp_and_trailing` 体内；第八十九刀该函数
+        搬入 `scripts/trader/position_exit.py` ⇒ **作用域收敛到实现体**
+        （数字与语义一字不改），并加反证：门面自身不得再内联这些调用。
+
+        ⚠️ 不能用"域合并文本"计数：`scripts/trader/protection.py` 里的
+        `def ratcheted_trailing_stop(` 会把计数从 2 顶到 3（首版改法实测）。"""
+        import ast as _ast
+        from tests import source_scan
+        node, path = source_scan.find_function_node(
+            "scripts/ai_factor_trader.py", "manage_position_tp_and_trailing",
+            pkg_name="trader")
+        self.assertEqual(path.name, "position_exit.py",
+                         f"持仓退出主流程应住在子包实现里，实际 {path.name}")
+        impl = _ast.get_source_segment(path.read_text(encoding="utf-8"), node)
+        self.assertIsNotNone(impl)
+        self.assertIn("hard_stop_hit = protection_signals(", impl)
+        self.assertEqual(impl.count("ratcheted_trailing_stop("), 2,
                          "长/空两个分支都必须走新模块")
         # 7 处平仓台账（硬止损1 + 保护失效1 + 时间止损1 + 阶梯锁利2 + 移动止盈2）
-        self.assertEqual(self.src.count("_close_trade_payload("), 7,
+        self.assertEqual(impl.count("_close_trade_payload("), 7,
                          "7 处平仓台账都必须走公共装配器")
-        self.assertEqual(self.src.count("fee=_close_fee(") + self.src.count("close_fee = _close_fee("), 7,
+        self.assertEqual(impl.count("fee=_close_fee(") + impl.count("close_fee = _close_fee("), 7,
                          "7 处手续费计算都必须走 close_fee（6 处赋值 + 1 处直接传参）")
+        # 反证：门面自己不得残留这些调用（否则上面定位到的可能不是真实现）
+        for frag in ("ratcheted_trailing_stop(", "_close_trade_payload("):
+            self.assertNotIn(frag, self.src, f"门面残留 {frag} ⇒ 定位可能虚 Hits")
 
     def test_no_inline_record_trade_dict_left(self):
         """反向哨：内联 `record_trade({` 字面量载荷不得复活。"""
