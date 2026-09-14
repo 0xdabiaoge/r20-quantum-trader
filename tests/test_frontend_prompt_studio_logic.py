@@ -168,7 +168,12 @@ def _guard_offline(case: unittest.TestCase) -> None:
     等于**没跳过** —— 副作用已经发生了。
     """
     if os.environ.get("OFFLINE_SUITE_RUNNING"):
-        case.skipTest("离线套件禁用外部子进程（node 不在白名单）—— 见 tests/offline_suite.py")
+        # ⚠️ 必须 `raise`，不能 `case.skipTest(...)`：
+        # `setUpClass` 收到的是**类**，`TestClass.skipTest(reason)` 会把 reason
+        # 绑到 `self` 上 → `TypeError: missing 1 required positional argument: 'reason'`。
+        # 我上一版正是这么写的，于是离线套件多出 1 个 ERROR（11 而不是 10）。
+        # `raise unittest.SkipTest` 在 setUpClass 与 setUp 里**都**正确。
+        raise unittest.SkipTest("离线套件禁用外部子进程（node 不在白名单）—— 见 tests/offline_suite.py")
 
 
 def _fn_body(src: str, name: str) -> str:

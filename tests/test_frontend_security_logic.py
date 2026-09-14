@@ -187,14 +187,16 @@ def _guard_offline(case: unittest.TestCase) -> None:
     `external child process: node`，套件 exit 1）。
     """
     if os.environ.get("OFFLINE_SUITE_RUNNING"):
-        case.skipTest("离线套件禁用外部子进程（node 不在白名单）—— 见 tests/offline_suite.py")
+        # ⚠️ 必须 `raise`（理由同 prompt_studio 那份）：`setUpClass` 里
+        # `cls.skipTest(reason)` 会把 reason 绑到 self → TypeError。
+        raise unittest.SkipTest("离线套件禁用外部子进程（node 不在白名单）—— 见 tests/offline_suite.py")
 
 
 def _require_node(case: unittest.TestCase):
     _guard_offline(case)
     data, why = _probe()
     if data is None:
-        case.skipTest(f"拿不到 node oracle：{why}（规则断言仍会执行，但本项未验证）")
+        raise unittest.SkipTest(f"拿不到 node oracle：{why}（规则断言仍会执行，但本项未验证）")
     return data
 
 
