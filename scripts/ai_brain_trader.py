@@ -74,6 +74,11 @@ from scripts.brain.packages import fetch_single_instrument_package as _fetch_sin
 # 结构优化阶段4·B3 第二块：跨所采集/健康度/提示词组装已搬入 scripts/brain/xvenue.py。
 # 依赖面较宽（适配器缝、safe_float、VENUE_HEALTH_FILE、atomic_write_json、_XV_HEALTH），
 # 全部走**调用期注入**，理由见该模块 docstring 与 r20_backend/README.md §5。
+from scripts.brain.cycle_parts import (
+    normalize_position_management as _normalize_position_management,
+    build_effective_prompt_text as _build_effective_prompt_text,
+    build_history_record as _build_history_record,
+)
 from scripts.brain.decisions import (
     validate_and_filter_decision as _validate_and_filter_decision_impl,
     assemble_decision_cache as _assemble_decision_cache_impl,
@@ -1110,7 +1115,9 @@ def execute_batch_ai_brain_cycle(
     try:
         tmp_prompt = AI_LAST_PROMPT_FILE + ".tmp"
         with open(tmp_prompt, "w", encoding="utf-8") as f:
-            f.write(f"【SYSTEM PROMPT】:\n{effective_system_prompt.strip()}\n\n{'='*70}\n【USER PROMPT ({time_str})】：\n{prompt.strip()}")
+            f.write(_build_effective_prompt_text(
+                effective_system_prompt=effective_system_prompt, policy_version="",
+                time_str=time_str, prompt=prompt))
         os.replace(tmp_prompt, AI_LAST_PROMPT_FILE)
     except Exception:
         pass
@@ -1236,39 +1243,9 @@ def execute_batch_ai_brain_cycle(
         if not isinstance(pos_mgmt_list, list):
             pos_mgmt_list = []
 
-        validated_pos_mgmt = []
-        seen_positions = set()
-        for item in pos_mgmt_list:
-            if not isinstance(item, dict):
-                continue
-            inst_id = str(item.get("instId", ""))
-            if inst_id not in active_inst_ids or inst_id in seen_positions:
-                continue
-            seen_positions.add(inst_id)
-            action = str(item.get("action", "HOLD")).upper()
-            if action not in {"HOLD", "CLOSE_MARKET", "UPDATE_SL"}:
-                action = "HOLD"
-            confidence = max(0.0, min(100.0, safe_float(item.get("confidence"))))
-            suggested_sl = safe_float(item.get("suggested_sl_price"))
-            if action != "UPDATE_SL":
-                suggested_sl = 0.0
-            validated_pos_mgmt.append({
-                "instId": inst_id,
-                "action": action,
-                "suggested_sl_price": suggested_sl,
-                "confidence": confidence,
-                "reason": str(item.get("reason", "模型未提供持仓理由"))[:120]
-            })
-
-        for inst_id in sorted(active_inst_ids - seen_positions):
-            validated_pos_mgmt.append({
-                "instId": inst_id,
-                "action": "HOLD",
-                "suggested_sl_price": 0.0,
-                "confidence": 0.0,
-                "reason": "模型遗漏该持仓，安全降级为 HOLD"
-            })
-        pos_mgmt_list = validated_pos_mgmt
+        # 白名单归一 + 遗漏持仓安全兜底，见 scripts/brain/cycle_parts.py
+        pos_mgmt_list = _normalize_position_management(
+            pos_mgmt_list, active_inst_ids, safe_float=safe_float)
 
         # Execute Pending Orders Cancellation if AI Brain decides CANCEL
         pending_mgmt_list = brain_output.get("pending_orders_management", [])
@@ -1300,35 +1277,18 @@ def execute_batch_ai_brain_cycle(
         })
 
         # Record durable history for Web Audit
-        full_prompt_text = f"【SYSTEM PROMPT ({policy_version})】：\n{effective_system_prompt.strip()}\n\n{'='*70}\n【USER PROMPT ({time_str})】：\n{prompt.strip()}"
-        history_record = {
-            "time": time_str,
-            "policy_version": policy_version,
-            "policy_hash": policy_hash,
-            "policy_snapshot": policy_snapshot,
-            "policy_snapshot_summary": policy_summary,
-            "macro_assessment": macro_summary,
-            # 投委会周期级状态（ran/降级原因/参谋有效率）；逐单采纳席位在各缓存条目 "council" 内
-            "council_status": council_status,
-            "ai_last_prompt": full_prompt_text,
-            "position_management": pos_mgmt_list,
-            "council_transcript": brain_output.get("council_transcript") if isinstance(brain_output, dict) else None,
-            "top_opportunities": [
-                {
-                    "inst": p["name"],
-                    "action": standard_cache[p["instId"]]["decision"]["action"],
-                    "confidence": standard_cache[p["instId"]]["decision"]["confidence"],
-                    "leverage": standard_cache[p["instId"]]["decision"].get("leverage", 3),
-                    "council_adopted": (standard_cache[p["instId"]].get("council") or {}).get("adopted_role"),
-                    "margin_usdt": standard_cache[p["instId"]]["decision"].get("margin_usdt", 0.0),
-                    "risk_reward_ratio": standard_cache[p["instId"]]["decision"]["risk_reward_ratio"],
-                    "data_quality": standard_cache[p["instId"]]["data_quality"],
-                    "policy_version": policy_version,
-                    "reason": standard_cache[p["instId"]]["decision"]["summary_reason"]
-                }
-                for p in packages
-            ]
-        }
+        full_prompt_text = _build_effective_prompt_text(
+            effective_system_prompt=effective_system_prompt, policy_version=policy_version,
+            time_str=time_str, prompt=prompt)
+        history_record = _build_history_record(
+            time_str=time_str, policy_version=policy_version, policy_hash=policy_hash,
+            policy_snapshot=policy_snapshot, policy_summary=policy_summary,
+            macro_summary=macro_summary, council_status=council_status,
+            ai_last_prompt=full_prompt_text, pos_mgmt_list=pos_mgmt_list,
+            council_transcript=(brain_output.get("council_transcript")
+                                if isinstance(brain_output, dict) else None),
+            packages=packages, standard_cache=standard_cache,
+        )
 
         history_list = []
         if os.path.exists(AI_DECISION_HISTORY_FILE):

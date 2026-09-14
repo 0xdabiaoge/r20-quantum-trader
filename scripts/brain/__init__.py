@@ -16,6 +16,7 @@
 | `packages.py` | `fetch_single_instrument_package` 单标的数据包装配（254 行） | 门面 L303-556 |
 | `xvenue.py` | 跨所矩阵采集 / 场所健康度落盘 / 分歧标注与提示词证据行（231 行） | 门面 L446-676 |
 | `decisions.py` | `validate_and_filter_decision` + `assemble_decision_cache` 决策校验与缓存装配（148 行） | 门面 L915-1062 |
+| `cycle_parts.py` | `normalize_position_management` / `build_effective_prompt_text` / `build_history_record`（周期内纯组装，108 行） | 门面 `execute_batch_ai_brain_cycle` 内联段 |
 
 ## 注入面速查（改这些前先看）
 
@@ -23,7 +24,8 @@
 |---|---|---|
 | `packages.py` | `fetch_candles` / `fetch_single_indicator` | 门面重载后 import 期绑定会失配；且测试可能 patch 门面名 |
 | `xvenue.py` | `get_adapter`（门面 `_get_xvenue_adapter`）/ `safe_float` / `atomic_write_json` / `venue_health_file` / `health`（门面 `_XV_HEALTH`） | 前四个都是既有测试缝；`_XV_HEALTH` 被 `tests/test_xvenue_prompt.py:120` 直接断言，状态必须留在门面 |
-| `decisions.py` | `data_dir`（门面 `DATA_DIR`）/ `max_leverage` / `min_leverage` / `safe_float` / `get_system_version_tag` / `validate` | 前三个都是既有测试缝（`test_ai_health_sidecar`、`test_leverage_range_and_council`）；`validate` 的契约是 **4 个位置参数**，由门面 curry 进 `safe_float` |
+| `decisions.py` | `data_dir`（门面 `DATA_DIR`）/ `max_leverage` / `min_leverage` / `safe_float` / `get_system_version_tag` / `validate` |
+| `cycle_parts.py` | `safe_float`（只此一个） | 门面私有函数，且门面会被原地重载 | 前三个都是既有测试缝（`test_ai_health_sidecar`、`test_leverage_range_and_council`）；`validate` 的契约是 **4 个位置参数**，由门面 curry 进 `safe_float` |
 
 **`xvenue.py` 是注入面最宽、`decisions.py` 是契约最容易写错的一块。**
 改动它们前请先看对应的 `tests/test_brain_*_extraction.py`：那里的 `InjectionContractTest`
