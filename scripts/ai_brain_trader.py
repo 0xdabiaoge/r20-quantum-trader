@@ -165,6 +165,7 @@ from r20_backend.version import __version__
 from instrument_pool import load_instruments
 from prompt_library import active_profile, append_layer, apply_module_layout
 from r20_gateway.telemetry import ModelCallTelemetry
+from llm_credentials import get_cpa_client_config as _get_cpa_client_config  # noqa: E402
 
 TARGET_INSTRUMENTS = load_instruments()
 
@@ -237,20 +238,13 @@ def is_same_direction_scale_request(position_side: str, action: str) -> bool:
 
 
 def get_cpa_client_config() -> Tuple[str, str]:
-    """Resolve LLM credentials only from process environment or local .env."""
-    try:
-        from r20_backend.llm_manager import get_active_llm_runtime
-        active_llm = get_active_llm_runtime()
-        if active_llm.get("base_url"):
-            return active_llm["base_url"], active_llm.get("api_key", "")
-    except Exception:
-        pass
-    if standalone_settings:
-        return standalone_settings.llm_base_url, standalone_settings.llm_api_key
-    return (
-        os.getenv("LLM_BASE_URL") or os.getenv("OPENAI_BASE_URL") or "https://api.openai.com/v1",
-        os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY") or "",
-    )
+    """薄壳：调用时解析门面全局，使测试的 patch / 直接赋值生效。
+
+    实现已迁往 r20_backend.llm.credentials（结构优化阶段 4·B3 第四十六刀）。
+    ⚠️ `standalone_settings` 必须**在这里**读取后传入 —— 门面全局会被测试
+    patch / 原地 reload，子模块 import 期绑定会读到陈旧副本。
+    """
+    return _get_cpa_client_config(standalone_settings)
 
 def read_prompt_override() -> str:
     """读取管理员提示词覆盖层（不存在/不可读 → 空串，绝不抛）。"""

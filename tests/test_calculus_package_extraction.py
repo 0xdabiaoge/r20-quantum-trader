@@ -55,13 +55,24 @@ for p in (str(ROOT), str(SCRIPTS)):
         sys.path.insert(0, p)
 
 FACADE = SCRIPTS / "calculus_engine.py"
+
+#: ⚠️ 抽取前的最后一次提交 —— **必须固定成提交号，不能用 `HEAD:`**。
+#:
+#: 第四十五刀我写成了 `git show HEAD:scripts/calculus_engine.py`，当时 HEAD
+#: 就是抽取前的版本，测试通过。但**我提交这一刀之后**，HEAD 变成了抽取**后**
+#: 的 71 行门面 —— 于是 `test_all_fourteen_are_accounted_for` 与
+#: `test_every_moved_function_is_byte_identical` 在第四十六刀的回归里翻红。
+#:
+#: 这是**我上一刀留下的自伤**：逐字对拍的"基准"必须指向一个**不可变**提交，
+#: 而不是"当前 HEAD"。基准会随提交漂移 = 基准不可信。
+PRE_EXTRACTION_COMMIT = "e82188f"   # 第四十四刀（抽取前）
 PRIM = SCRIPTS / "calculus" / "primitives.py"
 CALC = SCRIPTS / "calculus" / "calculate.py"
 
 
 def _load_legacy():
     """从 git HEAD 取出抽取前的 `calculus_engine.py` 并执行。"""
-    src = subprocess.run(["git", "show", "HEAD:scripts/calculus_engine.py"],
+    src = subprocess.run([f"git", "show", f"{PRE_EXTRACTION_COMMIT}:scripts/calculus_engine.py"],
                          cwd=str(ROOT), capture_output=True, text=True, check=True).stdout
     spec = importlib.util.spec_from_loader("legacy_calculus_engine", loader=None)
     mod = importlib.util.module_from_spec(spec)
@@ -88,7 +99,7 @@ class VerbatimCopyTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        src = subprocess.run(["git", "show", "HEAD:scripts/calculus_engine.py"],
+        src = subprocess.run([f"git", "show", f"{PRE_EXTRACTION_COMMIT}:scripts/calculus_engine.py"],
                              cwd=str(ROOT), capture_output=True, text=True, check=True).stdout
         cls.old_lines = src.splitlines()
         cls.old_fns = {n.name: n for n in ast.parse(src).body
