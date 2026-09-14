@@ -47,6 +47,21 @@ from r20_backend.version import __version__
 from instrument_pool import load_instruments
 from prompt_library import active_profile, apply_module_layout
 from r20_gateway.telemetry import ModelCallTelemetry
+
+# 结构优化阶段 4·B3 第四十二刀：数理快照可观测性聚簇外提到 scripts/evolution/observability.py。
+# 这里**再导出**（不是搬空）——外部 `from scripts.self_improvement_engine import
+# EVOLUTION_SYSTEM_PROMPT` 式的引用与既有测试都按门面名解析，故门面必须继续提供。
+# ⚠️ 注意：`SNAPSHOT_MAX_STALE_SECONDS` / `SIDE_ALIASES` **留在本文件** ——
+# 它们属于 join 侧（`_match_snapshot`），不属于可观测性判定。
+from scripts.evolution.observability import (  # noqa: E402,F401
+    DYNAMICS_FIELDS,
+    DYNAMICS_OBSERVED_MIN,
+    _parse_bj,
+    audit_snapshot_observability,
+    classify_snapshot_observability,
+    prune_snapshot,
+    render_observability_brief,
+)
 TARGET_INSTRUMENTS = [item["name"] for item in load_instruments()]
 
 def atomic_write_json(path: str, payload: Any) -> None:
@@ -131,66 +146,8 @@ def get_cpa_client_config() -> Tuple[str, str]:
 # 判定可观测性并把统计结论前置注入 Prompt；join 侧同时禁止用未来或过期快照
 # 回填因果证据。
 # =============================================================================
-DYNAMICS_FIELDS = (
-    "velocity", "acceleration", "jerk", "impulse", "curvature", "power",
-    "power_regime", "regime", "dynamics_quality",
-    "continuation_prob_pct", "breakdown_prob_pct", "var_95_pct", "cvar_95_pct",
-    "prob_regime", "is_fat_tail", "energy_integral", "deviation_area_integral",
-)
-# 动力学链视为「可观测」的最低非空字段数（88% 容差：允许个别外部观测缺失）
-DYNAMICS_OBSERVED_MIN = max(1, int(len(DYNAMICS_FIELDS) * 0.85) + 1)
-# 开仓时刻快照与开仓时间的 join 窗口：至多 6 小时（adoption 路径应在开仓后 1~2 个 15M 周期内补录）
 SNAPSHOT_MAX_STALE_SECONDS = 6 * 3600
 SIDE_ALIASES = {"多": "long", "空": "short", "long": "long", "short": "short"}
-
-
-def _parse_bj(ts) -> Optional[datetime.datetime]:
-    dt = parse_beijing(ts)
-    # Existing join callers use naive Beijing values; normalize BEFORE removing tz.
-    return dt.replace(tzinfo=None) if dt else None
-
-
-def classify_snapshot_observability(snap) -> str:
-    """逐单分类：DYNAMICS_OBSERVED / PARTIAL / PRICE_ONLY / NONE。
-
-    只按 DYNAMICS_FIELDS 的真实非空计数；price/atr/adx/funding 等属于普通观测，
-    不算动力学链。全 null 空壳不再是「有快照」，杜绝表面可观测、实际不可归因。
-    """
-    if not isinstance(snap, dict) or not snap:
-        return "NONE"
-    n = sum(1 for k in DYNAMICS_FIELDS if snap.get(k) is not None)
-    if n == 0:
-        return "PRICE_ONLY"
-    if n >= DYNAMICS_OBSERVED_MIN:
-        return "DYNAMICS_OBSERVED"
-    return "PARTIAL"
-
-
-def prune_snapshot(snap):
-    """剔除值为 null 的字段；可观测性判定由 snapshot_observability 标签承载，
-    不再让模型在 22 个 null 里自行数证据。"""
-    if not isinstance(snap, dict):
-        return None
-    pruned = {k: v for k, v in snap.items() if v is not None}
-    return pruned or None
-
-
-def audit_snapshot_observability(closed_trades) -> Dict[str, int]:
-    total = len(closed_trades)
-    counts = {"DYNAMICS_OBSERVED": 0, "PARTIAL": 0, "PRICE_ONLY": 0, "NONE": 0}
-    for t in closed_trades:
-        tag = str(t.get("snapshot_observability") or "NONE")
-        counts[tag] = counts.get(tag, 0) + 1
-    counts["total"] = total
-    counts["math_observable"] = counts["DYNAMICS_OBSERVED"] + counts["PARTIAL"]
-    return counts
-
-
-def render_observability_brief(audit) -> str:
-    return (
-        f"已平仓 {audit['total']} 笔 | 开仓时刻数理快照：完全可观测 {audit['DYNAMICS_OBSERVED']} / "
-        f"部分可观测 {audit['PARTIAL']} / 仅价格与普通观测 {audit['PRICE_ONLY']} / 无快照 {audit['NONE']}"
-    )
 
 
 def evolution_fallback_model() -> Optional[str]:

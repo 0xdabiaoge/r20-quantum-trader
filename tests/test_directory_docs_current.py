@@ -63,6 +63,8 @@ MANAGED = {
     "r20_backend/execution": {"allowed_extra": {"execution_router.py"}},
     # 第三十九刀新增：回测引擎的成块领域逻辑外提（门面仍是单文件 backtest_engine.py）。
     "scripts/backtest": {"allowed_extra": {"backtest_engine.py"}},
+    # 第四十二刀新增：自进化引擎的可观测性聚簇外提。
+    "scripts/evolution": {"allowed_extra": {"self_improvement_engine.py"}},
 }
 
 #: 从文档里抽出的 `xxx.py` 文件名。
