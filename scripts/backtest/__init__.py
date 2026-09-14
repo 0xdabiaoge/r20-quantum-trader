@@ -9,6 +9,7 @@
 | 模块 | 职责 | 注入面 |
 |---|---|---|
 | `lifecycle.py` | 持仓生命周期：保本锁定 / 止损止盈判定 / 结算（手续费、盈亏、`R` 倍数） | 无（纯计算；费率与滑点由调用方传参） |
+| `metrics.py` | 入场装配（方向 / ATR 止损 / `rr` 倍止盈 / 张数）+ 绩效统计（胜率 / 盈亏比 / 夏普 / 索提诺 / 卡玛 / 平均 `R`） | 无（纯计算；资本与费率由调用方传参） |
 
 ## 约定
 
@@ -19,4 +20,8 @@
 3. **`r_dist` 必须用"锁定前"的止损**：`ExitDecision.initial_stop_loss` 就是为此存在。
    用 `pos["stop_loss"]` 会在锁定发生后让 `R` 倍数退化成 0.0
    （第三十九刀第一版就踩了这个坑，见 `tests/test_backtest_lifecycle_extraction.py`）。
+4. **`rr` 必须是显式形参**，不能图省事写成 `sig.get("rr")`：缺键时后者得 `None`
+   而非 `0.0`，`None * float` 直接 `TypeError`（见 `metrics.build_entry_candidate`）。
+5. **开仓滑点与平仓滑点方向相反**（`lifecycle` 的多头平仓 `×(1-s)`；
+   `metrics` 的多头开仓 `×(1+s)`）—— 两者都取其**不利**方向，**勿"统一"成同号**。
 """

@@ -23,6 +23,7 @@ import os
 import sys
 import urllib.request
 from scripts.backtest.lifecycle import evaluate_position_exit, settle_exit
+from scripts.backtest.metrics import build_entry_candidate, compute_performance_metrics
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -242,60 +243,24 @@ class BacktestEngine:
                     continue
 
                 if active_position is None:
-                    direction = "LONG" if sig.get("action") == "BUY" else "SHORT"
-                    atr = sig.get("atr", c * 0.012)
-                    entry_px = c * (1 + self.slippage if direction == "LONG" else 1 - self.slippage)
+                    active_position = build_entry_candidate(
+                        sig=sig, close=c, timestamp=ts, capital=self.capital,
+                        risk_per_trade_pct=self.risk_per_trade_pct,
+                        slippage=self.slippage, rr=rr)
 
-                    # 2.0x ATR wide stop loss & 2.2R take profit
-                    risk_dist = atr * 2.0
-                    if direction == "LONG":
-                        sl = entry_px - risk_dist
-                        tp = entry_px + (risk_dist * rr)
-                    else:
-                        sl = entry_px + risk_dist
-                        tp = entry_px - (risk_dist * rr)
-
-                    risk_usd = self.capital * self.risk_per_trade_pct
-                    size = risk_usd / risk_dist if risk_dist > 0 else 0.0
-
-                    active_position = {
-                        "direction": direction,
-                        "entry_time": ts,
-                        "entry_price": entry_px,
-                        "stop_loss": sl,
-                        "take_profit": tp,
-                        "size": size,
-                    }
-
-        winning = [t for t in trades if t.pnl_usd > 0]
-        losing = [t for t in trades if t.pnl_usd <= 0]
-        win_rate = (len(winning) / len(trades) * 100) if trades else 0.0
-
-        gross_profit = sum(t.pnl_usd for t in winning)
-        gross_loss = abs(sum(t.pnl_usd for t in losing))
-        profit_factor = (gross_profit / gross_loss) if gross_loss > 0 else (99.0 if gross_profit > 0 else 0.0)
-
-        total_return = ((self.capital - self.initial_capital) / self.initial_capital) * 100
-
-        # Sharpe & Sortino (Annualized 1H ~ 8760)
-        if len(returns_list) > 1:
-            mean_ret = sum(returns_list) / len(returns_list)
-            var_ret = sum((r - mean_ret) ** 2 for r in returns_list) / (len(returns_list) - 1)
-            std_ret = math.sqrt(var_ret) if var_ret > 0 else 1e-6
-            sharpe = (mean_ret / std_ret) * math.sqrt(8760)
-
-            downside = [r for r in returns_list if r < 0]
-            if downside:
-                var_down = sum(r**2 for r in downside) / len(downside)
-                sortino = (mean_ret / math.sqrt(var_down)) * math.sqrt(8760)
-            else:
-                sortino = 99.0
-        else:
-            sharpe = 0.0
-            sortino = 0.0
-
-        calmar = (total_return / (max_drawdown * 100)) if max_drawdown > 0 else 0.0
-        avg_r = (sum(t.r_multiple for t in trades) / len(trades)) if trades else 0.0
+        _metrics = compute_performance_metrics(
+            trades=trades, capital=self.capital,
+            initial_capital=self.initial_capital,
+            returns_list=returns_list, max_drawdown=max_drawdown)
+        win_rate = _metrics["win_rate"]
+        profit_factor = _metrics["profit_factor"]
+        total_return = _metrics["total_return"]
+        sharpe = _metrics["sharpe"]
+        sortino = _metrics["sortino"]
+        calmar = _metrics["calmar"]
+        avg_r = _metrics["avg_r"]
+        winning_count = _metrics["winning_trades"]
+        losing_count = _metrics["losing_trades"]
 
         # Format trade logs (last 10)
         recent_trades_json = [asdict(t) for t in reversed(trades[-10:])]
@@ -303,8 +268,8 @@ class BacktestEngine:
         return BacktestSummary(
             symbol=symbol,
             total_trades=len(trades),
-            winning_trades=len(winning),
-            losing_trades=len(losing),
+            winning_trades=winning_count,
+            losing_trades=losing_count,
             win_rate_pct=round(win_rate, 1),
             profit_factor=round(profit_factor, 2),
             initial_equity=round(self.initial_capital, 2),
