@@ -294,10 +294,21 @@ class TestLeverageLanding(unittest.TestCase):
     def test_source_pins(self):
         # 领域定位：把"四处开仓通知携带真实杠杆"从门面单文件放宽到整个执行层领域。
         # 这是**正向**计数断言，搬家会让单文件定位翻红（假红），领域定位才描述得准。
-        from tests.source_scan import combined
+        #
+        # 计数改走 AST（count_keyword_argument）—— 原先是文本 count
+        # `"leverage=int(ai_lever),"`。文本计数有两个坑：①任何 docstring/注释里
+        # 提到这段代码都会把计数抬高（本轮抽 notifications.py 时，我的模块 docstring
+        # 解释了这 4 行的来由，计数就从 4 变 5 —— 行为毫无变化却翻红）；
+        # ②换行/空格一变也失灵。
+        # AST 版直接数 `notify_trade_open(..., leverage=...)` 的实参个数，
+        # 既不受文档影响，也能真正表达"四处开仓通知都带杠杆"这个语义。
+        from tests.source_scan import combined, count_keyword_argument
         trader_src = combined("scripts/ai_factor_trader.py", pkg_name="trader")
-        self.assertEqual(trader_src.count("leverage=int(ai_lever),"), 4,
-                         "四处开仓通知必须携带钳制后的真实杠杆")
+        self.assertEqual(
+            count_keyword_argument("scripts/ai_factor_trader.py", "notify_trade_open",
+                                   "leverage", value_must_contain="int(ai_lever)",
+                                   pkg_name="trader"), 4,
+            "四处开仓通知必须携带钳制后的真实杠杆（AST 计数，不受文档/换行影响）")
         submit_src = trader_src.split("def submit_protected_limit_order")[1].split("\ndef ")[0]
         self.assertIn("okx_rest.set_leverage(", submit_src,
                       "OKX 直下路径发单前必须落 AI 杠杆档位")

@@ -42,6 +42,11 @@ from scripts.trader.signals import clamp, evaluate_asset_signal as _evaluate_ass
 from scripts.trader.position_mgmt import (
     execute_ai_position_management as _execute_ai_position_management_impl,
 )
+from scripts.trader.notifications import (
+    entry_action_message,
+    entry_failure_message,
+    trade_open_kwargs,
+)
 from scripts.trader.order_intent import (
     build_order_intent,
     resolve_entry_prices,
@@ -2731,38 +2736,35 @@ def execute_portfolio():
                             tracker = trackers.get(f"{inst_id}_long", {})
                             tracker["scale_count"] = tracker.get("scale_count", 0) + 1
                             save_trackers(trackers)
-                            executed_actions.append(f"[{f['name']}] 🚀 AI顺势浮盈金字塔加多挂单已提交 {actual_sz}张@{limit_px} (order={order_ref}, TP={tp_px}, SL={sl_px})")
+                            executed_actions.append(entry_action_message(
+                                is_long=True, is_scale_in=True, name=f["name"], sz=actual_sz,
+                                px=limit_px, order_ref=order_ref, tp_px=tp_px, sl_px=sl_px))
                             if notify_trade_open:
                                 notify_trade_open(
-                                    inst=f["name"],
-                                    side="多 (顺势加多)",
-                                    sz=actual_sz,
-                                    px=limit_px,
-                                    strategy="🚀 顺势金字塔加多",
-                                    reason=str(ai_reason),
-                                    tp_px=tp_px,
-                                    sl_px=sl_px,
+                                    **trade_open_kwargs(
+                                        is_long=True, is_scale_in=True, name=f["name"], sz=actual_sz,
+                                        px=limit_px, strat_tag=strat_tag, ai_reason=ai_reason,
+                                        tp_px=tp_px, sl_px=sl_px),
                                     leverage=int(ai_lever),  # 审计D(2026-09-13)：曾恒写 3——5x 仓实开也通知「3x 杠杆」，票圈谎报
                                 )
                         else:
-                            executed_actions.append(f"[{f['name']}] AI限价多单已提交待成交 {actual_sz}张@{limit_px} (order={order_ref}, TP={tp_px}, SL={sl_px})")
+                            executed_actions.append(entry_action_message(
+                                is_long=True, is_scale_in=False, name=f["name"], sz=actual_sz,
+                                px=limit_px, order_ref=order_ref, tp_px=tp_px, sl_px=sl_px))
                             pending_inst_ids.add(inst_id)
                             reserved_slot_count += 1
                             reserved_long_count += 1
                             if notify_trade_open:
                                 notify_trade_open(
-                                    inst=f["name"],
-                                    side="多",
-                                    sz=actual_sz,
-                                    px=limit_px,
-                                    strategy=strat_tag,
-                                    reason=str(ai_reason),
-                                    tp_px=tp_px,
-                                    sl_px=sl_px,
+                                    **trade_open_kwargs(
+                                        is_long=True, is_scale_in=False, name=f["name"], sz=actual_sz,
+                                        px=limit_px, strat_tag=strat_tag, ai_reason=ai_reason,
+                                        tp_px=tp_px, sl_px=sl_px),
                                     leverage=int(ai_lever),  # 审计D(2026-09-13)：曾恒写 3——5x 仓实开也通知「3x 杠杆」，票圈谎报
                                 )
                     else:
-                        executed_actions.append(f"[{f['name']}] AI限价多单提交失败: {order_ref}")
+                        executed_actions.append(entry_failure_message(
+                            is_long=True, name=f["name"], order_ref=order_ref))
 
             # Short Execution (Initial Entry or Strict Pyramiding Scale-In)
             elif action == "SELL_SHORT":
@@ -2834,38 +2836,35 @@ def execute_portfolio():
                             tracker = trackers.get(f"{inst_id}_short", {})
                             tracker["scale_count"] = tracker.get("scale_count", 0) + 1
                             save_trackers(trackers)
-                            executed_actions.append(f"[{f['name']}] 🌪️ AI顺势浮盈金字塔加空挂单已提交 {actual_sz}张@{limit_px} (order={order_ref}, TP={tp_px}, SL={sl_px})")
+                            executed_actions.append(entry_action_message(
+                                is_long=False, is_scale_in=True, name=f["name"], sz=actual_sz,
+                                px=limit_px, order_ref=order_ref, tp_px=tp_px, sl_px=sl_px))
                             if notify_trade_open:
                                 notify_trade_open(
-                                    inst=f["name"],
-                                    side="空 (顺势加空)",
-                                    sz=actual_sz,
-                                    px=limit_px,
-                                    strategy="🌪️ 顺势金字塔加空",
-                                    reason=str(ai_reason),
-                                    tp_px=tp_px,
-                                    sl_px=sl_px,
+                                    **trade_open_kwargs(
+                                        is_long=False, is_scale_in=True, name=f["name"], sz=actual_sz,
+                                        px=limit_px, strat_tag=strat_tag, ai_reason=ai_reason,
+                                        tp_px=tp_px, sl_px=sl_px),
                                     leverage=int(ai_lever),  # 审计D(2026-09-13)：曾恒写 3——5x 仓实开也通知「3x 杠杆」，票圈谎报
                                 )
                         else:
-                            executed_actions.append(f"[{f['name']}] AI限价空单已提交待成交 {actual_sz}张@{limit_px} (order={order_ref}, TP={tp_px}, SL={sl_px})")
+                            executed_actions.append(entry_action_message(
+                                is_long=False, is_scale_in=False, name=f["name"], sz=actual_sz,
+                                px=limit_px, order_ref=order_ref, tp_px=tp_px, sl_px=sl_px))
                             pending_inst_ids.add(inst_id)
                             reserved_slot_count += 1
                             reserved_short_count += 1
                             if notify_trade_open:
                                 notify_trade_open(
-                                    inst=f["name"],
-                                    side="空",
-                                    sz=actual_sz,
-                                    px=limit_px,
-                                    strategy=strat_tag,
-                                    reason=str(ai_reason),
-                                    tp_px=tp_px,
-                                    sl_px=sl_px,
+                                    **trade_open_kwargs(
+                                        is_long=False, is_scale_in=False, name=f["name"], sz=actual_sz,
+                                        px=limit_px, strat_tag=strat_tag, ai_reason=ai_reason,
+                                        tp_px=tp_px, sl_px=sl_px),
                                     leverage=int(ai_lever),  # 审计D(2026-09-13)：曾恒写 3——5x 仓实开也通知「3x 杠杆」，票圈谎报
                                 )
                     else:
-                        executed_actions.append(f"[{f['name']}] AI限价空单提交失败: {order_ref}")
+                        executed_actions.append(entry_failure_message(
+                            is_long=False, name=f["name"], order_ref=order_ref))
 
     # 5. Persist Latest State for Web Monitoring Dashboard
     state_payload = {
