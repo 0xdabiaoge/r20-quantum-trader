@@ -42,6 +42,9 @@ from scripts.trader.signals import clamp, evaluate_asset_signal as _evaluate_ass
 from scripts.trader.position_mgmt import (
     execute_ai_position_management as _execute_ai_position_management_impl,
 )
+from scripts.trader.brackets import (
+    normalize_bracket_prices,
+)
 from scripts.trader.gates import (
     order_margin_gate as _order_margin_gate_impl,
     equity_margin_cap as _equity_margin_cap_impl,
@@ -2705,11 +2708,10 @@ def execute_portfolio():
                     tp_px = round(ai_decision.get("take_profit_price") if (ai_decision and ai_decision.get("take_profit_price", 0) > 0) else (limit_px + tp_dist), prec)
                     sl_px = round(ai_decision.get("stop_loss_price") if (ai_decision and ai_decision.get("stop_loss_price", 0) > 0) else (limit_px - sl_dist), prec)
 
-                    # Hard check: For BUY LONG, OKX strictly requires sl_px < limit_px < tp_px
-                    if sl_px >= limit_px:
-                        sl_px = round(limit_px - max(sl_dist, f["price"] * 0.012), prec)
-                    if tp_px <= limit_px:
-                        tp_px = round(limit_px + max(tp_dist, f["price"] * 0.024), prec)
+                    # Hard check: 做多须 sl_px < limit_px < tp_px（钳制见 scripts/trader/brackets.py）
+                    sl_px, tp_px = normalize_bracket_prices(
+                        is_long=True, limit_px=limit_px, tp_px=tp_px, sl_px=sl_px,
+                        sl_dist=sl_dist, tp_dist=tp_dist, price=f["price"], prec=prec)
 
                     # US-003 决策面上下文：名义额（选所硬筛/深度需求）+ 保证金估算
                     # （预算预留额）+ 意图号（同一条 AI 决策重投幂等，不重复占预算）
@@ -2823,11 +2825,10 @@ def execute_portfolio():
                     tp_px = round(ai_decision.get("take_profit_price") if (ai_decision and ai_decision.get("take_profit_price", 0) > 0) else (limit_px - tp_dist), prec)
                     sl_px = round(ai_decision.get("stop_loss_price") if (ai_decision and ai_decision.get("stop_loss_price", 0) > 0) else (limit_px + sl_dist), prec)
 
-                    # Hard check: For SELL SHORT, OKX strictly requires tp_px < limit_px < sl_px
-                    if sl_px <= limit_px:
-                        sl_px = round(limit_px + max(sl_dist, f["price"] * 0.012), prec)
-                    if tp_px >= limit_px:
-                        tp_px = round(limit_px - max(tp_dist, f["price"] * 0.024), prec)
+                    # Hard check: 做空须 tp_px < limit_px < sl_px（钳制见 scripts/trader/brackets.py）
+                    sl_px, tp_px = normalize_bracket_prices(
+                        is_long=False, limit_px=limit_px, tp_px=tp_px, sl_px=sl_px,
+                        sl_dist=sl_dist, tp_dist=tp_dist, price=f["price"], prec=prec)
 
                     # US-003 决策面上下文（与多单同构：名义额/保证金估算/幂等意图号）
                     _notional = actual_sz * ct_val * limit_px
