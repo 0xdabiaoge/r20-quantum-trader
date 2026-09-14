@@ -14,6 +14,7 @@ if str(_THIS_DIR) not in sys.path:
 
 from r20_backend.time_utils import beijing_day
 import json
+from typing import Any, Dict, Optional
 import time
 import subprocess
 import datetime
@@ -47,7 +48,43 @@ def get_disk_info():
     except Exception:
         return {"total_gb": 0, "used_gb": 0, "free_gb": 0, "percent": 0}
 
+def _load_json_list(path: str, *, default=None):
+    """读 JSON 并缓存 —— **同一函数内重复读同一文件**是本文件的既有浪费
+    （第六十二刀修）：`generate_trading_data` 里 `snapshots.json` 与
+    `trading_ledger.json` 各被打开、解析**两次**，第二次完全浪费一次磁盘
+    读 + 一次全量 JSON 解析（台账可到数千行）。
+
+    ⚠️ 语义与原实现逐条对齐：
+    - 每处调用**各自** `try/except`（本函数内不捕获）——
+      原代码是两个独立 try，不能合并成一个 try（那会改变异常传播路径）；
+    - 失败/文件缺失一律回落 `default`（原实现是 `pass` 让变量保持初值）；
+    - 返回值**不做拷贝**：缓存对象在调用点只读（已逐处确认无 `del`/`append`/
+      `[i]=` 等原地修改）。
+
+    函数的取值必须**惰性**：原代码只在各自 `os.path.exists(...)` 成立时才读，
+    若改成函数一进来就预读，`disk_usage` 的失败顺序会变。
+    """
+    if _JSON_CACHE.get(path, _CACHE_MISS) is _CACHE_MISS:
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                _JSON_CACHE[path] = json.load(f)
+        except Exception:
+            _JSON_CACHE[path] = default
+    cached = _JSON_CACHE[path]
+    # ⚠️ 用哨兵而不是 None 表示"未缓存" —— 否则文件内容恰为 `null`
+    #    （合法 JSON）时，每次都判为未缓存，退化成**每调用一次读一次**。
+    return default if cached is _CACHE_MISS else cached
+
+
+_CACHE_MISS = object()
+_JSON_CACHE: dict = {}
+
+
 def generate_trading_data():
+    # ⚠️ 缓存**只服务于本次调用**：调用方 `daemon_web_sync.py` 是**循环**调用的，
+    #    若让缓存跨调用存活，第二轮就会读到第一轮的文件内容（陈旧数据）。
+    #    原实现每次调用都重新 open，故这里必须逐调用清空。
+    _JSON_CACHE.clear()
     env = okx_runtime.current_environment()
     if not env.configured:
         # fail-closed (2026-09-09 CLI removal): never overwrite the web cache with zeros
@@ -106,8 +143,8 @@ def generate_trading_data():
     # Fallback to last valid snapshot if balance is 0
     if total_eq == 0 and os.path.exists(SNAPSHOTS_JSON_FILE):
         try:
-            with open(SNAPSHOTS_JSON_FILE, "r", encoding="utf-8") as f:
-                snaps = json.load(f)
+            snaps = _load_json_list(SNAPSHOTS_JSON_FILE, default=[])
+            if snaps:
                 valid_snaps = [s for s in snaps if s.get("equity", 0.0) > 0]
                 if valid_snaps:
                     last_s = valid_snaps[-1]
@@ -147,8 +184,8 @@ def generate_trading_data():
         # Load from JSON ledger
         if os.path.exists(LEDGER_JSON_FILE):
             try:
-                with open(LEDGER_JSON_FILE, "r", encoding="utf-8") as f:
-                    t_list = json.load(f)
+                t_list = _load_json_list(LEDGER_JSON_FILE, default=[])
+                if t_list:
                     for t in t_list:
                         # 审计 D5：台账行根本没有 "time" 键（真实键名 close_time）
                         # ——旧代码 beijing_day(t.get("time")) 恒 None，JSON 兜底
@@ -175,15 +212,13 @@ def generate_trading_data():
     trades = []
     if os.path.exists(SNAPSHOTS_JSON_FILE):
         try:
-            with open(SNAPSHOTS_JSON_FILE, "r", encoding="utf-8") as f:
-                snapshots = json.load(f)[-40:]
+            snapshots = _load_json_list(SNAPSHOTS_JSON_FILE, default=[])[-40:]
         except Exception:
             pass
 
     if os.path.exists(LEDGER_JSON_FILE):
         try:
-            with open(LEDGER_JSON_FILE, "r", encoding="utf-8") as f:
-                trades = list(reversed(json.load(f)))[:60]
+            trades = list(reversed(_load_json_list(LEDGER_JSON_FILE, default=[])))[:60]
         except Exception:
             pass
 
