@@ -169,6 +169,69 @@ class DirectoryDocsTest(unittest.TestCase):
                 self.assertTrue((ROOT / rel).is_dir(), f"{rel} 不是目录")
 
 
+class RootLevelModulesRegisteredTest(unittest.TestCase):
+    """⚠️ 第六十五刀补：**根层模块**此前不在任何门禁里。
+
+    `MANAGED` 只覆盖**子包**，而 `r20_backend/*.py`（根层，38 个）靠
+    `r20_backend/README.md` 的 §L3/§L4 表格导航 —— 那张表**没有任何测试看着**。
+
+    后果实测：第四十九刀抽出的 `r20_backend/redact.py` 与
+    第五十一刀抽出的 `r20_backend/math_utils.py` **从未登记进 README**，
+    直到本刀才发现。而这两刀恰恰就是"新增模块"的操作 ——
+    **说明这个洞一直在漏**。
+
+    判据与子包一致：磁盘上的每个根层模块名，都必须在该 README 里出现过；
+    反向也查（README 提到的 `.py` 必须真实存在，避免把人引到死路）。
+    """
+
+    README = ROOT / "r20_backend" / "README.md"
+
+    #: 文档里**有意**提到但不在 `r20_backend/` 根层的文件
+    #: （子包内的、以及作为门面被引用的上层脚本）。
+    ALLOWED_EXTRA = {
+        "dashboard.py", "app.py",                       # dashboard_payload 的门面
+        "ai_factor_trader.py", "ai_brain_trader.py",    # scripts/ 下的调用方
+        "factor_library.py", "sync_full_ledger.py",     # scripts/ 下的兄弟模块
+        "council_manager.py", "risk_gates.py",
+    }
+
+    def _disk_modules(self) -> set:
+        pkg = ROOT / "r20_backend"
+        return {p.name for p in pkg.glob("*.py")
+                if p.name != "__init__.py" and not p.name.startswith("_")}
+
+    def test_every_root_module_is_registered(self):
+        doc = self.README.read_text(encoding="utf-8")
+        missing = sorted(m for m in self._disk_modules() if m not in doc)
+        self.assertEqual(
+            missing, [],
+            f"这些 r20_backend/ 根层模块未登记在 {self.README.name} —— "
+            f"新增模块后请补进 §L3/§L4 的表格: {missing}")
+
+    def test_documented_root_names_exist(self):
+        """反向：README 里以根层形态出现的 `.py` 必须真实存在。"""
+        doc = self.README.read_text(encoding="utf-8")
+        referenced = set(re.findall(r"`([A-Za-z0-9_]+\.py)`", doc))
+        on_disk = self._disk_modules()
+        dangling = sorted(
+            n for n in referenced
+            if n not in on_disk and n not in self.ALLOWED_EXTRA
+            and not any((ROOT / "r20_backend" / sub / n).exists()
+                        for sub in ("dashboard_payload", "council", "execution",
+                                    "exchanges", "routers", "llm", "policy",
+                                    "sandbox", "venue_routing")))
+        self.assertEqual(
+            dangling, [],
+            f"README 提到这些 `.py` 但全仓找不到 —— 会把人引到死路: {dangling}")
+
+    def test_no_root_module_regressed_to_the_old_state(self):
+        """把本刀修掉的两个具体漏登记钉住（防止再被"顺手删掉"）。"""
+        doc = self.README.read_text(encoding="utf-8")
+        for name in ("redact.py", "math_utils.py"):
+            self.assertIn(name, doc,
+                          f"{name} 是抽取产物，必须留在 README 的模块表里")
+
+
 class DocsDescribeRealityTest(unittest.TestCase):
     """抽查：文档里声称的"注入面"是否与代码相符（只查可机器判定的几条）。"""
 

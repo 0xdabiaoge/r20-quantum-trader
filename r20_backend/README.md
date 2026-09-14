@@ -61,12 +61,12 @@
 | 域 | 模块 |
 |---|---|
 | 交易执行 | `execution_router.py`、`okx_trade_service.py`、`okx_client.py`、`close_intent.py`、`risk_reservation.py`、`venue_router.py`、`exchanges/`、`execution/`、`sandbox/` |
-| 风控与安全 | `risk_config.py`、`net_security.py`、`login_guard.py`、`client_ip.py`、`admin_auth.py`、`interceptor_manager.py` |
+| 风控与安全 | `risk_config.py`、`net_security.py`、`login_guard.py`、`client_ip.py`、`admin_auth.py`、`interceptor_manager.py`、`redact.py` |
 | 通知与外部通道 | `notifications.py`、`qq_bind.py`、`qq_gateway_daemon.py` |
 | 审计与备份 | `audit.py`、`backup_store.py`、`backup_secrets.py`、`file_locks.py` |
 | 组合与账户 | `portfolio_aggregator.py`、`account_baseline.py` |
 | 提示词 | `prompt_views.py`、`dashboard_payload/prompts*` |
-| 通用 | `time_utils.py`、`schemas.py`、`schedule_store.py` |
+| 通用 | `time_utils.py`、`math_utils.py`、`schemas.py`、`schedule_store.py` |
 
 ### L4 纯计算/载荷子包（新代码的默认去处）
 
