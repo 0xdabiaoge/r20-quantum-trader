@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { chartStyles } from './chartStyles'
 import { computeRiskReward, symbolPrecision } from './chartMath'
+import { planPriceLines } from './chartOverlays'
 import { fmtDate, fmtHM, fmtClock } from '../../utils/format';
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useDashboardStore } from '../../stores/dashboard'
@@ -554,72 +555,31 @@ function updatePriceLines() {
   const tpPx = effectiveTP.value
   const hasPosOrOrder = activePosition.value || activeOrder.value || simMode.value
 
-  if (hasPosOrOrder && entryPx > 0) {
-    const isLong = liveSide.value === 'long'
-    const entryRes = klineChart.createOverlay({
-      name: 'priceLine',
-      paneId: 'candle_pane',
-      points: [{ value: entryPx }],
-      styles: {
-        line: {
-          style: 'solid',
-          size: 1.5,
-          color: isLong ? '#10B981' : '#F43F5E',
-        },
-        text: {
-          size: 11,
-          color: tok('--ink-1'),
-          backgroundColor: isLong ? '#10B981' : '#F43F5E',
-        },
-      },
-      extendData: isLong ? (isEn.value ? 'Entry Long' : '多头入场') : (isEn.value ? 'Entry Short' : '空头入场'),
-    })
+  // 阶段 3·F4：建线描述符抽到 chartOverlays.ts（纯函数）；此处只负责"怎么画"。
+  const plan = planPriceLines({
+    entryPx,
+    slPx,
+    tpPx,
+    hasPosOrOrder: !!hasPosOrOrder,
+    isLong: liveSide.value === 'long',
+    riskPct: riskRewardMetrics.value.riskPct,
+    rewardPct: riskRewardMetrics.value.rewardPct,
+    textColor: tok('--ink-1'),
+    isEn: isEn.value,
+  })
+
+  if (plan.entry) {
+    const entryRes = klineChart.createOverlay(plan.entry)
     entryOverlayId = typeof entryRes === 'string' ? entryRes : null
   }
 
-  if (slPx > 0) {
-    const slRes = klineChart.createOverlay({
-      name: 'priceLine',
-      paneId: 'candle_pane',
-      points: [{ value: slPx }],
-      styles: {
-        line: {
-          style: 'dashed',
-          dashedValue: [6, 4],
-          size: 1.5,
-          color: '#F43F5E',
-        },
-        text: {
-          size: 11,
-          color: tok('--ink-1'),
-          backgroundColor: '#F43F5E',
-        },
-      },
-      extendData: `🛑 ${isEn.value ? 'SL' : '止损SL'} -${riskRewardMetrics.value.riskPct.toFixed(1)}%`,
-    })
+  if (plan.sl) {
+    const slRes = klineChart.createOverlay(plan.sl)
     slOverlayId = typeof slRes === 'string' ? slRes : null
   }
 
-  if (tpPx > 0) {
-    const tpRes = klineChart.createOverlay({
-      name: 'priceLine',
-      paneId: 'candle_pane',
-      points: [{ value: tpPx }],
-      styles: {
-        line: {
-          style: 'dashed',
-          dashedValue: [6, 4],
-          size: 1.5,
-          color: '#10B981',
-        },
-        text: {
-          size: 11,
-          color: tok('--ink-1'),
-          backgroundColor: '#10B981',
-        },
-      },
-      extendData: `🎯 ${isEn.value ? 'TP' : '止盈TP'} +${riskRewardMetrics.value.rewardPct.toFixed(1)}%`,
-    })
+  if (plan.tp) {
+    const tpRes = klineChart.createOverlay(plan.tp)
     tpOverlayId = typeof tpRes === 'string' ? tpRes : null
   }
 }
