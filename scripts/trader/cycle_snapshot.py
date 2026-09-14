@@ -63,7 +63,11 @@ def collect_pending_inst_ids(*, venues, venue_mode, broken_venues, venue_registr
                 _grows = _gad.open_orders() or []
             else:
                 _grows = []
-                for _ins in load_instruments():
+                # 性能：标的池**读一次**即可。原实现在内层循环里每次迭代都
+                # `load_instruments()`（一次磁盘读 + JSON 解析 + 逐项校验 + 重建列表），
+                # 8 个标的就白读 8 次。提到循环外，语义不变（见测试）。
+                _gpool = load_instruments()
+                for _ins in _gpool:
                     _gb = str(_ins.get("instId") or "").split("-")[0].upper()
                     if _gb:
                         _grows.extend(_gad.list_open_orders(_gb) or [])
