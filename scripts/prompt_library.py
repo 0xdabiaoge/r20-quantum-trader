@@ -13,6 +13,38 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
+
+# 结构优化阶段 4·B3 第五十三刀：模板编译簇外提到 `scripts/prompt_templates.py`。
+# ⚠️ 双模导入：本模块既可能以裸名 `prompt_library` 导入（`scripts/` 在
+# sys.path），也可能以 `scripts.prompt_library` 导入（repo 根在 sys.path）——
+# 后一种情况下裸名 `prompt_templates` **不在** sys.path。
+# （第四十八刀在 local_lock 上踩过同一个坑，被 dashboard 用例当场抓住。）
+try:  # repo 根在 sys.path
+    from scripts.prompt_templates import (
+        stable_base_module_id as _tpl_stable_base_module_id,
+        _module as _tpl_module,
+        text_to_modules as _tpl_text_to_modules,
+        compile_modules as _tpl_compile_modules,
+        base_template_modules as _tpl_base_template_modules,
+        base_template_text as _tpl_base_template_text,
+        align_pipeline_sources as _tpl_align_pipeline_sources,
+        _inherit_module_tags as _tpl__inherit_module_tags,
+        pipeline_view as _tpl_pipeline_view,
+        append_layer as _tpl_append_layer,
+    )
+except ImportError:  # scripts/ 在 sys.path
+    from prompt_templates import (
+        stable_base_module_id as _tpl_stable_base_module_id,
+        _module as _tpl_module,
+        text_to_modules as _tpl_text_to_modules,
+        compile_modules as _tpl_compile_modules,
+        base_template_modules as _tpl_base_template_modules,
+        base_template_text as _tpl_base_template_text,
+        align_pipeline_sources as _tpl_align_pipeline_sources,
+        _inherit_module_tags as _tpl__inherit_module_tags,
+        pipeline_view as _tpl_pipeline_view,
+        append_layer as _tpl_append_layer,
+    )
 # 结构优化阶段 4·B3 第四十八刀：本地锁兜底外提到 `scripts/local_lock.py`。
 # ⚠️ 双模导入：本模块既可能以裸名 `prompt_library` 导入（`scripts/` 在 sys.path），
 # 也可能以 `scripts.prompt_library` 导入（repo 根在 sys.path）——
@@ -191,7 +223,6 @@ MAX_TEMPLATE_CHARS = 12_000
 MAX_PROFILE_CHARS = 32_000
 MAX_REVISIONS = 100
 MAX_MODULES_PER_PIPELINE = 40
-_SECTION_RE = re.compile(r"(?m)(?=^={0,30}\s*【[^\n】]+】[^\n]*$)")
 
 PRESETS: dict[str, dict[str, Any]] = {
     "stable": {
@@ -317,21 +348,17 @@ def _default() -> dict[str, Any]:
 
 
 def stable_base_module_id(title: str) -> str:
-    """基座模块的**确定性** id（由标题派生）。
+    """薄壳：转调 `scripts/prompt_templates.py`（结构优化阶段 4·B3 第五十三刀）。"""
+    return _tpl_stable_base_module_id(title)
 
-    旧实现给每个模块随机 uuid：同一段基座文本每次重建都换 id，于是
-    「同 id/同标题继承来源」只能靠标题兜底，方案库里 base 模块 id 每存一次就翻新一遍
-    （P1-2/批5 同族）。基座模块内容由代码决定，id 派生自标题即可稳定。
+
+def _module(module: dict[str, Any], index: int=0) -> dict[str, Any]:
+    """薄壳：转调 `scripts/prompt_templates.py`（结构优化阶段 4·B3 第五十三刀）。
+
+    ⚠️ `MAX_TEMPLATE_CHARS` 在**调用时**作为实参传入 —— 它留在门面，
+    故仍可被 patch / 直接赋值；本模块不在 import 期烘焙它。
     """
-    digest = hashlib.sha1(f"r20-base-module::{title}".encode("utf-8")).hexdigest()[:10]
-    return f"module-base-{digest}"
-
-
-def _module(module: dict[str, Any], index: int = 0) -> dict[str, Any]:
-    title = str(module.get("title") or f"模块 {index+1}").strip()[:100]
-    source = str(module.get("source") or "custom")[:40]
-    fallback_id = stable_base_module_id(title) if source == "base" else f"module-{uuid.uuid4().hex[:10]}"
-    return {"id":str(module.get("id") or fallback_id)[:80],"title":title,"content":str(module.get("content") or "").strip()[:MAX_TEMPLATE_CHARS],"enabled":bool(module.get("enabled",True)),"locked":bool(module.get("locked",False)),"source":source}
+    return _tpl_module(module, index, max_template_chars=MAX_TEMPLATE_CHARS)
 
 
 # ── 管线 → 代码基座文本（审计批5 新发现：update_profile 的来源判定缺陷）──────────
@@ -352,6 +379,22 @@ _BASE_TEMPLATE_SOURCES: dict[str, tuple[str, tuple[str, ...]]] = {
 _BASE_TEMPLATE_CACHE: dict[str, str] = {}
 
 
+def _base_text_resolver(pipeline: str) -> str:
+    """在**调用时**把门面的 `_BASE_TEMPLATE_SOURCES` / `_BASE_TEMPLATE_CACHE`
+    交给 `scripts/prompt_templates.py`（结构优化阶段 4·B3 第五十三刀）。
+
+    ⚠️ 这两个名字都留在门面：前者是"管线 → 基座来源"注册表（配置面），
+    后者是**可变**缓存（门面的 `register_base_template()` 会往里写）。
+    子模块若在 import 期绑一份，登记的基座就永远读不到 —— 两处状态分叉。
+    故用这个 resolver 在每次调用时现读门面全局。
+    """
+    return _tpl_base_template_text(
+        pipeline,
+        sources=_BASE_TEMPLATE_SOURCES,
+        cache=_BASE_TEMPLATE_CACHE,
+    )
+
+
 def register_base_template(pipeline: str, text: str) -> None:
     """显式登记某条管线的代码基座文本（懒加载失败时的兜底入口）。"""
     if pipeline in TEMPLATE_KEYS:
@@ -359,97 +402,51 @@ def register_base_template(pipeline: str, text: str) -> None:
 
 
 def base_template_text(pipeline: str) -> str:
-    """取代码基座文本；取不到时返回空串（调用方必须退化为"不改来源"，绝不臆造）。"""
-    if pipeline in _BASE_TEMPLATE_CACHE:
-        return _BASE_TEMPLATE_CACHE[pipeline]
-    entry = _BASE_TEMPLATE_SOURCES.get(pipeline)
-    if not entry:
-        return ""
-    attribute, candidates = entry
-    module = next((sys.modules[name] for name in candidates if name in sys.modules), None)
-    if module is None:
-        for name in candidates:
-            try:
-                module = importlib.import_module(name)
-                break
-            except Exception:
-                continue
-    if module is None:
-        return ""
-    text = str(getattr(module, attribute, "") or "")
-    if text:
-        _BASE_TEMPLATE_CACHE[pipeline] = text
-    return text
+    """薄壳：转调 `scripts/prompt_templates.py`（结构优化阶段 4·B3 第五十三刀）。
+
+    ⚠️ `_BASE_TEMPLATE_SOURCES` / `_BASE_TEMPLATE_CACHE` 都以**实参**传入，
+    而不是让子模块 import：
+
+    - `_BASE_TEMPLATE_CACHE` 是**可变** dict，且本模块的
+      `register_base_template()` 会往它里面写。子模块若在 import 期绑一份，
+      登记的基座就永远读不到（两处状态分叉）；
+    - `_BASE_TEMPLATE_SOURCES` 是"管线 → 基座来源"注册表，属门面配置面。
+    """
+    return _tpl_base_template_text(
+        pipeline,
+        sources=_BASE_TEMPLATE_SOURCES,
+        cache=_BASE_TEMPLATE_CACHE,
+    )
 
 
 def align_pipeline_sources(modules: list[dict[str, Any]], pipeline: str) -> list[dict[str, Any]]:
-    """把重建出来的模块与代码基座对齐（只按**逐字相同**判定，避免误认亲）。"""
-    base_text = base_template_text(pipeline)
-    if not base_text or not modules:
-        return modules
-    base_by_title = {m["title"]: m for m in text_to_modules(base_text, "base")}
-    aligned: list[dict[str, Any]] = []
-    for module in modules:
-        candidate = base_by_title.get(str(module.get("title") or ""))
-        if candidate and candidate.get("content") == module.get("content"):
-            aligned.append({**candidate, "enabled": bool(module.get("enabled", True))})
-        else:
-            aligned.append(module)
-    return aligned
+    """薄壳：转调 `scripts/prompt_templates.py`（结构优化阶段 4·B3 第五十三刀）。"""
+    return _tpl_align_pipeline_sources(modules, pipeline,
+                                       max_template_chars=MAX_TEMPLATE_CHARS,
+                                       base_text_resolver=_base_text_resolver)
 
 
-def text_to_modules(text: str, source: str = "legacy", locked: bool = False) -> list[dict[str, Any]]:
-    chunks=[chunk.strip() for chunk in _SECTION_RE.split(str(text or "")) if chunk.strip()]
-    if not chunks and str(text or "").strip(): chunks=[str(text).strip()]
-    result=[]
-    for i,chunk in enumerate(chunks):
-        first=chunk.splitlines()[0].strip(" =") if chunk.splitlines() else f"模块 {i+1}"
-        title=(re.search(r"【([^】]+)】",first).group(1) if re.search(r"【([^】]+)】",first) else first)[:100]
-        result.append(_module({"title":title,"content":chunk,"locked":locked,"source":source},i))
-    return result
+def text_to_modules(text: str, source: str='legacy', locked: bool=False) -> list[dict[str, Any]]:
+    """薄壳：转调 `scripts/prompt_templates.py`（结构优化阶段 4·B3 第五十三刀）。"""
+    return _tpl_text_to_modules(text, source, locked,
+                                max_template_chars=MAX_TEMPLATE_CHARS)
 
 
 def compile_modules(modules: list[dict[str, Any]]) -> str:
-    return "\n\n".join(
-        str(item.get("content") or "")
-        for item in modules
-        if isinstance(item, dict) and item.get("enabled", True) and str(item.get("content") or "").strip()
-    ).strip()
+    """薄壳：转调 `scripts/prompt_templates.py`（结构优化阶段 4·B3 第五十三刀）。"""
+    return _tpl_compile_modules(modules)
 
 
 def base_template_modules(text: str, pipeline: str) -> list[dict[str, Any]]:
-    modules = text_to_modules(text, "base", locked=False)
-    for module in modules:
-        module["locked"] = False
-    return modules
+    """薄壳：转调 `scripts/prompt_templates.py`（结构优化阶段 4·B3 第五十三刀）。"""
+    return _tpl_base_template_modules(text, pipeline,
+                                      max_template_chars=MAX_TEMPLATE_CHARS,
+                                      base_text_resolver=_base_text_resolver)
 
 
 def _inherit_module_tags(submitted: list[Any], stored: Any) -> list[Any]:
-    """提交的模块缺 source/locked 时，从同 id（或同标题）的已存模块继承。
-
-    审计 P1-2 同族：UI 的模块视图会把 base 模块的 locked 抹平；若再丢掉 source=base
-    标签，`apply_module_layout` 就会认为「这条管线没有 base 模块」→ 把整段 base 前置，
-    叠加已含同样内容的模块 = 提示词翻倍。显式传入的值永远优先。
-    """
-    if not isinstance(stored, list) or not stored:
-        return submitted
-    by_id = {str(m.get("id")): m for m in stored if isinstance(m, dict) and m.get("id")}
-    by_title = {str(m.get("title")): m for m in stored if isinstance(m, dict) and m.get("title")}
-    out: list[Any] = []
-    for item in submitted:
-        if not isinstance(item, dict):
-            out.append(item)
-            continue
-        ref = by_id.get(str(item.get("id"))) or by_title.get(str(item.get("title")))
-        if isinstance(ref, dict):
-            merged = dict(item)
-            for field in ("source", "locked"):
-                if field not in item and field in ref:
-                    merged[field] = ref[field]
-            out.append(merged)
-        else:
-            out.append(item)
-    return out
+    """薄壳：转调 `scripts/prompt_templates.py`（结构优化阶段 4·B3 第五十三刀）。"""
+    return _tpl__inherit_module_tags(submitted, stored)
 
 
 def _clean_pipelines(raw: Any, legacy: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
@@ -1020,16 +1017,12 @@ def apply_module_layout(base: str, profile: dict[str, Any], pipeline: str, label
 
 
 def pipeline_view(base: str, profile: dict[str, Any], pipeline: str) -> list[dict[str, Any]]:
-    base_modules = base_template_modules(base, pipeline)
-    current = ((profile.get("pipelines") or {}).get(pipeline) if isinstance(profile.get("pipelines"), dict) else [])
-    if isinstance(current, list) and current:
-        view = copy.deepcopy(current)
-        for m in view:
-            m["locked"] = False
-        return view
-    return base_modules + (text_to_modules(str(profile.get(pipeline) or ""), "custom") if profile.get(pipeline) else [])
+    """薄壳：转调 `scripts/prompt_templates.py`（结构优化阶段 4·B3 第五十三刀）。"""
+    return _tpl_pipeline_view(base, profile, pipeline,
+                              max_template_chars=MAX_TEMPLATE_CHARS,
+                              base_text_resolver=_base_text_resolver)
 
 
 def append_layer(base: str, layer: str, label: str) -> str:
-    layer = (layer or "").strip()
-    return base if not layer else f"{base.rstrip()}\n\n======================= 【{label}】 =======================\n{layer}"
+    """薄壳：转调 `scripts/prompt_templates.py`（结构优化阶段 4·B3 第五十三刀）。"""
+    return _tpl_append_layer(base, layer, label)
