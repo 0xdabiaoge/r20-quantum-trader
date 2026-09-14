@@ -9,6 +9,9 @@ from r20_backend.dashboard_payload.cache import (  # noqa: E402
     persist_dashboard_cache as _core_persist_dashboard_cache,
     _inject_local_data_into_stale as _core__inject_local_data_into_stale,
 )
+from r20_backend.dashboard_payload.position_view import (  # noqa: E402
+    collect_position_rows as _core_collect_position_rows,
+)
 from r20_backend.dashboard_payload.bills import (  # noqa: E402
     aggregate_bills as _core_aggregate_bills,
 )
@@ -295,77 +298,11 @@ def update_cache_cycle():
 
     trackers = load_position_trackers()
 
-    if isinstance(pos_data, list):
-        for p in pos_data:
-            pos_val = float(p.get("pos", 0.0) or 0.0)
-            if pos_val == 0.0:
-                continue
-
-            pos_side = p.get("posSide", p.get("side", "")).lower()
-            if "long" in pos_side:
-                long_count += 1
-            elif "short" in pos_side:
-                short_count += 1
-
-            upl = float(p.get("upl", 0.0) or 0.0)
-            total_pos_upl += upl
-
-            pos_key = f"{p.get('instId')}_{p.get('posSide', 'net')}"
-            t_info = trackers.get(pos_key, {})
-            trailing_sl = t_info.get("trailingStopPx", "--")
-            stage_desc = t_info.get("stage_desc", "持有监控中")
-            strategy_tag = t_info.get("strategy_tag") or ("🌊 低吸" if "long" in pos_side else "⚡ 高空")
-
-            avg_px = float(p.get("avgPx", 0) or 0)
-            mark_px = float(p.get("markPx", 0) or 0)
-            pos_sz = float(p.get("pos", 0) or 0)
-
-            ct_val = 1.0
-            inst_id_val = p.get("instId", "")
-            for target_item in load_instruments():
-                if target_item["instId"] == inst_id_val:
-                    ct_val = target_item.get("ctVal", 1.0)
-                    break
-            
-            okx_notional = float(p.get("notionalUsd", 0) or 0)
-            okx_imr = float(p.get("imr", 0) or 0)
-
-            notional_usdt = round(okx_notional if okx_notional > 0 else (pos_sz * ct_val * (mark_px if mark_px > 0 else avg_px)), 2)
-            raw_upl_ratio = float(p.get("uplRatio", 0.0) or 0.0)
-            real_roi_pct = round(raw_upl_ratio * 100, 2)
-            price_chg = round(((mark_px - avg_px) / avg_px * 100) if avg_px > 0 else 0, 2)
-
-            lever_val = float(p.get("lever", "3") or 3.0)
-            margin_usdt_val = round(okx_imr if okx_imr > 0 else (notional_usdt / lever_val), 2)
-
-            positions.append({
-                "venue": "okx",
-                "exchange": "okx",
-                "instId": p.get("instId"),
-                "name": p.get("instId", "").replace("-USDT-SWAP", ""),
-                "posSide": pos_side,
-                "side": pos_side,
-                "pos": p.get("pos"),
-                "pos_sz": pos_sz,
-                "notional_usdt": notional_usdt,
-                "margin_usdt": margin_usdt_val,
-                "marginSource": "exchange_imr" if okx_imr > 0 else "notional_div_leverage",
-                "imr": okx_imr or None,
-                "lever": p.get("lever", "3"),
-                "avgPx": avg_px,
-                "markPx": mark_px,
-                "upl": upl,
-                "uplRatio": real_roi_pct,
-                "roi_pct": real_roi_pct,
-                "price_change_pct": price_chg,
-                "liqPx": p.get("liqPx", "--"),
-                "bePx": p.get("bePx", "--"),
-                "trailingSl": trailing_sl,
-                "stageDesc": stage_desc,
-                "strategyTag": strategy_tag,
-                "tp1Hit": t_info.get("tp1_hit", False),
-                "tp2Hit": t_info.get("tp2_hit", False)
-            })
+    _pos_delta = _core_collect_position_rows(pos_data, positions, trackers,
+                                            load_instruments=load_instruments)
+    long_count += _pos_delta[0]
+    short_count += _pos_delta[1]
+    total_pos_upl += _pos_delta[2]
 
     # Parse Pending Maker Orders
     pending_orders_list = []
