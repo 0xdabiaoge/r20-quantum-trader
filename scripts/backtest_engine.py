@@ -22,6 +22,7 @@ import math
 import os
 import sys
 import urllib.request
+from scripts.backtest.lifecycle import evaluate_position_exit, settle_exit
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -190,48 +191,13 @@ class BacktestEngine:
             # 1. Active Position Lifecycle Management
             if active_position is not None:
                 pos = active_position
-                direction = pos["direction"]
-                entry_px = pos["entry_price"]
-                sl = pos["stop_loss"]
-                tp = pos["take_profit"]
-                sz = pos["size"]
-                r_dist = abs(entry_px - sl)
+                _exit = evaluate_position_exit(
+                    pos=pos, high=h, low=l, close=c, slippage=self.slippage)
 
-                exit_trade = False
-                exit_price = c
-                exit_reason = ""
-
-                if direction == "LONG":
-                    # Break-even lock rule: move stop to entry once reached +0.8R
-                    if h >= entry_px + (r_dist * 0.8) and pos["stop_loss"] < entry_px:
-                        pos["stop_loss"] = entry_px
-
-                    if l <= pos["stop_loss"]:
-                        exit_trade = True
-                        exit_price = pos["stop_loss"] * (1 - self.slippage)
-                        exit_reason = "STOP_LOSS"
-                    elif h >= tp:
-                        exit_trade = True
-                        exit_price = tp * (1 - self.slippage)
-                        exit_reason = "TAKE_PROFIT"
-                else:  # SHORT
-                    if l <= entry_px - (r_dist * 0.8) and pos["stop_loss"] > entry_px:
-                        pos["stop_loss"] = entry_px
-
-                    if h >= pos["stop_loss"]:
-                        exit_trade = True
-                        exit_price = pos["stop_loss"] * (1 + self.slippage)
-                        exit_reason = "STOP_LOSS"
-                    elif l <= tp:
-                        exit_trade = True
-                        exit_price = tp * (1 + self.slippage)
-                        exit_reason = "TAKE_PROFIT"
-
-                if exit_trade:
-                    fee = (entry_px * sz * self.taker_fee) + (exit_price * sz * self.maker_fee)
-                    pnl = ((exit_price - entry_px) if direction == "LONG" else (entry_px - exit_price)) * sz - fee
-                    pnl_pct = pnl / (entry_px * sz) if (entry_px * sz) > 0 else 0.0
-                    r_mult = pnl / (r_dist * sz) if (r_dist * sz) > 0 else 0.0
+                if _exit.should_exit:
+                    pnl, pnl_pct, r_mult = settle_exit(
+                        pos=pos, decision=_exit,
+                        taker_fee=self.taker_fee, maker_fee=self.maker_fee)
 
                     self.capital += pnl
                     trades.append(
@@ -239,13 +205,13 @@ class BacktestEngine:
                             symbol=candle.get("symbol", symbol),
                             entry_time=pos["entry_time"],
                             exit_time=ts,
-                            direction=direction,
-                            entry_price=round(entry_px, 4),
-                            exit_price=round(exit_price, 4),
-                            size=round(sz, 4),
+                            direction=pos["direction"],
+                            entry_price=round(pos["entry_price"], 4),
+                            exit_price=round(_exit.exit_price, 4),
+                            size=round(pos["size"], 4),
                             pnl_usd=round(pnl, 2),
                             pnl_pct=round(pnl_pct * 100, 2),
-                            exit_reason=exit_reason,
+                            exit_reason=_exit.exit_reason,
                             r_multiple=round(r_mult, 2),
                         )
                     )
