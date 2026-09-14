@@ -18,6 +18,9 @@ from r20_backend.dashboard_payload.order_view import (  # noqa: E402
 from r20_backend.dashboard_payload.trade_stats import (  # noqa: E402
     aggregate_trade_stats as _core_aggregate_trade_stats,
 )
+from r20_backend.dashboard_payload.trader_leaderboard import (  # noqa: E402
+    build_inst_leaderboard as _core_build_inst_leaderboard,
+)
 from r20_backend.dashboard_payload.bills import (  # noqa: E402
     aggregate_bills as _core_aggregate_bills,
 )
@@ -409,18 +412,7 @@ def update_cache_cycle():
     cum_roi_pct = round((total_cum_net_pnl / initial_capital_val * 100) if initial_capital_val > 0 else 0.0, 2)
     total_cum_realized_pnl = round(total_cum_net_pnl - total_pos_upl, 2)
 
-    inst_leaderboard = []
-    for inst, s in by_inst.items():
-        w_r = round((s["wins"] / s["trades"]) * 100, 1) if s["trades"] > 0 else 0.0
-        inst_leaderboard.append({
-            "inst": inst,
-            "trades": s["trades"],
-            "wins": s["wins"],
-            "losses": s["losses"],
-            "win_rate": w_r,
-            "pnl": round(s["pnl"], 2)
-        })
-    inst_leaderboard.sort(key=lambda x: x["pnl"], reverse=True)
+    inst_leaderboard = _core_build_inst_leaderboard(by_inst)
 
     # 5. Load Log Lines
     log_lines = read_text_lines(LOG_FILE, 60)

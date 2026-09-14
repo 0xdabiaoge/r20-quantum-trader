@@ -45,7 +45,7 @@ import dashboard.app as app  # noqa: E402
 from r20_backend import dashboard_payload as payload_pkg  # noqa: E402
 from r20_backend.dashboard_payload import (  # noqa: E402
     bills as bills_mod, cache, factors, health, local_reads, market,
-    order_view, position_view, slim, trade_stats,
+    order_view, position_view, slim, trade_stats, trader_leaderboard,
 )
 
 PAYLOAD_DIR = ROOT / "r20_backend" / "dashboard_payload"
@@ -71,7 +71,7 @@ FACADE_SURFACE = [
 
 # 核心模块白名单：新迁出的域模块都应在此，且必须被门面导入（否则 sandbox 覆盖不到）
 CORE_MODULES = (slim, market, factors, health, cache, local_reads, bills_mod,
-                position_view, order_view, trade_stats)
+                position_view, order_view, trade_stats, trader_leaderboard)
 
 
 def _core_aliases() -> dict[str, object]:
