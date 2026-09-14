@@ -69,3 +69,48 @@ def ratcheted_trailing_stop(*, is_long, entry_px, atr, prec, peak_profit_px,
         dynamic_floor_sl = max(dynamic_floor_sl, breakeven) if is_long else min(dynamic_floor_sl, breakeven)
         stage_desc = f"已推保本无风险 (保底止损 {dynamic_floor_sl})"
     return dynamic_floor_sl, stage_desc
+
+
+# 载荷字段顺序由 `close_trade_payload` 的字面量保证，并由
+# `tests/test_trader_protection_extraction.py` 对旧载荷做逐键对拍。
+
+
+def close_fee(pos_sz, ct_val, cur_px, taker_fee_rate):
+    """平仓手续费 = 张数 × 合约面值 × 成交价 × taker 费率。
+
+    原门面在 6 处把同一表达式内联为局部量，另有 1 处直接作为 `fee=` 实参；
+    抽成函数后费率仍是**调用期注入**（`TAKER_FEE_RATE` 由门面传入，
+    不在本模块 import 期烘焙）。
+    """
+    return (pos_sz * ct_val * cur_px) * taker_fee_rate
+
+
+def close_trade_payload(*, is_long, timestamp_full, name, action_type, side_suffix,
+                        pos_sz, cur_px, fee, pnl, remark):
+    """装配一条平仓台账载荷（原门面 7 处 `record_trade({...})` 的公共 14 字段）。
+
+    `venue` 不在这里给：`record_trade()` 会 `setdefault("venue", "okx")`，
+    而 7 处调用点全部是 OKX V5 直签链路（gate lab 写侧自带 `venue="gate"`）。
+    在此显式写 `okx` 会在 dict 顺序上**多一个键**，与旧载荷不再逐字节相同 ——
+    故保持原样交给 `setdefault`。
+
+    `direction` / `side` 的拼法与旧载荷逐字一致：
+    `direction = f"平{'多' if is_long else '空'}"`、`side = f"{前缀}单{side_suffix}"`。
+    """
+    direction_char = "多" if is_long else "空"
+    return {
+        "is_trade": True,
+        "time": timestamp_full,
+        "inst": name,
+        "name": name,
+        "action": "平仓",
+        "action_type": action_type,
+        "direction": f"平{direction_char}",
+        "side": f"{direction_char}单{side_suffix}",
+        "size": pos_sz,
+        "sz": pos_sz,
+        "price": cur_px,
+        "fee": fee,
+        "pnl": pnl,
+        "remark": remark,
+    }

@@ -40,7 +40,12 @@ from r20_backend.time_utils import beijing_day
 # 结构优化阶段4·B3：纯信号逻辑已搬入 scripts/trader/signals.py，re-export 保持门面表面不变
 from scripts.trader.signals import clamp, evaluate_asset_signal as _evaluate_asset_signal  # noqa: F401
 from scripts.trader.factors import fetch_single_instrument_data as _fetch_single_instrument_data
-from scripts.trader.protection import protection_signals, ratcheted_trailing_stop
+from scripts.trader.protection import (
+    protection_signals,
+    ratcheted_trailing_stop,
+    close_fee as _close_fee,
+    close_trade_payload as _close_trade_payload,
+)
 
 # US-003 决策面接线：选所路由（US-002）与预算原子预留（US-001）以模块绑定名引用，
 # 接线级测试 patch 模块属性即可完全离线（零出网/零凭证/零真实预留库）。
@@ -2011,25 +2016,15 @@ def manage_position_tp_and_trailing(f, curr_pos, trackers, timestamp_full, execu
         if not closed:
             executed_actions.append(f"[{name}] 硬止损平仓失败，仓位仍保留: {close_detail}")
             return False, "硬止损平仓失败"
-        close_fee = (pos_sz * ct_val * cur_px) * TAKER_FEE_RATE
+        close_fee = _close_fee(pos_sz, ct_val, cur_px, TAKER_FEE_RATE)
         pnl_val = curr_pos["upl"]
         executed_actions.append(f"[{name}] 🛑 触发硬止损 {hard_stop_px} 并确认平仓 (净盈亏: {pnl_val:+.2f}U)")
-        record_trade({
-            "is_trade": True,
-            "time": timestamp_full,
-            "inst": name,
-            "name": name,
-            "action": "平仓",
-            "action_type": "硬止损",
-            "direction": f"平{'多' if is_long else '空'}",
-            "side": f"{'多' if is_long else '空'}单硬止损",
-            "size": pos_sz,
-            "sz": pos_sz,
-            "price": cur_px,
-            "fee": close_fee,
-            "pnl": pnl_val,
-            "remark": f"价格 {cur_px} 触及保护止损 {hard_stop_px}，交易所确认平仓"
-        })
+        record_trade(_close_trade_payload(
+            is_long=is_long, timestamp_full=timestamp_full, name=name,
+            action_type="硬止损", side_suffix="硬止损",
+            pos_sz=pos_sz, cur_px=cur_px, fee=close_fee, pnl=pnl_val,
+            remark=f"价格 {cur_px} 触及保护止损 {hard_stop_px}，交易所确认平仓",
+        ))
         add_stop_cooldown(inst_id, "long" if is_long else "short", "硬止损")
         if notify_trade_close:
             notify_trade_close(inst=name, pnl=pnl_val, stage="硬止损平仓", exit_px=cur_px)
@@ -2049,14 +2044,13 @@ def manage_position_tp_and_trailing(f, curr_pos, trackers, timestamp_full, execu
             return False, "保护与退出均失败"
         pnl_val = curr_pos["upl"]
         executed_actions.append(f"[{name}] 🧯 云端 OCO 无法确认，已安全平仓: {protection_detail}")
-        record_trade({
-            "is_trade": True, "time": timestamp_full, "inst": name, "name": name,
-            "action": "平仓", "action_type": "保护失效退出",
-            "direction": f"平{'多' if is_long else '空'}", "side": f"{'多' if is_long else '空'}单保护失效退出",
-            "size": pos_sz, "sz": pos_sz, "price": cur_px,
-            "fee": (pos_sz * ct_val * cur_px) * TAKER_FEE_RATE, "pnl": pnl_val,
-            "remark": f"云端 OCO 无法达到全仓覆盖，交易所确认安全平仓：{protection_detail}"
-        })
+        record_trade(_close_trade_payload(
+            is_long=is_long, timestamp_full=timestamp_full, name=name,
+            action_type="保护失效退出", side_suffix="保护失效退出",
+            pos_sz=pos_sz, cur_px=cur_px,
+            fee=_close_fee(pos_sz, ct_val, cur_px, TAKER_FEE_RATE), pnl=pnl_val,
+            remark=f"云端 OCO 无法达到全仓覆盖，交易所确认安全平仓：{protection_detail}",
+        ))
         add_stop_cooldown(inst_id, "long" if is_long else "short", "云端保护失效")
         if notify_trade_close:
             notify_trade_close(inst=name, pnl=pnl_val, stage="云端保护失效退出", exit_px=cur_px)
@@ -2071,24 +2065,14 @@ def manage_position_tp_and_trailing(f, curr_pos, trackers, timestamp_full, execu
         if not closed:
             executed_actions.append(f"[{name}] 时间止损平仓失败，仓位仍保留: {close_detail}")
             return False, "平仓失败"
-        close_fee = (pos_sz * ct_val * cur_px) * TAKER_FEE_RATE
+        close_fee = _close_fee(pos_sz, ct_val, cur_px, TAKER_FEE_RATE)
         executed_actions.append(f"[{name}] ⌛ 超过 {TIME_STOP_HOURS:g} 小时无波动横盘，时间止损平仓释放保证金")
-        record_trade({
-            "is_trade": True,
-            "time": timestamp_full,
-            "inst": name,
-            "name": name,
-            "action": "平仓",
-            "action_type": "时间止损",
-            "direction": f"平{'多' if is_long else '空'}",
-            "side": f"{'多' if is_long else '空'}单无波动出场",
-            "size": pos_sz,
-            "sz": pos_sz,
-            "price": cur_px,
-            "fee": close_fee,
-            "pnl": curr_pos["upl"],
-            "remark": f"持仓超 {TIME_STOP_HOURS:g} 小时无突破，主动平仓释放配比"
-        })
+        record_trade(_close_trade_payload(
+            is_long=is_long, timestamp_full=timestamp_full, name=name,
+            action_type="时间止损", side_suffix="无波动出场",
+            pos_sz=pos_sz, cur_px=cur_px, fee=close_fee, pnl=curr_pos["upl"],
+            remark=f"持仓超 {TIME_STOP_HOURS:g} 小时无突破，主动平仓释放配比",
+        ))
         if notify_trade_close:
             notify_trade_close(inst=name, pnl=float(curr_pos.get("upl", 0.0) or 0.0), stage="时间止损平仓", exit_px=cur_px)
         if pos_key in trackers: del trackers[pos_key]
@@ -2129,25 +2113,15 @@ def manage_position_tp_and_trailing(f, curr_pos, trackers, timestamp_full, execu
             if not closed:
                 executed_actions.append(f"[{name}] 锁利平多失败，仓位仍保留: {close_detail}")
                 return False, "平仓失败"
-            close_fee = (pos_sz * ct_val * cur_px) * TAKER_FEE_RATE
+            close_fee = _close_fee(pos_sz, ct_val, cur_px, TAKER_FEE_RATE)
             pnl_val = curr_pos["upl"]
             executed_actions.append(f"[{name}] 🛡️ 触发阶梯动态锁利平仓 (净盈亏: {pnl_val:+.2f}U)")
-            record_trade({
-                "is_trade": True,
-                "time": timestamp_full,
-                "inst": name,
-                "name": name,
-                "action": "平仓",
-                "action_type": "阶梯锁利",
-                "direction": "平多",
-                "side": "多单阶梯锁利平仓",
-                "size": pos_sz,
-                "sz": pos_sz,
-                "price": cur_px,
-                "fee": close_fee,
-                "pnl": pnl_val,
-                "remark": f"最高 {t['highWaterMark']} 触发阶梯利润锁定线 {dynamic_floor_sl}"
-            })
+            record_trade(_close_trade_payload(
+                is_long=is_long, timestamp_full=timestamp_full, name=name,
+                action_type="阶梯锁利", side_suffix="阶梯锁利平仓",
+                pos_sz=pos_sz, cur_px=cur_px, fee=close_fee, pnl=pnl_val,
+                remark=f"最高 {t['highWaterMark']} 触发阶梯利润锁定线 {dynamic_floor_sl}",
+            ))
             if notify_trade_close:
                 notify_trade_close(inst=name, pnl=pnl_val, stage="阶梯锁利平仓", exit_px=cur_px)
             if pos_key in trackers: del trackers[pos_key]
@@ -2159,25 +2133,15 @@ def manage_position_tp_and_trailing(f, curr_pos, trackers, timestamp_full, execu
             if not closed:
                 executed_actions.append(f"[{name}] 动能见顶移动止盈失败，仓位仍保留: {close_detail}")
                 return False, "平仓失败"
-            close_fee = (pos_sz * ct_val * cur_px) * TAKER_FEE_RATE
+            close_fee = _close_fee(pos_sz, ct_val, cur_px, TAKER_FEE_RATE)
             pnl_val = curr_pos["upl"]
             executed_actions.append(f"[{name}] 🎯 触发高点回撤动能止盈 (净盈亏: {pnl_val:+.2f}U)")
-            record_trade({
-                "is_trade": True,
-                "time": timestamp_full,
-                "inst": name,
-                "name": name,
-                "action": "平仓",
-                "action_type": "移动止盈",
-                "direction": "平多",
-                "side": "多单高点回撤止盈",
-                "size": pos_sz,
-                "sz": pos_sz,
-                "price": cur_px,
-                "fee": close_fee,
-                "pnl": pnl_val,
-                "remark": f"最高 {t['highWaterMark']} 动能回撤触及移动止盈线"
-            })
+            record_trade(_close_trade_payload(
+                is_long=is_long, timestamp_full=timestamp_full, name=name,
+                action_type="移动止盈", side_suffix="高点回撤止盈",
+                pos_sz=pos_sz, cur_px=cur_px, fee=close_fee, pnl=pnl_val,
+                remark=f"最高 {t['highWaterMark']} 动能回撤触及移动止盈线",
+            ))
             if notify_trade_close:
                 notify_trade_close(inst=name, pnl=pnl_val, stage="移动止盈", exit_px=cur_px)
             if pos_key in trackers: del trackers[pos_key]
@@ -2208,25 +2172,15 @@ def manage_position_tp_and_trailing(f, curr_pos, trackers, timestamp_full, execu
             if not closed:
                 executed_actions.append(f"[{name}] 锁利平空失败，仓位仍保留: {close_detail}")
                 return False, "平仓失败"
-            close_fee = (pos_sz * ct_val * cur_px) * TAKER_FEE_RATE
+            close_fee = _close_fee(pos_sz, ct_val, cur_px, TAKER_FEE_RATE)
             pnl_val = curr_pos["upl"]
             executed_actions.append(f"[{name}] 🛡️ 触发阶梯动态锁利平仓 (净盈亏: {pnl_val:+.2f}U)")
-            record_trade({
-                "is_trade": True,
-                "time": timestamp_full,
-                "inst": name,
-                "name": name,
-                "action": "平仓",
-                "action_type": "阶梯锁利",
-                "direction": "平空",
-                "side": "空单阶梯锁利平仓",
-                "size": pos_sz,
-                "sz": pos_sz,
-                "price": cur_px,
-                "fee": close_fee,
-                "pnl": pnl_val,
-                "remark": f"最低 {t['lowWaterMark']} 触发阶梯利润锁定线 {dynamic_floor_sl}"
-            })
+            record_trade(_close_trade_payload(
+                is_long=is_long, timestamp_full=timestamp_full, name=name,
+                action_type="阶梯锁利", side_suffix="阶梯锁利平仓",
+                pos_sz=pos_sz, cur_px=cur_px, fee=close_fee, pnl=pnl_val,
+                remark=f"最低 {t['lowWaterMark']} 触发阶梯利润锁定线 {dynamic_floor_sl}",
+            ))
             if notify_trade_close:
                 notify_trade_close(inst=name, pnl=pnl_val, stage="阶梯锁利平仓", exit_px=cur_px)
             if pos_key in trackers: del trackers[pos_key]
@@ -2238,25 +2192,15 @@ def manage_position_tp_and_trailing(f, curr_pos, trackers, timestamp_full, execu
             if not closed:
                 executed_actions.append(f"[{name}] 动能见底移动止盈失败，仓位仍保留: {close_detail}")
                 return False, "平仓失败"
-            close_fee = (pos_sz * ct_val * cur_px) * TAKER_FEE_RATE
+            close_fee = _close_fee(pos_sz, ct_val, cur_px, TAKER_FEE_RATE)
             pnl_val = curr_pos["upl"]
             executed_actions.append(f"[{name}] 🎯 触发低点反弹动能止盈 (净盈亏: {pnl_val:+.2f}U)")
-            record_trade({
-                "is_trade": True,
-                "time": timestamp_full,
-                "inst": name,
-                "name": name,
-                "action": "平仓",
-                "action_type": "移动止盈",
-                "direction": "平空",
-                "side": "空单低点反弹止盈",
-                "size": pos_sz,
-                "sz": pos_sz,
-                "price": cur_px,
-                "fee": close_fee,
-                "pnl": pnl_val,
-                "remark": f"最低 {t['lowWaterMark']} 动能反弹触及移动止盈线"
-            })
+            record_trade(_close_trade_payload(
+                is_long=is_long, timestamp_full=timestamp_full, name=name,
+                action_type="移动止盈", side_suffix="低点反弹止盈",
+                pos_sz=pos_sz, cur_px=cur_px, fee=close_fee, pnl=pnl_val,
+                remark=f"最低 {t['lowWaterMark']} 动能反弹触及移动止盈线",
+            ))
             if notify_trade_close:
                 notify_trade_close(inst=name, pnl=pnl_val, stage="移动止盈", exit_px=cur_px)
             if pos_key in trackers: del trackers[pos_key]

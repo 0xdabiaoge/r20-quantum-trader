@@ -33,7 +33,12 @@ scripts_dir = str(Path(__file__).resolve().parent.parent / "scripts")
 if scripts_dir not in sys.path:
     sys.path.insert(0, scripts_dir)
 
-from scripts.trader.protection import protection_signals, ratcheted_trailing_stop
+from scripts.trader.protection import (
+    close_fee,
+    close_trade_payload,
+    protection_signals,
+    ratcheted_trailing_stop,
+)
 
 
 # --------------------------------------------------------------------------
@@ -192,18 +197,123 @@ class RatchetedTrailingStopParityTest(unittest.TestCase):
         self.assertEqual(floor_short, 0.0)
 
 
+class CloseFeeParityTest(unittest.TestCase):
+    """`close_fee` 与旧内联 `(pos_sz * ct_val * cur_px) * TAKER_FEE_RATE` 逐值对拍。"""
+
+    def test_random_parity(self):
+        rng = random.Random(20260917)
+        for _ in range(10000):
+            pos_sz = float(rng.uniform(0.001, 5000.0))
+            ct_val = rng.choice([1.0, 0.01, 0.0001, 0.5])
+            cur_px = rng.uniform(0.0001, 120000.0)
+            rate = rng.choice([0.0005, 0.0004, 0.0])
+            got = close_fee(pos_sz, ct_val, cur_px, rate)
+            expected = (pos_sz * ct_val * cur_px) * rate
+            self.assertEqual(got, expected,
+                             f"手续费分叉: {pos_sz} {ct_val} {cur_px} {rate}")
+
+
+class CloseTradePayloadParityTest(unittest.TestCase):
+    """7 处 `record_trade({...})` 的字段与逐字节顺序必须与旧载荷完全一致。"""
+
+    # 旧门面 7 处的 action_type / side 后缀 / remark 生成器（长空镜像）。
+    CASES = (
+        ("硬止损", "硬止损", lambda side, c: f"价格 {c['cur_px']} 触及保护止损 {c['level']}，交易所确认平仓"),
+        ("保护失效退出", "保护失效退出", lambda side, c: f"云端 OCO 无法达到全仓覆盖，交易所确认安全平仓：{c['detail']}"),
+        ("时间止损", "无波动出场", lambda side, c: f"持仓超 {c['hours']:g} 小时无突破，主动平仓释放配比"),
+        ("阶梯锁利", "阶梯锁利平仓", lambda side, c: f"{'最高' if side == '多' else '最低'} {c['watermark']} 触发阶梯利润锁定线 {c['level']}"),
+        ("移动止盈", "高点回撤止盈", lambda side, c: f"{'最高' if side == '多' else '最低'} {c['watermark']} 动能{'回撤' if side == '多' else '反弹'}触及移动止盈线"),
+    )
+
+    def _legacy_payload(self, *, is_long, timestamp_full, name, action_type, side_suffix,
+                        pos_sz, cur_px, fee, pnl, remark):
+        """搬走前门面里 7 处逐字相同的字段表。"""
+        return {
+            "is_trade": True,
+            "time": timestamp_full,
+            "inst": name,
+            "name": name,
+            "action": "平仓",
+            "action_type": action_type,
+            "direction": f"平{'多' if is_long else '空'}",
+            "side": f"{'多' if is_long else '空'}单{side_suffix}",
+            "size": pos_sz,
+            "sz": pos_sz,
+            "price": cur_px,
+            "fee": fee,
+            "pnl": pnl,
+            "remark": remark,
+        }
+
+    def test_all_seven_cases_byte_identical(self):
+        for is_long in (True, False):
+            side = "多" if is_long else "空"
+            for action_type, suffix, make_remark in self.CASES:
+                ctx = {
+                    "cur_px": 12345.678, "level": 11000.25, "detail": "覆盖 60%",
+                    "hours": 24.0, "watermark": 13000.5,
+                }
+                remark = make_remark(side, ctx)
+                kwargs = dict(
+                    is_long=is_long, timestamp_full="2026-09-14 08:15:00", name="BTC",
+                    action_type=action_type, side_suffix=suffix, pos_sz=0.5,
+                    cur_px=ctx["cur_px"], fee=0.3, pnl=12.5, remark=remark)
+                got = close_trade_payload(**kwargs)
+                expected = self._legacy_payload(**kwargs)
+                self.assertEqual(got, expected, f"载荷分叉: is_long={is_long} {action_type}")
+                # dict 顺序也必须是同一套（旧载荷是字面量，顺序固定）
+                self.assertEqual(list(got.keys()), list(expected.keys()),
+                                 f"字段顺序变了: is_long={is_long} {action_type}")
+
+    def test_direction_and_side_mirrors(self):
+        """长空镜像必须完全对称 —— 抄错一个方向字就是台账错误。"""
+        long_p = close_trade_payload(
+            is_long=True, timestamp_full="t", name="ETH", action_type="阶梯锁利",
+            side_suffix="阶梯锁利平仓", pos_sz=1.0, cur_px=2.0, fee=0.0, pnl=0.0, remark="r")
+        short_p = close_trade_payload(
+            is_long=False, timestamp_full="t", name="ETH", action_type="阶梯锁利",
+            side_suffix="阶梯锁利平仓", pos_sz=1.0, cur_px=2.0, fee=0.0, pnl=0.0, remark="r")
+        self.assertEqual(long_p["direction"], "平多")
+        self.assertEqual(short_p["direction"], "平空")
+        self.assertEqual(long_p["side"], "多单阶梯锁利平仓")
+        self.assertEqual(short_p["side"], "空单阶梯锁利平仓")
+
+    def test_no_venue_key_added_by_assembler(self):
+        """`venue` 必须仍由 `record_trade()` 的 setdefault 补 —— 在此写死会改变载荷键集。"""
+        payload = close_trade_payload(
+            is_long=True, timestamp_full="t", name="BTC", action_type="硬止损",
+            side_suffix="硬止损", pos_sz=1.0, cur_px=2.0, fee=0.0, pnl=0.0, remark="r")
+        self.assertNotIn("venue", payload)
+        self.assertEqual(len(payload), 14)
+
+
 class TraderFacadeWiringTest(unittest.TestCase):
     """门面必须真的用上新模块，而不是把旧内联代码悄悄留在原地。"""
 
-    def test_facade_imports_and_calls_protection_module(self):
-        facade = Path(__file__).resolve().parent.parent / "scripts" / "ai_factor_trader.py"
-        src = facade.read_text(encoding="utf-8")
-        self.assertIn("from scripts.trader.protection import protection_signals, ratcheted_trailing_stop", src)
-        self.assertIn("hard_stop_hit = protection_signals(", src)
-        self.assertEqual(src.count("ratcheted_trailing_stop("), 2,
+    def setUp(self):
+        self.facade = Path(__file__).resolve().parent.parent / "scripts" / "ai_factor_trader.py"
+        self.src = self.facade.read_text(encoding="utf-8")
+
+    def test_facade_imports_protection_module(self):
+        self.assertIn("from scripts.trader.protection import (", self.src)
+        for name in ("protection_signals", "ratcheted_trailing_stop",
+                     "close_fee as _close_fee", "close_trade_payload as _close_trade_payload"):
+            self.assertIn(name, self.src, f"门面未导入 {name}")
+
+    def test_facade_calls_new_helpers(self):
+        self.assertIn("hard_stop_hit = protection_signals(", self.src)
+        self.assertEqual(self.src.count("ratcheted_trailing_stop("), 2,
                          "长/空两个分支都必须走新模块")
-        # 反向哨：旧内联写法不得复活
-        self.assertNotIn("peak_profit_px >= tier2_lock_trigger:\n            dynamic_floor_sl", src)
+        # 7 处平仓台账（硬止损1 + 保护失效1 + 时间止损1 + 阶梯锁利2 + 移动止盈2）
+        self.assertEqual(self.src.count("_close_trade_payload("), 7,
+                         "7 处平仓台账都必须走公共装配器")
+        self.assertEqual(self.src.count("fee=_close_fee(") + self.src.count("close_fee = _close_fee("), 7,
+                         "7 处手续费计算都必须走 close_fee（6 处赋值 + 1 处直接传参）")
+
+    def test_no_inline_record_trade_dict_left(self):
+        """反向哨：内联 `record_trade({` 字面量载荷不得复活。"""
+        self.assertNotIn("record_trade({", self.src)
+        self.assertNotIn("peak_profit_px >= tier2_lock_trigger:\n            dynamic_floor_sl", self.src)
 
 
 if __name__ == "__main__":
