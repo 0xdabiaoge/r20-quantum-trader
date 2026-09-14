@@ -5,6 +5,13 @@ import os
 import tempfile
 from pathlib import Path
 from typing import Any, Dict
+# 结构优化阶段 4·B3 第四十八刀：本地锁兜底外提到 `scripts/local_lock.py`。
+# ⚠️ 双模导入：本模块既可能以裸名导入（`scripts/` 在 sys.path），
+# 也可能以 `scripts.instrument_pool` 导入（repo 根在 sys.path）。
+try:  # repo 根在 sys.path
+    from scripts.local_lock import local_file_lock  # noqa: E402
+except ImportError:  # scripts/ 在 sys.path
+    from local_lock import local_file_lock  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 POOL_FILE = ROOT / "data" / "instrument_pool.json"
@@ -199,28 +206,17 @@ def load_instruments() -> list[dict[str, Any]]:
 def _pool_lock():
     """跨进程互斥（审计 P2-6）：池文件是多进程 RMW 目标（后台路由写、采集脚本写）。
     优先用 r20_backend.file_locks（可重入、锁文件同目录），后端不在路径时退化为
-    本地 flock —— 绝不在"锁不可用"时静默放行。"""
+    本地 flock —— 绝不在"锁不可用"时静默放行。
+
+    兜底实现已移到 `scripts/local_lock.py`（结构优化阶段 4·B3 第四十八刀）——
+    原手写兜底**不可重入**，而 `mutate_instruments` 会在锁内调
+    `save_instruments`（嵌套取锁），走兜底分支会同线程自锁挂死。
+    """
     try:
         from r20_backend.file_locks import file_lock
         return file_lock(POOL_FILE)
     except Exception:
-        import fcntl
-        from contextlib import contextmanager
-
-        @contextmanager
-        def _local_lock():
-            lock_path = POOL_FILE.with_name("." + POOL_FILE.name + ".lock")
-            lock_path.parent.mkdir(parents=True, exist_ok=True)
-            fd = os.open(str(lock_path), os.O_RDWR | os.O_CREAT, 0o600)
-            try:
-                fcntl.flock(fd, fcntl.LOCK_EX)
-                yield
-            finally:
-                try:
-                    fcntl.flock(fd, fcntl.LOCK_UN)
-                finally:
-                    os.close(fd)
-        return _local_lock()
+        return local_file_lock(POOL_FILE)
 
 
 def mutate_instruments(mutator):

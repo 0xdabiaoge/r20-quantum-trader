@@ -13,6 +13,15 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
+# 结构优化阶段 4·B3 第四十八刀：本地锁兜底外提到 `scripts/local_lock.py`。
+# ⚠️ 双模导入：本模块既可能以裸名 `prompt_library` 导入（`scripts/` 在 sys.path），
+# 也可能以 `scripts.prompt_library` 导入（repo 根在 sys.path）——
+# 后一种情况下裸名 `local_lock` **不在** sys.path，直接 import 会
+# `ModuleNotFoundError`（实测被 tests/test_dashboard_bills_extraction 抓到）。
+try:  # repo 根在 sys.path
+    from scripts.local_lock import local_file_lock  # noqa: E402
+except ImportError:  # scripts/ 在 sys.path
+    from local_lock import local_file_lock  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 LIBRARY_FILE = ROOT / "data" / "prompt_library.json"
@@ -527,28 +536,17 @@ def load_library() -> dict[str, Any]:
 
 def _library_lock():
     """跨进程互斥（审计 P2-6）：提示词方案库是 RMW 目标（管理页多次点击 / 导入 / 回滚 /
-    采集脚本都会 load→改→save）。优先用可重入的后端锁，退化为本地 flock。"""
+    采集脚本都会 load→改→save）。优先用可重入的后端锁，退化为本地 flock。
+
+    兜底实现已移到 `scripts/local_lock.py`（结构优化阶段 4·B3 第四十八刀）——
+    原先两处脚本各手写一份**不可重入**的裸 flock，而调用方存在嵌套
+    （`mutate_instruments` → `save_instruments`），一旦走兜底分支会同线程自锁挂死。
+    """
     try:
         from r20_backend.file_locks import file_lock
         return file_lock(LIBRARY_FILE)
     except Exception:
-        import fcntl
-        from contextlib import contextmanager
-
-        @contextmanager
-        def _local_lock():
-            lock_path = LIBRARY_FILE.with_name("." + LIBRARY_FILE.name + ".lock")
-            lock_path.parent.mkdir(parents=True, exist_ok=True)
-            fd = os.open(str(lock_path), os.O_RDWR | os.O_CREAT, 0o600)
-            try:
-                fcntl.flock(fd, fcntl.LOCK_EX)
-                yield
-            finally:
-                try:
-                    fcntl.flock(fd, fcntl.LOCK_UN)
-                finally:
-                    os.close(fd)
-        return _local_lock()
+        return local_file_lock(LIBRARY_FILE)
 
 
 def _locked_library(fn):
