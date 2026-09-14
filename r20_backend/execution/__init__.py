@@ -8,6 +8,15 @@
 | `sizing.py` | 按 AI 决策与账户实况推导下单张数并套四道钳制 | 由调用方传入上限常量 |
 | `circuit_breaker.py` | 黑天鹅哨兵、熔断态、止损冷却期读写 | 无（读自身状态文件） |
 | `risk_gates.py` | **发送前三道风控闸门**：杠杆区间夹取 / 单笔保证金夹取 / 跨所同向敞口拒开 | 无（纯计算；常量与 `_fail` 由调用方注入） |
+| `cooldowns.py` | **止损冷却单一事实源**：读冷却状态（损坏≠缺失）/ 是否仍在冷却 / 只读展示面 | 无（路径与时长由调用方传入） |
+
+> `cooldowns.py`（结构优化阶段 4·B3 第五十刀）原为
+> `scripts/ai_factor_trader.py` 与 `r20_backend/execution/circuit_breaker.py`
+> **各自内联**的同一套止损冷却读写（`is_in_stop_cooldown` 逐字节相同、
+> `_read_stop_cooldowns_state` / `load_stop_cooldowns` 等价）。
+> 冷却判定直接决定「硬止损后能否立即同向重进」，两份拷贝漂移会造成
+> 交易侧与风控面判断不一致。**冷却文件路径与冷却时长一律由调用方在调用时传入**
+> （两侧的 `STOP_COOLDOWN_FILE` 都可被测试 patch；`aft` 用 str、`cb` 用 Path）。
 
 > `risk_gates.py`（结构优化阶段 4·B3 第三十八刀）原为
 > `r20_backend/execution_router.py::open_protected_position` 的 L108–173，
@@ -51,6 +60,13 @@ from .risk_gates import (
     clamp_margin,
     check_total_exposure,
 )
+# 结构优化阶段 4·B3 第五十刀：止损冷却的**单一事实源**。
+# `circuit_breaker` 与 `scripts/ai_factor_trader` 的同名函数现在都是转调这里的薄壳。
+from .cooldowns import (
+    read_stop_cooldowns_state,
+    is_in_stop_cooldown as is_in_stop_cooldown_impl,
+    load_stop_cooldowns as load_stop_cooldowns_impl,
+)
 # 审计④#7(2026-09-13)：删除 execution/reservation.py 幻影孪生——它按不存在的 API 写
 # （mgr.reserve(venue=…, ttl_seconds=…) / res.ok / DEFAULT_RESERVATION_TTL_SECONDS /
 # list_active 均不存在），任何调用即 TypeError，却挂在包导出面上「谁接谁炸」。
@@ -72,6 +88,9 @@ __all__ = [
     "check_black_swan_sentinel",
     "is_circuit_breaker_active",
     "is_in_stop_cooldown",
+    "read_stop_cooldowns_state",
+    "is_in_stop_cooldown_impl",
+    "load_stop_cooldowns_impl",
     "add_stop_cooldown",
     "load_stop_cooldowns",
     "clamp_leverage",

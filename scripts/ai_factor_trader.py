@@ -215,6 +215,11 @@ from r20_backend.execution import (
     max_size_within_margin,
     quantize_size,
 )
+from r20_backend.execution.cooldowns import (
+    is_in_stop_cooldown as _cooldowns_is_in,
+    load_stop_cooldowns as _cooldowns_load,
+    read_stop_cooldowns_state as _cooldowns_read_state,
+)
 
 def order_margin_gate(planned_margin: float, *, size: float, price: float, ct_val: float,
                       leverage: float, usdt_available: float) -> float:
@@ -291,24 +296,27 @@ def _atomic_write_json(path, payload):
 
 
 def _read_stop_cooldowns_state():
-    """审计③(2026-09-13)：返回 (data, corrupt)。损坏与缺失从此不同权——
+    """薄壳：转调单一事实源，并在**调用时**解析本模块的 `STOP_COOLDOWN_FILE`。
+
+    结构优化阶段 4·B3 第五十刀：本函数与
+    `r20_backend/execution/circuit_breaker.py` 的同名函数原为等价重复
+    （差在 `os.path.exists` vs `Path.exists`）。已收敛到
+    `r20_backend.execution.cooldowns.read_stop_cooldowns_state`。
+
+    ⚠️ 文件路径**必须**在调用时从本模块全局解析：测试会
+    `patch.object(aft, "STOP_COOLDOWN_FILE", f)`（见
+    `tests/test_audit_batch3_persistence_atomic.py`），import 期烘焙会让补丁静默失效。
+
+    审计③(2026-09-13)：返回 (data, corrupt)。损坏与缺失从此不同权——
     corrupt=True 时 is_in_stop_cooldown 按「在冷却」fail-closed（旧实现损坏→{}
-    等价于「无冷却」，硬止损后可立即同向重进）；add 拒做 RMW 防覆盖现场。"""
-    if not os.path.exists(STOP_COOLDOWN_FILE):
-        return {}, False
-    try:
-        with open(STOP_COOLDOWN_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        if not isinstance(data, dict):
-            return {}, True
-        return data, False
-    except Exception:
-        return {}, True
+    等价于「无冷却」，硬止损后可立即同向重进）；add 拒做 RMW 防覆盖现场。
+    """
+    return _cooldowns_read_state(STOP_COOLDOWN_FILE)
 
 
 def load_stop_cooldowns():
     # 兼容旧契约（只读展示面）；风控判断路径一律走 _read_stop_cooldowns_state
-    return _read_stop_cooldowns_state()[0]
+    return _cooldowns_load(STOP_COOLDOWN_FILE)
 
 def add_stop_cooldown(inst_id: str, side: str, reason: str = "止损冷却"):
     cooldowns, corrupt = _read_stop_cooldowns_state()
@@ -329,15 +337,14 @@ def add_stop_cooldown(inst_id: str, side: str, reason: str = "止损冷却"):
         print(f"[止损冷却] warn 落盘失败（本笔冷却丢失，依赖云端SL兜底）: {e}")
 
 def is_in_stop_cooldown(inst_id: str, side: str) -> bool:
-    cooldowns, corrupt = _read_stop_cooldowns_state()
-    if corrupt:
-        return True  # 不可判定=不放松：损坏按仍在冷却处理
-    key = f"{inst_id}_{side}"
-    if key in cooldowns:
-        rem_sec = STOP_COOLDOWN_MINUTES * 60 - (int(time.time()) - cooldowns[key].get("ts", 0))
-        if rem_sec > 0:
-            return True
-    return False
+    """薄壳：转调单一事实源（结构优化阶段 4·B3 第五十刀）。
+
+    ⚠️ 冷却文件与冷却时长都在**调用时**从本模块全局解析 ——
+    测试会 patch `STOP_COOLDOWN_FILE`，且 `risk_test_env.pin_baseline_risk_env()`
+    会重载本模块（它在重载名单里），故按全局名查找是必须的。
+    """
+    return _cooldowns_is_in(inst_id, side, STOP_COOLDOWN_FILE,
+                            STOP_COOLDOWN_MINUTES * 60)
 
 
 

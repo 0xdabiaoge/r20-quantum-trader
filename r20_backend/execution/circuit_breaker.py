@@ -10,6 +10,11 @@ from typing import Dict, Any, Tuple, Optional
 from scripts.risk_constants import STOP_COOLDOWN_MINUTES
 from r20_backend.time_utils import beijing_day
 from r20_backend.execution.sizing import effective_daily_loss_limit
+from r20_backend.execution.cooldowns import (
+    is_in_stop_cooldown as _cooldowns_is_in,
+    load_stop_cooldowns as _cooldowns_load,
+    read_stop_cooldowns_state as _cooldowns_read_state,
+)
 
 ROOT = Path(__file__).resolve().parents[2]
 DATA_DIR = ROOT / "data"
@@ -120,21 +125,18 @@ def ledger_today_stats(ledger, environment_mode: str, today_str: str) -> Dict[st
 
 
 def _read_stop_cooldowns_state() -> Tuple[Dict[str, Any], bool]:
-    """(data, corrupt)。损坏≠缺失：corrupt 时 is_in_stop_cooldown fail-closed。"""
-    if not STOP_COOLDOWN_FILE.exists():
-        return {}, False
-    try:
-        with open(STOP_COOLDOWN_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        if not isinstance(data, dict):
-            return {}, True
-        return data, False
-    except Exception:
-        return {}, True
+    """薄壳：转调单一事实源，并在调用时解析本模块的 `STOP_COOLDOWN_FILE`。
+
+    结构优化阶段 4·B3 第五十刀：与 `scripts/ai_factor_trader.py` 的同名函数
+    原为等价重复，已收敛到 `r20_backend.execution.cooldowns`。
+
+    (data, corrupt)。损坏≠缺失：corrupt 时 is_in_stop_cooldown fail-closed。
+    """
+    return _cooldowns_read_state(STOP_COOLDOWN_FILE)
 
 
 def load_stop_cooldowns() -> Dict[str, Any]:
-    return _read_stop_cooldowns_state()[0]
+    return _cooldowns_load(STOP_COOLDOWN_FILE)
 
 
 def _atomic_write_json(path, payload) -> None:
@@ -176,15 +178,14 @@ def add_stop_cooldown(inst_id: str, side: str, reason: str = "止损冷却") -> 
 
 
 def is_in_stop_cooldown(inst_id: str, side: str) -> bool:
-    cooldowns, corrupt = _read_stop_cooldowns_state()
-    if corrupt:
-        return True  # 不可判定=不放松：损坏按仍在冷却处理
-    key = f"{inst_id}_{side}"
-    if key in cooldowns:
-        rem_sec = STOP_COOLDOWN_MINUTES * 60 - (int(time.time()) - cooldowns[key].get("ts", 0))
-        if rem_sec > 0:
-            return True
-    return False
+    """薄壳：转调单一事实源（结构优化阶段 4·B3 第五十刀）。
+
+    ⚠️ 冷却时长按全局名在调用时读取（本模块**不在**
+    `pin_baseline_risk_env()` 的重载名单里，故与改动前读 `STOP_COOLDOWN_MINUTES`
+    静态导入名的行为**完全等价**）。
+    """
+    return _cooldowns_is_in(inst_id, side, STOP_COOLDOWN_FILE,
+                            STOP_COOLDOWN_MINUTES * 60)
 
 
 def check_black_swan_sentinel(fetch_candles_fn=None) -> Tuple[bool, str]:
