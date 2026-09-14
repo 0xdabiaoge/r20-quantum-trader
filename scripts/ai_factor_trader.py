@@ -43,6 +43,7 @@ from scripts.trader.position_mgmt import (
     execute_ai_position_management as _execute_ai_position_management_impl,
 )
 from scripts.trader.leverage import clamp_ai_leverage
+from scripts.trader.sizing import size_for_decision
 from scripts.trader.cycle_snapshot import (
     build_state_payload,
     collect_pending_inst_ids,
@@ -2617,19 +2618,13 @@ def execute_portfolio():
             step_sz = float(f.get("minSz", 1) or 1)
 
             # If AI planned margin & leverage, calculate custom contract size
-            if ai_margin > 0 and ai_lever >= 1.0 and f["price"] > 0 and ct_val > 0:
-                planned_notional = ai_margin * ai_lever
-                calculated_sz = quantize_size(planned_notional / (f["price"] * ct_val), step_sz)
-                if calculated_sz > 0:
-                    # 风险钳制：围绕自适应基准仓位的 0.5x~2.0x（按交易所最小步长量化，不再强制整数）
-                    min_allowed_sz = max(step_sz, quantize_size(f["sz"] * 0.5, step_sz))
-                    max_allowed_sz = max(min_allowed_sz, quantize_size(f["sz"] * 2.0, step_sz))
-                    actual_sz = max(min_allowed_sz, min(max_allowed_sz, calculated_sz))
-                    # 可用余额硬顶：单笔保证金不得超过风控页配置的余额占比，付不起则直接归零跳过而非放大
-                    afford_sz = max_size_within_margin(usdt_available, ai_lever, f["price"], ct_val, step_sz)
-                    if afford_sz is not None and afford_sz < float("inf"):
-                        actual_sz = min(actual_sz, afford_sz)
-                    actual_sz = quantize_size(actual_sz, step_sz)
+            # （四道钳制的顺序见 scripts/trader/sizing.py —— 顺序换了会放大仓位）
+            actual_sz = size_for_decision(
+                ai_margin=ai_margin, ai_lever=ai_lever, price=f["price"],
+                ct_val=ct_val, step_sz=step_sz, base_sz=f["sz"],
+                usdt_available=usdt_available, actual_sz=actual_sz,
+                quantize_size=quantize_size,
+                max_size_within_margin=max_size_within_margin)
 
             if actual_sz <= 0:
                 if f.get("size_below_exchange_min") or ai_margin > 0:

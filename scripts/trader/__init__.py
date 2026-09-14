@@ -19,6 +19,7 @@
 | `notifications.py` | `entry_action_message` / `entry_failure_message` / `trade_open_kwargs` 方向文案与通知参数（12 个方向常量收成单一来源） | 全部入参；`leverage` 与全部状态变更刻意留在门面 |
 | `cycle_snapshot.py` | `collect_pending_inst_ids` 外所挂单枚举与去重计数 + `build_state_payload` 面板状态快照 | venue_registry/load_instruments/信号求值函数，均调用期 |
 | `leverage.py` | `clamp_ai_leverage` AI 杠杆夹取（配置区间 → 池内单标的上限，顺序是关键） | MIN/MAX_LEVERAGE + 池值，均调用期 |
+| `sizing.py` | `size_for_decision` 按 AI 决策推导下单张数（四道钳制：0.5x 下限 / 2.0x 上限 / 余额硬顶只砍不放 / 步长量化） | quantize_size + max_size_within_margin 由门面注入 |
 
 ## 两条铁律
 
