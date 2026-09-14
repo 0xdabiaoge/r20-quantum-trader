@@ -39,6 +39,10 @@ from r20_backend.time_utils import beijing_day
 
 # 结构优化阶段4·B3：纯信号逻辑已搬入 scripts/trader/signals.py，re-export 保持门面表面不变
 from scripts.trader.signals import clamp, evaluate_asset_signal as _evaluate_asset_signal  # noqa: F401
+from scripts.trader.reservation_reconcile import (
+    utc_age_seconds as _rr_utc_age_seconds,
+    reconcile_reservation_ledger as _rr_reconcile,
+)
 from scripts.trader.position_mgmt import (
     execute_ai_position_management as _execute_ai_position_management_impl,
 )
@@ -1394,16 +1398,12 @@ RESERVATION_RECONCILE_TTL_S = 7200.0
 
 
 def _utc_age_seconds(ts_str: str, now_utc: float) -> float:
-    """SQLite CURRENT_TIMESTAMP（UTC 'YYYY-MM-DD HH:MM:SS'）→ 秒龄。
+    """薄壳：转调 `scripts/trader/reservation_reconcile.py`（第五十八刀）。
 
-    不可解析 = -inf（保守：年龄未知按「没到对账窗口」处理，**永不释放**；
-    返回 +inf 会把脏时间戳当成超旧而错杀活占用——方向绝不能反）。
+    ⚠️ 依赖一律调用期注入（本模块会被 `pin_baseline_risk_env()` 原地 reload，
+    而重载名单**不含子模块**，import 期绑定会读到旧值）。
     """
-    try:
-        dt = datetime.datetime.strptime(str(ts_str).strip()[:19], "%Y-%m-%d %H:%M:%S")
-        return max(0.0, now_utc - dt.replace(tzinfo=datetime.timezone.utc).timestamp())
-    except (TypeError, ValueError):
-        return float("-inf")
+    return _rr_utc_age_seconds(ts_str, now_utc)
 
 
 def reconcile_reservation_ledger(real_pos_dict: Dict[str, Any],
@@ -1411,75 +1411,25 @@ def reconcile_reservation_ledger(real_pos_dict: Dict[str, Any],
                                  environment: str,
                                  ttl_s: float = None,
                                  venue_snapshot: Optional[Dict[str, list]] = None) -> int:
-    """周期级预留对账（US-010）：账实相符原则回笼陈旧占用。
+    """薄壳：转调 `scripts/trader/reservation_reconcile.py`（第五十八刀）。
 
-    背景：confirm 只翻状态、平仓/撤单/凭证代际轮换都无释放路径——预留台账
-    单向累积，面板「已预留」虚高；一旦启用组合预算封顶，陈旧 pending 会挤占
-    真实额度把合法开仓挡死。recovery() 的纪律是孤儿「标记不清算」，本函数
-    就是那个「对账确认后的显式释放」：
-
-    - 意图标的在当前真实持仓（同所同环境）或仍在挂 → **保留**（无论多旧）；
-    - 现货两清（无仓无挂）且 updated_at 超 TTL → release(state=closed) 回笼；
-    - 时间戳不可解析 / 环境不匹配 / account_key 异常 → 保守保留；
-    - 单条释放失败不影响其余（下周期重试，幂等 UNIQUE 键）。
-
-    返回释放条数。调用方必须传**本周期刚核验过的**持仓/挂单实况（fail-closed
-    路径不会到这里），杜绝拿陈旧视图误释放活仓预算。
+    ⚠️ **签名对外一字未变**（`tests/test_reservation_reconcile.py` 用位置参数调用）。
+    四个依赖全部在**调用时**注入 —— 尤其 `reservation_manager` 与
+    `fetch_other_venue_positions` 是本模块的模块级名字，测试用
+    `patch.object(trader, …)` 替换它们；若子模块 import 期绑一份，
+    那 9 条用例会当场翻红（且会真的出网）。
     """
-    ttl = RESERVATION_RECONCILE_TTL_S if ttl_s is None else float(ttl_s)
-    now_utc = time.time()
-    try:
-        mgr = reservation_manager()
-        rows = mgr.list_unreleased(environment)
-    except Exception as exc:
-        print(f"[预留对账] warn 台账不可读，本周期跳过（不强行释放）: {exc}")
-        return 0
-    # 同所同环境的真实持仓索引：venue → {base: posSide}（OKX 持仓字典是 instId→p）
-    live_by_venue: Dict[str, set] = {}
-    for inst_id, p in (real_pos_dict or {}).items():
-        v = "okx"  # 主循环持仓字典当前仅 OKX 直签链
-        base = str(inst_id).split("-")[0].upper()
-        side = str(p.get("posSide", "net")).lower()
-        live_by_venue.setdefault(v, set()).add(f"{base}:{side}")
-    # 跨所封顶快照（gate/binance）——有仓则对应意图必须保留（复用主循环已读结果，零重复出网）
-    if venue_snapshot is None:
-        try:
-            _xv_ok, venue_snapshot, _ = fetch_other_venue_positions(environment)
-            if not _xv_ok:
-                venue_snapshot = {}
-        except Exception:
-            venue_snapshot = {}
-    for v, _rows in (venue_snapshot or {}).items():
-        for _p in _rows:
-            base = str(_p.get("base") or str(_p.get("inst_id", "")).split("_")[0]).upper()
-            live_by_venue.setdefault(v, set()).add(f"{base}:{_p.get('side', 'net')}")
-    pending = {str(x) for x in (pending_inst_ids or set())}
-    released_n = 0
-    for row in rows:
-        try:
-            intent = str(row.get("intent_id") or "")
-            parts = intent.split(":")
-            inst_id = parts[0] if parts else ""
-            pos_side = ("long" if "LONG" in intent.upper()
-                        else "short" if "SHORT" in intent.upper() else "net")
-            base = inst_id.split("-")[0].upper()
-            venue = str(row.get("venue") or "").lower()
-            still_live = (f"{base}:{pos_side}" in live_by_venue.get(venue, set())
-                          or (venue == "okx" and inst_id in pending))
-            if still_live:
-                continue
-            if _utc_age_seconds(row.get("updated_at"), now_utc) < ttl:
-                continue  # 新周期意图（本周期刚预留/成交在途）：未到对账窗口
-            mgr.release(str(row.get("account_key") or ""), intent,
-                        state=risk_reservation.STATE_CLOSED)
-            released_n += 1
-            print(f"[预留对账] 释放 {intent}（{venue}/{environment} 无仓无挂 且 "
-                  f"age>={ttl:.0f}s，state=closed 回笼 {row.get('amount_usdt')}U）")
-        except Exception as exc:
-            print(f"[预留对账] warn 单条释放失败（下周期重试）{row.get('intent_id')}: {exc}")
-    if released_n:
-        print(f"[预留对账] 本周期回笼 {released_n} 笔陈旧占用")
-    return released_n
+    return _rr_reconcile(
+        real_pos_dict,
+        pending_inst_ids,
+        environment,
+        reservation_manager=reservation_manager,
+        fetch_other_venue_positions=fetch_other_venue_positions,
+        state_closed=risk_reservation.STATE_CLOSED,
+        default_ttl_s=RESERVATION_RECONCILE_TTL_S,
+        ttl_s=ttl_s,
+        venue_snapshot=venue_snapshot,
+    )
 
 
 def submit_protected_limit_order(inst_id: str, side: str, pos_side: str, size: float, price: float, tp_px: float, sl_px: float, venue_ctx: Optional[Dict[str, Any]] = None) -> Tuple[bool, str]:
