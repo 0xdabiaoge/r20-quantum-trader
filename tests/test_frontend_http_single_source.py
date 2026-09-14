@@ -48,6 +48,29 @@ import subprocess
 import sys
 import unittest
 from pathlib import Path
+import os
+
+
+def _guard_offline() -> None:
+    """离线套件下跳过（**必须在 spawn 之前调用**）。
+
+    ⚠️ 这是第六十一刀补的**回归修复**：`tests/offline_suite.py::main` 会装
+    audit hook 阻止一切未白名单的外部子进程，而 `node` / `vite` / `vue-tsc`
+    **都不在白名单**。§44.4 早已立此规矩并核实过
+    "离线套件里 `external child process: node` 计数 = 0"，
+    但第五十六～六十刀新增的 node 套件**漏了这道守卫**，使该计数重新变成 5。
+
+    判据是套件在装 hook **之前**显式设的 `OFFLINE_SUITE_RUNNING`，
+    所以这里一定来得及。**必须 `raise` 而不是 `case.skipTest(...)`**
+    —— 后者在 `setUpClass` 收到类时会 `TypeError`（§44.4 的教训）。
+
+    ⚠️ 守卫直接贴在 `subprocess.run(...)` **上一行**（而不是各 `test_` 方法里）：
+    这样模块级/`setUpClass` 里的 spawn 也覆盖得到，且加新用例时不会漏。
+    """
+    if os.environ.get("OFFLINE_SUITE_RUNNING"):
+        raise unittest.SkipTest(
+            "离线套件禁用外部子进程（node/vite/vue-tsc 不在白名单）—— 见 tests/offline_suite.py"
+        )
 
 ROOT = Path(__file__).resolve().parents[1]
 FRONTEND = ROOT / "frontend"
@@ -174,6 +197,7 @@ class FrontendGateTest(unittest.TestCase):
         exe = FRONTEND / "node_modules" / ".bin" / cmd[0]
         if not exe.exists():
             raise unittest.SkipTest(f"{exe} 不存在（前端依赖未安装）")
+        _guard_offline()
         return subprocess.run([str(exe), *cmd[1:]], cwd=str(FRONTEND),
                               capture_output=True, text=True, timeout=timeout)
 
@@ -221,6 +245,7 @@ class NodeBehaviourTest(unittest.TestCase):
         if not self.TEST.exists():
             self.fail(f"行为测试文件缺失: {self.TEST}")
         try:
+            _guard_offline()
             r = subprocess.run(
                 [node, "--experimental-strip-types", str(self.TEST)],
                 cwd=str(FRONTEND), capture_output=True, text=True, timeout=300)

@@ -458,6 +458,14 @@ def main():
 
     TZ = datetime.timezone(datetime.timedelta(hours=8))
 
+    # ⚠️ 第六十一刀修：账单日期必须取**执行时刻的北京日期**，不能写死。
+    #    聚合按"今天"过滤（用的是真实 `time.time()`），写死日期后一旦跨过
+    #    北京时间零点，三条账单就全部落到"昨天" → fees_paid 变 0.0 →
+    #    `test_bills_values_reach_the_payload` 在 00:00 之后**必然翻红**
+    #    （实测：2026-09-15 00:19 复现，`0.0 != -3.0`）。
+    #    这是**本仓既有的时间依赖缺陷**，与结构优化无关；本刀顺手修掉。
+    _TODAY = datetime.datetime.now(TZ).strftime("%Y-%m-%d")
+
     def ms(text):
         dt = datetime.datetime.strptime(text, "%Y-%m-%d %H:%M:%S").replace(tzinfo=TZ)
         return int(dt.timestamp() * 1000)
@@ -468,9 +476,9 @@ def main():
                     pnl=pnl, fee=fee, balChg=balChg, sz=sz)
 
     bills = [
-        bill("2026-09-14 12:00:00", "173", type_="8", balChg=-1.25, sz=3.0),
-        bill("2026-09-14 10:00:20", "5", pnl=50.0, fee=-2.0),
-        bill("2026-09-14 11:30:40", "6", pnl=-10.0, fee=-1.0),
+        bill(f"{_TODAY} 12:00:00", "173", type_="8", balChg=-1.25, sz=3.0),
+        bill(f"{_TODAY} 10:00:20", "5", pnl=50.0, fee=-2.0),
+        bill(f"{_TODAY} 11:30:40", "6", pnl=-10.0, fee=-1.0),
     ]
     bal = [{"details": [{"ccy": "USDT", "eq": "10000", "availBal": "9000",
                          "cashBal": "8000", "upl": "12.5"}]}]
