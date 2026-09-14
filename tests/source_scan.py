@@ -152,3 +152,52 @@ def find_function_node(module_file: str | Path, name: str, *, pkg_name: str | No
     # 门面壳 vs 子包实现：取实现体（源码更长者）
     node, path, _ = max(hits, key=lambda h: len(h[2]))
     return node, path
+
+
+def count_keyword_argument(module_file, function_name, keyword, *,
+                           value_must_contain=None, pkg_name=None):
+    """数 `function_name(...)` 调用里出现 `keyword=` 的次数（AST，不受换行影响）。
+
+    ## 为什么需要它
+
+    既有的门面锚点用 `facade.count('"max_margin_usdt": equity_margin_cap(usdt_available)')`
+    这类**整行字面量**做断言。它脆得离谱：抽取时我只是把该行拆成两行
+    （`max_margin_usdt=` 与 `equity_margin_cap(...)` 分行），计数就从 2 变 0 ——
+    **代码行为完全没变，断言却翻了红**。这类"排版一变就失灵"的锚点会逼着后人
+    别去格式化代码，与重构目标直接冲突。
+
+    改成 AST 计数后，换行、缩进、尾随注释都不影响；而"漏一条路径""多加一处"
+    仍然抓得住。`value_must_contain` 用来进一步钉住实参内容（例如必须是
+    `equity_margin_cap(usdt_available)` 这个调用，而不是别的值）。
+
+    返回该关键字在全部匹配调用中出现的次数。
+    """
+    import ast
+    from pathlib import Path
+
+    files = [Path(module_file)]
+    if pkg_name:
+        pkg_dir = Path(module_file).parent / pkg_name
+        if pkg_dir.is_dir():
+            files.extend(sorted(pkg_dir.rglob("*.py")))
+
+    hits = 0
+    for path in files:
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+        except SyntaxError:
+            continue
+        for node in ast.walk(tree):
+            if not (isinstance(node, ast.Call)
+                    and isinstance(node.func, ast.Name)
+                    and node.func.id == function_name):
+                continue
+            for kw in node.keywords:
+                if kw.arg != keyword:
+                    continue
+                if value_must_contain is not None:
+                    rendered = ast.unparse(kw.value)
+                    if value_must_contain not in rendered:
+                        continue
+                hits += 1
+    return hits

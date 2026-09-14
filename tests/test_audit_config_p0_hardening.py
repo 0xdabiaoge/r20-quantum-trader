@@ -207,15 +207,23 @@ class OrderMarginGateTests(_SandboxBase):
         注释与 docstring 里（它们解释的正是这条锚点本身）。文本数字会把
         "文档写得多细"变成测试条件，所以领域侧一律走 AST。
         """
-        from tests.source_scan import count_name_references
+        from tests.source_scan import count_name_references, count_keyword_argument
 
         facade = (ROOT / "scripts" / "ai_factor_trader.py").read_text(encoding="utf-8")
         self.assertEqual(facade.count("def order_margin_gate("), 1,
                          "门面必须恰有一处 def order_margin_gate（否则全局名解析不到）")
         self.assertEqual(facade.count("_order_margin = order_margin_gate("), 2,
                          "开多/开空必须各自在门面主执行路径上经过 order_margin_gate")
-        self.assertEqual(facade.count('"max_margin_usdt": equity_margin_cap(usdt_available)'), 2,
-                         "开多/开空必须各自携带权益顶")
+        # 权益顶：改走 AST 计数 —— 原来是整行字面量
+        # `'"max_margin_usdt": equity_margin_cap(usdt_available)'`，
+        # 抽取时只是把该行拆成两行，计数就从 2 变 0：**行为没变，排版一变就翻红**。
+        # 这类锚点与"允许格式化/抽公共代码"直接冲突，故换成不受换行影响的 AST 计数，
+        # 同时钉住实参内容必须是 equity_margin_cap(usdt_available)。
+        self.assertEqual(
+            count_keyword_argument("scripts/ai_factor_trader.py", "build_order_intent",
+                                   "max_margin_usdt",
+                                   value_must_contain="equity_margin_cap(usdt_available)"),
+            2, "开多/开空必须各自携带权益顶（AST 计数，不受换行影响）")
 
         counts = count_name_references("scripts/ai_factor_trader.py", "order_margin_gate",
                                        pkg_name="trader")

@@ -192,6 +192,23 @@ class ImplementationMovedTest(unittest.TestCase):
                             out.add(nm.id)
             elif isinstance(stmt, ast.For) and isinstance(stmt.target, ast.Name):
                 out.add(stmt.target.id)
+            elif isinstance(stmt, (ast.Try, ast.With)):
+                # try 体 / with 体里的赋值也算 —— 例如
+                # `try: _inst_lever_cap = ... except ...: _inst_lever_cap = 0.0`
+                # 若只处理 Assign/For，就会把它误报成"未定义"。
+                for sub in list(getattr(stmt, "body", [])) + \
+                           list(getattr(stmt, "handlers", [])) + \
+                           list(getattr(stmt, "finalbody", [])) + \
+                           list(getattr(stmt, "orelse", [])):
+                    if isinstance(sub, ast.Assign):
+                        for t in sub.targets:
+                            for nm in ast.walk(t):
+                                if isinstance(nm, ast.Name):
+                                    out.add(nm.id)
+                    elif isinstance(sub, ast.ExceptHandler) and sub.name:
+                        out.add(sub.name)
+            elif isinstance(stmt, ast.ExceptHandler) and stmt.name:
+                out.add(stmt.name)
             return out
 
         def defines_before(call):

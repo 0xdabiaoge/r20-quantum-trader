@@ -15,6 +15,7 @@
 | `position_mgmt.py` | `execute_ai_position_management` 主脑持仓指令执行器（95 行） | 文件路径 / `ai_tightens_stop` / `close_position_confirmed` / `okx_rest` / 多所三项，全部调用期 |
 | `brackets.py` | `normalize_bracket_prices` 限价单三价顺序钳制（长/空各一份内联合并为一处） | 无（纯函数，数值全部入参） |
 | `pyramiding.py` | `pyramiding_gate` 顺势浮盈加仓五条门禁（长/空各一份内联合并为一处） | 4 个风控常量 + 全部中间量，均调用期 |
+| `order_intent.py` | `resolve_entry_prices` 三价定价 + `build_order_intent` 下单载荷装配（长/空各一份内联合并为一处） | 全部入参；保证金闸门/权益顶刻意留在门面（计数锚点载体） |
 
 ## 两条铁律
 
