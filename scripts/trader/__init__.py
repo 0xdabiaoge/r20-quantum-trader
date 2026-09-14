@@ -22,6 +22,35 @@
 | `sizing.py` | `size_for_decision` 按 AI 决策推导下单张数（四道钳制：0.5x 下限 / 2.0x 上限 / 余额硬顶只砍不放 / 步长量化） | quantize_size + max_size_within_margin 由门面注入 |
 | `position_universe.py` | `collect_okx_position_payloads` 从因子快照摘出 OKX 在仓并补追踪器字段 + `merge_cross_venue_positions` 汇入三所持仓（合成 id `VENUE:inst`） | 无（纯装配；不取数 —— 必须吃**已冻结**的周期快照） |
 
+## ⛔ 已评估、**结论是不该抽**：`execute_portfolio` 的开仓执行段
+
+`execute_portfolio` 主循环里，做多与做空各有一份 **59 行**的开仓执行段，
+逐行 diff 确认**除 7 处替换外完全相同**（`is_long` / 追踪器键后缀 / 一个计数器）——
+看起来是"抽公共代码"的教科书场景。
+
+**但它不该抽，而且已经被试过一次（2026-09-14，第三十七刀，已回滚）。**
+那 59 行里约 **30 行是既有测试锚点的载体**：
+
+| 锚点 | 数量 | 位置要求 |
+|---|---|---|
+| `resolve_entry_prices(` | 2 | **门面**主执行路径，且所在分支须备齐传入的每个名字 |
+| `build_order_intent(` | 2 | 同上（`tests/test_trader_order_intent_extraction.py`） |
+| `sl_px, tp_px = normalize_bracket_prices(` | 2 | **门面**（`tests/test_trader_brackets_extraction.py`） |
+| `_order_margin = order_margin_gate(` | 2 | **门面**（`tests/test_trader_gates_extraction.py`） |
+| `notify_trade_open(..., leverage=int(ai_lever))` | 4 | **门面**（审计缺陷 D 的守卫） |
+
+`tests/test_trader_order_intent_extraction.py::test_facade_keeps_the_two_anchor_lines`
+的 docstring 明确写着这是**刻意**不抽的部分。**实测：整块搬走会让 11 个测试翻红。**
+
+更要紧的是**技术上的死结**：这些锚点行**算出的正是下游要用的值** ——
+`limit_px/tp_px/sl_px`（来自 `resolve_entry_prices` + `normalize_bracket_prices`）、
+`_order_margin`、`_side/_pos_side/_venue_ctx`（来自 `build_order_intent`）。
+留下锚点行，就必须把这些值**再传一遍**给子模块（新增约 6 个参数）；
+而"只抽剩下的 29 行"要新增一层 18 参数的间接。
+
+> **收益 4%（`ai_factor_trader.py` 2844 → 约 2738 行），代价是一层 18 参数的间接。**
+> 不划算，故保持现状。**留着这份记录，避免后人第三次尝试。**
+
 ## 两条铁律
 
 1. **子模块不得在 import 期绑定门面名字**。`pin_baseline_risk_env()` 的原地重载
