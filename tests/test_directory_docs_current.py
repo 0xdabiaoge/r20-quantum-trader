@@ -343,6 +343,79 @@ class ScriptsRootModulesRegisteredTest(unittest.TestCase):
         self.assertIn("每 15 分钟", doc, "主脚本的调度周期是关键信息，必须写明")
 
 
+class ExtractedModulesHaveTestsTest(unittest.TestCase):
+    """⚠️ 第六十八刀补：**抽出来的模块必须有测试引用**。
+
+    ## 为什么要这条
+
+    本阶段到第六十七刀共抽出 **72 个模块**。用
+    `git log --diff-filter=A --grep=第.*刀` 取出清单逐个查 `tests/`，
+    发现 **3 个一次都没被提到**：
+
+    | 模块 | 行数 | 此前测试引用 |
+    |---|---|---|
+    | `dashboard_payload/factors_view.py` | 141 | **0** |
+    | `dashboard_payload/reset_state.py` | 27 | **0** |
+    | `dashboard_payload/ledger_view.py` | 79 | 1（仅间接） |
+
+    它们只经 `dashboard/app.py` 门面被调用，而门面级用例只验证
+    "载荷非空 / 某几个键在"，**从不验证这些模块内部的取值优先级链**。
+    这三个模块的 docstring 都写着"路径由门面注入（测试会指向沙箱）" ——
+    **为可测性做了准备，却始终没人测。**
+
+    ## 判据
+
+    `MANAGED` 里每个子包的每个 `.py`，其**模块名或文件名**必须出现在
+    某个 `tests/test_*.py` 里。
+
+    ⚠️ 这条判据**比"必须有专门测试文件"宽松** —— 它只要求"被测试提到过"。
+    这是刻意的：要求每个模块一个专属测试文件会产生大量样板，
+    而真正要防的是"**抽完就当测过了**"这种静默漏测。
+    """
+
+    def _tests_text(self) -> str:
+        """所有 `tests/test_*.py` 的正文。
+
+        ⚠️ **必须排除本文件**（第六十八刀实测踩到）：
+        本用例的 docstring 与断言里就写着那三个模块名，
+        若不排除，则**把补测文件整个删掉、用例依然是绿的** ——
+        门禁靠"自己提到自己"通过了。排除后该洞关闭。
+        """
+        me = Path(__file__).resolve()
+        return "\n".join(
+            p.read_text(encoding="utf-8", errors="replace")
+            for p in sorted((ROOT / "tests").glob("test_*.py"))
+            if p.resolve() != me)
+
+    def test_every_managed_module_is_referenced_by_some_test(self):
+        tests_text = self._tests_text()
+        self.assertGreater(len(tests_text), 10000, "读到的测试文本异常地少")
+
+        untested = []
+        for rel in MANAGED:
+            for f in sorted((ROOT / rel).glob("*.py")):
+                if f.name == "__init__.py":
+                    continue
+                if f.stem in tests_text or f.name in tests_text:
+                    continue
+                untested.append(f"{rel}/{f.name}")
+        self.assertEqual(
+            untested, [],
+            "这些抽取出来的模块在 tests/ 里一次都没被提到 —— "
+            "抽完不等于测过，请补测试: " + ", ".join(untested))
+
+    def test_the_three_originally_untested_modules_are_covered(self):
+        """把本刀补测的三个模块具体钉住，防止测试文件被删。"""
+        tests_text = self._tests_text()
+        for name in ("build_factors_list", "read_reset_initial_state",
+                     "load_ledger_lifecycle_trades"):
+            # ⚠️ 用 assertTrue 而不是 assertIn：`assertIn(x, <一大段文本>)`
+            #    在失败时会把**整份测试正文**倒进终端（实测刷屏数千行）。
+            self.assertTrue(
+                name in tests_text,
+                name + " 曾被漏测（第六十八刀补上），不应再失去覆盖")
+
+
 class ProjectReadmeStructureEntryTest(unittest.TestCase):
     """`README.md` 的「代码结构入口」章节必须指向**真实存在**的文件。
 
