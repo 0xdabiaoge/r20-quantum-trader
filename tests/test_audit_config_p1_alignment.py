@@ -150,7 +150,10 @@ class PromptRiskBudgetAlignmentTests(_SandboxBase):
             for eq in (80.0, 1000.0, 4989.41, 0.0, None):
                 self.assertEqual(getattr(sizing, name)(eq), rc_fn(eq))
                 self.assertEqual(getattr(trader, name)(eq), rc_fn(eq))
-        trader_src = (ROOT / "scripts" / "ai_factor_trader.py").read_text(encoding="utf-8")
+        # 领域定位：下面两条是**负向**断言（不得自带实现）。单文件定位在搬家后会
+        # **静默空转**——本地孪生搬进子包照样违规，却因为门面里找不到而永远通过。
+        from tests.source_scan import combined
+        trader_src = combined("scripts/ai_factor_trader.py", pkg_name="trader")
         self.assertNotIn("def effective_daily_loss_limit", trader_src,
                          "本地拷贝复活 → 又是两份 min() 公式漂移之源")
         sizing_src = (ROOT / "r20_backend" / "execution" / "sizing.py").read_text(encoding="utf-8")

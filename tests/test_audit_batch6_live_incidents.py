@@ -243,7 +243,10 @@ class TestSpawnHygiene(unittest.TestCase):
 
 class TestVenueSnapshotSingleSource(unittest.TestCase):
     def test_fetch_is_silent_and_owner_prints(self):
-        src = (ROOT / "scripts" / "ai_factor_trader.py").read_text(encoding="utf-8")
+        # 领域定位：fetch_other_venue_positions 及其唯一归属打印都属执行层领域。
+        # 其中 `assertNotIn` 是**负向**断言——单文件定位在搬家后会静默空转。
+        from tests.source_scan import combined
+        src = combined("scripts/ai_factor_trader.py", pkg_name="trader")
         fetch_body = src.split("def fetch_other_venue_positions")[1].split("\ndef ")[0]
         self.assertNotIn("纳入本周期仓位配额", fetch_body,
                          "fetcher 复活逐仓打印=多点复用日志成倍的老病")
@@ -251,7 +254,8 @@ class TestVenueSnapshotSingleSource(unittest.TestCase):
         self.assertIn("纳入本周期仓位配额", owner, "唯一归属打印必须在主周期 1a 块")
 
     def test_panorama_reuses_frozen_snapshot(self):
-        src = (ROOT / "scripts" / "ai_factor_trader.py").read_text(encoding="utf-8")
+        from tests.source_scan import combined
+        src = combined("scripts/ai_factor_trader.py", pkg_name="trader")
         pano = src.split("# 汇入多所（Binance / Gate）在管持仓")[1].split("except Exception as _xv_e")[0]
         self.assertIn("_xv_snap = xv_positions_by_venue", pano,
                       "全景块复活现拉=同周期两次外所读取撕裂的老病")

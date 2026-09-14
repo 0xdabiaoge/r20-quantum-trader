@@ -292,7 +292,10 @@ class TestExternalVenueReclaim(unittest.TestCase):
 
 class TestLeverageLanding(unittest.TestCase):
     def test_source_pins(self):
-        trader_src = (ROOT / "scripts" / "ai_factor_trader.py").read_text(encoding="utf-8")
+        # 领域定位：把"四处开仓通知携带真实杠杆"从门面单文件放宽到整个执行层领域。
+        # 这是**正向**计数断言，搬家会让单文件定位翻红（假红），领域定位才描述得准。
+        from tests.source_scan import combined
+        trader_src = combined("scripts/ai_factor_trader.py", pkg_name="trader")
         self.assertEqual(trader_src.count("leverage=int(ai_lever),"), 4,
                          "四处开仓通知必须携带钳制后的真实杠杆")
         submit_src = trader_src.split("def submit_protected_limit_order")[1].split("\ndef ")[0]

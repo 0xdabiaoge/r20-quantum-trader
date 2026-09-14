@@ -296,7 +296,10 @@ class RiskExecutionWiringTests(unittest.TestCase):
 
     def test_trader_sources_use_shared_constants(self):
         root = Path(__file__).resolve().parents[1]
-        trader = (root / "scripts" / "ai_factor_trader.py").read_text(encoding="utf-8")
+        # 领域定位：下面 forbidden 是**负向**断言。单文件定位在搬家后会静默空转
+        # （写死的风控常量跟着搬进子包，门面里查不到 → 永远通过）。
+        from tests.source_scan import combined
+        trader = combined("scripts/ai_factor_trader.py", pkg_name="trader")
         self.assertIn("from risk_constants import", trader)
         for forbidden in ('os.getenv("R20_MAX_DAILY_LOSS_USDT"', 'MAX_SAME_DIRECTION_POSITIONS = 3',
                           "rem_sec = 1800", "hold_duration_sec > 28800", "ai_conf >= 80.0"):

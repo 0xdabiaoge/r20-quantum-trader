@@ -293,7 +293,9 @@ class TestVenueHealthAndStateAtomicSource(unittest.TestCase):
         source_scan.assert_area_looks_real(
             self, brain, must_contain="def construct_full_market_prompt", min_chars=60000)
         self.assertNotIn('open(VENUE_HEALTH_FILE, "w"', brain)   # ③#3 改道 atomic_write_json
-        trader = Path(ROOT / "scripts" / "ai_factor_trader.py").read_text(encoding="utf-8")
+        # 领域定位：执行层源码已按 B3 拆进 scripts/trader/，单文件定位会在搬家后假红。
+        from tests.source_scan import combined
+        trader = combined("scripts/ai_factor_trader.py", pkg_name="trader")
         self.assertIn('_atomic_write_json(os.path.join(DATA_DIR, "trading_state.json")', trader)
 
 

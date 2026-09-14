@@ -181,7 +181,8 @@ class InstrumentPoolTrustTests(_Base):
         self.assertEqual(self.ip.pool_state()["status"], "ok")
 
     def test_trader_refuses_new_entries_when_pool_untrusted(self):
-        src = (ROOT / "scripts" / "ai_factor_trader.py").read_text(encoding="utf-8")
+        from tests.source_scan import combined
+        src = combined("scripts/ai_factor_trader.py", pkg_name="trader")
         self.assertIn("pool_is_trustworthy()", src, "开新仓前必须检查池可信度（fail-closed）")
         self.assertIn("if not cb_active and pool_is_trustworthy():", src)
 

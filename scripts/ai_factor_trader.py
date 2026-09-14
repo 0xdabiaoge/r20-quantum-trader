@@ -39,6 +39,9 @@ from r20_backend.time_utils import beijing_day
 
 # 结构优化阶段4·B3：纯信号逻辑已搬入 scripts/trader/signals.py，re-export 保持门面表面不变
 from scripts.trader.signals import clamp, evaluate_asset_signal as _evaluate_asset_signal  # noqa: F401
+from scripts.trader.position_mgmt import (
+    execute_ai_position_management as _execute_ai_position_management_impl,
+)
 from scripts.trader.gates import (
     order_margin_gate as _order_margin_gate_impl,
     equity_margin_cap as _equity_margin_cap_impl,
@@ -2179,100 +2182,21 @@ def manage_position_tp_and_trailing(f, curr_pos, trackers, timestamp_full, execu
     return False, "持仓监控中"
 
 def execute_ai_position_management(real_pos_dict, trackers, timestamp_full, executed_actions):
-    """Execute only fresh, high-confidence and risk-reducing AI position instructions."""
-    if not os.path.exists(AI_POSITION_MANAGEMENT_FILE):
-        return
-    try:
-        with open(AI_POSITION_MANAGEMENT_FILE, "r", encoding="utf-8") as f:
-            payload = json.load(f)
-        if int(time.time()) - int(payload.get("timestamp", 0) or 0) > 300:
-            executed_actions.append("AI持仓指令已过期，未执行")
-            return
-    except Exception as e:
-        executed_actions.append(f"AI持仓指令读取失败: {e}")
-        return
+    """执行主脑写下的持仓指令。实现与两条安全语义见 scripts/trader/position_mgmt.py。
 
-    for instruction in payload.get("instructions", []):
-        inst_id = str(instruction.get("instId", ""))
-        action = str(instruction.get("action", "HOLD")).upper()
-        confidence = float(instruction.get("confidence", 0) or 0)
-        reason = str(instruction.get("reason", "AI持仓管理"))[:120]
-        position = real_pos_dict.get(inst_id)
-        if not position or action == "HOLD":
-            continue
-
-        pos_side = str(position.get("posSide", "net")).lower()
-        pos_venue = str(position.get("venue") or position.get("exchange") or "okx").lower()
-        current_px = float(position.get("markPx", position.get("last", 0)) or 0)
-        name = inst_id.replace("-USDT-SWAP", "")
-
-        if action == "CLOSE_MARKET":
-            if confidence < 85:
-                executed_actions.append(f"[{name}] AI平仓置信度{confidence:.0f}<85，拒绝执行")
-                continue
-            closed, close_detail = close_position_confirmed(inst_id, pos_side, float(position.get("pos", 0) or 0), venue=pos_venue)
-            if closed:
-                executed_actions.append(f"[{name}] AI高置信度整仓退出 ({pos_venue.upper()}): {reason}")
-                trackers.pop(f"{inst_id}_{pos_side}", None)
-            else:
-                executed_actions.append(f"[{name}] AI平仓请求未获交易所确认，仓位保持不变: {close_detail}")
-
-        elif action == "UPDATE_SL":
-            new_sl = float(instruction.get("suggested_sl_price", 0) or 0)
-            # 反过早收紧判定见 scripts/trader/protection.py::ai_tightens_stop
-            # （判定收紧方向；放松即账户裸奔）。三个阈值常量随函数搬去，值未改。
-            tightens_risk = ai_tightens_stop(instruction, position)
-
-            if not tightens_risk:
-                executed_actions.append(f"[{name}] 浮盈空间不足或与现价缓冲过近({current_px} vs 拟调SL {new_sl})，拒绝过早收紧止损")
-                continue
-
-            amend_ok = False
-            old_sl = 0.0
-            if pos_venue != "okx":
-                try:
-                    from r20_backend.close_intent import adapter_environment as _sl_env
-                    ad = venue_registry.get_adapter(pos_venue,
-                        environment=_sl_env(pos_venue, str(current_environment().mode)))  # 审计 C2+C3
-                    # 审计 C3（后半）：棘轮而非堆单——原生改单优先，回退先挂新再撤旧
-                    _c3_ok, _c3_note = amend_venue_stop_loss(
-                        ad, name, pos_side, float(new_sl), abs(float(position.get("pos", 0) or 0)))
-                    amend_ok = bool(_c3_ok)
-                    if not amend_ok:
-                        executed_actions.append(f"[{name}] {pos_venue.upper()} 云端止损更新失败: {_c3_note}")
-                        continue
-                except Exception as vexc:
-                    executed_actions.append(f"[{name}] {pos_venue.upper()} 云端止损更新失败: {vexc}")
-                    continue
-            else:
-                try:
-                    algo_orders = okx_rest.pending_algo_orders(inst_id)
-                except Exception as exc:
-                    executed_actions.append(f"[{name}] 云端止损收紧失败，原保护单保持不变（查询异常：{exc}）")
-                    continue
-                live_algo = next((o for o in algo_orders if o.get("state") == "live" and o.get("posSide") == pos_side and o.get("slTriggerPx")), None)
-                if not live_algo:
-                    executed_actions.append(f"[{name}] 未找到真实云端止损单，无法更新")
-                    continue
-                old_sl = float(live_algo.get("slTriggerPx", 0) or 0)
-                try:
-                    okx_rest.amend_algo_sl(live_algo["algoId"], new_sl, inst_id=inst_id, new_sl_ord_px="-1")
-                    amend_ok = True
-                except Exception:
-                    amend_ok = False
-
-            if amend_ok:
-                executed_actions.append(f"[{name}] 云端止损收紧至 {new_sl} ({pos_venue.upper()}): {reason}")
-                tracker = trackers.get(f"{inst_id}_{pos_side}")
-                if tracker:
-                    tracker["trailingStopPx"] = new_sl
-                try:
-                    from qq_notifier import notify_sl_updated
-                    notify_sl_updated(name, pos_side, old_sl, new_sl, reason)
-                except Exception:
-                    pass
-            else:
-                executed_actions.append(f"[{name}] 云端止损更新失败，原保护单保持不变")
+    注入项**调用期**从门面取值：`AI_POSITION_MANAGEMENT_FILE` 是既有测试缝
+    （测试会 patch 门面属性），其余是执行层函数与配置常量。
+    """
+    return _execute_ai_position_management_impl(
+        real_pos_dict, trackers, timestamp_full, executed_actions,
+        ai_position_management_file=AI_POSITION_MANAGEMENT_FILE,
+        ai_tightens_stop=ai_tightens_stop,
+        close_position_confirmed=close_position_confirmed,
+        okx_rest=okx_rest,
+        venue_registry=venue_registry,
+        current_environment=current_environment,
+        amend_venue_stop_loss=amend_venue_stop_loss,
+    )
 
 # =============================================================================
 # 🧠 R20 Quantum Trader v6.8.1 Multi-Factor Scoring & Strategy Setup Classifier

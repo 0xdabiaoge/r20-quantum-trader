@@ -12,6 +12,7 @@
 | `signals.py` | `evaluate_asset_signal` / `clamp` 多因子评分 | `asset_class_profiles` / `is_in_stop_cooldown` / `load_adaptive_config` |
 | `protection.py` | 止损信号、棘轮移损、AI 收紧判定、平仓载荷/手续费 | `safe_float` 等，全部调用期注入 |
 | `gates.py` | `order_margin_gate` / `equity_margin_cap` / `is_tradfi_market_liquid` | `MAX_SINGLE_ASSET_MARGIN` / `MAX_MARGIN_EQUITY_RATIO` |
+| `position_mgmt.py` | `execute_ai_position_management` 主脑持仓指令执行器（95 行） | 文件路径 / `ai_tightens_stop` / `close_position_confirmed` / `okx_rest` / 多所三项，全部调用期 |
 
 ## 两条铁律
 
