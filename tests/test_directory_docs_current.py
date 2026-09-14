@@ -65,6 +65,8 @@ MANAGED = {
     "scripts/backtest": {"allowed_extra": {"backtest_engine.py"}},
     # 第四十二刀新增：自进化引擎的可观测性聚簇外提。
     "scripts/evolution": {"allowed_extra": {"self_improvement_engine.py"}},
+    # 第四十三刀新增：选所质量域外提（门面仍是单文件 venue_router.py）。
+    "r20_backend/venue_routing": {"allowed_extra": {"venue_router.py"}},
 }
 
 #: 从文档里抽出的 `xxx.py` 文件名。
