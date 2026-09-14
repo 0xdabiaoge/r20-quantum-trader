@@ -166,67 +166,7 @@ class ImplementationMovedTest(unittest.TestCase):
         func = next(n for n in ast.walk(tree)
                     if isinstance(n, ast.FunctionDef) and n.name == "execute_portfolio")
 
-        params = {a.arg for a in func.args.args + func.args.kwonlyargs}
-        module_names = set()
-        for node in tree.body:
-            if isinstance(node, (ast.Import, ast.ImportFrom)):
-                for al in node.names:
-                    module_names.add(al.asname or al.name.split(".")[0])
-            elif isinstance(node, ast.Assign):
-                for t in node.targets:
-                    for nm in ast.walk(t):
-                        if isinstance(nm, ast.Name):
-                            module_names.add(nm.id)
-
-        parent = {}
-        for n in ast.walk(func):
-            for child in ast.iter_child_nodes(n):
-                parent[child] = n
-
-        def names_assigned(stmt):
-            out = set()
-            if isinstance(stmt, ast.Assign):
-                for t in stmt.targets:
-                    for nm in ast.walk(t):
-                        if isinstance(nm, ast.Name):
-                            out.add(nm.id)
-            elif isinstance(stmt, ast.For) and isinstance(stmt.target, ast.Name):
-                out.add(stmt.target.id)
-            elif isinstance(stmt, (ast.Try, ast.With)):
-                # try 体 / with 体里的赋值也算 —— 例如
-                # `try: _inst_lever_cap = ... except ...: _inst_lever_cap = 0.0`
-                # 若只处理 Assign/For，就会把它误报成"未定义"。
-                for sub in list(getattr(stmt, "body", [])) + \
-                           list(getattr(stmt, "handlers", [])) + \
-                           list(getattr(stmt, "finalbody", [])) + \
-                           list(getattr(stmt, "orelse", [])):
-                    if isinstance(sub, ast.Assign):
-                        for t in sub.targets:
-                            for nm in ast.walk(t):
-                                if isinstance(nm, ast.Name):
-                                    out.add(nm.id)
-                    elif isinstance(sub, ast.ExceptHandler) and sub.name:
-                        out.add(sub.name)
-            elif isinstance(stmt, ast.ExceptHandler) and stmt.name:
-                out.add(stmt.name)
-            return out
-
-        def defines_before(call):
-            """沿「到达调用的唯一路径」收集在其之前完成的赋值。"""
-            defined = set()
-            node = call
-            while node is not None:
-                par = parent.get(node)
-                if par is None:
-                    break
-                body = getattr(par, "body", None) or []
-                # 只看同层、且排在通往 node 的那条语句之前的兄弟语句
-                for stmt in body:
-                    if stmt is node:
-                        break
-                    defined |= names_assigned(stmt)
-                node = par
-            return defined
+        from tests.source_scan import names_defined_at_call
 
         checked = 0
         for node in ast.walk(func):
@@ -243,7 +183,7 @@ class ImplementationMovedTest(unittest.TestCase):
                     if isinstance(nm, ast.Name):
                         passed.add(nm.id)
             # 调用自己的实参绑定也算：c_accel=c_accel 之类左右同名，取右值
-            available = params | module_names | defines_before(node)
+            available = names_defined_at_call(func, node, module_tree=tree)
             missing = sorted(n for n in passed if n not in available)
             self.assertEqual(missing, [],
                              f"gate 调用（L{node.lineno}）所在分支引用了未定义的名字 "
@@ -356,6 +296,30 @@ class ParityTest(unittest.TestCase):
             (got, gout), (exp, eout) = _both(kw)
             self.assertEqual(got, exp, f"返回值分叉: {kw}")
             self.assertEqual(gout, eout, f"stdout 分叉: {kw}")
+
+    def test_both_call_sites_define_every_name_they_pass(self):
+        """调用点必须在自己**这一支**里备好传给门禁的每个名字。
+
+        **这条是本块最重要的回归。** 抽取时替换 facade 代码块，把做空分支的
+        `c_dyn` / `c_accel` / `p_th` 三行一起吞掉了 —— 做空加仓一旦触发就
+        `NameError`，而**全量测试当时全绿**（没有测试走那条分支）。
+
+        走集中式守卫 `tests.source_scan.missing_names_at_helper_calls`：
+        只沿**唯一到达路径**收集定义，绝不下钻进兄弟分支。该守卫自身有 16 个
+        专项用例（含"兄弟分支不得泄漏""调用之后的赋值不算"），见
+        `test_source_scan_domain.py`。
+        """
+        from tests.source_scan import missing_names_at_helper_calls
+
+        offenders = missing_names_at_helper_calls(
+            "scripts/ai_factor_trader.py", "execute_portfolio",
+            (
+                "pyramiding_gate",
+            ),
+            pkg_name="trader")
+        self.assertEqual(offenders, {},
+                         f"gate 调用引用了未定义的名字，实盘走到该分支会 NameError："
+                         f"{offenders}")
 
     def test_facade_constants_are_passed_not_baked(self):
         """门面必须把风控常量作为实参传入（不得让子模块 import 期烘焙）。"""

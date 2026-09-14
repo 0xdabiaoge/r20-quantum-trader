@@ -195,3 +195,142 @@ class DomainTreesAndCombinedTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class NamesDefinedAtCallTests(unittest.TestCase):
+    """`names_defined_at_call` —— 抽取后调用点局部量守卫的公共实现。
+
+    这个助手现在被 4 个抽取测试文件共用，它自己的正确性因此变得关键：
+    **假绿**（漏报未定义）会让所有守卫一起失效；**假红**（误报已定义）会逼着
+    后人关掉守卫。两侧都在这里钉住。
+    """
+
+    def _fn(self, src, name="f"):
+        import ast
+        tree = ast.parse(src)
+        fn = next(n for n in ast.walk(tree)
+                  if isinstance(n, ast.FunctionDef) and n.name == name)
+        return tree, fn
+
+    def _missing(self, src, call_name):
+        """返回**任意一处**对 `call_name` 调用的未定义实参名（合并、去重、升序）。
+
+        不要用 `next(ast.walk(fn) ...)` 取"第一个"调用：`ast.walk` 是宽度优先，
+        顺序不稳定，取到的可能是另一处调用（本轮实际因此得出过相反结论）。
+        """
+        import ast
+        from tests.source_scan import names_defined_at_call
+        tree, fn = self._fn(src)
+        out = set()
+        for call in ast.walk(fn):
+            if not (isinstance(call, ast.Call) and isinstance(call.func, ast.Name)
+                    and call.func.id == call_name):
+                continue
+            passed = set()
+            for arg in call.args:
+                for nm in ast.walk(arg):
+                    if isinstance(nm, ast.Name):
+                        passed.add(nm.id)
+            for kw in call.keywords:
+                for nm in ast.walk(kw.value):
+                    if isinstance(nm, ast.Name):
+                        passed.add(nm.id)
+            available = names_defined_at_call(fn, call, module_tree=tree)
+            out |= {n for n in passed if n not in available}
+        return sorted(out)
+
+    def test_function_parameter_is_defined(self):
+        self.assertEqual(self._missing(
+            "def f(x):\n    return g(x)\n", "g"), [])
+
+    def test_assignment_before_call_is_defined(self):
+        self.assertEqual(self._missing(
+            "def f():\n    a = 1\n    return g(a)\n", "g"), [])
+
+    def test_annotated_assignment_counts(self):
+        """`x: int = 1` 是 ast.AnnAssign —— 漏了它会误报（本轮实际踩到）。"""
+        self.assertEqual(self._missing(
+            "def f():\n    a: int = 1\n    return g(a)\n", "g"), [])
+
+    def test_module_level_annotated_assignment_counts(self):
+        self.assertEqual(self._missing(
+            "BROKEN: set = set()\ndef f():\n    return g(BROKEN)\n", "g"), [])
+
+    def test_assignment_inside_module_level_try_counts(self):
+        self.assertEqual(self._missing(
+            "try:\n    A = 1\nexcept Exception:\n    A = 2\ndef f():\n    return g(A)\n",
+            "g"), [])
+
+    def test_assignment_inside_function_try_counts(self):
+        self.assertEqual(self._missing(
+            "def f():\n    try:\n        a = 1\n    except Exception:\n        a = 2\n"
+            "    return g(a)\n", "g"), [])
+
+    def test_for_target_counts(self):
+        self.assertEqual(self._missing(
+            "def f(xs):\n    for a in xs:\n        g(a)\n", "g"), [])
+
+    def test_with_as_counts(self):
+        self.assertEqual(self._missing(
+            "def f(h):\n    with h() as a:\n        g(a)\n", "g"), [])
+
+    def test_except_as_counts(self):
+        self.assertEqual(self._missing(
+            "def f():\n    try:\n        pass\n    except Exception as e:\n        g(e)\n",
+            "g"), [])
+
+    def test_comprehension_target_counts(self):
+        self.assertEqual(self._missing(
+            "def f(xs):\n    return g([v for v in xs])\n", "g"), [])
+
+    def test_lambda_parameter_counts(self):
+        self.assertEqual(self._missing(
+            "def f(xs):\n    return g(list(map(lambda v: v, xs)))\n", "g"), [])
+
+    def test_builtins_count(self):
+        self.assertEqual(self._missing(
+            "def f(xs):\n    return g(print, len(xs))\n", "g"), [])
+
+    def test_imported_name_counts(self):
+        self.assertEqual(self._missing(
+            "from os import path\ndef f():\n    return g(path)\n", "g"), [])
+
+    def test_module_level_def_counts(self):
+        self.assertEqual(self._missing(
+            "def helper():\n    pass\ndef f():\n    return g(helper)\n", "g"), [])
+
+    # ---- 假绿侧：必须抓得住 ----
+
+    def test_undefined_name_is_reported(self):
+        self.assertEqual(self._missing(
+            "def f():\n    return g(missing)\n", "g"), ["missing"])
+
+    def test_sibling_branch_assignment_does_not_leak(self):
+        """**核心不变式**：兄弟分支的同名赋值不得盖住本支的缺口。
+
+        这正是本会话连漏两次的那个 bug：开多分支有 `c_accel = ...`，
+        开空分支删掉后，宽泛的 ast.walk 判据会认为开空也"已定义"。
+        """
+        src = (
+            "def f(action):\n"
+            "    if action == 'LONG':\n"
+            "        v = 1\n"
+            "        return g(v)\n"
+            "    elif action == 'SHORT':\n"
+            "        return g(v)\n"
+        )
+        self.assertEqual(self._missing(src, "g"), ["v"],
+                         "开空分支的 v 未定义，不得被开多分支的赋值掩盖")
+
+    def test_assignment_after_call_does_not_count(self):
+        self.assertEqual(self._missing(
+            "def f():\n    r = g(a)\n    a = 1\n    return r\n", "g"), ["a"])
+
+    def test_nested_function_body_does_not_leak(self):
+        """嵌套函数里的赋值属于它自己的作用域，不得算进外层。"""
+        self.assertEqual(self._missing(
+            "def f():\n    def inner():\n        a = 1\n    return g(a)\n", "g"), ["a"])
+
+    def test_lambda_body_assignment_does_not_leak(self):
+        self.assertEqual(self._missing(
+            "def f():\n    h = lambda: (a := 1)\n    return g(a)\n", "g"), ["a"])

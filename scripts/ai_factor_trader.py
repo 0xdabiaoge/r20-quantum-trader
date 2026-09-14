@@ -42,6 +42,10 @@ from scripts.trader.signals import clamp, evaluate_asset_signal as _evaluate_ass
 from scripts.trader.position_mgmt import (
     execute_ai_position_management as _execute_ai_position_management_impl,
 )
+from scripts.trader.cycle_snapshot import (
+    build_state_payload,
+    collect_pending_inst_ids,
+)
 from scripts.trader.notifications import (
     entry_action_message,
     entry_failure_message,
@@ -2366,41 +2370,12 @@ def execute_portfolio():
         _gv_mode = str(current_environment().mode or "")
     except Exception:
         _gv_mode = ""
-    for _gv in ("gate", "binance"):
-        try:
-            if _gv in _BROKEN_VENUES:
-                continue   # 回收侧已实证凭证死，不再逐标的空转（每轮进程级重探）
-            if not (_gv_mode and venue_registry.execution_open(_gv, _gv_mode)):
-                continue
-            _gad = venue_registry.get_adapter(_gv, environment=_gv_mode)
-            if _gv == "binance":
-                _grows = _gad.open_orders() or []
-            else:
-                _grows = []
-                for _ins in load_instruments():
-                    _gb = str(_ins.get("instId") or "").split("-")[0].upper()
-                    if _gb:
-                        _grows.extend(_gad.list_open_orders(_gb) or [])
-            for o in _grows:
-                if not isinstance(o, dict):
-                    continue
-                _graw = o.get("raw") if isinstance(o.get("raw"), dict) else {}
-                _gs = str(o.get("side") or _graw.get("side") or "").lower()
-                _gro = o.get("reduce_only") if o.get("reduce_only") is not None else _graw.get("reduce_only")
-                if _gs not in ("buy", "sell") or _gro in (True, "true", "1"):
-                    continue
-                _ginst = str(o.get("inst_id") or o.get("contract") or _graw.get("contract") or _graw.get("symbol") or "")
-                _gbase = str(o.get("base") or "").upper() or _ginst.split("_")[0].split("-")[0].upper()
-                if not _gbase:
-                    continue
-                pending_inst_ids.add(f"{_gbase}-USDT-SWAP")
-                if _gs == "buy":
-                    pending_long_count += 1
-                else:
-                    pending_short_count += 1
-        except Exception as _gexc:
-            if not any(m in str(_gexc) for m in _auth_markers):
-                print(f"[周期快照] warn 外所 {_gv} 挂单枚举失败（去重计数从缺，回收侧已另行把关）: {str(_gexc)[:80]}")
+    pending_inst_ids, pending_long_count, pending_short_count = \
+        collect_pending_inst_ids(
+            venues=("gate", "binance"), venue_mode=_gv_mode,
+            broken_venues=_BROKEN_VENUES, venue_registry=venue_registry,
+            load_instruments=load_instruments, auth_markers=_auth_markers,
+            warn=print)
     reserved_slot_count = active_pos_count + len(pending_inst_ids)
     reserved_long_count = long_count + pending_long_count
     reserved_short_count = short_count + pending_short_count
@@ -2867,42 +2842,12 @@ def execute_portfolio():
                             is_long=False, name=f["name"], order_ref=order_ref))
 
     # 5. Persist Latest State for Web Monitoring Dashboard
-    state_payload = {
-        "timestamp": timestamp_full,
-        "active_positions_count": active_pos_count,
-        "max_positions": MAX_CONCURRENT_POSITIONS,
-        "long_count": long_count,
-        "short_count": short_count,
-        "circuit_breaker": {"active": cb_active, "reason": cb_reason},
-        "executed_actions": executed_actions,
-        "instruments": []
-    }
-
-    for f in all_factors:
-        score, action, reasons, strat_tag, strat_desc = evaluate_asset_signal(f)
-        state_payload["instruments"].append({
-            "name": f["name"],
-            "instId": f["instId"],
-            "type": f["type"],
-            "price": f["price"],
-            "rsi": round(f["rsi"], 1),
-            "rsi_7": round(f.get("rsi_7", 50.0), 1),
-            "vwap_bias": round(f.get("vwap_bias", 0.0), 2),
-            "macd_hist": f.get("macd_hist", 0.0),
-            "macd_accel": f.get("macd_accel", 0.0),
-            "obv_flow": f.get("obv_flow", "NEUTRAL"),
-            "bb_bandwidth": f.get("bb_bandwidth", 0.0),
-            "vol_ratio": f.get("vol_ratio", 1.0),
-            "market_regime": f.get("market_regime", "CHOP"),
-            "structure_1h": f.get("structure_1h", "CHOP"),
-            "trend_1h": "多头" if f.get("trend_1h_bullish") else "空头",
-            "trend_4h": "多头" if f.get("trend_4h_bullish") else "空头",
-            "score": score,
-            "action": action,
-            "strategy": strat_tag,
-            "desc": strat_desc,
-            "position": f["position"]
-        })
+    state_payload = build_state_payload(
+        timestamp_full=timestamp_full, active_pos_count=active_pos_count,
+        max_positions=MAX_CONCURRENT_POSITIONS, long_count=long_count,
+        short_count=short_count, cb_active=cb_active, cb_reason=cb_reason,
+        executed_actions=executed_actions, all_factors=all_factors,
+        evaluate_asset_signal=evaluate_asset_signal)
 
     # 审计③：原子替换（读者=面板/巡检；旧直写有撕裂窗）。异常语义不变：照旧上抛。
     _atomic_write_json(os.path.join(DATA_DIR, "trading_state.json"), state_payload)

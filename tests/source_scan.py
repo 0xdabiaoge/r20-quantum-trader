@@ -201,3 +201,308 @@ def count_keyword_argument(module_file, function_name, keyword, *,
                         continue
                 hits += 1
     return hits
+
+
+def names_defined_at_call(fn_node, call_node, *, module_tree):
+    """返回在 `call_node` 处**沿唯一到达路径**已定义的名字集合。
+
+    ## 用途
+
+    抽取大函数里的代码块时，调用点会引用一批局部量。若某个局部量没在**这一支**
+    里定义，实盘走到该分支就 `NameError` —— 而这类缺陷**常规测试抓不到**：
+    只有当那条分支真的被执行时才暴露（本会话在 pyramiding 抽取时实际踩过，
+    做空分支丢了 3 行定义，当时全量 1466 个测试仍是全绿）。
+
+    ## 判据（反复迭代才写对，故集中在此统一复用）
+
+    1. **只沿到达该调用的唯一路径**收集定义：从函数体逐层下沉，每层只看
+       「该层内、位于通往调用那条语句之前」的兄弟语句。
+       用 `ast.walk` 遍历祖先块是错的 —— 祖先块若是
+       `if action == "SELL_SHORT":`，`walk` 会**下钻进开多分支**，
+       于是开多分支的同名局部量把开空的缺口盖住（本会话连漏两次）。
+    2. **按词法作用域逐层收集**：`lambda` 参数、推导式（comprehension）目标变量
+       只在各自的嵌套作用域内可见。若把它们混进外层，会把 `sum(v for v in ...)`
+       里的 `v` 误判成"外层已定义"；反之若完全不管，又会误报未定义。
+    3. 模块级名字（import / 赋值 / `def`）也算。注意两种易漏写法：
+       - **带注解赋值** `_BROKEN_VENUES: set = set()` 是 `ast.AnnAssign`，
+         不是 `ast.Assign`；
+       - 赋值可能落在模块级 `try:` 体内。
+    4. 内建名（`print` / `float` / `len` 等）不能算未定义。
+
+    返回的集合可直接与调用点实参里出现的名字求差。
+    """
+    import ast
+    import builtins
+
+    def bindings_in(stmt):
+        """**该语句自身在当前位置**产生的绑定（不下钻、不前瞻）。
+
+        关键：只认"执行到这一句时已经生效"的绑定点 ——
+        `x = ...`（含注解/自增）的目标、`for x in ...` 的目标、
+        `with ... as x`、`except ... as x`、推导式/`lambda` 的自有变量。
+
+        **不**递归进语句内部找所有 `Store`：那样会让"调用之后才赋值"和
+        "兄弟分支里赋值"被误判成已定义（`ast.walk` 不看顺序、不看分支）。
+        本会话三次踩到这个坑，故实现按绑定点逐个取出。
+        """
+        out = set()
+
+        def target_of(t):
+            for nm in ast.walk(t):
+                if isinstance(nm, ast.Name):
+                    out.add(nm.id)
+
+        if isinstance(stmt, ast.Assign):
+            for t in stmt.targets:
+                target_of(t)
+        elif isinstance(stmt, (ast.AugAssign, ast.AnnAssign)):
+            target_of(stmt.target)
+        elif isinstance(stmt, (ast.For, ast.AsyncFor)):
+            target_of(stmt.target)
+        elif isinstance(stmt, (ast.With, ast.AsyncWith)):
+            for item in stmt.items:
+                if item.optional_vars is not None:
+                    target_of(item.optional_vars)
+        elif isinstance(stmt, ast.ExceptHandler):
+            if stmt.name:
+                out.add(stmt.name)
+        elif isinstance(stmt, (ast.ListComp, ast.SetComp, ast.DictComp,
+                              ast.GeneratorExp)):
+            for gen in stmt.generators:
+                target_of(gen.target)
+        elif isinstance(stmt, ast.Lambda):
+            for a in (stmt.args.args + stmt.args.kwonlyargs + stmt.args.posonlyargs):
+                out.add(a.arg)
+            if stmt.args.vararg:
+                out.add(stmt.args.vararg.arg)
+            if stmt.args.kwarg:
+                out.add(stmt.args.kwarg.arg)
+        elif isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef,
+                              ast.ClassDef)):
+            out.add(stmt.name)
+        elif isinstance(stmt, ast.Try):
+            # try/except/finally 里**必有一条执行**（无异常走 body/no-exception，
+            # 有异常走某个 handler），故其内层绑定在 try 之后一定存在。
+            # 这也覆盖了模块级 `try: X = ... except: X = ...` 这种常见写法。
+            # 注意 `if` 不能这样处理 —— 分支可能都不走。
+            for sub in (list(stmt.body) + list(stmt.orelse) + list(stmt.finalbody)
+                        + list(stmt.handlers)):
+                out |= bindings_in(sub)
+        return out
+
+    def seq_and_branches(owner):
+        """把 `owner` 的子语句拆成 `(必过序列, [分支列表, ...])`。
+
+        - **必过序列**：真正按顺序执行的语句（函数体、`for` 体、`try` 的
+          `body`+`finally` 等）。
+        - **分支列表**：`if/elif/else` 这类**互斥**分支，每组里只会走一条。
+          路径若走的是第 2 组，就绝不能被第 1 组里的绑定"喂饱"。
+
+        `elif` 是挂在 `orelse` 里的嵌套 `If`，所以 `if` 的分支组是
+        `[body, orelse]`，而不是"按源码顺序的平铺列表" —— 这一点没搞清
+        就会写出"从 body 拿了绑定、却从 orelse 往下走"的错（本轮实际踩到）。
+        """
+        seq, branch_groups = [], []
+        if isinstance(owner, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            seq = list(owner.body)
+        elif isinstance(owner, ast.If):
+            branch_groups = [list(owner.body), list(owner.orelse)]
+        elif isinstance(owner, (ast.For, ast.AsyncFor, ast.While)):
+            seq = list(owner.body)
+            if owner.orelse:
+                branch_groups.append(list(owner.orelse))
+        elif isinstance(owner, ast.Try):
+            # body 与 finally 必过；handlers 互斥
+            seq = list(owner.body) + list(owner.finalbody)
+            if owner.handlers:
+                branch_groups.append(list(owner.handlers))
+        elif isinstance(owner, (ast.With, ast.AsyncWith)):
+            seq = list(owner.body)
+        return seq, branch_groups
+
+    def collect_along(target):
+        """收集到达 `target` 的**唯一路径**上、先于它的绑定。
+
+        逐层下沉：每层沿「必过序列」收集路径之前的兄弟语句；若路径进入某个
+        **互斥分支组**，只在该组内继续，绝不回头看别的分支组。
+        """
+        par_of = {}
+        for n in ast.walk(fn_node):
+            for ch in ast.iter_child_nodes(n):
+                par_of[ch] = n
+
+        def walk(owner, node, acc):
+            """把 `node` 在 `owner` 内的前置绑定累加进 `acc`。"""
+            seq, groups = seq_and_branches(owner)
+            for stmt in seq:
+                if stmt is node:
+                    return True
+                acc |= bindings_in(stmt)
+            for group in groups:
+                if node in group:
+                    for stmt in group:
+                        if stmt is node:
+                            return True
+                        acc |= bindings_in(stmt)
+                    return True
+                # 路径不在这组，整组忽略（互斥）
+            return False
+
+        out = set()
+        cur = target
+        while True:
+            par = par_of.get(cur)
+            if par is None:
+                break
+            # 找到 cur 所属的父块（跳过 Return/Call 之类的中转节点）
+            walk(par, cur, out)
+            # 本层的绑定点（块开始即生效）
+            if isinstance(par, (ast.For, ast.AsyncFor, ast.With, ast.AsyncWith,
+                                ast.ExceptHandler)):
+                out |= bindings_in(par)
+            cur = par
+
+        # 嵌套块里的绑定也必须收进来：`all_factors` 是绑在
+        # `with ThreadPoolExecutor(...):` 体里的，只在最外层看直接子语句
+        # 会把它漏掉（本轮实际踩到）。这里在不越过路径的前提下做一次补收：
+        # 对函数体内路径之前的语句，递归取其"必过绑定"（Skip 互斥 if 分支）。
+        def always_bound(stmt, seen=None):
+            """该语句在自身执行后**必然**产生的绑定（不下钻互斥分支）。"""
+            got = bindings_in(stmt)
+            if isinstance(stmt, (ast.Try, ast.With, ast.AsyncWith,
+                                 ast.For, ast.AsyncFor, ast.While)):
+                for sub in (list(getattr(stmt, "body", []))
+                            + list(getattr(stmt, "orelse", []))
+                            + list(getattr(stmt, "finalbody", []))):
+                    got |= always_bound(sub)
+                for h in getattr(stmt, "handlers", []):
+                    got |= always_bound(h)
+            return got
+
+        cur = target
+        while True:
+            par = par_of.get(cur)
+            if par is None:
+                break
+            seq, groups = seq_and_branches(par)
+            on_path = None
+            for group in ([seq] + groups):
+                if cur in group:
+                    on_path = group
+                    break
+            if on_path is not None:
+                for stmt in on_path:
+                    if stmt is cur:
+                        break
+                    out |= always_bound(stmt)
+            cur = par
+
+        return out
+
+    def scope_names(scope_owner):
+        """该作用域内由 lambda 参数 / 推导式目标引入的名字。"""
+        out = set()
+        for n in ast.walk(scope_owner):
+            if isinstance(n, ast.Lambda):
+                out |= {a.arg for a in n.args.args + n.args.kwonlyargs}
+                if n.args.vararg:
+                    out.add(n.args.vararg.arg)
+                if n.args.kwarg:
+                    out.add(n.args.kwarg.arg)
+            elif isinstance(n, (ast.ListComp, ast.SetComp, ast.DictComp,
+                                ast.GeneratorExp)):
+                for gen in n.generators:
+                    for nm in ast.walk(gen.target):
+                        if isinstance(nm, ast.Name):
+                            out.add(nm.id)
+        return out
+
+    defined = {a.arg for a in fn_node.args.args + fn_node.args.kwonlyargs}
+    if fn_node.args.vararg:
+        defined.add(fn_node.args.vararg.arg)
+    if fn_node.args.kwarg:
+        defined.add(fn_node.args.kwarg.arg)
+    defined |= set(dir(builtins))
+    defined |= scope_names(fn_node)
+
+    for node in module_tree.body:
+        defined |= bindings_in(node)
+        if isinstance(node, (ast.Import, ast.ImportFrom)):
+            for al in node.names:
+                defined.add(al.asname or al.name.split(".")[0])
+        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            defined.add(node.name)
+    defined |= scope_names(module_tree)
+
+    parent = {}
+    for n in ast.walk(fn_node):
+        for child in ast.iter_child_nodes(n):
+            parent[child] = n
+
+    defined |= collect_along(call_node)
+
+    return defined
+
+
+def missing_names_at_helper_calls(module_file, function_name, helper_names, *,
+                                  pkg_name=None):
+    """检查 `function_name` 里每处对 `helper_names` 的调用，实参名是否都已定义。
+
+    返回 `{helper: [{"line": L, "missing": [名字...]}, ...]}`；空 dict 表示全部安全。
+
+    ## 为什么要有这个函数
+
+    这是抽取大函数时的**主要守卫**：搬走一段代码后，调用点会引用一批局部量；
+    若某个局部量没在**这一支**里定义，实盘走到该分支就 `NameError`，
+    而常规测试只在分支真正执行时才暴露（本会话实际踩过：做空分支丢 3 行定义，
+    当时全量 1466 个测试仍全绿）。
+
+    之前每个抽取测试文件各自复制了一段"收集实参 → 求差"的循环，
+    结果**四处都有同一个取值 bug**：从 `ast.walk` 取调用时拿到的是"第一个匹配"，
+    而 `ast.walk` 是宽度优先、顺序不稳定，于是同一份判据在不同测试里
+    给出不同结论。集中到一处后只需修一次。
+    """
+    import ast
+    from pathlib import Path
+
+    files = [Path(module_file)]
+    if pkg_name:
+        pkg_dir = Path(module_file).parent / pkg_name
+        if pkg_dir.is_dir():
+            files.extend(sorted(pkg_dir.rglob("*.py")))
+
+    result = {}
+    for path in files:
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+        except SyntaxError:
+            continue
+        func = next((n for n in ast.walk(tree)
+                     if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
+                     and n.name == function_name), None)
+        if func is None:
+            continue
+
+        # 按行号排序，保证结论与遍历顺序无关
+        calls = sorted(
+            (n for n in ast.walk(func)
+             if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)
+             and n.func.id in helper_names),
+            key=lambda n: n.lineno)
+
+        for call in calls:
+            passed = set()
+            for arg in call.args:
+                for nm in ast.walk(arg):
+                    if isinstance(nm, ast.Name):
+                        passed.add(nm.id)
+            for kw in call.keywords:
+                for nm in ast.walk(kw.value):
+                    if isinstance(nm, ast.Name):
+                        passed.add(nm.id)
+            available = names_defined_at_call(func, call, module_tree=tree)
+            missing = sorted(n for n in passed if n not in available)
+            if missing:
+                result.setdefault(call.func.id, []).append(
+                    {"line": call.lineno, "missing": missing, "file": str(path)})
+    return result

@@ -287,63 +287,7 @@ class WiringTest(unittest.TestCase):
         func = next(n for n in ast.walk(tree)
                     if isinstance(n, ast.FunctionDef) and n.name == "execute_portfolio")
 
-        params = {a.arg for a in func.args.args + func.args.kwonlyargs}
-        module_names = set()
-        for node in tree.body:
-            if isinstance(node, (ast.Import, ast.ImportFrom)):
-                for al in node.names:
-                    module_names.add(al.asname or al.name.split(".")[0])
-            elif isinstance(node, ast.Assign):
-                for t in node.targets:
-                    for nm in ast.walk(t):
-                        if isinstance(nm, ast.Name):
-                            module_names.add(nm.id)
-            elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-                module_names.add(node.name)
-
-        parent = {}
-        for n in ast.walk(func):
-            for child in ast.iter_child_nodes(n):
-                parent[child] = n
-
-        def names_assigned(stmt):
-            out = set()
-            if isinstance(stmt, ast.Assign):
-                for t in stmt.targets:
-                    for nm in ast.walk(t):
-                        if isinstance(nm, ast.Name):
-                            out.add(nm.id)
-            elif isinstance(stmt, ast.For) and isinstance(stmt.target, ast.Name):
-                out.add(stmt.target.id)
-            elif isinstance(stmt, (ast.Try, ast.With)):
-                for sub in list(getattr(stmt, "body", [])) + \
-                           list(getattr(stmt, "handlers", [])) + \
-                           list(getattr(stmt, "finalbody", [])) + \
-                           list(getattr(stmt, "orelse", [])):
-                    if isinstance(sub, ast.Assign):
-                        for t in sub.targets:
-                            for nm in ast.walk(t):
-                                if isinstance(nm, ast.Name):
-                                    out.add(nm.id)
-                    elif isinstance(sub, ast.ExceptHandler) and sub.name:
-                        out.add(sub.name)
-            elif isinstance(stmt, ast.ExceptHandler) and stmt.name:
-                out.add(stmt.name)
-            return out
-
-        def defines_before(call):
-            defined = set()
-            node = call
-            while node is not None:
-                par = parent.get(node)
-                if par is None:
-                    break
-                for stmt in (getattr(par, "body", None) or []):
-                    if stmt is node:
-                        break
-                    defined |= names_assigned(stmt)
-                node = par
-            return defined
+        from tests.source_scan import names_defined_at_call
 
         checked = 0
         for node in ast.walk(func):
@@ -360,7 +304,7 @@ class WiringTest(unittest.TestCase):
                 for nm in ast.walk(kw.value):
                     if isinstance(nm, ast.Name):
                         passed.add(nm.id)
-            available = params | module_names | defines_before(node)
+            available = names_defined_at_call(func, node, module_tree=tree)
             missing = sorted(n for n in passed if n not in available)
             self.assertEqual(missing, [],
                              f"{node.func.id} 调用（L{node.lineno}）所在分支引用了"
