@@ -37,13 +37,20 @@ PILLARS = (
 )
 
 
-def _facade_dict_literal():
-    """取门面**当前**源码里 `build_default_factors(...)` 那一行之前的原始字面量。
+#: 抽取落地的那次提交（本刀）。字面量在**它的父提交**里存在。
+EXTRACTION_COMMIT = "4aef066"
+_BASE_REV = f"{EXTRACTION_COMMIT}^"
 
-    本刀之后门面已无该字面量，故从 git 的 HEAD 版本取搬走前的那一份。
+
+def _facade_dict_literal():
+    """取**搬走前**门面里的原始字面量（抽取提交的父提交）。
+
+    ⚠️ 不能用 `HEAD`：抽取提交本身就把字面量删了，用 HEAD 取到的是
+    "已经没有该字面量"的版本，测试会在下一次提交后莫名变红 ——
+    我第一版正是用 HEAD，提交后立刻红。故**钉死到具体提交的父提交**。
     """
     out = subprocess.run(
-        ["git", "show", "HEAD:scripts/factor_library.py"],
+        ["git", "show", f"{_BASE_REV}:scripts/factor_library.py"],
         capture_output=True, text=True, cwd=str(ROOT))
     if out.returncode != 0:
         return None
@@ -71,7 +78,8 @@ class AstIdentityTest(unittest.TestCase):
     def test_ast_matches_the_pre_move_literal(self):
         old = _facade_dict_literal()
         if old is None:
-            self.skipTest("git 不可用，无法取搬走前的字面量")
+            self.skipTest(
+                f"git 取不到 {_BASE_REV}（浅克隆/无该提交），无法比对搬走前的字面量")
         tree = ast.parse(MODULE.read_text(encoding="utf-8"))
         fn = next(n for n in ast.walk(tree)
                   if isinstance(n, ast.FunctionDef)
@@ -85,7 +93,7 @@ class AstIdentityTest(unittest.TestCase):
         """反向验证这条闸不是空转：改一个值必须能让 AST 比对失败。"""
         old = _facade_dict_literal()
         if old is None:
-            self.skipTest("git 不可用")
+            self.skipTest(f"git 取不到 {_BASE_REV}")
         mutated = ast.parse(ast.unparse(old))
         # 把第一个 0.0 改成 1.0
         for node in ast.walk(mutated):
@@ -214,6 +222,57 @@ class TimestampTest(unittest.TestCase):
                   and n.name == "build_default_factors")
         self.assertTrue(any(isinstance(n, ast.Call) for n in ast.walk(fn)),
                         "函数体内应含 time.time() 调用")
+
+
+class ProductionSnapshotShapeTest(unittest.TestCase):
+    """与**生产快照**对照：默认结构的形状必须与实盘产出的因子一致。
+
+    ⚠️ 这条测试的价值与局限都要说清：
+
+    - 价值：`data/factor_library_snapshot.json` 是**真实产出**。若默认结构与它
+      有任何键位分叉（少了某个 Pillar 字段、多了个幽灵键），这里立刻红 ——
+      比"我自己写两份期望值互相对照"强得多。
+    - 局限：快照是**当前实现**跑出来的。所以它只能证明"结构与产出同形"，
+      **不能证明产出本身正确**（§33.3 那次的教训：样本 == 实现不等于正确）。
+      "产出正确"由 `compute_instrument_factors` 既有的测试保证。
+    - 快照缺失时跳过（例如全新 checkout 尚未跑过因子库），不假绿。
+    """
+
+    SNAPSHOT = ROOT / "data" / "factor_library_snapshot.json"
+
+    def _items(self):
+        if not self.SNAPSHOT.exists():
+            self.skipTest("无生产因子快照")
+        import json
+        snap = json.loads(self.SNAPSHOT.read_text(encoding="utf-8"))
+        insts = snap.get("instruments")
+        if not insts:
+            self.skipTest("快照里没有 instruments")
+        return insts if isinstance(insts, list) else list(insts.values())
+
+    def test_top_level_keys_match(self):
+        default = build_default_factors("x", "x")
+        for it in self._items():
+            self.assertEqual(sorted(it), sorted(default),
+                             f"{it.get('instId')} 顶层键与默认结构分叉")
+
+    def test_every_pillar_key_set_matches(self):
+        default = build_default_factors("x", "x")
+        for it in self._items():
+            for pillar in PILLARS:
+                self.assertIn(pillar, it, f"{it.get('instId')} 缺 Pillar {pillar}")
+                self.assertEqual(
+                    sorted(it[pillar]), sorted(default[pillar]),
+                    f"{it.get('instId')}.{pillar} 键位与默认结构分叉")
+
+    def test_smart_money_missing_semantics_survives_roundtrip(self):
+        """缺失语义必须原样进快照 —— 被中性值替换就是"UI 说谎"。"""
+        for it in self._items():
+            sm = it.get("smart_money_derivatives")
+            if not isinstance(sm, dict):
+                continue
+            self.assertIs(sm.get("available"), False)
+            self.assertEqual(sm.get("signal"), "UNAVAILABLE")
 
 
 class ImportSafetyTest(unittest.TestCase):
