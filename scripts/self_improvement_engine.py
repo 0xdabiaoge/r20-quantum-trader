@@ -63,6 +63,7 @@ from scripts.evolution.observability import (  # noqa: E402,F401
     render_observability_brief,
 )
 from llm_credentials import get_cpa_client_config as _get_cpa_client_config  # noqa: E402
+from r20_backend.math_utils import clamp as _clamp
 TARGET_INSTRUMENTS = [item["name"] for item in load_instruments()]
 
 def atomic_write_json(path: str, payload: Any) -> None:
@@ -80,10 +81,15 @@ def atomic_write_json(path: str, payload: Any) -> None:
 
 
 def clamp(value, lower, upper, default):
-    try:
-        return max(lower, min(upper, float(value)))
-    except (TypeError, ValueError):
-        return default
+    """把 value 夹到 [lower, upper]；不可比较时返回 default。
+
+    结构优化阶段 4·B3 第五十一刀：本函数与 ``scripts/trader/signals.py`` 的同名函数原为逐字重复，
+    已收敛到 `r20_backend.math_utils.clamp`。
+
+    ⚠️ 名字保留在本模块：调用点按全局名查找，且 `patch.object(模块, "clamp")`
+    是既有接缝（别名赋值会让它失效）。
+    """
+    return _clamp(value, lower, upper, default)
 
 
 def single_evolution_cycle(func):
