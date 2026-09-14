@@ -19,6 +19,7 @@
 | `notifications.py` | `entry_action_message` / `entry_failure_message` / `trade_open_kwargs` 方向文案与通知参数（12 个方向常量收成单一来源） | 全部入参；`leverage` 与全部状态变更刻意留在门面 |
 | `cycle_snapshot.py` | `collect_pending_inst_ids` 外所挂单枚举与去重计数 + `build_state_payload` 面板状态快照 | venue_registry/load_instruments/信号求值函数，均调用期 |
 | `signal_snapshot.py` | `build_signal_snapshot` 开仓时刻因果/数理/舆情观测组装（自进化复盘数据源；B3 第八十二刀，零交易动作） | 唯一外部依赖 `DATA_DIR`（因子库快照路径根），门面壳调用期注入；专测 patch 面保真 |
+| `venue_query.py` | `query_positions` OKX 查持仓 + `venue_execution_ready` 就绪判定（登记/闸开/坏所摘除） + `fetch_other_venue_positions` 外所持仓全景 + `_venue_health_stamp` 健康观测读取 + `close_position_confirmed` 平仓后交易所侧确认（B3 第八十六刀） | 同名注入 ⇒ body 零例外逐字；`_BROKEN_VENUES` 按引用注入（读写同一集合）；三个跨模块注入项（position_mgmt / reservation_reconcile / venue_evidence）由门面调用期解析 |
 | `cloud_protection.py` | `amend_venue_stop_loss` 跨所云端 SL 棘轮（amend 优先/否则先挂新再撤旧）+ `_live_oco_coverage` 覆盖统计 + `ensure_cloud_position_protection` 100% OCO 校验修复 + `sync_cloud_algo_stop` 云端条件单同步（B3 第八十五刀） | 同名注入 ⇒ body 零例外逐字；`_live_oco_coverage` 亦按注入项传给 ensure（跨函数 patch 面） |
 | `order_lifecycle.py` | `clean_stale_open_orders` 超时挂单回收+同向重复单收敛（OKX 与外所同尺，fail-closed）+ `reconcile_pending_orders` 重启接管对账（B3 第八十四刀） | 同名注入 ⇒ body 零例外逐字；**嵌套闭包随函数整体迁**（`_intent_covers`/`_cancel_orphan`）；`_BROKEN_VENUES` 按引用注入 |
 | `ledger_writer.py` | `record_trade` 成交双写台账（policy 溯源→JSON 原子替换→SQLite）+ `record_open_intent` 意图簿写入时清理（B3 第八十三刀） | 同名注入 ⇒ body 零例外逐字；`record_trade_sqlite` 可为 None 的语义原样 |
