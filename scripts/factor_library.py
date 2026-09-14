@@ -26,6 +26,8 @@ from datetime import datetime, timedelta, timezone
 import subprocess
 import urllib.request
 from typing import Dict, Any, List, Optional
+
+from scripts.factors.defaults import build_default_factors
 from concurrent.futures import ThreadPoolExecutor
 
 _BJ = timezone(timedelta(hours=8))
@@ -52,101 +54,7 @@ def compute_instrument_factors(item: Dict[str, Any], smart_money_pool: Dict[str,
     ccy = item.get("ccy", "")
     headers = {"User-Agent": "Mozilla/5.0"}
     
-    factors = {
-        "instId": inst_id,
-        "name": name,
-        "timestamp": int(time.time()),
-        "price": 0.0,
-        "chg24h": 0.0,
-        
-        # Pillar 1: Trend & Momentum
-        "trend_momentum": {
-            "adx_1h": 0.0,
-            "rsi_14": 50.0,
-            "kdj_j": 50.0,
-            "vwap_bias_pct": 0.0,
-            "trend_regime": "NEUTRAL"
-        },
-        
-        # Pillar 2: Volatility & Channel
-        "volatility_channel": {
-            "atr_14": 0.0,
-            "atr_pct": 0.0,
-            "atr_1h": 0.0,
-            "atr_1h_pct": 0.0,
-            "bb_width_1h": 0.0,
-            "volatility_regime": "NORMAL"
-        },
-        
-        # Pillar 3: Volume & Money Flow
-        "volume_money_flow": {
-            "vol_ratio_15m": 1.0,
-            "obv_flow": "NEUTRAL",
-            "cmf_1h": 0.0,
-            "taker_net_usd": "0 U",
-            "flow_sentiment": "BALANCED"
-        },
-        
-        # Pillar 4: Microstructure & Orderbook
-        "microstructure": {
-            "bid_px": 0.0,
-            "ask_px": 0.0,
-            "spread_pct": 0.0,
-            "bid_ask_depth_ratio": 1.0,
-            "depth_bias": "NEUTRAL"
-        },
-        
-        # Pillar 5: Smart Money & Derivatives
-        # 缺失语义：OKX CLI 已移除且 smartmoney 无公开 V5 等价接口。数据源缺失时
-        # 显式 available=False + 占位符，禁止以 50/NEUTRAL/0 中性值冒充真实信号。
-        "smart_money_derivatives": {
-            "available": False,
-            "reason": "OKX CLI 已移除，smartmoney 无公开 V5 等价接口（待接新数据源）",
-            "weighted_long_pct": "--",
-            "smart_money_flow_usd": "--",
-            "funding_rate_pct": 0.0,
-            "oi_usd": "--",
-            "long_short_ratio": "--",
-            "avg_long_entry": "--",
-            "avg_short_entry": "--",
-            "top_win_rate": "--",
-            "signal": "UNAVAILABLE"
-        },
-
-        # Pillar 6: Calculus, Definite Integrals & Probability Theory
-        "calculus_dynamics": {
-            "velocity": 0.0,
-            "acceleration": 0.0,
-            "impulse": 0.0,
-            "jerk": 0.0,
-            "curvature": 0.0,
-            "power": 0.0,
-            "power_regime": "STEADY_FLUX",
-            "regime": "RANGE_LOW_VELOCITY",
-            "quality": 0.0,
-            "direction": 0
-        },
-        "definite_integrals": {
-            "energy_integral": 0.0,
-            "deviation_area_integral": 0.0,
-            "volume_action_integral": 0.0,
-            "integral_regime": "BALANCED_ENERGY"
-        },
-        "probability_theory": {
-            "skewness": 0.0,
-            "kurtosis": 0.0,
-            "continuation_prob_pct": 50.0,
-            "breakdown_prob_pct": 50.0,
-            "var_95_pct": 1.5,
-            "cvar_95_pct": 2.2,
-            "prob_regime": "GAUSSIAN_BALANCED",
-            "is_fat_tail": False
-        },
-        
-        # Composite Factor Score (-100 to +100)
-        "composite_alpha_score": 0.0,
-        "signal_recommendation": "WAIT"
-    }
+    factors = build_default_factors(inst_id, name)
 
     # 1. Ticker & Depth (Orderbook)
     try:
