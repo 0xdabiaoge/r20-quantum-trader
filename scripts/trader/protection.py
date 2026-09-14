@@ -44,6 +44,50 @@ def protection_signals(*, is_long, cur_px, hard_stop_px):
     )
 
 
+# 反过早收紧止损的三个判定常量（原门面内联字面量，逐个搬来、值不得改）
+EARLY_TIGHTEN_MIN_PROFIT_ATR = 1.2   # 浮盈须达 1.2x ATR 才算"有意义的盈利"
+EARLY_TIGHTEN_BUFFER_ATR = 0.7       # 现价与新止损之间须留 0.7x ATR 呼吸垫
+EARLY_TIGHTEN_ATR_FLOOR_RATIO = 0.012  # ATR 缺失时的地板：现价的 1.2%
+
+
+def ai_tightens_stop(instruction, position):
+    """AI 持仓指令 `UPDATE_SL` 是否**真的在收紧风险**（返回 bool）。
+
+    原门面 `execute_ai_position_management` 里的内联长空双分支（约 10 行）。
+    **该路径在重构前零测试覆盖**，而它决定"要不要动真实止损单" —— 判定放松
+    就是账户裸奔，收紧方向判反就是自伤。故抽成纯函数并补差分对拍。
+
+    判定要点（原样保留，值不得改）：
+    - `new_sl > 0` 且新止损必须落在 [入场价, 现价] 区间内（长）/ [现价, 入场价]（空）；
+    - 浮盈 >= 1.2x ATR；
+    - 现价与新止损之间 >= 0.7x ATR 呼吸垫（防噪声打到）。
+    - ATR 取 `max(atr_1h, atr, 现价*1.2%)`，缺失时用现价比例兜底。
+    - `posSide` 既不是 long 也不是 short：一律 False（原样保留）。
+    """
+    new_sl = float(instruction.get("suggested_sl_price", 0) or 0)
+    side = str(position.get("posSide", "net")).lower()
+    current_px = float(position.get("markPx", position.get("last", 0)) or 0)
+    avg_px = float(position.get("avgPx", 0) or 0)
+    atr_val = max(float(position.get("atr_1h", 0) or 0),
+                  float(position.get("atr", 0) or 0),
+                  current_px * EARLY_TIGHTEN_ATR_FLOOR_RATIO)
+
+    if side == "long":
+        min_profit_reached = (current_px - avg_px) >= EARLY_TIGHTEN_MIN_PROFIT_ATR * atr_val
+        safe_buffer_from_current = (current_px - new_sl) >= EARLY_TIGHTEN_BUFFER_ATR * atr_val
+        tightens_risk = (new_sl > 0 and avg_px <= new_sl < current_px
+                         and min_profit_reached and safe_buffer_from_current)
+    elif side == "short":
+        min_profit_reached = (avg_px - current_px) >= EARLY_TIGHTEN_MIN_PROFIT_ATR * atr_val
+        safe_buffer_from_current = (new_sl - current_px) >= EARLY_TIGHTEN_BUFFER_ATR * atr_val
+        tightens_risk = (new_sl > 0 and current_px < new_sl <= avg_px
+                         and min_profit_reached and safe_buffer_from_current)
+    else:
+        tightens_risk = False
+
+    return bool(tightens_risk)
+
+
 def ratcheted_trailing_stop(*, is_long, entry_px, atr, prec, peak_profit_px,
                             old_sl, tier1_breakeven_trigger, tier2_lock_trigger):
     """按峰值浮盈把保底止损**单向**推进，返回 `(dynamic_floor_sl, stage_desc)`。

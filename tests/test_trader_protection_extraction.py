@@ -34,6 +34,7 @@ if scripts_dir not in sys.path:
     sys.path.insert(0, scripts_dir)
 
 from scripts.trader.protection import (
+    ai_tightens_stop,
     close_fee,
     close_trade_payload,
     protection_signals,
@@ -48,6 +49,27 @@ def _legacy_hard_stop_hit(is_long, cur_px, hard_stop_px):
     return hard_stop_px > 0 and (
         (is_long and cur_px <= hard_stop_px) or (not is_long and cur_px >= hard_stop_px)
     )
+
+
+def _legacy_tightens_stop(instruction, position):
+    """搬走前门面 `execute_ai_position_management` 里的内联长空双分支（逐字原样）。"""
+    new_sl = float(instruction.get("suggested_sl_price", 0) or 0)
+    pos_side = str(position.get("posSide", "net")).lower()
+    current_px = float(position.get("markPx", position.get("last", 0)) or 0)
+    avg_px = float(position.get("avgPx", 0) or 0)
+    atr_val = max(float(position.get("atr_1h", 0) or 0),
+                  float(position.get("atr", 0) or 0), current_px * 0.012)
+    if pos_side == "long":
+        min_profit_reached = (current_px - avg_px) >= 1.2 * atr_val
+        safe_buffer_from_current = (current_px - new_sl) >= 0.7 * atr_val
+        tightens_risk = new_sl > 0 and avg_px <= new_sl < current_px and min_profit_reached and safe_buffer_from_current
+    elif pos_side == "short":
+        min_profit_reached = (avg_px - current_px) >= 1.2 * atr_val
+        safe_buffer_from_current = (new_sl - current_px) >= 0.7 * atr_val
+        tightens_risk = new_sl > 0 and current_px < new_sl <= avg_px and min_profit_reached and safe_buffer_from_current
+    else:
+        tightens_risk = False
+    return tightens_risk
 
 
 def _legacy_ratchet_long(entry_px, atr, prec, peak_profit_px, old_sl,
@@ -195,6 +217,98 @@ class RatchetedTrailingStopParityTest(unittest.TestCase):
             is_long=False, entry_px=30000.0, atr=100.0, prec=2, peak_profit_px=300.0,
             old_sl=0.0, tier1_breakeven_trigger=150.0, tier2_lock_trigger=220.0)
         self.assertEqual(floor_short, 0.0)
+
+
+class AiTightensStopParityTest(unittest.TestCase):
+    """`ai_tightens_stop` 与旧内联判定逐值对拍。
+
+    这条路径在重构前**全仓零测试覆盖**，却决定"要不要动真实止损单"。
+    """
+
+    def _assert_parity(self, instruction, position):
+        got = ai_tightens_stop(instruction, position)
+        expected = _legacy_tightens_stop(instruction, position)
+        self.assertEqual(got, bool(expected),
+                         f"判定分叉: instruction={instruction} position={position}")
+
+    def test_random_parity(self):
+        rng = random.Random(20260918)
+        for _ in range(20000):
+            pos_side = rng.choice(["long", "short", "net", "LONG", "Short"])
+            avg_px = rng.uniform(0.0001, 100000.0)
+            current_px = avg_px * rng.uniform(0.5, 1.8)
+            position = {
+                "posSide": pos_side,
+                "avgPx": avg_px,
+                "markPx": current_px,
+                "atr": rng.choice([0.0, rng.uniform(0.0, avg_px * 0.05)]),
+            }
+            if rng.random() < 0.4:
+                position["atr_1h"] = rng.uniform(0.0, avg_px * 0.05)
+            if rng.random() < 0.1:
+                del position["markPx"]
+                position["last"] = current_px
+            instruction = {"suggested_sl_price": rng.choice([
+                0.0, -1.0, current_px, avg_px,
+                avg_px + (current_px - avg_px) * rng.uniform(-0.5, 1.5),
+            ])}
+            self._assert_parity(instruction, position)
+
+    def test_long_accepts_safe_tightening(self):
+        # 入场 100、现价 110、ATR 2 → 浮盈 10 >= 1.2*2；新止损 108，缓冲 2 >= 0.7*2
+        self.assertTrue(ai_tightens_stop(
+            {"suggested_sl_price": 108.0},
+            {"posSide": "long", "avgPx": 100.0, "markPx": 110.0, "atr": 2.0}))
+
+    def test_short_accepts_safe_tightening(self):
+        # 入场 110、现价 100、ATR 2 → 浮盈 10；新止损 102，缓冲 2 >= 1.4
+        self.assertTrue(ai_tightens_stop(
+            {"suggested_sl_price": 102.0},
+            {"posSide": "short", "avgPx": 110.0, "markPx": 100.0, "atr": 2.0}))
+
+    def test_rejects_when_profit_too_small(self):
+        """浮盈不足 1.2x ATR → 拒绝（原注释说的"有意义的盈利"门槛）。"""
+        self.assertFalse(ai_tightens_stop(
+            {"suggested_sl_price": 100.5},
+            {"posSide": "long", "avgPx": 100.0, "markPx": 100.8, "atr": 2.0}))
+
+    def test_rejects_when_buffer_too_close(self):
+        """新止损贴现价太近（< 0.7x ATR）→ 拒绝，防噪声打到。"""
+        self.assertFalse(ai_tightens_stop(
+            {"suggested_sl_price": 109.9},
+            {"posSide": "long", "avgPx": 100.0, "markPx": 110.0, "atr": 2.0}))
+
+    def test_rejects_when_stop_would_loosen(self):
+        """新止损低于入场价（等于放松风险）→ 必须拒绝。"""
+        self.assertFalse(ai_tightens_stop(
+            {"suggested_sl_price": 95.0},
+            {"posSide": "long", "avgPx": 100.0, "markPx": 110.0, "atr": 2.0}))
+        self.assertFalse(ai_tightens_stop(
+            {"suggested_sl_price": 115.0},
+            {"posSide": "short", "avgPx": 110.0, "markPx": 100.0, "atr": 2.0}))
+
+    def test_rejects_non_positive_or_missing_stop(self):
+        for bad in (0.0, -1.0, None):
+            inst = {} if bad is None else {"suggested_sl_price": bad}
+            self.assertFalse(ai_tightens_stop(
+                inst, {"posSide": "long", "avgPx": 100.0, "markPx": 110.0, "atr": 2.0}))
+
+    def test_unknown_side_is_false(self):
+        for side in ("net", "", "LONGER", "both"):
+            self.assertFalse(ai_tightens_stop(
+                {"suggested_sl_price": 108.0},
+                {"posSide": side, "avgPx": 100.0, "markPx": 110.0, "atr": 2.0}))
+
+    def test_atr_falls_back_to_price_ratio(self):
+        """ATR 与 atr_1h 都缺失时用 现价*1.2% 兜底（不是 0，否则门槛失效）。"""
+        # 现价 1000 → ATR 地板 12；浮盈 20 >= 14.4 通过；止损 990 缓冲 10 < 8.4? 否 → 10 >= 8.4 通过
+        self.assertTrue(ai_tightens_stop(
+            {"suggested_sl_price": 990.0},
+            {"posSide": "long", "avgPx": 980.0, "markPx": 1000.0}))
+        # 同一组但止损贴到 998（缓冲 2 < 8.4）→ 拒绝
+        self.assertFalse(ai_tightens_stop(
+            {"suggested_sl_price": 998.0},
+            {"posSide": "long", "avgPx": 980.0, "markPx": 1000.0}))
 
 
 class CloseFeeParityTest(unittest.TestCase):

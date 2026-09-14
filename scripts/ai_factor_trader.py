@@ -43,6 +43,7 @@ from scripts.trader.factors import fetch_single_instrument_data as _fetch_single
 from scripts.trader.protection import (
     protection_signals,
     ratcheted_trailing_stop,
+    ai_tightens_stop,
     close_fee as _close_fee,
     close_trade_payload as _close_trade_payload,
 )
@@ -2234,7 +2235,6 @@ def execute_ai_position_management(real_pos_dict, trackers, timestamp_full, exec
         pos_side = str(position.get("posSide", "net")).lower()
         pos_venue = str(position.get("venue") or position.get("exchange") or "okx").lower()
         current_px = float(position.get("markPx", position.get("last", 0)) or 0)
-        avg_px = float(position.get("avgPx", 0) or 0)
         name = inst_id.replace("-USDT-SWAP", "")
 
         if action == "CLOSE_MARKET":
@@ -2250,21 +2250,9 @@ def execute_ai_position_management(real_pos_dict, trackers, timestamp_full, exec
 
         elif action == "UPDATE_SL":
             new_sl = float(instruction.get("suggested_sl_price", 0) or 0)
-            atr_val = max(float(position.get("atr_1h", 0) or 0), float(position.get("atr", 0) or 0), current_px * 0.012)
-            
-            # Anti-premature trailing fix:
-            # 1. Do NOT move SL up until price is at least +1.2x ATR above entry (meaningful profit)
-            # 2. Maintain at least 0.8x ATR breathing buffer between current price and new SL to prevent tagging by noise
-            if pos_side == "long":
-                min_profit_reached = (current_px - avg_px) >= 1.2 * atr_val
-                safe_buffer_from_current = (current_px - new_sl) >= 0.7 * atr_val
-                tightens_risk = new_sl > 0 and avg_px <= new_sl < current_px and min_profit_reached and safe_buffer_from_current
-            elif pos_side == "short":
-                min_profit_reached = (avg_px - current_px) >= 1.2 * atr_val
-                safe_buffer_from_current = (new_sl - current_px) >= 0.7 * atr_val
-                tightens_risk = new_sl > 0 and current_px < new_sl <= avg_px and min_profit_reached and safe_buffer_from_current
-            else:
-                tightens_risk = False
+            # 反过早收紧判定见 scripts/trader/protection.py::ai_tightens_stop
+            # （判定收紧方向；放松即账户裸奔）。三个阈值常量随函数搬去，值未改。
+            tightens_risk = ai_tightens_stop(instruction, position)
 
             if not tightens_risk:
                 executed_actions.append(f"[{name}] 浮盈空间不足或与现价缓冲过近({current_px} vs 拟调SL {new_sl})，拒绝过早收紧止损")
