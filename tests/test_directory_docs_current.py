@@ -69,6 +69,8 @@ MANAGED = {
     "r20_backend/venue_routing": {"allowed_extra": {"venue_router.py"}},
     # 第四十四刀新增：快讯纯判断逻辑外提（门面仍是 news_sentiment_harvester.py）。
     "scripts/news": {"allowed_extra": {"news_sentiment_harvester.py"}},
+    # 第四十五刀新增：微积分引擎实现外提（门面仍只做再导出）。
+    "scripts/calculus": {"allowed_extra": {"calculus_engine.py"}},
 }
 
 #: 从文档里抽出的 `xxx.py` 文件名。
