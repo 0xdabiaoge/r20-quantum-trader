@@ -4,11 +4,27 @@ import { useToast } from '../../composables/useToast'
 import { useConfirm } from '../../composables/useConfirm'
 const toast = useToast()
 const { ask } = useConfirm()
-import { computed, ref, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import PageHeader from '../../components/admin/PageHeader.vue'
 import { useI18n } from '../../composables/useI18n'
 import { useApi } from '../../composables/useApi'
 import { useAuthStore } from '../../stores/auth'
+import {
+  CONSENSUS_MODES,
+  DATA_SLOTS,
+  buildCouncilImportPayload,
+  buildCouncilSavePayload,
+  consensusModeName,
+  isBuiltinTrader,
+  isCioSeat,
+  isModelMissing,
+  nextExpandedRole,
+  roleColorOf,
+  roleDisplayName,
+  roleIconKeyOf,
+  roleIdOf,
+  roleTitleOf,
+} from './council/councilLogic'
 import {Users,
   Shield,
   Zap,
@@ -46,57 +62,19 @@ const availableSuites = ref<any[]>([])
 const availableModels = ref<any[]>([])
 /** 审计 P1-4b：席位绑定的 model_id 不在模型库 → 后端会静默回落主脑，UI 必须说出来 */
 function modelMissing(role: any): boolean {
-  const id = String(role?.model_id || '').trim()
-  if (!id) return false
-  return !availableModels.value.some((m: any) => String(m?.id) === id)
+  return isModelMissing(role, availableModels.value)
 }
 const expandedRole = ref<string>('trader_trend')
 const testResult = ref<any>(null)
 const expandedReasoning = ref<Record<string, boolean>>({})
 
-const consensusModes = computed(() => [
-  {
-    id: 'standard',
-    name: t('admin.council.modeStandardName'),
-    tag: t('admin.council.modeStandardTag'),
-    desc: t('admin.council.modeStandardDesc'),
-  },
-  {
-    id: 'cross_examination',
-    name: t('admin.council.modeCrossName'),
-    tag: t('admin.council.modeCrossTag'),
-    desc: t('admin.council.modeCrossDesc'),
-  },
-])
-
-/** 审计 P1-4d：插入槽位必须是 prompt_library.ALLOWED_VARIABLES 里的真变量。
- *  旧列表 6 个里 5 个（macro_4h/calculus_1h/smart_money/orderbook_depth/sentiment）
- *  不是合法变量 → 插进去只会渲染成 [UNKNOWN_VARIABLE:x]，模型永远拿不到值。 */
-const dataSlots = computed(() => [
-  { k: 'market_matrix', label: t('admin.council.slotMarketMatrix') },
-  { k: 'account_balance', label: t('admin.council.slotBalance') },
-  { k: 'account_positions', label: t('admin.council.slotPositions') },
-  { k: 'pending_orders', label: t('admin.council.slotOrders') },
-  { k: 'risk_budget', label: t('admin.council.slotRiskBudget') },
-  { k: 'active_instruments', label: t('admin.council.slotInstruments') },
-  { k: 'news_intelligence', label: t('admin.council.slotNews') },
-  { k: 'trading_memory', label: t('admin.council.slotMemory') },
-])
-
+/** 图标表：键由 councilLogic.roleIconKeyOf() 决定（未知席位 → 'custom'）。 */
 const roleIcons: Record<string, any> = {
   trader_trend: Shield,
   trader_momentum: Zap,
   trader_quant: Cpu,
   cio: Users,
   custom: Sliders,
-}
-
-const roleColors: Record<string, string> = {
-  trader_trend: 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10',
-  trader_momentum: 'text-amber-400 border-amber-500/30 bg-amber-500/10',
-  trader_quant: 'text-cyan-400 border-cyan-500/30 bg-cyan-500/10',
-  cio: 'text-purple-400 border-purple-500/30 bg-purple-500/10',
-  custom: 'text-blue-400 border-blue-500/30 bg-blue-500/10',
 }
 
 async function loadData() {
@@ -109,10 +87,7 @@ async function loadData() {
     councilConfig.value = cRes
     availableSuites.value = cRes.available_suites || []
     availableModels.value = mRes.models || []
-    const roleKeys = Object.keys(cRes.roles || {})
-    if (roleKeys.length > 0 && !roleKeys.includes(expandedRole.value)) {
-      expandedRole.value = roleKeys[0]
-    }
+    expandedRole.value = nextExpandedRole(Object.keys(cRes.roles || {}), expandedRole.value)
   } catch (e: any) {
     toast.err(`加载配置失败: ${e.message}`)
   } finally {
@@ -129,16 +104,11 @@ async function saveConfig() {
   try {
     const res = await api('/api/v1/admin/council/config', {
       method: 'PUT',
-      body: JSON.stringify({
-        enabled: councilConfig.value.enabled,
-        consensus_mode: councilConfig.value.consensus_mode || 'standard',
-        timeout_seconds: Number(councilConfig.value.timeout_seconds) || 240.0,
-        roles: councilConfig.value.roles,
-      }),
+      body: JSON.stringify(buildCouncilSavePayload(councilConfig.value)),
     })
     councilConfig.value = res.config
     toast.ok(councilConfig.value.enabled
-        ? `对冲基金投委会配置已保存并生效（${consensusModes.value.find((m) => m.id === councilConfig.value.consensus_mode)?.name || '标准提案模式'}）`
+        ? `对冲基金投委会配置已保存并生效（${consensusModeName(councilConfig.value.consensus_mode, '标准提案模式')}）`
         : '投委会配置已保存（当前为单模型直连决策）')
   } catch (e: any) {
     toast.err(`保存失败: ${e.message}`)
@@ -194,7 +164,7 @@ async function doImportConfig() {
   try {
     const res = await api('/api/v1/admin/council/import', {
       method: 'POST',
-      body: JSON.stringify({ payload }),
+      body: JSON.stringify(buildCouncilImportPayload(payload)),
     })
     await loadData()
     importVisible.value = false
@@ -225,7 +195,7 @@ async function applySuite(suiteId: string) {
 
 function addNewCustomTrader() {
   if (!auth.isSuperadmin) return
-  const roleId = `trader_${Date.now().toString(36)}`
+  const roleId = roleIdOf()
   councilConfig.value.roles[roleId] = {
     id: roleId,
     name: '自定义交易员',
@@ -251,18 +221,18 @@ function addNewCustomTrader() {
 async function removeRole(roleId: string) {
   if (!auth.isSuperadmin) return
   const role = councilConfig.value.roles[roleId]
-  if (role?.is_arbitrator || roleId === 'cio') {
+  if (isCioSeat(role, roleId)) {
     toast.warn('首席投资官 (CIO) 负责终审收口与发单，不可删除！')
     return
   }
-  const _ok = await ask({ title: '移除交易员席位', desc: `【${role?.name || roleId}】席位将被移除`, danger: true, okText: '移除' })
+  const _ok = await ask({ title: '移除交易员席位', desc: `【${roleDisplayName(role, roleId)}】席位将被移除`, danger: true, okText: '移除' })
   if (!_ok) return
   delete councilConfig.value.roles[roleId]
   toast.warn('已移除席位，点击右上角「保存配置」后生效')
 }
 
 async function resetRole(roleId: string) {
-  const _ok = await ask({ title: '恢复出厂提示词', desc: `【${councilConfig.value.roles[roleId]?.name || roleId}】的自定义提示词将被覆盖`, danger: true, okText: '恢复' })
+  const _ok = await ask({ title: '恢复出厂提示词', desc: `【${roleDisplayName(councilConfig.value.roles[roleId], roleId)}】的自定义提示词将被覆盖`, danger: true, okText: '恢复' })
   if (!_ok) return
   try {
     const res = await api('/api/v1/admin/council/reset-role', {
@@ -413,7 +383,7 @@ onMounted(loadData)
       <!-- Consensus Mode Selection Grid -->
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div
-          v-for="mode in consensusModes"
+          v-for="mode in CONSENSUS_MODES"
           :key="mode.id"
           @click="auth.isSuperadmin && (councilConfig.consensus_mode = mode.id)"
           class="p-3 rounded-xl border transition-all cursor-pointer shadow-xs"
@@ -496,9 +466,9 @@ onMounted(loadData)
           <div class="flex items-center space-x-3 min-w-0 flex-1">
             <span
               class="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs border shrink-0"
-              :class="roleColors[roleId] || roleColors['custom']"
+              :class="roleColorOf(String(roleId))"
             >
-              <component :is="roleIcons[roleId] || roleIcons['custom']" class="w-4 h-4" />
+              <component :is="roleIcons[roleIconKeyOf(String(roleId))]" class="w-4 h-4" />
             </span>
             <div class="min-w-0 flex-1">
               <div class="flex flex-wrap items-center gap-2">
@@ -513,10 +483,10 @@ onMounted(loadData)
                   class="rounded px-2 py-0.5 text-[11px] border"
                   style="background-color: var(--surface-1); border-color: var(--line-1); color: var(--ink-2);"
                 >
-                  {{ role.role_title || (role.is_arbitrator ? t('admin.council.cioTitle') : 'Senior Trader') }}
+                  {{ roleTitleOf(role, isCioSeat(role, String(roleId)) ? t('admin.council.cioTitle') : 'Senior Trader') }}
                 </span>
                 <span
-                  v-if="role.is_arbitrator || roleId === 'cio'"
+                  v-if="isCioSeat(role, String(roleId))"
                   class="text-[11px] font-bold px-1.5 py-0.2 rounded border shrink-0 text-purple-400 border-purple-500/30 bg-purple-500/10"
                 >
                   {{ t('admin.council.arbitratorBadge') }}
@@ -564,7 +534,7 @@ onMounted(loadData)
             </div>
 
             <!-- Weight (For traders only) -->
-            <div v-if="!role.is_arbitrator && roleId !== 'cio'" class="flex items-center space-x-1">
+            <div v-if="!isCioSeat(role, String(roleId))" class="flex items-center space-x-1">
               <span class="text-[11px] text-[var(--ink-2)]" :title="t('admin.council.weightHint')">{{ t('admin.council.weightLabel') }}</span>
               <input
                 v-model="role.weight"
@@ -580,7 +550,7 @@ onMounted(loadData)
 
             <!-- Enable / Mute Toggle -->
             <button
-              v-if="!role.is_arbitrator && roleId !== 'cio'"
+              v-if="!isCioSeat(role, String(roleId))"
               @click="role.enabled = role.enabled === false ? true : false"
               :disabled="!auth.isSuperadmin"
               class="cursor-pointer p-1"
@@ -593,7 +563,7 @@ onMounted(loadData)
 
             <!-- Delete (Only for custom traders) -->
             <button
-              v-if="!role.is_arbitrator && roleId !== 'cio' && !['trader_trend', 'trader_momentum', 'trader_quant'].includes(String(roleId))"
+              v-if="!isCioSeat(role, String(roleId)) && !isBuiltinTrader(String(roleId))"
               @click="removeRole(String(roleId))"
               :disabled="!auth.isSuperadmin"
               class="p-1.5 rounded text-rose-400 hover:opacity-80 cursor-pointer"
@@ -637,7 +607,7 @@ onMounted(loadData)
             <div class="flex flex-wrap items-center gap-1 text-[11px]">
               <span class="text-[var(--ink-2)]" :title="t('admin.council.insertSlotHint')">{{ t('admin.council.insertSlotLabel') }}</span>
               <button
-                v-for="slot in dataSlots"
+                v-for="slot in DATA_SLOTS"
                 :key="slot.k"
                 type="button"
                 @click="role.prompt = role.prompt ? `${role.prompt.trim()}\n${t('admin.council.slotVerifyLine')}{{${slot.k}}}` : `{{${slot.k}}}`"

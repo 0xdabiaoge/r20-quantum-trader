@@ -578,12 +578,29 @@ class CouncilPromptRenderingTests(_Base):
         self.assertIn("runtime_context", src)
 
     def test_ui_slots_are_real_variables(self):
-        """UI 的"插入槽位"必须都是 prompt_library 认得的变量（旧列表 6 个里 5 个非法）。"""
+        """UI 的"插入槽位"必须都是 prompt_library 认得的变量（旧列表 6 个里 5 个非法）。
+
+        ⚠️ 第六十刀把 `dataSlots` 从 `CouncilPage.vue` 搬进了
+        `views/admin/council/councilLogic.ts`，本用例随之改为扫描**两个文件**。
+
+        ⚠️⚠️ 这里刻意**不**改成"import 那个 ts 模块再读 DATA_SLOTS"：
+        那样做，本用例就**不再强制任何源文件里存在槽位定义** ——
+        把定义删掉、只在测试旁边的变量里留一份，用例照样绿。
+        扫源文件虽然粗糙，但它保证"真值在源码里"。
+        """
         import re
         import prompt_library as pl
-        src = (ROOT / "frontend" / "src" / "views" / "admin" / "CouncilPage.vue").read_text(encoding="utf-8")
-        keys = re.findall(r"\{ k: '([a-z0-9_]+)'", src)
-        self.assertTrue(keys, "未解析到槽位定义")
+        candidates = [
+            ROOT / "frontend" / "src" / "views" / "admin" / "CouncilPage.vue",
+            ROOT / "frontend" / "src" / "views" / "admin" / "council" / "councilLogic.ts",
+        ]
+        # `{ k: 'x' }`（单引号，旧形态）或 `{ k: "x" }`（双引号）都要能读到
+        keys = []
+        for f in candidates:
+            self.assertTrue(f.exists(), f"槽位定义所在文件不存在: {f}")
+            keys += re.findall(r"\{ k: ['\"]([a-z0-9_]+)['\"]", f.read_text(encoding="utf-8"))
+        self.assertTrue(keys, "未解析到槽位定义（源码里必须存在真值）")
+        self.assertGreaterEqual(len(keys), 8, f"槽位数量异常地少（{len(keys)}）—— 是否被删了？")
         invalid = [k for k in keys if k not in pl.ALLOWED_VARIABLES]
         self.assertEqual(invalid, [], f"槽位里有非法变量（会渲染成 [UNKNOWN_VARIABLE]）: {invalid}")
 
