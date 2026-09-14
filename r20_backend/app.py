@@ -1,5 +1,6 @@
 """Standalone control plane: modular APIRouter-based architecture."""
 from __future__ import annotations
+
 import hmac
 import os
 import sys
@@ -76,13 +77,32 @@ class MemoryUpdateAllRequest(BaseModel):
     expected_version: str | None = Field(default=None, max_length=64)
 
 
+
+
 def require_admin_token(token: str) -> None:
+    """⚠️ 本函数**必须**定义在 `app.py`，不能只从 dependencies 导入。
+
+    它看起来与 `r20_backend/dependencies.py::require_admin_token` 逐字重复
+    （结构优化阶段 4·B3 第四十七刀曾据此把它删掉），但那份重复是**承重的**：
+
+    `tests/test_memory_routes_isolated.py` 用 AST 抽出 `app.py` 的
+    **顶层函数/类定义**，再 `exec` 到一个**隔离作用域**里跑内存路由的
+    端到端测试 —— 该作用域**显式提供了 `hmac` 与 `settings`**
+    （`settings=SimpleNamespace(admin_token='', setup_token='')`），
+    并断言抽到的名字集合**恰好**含 `require_admin_token`。
+
+    若这里改成 import，AST 抽不到它 → 隔离作用域里 `NameError`
+    → 23 个内存路由测试全红（实测）。所以删除该重复**会**破坏
+    app.py 的"可隔离执行"这个既有契约。
+
+    已把这条约束钉成测试：见
+    `tests/test_admin_token_duplication_contract.py`。
+    """
     expected = settings.admin_token or settings.setup_token
     if not expected:
         raise HTTPException(status_code=503, detail="后台尚未设置 R20_SETUP_TOKEN 或 R20_ADMIN_TOKEN")
     if not hmac.compare_digest(token, expected):
         raise HTTPException(status_code=403, detail="管理员令牌无效")
-
 
 def current_admin(x_r20_session: str | None = None, x_r20_admin_token: str | None = None) -> dict[str, Any]:
     user = admin_auth.validate_session(x_r20_session or "")
