@@ -68,7 +68,13 @@ class ChannelBusinessCodeTests(unittest.TestCase):
 
     def test_telegram_http_200_error_is_failure(self):
         env={"R20_TELEGRAM_BOT_TOKEN":"T","R20_TELEGRAM_CHAT_ID":"1"}
-        with patch.object(notifications,"_post_json",return_value=(True,"HTTP 200",{"ok":False,"description":"denied"})):
+        # 第七十八刀：`_post_json` 已假，但 telegram 分支发送前还调
+        # `validate_outbound_url`（SSRF 防线，内部 getaddrinfo 真解析
+        # api.telegram.org）—— 本用例验证的是**业务响应码判定**，
+        # 不该为它发真 DNS（离线守护下必被拦；wecom 用例同款 patch）。
+        with patch.object(notifications,"validate_outbound_url",
+                          side_effect=lambda u, **k: u), \
+             patch.object(notifications,"_post_json",return_value=(True,"HTTP 200",{"ok":False,"description":"denied"})):
             self.assertFalse(notifications.send_channel("telegram","x",env)[0])
 
     def test_qq_http_200_error_is_failure(self):

@@ -226,6 +226,9 @@ with make_old(t)():
 '''
 
     def test_new_shared_implementation_does_not_hang(self):
+        # 第七十八刀：以 spawn 为被测行为，离线守护下如实 skip（守卫在 spawn 前）。
+        from tests.config_sandbox import skip_if_offline_suite
+        skip_if_offline_suite(self)
         code = (
             "import sys; sys.path.insert(0, %r)\n"
             "import tempfile, pathlib\n"
@@ -246,6 +249,9 @@ with make_old(t)():
         旧实现在嵌套时是**阻塞**（不抛异常、不打日志、进程不退出），
         这正是它危险的原因：没有任何错误信号。
         """
+        # 第七十八刀：以 spawn 为被测行为，离线守护下如实 skip（守卫在 spawn 前）。
+        from tests.config_sandbox import skip_if_offline_suite
+        skip_if_offline_suite(self)
         try:
             subprocess.run([sys.executable, "-c", self.OLD_IMPL],
                            capture_output=True, text=True, timeout=8, cwd=str(ROOT))
@@ -286,6 +292,9 @@ class FacadeWiringTest(unittest.TestCase):
         故这里用子进程 + `TempDirectory`，并把 `LIBRARY_FILE`/`POOL_FILE`
         一并指向临时目录 —— **绝不触碰真实 `data/`**。
         """
+        # 第七十八刀：以 spawn 为被测行为，离线守护下如实 skip（守卫在 spawn 前）。
+        from tests.config_sandbox import skip_if_offline_suite
+        skip_if_offline_suite(self)
         probe = """
 import sys, tempfile, pathlib
 sys.path.insert(0, %r)
@@ -314,6 +323,9 @@ assert (d / '.library_file.json.lock').exists() or (d / '.pool_file.json.lock').
         做法：同一探针里断言 `local_file_lock` 被真的调到 ——
         通过检查锁文件是否落在临时目录（后端锁不会创建它）。
         """
+        # 第七十八刀：以 spawn 为被测行为，离线守护下如实 skip（守卫在 spawn 前）。
+        from tests.config_sandbox import skip_if_offline_suite
+        skip_if_offline_suite(self)
         probe = """
 import sys, tempfile, pathlib
 sys.path.insert(0, %r)
@@ -347,6 +359,9 @@ assert created == ['.pool.json.lock'], created
         `ModuleNotFoundError: No module named 'local_lock'`（3 例翻红）。
         本用例在**子进程**里分别验证两种布局。
         """
+        # 第七十八刀：以 spawn 为被测行为，离线守护下如实 skip（守卫在 spawn 前）。
+        from tests.config_sandbox import skip_if_offline_suite
+        skip_if_offline_suite(self)
         bare = ("import sys\n"
                 "sys.path.insert(0, %r)\n"
                 "import prompt_library, instrument_pool\n"

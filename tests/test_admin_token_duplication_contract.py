@@ -140,6 +140,9 @@ class LoadBearingDuplicationTest(unittest.TestCase):
 class IsolationContractStillGreenTest(unittest.TestCase):
     def test_memory_routes_isolated_passes(self):
         """直接跑那道因我删重复而翻红的测试模块（23 例）。"""
+        # 第七十八刀：以 spawn 为被测行为，离线守护下如实 skip（守卫在 spawn 前）。
+        from tests.config_sandbox import skip_if_offline_suite
+        skip_if_offline_suite(self)
         r = subprocess.run([sys.executable, "-m", "unittest",
                             "tests.test_memory_routes_isolated"],
                            cwd=str(ROOT), capture_output=True, text=True)

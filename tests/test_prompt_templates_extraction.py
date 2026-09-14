@@ -316,6 +316,9 @@ class DualImportTest(unittest.TestCase):
     """⚠️ 本刀又一次踩了双模导入的坑（与第四十八刀 `local_lock` 相同）。"""
 
     def test_imports_under_both_path_layouts(self):
+        # 第七十八刀：以 spawn 为被测行为，离线守护下如实 skip（守卫在 spawn 前）。
+        from tests.config_sandbox import skip_if_offline_suite
+        skip_if_offline_suite(self)
         import subprocess
         cases = {
             "bare": ("import sys\nsys.path.insert(0, %r)\n"

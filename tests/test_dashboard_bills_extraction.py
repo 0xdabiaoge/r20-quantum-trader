@@ -573,11 +573,17 @@ class UpdateCacheCycleIntegrationTest(unittest.TestCase):
         return json.loads(line[len("CYCLE_JSON "):])
 
     def test_cycle_produces_payload(self):
+        # 第七十八刀：以 spawn 为被测行为，离线守护下如实 skip（守卫在 spawn 前）。
+        from tests.config_sandbox import skip_if_offline_suite
+        skip_if_offline_suite(self)
         out = self._run_probe()
         self.assertTrue(out["is_dict"], "载荷不是 dict")
         self.assertGreater(out["len"], 0, "载荷为空 —— 门面拼装可能已失效")
 
     def test_bills_values_reach_the_payload(self):
+        # 第七十八刀：以 spawn 为被测行为，离线守护下如实 skip（守卫在 spawn 前）。
+        from tests.config_sandbox import skip_if_offline_suite
+        skip_if_offline_suite(self)
         out = self._run_probe()
         # 手续费：-2.0 + -1.0 = -3.0（两笔平仓单，分属不同分钟故不合并）
         self.assertEqual(out["fees_paid"], -3.0, "bills 的当日手续费未到达载荷")

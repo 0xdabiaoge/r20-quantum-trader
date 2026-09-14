@@ -1,9 +1,22 @@
 """Per-test configuration sandbox: patch source constants AND imported path aliases."""
 import importlib
+import os
 import sys
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
+
+
+def skip_if_offline_suite(test, reason='本用例以 spawn 子进程/网络栈为**被测行为**，'
+                                       '离线守护下无法验证（skip ≠ fail，如实反映环境能力）'):
+    """离线套件（`OFFLINE_SUITE_RUNNING`）下跳过"以 spawn 为被测对象"的用例。
+
+    第六十一刀立规矩（守卫必须在 spawn **之前**）、第七十八刀推广成共享 helper：
+    护栏挡子进程是**本职**，这类用例与护栏天然冲突 —— 在离线环境它们
+    "测不了"而非"测不过"，如实 skip 才不污染守护基线。
+    """
+    if os.environ.get("OFFLINE_SUITE_RUNNING"):
+        test.skipTest(reason)
 
 
 def isolate_config(test):

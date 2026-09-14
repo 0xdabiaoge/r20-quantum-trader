@@ -192,6 +192,11 @@ class EndToEndSingleReadTest(unittest.TestCase):
     """
 
     def test_generate_reads_each_data_file_exactly_once(self):
+        # 第七十八刀：generate 的**读取深度**依赖真实网络失败走到哪层
+        # fail-soft（离线守护拦 socket 后根本到不了这两个文件的读取点）
+        # —— 本用例验证的是真网络环境下的端到端行为，离线如实 skip。
+        from tests.config_sandbox import skip_if_offline_suite
+        skip_if_offline_suite(self, '读取深度依赖真实网络失败路径，离线无法复现该深度')
         prod = pathlib.Path(sync_web_data.DATA_DIR).resolve()
         snaps = str(pathlib.Path(sync_web_data.SNAPSHOTS_JSON_FILE))
         led = str(pathlib.Path(sync_web_data.LEDGER_JSON_FILE))

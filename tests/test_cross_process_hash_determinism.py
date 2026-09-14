@@ -34,6 +34,9 @@ def _run_with_seed(snippet: str, seed: str) -> str:
 
 class BalancedPickDeterminismTests(unittest.TestCase):
     def test_same_result_across_hash_seeds(self):
+        # 第七十八刀：以 spawn 为被测行为，离线守护下如实 skip（守卫在 spawn 前）。
+        from tests.config_sandbox import skip_if_offline_suite
+        skip_if_offline_suite(self)
         results = {_run_with_seed(_SNIPPET_PICK, s) for s in ("1", "7", "12345")}
         self.assertEqual(len(results), 1, f"均衡选所跨进程漂移: {results}")
         self.assertIn(next(iter(results)), {"binance", "gate", "okx"})
@@ -56,6 +59,9 @@ class BalancedPickDeterminismTests(unittest.TestCase):
         self.assertEqual(_balanced_pick("BTC", []), "")
 
     def test_builtin_hash_would_drift(self):
+        # 第七十八刀：以 spawn 为被测行为，离线守护下如实 skip（守卫在 spawn 前）。
+        from tests.config_sandbox import skip_if_offline_suite
+        skip_if_offline_suite(self)
         # 反证锚点：证明旧 abs(hash(x)) 确实随种子漂移（本测试环境内模拟）
         outs = {_run_with_seed("import sys;print(abs(hash('BTC'))%3)", s) for s in ("1", "7", "12345")}
         self.assertGreater(len(outs), 1, "种子环境失效——此锚测失去意义时请调整种子")

@@ -347,6 +347,9 @@ class FacadeWiringTest(unittest.TestCase):
 
         用子进程实测两种布局都能 `from calculus_engine import calculate_calculus`。
         """
+        # 第七十八刀：以 spawn 为被测行为，离线守护下如实 skip（守卫在 spawn 前）。
+        from tests.config_sandbox import skip_if_offline_suite
+        skip_if_offline_suite(self)
         code = ("import sys; sys.path.insert(0, %r)\n"
                 "from calculus_engine import calculate_calculus, _normal_cdf\n"
                 "print(calculate_calculus([100,101,102,104,107,111,116,122])['valid'])\n")

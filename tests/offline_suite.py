@@ -62,11 +62,50 @@ class OfflineGuard:
             path == root / '.env' or path.is_relative_to(root / 'data')
             for root in self.roots)
 
+    @staticmethod
+    def _is_loopback_addr(address) -> bool:
+        """audit `socket.connect` / `socket.sendto` 的 args[1]（address tuple）。
+        只认 **字面回环**：127.0.0.0/8、::1、以及主机名 'localhost'
+        （它经 getaddrinfo 的放行判断同规则）。AF_UNIX 等一律不放行（保守）。
+        """
+        if not (isinstance(address, tuple) and address):
+            return False
+        return OfflineGuard._is_loopback_host(address[0])
+
+    @staticmethod
+    def _is_loopback_host(host) -> bool:
+        if not isinstance(host, str) or not host:
+            return False
+        if host == 'localhost':
+            return True
+        try:
+            import ipaddress
+            return ipaddress.ip_address(host).is_loopback
+        except ValueError:
+            return False
+
     def audit(self, event, args):
-        if event in ('socket.connect', 'socket.getaddrinfo', 'socket.sendto'):
-            self.attempts.append(event)
-            self._log_diagnostics(event, args)
-            raise RuntimeError('Offline suite blocked network: ' + event)
+        if event in ('socket.connect', 'socket.sendto'):
+            # ⚠️ 第七十八刀：loopback 放行。护栏的目标是"不外泄"，
+            # `127.0.0.1`/`::1` 的连接**永不离开本机**（本机回环由内核直达）。
+            # 一刀切拦掉会误伤"起本地 HTTP server 验 HTTP 语义"的用例
+            # （safe_urlopen 的 302 拒绝、telegram 的业务码）—— 它们的出站
+            # 测试目标本来就是 localhost，被拦反而**测不到真行为**。
+            # ⚠️ 实测 audit 形状：connect/sendto 都是 (sock, address) ——
+            # buffer **不在** audit args 里，两类事件统一取 args[1]。
+            if not self._is_loopback_addr(args[1]):
+                self.attempts.append(event)
+                self._log_diagnostics(event, args)
+                raise RuntimeError('Offline suite blocked network: ' + event)
+            return
+        if event == 'socket.getaddrinfo':
+            # 主机名解析只有"解析回环字面量"是本地行为；真实主机名要发 DNS
+            # 查询（外部） ⇒ 仍全拦。
+            if not self._is_loopback_host(args[0]):
+                self.attempts.append(event)
+                self._log_diagnostics(event, args)
+                raise RuntimeError('Offline suite blocked network: ' + event)
+            return
         if event == 'subprocess.Popen':
             command = args[1]
             tokens = list(command) if isinstance(command, (list, tuple)) else [str(command)]
@@ -84,7 +123,20 @@ class OfflineGuard:
                 executable in ('python3', 'python', Path(sys.executable).name)
                 and len(tokens) == 3 and tokens[1] == '-c'
                 and hashlib.sha256(tokens[2].encode()).hexdigest() ==
-                'ae478ea673237b4bb4e386e0df78313d11ee02594816f1d3d2bf1e2213789b37')
+                'ae478ea673237b4bb4e386e0df78313d11ee02594816f1d3d2bf1e2213789b37') or (
+                # ⚠️ 第七十八刀：git **只读**子命令白名单。verbatim 对拍门全靠
+                # `git show <rev>:<path>` 取"抽取前原文"当基准 —— 拦掉它们
+                # 不是"更安全"，而是**把最值钱的回归覆盖在离线环境里弄瞎**。
+                # 论证无外泄/无副作用：show/rev-parse 只读本地 object DB、
+                # 输出到 stdout，不发网络（fetch/push/clone 等一律不在列）。
+                # 参数形状收紧：`show` 恰好一个 `<rev>:<path>`；`rev-parse --short <ref>`。
+                (executable == 'git' and (
+                    (tokens[1:2] == ['show'] and len(tokens) == 3
+                     and ':' in str(tokens[2])
+                     and not str(tokens[2]).startswith('-'))
+                    or (tokens[1:3] == ['rev-parse', '--short'] and len(tokens) == 4
+                        and not str(tokens[3]).startswith('-'))
+                )))
             if not allowed:
                 self.attempts.append('external child process: ' + executable)
                 raise RuntimeError('Offline suite blocked external child process')
@@ -148,7 +200,19 @@ class OfflineGuard:
                     raise AssertionError('Connection guard did not fire')
         assert self.attempts[start:] == ['socket.connect', 'socket.connect']
         del self.attempts[start:]
-        print('EGRESS_GUARD_SELF_TEST: HTTP/80 + HTTPS/443 blocked')
+        # ⚠️ 第七十八刀对称探针：回环**必须放行** —— 没有这条，"回环判据"
+        # 哪天被改坏会静默退回"拦一切"，把误伤重新藏回噪声里。
+        with socket.socket() as sock:
+            n0 = len(self.attempts)
+            try:
+                sock.connect(('127.0.0.1', 1))     # 大概率 refused（OS 错误）
+            except RuntimeError as exc:
+                if 'Offline suite blocked network' in str(exc):
+                    raise AssertionError('Loopback connect must NOT be blocked')
+            except OSError:
+                pass                                # ECONNREFUSED 等 = 穿过了护栏 ✓
+            assert len(self.attempts) == n0, "回环连接被记成了网络尝试"
+        print('EGRESS_GUARD_SELF_TEST: HTTP/80 + HTTPS/443 blocked; loopback allowed')
 
     def report(self):
         after = self.fingerprint()
