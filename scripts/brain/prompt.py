@@ -50,7 +50,8 @@ def construct_full_market_prompt(packages: List[Dict[str, Any]], pos_summary: st
                              ai_memory_md_file=None, ai_memory_file=None,
                              news_sentiment_file=None, max_leverage=None, min_leverage=None,
                              max_scale_in_count=None, min_scale_in_confidence=None,
-                             max_margin_equity_ratio=None) -> str:
+                             max_margin_equity_ratio=None,
+                             _build_position_lines=None, _build_pending_order_lines=None) -> str:
     # --- 注入项解析 ---------------------------------------------------------
     # 两种调用方式必须都成立：
     #   a) 门面薄壳：显式传全部 15 项（生产路径）；
@@ -59,36 +60,60 @@ def construct_full_market_prompt(packages: List[Dict[str, Any]], pos_summary: st
     #      它的 ns 里注入了 safe_float / 风控常量 / 文件路径 / 门面函数等）。
     # 因此这里用"同名回退"而不是设默认值：默认值会把解析结果固化成 import 期快照。
     _g = globals()
+
+    def _resolve(_name, _fallback=None):
+        """按名解析注入项：`_g` 里没有时用 `_fallback`。
+
+        ⚠️ 为什么不是 `_g["NAME"]`：本函数体会被 `tests/test_prompt_rendering_isolated.py`
+        **按 AST 抽取后隔离 exec**，那个命名空间只注入它**已知**的名字。用裸下标
+        会让"新增一个注入项"直接 KeyError 打挂隔离测试 —— 而隔离测试本来就
+        **不该**知道实现细节（它测的是渲染，不是依赖清单）。
+        故：显式参数 → `_g` → 回退（懒 import 或 `_g` 取）。
+        """
+        if _name in _g:
+            return _g[_name]
+        if _fallback is not None:
+            return _fallback()
+        raise KeyError(_name)
+
     if safe_float is None:
-        safe_float = _g["safe_float"]
+        safe_float = _resolve("safe_float", lambda: safe_float)
     if sl_atr_mult_for is None:
-        sl_atr_mult_for = _g["_sl_atr_mult_for"]
+        sl_atr_mult_for = _resolve("_sl_atr_mult_for", lambda: _sl_atr_mult_for)
     if xvenue_prompt_line is None:
-        xvenue_prompt_line = _g["_xvenue_prompt_line"]
+        xvenue_prompt_line = _resolve("_xvenue_prompt_line", lambda: _xvenue_prompt_line)
     if build_risk_budget_text is None:
-        build_risk_budget_text = _g["build_risk_budget_text"]
+        build_risk_budget_text = _resolve("build_risk_budget_text", lambda: build_risk_budget_text)
     if active_profile is None:
-        active_profile = _g["active_profile"]
+        active_profile = _resolve("active_profile", lambda: active_profile)
     if apply_module_layout is None:
-        apply_module_layout = _g["apply_module_layout"]
+        apply_module_layout = _resolve("apply_module_layout", lambda: apply_module_layout)
     if system_version is None:
-        system_version = _g["__version__"]
+        system_version = _resolve("__version__", lambda: __version__)
     if ai_memory_md_file is None:
-        ai_memory_md_file = _g["AI_MEMORY_MD_FILE"]
+        ai_memory_md_file = _resolve("AI_MEMORY_MD_FILE", lambda: AI_MEMORY_MD_FILE)
     if ai_memory_file is None:
-        ai_memory_file = _g["AI_MEMORY_FILE"]
+        ai_memory_file = _resolve("AI_MEMORY_FILE", lambda: AI_MEMORY_FILE)
     if news_sentiment_file is None:
-        news_sentiment_file = _g["NEWS_SENTIMENT_FILE"]
+        news_sentiment_file = _resolve("NEWS_SENTIMENT_FILE", lambda: NEWS_SENTIMENT_FILE)
     if max_leverage is None:
-        max_leverage = _g["MAX_LEVERAGE"]
+        max_leverage = _resolve("MAX_LEVERAGE", lambda: MAX_LEVERAGE)
     if min_leverage is None:
-        min_leverage = _g["MIN_LEVERAGE"]
+        min_leverage = _resolve("MIN_LEVERAGE", lambda: MIN_LEVERAGE)
     if max_scale_in_count is None:
-        max_scale_in_count = _g["MAX_SCALE_IN_COUNT"]
+        max_scale_in_count = _resolve("MAX_SCALE_IN_COUNT", lambda: MAX_SCALE_IN_COUNT)
     if min_scale_in_confidence is None:
-        min_scale_in_confidence = _g["MIN_SCALE_IN_CONFIDENCE"]
+        min_scale_in_confidence = _resolve("MIN_SCALE_IN_CONFIDENCE", lambda: MIN_SCALE_IN_CONFIDENCE)
     if max_margin_equity_ratio is None:
-        max_margin_equity_ratio = _g["MAX_MARGIN_EQUITY_RATIO"]
+        max_margin_equity_ratio = _resolve("MAX_MARGIN_EQUITY_RATIO", lambda: MAX_MARGIN_EQUITY_RATIO)
+    if _build_position_lines is None:
+        _build_position_lines = _resolve(
+            "_build_position_lines",
+            lambda: __import__("scripts.brain.account_text", fromlist=["x"]).build_position_lines)
+    if _build_pending_order_lines is None:
+        _build_pending_order_lines = _resolve(
+            "_build_pending_order_lines",
+            lambda: __import__("scripts.brain.account_text", fromlist=["x"]).build_pending_order_lines)
 
     tz_bj = datetime.timezone(datetime.timedelta(hours=8))
     now_bj_str = current_time_str or datetime.datetime.now(tz_bj).strftime("%Y-%m-%d %H:%M:%S (北京时间)")
@@ -160,75 +185,15 @@ def construct_full_market_prompt(packages: List[Dict[str, Any]], pos_summary: st
 
     all_market_str = "\n".join(market_lines)
 
-    pos_lines = []
-    if active_positions_detail and len(active_positions_detail) > 0:
-        for p in active_positions_detail:
-            inst_name = p.get('name') or p.get('instId')
-            side = p.get('side') or p.get('posSide', 'long')
-            is_long = "long" in str(side).lower()
-            entry_px = safe_float(p.get('avgPx', 0))
-            cur_px = safe_float(p.get('markPx') or p.get('lastPx') or entry_px)
-            hwm = safe_float(p.get('highWaterMark', 0))
-            lwm = safe_float(p.get('lowWaterMark', 0))
-            tp_px = p.get('takeProfitPx', '--')
-            stage_desc = p.get('stage_desc', '持有监控中')
+    # Format Active Positions / Pending Limit Orders
+    # （阶段 4·B3 第三十刀：两段文本装配迁至 scripts/brain/account_text.py。
+    #   经同名回退解析 —— 见本函数开头的注入项解析约定：本函数体会被测试按
+    #   AST 抽取后 exec，故子模块函数也必须**按名解析**而不是直接引用。）
+    active_pos_text = _build_position_lines(
+        active_positions_detail, safe_float=safe_float)
+    pending_orders_text = _build_pending_order_lines(
+        pending_orders_detail, tz_bj=tz_bj, datetime=datetime)
 
-            profit_desc = ""
-            if is_long and hwm > entry_px and entry_px > 0:
-                peak_gain_pct = round((hwm - entry_px) / entry_px * 100, 2)
-                dd_from_peak = round((hwm - cur_px) / (hwm - entry_px) * 100, 1) if hwm > entry_px else 0.0
-                profit_desc = f" | 曾最高到: {hwm} (极值浮盈 +{peak_gain_pct}%, 现已从极值回撤 {dd_from_peak}%)"
-            elif not is_long and lwm > 0 and lwm < entry_px and entry_px > 0:
-                peak_gain_pct = round((entry_px - lwm) / entry_px * 100, 2)
-                dd_from_peak = round((cur_px - lwm) / (entry_px - lwm) * 100, 1) if lwm < entry_px else 0.0
-                profit_desc = f" | 曾最低到: {lwm} (极值浮盈 +{peak_gain_pct}%, 现已从极值回撤 {dd_from_peak}%)"
-
-            v_badge = f"[{str(p.get('venue', 'OKX')).upper()}] "
-            pos_lines.append(
-                f"- {v_badge}标的: {inst_name} | 方向: {side} {p.get('lever', p.get('leverage', '3'))}x | 开仓均价: {p.get('avgPx')} | 当前价: {cur_px} | 浮盈: {p.get('upl')} U (ROI: {round(safe_float(p.get('uplRatio')) * 100, 2)}%){profit_desc} | 动态止损线: {p.get('trailingStopPx', p.get('trailingSl', '--'))} | 目标止盈: {tp_px} | 状态: {stage_desc}"
-            )
-    else:
-        pos_lines.append("[MISSING_CONTEXT:account_positions]" if active_positions_detail is None else "当前无任何在途持仓敞口 (100% 现金空仓状态)")
-
-    active_pos_text = "\n".join(pos_lines)
-
-    # Format Pending Limit Orders
-    pending_lines = []
-    if pending_orders_detail and len(pending_orders_detail) > 0:
-        for o in pending_orders_detail:
-            c_ts = int(o.get("cTime", 0) or 0) / 1000.0
-            c_time_str = datetime.datetime.fromtimestamp(c_ts, tz=tz_bj).strftime("%Y-%m-%d %H:%M:%S") if c_ts > 0 else "--"
-            inst_id = o.get("instId", "")
-            side_raw = str(o.get("side", "")).lower()
-            # 审计D(2026-09-13)：死局部清除——pos_side 从未参与下方展示/判定
-            reduce_only = str(o.get("reduceOnly", "false")).lower() == "true"
-            ord_type = str(o.get("ordType", "limit")).lower()
-
-            if reduce_only:
-                side_str = "市价平多" if (side_raw == "sell" and ord_type == "market") else ("限价平多" if side_raw == "sell" else ("市价平空" if ord_type == "market" else "限价平空"))
-            else:
-                side_str = "限价买多" if (side_raw == "buy" and ord_type != "market") else ("市价买多" if side_raw == "buy" else ("限价卖空" if ord_type != "market" else "市价卖空"))
-
-            raw_px = str(o.get("px") or "").strip()
-            px_val = raw_px if raw_px and raw_px != "0" else ("市价" if ord_type == "market" else "--")
-            sz_val = str(o.get("sz", "--"))
-            ord_id = str(o.get("ordId", ""))
-
-            attach_list = o.get("attachAlgoOrds", [])
-            tp_sl_info = ""
-            if attach_list and len(attach_list) > 0:
-                att = attach_list[0]
-                tp_p = att.get("tpTriggerPx", "--")
-                sl_p = att.get("slTriggerPx", "--")
-                tp_sl_info = f" | 附带云端止盈: {tp_p} / 止损: {sl_p}"
-
-            pending_lines.append(
-                f"- [挂单ID: {ord_id}] {inst_id} | {side_str} {sz_val}张 @ {px_val} | 挂单时间: {c_time_str}{tp_sl_info}"
-            )
-    else:
-        pending_lines.append("[MISSING_CONTEXT:pending_orders]" if pending_orders_detail is None else "当前无任何在途未成交限价挂单 (挂单池为空)")
-
-    pending_orders_text = "\n".join(pending_lines)
 
     from scripts.evolution_shield import render_trading_memory
     # Damaged authority raises; empty authority never falls back to legacy text.

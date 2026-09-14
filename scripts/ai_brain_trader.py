@@ -77,6 +77,12 @@ from scripts.brain.packages import fetch_single_instrument_package as _fetch_sin
 from scripts.brain.prompt import (
     construct_full_market_prompt as _construct_full_market_prompt_impl,
 )
+# 第三十刀：在途持仓/挂单文本装配搬入 account_text，按调用期注入（同名参数解析陷阱见
+# construct_full_market_prompt 的 docstring）。
+from scripts.brain.account_text import (
+    build_position_lines as _build_position_lines,
+    build_pending_order_lines as _build_pending_order_lines,
+)
 from scripts.brain.cycle_parts import (
     normalize_position_management as _normalize_position_management,
     build_effective_prompt_text as _build_effective_prompt_text,
@@ -691,6 +697,8 @@ def construct_full_market_prompt(
         max_scale_in_count=MAX_SCALE_IN_COUNT,
         min_scale_in_confidence=MIN_SCALE_IN_CONFIDENCE,
         max_margin_equity_ratio=MAX_MARGIN_EQUITY_RATIO,
+        _build_position_lines=_build_position_lines,
+        _build_pending_order_lines=_build_pending_order_lines,
     )
 
 
