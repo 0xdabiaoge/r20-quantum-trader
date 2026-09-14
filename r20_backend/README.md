@@ -94,6 +94,13 @@
 1. **子包名 ≠ 门面名时**，在 `tests/source_scan.py::source_area()` 里用
    `pkg_name=` 显式指定（例如 `source_area("scripts/ai_factor_trader.py", pkg_name="trader")`），
    这样**后续再往该子包搬文件时，源码锚点断言自动覆盖**，不用回来改测试。
+   已有的"门面 → 子包"映射：
+
+   | 门面 | 子包 |
+   |---|---|
+   | `scripts/ai_factor_trader.py`（交易执行） | `scripts/trader/` |
+   | `scripts/ai_brain_trader.py`（AI 主脑） | `scripts/brain/` |
+   | `scripts/sync_full_ledger.py`（台账同步） | `scripts/ledger/` |
 2. **被测试 patch 的全局（路径、配置、可替换函数）一律走调用期注入**，
    绝不在子模块 import 期烘焙。原因见 §5。
 3. **门面保留同名薄壳**（若调用点走全局名查找，调用点可以一行都不改）。

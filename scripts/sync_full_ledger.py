@@ -489,6 +489,9 @@ def _holding_row(p, venue, *, env, trackers, tz_bj, allowed, council_by_inst):
     }
 
 
+from scripts.ledger.okx_history import build_okx_trade
+
+
 def build_lifecycle_ledger():
     reset_time = "1970-01-01 00:00:00"
     if os.path.exists(INITIAL_STATE_FILE):
@@ -605,130 +608,23 @@ def build_lifecycle_ledger():
     # 时刻 c_ts + 同键自增序号，保证「每一笔平仓」有唯一稳定身份。
     _pos_id_seen: dict = {}
     for h in pos_history:
-        c_ts = int(h.get("cTime", 0) or 0) / 1000.0
-        u_ts = int(h.get("uTime", 0) or 0) / 1000.0
-        open_time = datetime.datetime.fromtimestamp(c_ts, tz=tz_bj).strftime("%Y-%m-%d %H:%M:%S") if c_ts > 0 else "--"
-        close_time = datetime.datetime.fromtimestamp(u_ts, tz=tz_bj).strftime("%Y-%m-%d %H:%M:%S") if u_ts > 0 else "--"
-
-        if close_time < reset_time:
-            continue
-
-        inst_id = h.get("instId", "")
-        if inst_id not in allowed:
-            continue
-        inst = inst_id.replace("-USDT-SWAP", "")
-        direction = str(h.get("direction", "")).lower()
-        side = "多" if "long" in direction else "空"
-        
-        open_px = float(h.get("openAvgPx", 0) or 0)
-        close_px = float(h.get("closeAvgPx", 0) or 0)
-        gross_pnl = float(h.get("pnl", 0) or 0)
-        fee = float(h.get("fee", 0) or 0)
-        net_pnl = round(gross_pnl + fee, 2)
-        lever = int(float(h.get("lever", "3") or 3))
-        
-        # Calculate Margin & Real Position Size
-        ct_val = get_ct_val(inst)
-        close_pos_sz = float(h.get("closeTotalPos", 0) or h.get("openMaxPos", 0) or 0)
-        
-        if close_pos_sz > 0 and open_px > 0 and ct_val > 0:
-            notional = close_pos_sz * ct_val * open_px
-            margin_usdt = round(notional / lever, 2) if lever > 0 else round(notional, 2)
-        else:
-            pnl_ratio = float(h.get("pnlRatio", 0) or 0)
-            margin_usdt = 500.0 # Standard fallback
-            if pnl_ratio != 0:
-                est_margin = abs(gross_pnl / pnl_ratio)
-                margin_usdt = round(est_margin, 2)
-        
-        roi_pct = round((net_pnl / margin_usdt * 100) if margin_usdt > 0 else 0.0, 2)
-
-        # Duration
-        try:
-            t1 = datetime.datetime.strptime(open_time, "%Y-%m-%d %H:%M:%S")
-            t2 = datetime.datetime.strptime(close_time, "%Y-%m-%d %H:%M:%S")
-            dur_mins = int((t2 - t1).total_seconds() / 60)
-            duration_str = f"{dur_mins}分钟" if dur_mins < 60 else f"{dur_mins//60}时{dur_mins%60}分"
-        except Exception:
-            duration_str = "--"
-
-        # Strategy tag
-        strat_tag = "🌊 顺势做多" if side == "多" else "⚡ 阻力高空"
-        
-        # Accurate Exit Reason Inference via Matched Close Order Attributes
-        exit_type = str(h.get("type", ""))
-        if exit_type == "3":
-            exit_reason = "💥 强平出场"
-        else:
-            # Match filled close order within 5000ms window
-            u_ms = int(h.get("uTime", 0) or 0)
-            matched_close = next(
-                (o for o in close_orders if o.get("instId") == inst_id and o.get("posSide") == direction and abs(int(o.get("uTime", 0) or 0) - u_ms) < 5000),
-                None
-            )
-            if matched_close:
-                algo_id = matched_close.get("algoId")
-                cl_ord_id = str(matched_close.get("clOrdId", ""))
-                
-                if algo_id:
-                    if net_pnl > 3.0:
-                        exit_reason = "🎯 目标止盈达成"
-                    elif net_pnl < -1.0:
-                        exit_reason = "🛑 触发云端止损"
-                    else:
-                        exit_reason = "🛡️ 移动止损保本出场"
-                elif cl_ord_id.startswith("O") or "CLI" in matched_close.get("tag", ""):
-                    if net_pnl > 3.0:
-                        exit_reason = "✨ 移动止盈锁利"
-                    elif net_pnl < -1.0:
-                        exit_reason = "🛑 策略风控止损"
-                    else:
-                        exit_reason = "⏱️ 超时/保本平仓"
-                else:
-                    exit_reason = "🎯 目标止盈达成" if net_pnl > 3.0 else ("🛑 止损离场" if net_pnl < -1.0 else "🛡️ 保本平仓")
-            else:
-                exit_reason = "🎯 目标止盈达成" if net_pnl > 3.0 else ("🛑 止损出场" if net_pnl < -1.0 else "🛡️ 保本平仓")
-
-        funding_fee = round(float(h.get("fundingFee") or 0.0), 4)
-
-        # 审计 D8：去重键原嵌 u_ts（持仓最后更新时间）——同一笔平仓被 OKX 改写
-        # uTime（如补算资金费/结算修正）时 id 漂移，与旧行按 id 去重失败 → 同笔
-        # 重复计入台账/日亏。改用不可变 posId，缺失时退回开仓时刻 c_ts（同样稳定）。
-        _stable = str(h.get("posId") or "").strip() or (str(int(c_ts)) if c_ts > 0 else str(int(u_ts)))
-        # 审计批7：posId 会在多轮往返间复用（见上方注释），故 id 追加开仓时刻 c_ts
-        # 区分同 posId 的不同轮；同 (posId,c_ts) 仍多笔时再挂自增序号兜底，绝不再撞键。
-        _key = f"{_stable}|{int(c_ts)}"
+        # 去重键所需的两个时间戳在此单独取一次（翻译函数内部会再取，见其文档）。
+        # 交叉行状态（_pos_id_seen）属于本循环，不属于单行翻译，故序号在此算出后传入。
+        _c_ts = int(h.get("cTime", 0) or 0) / 1000.0
+        _u_ts = int(h.get("uTime", 0) or 0) / 1000.0
+        _stable_for_key = (str(h.get("posId") or "").strip()
+                           or (str(int(_c_ts)) if _c_ts > 0 else str(int(_u_ts))))
+        _key = f"{_stable_for_key}|{int(_c_ts)}"
         _seq = _pos_id_seen.get(_key, 0)
         _pos_id_seen[_key] = _seq + 1
-        _id_suffix = f"_{int(c_ts)}" + (f"#{_seq}" if _seq else "")
-        trades_lifecycle.append({
-            "id": f"pos_hist_{_stable}_{inst}{_id_suffix}",
-            "inst": inst,
-            "side": side,
-            "venue": "okx",   # G10：同上，OKX 历史行源头标注
-            "account_mode": env.mode.upper(),
-            "environment": env.mode.lower(),
-            "lever": f"{lever}x",
-            "strategy": strat_tag,
-            "margin": margin_usdt,
-            "sz": round(close_pos_sz, 4),
-            "open_time": open_time,
-            "open_px": round(open_px, 4),
-            "close_time": close_time,
-            "close_px": round(close_px, 4),
-            "gross_pnl": round(gross_pnl, 2),
-            "open_fee": round(fee / 2.0, 4),
-            "close_fee": round(fee / 2.0, 4),
-            "fee": round(fee, 2),
-            "funding_fee": funding_fee,
-            "pnl": net_pnl,
-            "net_pnl": net_pnl,
-            "roi": roi_pct,
-            "roi_pct": roi_pct,
-            "duration": duration_str,
-            "status": "closed",
-            "exit_reason": exit_reason
-        })
+        _id_suffix = f"_{int(_c_ts)}" + (f"#{_seq}" if _seq else "")
+        _trade = build_okx_trade(
+            h=h, reset_time=reset_time, allowed=allowed, close_orders=close_orders,
+            env=env, tz_bj=tz_bj, id_suffix=_id_suffix,
+            datetime=datetime, get_ct_val=get_ct_val)
+        if _trade is None:
+            continue
+        trades_lifecycle.append(_trade)
 
     # 多所台账协同（US-009 / v7.9.1）：自动并发拉取 Binance 与 Gate 真实平仓盈亏
     # 审计 A2：fetch 内部吞异常（except 内 _mark failed）——调用点为未标失败的所

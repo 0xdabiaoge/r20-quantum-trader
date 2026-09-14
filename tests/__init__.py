@@ -20,6 +20,29 @@ from pathlib import Path
 # 在 discover 导入任何测试模块之前把变量指到会话级临时目录，一次性隔离所有
 # 此类落盘副作用（律①：测试不触生产文件）。
 _TEST_SANDBOX = tempfile.mkdtemp(prefix="r20-tests-")
+
+# 会话级沙箱必须在进程退出时清掉。
+#
+# 2026-09-14 实测：本会话反复运行全量套件后，/tmp（256M tmpfs）里积了 **6000+ 个**
+# `r20-tests-*` 空目录，把 /tmp 用到 94%，导致 `No space left on device`，
+# 进而让 `test_copytruncate_keeps_inode_for_live_writer` 这类**真的往 /tmp 写文件**
+# 的测试假红（它断言的是"轮转成功"，失败信息里才看到 ENOSPC）。
+#
+# 危害不只是脏：tmpfs 写满会波及同机的其它进程（含网关/交易子进程的临时文件）。
+# 只有 import 期的一次性 mkdtemp 是可回收的（各测试自己用 `addCleanup` 管理的
+# 临时目录不归这里管），故在此注册退出清理。
+def _cleanup_test_sandbox() -> None:
+    import shutil
+    try:
+        shutil.rmtree(_TEST_SANDBOX, ignore_errors=True)
+    except Exception:                                  # noqa: BLE001
+        pass
+
+
+import atexit as _atexit
+
+_atexit.register(_cleanup_test_sandbox)
+
 os.environ.setdefault("R20_AUDIT_FILE", os.path.join(_TEST_SANDBOX, "r20_admin_audit.jsonl"))
 os.environ.setdefault("R20_SELF_IMPROVEMENT_LOG", os.path.join(_TEST_SANDBOX, "self_improvement.log"))
 # 批E(2026-09-13)：仪表盘载荷构建在台账 >60s 未更新时会 spawn 真实台账同步子进程
