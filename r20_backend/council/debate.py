@@ -12,6 +12,9 @@ import json
 import time
 from typing import Any, Callable, Dict, Optional, Tuple
 
+from r20_backend.council.role_normalizer import (
+    process_brain_output as _normalize_cio_adopted_roles,
+)
 from r20_backend.council.policy import (
     DEFAULT_CONSENSUS_MODE,
     CIO_MIN_ARBITRATION_TIME,
@@ -559,35 +562,8 @@ def execute_council_debate(load_config: Callable[[], Dict[str, Any]], resolve_se
         raise ValueError("CIO output root must be a JSON object")
 
     # Post-process & normalize adopted_role in decisions for traceability
-    decisions = brain_output.get("decisions")
-    if isinstance(decisions, dict):
-        for sym, dec in decisions.items():
-            if isinstance(dec, dict):
-                act = str(dec.get("action", "")).upper()
-                ar = dec.get("adopted_role")
-                if ar is None or str(ar).strip() == "" or str(ar).strip().lower() == "none":
-                    if act == "WAIT":
-                        dec["adopted_role"] = "REJECT_ALL"
-                    else:
-                        # Attempt to resolve from reasoning text
-                        reasoning_text = str(dec.get("reasoning", ""))
-                        matched_role = None
-                        for r_k in trader_keys:
-                            r_name = roles.get(r_k, {}).get("name", "")
-                            alias_candidates = [r_k, r_name]
-                            if "trend" in r_k:
-                                alias_candidates.extend(["交易员 A", "交易员A", "Trader A", "trader a", "稳健型"])
-                            elif "momentum" in r_k:
-                                alias_candidates.extend(["交易员 B", "交易员B", "Trader B", "trader b", "动能型"])
-                            elif "quant" in r_k:
-                                alias_candidates.extend(["交易员 C", "交易员C", "Trader C", "trader c", "量化型"])
-
-                            if any(alias and alias.lower() in reasoning_text.lower() for alias in alias_candidates):
-                                matched_role = r_k
-                                break
-                        dec["adopted_role"] = matched_role
-                else:
-                    dec["adopted_role"] = str(ar).strip()
+    # （阶段 4·B3 第二十八刀：迁至 council/role_normalizer.py）
+    _normalize_cio_adopted_roles(brain_output, roles, trader_keys)
 
     council_transcript = {
         "council_mode": True,
