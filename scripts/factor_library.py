@@ -28,6 +28,7 @@ import urllib.request
 from typing import Dict, Any, List, Optional
 
 from scripts.factors.defaults import build_default_factors
+from scripts.factors.scoring import score_composite_alpha
 from concurrent.futures import ThreadPoolExecutor
 
 _BJ = timezone(timedelta(hours=8))
@@ -300,96 +301,11 @@ def compute_instrument_factors(item: Dict[str, Any], smart_money_pool: Dict[str,
         elif w_long <= 35.0 and net_usdt < 0:
             factors["smart_money_derivatives"]["signal"] = "BEAR_DISTRIBUTION"
 
-    # =========================================================================
-    # COMPOSITE HIGH-ALPHA SCORING (-100 to +100)
-    # =========================================================================
-    score = 0.0
-    
-    # 1. ADX Trend Filter (Threshold = 22)
-    adx = factors["trend_momentum"]["adx_1h"]
-    if adx >= 22.0:
-        score += 15.0 if factors["trend_momentum"]["rsi_14"] >= 50 else -15.0
-        factors["trend_momentum"]["trend_regime"] = "STRONG_TREND"
-    else:
-        factors["trend_momentum"]["trend_regime"] = "CHOP_RANGE"
+    # 复合 alpha 打分与信号建议（-100~+100）
+    # 阶段 4·B3 第二十九刀：整段迁至 scripts/factors/scoring.py::score_composite_alpha，
+    # 本处只保留调用。八项门槛/加减分与两处阻尼的说明见该模块文档串。
+    score_composite_alpha(factors)
 
-    # 2. Smart Money Direction（信号缺失时跳过本项计分，绝不当 0/中性计入）
-    sm_block = factors["smart_money_derivatives"]
-    sm_long = sm_block.get("weighted_long_pct")
-    if sm_block.get("available") and isinstance(sm_long, (int, float)):
-        if sm_long >= 70.0: score += 30.0
-        elif sm_long <= 35.0: score -= 30.0
-
-    # 3. RSI & KDJ Dynamic Momentum
-    rsi = factors["trend_momentum"]["rsi_14"]
-    kdj_j = factors["trend_momentum"]["kdj_j"]
-    if rsi >= 55.0 and kdj_j >= 60.0: score += 20.0
-    elif rsi <= 45.0 and kdj_j <= 40.0: score -= 20.0
-
-    # 4. Money Flow (OBV & CMF)
-    cmf = factors["volume_money_flow"]["cmf_1h"]
-    obv_f = factors["volume_money_flow"]["obv_flow"]
-    if cmf > 0.05 and obv_f == "BULL_FLOW": score += 20.0
-    elif cmf < -0.05 and obv_f == "BEAR_FLOW": score -= 20.0
-
-    # 5. Orderbook Microstructure Imbalance
-    depth_r = factors["microstructure"]["bid_ask_depth_ratio"]
-    if depth_r >= 1.4: score += 15.0
-    elif depth_r <= 0.7: score -= 15.0
-
-    # 6. Calculus, Definite Integrals & Probability Theory Modulation
-    c_dyn = factors["calculus_dynamics"]
-    c_v = c_dyn.get("velocity", 0.0)
-    c_a = c_dyn.get("acceleration", 0.0)
-    c_i = c_dyn.get("impulse", 0.0)
-    c_j = abs(c_dyn.get("jerk", 0.0))
-    c_regime = c_dyn.get("regime", "")
-
-    # Bullish acceleration vs deceleration
-    if c_regime == "BULL_ACCELERATING" or (c_v > 0.2 and c_a > 0.1 and c_i > 0):
-        score += 15.0
-    elif c_regime == "BULL_DECELERATING" or (c_v > 0.2 and c_a < -0.3):
-        score -= 10.0 # Anti-FOMO top chasing penalty
-    elif c_regime == "BEAR_ACCELERATING" or (c_v < -0.2 and c_a < -0.1 and c_i < 0):
-        score -= 15.0
-    elif c_regime == "BEAR_DECELERATING" or (c_v < -0.2 and c_a > 0.3):
-        score += 10.0 # Anti-bottom chasing penalty
-
-    # 7. Definite Integrals & Energy Modulation
-    d_int = factors.get("definite_integrals", {})
-    e_int = d_int.get("energy_integral", 0.0)
-    dev_area = d_int.get("deviation_area_integral", 0.0)
-    if e_int > 1.2 and dev_area > 0.8:
-        score += 10.0 # Multi-period net positive displacement energy
-    elif e_int < -1.2 and dev_area < -0.8:
-        score -= 10.0 # Multi-period net negative depletion
-    elif abs(dev_area) >= 2.8:
-        # Overstretched deviation integral penalty: trigger mean-reversion caution
-        score *= 0.8
-
-    # 8. Probability Theory & Stochastic Risk
-    p_th = factors.get("probability_theory", {})
-    p_cont = p_th.get("continuation_prob_pct", 50.0)
-    p_break = p_th.get("breakdown_prob_pct", 50.0)
-    is_fat = p_th.get("is_fat_tail", False)
-    if p_cont >= 72.0:
-        score += 10.0 # High conditional continuation probability
-    elif p_break >= 72.0:
-        score -= 10.0 # High conditional breakdown probability
-
-    # High Jerk or Extreme Fat Tail Shock Dampener
-    if c_j >= 1.8 or c_regime == "SHOCK_HIGH_JERK" or (is_fat and p_th.get("kurtosis", 0) >= 3.5):
-        score *= 0.6 # dampen conviction under high-jerk shock / extreme fat tails
-
-    factors["composite_alpha_score"] = round(score, 1)
-
-    # Decision Recommendation
-    if score >= 45.0 and adx >= 20.0 and c_j < 1.8:
-        factors["signal_recommendation"] = "BUY_LONG"
-    elif score <= -45.0 and adx >= 20.0 and c_j < 1.8:
-        factors["signal_recommendation"] = "SELL_SHORT"
-    else:
-        factors["signal_recommendation"] = "WAIT"
 
     return factors
 
