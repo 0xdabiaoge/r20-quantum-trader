@@ -2,7 +2,6 @@
  * 全局 HTTP 层 —— fetch 封装 + 会话头 + 错误归一
  * 迁移自旧 useApi()，行为保持：401 登出、FastAPI 422 detail 数组转中文提示。
  */
-import { ref } from 'vue';
 import { useAuthStore } from '../stores/auth';
 
 export class HttpError extends Error {
@@ -68,21 +67,3 @@ export const patch = <T = any>(path: string, body?: unknown) =>
   http<T>(path, { method: 'PATCH', body: body === undefined ? undefined : JSON.stringify(body) });
 export const del = <T = any>(path: string) => http<T>(path, { method: 'DELETE' });
 
-/** 组合式包装：需要 loading 态的调用方使用 */
-export function useHttp() {
-  const loading = ref(false);
-  const error = ref<string | null>(null);
-  async function request<T = any>(path: string, options: RequestInit = {}): Promise<T> {
-    loading.value = true;
-    error.value = null;
-    try {
-      return await http<T>(path, options);
-    } catch (e: any) {
-      error.value = e.message || String(e);
-      throw e;
-    } finally {
-      loading.value = false;
-    }
-  }
-  return { loading, error, request };
-}
