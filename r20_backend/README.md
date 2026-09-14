@@ -73,6 +73,35 @@
 `llm/`、`council/`、`policy/`、`dashboard_payload/`、`execution/`、`exchanges/`、
 `routers/`、`sandbox/`。
 
+#### `dashboard_payload/` 模块清单
+
+`dashboard/app.py::update_cache_cycle` 曾是 581 行的单函数，载荷各段按域搬进此处。
+**新加的载荷段请进这个子包，不要再往 `app.py` 堆。**
+
+| 模块 | 内容 |
+|---|---|
+| `slim.py` | 瘦身载荷（默认返回；`?full=1` 才给全量） |
+| `market.py` | 行情/盘口片段 |
+| `factors.py` | 因子库快照片段 |
+| `factors_view.py` | 因子视图（Pillar 展开） |
+| `health.py` | `data_health` 与缓存年龄 |
+| `cache.py` | 缓存读写与原子落盘 |
+| `readers.py` | 本地文件读取的容错包装（存在性 → 解析 → 降级） |
+| `local_reads.py` | 本地只读数据装配 |
+| `bills.py` | `aggregate_bills` —— OKX 账单聚合 |
+| `trade_stats.py` | `aggregate_trade_stats` —— 累计胜率/盈亏/分币种 |
+| `trader_leaderboard.py` | `build_inst_leaderboard` —— 分币种战绩榜（按 pnl 降序） |
+| `position_view.py` | `collect_position_rows` —— 持仓行（含 `ctVal` 折算与 `lever<=0` 守卫） |
+| `order_view.py` | `collect_pending_order_rows` —— 在途挂单行 |
+| `algo_protection.py` | 算法保护单视图 |
+| `ledger_view.py` | 台账视图 |
+| `multi_venue.py` | 三所组合视图 |
+| `integrity_sidecars.py` | 完整性旁车并入 `source_errors`（台账同步状态 / AI 连败） |
+| `reset_state.py` | 状态重置 |
+
+> 约定的"注入面"铁律见 §5：这些模块**不得**在 import 期绑定 `dashboard.app`
+> 的模块级名字（它们会被测试 `patch.object`）。
+
 ## 3. 新文件该放哪：决策树
 
 ```
