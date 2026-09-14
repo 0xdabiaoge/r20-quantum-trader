@@ -14,7 +14,14 @@ def isolate_config(test):
     for name in ('r20_backend.llm_manager', 'r20_backend.council_manager',
                  'r20_backend.policy_snapshot', 'r20_backend.interceptor_manager',
                  'scripts.prompt_library', 'scripts.evolution_shield',
-                 'r20_gateway.secrets'):
+                 'r20_gateway.secrets',
+                 # `dashboard.app` 的一批大写路径常量（DASHBOARD_CACHE_FILE、
+                 # LOG_FILE、STATE_JSON_FILE、LEDGER_JSON_FILE…）此前**不在任何
+                 # 白名单里**，于是直调 `update_cache_cycle()` 的测试会写生产
+                 # `data/dashboard_last_good.json`（实测有告警但无人处理）。
+                 # 它内部会调 `load_persisted_dashboard_cache()`，但那只是读一个
+                 # JSON，且所有跑过仪表盘的测试本来就会 import 它。
+                 'dashboard.app'):
         importlib.import_module(name)
     # Patch every already-bound alias, not just the defining module (law 2).
     # 白名单必须覆盖**顶层名**形式的兄弟模块：`scripts/` 在 sys.path 上，脚本以
@@ -24,7 +31,8 @@ def isolate_config(test):
     for name, module in list(sys.modules.items()):
         if not module or name.startswith('tests'):
             continue
-        if not (name.startswith(('r20_backend.', 'r20_gateway.', 'scripts.')) or
+        if not (name.startswith(('r20_backend.', 'r20_gateway.', 'scripts.',
+                                 'dashboard.')) or
                 name in ('prompt_library', 'evolution_shield', 'ai_brain_trader', 'ai_factor_trader')):
             continue
         for key, value in list(vars(module).items()):

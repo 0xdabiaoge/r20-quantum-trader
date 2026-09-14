@@ -427,5 +427,170 @@ class WiringTest(unittest.TestCase):
         self.assertEqual(len(calls), 1, "补丁未被走到")
 
 
+_CYCLE_PROBE = r'''
+"""在**全新解释器**里跑一遍 update_cache_cycle，并打印载荷摘要。
+
+为什么要另起进程：`update_cache_cycle()` 把结果写进**模块全局** `CACHE_DATA`，
+而 `dashboard.app` 是单例模块。全量套件里别的用例会 `patch.object(dashboard.app,
+"CACHE_DATA", ...)`（`unittest.mock` 在 unwinding 时**还原该属性**，从而丢掉函数
+刚写好的载荷），于是断言读到的是别人塞进去的空 dict —— 与抽取正确性无关。
+全新进程没有这些外部补丁，是唯一能稳定验证"端到端是否接通"的办法。
+"""
+import json
+import sys
+import datetime
+
+sys.path.insert(0, ".")
+
+
+def main():
+    from unittest.mock import patch
+    from tests.config_sandbox import isolate_config
+    import unittest
+
+    class _T(unittest.TestCase):
+        def runTest(self):
+            pass
+
+    t = _T()
+    isolate_config(t)
+    import dashboard.app as app
+
+    TZ = datetime.timezone(datetime.timedelta(hours=8))
+
+    def ms(text):
+        dt = datetime.datetime.strptime(text, "%Y-%m-%d %H:%M:%S").replace(tzinfo=TZ)
+        return int(dt.timestamp() * 1000)
+
+    def bill(when, subType, type_="2", instId="BTC-USDT-SWAP",
+             pnl=0.0, fee=0.0, balChg=0.0, sz=0.0):
+        return dict(ts=ms(when), subType=subType, type=type_, instId=instId,
+                    pnl=pnl, fee=fee, balChg=balChg, sz=sz)
+
+    bills = [
+        bill("2026-09-14 12:00:00", "173", type_="8", balChg=-1.25, sz=3.0),
+        bill("2026-09-14 10:00:20", "5", pnl=50.0, fee=-2.0),
+        bill("2026-09-14 11:30:40", "6", pnl=-10.0, fee=-1.0),
+    ]
+    bal = [{"details": [{"ccy": "USDT", "eq": "10000", "availBal": "9000",
+                         "cashBal": "8000", "upl": "12.5"}]}]
+
+    def fetch(fn, *a, **k):
+        name = getattr(fn, "__name__", "")
+        if name == "balances":
+            return True, bal, ""
+        if name == "bills":
+            return True, bills, ""
+        return True, [], ""
+
+    local = {"adaptive_cfg": {}, "ai_history_list": [], "ai_last_prompt_text": "",
+             "ai_memory_md_content": "", "disk_free_gb": 100.0,
+             "factor_lib_snapshot": {}, "news_data": {}, "review_data": {},
+             "snapshots_list": []}
+
+    app.CACHE_DATA = {}
+    app.LAST_CACHE_TIME = 0.0
+    with patch.object(app, "_fetch_json", fetch), \
+         patch.object(app, "load_position_trackers", lambda: {"insts": {}}), \
+         patch.object(app, "_load_cross_venue_data", lambda: {}), \
+         patch.object(app, "_load_local_factor_library", lambda: {}), \
+         patch.object(app, "_build_factors_from_local_files", lambda p, ts: ([], {})), \
+         patch.object(app, "build_ai_health", lambda ai: {}), \
+         patch.object(app, "_core_load_ledger_lifecycle_trades", lambda *a, **k: ([], [])), \
+         patch.object(app, "_core_load_local_reads", lambda *a, **k: dict(local)), \
+         patch.object(app, "_core_collect_algo_protection", lambda *a, **k: None):
+        app.update_cache_cycle()
+
+    d = app.CACHE_DATA
+    out = {
+        "is_dict": isinstance(d, dict),
+        "len": len(d or {}),
+        "fees_paid": (d.get("today_stats") or {}).get("fees_paid"),
+        "funding_paid": (d.get("today_stats") or {}).get("funding_paid"),
+        "win_trades": (d.get("today_stats") or {}).get("win_trades"),
+        "loss_trades": (d.get("today_stats") or {}).get("loss_trades"),
+        "realized_gross": (d.get("today_stats") or {}).get("realized_gross"),
+        "cum_total_fees": (d.get("account") or {}).get("cum_total_fees"),
+        "funding_items": (d.get("funding_settlements") or {}).get("items"),
+        "funding_total": (d.get("funding_settlements") or {}).get("total_funding_pnl"),
+    }
+    print("CYCLE_JSON " + json.dumps(out, ensure_ascii=False))
+
+
+main()
+'''
+
+
+class UpdateCacheCycleIntegrationTest(unittest.TestCase):
+    """**端到端**验证 `update_cache_cycle()` 真的把 bills 产物接到了载荷上。
+
+    ## 为什么必须补这一条
+
+    本仓有过一次真实生产事故：抽取后所有"抽取测试"全绿，但**门面从未被 import**，
+    于是语法错误让一整个交易周期静默消失。教训是"读源码的测试"证明不了"能跑"。
+
+    抽取 bills 后我查了一遍：**没有任何测试真正调用 `update_cache_cycle()`**
+    （只有一处把它替换成 `lambda: None`）。也就是说本刀之前，"bills 段是否真的接上、
+    门面拼装是否还活着"全靠人读 —— 正是上面那类盲区。
+
+    ## 为什么另起进程
+
+    `update_cache_cycle()` 把结果写进**模块全局** `CACHE_DATA`，而 `dashboard.app`
+    是单例模块。全量套件里别的用例会 `patch.object(dashboard.app, "CACHE_DATA", ...)`，
+    而 `unittest.mock` 在 unwinding 时**还原该属性**，等于把函数刚写好的载荷丢掉 ——
+    实测现象极具误导性：单独跑全绿、全量跑读到空 dict，看起来像"跨测试污染"，
+    根因却是 patch 语义本身吃掉了赋值（我为此绕了很久）。
+
+    另起进程没有这些外部补丁，是唯一能稳定验"端到端接通"的办法。
+    """
+
+    def _run_probe(self):
+        import json
+        import subprocess
+        import sys
+
+        script = ROOT / "tests" / "_dashboard_cycle_probe.py"
+        # 探针内嵌在本文件里，运行时写到一个临时脚本再执行（保持单一事实源：
+        # 探针正文就写在下面，读代码的人不必再跳一个文件）。
+        script.write_text(_CYCLE_PROBE, encoding="utf-8")
+        self.addCleanup(lambda: script.unlink(missing_ok=True))
+        proc = subprocess.run([sys.executable, str(script)], capture_output=True,
+                              text=True, cwd=str(ROOT))
+        line = next((l for l in proc.stdout.splitlines()
+                     if l.startswith("CYCLE_JSON ")), None)
+        self.assertIsNotNone(
+            line,
+            "探针未产出载荷摘要 —— 端到端可能已断。\n"
+            f"stdout:\n{proc.stdout[-2000:]}\nstderr:\n{proc.stderr[-2000:]}")
+        return json.loads(line[len("CYCLE_JSON "):])
+
+    def test_cycle_produces_payload(self):
+        out = self._run_probe()
+        self.assertTrue(out["is_dict"], "载荷不是 dict")
+        self.assertGreater(out["len"], 0, "载荷为空 —— 门面拼装可能已失效")
+
+    def test_bills_values_reach_the_payload(self):
+        out = self._run_probe()
+        # 手续费：-2.0 + -1.0 = -3.0（两笔平仓单，分属不同分钟故不合并）
+        self.assertEqual(out["fees_paid"], -3.0, "bills 的当日手续费未到达载荷")
+        # 资金费：-1.25（当日）
+        self.assertEqual(out["funding_paid"], -1.25, "bills 的资金费未到达载荷")
+        self.assertEqual(out["cum_total_fees"], -3.0, "累计手续费未到达载荷")
+
+        # 资金费明细
+        self.assertEqual(len(out["funding_items"]), 1)
+        self.assertEqual(out["funding_items"][0]["inst"], "BTC")
+        self.assertEqual(out["funding_items"][0]["pnl"], -1.25)
+        self.assertAlmostEqual(out["funding_total"], -1.25, places=6)
+
+        # 平仓聚合：两笔分属不同分钟 → 2 条记录 → 1 盈 1 亏
+        self.assertEqual(out["win_trades"], 1, "平仓聚合应算出 1 笔盈利")
+        self.assertEqual(out["loss_trades"], 1, "平仓聚合应算出 1 笔亏损")
+        # bills 返回的 today_realized_gross 恒为 0（占位），门面尾段用 Σ gross_pnl
+        # 覆盖它 → 50 + (-10) = 40。这正是"占位值只是占位"的实证。
+        self.assertEqual(out["realized_gross"], 40.0,
+                         "门面尾段应以 Σ gross_pnl 覆盖 bills 的占位值")
+
+
 if __name__ == "__main__":
     unittest.main()
