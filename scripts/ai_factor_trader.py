@@ -48,6 +48,13 @@ from scripts.trader.position_mgmt import (
 )
 from scripts.trader.leverage import clamp_ai_leverage
 from scripts.trader.sizing import size_for_decision
+from scripts.trader.venue_evidence import (
+    build_venue_candidates as _venue_evidence_candidates,
+    persist_venue_decision as _venue_evidence_persist,
+)
+from scripts.trader.signal_snapshot import (
+    build_signal_snapshot as _signal_snapshot_build,
+)
 from scripts.trader.circuit_guard import (
     check_black_swan_sentinel as _circuit_guard_sentinel,
     is_circuit_breaker_active as _circuit_guard_breaker,
@@ -986,58 +993,15 @@ def _venue_health_stamp() -> Tuple[Optional[str], Dict[str, Any]]:
 
 
 def build_venue_candidates(inst_id: str, environment: str) -> List[Dict[str, Any]]:
-    """路由候选集 = registry 全部已登记场所（okx 真候选 + binance/gate 占位）。
-
-    场所清单与 executable 全部来自能力表，不硬编码；价差/深度/资金费的成本观测
-    输入在跨所证据二期（US-004+）接入前先给 0（评分中性），不猜数。
-    """
-    observed_stamp, venues = _venue_health_stamp()
-    live_stamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-    cands: List[Dict[str, Any]] = []
-    try:
-        names = list(venue_registry.registered_venues())
-    except Exception as exc:
-        print(f"[选所路由] warn registry 场所清单不可用，回退 OKX 单候选: {exc}")
-        names = ["okx"]
-    for name in names:
-        observed = venues.get(name) if isinstance(venues.get(name), dict) else {}
-        latency = [float(v) for v in (observed.get("latency_ms") or {}).values()
-                   if isinstance(v, (int, float))]
-        avg_latency = sum(latency) / len(latency) if latency else 0.0
-        pref = load_preferred_venue()
-        if name == "okx" or (pref != "auto" and name == pref and venue_execution_ready(name, environment)):
-            # OKX 由巡检周期直连取数；手选锁定所（如锁定币安且就绪）享有同等现时新鲜度，
-            # 不受跨所观测文件暂态老化影响（三所对等平权）。
-            stamp = live_stamp
-        elif observed:
-            stamp = observed_stamp
-        else:
-            stamp = None  # 该所无跨所观测记录：诚实交新鲜度闸门判定
-        # 费率平权与返佣优势：Gate 80% 返佣 Maker 净成本约 0.0001 (2.0bps 双腿)；OKX/Binance 约 0.0002 (4.0bps 双腿)
-        eff_fee = (MAKER_FEE_RATE * 0.5) if name == "gate" else MAKER_FEE_RATE
-        # 延迟稳定性惩罚：300ms 以内正常网络零惩罚，超出部分温和计入（上限 5bps）
-        eff_stab = max(0.0, min(5.0, (avg_latency - 300.0) / 100.0)) if avg_latency > 0 else 0.0
-
-        cands.append({
-            "venue": name,
-            "environment": environment,
-            "executable": venue_execution_ready(name, environment),
-            "fee_rate": eff_fee,
-            "spread_bps": 0.0,
-            "depth_usd": 0.0,
-            "funding_rate": 0.0,
-            "stability_penalty": eff_stab,
-            "min_notional": 0.0,
-            "min_qty": 0.0,
-            "precision": 0.0,
-            "health_updated_utc": stamp,
-            "health_max_age_s": VENUE_HEALTH_MAX_AGE_S,
-            "price": 0.0,
-            # OKX 是本链路现任所（存量持仓与历史成交都在 OKX）
-            "current_venue": name == "okx",
-        })
-    return cands
-
+    """壳（第八十二刀搬至 `scripts/trader/venue_evidence.py`，调用期注入门面全局）。"""
+    return _venue_evidence_candidates(
+        inst_id, environment,
+        venue_health_stamp=_venue_health_stamp,
+        venue_registry=venue_registry,
+        load_preferred_venue=load_preferred_venue,
+        venue_execution_ready=venue_execution_ready,
+        MAKER_FEE_RATE=MAKER_FEE_RATE,
+        VENUE_HEALTH_MAX_AGE_S=VENUE_HEALTH_MAX_AGE_S)
 
 def reservation_manager():
     """US-001 预留层单一台账（默认 data/risk_reservation.db）。
@@ -1075,40 +1039,13 @@ def _decision_payload(decision, preferred: str) -> Dict[str, Any]:
 
 
 def persist_venue_decision(inst_id: str, venue_decision: Dict[str, Any]) -> bool:
-    """把选所证据并进决策缓存（data/ai_brain_decisions.json）对应标的条目。
+    """壳（第八十二刀搬至 `scripts/trader/venue_evidence.py`）。
 
-    只追加 `venue_decision` 键，既有字段逐键保留（老 reader 无感）；主脑缓存是
-    证据的落盘位置，写回沿用原子替换语义。缓存里没有该标的条目时**不伪造**决策
-    ——直接跳过并 warn（没有主脑决策就没有可附着的决策 JSON）。
+    同名注入 `AI_DECISION_CACHE_FILE`：patch 门面常量的既有面保真；
+    flock 包裹的写路径真现在子包（batch3 tripwire 断言指向那里）。
     """
-    try:
-        # 审计③(2026-09-13)：本函数与主脑（ai_brain_trader 整档覆盖写）是同一文件的
-        # 两路常驻写者——每次写虽原子，但 读→merge→写 之间可被对方插队（lost update，
-        # 证据回退/整轮决策被旧副本覆盖）。RMW 外包 flock 互斥（同 evolution_shield 路数）。
-        from r20_backend.file_locks import file_lock
-        with file_lock(AI_DECISION_CACHE_FILE):
-            with open(AI_DECISION_CACHE_FILE, "r", encoding="utf-8") as handle:
-                cache = json.load(handle)
-            if not isinstance(cache, dict) or not isinstance(cache.get(inst_id), dict):
-                print(f"[选所证据] warn {inst_id} 不在决策缓存中，本轮证据不落盘")
-                return False
-            cache[inst_id]["venue_decision"] = venue_decision
-            fd, tmp_path = tempfile.mkstemp(prefix=".venue-decision-", suffix=".tmp",
-                                            dir=os.path.dirname(AI_DECISION_CACHE_FILE))
-            try:
-                with os.fdopen(fd, "w", encoding="utf-8") as handle:
-                    json.dump(cache, handle, ensure_ascii=False, indent=2)
-                    handle.flush()
-                    os.fsync(handle.fileno())
-                os.replace(tmp_path, AI_DECISION_CACHE_FILE)
-            finally:
-                if os.path.exists(tmp_path):
-                    os.unlink(tmp_path)
-        return True
-    except Exception as exc:
-        print(f"[选所证据] warn 落盘失败（不影响本轮交易）: {exc}")
-        return False
-
+    return _venue_evidence_persist(inst_id, venue_decision,
+                                   AI_DECISION_CACHE_FILE=AI_DECISION_CACHE_FILE)
 
 def _rejection_focus_reason(decision, candidates: List[Dict[str, Any]],
                             preferred: str) -> str:
@@ -1625,92 +1562,12 @@ def ensure_cloud_position_protection(inst_id: str, pos_side: str, size: float, t
 
 
 def build_signal_snapshot(f: dict) -> dict:
-    """抽取开仓时刻的因果动力学与数理快照，供自进化复盘做真实因果归因（而非事后倒推）。
+    """壳（第八十二刀搬至 `scripts/trader/signal_snapshot.py`）。
 
-    兼容两套数据源 schema（2026-09-09 修复）：
-    1. factor_library 快照块结构（calculus_dynamics / probability_theory / definite_integrals）
-    2. 执行层 f["calculus"] = calculate_multi_timeframe 聚合结构
-       （velocity / max_abs_jerk / 嵌套 probability_theory / definite_integrals）
-    旧版只认结构 1，而开仓路径传入的是结构 2，导致 journal 里 22/24 字段恒为
-    None → 复盘全量「数理快照不可观测」、逐单归因失效。
+    调用期解析 `DATA_DIR` 注入 —— `patch.object(aft, "DATA_DIR", tmp)`
+    的既有专测面保真。
     """
-    calc = f.get("calculus_dynamics") or {}
-    prob = f.get("probability_theory") or {}
-    integ = f.get("definite_integrals") or {}
-    multi = f.get("calculus") or {}
-    if not calc and multi:
-        calc = {
-            "velocity": multi.get("velocity"),
-            "acceleration": multi.get("acceleration"),
-            "jerk": multi.get("max_abs_jerk"),
-            "impulse": multi.get("impulse"),
-            "curvature": multi.get("curvature"),
-            "power": multi.get("power"),
-            "power_regime": multi.get("power_regime"),
-            "regime": multi.get("regime"),
-            "quality": multi.get("quality"),
-        }
-        prob = multi.get("probability_theory") or {}
-        integ = multi.get("definite_integrals") or {}
-    micro = f.get("microstructure") or {}
-    money = f.get("smart_money_derivatives") or {}
-    trend = f.get("trend_momentum") or {}
-    snap = {
-        "price": f.get("price"),
-        "atr": f.get("atr"),
-        "velocity": calc.get("velocity"),
-        "acceleration": calc.get("acceleration"),
-        "jerk": calc.get("jerk"),
-        "impulse": calc.get("impulse"),
-        "curvature": calc.get("curvature"),
-        "power": calc.get("power"),
-        "power_regime": calc.get("power_regime"),
-        "regime": calc.get("regime"),
-        "dynamics_quality": calc.get("quality"),
-        "continuation_prob_pct": prob.get("continuation_prob_pct"),
-        "breakdown_prob_pct": prob.get("breakdown_prob_pct"),
-        "var_95_pct": prob.get("var_95_pct"),
-        "cvar_95_pct": prob.get("cvar_95_pct"),
-        "prob_regime": prob.get("prob_regime"),
-        "is_fat_tail": prob.get("is_fat_tail"),
-        "energy_integral": integ.get("energy_integral"),
-        "deviation_area_integral": integ.get("deviation_area_integral"),
-        "adx": trend.get("adx") or f.get("adx") or f.get("adx_1h"),
-        "rsi": trend.get("rsi") or f.get("rsi") or f.get("rsi_14"),
-        "funding_rate": micro.get("funding_rate") or f.get("funding_rate"),
-        "composite_alpha_score": f.get("composite_alpha_score") or f.get("alpha_score"),
-        "smart_money_net": money.get("net_flow") or money.get("taker_net") or money.get("smart_money_flow_usd"),
-    }
-
-    # 因子库快照（60s 频，开仓时刻即最新）二次补齐执行层 f 没有的四个外部观测字段
-    if any(snap.get(k) is None for k in ("adx", "funding_rate", "composite_alpha_score", "smart_money_net")):
-        try:
-            lib_file = os.path.join(DATA_DIR, "factor_library_snapshot.json")
-            if os.path.exists(lib_file):
-                with open(lib_file, "r", encoding="utf-8") as handle:
-                    lib = json.load(handle)
-                entries = lib.get("instruments") or []
-                if isinstance(entries, dict):
-                    entries = list(entries.values())
-                libf = next(
-                    (x for x in entries if isinstance(x, dict) and x.get("instId") == f.get("instId")),
-                    None,
-                )
-                if libf:
-                    tm = libf.get("trend_momentum") or {}
-                    sm = libf.get("smart_money_derivatives") or {}
-                    if snap["adx"] is None:
-                        snap["adx"] = tm.get("adx_1h")
-                    if snap["funding_rate"] is None:
-                        snap["funding_rate"] = sm.get("funding_rate_pct") or tm.get("funding_rate")
-                    if snap["composite_alpha_score"] is None:
-                        snap["composite_alpha_score"] = libf.get("composite_alpha_score")
-                    if snap["smart_money_net"] is None:
-                        snap["smart_money_net"] = sm.get("smart_money_flow_usd")
-        except Exception:
-            pass
-    return snap
-
+    return _signal_snapshot_build(f, data_dir=DATA_DIR)
 
 def record_signal_snapshot(snap: dict) -> None:
     """把开仓时刻的数理快照写入 signal_journal.json，保留最近 500 条供复盘 join。"""

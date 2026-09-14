@@ -261,7 +261,15 @@ class TestDecisionsFlock(unittest.TestCase):
         import inspect
         import scripts.ai_factor_trader as aft
         import scripts.ai_brain_trader as abr
-        self.assertIn("file_lock(AI_DECISION_CACHE_FILE)", inspect.getsource(aft.persist_venue_decision))
+        # 第八十二刀起 persist 真实现住 `scripts/trader/venue_evidence.py`
+        # （门面只剩调用期转发壳）。断言对象跟随搬家，意图不变：
+        # **写路径的 flock 包裹必须真实存在** —— 门面壳文本必须不含它（防虚 Hits）。
+        import scripts.trader.venue_evidence as _ve
+        self.assertIn("file_lock(AI_DECISION_CACHE_FILE)",
+                      inspect.getsource(_ve.persist_venue_decision))
+        self.assertNotIn("file_lock(AI_DECISION_CACHE_FILE)",
+                         inspect.getsource(aft.persist_venue_decision),
+                         "门面壳里出现 flock 文本会虚 Hits 上面断言")
         self.assertIn("file_lock(AI_DECISION_CACHE_FILE)",
                       inspect.getsource(abr.execute_batch_ai_brain_cycle))
 
