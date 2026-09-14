@@ -38,7 +38,8 @@ from __future__ import annotations
 import math
 from typing import Any, Dict, List
 
-__all__ = ["build_entry_candidate", "compute_performance_metrics"]
+__all__ = ["build_entry_candidate", "compute_performance_metrics",
+           "aggregate_portfolio"]
 
 #: 1H K 线年化因子（原实现硬编码，保持原样）
 HOURS_PER_YEAR = 8760
@@ -161,4 +162,66 @@ def compute_performance_metrics(
         "avg_r": avg_r,
         "winning_trades": len(winning),
         "losing_trades": len(losing),
+    }
+
+
+def aggregate_portfolio(
+    *,
+    asset_results: Dict[str, Dict[str, Any]],
+    symbols: List[str],
+    total_initial: float,
+    total_final: float,
+    total_gatekeeper_filtered: int,
+    combined_trades: List[Any],
+) -> Dict[str, Any]:
+    """把各标的的回测摘要汇总成组合层摘要（纯计算，不改入参）。
+
+    ## 单标量取的是**算术平均**，不是加权
+
+    `sharpe_ratio` / `sortino_ratio` / `calmar_ratio` / `avg_r_multiple` /
+    `profit_factor` 都是 `sum(各标的) / len(symbols)` —— **等权平均**，
+    不是按资金或成交笔数加权。这是既有口径，**勿"改进"**：
+    改成加权会改变产出，且历史上该值只用于粗看。
+
+    ## ⚠️ 除数是 `len(symbols)`，不是 `len(asset_results)`
+
+    原实现用前者。两者在当前调用点**恰好相等**（循环内每个 `sym` 都会写入
+    `asset_results`），但语义不同 —— 故这里**显式接收 `symbols`** 而不是
+    自己数 `asset_results`，以免将来某标的失败被跳过时静默改变分母。
+
+    ## `equity_curve` 与 `recent_trades` 的取法
+
+    - `equity_curve` 固定取 `BTC-USDT-SWAP`（组合曲线用 BTC 代表，既有行为）；
+    - `recent_trades` 取合并列表的**前 15 笔**（不是后 15 笔）。
+    """
+    symbols = list(symbols)
+    n = len(symbols)
+
+    comb_trades_total = sum(res["total_trades"] for res in asset_results.values())
+    comb_win_total = sum(res["winning_trades"] for res in asset_results.values())
+    comb_loss_total = sum(res["losing_trades"] for res in asset_results.values())
+    comb_win_rate = (comb_win_total / comb_trades_total * 100) if comb_trades_total > 0 else 0.0
+    comb_return = ((total_final - total_initial) / total_initial) * 100
+
+    sharpe_avg = sum(res["sharpe_ratio"] for res in asset_results.values()) / n
+    max_dd_avg = max(res["max_drawdown_pct"] for res in asset_results.values())
+
+    return {
+        "symbol": "ALL_PORTFOLIO (6大主流币全组合)",
+        "total_trades": comb_trades_total,
+        "winning_trades": comb_win_total,
+        "losing_trades": comb_loss_total,
+        "win_rate_pct": round(comb_win_rate, 1),
+        "profit_factor": round(sum(res["profit_factor"] for res in asset_results.values()) / n, 2),
+        "initial_equity": round(total_initial, 2),
+        "final_equity": round(total_final, 2),
+        "total_return_pct": round(comb_return, 2),
+        "max_drawdown_pct": round(max_dd_avg, 2),
+        "sharpe_ratio": round(sharpe_avg, 2),
+        "sortino_ratio": round(sum(res["sortino_ratio"] for res in asset_results.values()) / n, 2),
+        "calmar_ratio": round(sum(res["calmar_ratio"] for res in asset_results.values()) / n, 2),
+        "avg_r_multiple": round(sum(res["avg_r_multiple"] for res in asset_results.values()) / n, 2),
+        "gatekeeper_filtered_count": total_gatekeeper_filtered,
+        "equity_curve": asset_results.get("BTC-USDT-SWAP", {}).get("equity_curve", []),
+        "recent_trades": combined_trades[:15],
     }

@@ -23,7 +23,11 @@ import os
 import sys
 import urllib.request
 from scripts.backtest.lifecycle import evaluate_position_exit, settle_exit
-from scripts.backtest.metrics import build_entry_candidate, compute_performance_metrics
+from scripts.backtest.metrics import (
+    aggregate_portfolio,
+    build_entry_candidate,
+    compute_performance_metrics,
+)
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -326,34 +330,11 @@ def run_full_portfolio_backtest(bar: str = "1H", limit: int = 100, capital_per_a
         combined_trades.extend(summary.recent_trades)
 
     # Portfolio combined performance
-    comb_trades_total = sum(res["total_trades"] for res in asset_results.values())
-    comb_win_total = sum(res["winning_trades"] for res in asset_results.values())
-    comb_loss_total = sum(res["losing_trades"] for res in asset_results.values())
-    comb_win_rate = (comb_win_total / comb_trades_total * 100) if comb_trades_total > 0 else 0.0
-    comb_return = ((total_final - total_initial) / total_initial) * 100
-
-    sharpe_avg = sum(res["sharpe_ratio"] for res in asset_results.values()) / len(symbols)
-    max_dd_avg = max(res["max_drawdown_pct"] for res in asset_results.values())
-
-    portfolio_summary = {
-        "symbol": "ALL_PORTFOLIO (6大主流币全组合)",
-        "total_trades": comb_trades_total,
-        "winning_trades": comb_win_total,
-        "losing_trades": comb_loss_total,
-        "win_rate_pct": round(comb_win_rate, 1),
-        "profit_factor": round(sum(res["profit_factor"] for res in asset_results.values()) / len(symbols), 2),
-        "initial_equity": round(total_initial, 2),
-        "final_equity": round(total_final, 2),
-        "total_return_pct": round(comb_return, 2),
-        "max_drawdown_pct": round(max_dd_avg, 2),
-        "sharpe_ratio": round(sharpe_avg, 2),
-        "sortino_ratio": round(sum(res["sortino_ratio"] for res in asset_results.values()) / len(symbols), 2),
-        "calmar_ratio": round(sum(res["calmar_ratio"] for res in asset_results.values()) / len(symbols), 2),
-        "avg_r_multiple": round(sum(res["avg_r_multiple"] for res in asset_results.values()) / len(symbols), 2),
-        "gatekeeper_filtered_count": total_gatekeeper_filtered,
-        "equity_curve": asset_results.get("BTC-USDT-SWAP", {}).get("equity_curve", []),
-        "recent_trades": combined_trades[:15],
-    }
+    portfolio_summary = aggregate_portfolio(
+        asset_results=asset_results, symbols=symbols,
+        total_initial=total_initial, total_final=total_final,
+        total_gatekeeper_filtered=total_gatekeeper_filtered,
+        combined_trades=combined_trades)
 
     full_payload = {
         "updated_at": datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime("%Y-%m-%d %H:%M:%S (北京时间)"),
