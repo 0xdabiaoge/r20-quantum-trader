@@ -67,6 +67,8 @@ MANAGED = {
     "scripts/evolution": {"allowed_extra": {"self_improvement_engine.py"}},
     # 第四十三刀新增：选所质量域外提（门面仍是单文件 venue_router.py）。
     "r20_backend/venue_routing": {"allowed_extra": {"venue_router.py"}},
+    # 第四十四刀新增：快讯纯判断逻辑外提（门面仍是 news_sentiment_harvester.py）。
+    "scripts/news": {"allowed_extra": {"news_sentiment_harvester.py"}},
 }
 
 #: 从文档里抽出的 `xxx.py` 文件名。

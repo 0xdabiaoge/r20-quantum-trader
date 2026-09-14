@@ -11,6 +11,14 @@ Features:
 """
 
 import os
+
+# 结构优化阶段 4·B3 第四十四刀：重要度分级与币种识别（纯判断逻辑）
+# 已外提到 `scripts/news/importance.py`。门面**再导出** ——
+# `tests/test_news_sentiment_harvester.py` 按门面名直接调用这两个函数。
+from scripts.news.importance import (  # noqa: E402,F401
+    _classify_importance,
+    _extract_coins,
+)
 import sys
 import tempfile
 from pathlib import Path
@@ -108,63 +116,6 @@ def is_circuit_breaker_active():
         except Exception:
             pass
     return False, {}
-
-def _classify_importance(title: str, summary: str) -> str:
-    """根据快讯内容科学评定影响等级（high=重大/高危, mid=中等关注, low=普通快讯）。
-    绝不盲目全标 high，避免狼来了式恐慌。"""
-    text = f"{title} {summary}".lower()
-
-    # 高危关键词：系统性风险、崩盘、黑客、脱锚、破产清算、司法调查等
-    high_keywords = [
-        "脱锚", "depeg", "破产", "倒闭", "挤兑", "停止提现", "暂停提币",
-        "51%攻击", "系统瘫痪", "暴跌", "崩盘", "黑客", "被盗", "黑天鹅",
-        "起诉", "立案调查", "全面封杀", "严厉打击", "清算危机", "清退",
-        "bankruptcy", "insolvent", "halt withdrawals", "freeze withdrawals",
-        "exploit", "hacked", "plunge", "crash", "subpoena", "fraud", "scam"
-    ]
-    for kw in high_keywords:
-        if kw in text:
-            return "high"
-
-    # 中等关注关键词：宏观决议、ETF、大额投融资、主网升级、重要合作、大额流入
-    mid_keywords = [
-        "etf", "sec", "美联储", "降息", "加息", "鲍威尔", "cpi", "非农",
-        "融资", "主网", "升级", "硬分叉", "战略合作", "巨鲸", "大额增持",
-        "上市", "上线", "首发", "创历史新高", "暴涨", "突破",
-        "fed", "rate cut", "inflation", "funding", "mainnet", "upgrade",
-        "partnership", "whale", "inflow", "ath", "all-time high", "breakout"
-    ]
-    for kw in mid_keywords:
-        if kw in text:
-            return "mid"
-
-    return "low"
-
-
-def _extract_coins(title: str, summary: str, target_coins: list) -> list:
-    """从新闻文本中识别涉及的加密资产代码。"""
-    text = f" {title} {summary} ".upper()
-    found = []
-    coin_aliases = {
-        "BTC": ["BTC", "BITCOIN", "比特币"],
-        "ETH": ["ETH", "ETHEREUM", "以太坊", "以太币"],
-        "SOL": ["SOL", "SOLANA"],
-        "DOGE": ["DOGE", "DOGECOIN", "狗狗币"],
-        "LINK": ["LINK", "CHAINLINK"],
-        "AVAX": ["AVAX", "AVALANCHE", "雪崩"],
-        "SUI": ["SUI"],
-        "ADA": ["ADA", "CARDANO"],
-        "XRP": ["XRP", "RIPPLE", "瑞波"],
-    }
-    for c, aliases in coin_aliases.items():
-        if any(re.search(rf"\b{re.escape(a)}\b", text) if a.isascii() else (a in text) for a in aliases):
-            found.append(c)
-    for tc in (target_coins or []):
-        if tc not in found:
-            if re.search(rf"\b{re.escape(tc.upper())}\b", text):
-                found.append(tc.upper())
-    return found[:4]
-
 
 def fetch_okx_announcements(limit=15) -> list:
     """OKX 官方公告流抓取（/api/v5/support/announcements）。
