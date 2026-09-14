@@ -71,3 +71,54 @@ def assert_area_looks_real(testcase, text: str, *, must_contain: str,
     """防空：确认合并文本确实是目标领域，避免 assertNotIn / count==0 假通过。"""
     testcase.assertIn(must_contain, text, f"未读到目标领域源码（缺少 {must_contain}）")
     testcase.assertGreater(len(text), min_chars, "目标领域源码过短，疑似定位错误")
+
+
+def domain_trees(module_file: str | Path, *, pkg_name: str | None = None) -> list:
+    """把「门面 + 同名字包」逐个 `ast.parse`，返回 AST 列表（按路径排序，门面在前）。
+
+    与 `combined()` 的关系：那个拼**文本**（给 assertIn / count 用），这个保留
+    **每文件独立的 AST**（给"按名字取函数节点再 exec"这类用法用）。
+
+    为什么需要它：仓里有 3 处测试用 `ast.parse(单文件)` 再按函数名取节点
+    （`test_prompt_rendering_isolated`、`test_self_evolution_safety`、
+    `test_dashboard_payload_seam` 的同类写法）。一旦目标函数搬进子包，
+    `next(...)` 会 `StopIteration`。改成扫整个领域后，**函数搬到哪都找得到**。
+    """
+    import ast
+    return [ast.parse(text) for text in source_area(module_file, pkg_name=pkg_name).values()]
+
+
+def find_function_node(module_file: str | Path, name: str, *, pkg_name: str | None = None,
+                       node_only: bool = False):
+    """在「门面 + 同名字包」全领域里按名字找顶层函数节点。
+
+    找不到直接抛错。返回 `(node, 该节点所在文件路径)`，便于报错时指明位置。
+
+    ## 关于「同名两份」
+
+    本仓的抽取手法是**门面保留同名薄壳**（`return _xxx_impl(...)`）+ 子包放实现，
+    所以领域内同名函数**合理地出现两次**。此时：
+
+    - 默认（`node_only=False`）：返回**实现体**那一份 —— 即二者中源码更长的那个。
+      这是"要执行的真实逻辑"，也正是这类测试想要的。
+    - 域内同名多份且**源码完全相同**：判为搬家留下的拷贝（危险），抛错。
+    """
+    import ast
+    hits: list[tuple] = []
+    for path, text in source_area(module_file, pkg_name=pkg_name).items():
+        for node in ast.parse(text).body:
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == name:
+                hits.append((node, path, ast.get_source_segment(text, node) or ""))
+    if not hits:
+        raise LookupError(f"领域内找不到顶层函数 {name!r}（{module_file}）")
+    if len(hits) == 1:
+        return hits[0][0], hits[0][1]
+
+    bodies = [body for _, _, body in hits]
+    if len(set(bodies)) < len(bodies):
+        raise LookupError(
+            f"领域内 {name!r} 有 {len(bodies)} 份**完全相同**的实现，疑似搬家留下的拷贝："
+            + ", ".join(str(p) for _, p, _ in hits))
+    # 门面壳 vs 子包实现：取实现体（源码更长者）
+    node, path, _ = max(hits, key=lambda h: len(h[2]))
+    return node, path

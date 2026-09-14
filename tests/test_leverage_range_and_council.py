@@ -94,8 +94,10 @@ class BrainPromptAntiAnchorTests(unittest.TestCase):
     """模板示例不得再钉死 3；区间声明必须来自 MIN/MAX 常量。"""
 
     def _brain_src(self):
-        import ai_brain_trader as abt
-        return Path(abt.__file__).read_text(encoding="utf-8")
+        # 阶段 4：模板示例文本（含"严禁无差别照抄"）已搬进 scripts/brain/prompt.py。
+        # 按门面单文件定位会在搬家后假红（正向断言），故改为扫「主脑域源码集」。
+        from tests.source_scan import combined
+        return combined("scripts/ai_brain_trader.py", pkg_name="brain")
 
     def test_template_has_no_static_three_anchor(self):
         src = self._brain_src()

@@ -28,7 +28,26 @@ import scripts.risk_constants as risk_constants
 
 # Read code only, before installing the runtime IO fence.
 PROJECT = Path(__file__).resolve().parents[1]
-TRADER_TREE = ast.parse((PROJECT / "scripts/ai_brain_trader.py").read_text())
+# 结构优化阶段 4：主脑的提示词函数已部分搬进 scripts/brain/。原先按**单文件**
+# ast.parse 再按函数名取节点，搬走即 StopIteration。现按「主脑域源码集」定位
+# （tests/source_scan.find_function_node 会顺带断言"同名节点唯一"，防止搬家
+# 留下同名残壳）。见该函数的 docstring。
+from tests import source_scan  # noqa: E402
+
+BRAIN_FACADE = PROJECT / "scripts" / "ai_brain_trader.py"
+BRAIN_DOMAIN = dict(pkg_name="brain")
+
+# 必须在**安装 IO 栅栏之前**（即模块导入期）读盘并解析 —— 见本文件 Sandbox.setUp
+# 里的 guarded open：那里会把所有项目内路径的 open 全部拦掉。
+_CONSTRUCT_NODE, _CONSTRUCT_PATH = source_scan.find_function_node(
+    BRAIN_FACADE, "construct_full_market_prompt", **BRAIN_DOMAIN)
+_BUDGET_NODE, _BUDGET_PATH = source_scan.find_function_node(
+    BRAIN_FACADE, "build_risk_budget_text", **BRAIN_DOMAIN)
+_EXTRA_NODES = {
+    name: source_scan.find_function_node(BRAIN_FACADE, name, **BRAIN_DOMAIN)[0]
+    for name in ("_sl_atr_mult_for", "_xvenue_prompt_line")
+}
+
 APP_TREE = ast.parse((PROJECT / "r20_backend/app.py").read_text())
 OLD_TREE = ast.parse((PROJECT / "tests/test_control_plane_v2.py").read_text())
 
@@ -66,12 +85,11 @@ class Sandbox(unittest.TestCase):
         shield.render_trading_memory = self.memory
         self.stack.enter_context(patch.dict(sys.modules, {"scripts.evolution_shield": shield}))
         self.profile = {"name": "隔离策略", "pipelines": {"trading_user": [{"id": "u", "title": "自定义", "source": "custom", "enabled": True, "content": "余额={{account_balance}} 持仓={{account_positions}} 挂单={{pending_orders}}"}]}}
-        node = next(n for n in TRADER_TREE.body if isinstance(n, ast.FunctionDef) and n.name == "construct_full_market_prompt")
+        node = _CONSTRUCT_NODE
         # 批2 P1-1：风险预算小节已抽成 build_risk_budget_text（内含 min() 口径），
         # 隔离执行时把该 AST 节点一并注入，并注入它引用的两个 risk_constants 函数
         # （大写常量仍走下面的统一注入，保持"新增风控参数无需改本测试"）。
-        budget_node = next(n for n in TRADER_TREE.body
-                           if isinstance(n, ast.FunctionDef) and n.name == "build_risk_budget_text")
+        budget_node = _BUDGET_NODE
         self.ns = dict(List=List, Dict=Dict, Any=Any, datetime=datetime, os=os, json=json,
                        __version__="0.0.0-sandbox",
                        safe_float=lambda x: float(x or 0), active_profile=lambda: prompts.resolve_profile(self.profile),
@@ -79,7 +97,13 @@ class Sandbox(unittest.TestCase):
                        effective_single_asset_margin=risk_constants.effective_single_asset_margin,
                        effective_daily_loss_limit=risk_constants.effective_daily_loss_limit,
                        AI_MEMORY_MD_FILE=str(self.root / "memory.md"), AI_MEMORY_FILE=str(self.root / "memory.json"),
-                       NEWS_SENTIMENT_FILE=str(self.root / "news.json"))
+                       NEWS_SENTIMENT_FILE=str(self.root / "news.json"),
+                       # 下面两个是被 exec 的节点按**全局名**解析的主脑私有函数。
+                       # 本测试刻意不 import trader 模块（隔离），故同样从领域 AST
+                       # 取节点注入 —— 它们只被"按名解析"，不参与本测试的实际调用
+                       # （用例传 packages=[]，两个函数体都不会执行）。
+                       _sl_atr_mult_for=_EXTRA_NODES["_sl_atr_mult_for"],
+                       _xvenue_prompt_line=_EXTRA_NODES["_xvenue_prompt_line"])
         self.ns.update({k: v for k, v in vars(risk_constants).items() if k.isupper()})
         exec(compile(ast.Module(body=[budget_node, node], type_ignores=[]), "scripts/ai_brain_trader.py", "exec"), self.ns)
         self.construct = self.ns["construct_full_market_prompt"]

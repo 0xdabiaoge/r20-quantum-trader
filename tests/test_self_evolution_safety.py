@@ -401,15 +401,26 @@ class UnifiedMemoryTests(unittest.TestCase):
 
     def test_read_render_entrypoints_without_runtime_imports(self):
         root = Path(__file__).resolve().parents[1]
-        trader = ast.parse((root / "scripts" / "ai_brain_trader.py").read_text())
+        # 结构优化阶段 4：主脑源码已拆分到 scripts/brain/，原先按**单文件** ast.parse
+        # 定位会在搬家后取不到那两个节点。改为扫「主脑域源码集」并把各文件的 AST
+        # 拼起来 —— 断言强度不变（仍要求恰有 2 个匹配节点），且函数搬到哪都找得到。
+        from tests.source_scan import domain_trees
+        trees = domain_trees(root / "scripts" / "ai_brain_trader.py", pkg_name="brain")
         # Execute only the actual consumer import and assignment, not production functions.
-        nodes = [node for node in ast.walk(trader) if
+        nodes = [node for tree in trees for node in ast.walk(tree) if
                  (isinstance(node, ast.ImportFrom) and node.module == "scripts.evolution_shield") or
                  (isinstance(node, ast.Assign) and any(isinstance(t, ast.Name) and t.id == "memory_lessons" for t in node.targets))]
         self.assertEqual(len(nodes), 2)
         shield.STRUCTURED_MEMORY_FILE.write_text("[]")
         shield.AI_MEMORY_MD_FILE.write_text("- stale legacy")
-        scope = {"AI_MEMORY_MD_FILE": shield.AI_MEMORY_MD_FILE, "AI_MEMORY_FILE": self.root / "legacy.json"}
+        # 阶段 4 起该 memory 块搬进了 scripts/brain/prompt.py，函数参数名去掉了
+        # `_FILE` 后缀（`ai_memory_md_file`），故 exec 作用域要同时提供两个拼写。
+        scope = {
+            "AI_MEMORY_MD_FILE": shield.AI_MEMORY_MD_FILE,
+            "AI_MEMORY_FILE": self.root / "legacy.json",
+            "ai_memory_md_file": shield.AI_MEMORY_MD_FILE,
+            "ai_memory_file": self.root / "legacy.json",
+        }
         exec(compile(ast.Module(body=nodes, type_ignores=[]), "isolated_trader_memory", "exec"), scope)
         self.assertEqual(scope["memory_lessons"], "")
         shield.STRUCTURED_MEMORY_FILE.write_text("{")

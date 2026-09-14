@@ -46,7 +46,11 @@ class PromptUniversalityTests(unittest.TestCase):
         self.assertEqual(_offenders(get_effective_system_prompt()), [], "代码 base 系统提示词含绝对金额")
 
     def test_base_user_prompt_has_no_absolute_money(self):
-        src = (ROOT / "scripts" / "ai_brain_trader.py").read_text(encoding="utf-8")
+        # 结构优化阶段 4：用户提示词 f-string 已搬进 scripts/brain/prompt.py。
+        # 原先按单文件 index() 切片，搬走即 ValueError。改为扫「主脑域源码集」——
+        # 两个 marker 都在同一个函数体内，切出来的仍是同一段提示词文本。
+        from tests.source_scan import combined
+        src = combined("scripts/ai_brain_trader.py", pkg_name="brain")
         start, end = src.index("    prompt = f\"\"\""), src.index("    runtime_vars = {")
         self.assertEqual(_offenders(src[start:end]), [], "代码 base 用户提示词含绝对金额")
 
