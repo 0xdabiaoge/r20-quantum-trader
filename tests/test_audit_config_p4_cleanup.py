@@ -134,8 +134,11 @@ class LeverageFloorTests(_Base):
 
     def test_per_instrument_cap_tightens_global_upper(self):
         self.assertLessEqual(min(self.max_lev, 3.0), self.max_lev)
-        src = (ROOT / "r20_backend" / "execution_router.py").read_text(encoding="utf-8")
-        self.assertIn('decision.get("max_leverage")', src, "调用方给的池内杠杆上限必须被并入夹取")
+        # 结构优化阶段 4·B3 第三十八刀：杠杆夹取实现已迁至
+        # `r20_backend/execution/risk_gates.py`（`clamp_leverage`），定位随之改到那里。
+        src = (ROOT / "r20_backend" / "execution" / "risk_gates.py").read_text(encoding="utf-8")
+        self.assertIn('decision.get("max_leverage")', src,
+                      "调用方给的池内杠杆上限必须被并入夹取")
 
 
 class InstrumentPoolTrustTests(_Base):
@@ -319,20 +322,41 @@ class ExposureCapTests(_Base):
             def positions(self):
                 return [{"base": "BTC", "size_signed": 1.0, "side": "long", "mark_price": 100000.0}]
 
-        decision = {"asset": "BTC", "action": "buy", "margin_usdt": 200.0, "leverage": 5.0,
+        # ⚠️ 本用例**过去是"因为错误的理由"通过的**（结构优化阶段 4·B3 第三十八刀查明）：
+        #   ① `action` 曾写成 `"buy"`，而 R:R 闸门只认 `"BUY_LONG"`/`"SELL_SHORT"`
+        #   —— 故物理风控**先**拒开，根本走不到敞口闸门；
+        #   ② 敞口闸门那行 `_all_positions if _all_positions is not None else ...`
+        #   的 `_all_positions` 是**局部变量**（赋值在其后）→ 抛 UnboundLocalError，
+        #   被裸 `except Exception` 吞掉并返回 `_fail("exposure", ...)`。
+        #   于是 `ok is False` 恒成立、`stage == "exposure"` 恒成立 —— 断言全中，
+        #   但走的是**异常路径**，闸门一天也没真正生效过。
+        # 现改用合法方向 + 真正会让闸门触发的上限，断言它**按设计**拒开。
+        decision = {"asset": "BTC", "action": "BUY_LONG", "margin_usdt": 200.0, "leverage": 5.0,
                     "entry_price": 100.0, "take_profit_price": 110.0, "stop_loss_price": 95.0}
-        with patch.object(er, "TOTAL_EXPOSURE_CAP", 150000.0), \
+        # 已有同向 1.0 张 × 100000 = 100000U；本单名义 200×5 = 1000U。
+        # 上限设 50000U → 预计敞口 101000U 必然超限。
+        with patch.object(er, "TOTAL_EXPOSURE_CAP", 50000.0), \
              patch.object(er, "_load_venue_pool_soft", lambda venue: {}), \
              patch.object(er, "require_execution", lambda *a, **k: None):
             result = er.open_protected_position(decision, adapter=_Ad(), max_margin_usdt=5000.0)
         self.assertFalse(result.get("ok"), "同向敞口超上限必须拒开")
         self.assertEqual(result.get("stage"), "exposure")
+        self.assertIn("同向敞口", result.get("detail") or "",
+                      "必须是闸门给出的敞口理由，而不是异常兜底")
 
     def test_cap_zero_means_unlimited(self):
         import r20_backend.execution_router as er
         with patch.object(er, "TOTAL_EXPOSURE_CAP", 0.0):
-            src = (ROOT / "r20_backend" / "execution_router.py").read_text(encoding="utf-8")
-        self.assertIn("if exposure_cap > 0:", src, "0 必须表示不限制（与其余风控键语义一致）")
+            # 结构优化阶段 4·B3 第三十八刀：敞口闸门实现已迁至
+            # `r20_backend/execution/risk_gates.py`（`check_total_exposure`），
+            # 故定位随之改到那里。语义不变：0 / 负数 = 不限制（与其余风控键一致）——
+            # 现在写成早退形式 `if exposure_cap <= 0: return None`。
+            src = (ROOT / "r20_backend" / "execution" / "risk_gates.py").read_text(encoding="utf-8")
+            router_src = (ROOT / "r20_backend" / "execution_router.py").read_text(encoding="utf-8")
+        self.assertIn("if exposure_cap <= 0:", src,
+                      "0 必须表示不限制（与其余风控键语义一致）")
+        self.assertIn("_check_total_exposure(", router_src,
+                      "门面仍须在发送前调用敞口闸门")
 
 
 class HighRiskConfirmationTests(_Base):

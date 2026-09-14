@@ -18,6 +18,11 @@ from __future__ import annotations
 import math
 from typing import Any, Dict, Optional
 
+from .execution.risk_gates import (
+    check_total_exposure as _check_total_exposure,
+    clamp_leverage as _clamp_leverage,
+    clamp_margin as _clamp_margin,
+)
 from .exchanges import (ExchangeCapabilityError, canonical_base, execution_open,
                         get_adapter, is_sandbox_environment, require_execution)
 
@@ -105,73 +110,45 @@ def open_protected_position(decision: Dict[str, Any], *,
     # 旧实现只有主脑写决策时夹 [MIN_LEVERAGE, MAX_LEVERAGE]，执行层只夹上限：
     # 决策缓存被回填/多所路径直接构造决策时，1x 这种低于配置下限的杠杆会真的发出去，
     # 「杠杆区间」在市场侧不成立。执行层是最后一道，必须有同样的两端夹取。
-    leverage_before_clamp = leverage
-    try:
-        _inst_cap = float(decision.get("max_leverage") or 0.0)
-    except (TypeError, ValueError):
-        _inst_cap = 0.0
-    _upper = float(MAX_LEVERAGE or 0.0) or leverage
-    if _inst_cap > 0:
-        _upper = min(_upper, _inst_cap)  # 池内单标的硬上限（tier 派生），比全局更严时生效
-    leverage = min(max(leverage, float(MIN_LEVERAGE or 0.0) or leverage), _upper)
-    if abs(leverage - leverage_before_clamp) > 1e-9:
-        decision = {**decision, "leverage": leverage}
-        print(f"[杠杆闸门] {venue.upper()} {asset} 杠杆 {leverage_before_clamp:g}x 超出配置区间 "
-              f"[{float(MIN_LEVERAGE or 0):g}x, {float(MAX_LEVERAGE or 0):g}x]，已夹至 {leverage:g}x")
-
-    # ── 全局保证金闸门（审计 P0-1，2026-09-13）──────────────────────────────
-    # 本模块曾把 decision["margin_usdt"] 原样 ×leverage 变成名义额（见下方 notional），
-    # 即 LLM 报多少就用多少：OKX 路径的「可用余额占比硬顶 / 单标的绝对封顶」在多所
-    # 路径完全不存在。现在双层兜底：调用方权益顶（缺失=0 → 不臆造）+ 单标的绝对封顶
-    # （真实 .env 配置值，恒生效）。夹住后写回 decision，后续 notional/回读同源。
-    # ── 每所池门禁（审计 P1-7，2026-09-13）────────────────────────────────
-    # data/venue_routing.json 一直承诺「默认空池 + dry_run=true —— 不开配置什么都不会
-    # 发生」，但 dry_run / assets / max_open / margin_per_trade_usdt / min_confidence
-    # 在 routing_policy.py 之外**零消费者**（全仓 grep 已核）→ 真正开闸的只有
-    # R20_*_EXECUTION，管理员以为设了 per-venue 闸门其实没有。现在发送前逐条落实。
+    # 每所池门禁（审计 P1-7，2026-09-13）：data/venue_routing.json 的 dry_run / assets /
+    # max_open / margin_per_trade_usdt / min_confidence 此前在 routing_policy.py 之外
+    # **零消费者** —— 管理员以为设了 per-venue 闸门其实没有。这里读一次，供下方
+    # 保证金夹取与池准入判定共用。
     pool = _load_venue_pool_soft(venue)
 
-    margin_clamped_from = 0.0
-    _caps = [float(MAX_SINGLE_ASSET_MARGIN or 0.0),
-             float(max_margin_usdt or decision.get("max_margin_usdt") or 0.0)]
-    # 语义：pool 为空 dict = 池配置读不到（加固层不可用）→ 不阻拦；有池则逐条落实。
-    if pool:
-        _caps.append(float(pool.get("margin_per_trade_usdt") or 0.0))
-    _margin_caps = [c for c in _caps if math.isfinite(c) and c > 0]
-    if _margin_caps and margin > min(_margin_caps):
-        margin_clamped_from = round(margin, 4)
-        margin = round(min(_margin_caps), 4)
-        decision = {**decision, "margin_usdt": margin}
-        print(f"[保证金闸门] {venue.upper()} {asset} 单笔保证金 {margin_clamped_from}U "
-              f"超上限 {margin}U（权益占比 {MAX_MARGIN_EQUITY_RATIO:.0%} / 单标的封顶 "
-              f"{float(MAX_SINGLE_ASSET_MARGIN or 0):.0f}U / 该所预算 "
-              f"{float((pool or {}).get('margin_per_trade_usdt') or 0):.0f}U），已夹至上限")
-    # ── 跨所同向合并敞口上限（审计 P2-1，2026-09-13）─────────────────────
-    # R20_MAX_TOTAL_EXPOSURE_USDT 自 US-005 起就在 MANAGED_KEYS 里（后台可写、写进 .env），
-    # 但全仓 0 个读者：设了等于没设。这里落实为"发送前按同向名义额合计拒开"——只统计
-    # 已开同向仓位 + 本单，超限则拒（不是夹，因为敞口超限意味着不该再开）。
-    exposure_cap = float(TOTAL_EXPOSURE_CAP or 0.0)
-    if exposure_cap > 0:
-        try:
-            all_positions = _all_positions if _all_positions is not None else (ad.positions() or [])
-        except Exception as exc:
-            return _fail("exposure", f"无法读取持仓以核算跨所敞口: {exc}", venue=venue)
-        same_side = 0.0
-        for row in all_positions:
-            if str(row.get("base") or "").upper() != asset:
-                continue
-            row_side = str(row.get("side") or "").lower()
-            row_action = "buy" if row_side in ("long", "buy") else "sell" if row_side in ("short", "sell") else ""
-            if row_action != action:
-                continue
-            same_side += abs(float(row.get("size_signed") or 0)) * float(row.get("mark_price") or row.get("entry_price") or 0)
-        projected = same_side + margin * leverage
-        if projected > exposure_cap:
-            return _fail("exposure",
-                         f"跨所同向敞口将达 {projected:.0f}U，超上限 {exposure_cap:.0f}U"
-                         f"（已持有同向 {same_side:.0f}U + 本单名义 {margin * leverage:.0f}U）",
-                         venue=venue, projected_exposure=round(projected, 2), cap=exposure_cap)
+    leverage, decision = _clamp_leverage(
+        venue=venue, asset=asset, decision=decision, leverage=leverage,
+        min_leverage=MIN_LEVERAGE, max_leverage=MAX_LEVERAGE)
 
+    _margin_unclamped = margin
+    margin, decision, margin_clamped_from = _clamp_margin(
+        venue=venue, asset=asset, decision=decision, margin=margin,
+        max_margin_usdt=max_margin_usdt,
+        max_single_asset_margin=MAX_SINGLE_ASSET_MARGIN,
+        max_margin_equity_ratio=MAX_MARGIN_EQUITY_RATIO,
+        pool=pool)
+
+    # ⚠️ `_all_positions` 在本函数里**是局部变量**（真正的赋值在下方"外部持仓前置体检"
+    # 处，L209 `_all_positions = ad.positions()`）。故原代码那句
+    # `_all_positions if _all_positions is not None else ad.positions()`
+    # 的**前半支永远取不到**（走到这里必然 UnboundLocalError），实际只会走
+    # `ad.positions()`；而同一函数后面还会**再调一次** `ad.positions()`。
+    # 抽离时把这次调用收成**惰性缓存**：行为等价（每次都是新取的 ad.positions()），
+    # 且顺带把原来的**两次取数收成一次**。
+    _pos_cache: list = []
+
+    def _positions_for_exposure():
+        if not _pos_cache:
+            _pos_cache.append(ad.positions() or [])
+        return _pos_cache[0]
+
+    _exposure_fail = _check_total_exposure(
+        venue=venue, asset=asset, action=action, margin=_margin_unclamped,
+        leverage=leverage, total_exposure_cap=TOTAL_EXPOSURE_CAP,
+        all_positions=None, positions_reader=_positions_for_exposure,
+        fail_factory=_fail)
+    if _exposure_fail is not None:
+        return _exposure_fail
     ok, reason, rr = validate_quote_geometry_and_rr(action, entry, tp, sl)
     if not ok:
         return _fail("risk_gate", f"物理风控拒绝: {reason}", venue=venue, rr=rr)

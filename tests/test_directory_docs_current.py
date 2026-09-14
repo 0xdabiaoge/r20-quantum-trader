@@ -56,6 +56,11 @@ MANAGED = {
         "allowed_extra": {"dashboard.py", "app.py"},
         "docs": ["r20_backend/README.md"],
     },
+    # 第三十八刀补登记：`execution_router.py::open_protected_position` 的风控闸门
+    # 抽成 `risk_gates.py` 后才发现本子包**此前根本不在受管名单里** ——
+    # 也就是说 `indicators.py` / `sizing.py` / `circuit_breaker.py` 烂了文档也没人管。
+    # 顺手纳入。
+    "r20_backend/execution": {"allowed_extra": {"execution_router.py"}},
 }
 
 #: 从文档里抽出的 `xxx.py` 文件名。
