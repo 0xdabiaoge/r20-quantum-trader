@@ -9,6 +9,9 @@ from r20_backend.dashboard_payload.cache import (  # noqa: E402
     persist_dashboard_cache as _core_persist_dashboard_cache,
     _inject_local_data_into_stale as _core__inject_local_data_into_stale,
 )
+from r20_backend.dashboard_payload.bills import (  # noqa: E402
+    aggregate_bills as _core_aggregate_bills,
+)
 from r20_backend.dashboard_payload.algo_protection import (  # noqa: E402
     collect_algo_protection as _core_collect_algo_protection,
 )
@@ -492,62 +495,18 @@ def update_cache_cycle():
         bills_data = []
     
     # Process Real Orders Aggregation (Minute + Inst + Action)
-    orders_by_key = {}
-    today_realized_gross = 0.0
-    today_fees = 0.0
-    cum_total_fees = 0.0
-    today_funding = 0.0
-    funding_history_list = []
-    
-    if isinstance(bills_data, list):
-        for b in reversed(bills_data):
-            ts = int(b.get("ts", 0) or 0) / 1000.0
-            dt_bj = datetime.datetime.fromtimestamp(ts, tz=tz_beijing).strftime("%Y-%m-%d %H:%M:%S")
-            if dt_bj < reset_time_str:
-                continue
-
-            sub_type = str(b.get("subType", ""))
-            b_type = str(b.get("type", ""))
-            inst = b.get("instId", "").replace("-USDT-SWAP", "")
-            pnl = float(b.get("pnl", 0) or 0)
-            fee = float(b.get("fee", 0) or 0)
-            bal_chg = float(b.get("balChg", 0) or 0)
-            sz = float(b.get("sz", 0) or 0)
-
-            # Accumulate all trading fees (Cum & Today)
-            cum_total_fees += fee
-            if today_bj_str in dt_bj:
-                today_fees += fee
-
-            if b_type == "8" or sub_type in ["173", "174"]:
-                funding_pnl = (bal_chg if bal_chg != 0 else pnl)
-                if today_bj_str in dt_bj:
-                    today_funding += funding_pnl
-                funding_desc = "收取资金费 (+)" if sub_type == "174" or funding_pnl > 0 else "支付资金费 (-)"
-                funding_history_list.append({
-                    "time": dt_bj,
-                    "inst": inst,
-                    "type_desc": funding_desc,
-                    "pnl": round(funding_pnl, 6),
-                    "pos_sz": f"{sz} 张"
-                })
-                continue
-
-            if sub_type in ["5", "6"]: # Closed order
-                # Group by exact Minute + Inst + Close Action
-                time_min = dt_bj[:16]
-                agg_key = f"{time_min}_{inst}"
-                if agg_key not in orders_by_key:
-                    orders_by_key[agg_key] = {
-                        "time": dt_bj,
-                        "inst": inst,
-                        "gross_pnl": 0.0,
-                        "fee": 0.0,
-                        "pnl": 0.0
-                    }
-                orders_by_key[agg_key]["gross_pnl"] += pnl
-                orders_by_key[agg_key]["fee"] += fee
-                orders_by_key[agg_key]["pnl"] += (pnl + fee)
+    # 六项初值由 `_core_aggregate_bills` 内部建立并随返回值给出，此处不再重复初始化。
+    _bills = _core_aggregate_bills(
+        bills_data, reset_time_str=reset_time_str, today_bj_str=today_bj_str,
+        tz_beijing=tz_beijing, datetime=datetime)
+    orders_by_key = _bills["orders_by_key"]
+    # 注意：这一项在下方「平仓聚合」段会被继续累加（`+= o["gross_pnl"]`），
+    # 故此处取值是真赋值，不是可省的纯转发。
+    today_realized_gross = _bills["today_realized_gross"]
+    today_fees = _bills["today_fees"]
+    cum_total_fees = _bills["cum_total_fees"]
+    today_funding = _bills["today_funding"]
+    funding_history_list = _bills["funding_history_list"]
 
     today_win_trades = 0
     today_loss_trades = 0
