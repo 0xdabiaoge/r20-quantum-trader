@@ -52,6 +52,10 @@ from scripts.trader.venue_evidence import (
     build_venue_candidates as _venue_evidence_candidates,
     persist_venue_decision as _venue_evidence_persist,
 )
+from scripts.trader.ledger_writer import (
+    record_open_intent as _ledger_writer_intent,
+    record_trade as _ledger_writer_trade,
+)
 from scripts.trader.signal_snapshot import (
     build_signal_snapshot as _signal_snapshot_build,
 )
@@ -544,33 +548,10 @@ RECONCILE_REASON_INTENT_STALE = "周期意图已失效"
 
 
 def record_open_intent(inst_id: str, side: str, ts_ms: int = None) -> None:
-    """下单成功后记录本地开仓意图，供重启后挂单对账归属（US-006）。
-
-    审计(2026-09-13)·PEPE 永动机修复之二：写入时**清理**——过期(TTL 6h)条目丢弃、
-    同标的同方向只保留最新一条。旧实现只 append（上限 200 条 FIFO），意图文件里
-    永远躺着全天最老的一条，配合对账端 next() 取最老匹配 = 每轮误撤自己刚挂的单。"""
-    try:
-        intents = []
-        if os.path.exists(OPEN_INTENT_FILE):
-            try:
-                with open(OPEN_INTENT_FILE, "r", encoding="utf-8") as f:
-                    raw = json.load(f)
-                if isinstance(raw, list):
-                    intents = raw
-            except (ValueError, OSError):
-                intents = []  # 空文件/损坏文件：从空重建，不影响本单交易
-        _now_ms = int(time.time() * 1000)
-        intents = [i for i in intents
-                   if isinstance(i, dict) and _now_ms - int(i.get("ts", 0) or 0) <= OPEN_INTENT_TTL_MS]
-        _side_l = str(side).lower()
-        intents = [i for i in intents
-                   if not (str(i.get("instId")) == inst_id and str(i.get("side", "")).lower() == _side_l)]
-        intents.append({"instId": inst_id, "side": side, "ts": int(ts_ms or _now_ms)})
-        with open(OPEN_INTENT_FILE, "w", encoding="utf-8") as f:
-            json.dump(intents[-200:], f, ensure_ascii=False, indent=2)
-    except Exception as e:
-        print(f"[挂单对账] 记录开仓意图失败（不影响本单交易）: {e}")
-
+    """壳（第八十三刀搬至 `scripts/trader/ledger_writer.py`，调用期同名注入）。"""
+    return _ledger_writer_intent(inst_id, side, ts_ms,
+                                 OPEN_INTENT_FILE=OPEN_INTENT_FILE,
+                                 OPEN_INTENT_TTL_MS=OPEN_INTENT_TTL_MS)
 
 def load_open_intents() -> List[Dict[str, Any]]:
     """读取原始本地开仓意图（不做 TTL 过滤，过期判定交给对账语义分层）。"""
@@ -1584,42 +1565,14 @@ def record_signal_snapshot(snap: dict) -> None:
 
 
 def record_trade(trade_data):
-    # G10 场所标注：本链路全部为 OKX V5 直签执行，源头补 venue（gate lab 写侧
-    # 自带 venue="gate"）；setdefault 不覆盖显式值，旧调用方无感。
-    trade_data.setdefault("venue", "okx")
-    if not isinstance(trade_data, dict):
-        return
-    if "policy_version" not in trade_data:
-        try:
-            from policy_snapshot import generate_policy_snapshot
-            trade_data["policy_version"] = generate_policy_snapshot().get("policy_version", f"v{__version__}@unknown")
-        except Exception:
-            trade_data["policy_version"] = f"v{__version__}@unknown"
-    try:
-        ledger = []
-        if os.path.exists(LEDGER_JSON_FILE):
-            with open(LEDGER_JSON_FILE, "r", encoding="utf-8") as f:
-                ledger = json.load(f)
-        ledger.append(trade_data)
-        # 审计③(2026-09-13)：生产台账直 open("w") 覆写 → 原子替换。读者（熔断/
-        # 日报/备份/面板）不再可能撞见半截 JSON。
-        _atomic_write_json(LEDGER_JSON_FILE, ledger)
-    except Exception as e:
-        print(f"Failed to record trade to JSON: {e}")
-
-    try:
-        if record_trade_sqlite:
-            # US-003 环境轴贯通：OKX 生产写方按冻结环境传真实档 live|demo；
-            # 环境不可证明时交给 db_manager 兜底 unknown_legacy，绝不冒充。
-            sqlite_row = dict(trade_data)
-            try:
-                sqlite_row.setdefault("environment", current_environment().mode)
-            except Exception:
-                pass
-            record_trade_sqlite(sqlite_row)
-    except Exception as e:
-        print(f"Failed to record trade to SQLite: {e}")
-
+    """壳（第八十三刀搬至 `scripts/trader/ledger_writer.py`，调用期同名注入）。"""
+    return _ledger_writer_trade(
+        trade_data,
+        LEDGER_JSON_FILE=LEDGER_JSON_FILE,
+        _atomic_write_json=_atomic_write_json,
+        record_trade_sqlite=record_trade_sqlite,
+        current_environment=current_environment,
+        __version__=__version__)
 # =============================================================================
 # 🧮 Enhanced Quantitative Technical Indicators Math Engine
 # =============================================================================

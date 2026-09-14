@@ -19,6 +19,7 @@
 | `notifications.py` | `entry_action_message` / `entry_failure_message` / `trade_open_kwargs` 方向文案与通知参数（12 个方向常量收成单一来源） | 全部入参；`leverage` 与全部状态变更刻意留在门面 |
 | `cycle_snapshot.py` | `collect_pending_inst_ids` 外所挂单枚举与去重计数 + `build_state_payload` 面板状态快照 | venue_registry/load_instruments/信号求值函数，均调用期 |
 | `signal_snapshot.py` | `build_signal_snapshot` 开仓时刻因果/数理/舆情观测组装（自进化复盘数据源；B3 第八十二刀，零交易动作） | 唯一外部依赖 `DATA_DIR`（因子库快照路径根），门面壳调用期注入；专测 patch 面保真 |
+| `ledger_writer.py` | `record_trade` 成交双写台账（policy 溯源→JSON 原子替换→SQLite）+ `record_open_intent` 意图簿写入时清理（B3 第八十三刀） | 同名注入 ⇒ body 零例外逐字；`record_trade_sqlite` 可为 None 的语义原样 |
 | `venue_evidence.py` | `build_venue_candidates` 路由候选装配（健康观测/费率平权/稳定性惩罚）+ `persist_venue_decision` 选所证据回写（flock 包 RMW + 原子替换；B3 第八十二刀） | 注入 kw 与门面全局**同名**（函数体逐字零改动的代价；flock tripwire 文本随实现住此）|
 | `circuit_guard.py` | `check_black_swan_sentinel` 黑天鹅哨兵（行情断崖+极端舆情，"不可判定=不放松"）+ `is_circuit_breaker_active` 开仓熔断三查（B3 第八十一刀，trader 瘦身首域） | `fetch_candles_direct` / 三个文件路径常量 / `current_environment` / `effective_daily_loss_limit`，全部由门面壳调用期注入（对拍门 `tests/test_trader_circuit_guard_extraction.py`） |
 | `leverage.py` | `clamp_ai_leverage` AI 杠杆夹取（配置区间 → 池内单标的上限，顺序是关键） | MIN/MAX_LEVERAGE + 池值，均调用期 |
