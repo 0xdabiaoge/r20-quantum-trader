@@ -3,6 +3,7 @@ import { chartStyles } from './chartStyles'
 import { computeRiskReward, symbolPrecision } from './chartMath'
 import { planPriceLines } from './chartOverlays'
 import { countdownLabel } from './chartCountdown'
+import { fetchCandles } from './chartCandles'
 import { mainIndicators, subIndicators, DEFAULT_ACTIVE_INDICATORS } from './chartIndicators'
 import { fmtDate, fmtHM, fmtClock } from '../../utils/format';
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
@@ -450,27 +451,17 @@ function initChart() {
   klineChart.setDataLoader({
     getBars: async ({ callback }) => {
       try {
-        const res = await fetch(
-          `/api/v1/market/${currentInstId.value}/candles?bar=${currentPeriod.value}&limit=150&_t=${Date.now()}`,
-          { cache: 'no-store' }
+        // 取数与归一统一走 chartCandles.ts —— 本文件原先有两条**逐字重复**的
+        // 取数路径（此处与下方 loadCandles），字段映射完全一样。
+        const { candles: raw, klineList, lastClose } = await fetchCandles(
+          currentInstId.value,
+          currentPeriod.value,
         )
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        const data = await res.json()
-        if (Array.isArray(data.candles) && data.candles.length > 0) {
-          candles.value = data.candles
-          const lastC = data.candles[data.candles.length - 1]
-          if (lastC) {
-            currentPrice.value = Number(lastC.close)
+        if (klineList.length > 0) {
+          candles.value = raw
+          if (lastClose !== null) {
+            currentPrice.value = lastClose
           }
-          const klineList: KLineData[] = data.candles.map((c: any) => ({
-            timestamp: c.ts,
-            open: c.open,
-            high: c.high,
-            low: c.low,
-            close: c.close,
-            volume: c.vol,
-            turnover: c.vol * c.close,
-          }))
           callback(klineList, false)
           nextTick(() => {
             klineChart?.scrollToRealTime()
@@ -556,25 +547,13 @@ async function loadCandles(silent = false, resetTime = false) {
   if (!silent) isLoading.value = true
 
   try {
-    const res = await fetch(
-      `/api/v1/market/${currentInstId.value}/candles?bar=${currentPeriod.value}&limit=150&_t=${Date.now()}`,
-      { cache: 'no-store' }
+    // 取数与归一统一走 chartCandles.ts（与 setDataLoader 的 getBars 同源）
+    const { candles: raw, klineList, lastClose } = await fetchCandles(
+      currentInstId.value,
+      currentPeriod.value,
     )
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    const data = await res.json()
-    if (Array.isArray(data.candles) && data.candles.length > 0) {
-      candles.value = data.candles
-
-      // 转换为 KLineChart 标准数据结构
-      const klineList: KLineData[] = data.candles.map((c: any) => ({
-        timestamp: c.ts,
-        open: c.open,
-        high: c.high,
-        low: c.low,
-        close: c.close,
-        volume: c.vol,
-        turnover: c.vol * c.close,
-      }))
+    if (klineList.length > 0) {
+      candles.value = raw
 
       // 配置标的价格精度
       const prec = getSymbolPrecision(currentPrice.value)
@@ -586,8 +565,8 @@ async function loadCandles(silent = false, resetTime = false) {
 
       // 增量精准更新 vs 全量初始化
       const lastCandle = klineList[klineList.length - 1]
-      if (lastCandle) {
-        currentPrice.value = Number(lastCandle.close)
+      if (lastClose !== null) {
+        currentPrice.value = lastClose
       }
       if (resetTime || klineChart.getDataList().length === 0) {
         // 全量加载
