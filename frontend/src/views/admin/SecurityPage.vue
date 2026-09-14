@@ -11,6 +11,10 @@ import { useI18n } from '../../composables/useI18n'
 import { useApi } from '../../composables/useApi'
 import { useAuthStore } from '../../stores/auth'
 import { fmtDateTime } from '../../utils/format'
+import {
+  deriveOkxLinked, deriveMxHealthChips, deriveGateExecDirty,
+  venueStatus, envTextOf, okxEnvText as okxEnvTextOf, envBadge,
+} from './securityLogic' 
 import VenueCredentialCard from '../../components/admin/page-parts/VenueCredentialCard.vue'
 import { Save, RefreshCw, Layers, Trash2, Zap } from 'lucide-vue-next'
 
@@ -381,43 +385,18 @@ async function saveVenue(venue: 'binance' | 'gate') {
 }
 
 // ---- 总览派生（纯计算，零请求） ----
-const okxLinked = computed(() => runtime.value?.status === 'READY' && runtime.value?.mode_configured === true)
-const mxHealthChips = computed(() => {
-  const venues = mx.value?.health?.venues
-  if (!venues) return null
-  return Object.entries(venues).map(([name, v]: [string, any]) => ({
-    name,
-    ok: (v.ok || []).length,
-    total: (v.ok || []).length + Object.keys(v.failed || {}).length,
-    avg_ms: v.avg_ms || 0,
-    testnet: !!v.testnet,
-  }))
-})
-const gateExecDirty = computed(() => gateExec.value !== !!mx.value?.venues?.gate?.execution_open)
+// 显示派生逻辑已抽至 ./securityLogic.ts（阶段 4·B3 第三十四刀）——
+// 纯函数、可脱离组件单测；此处只保留响应式包装。
+const okxLinked = computed(() => deriveOkxLinked(runtime.value))
+const mxHealthChips = computed(() => deriveMxHealthChips(mx.value))
+const gateExecDirty = computed(() => deriveGateExecDirty(gateExec.value, mx.value))
 
-/** 三所状态徽章：未知一律 warn，不升级为已就绪。 */
-type VenueTone = 'up' | 'warn' | 'down'
-function venueStatus(venue: 'binance' | 'gate'): { text: string; tone: VenueTone } {
-  const v = mx.value?.venues?.[venue]
-  if (!v) return { text: t('admin.security.statusUnknown'), tone: 'warn' }
-  return v.has_api_key
-    ? { text: v.execution_open ? t('admin.security.keyExecOpen') : t('admin.security.keyExecClosed'), tone: 'up' }
-    : { text: t('admin.security.publicMarket'), tone: 'warn' }
-}
-const binanceStatus = computed(() => venueStatus('binance'))
-const gateStatus = computed(() => venueStatus('gate'))
+const binanceStatus = computed(() => venueStatus('binance', mx.value, t))
+const gateStatus = computed(() => venueStatus('gate', mx.value, t))
 
-/** 资金档位文字 */
-const okxEnvText = computed(() => {
-  const env = String(config.value?.editable?.okx_environment || '')
-  return env === 'live' ? t('admin.security.envLive') : env === 'demo' ? t('admin.security.envDemoOkx') : t('admin.security.envUnknown')
-})
-function envTextOf(venue: 'binance' | 'gate', sandboxLabel: string) {
-  if (!mx.value?.venues?.[venue]) return t('admin.security.envUnknown')
-  return mxTestnet.value[venue] ? sandboxLabel : t('admin.security.envLive')
-}
-const binanceEnvText = computed(() => envTextOf('binance', t('admin.security.envDemoBinance')))
-const gateEnvText = computed(() => envTextOf('gate', t('admin.security.envDemoGate')))
+const okxEnvText = computed(() => okxEnvTextOf(config.value?.editable?.okx_environment, t))
+const binanceEnvText = computed(() => envTextOf('binance', t('admin.security.envDemoBinance'), mx.value, mxTestnet.value, t))
+const gateEnvText = computed(() => envTextOf('gate', t('admin.security.envDemoGate'), mx.value, mxTestnet.value, t))
 
 const TABS = computed<Array<{ key: TabKey; label: string }>>(() => [
   { key: 'venues', label: t('admin.security.tabVenues') },
@@ -425,9 +404,6 @@ const TABS = computed<Array<{ key: TabKey; label: string }>>(() => [
   { key: 'emergency', label: t('admin.security.tabEmergency') },
 ])
 
-function envBadge(env: string) {
-  return (env || 'demo').toUpperCase()
-}
 
 onMounted(() => { loadAll(); loadMx() })
 </script>

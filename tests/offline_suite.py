@@ -157,6 +157,10 @@ class OfflineGuard:
 
 
 def main():
+    # 显式标记：让"会 spawn 子进程的测试"能在**spawn 之前**自行跳过。
+    # 否则它们会被 audit hook 拦下抛 RuntimeError（套件变脏 + 报 ERROR），
+    # 而它们本意只是"本环境无法验证"。判据必须**先于**子进程存在。
+    os.environ['OFFLINE_SUITE_RUNNING'] = '1'
     guard = OfflineGuard().install()
     os.chdir(guard.root)
     guard.prove_connection_guard()
