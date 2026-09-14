@@ -71,6 +71,20 @@ DATA_DIR = os.path.join(WORKSPACE_DIR, "data")
 from market_data_service import fetch_single_indicator, fetch_ticker, fetch_candles
 # 结构优化阶段4·B3：单标的数据包装配已搬入 scripts/brain/packages.py（门面保留薄壳）
 from scripts.brain.packages import fetch_single_instrument_package as _fetch_single_instrument_package
+# 结构优化阶段4·B3 第二块：跨所采集/健康度/提示词组装已搬入 scripts/brain/xvenue.py。
+# 依赖面较宽（适配器缝、safe_float、VENUE_HEALTH_FILE、atomic_write_json、_XV_HEALTH），
+# 全部走**调用期注入**，理由见该模块 docstring 与 r20_backend/README.md §5。
+from scripts.brain.xvenue import (
+    _xvenue_enabled as _xvenue_enabled_impl,
+    _xv_record as _xv_record_impl,
+    _xv_flush_health as _xv_flush_health_impl,
+    _get_xvenue_adapter as _get_xvenue_adapter_impl,
+    _xv_binance_snapshot as _xv_binance_snapshot_impl,
+    _xv_gate_snapshot as _xv_gate_snapshot_impl,
+    fetch_cross_venue_matrix as _fetch_cross_venue_matrix_impl,
+    _xv_divergence_notes as _xv_divergence_notes_impl,
+    _xvenue_prompt_line as _xvenue_prompt_line_impl,
+)
 AI_DECISION_CACHE_FILE = os.path.join(DATA_DIR, "ai_brain_decisions.json")
 AI_DECISION_HISTORY_FILE = os.path.join(DATA_DIR, "ai_brain_history.json")
 
@@ -443,237 +457,101 @@ _SYSTEM_JSON_CONTRACT = """==== 【严格 JSON 规范契约与完整输出骨架
 # 熔断开关 R20_XVENUE_PROMPT=0 时整段跳过（网络故障预案/测试封闭性）。
 # ---------------------------------------------------------------------------
 
-def _xvenue_enabled() -> bool:
-    return str(os.environ.get("R20_XVENUE_PROMPT", "1")).strip().lower() not in ("0", "off", "false")
-
-
-# 跨所分歧自动标注阈值（US-003，依据 2026-09-09 价值研究实测：
-# 方向二 同刻同币三所费率分化 2.3 倍属常态噪声 → 标注阈值取 3.0 倍且同号；
-# 方向三 大户比博弈样本 币安2.12 vs Gate1.10 ≈ 93% 差 → 阈值取 50%。
-# 注意：两所大户比口径不同（账户/持仓维度差异），标注定位为「博弈提示」而非绝对事实。）
-XV_FUNDING_DIVERGE_MULT = 3.0
-XV_LS_DIVERGE_RATIO = 0.50
-
-
-import threading
-
+# 跨所取数健康度状态：**刻意留在门面**（不是实现细节）——
+# `tests/test_xvenue_prompt.py:120` 直接断言 `abt._XV_HEALTH`，且门面被
+# `pin_baseline_risk_env()` 原地重载后，子模块 import 期持有的引用会与门面的
+# 那个不再是同一个对象。实现模块 scripts/brain/xvenue.py 只保留保护它的锁。
 _XV_HEALTH: Dict[str, Dict[str, Any]] = {}
-_XV_HEALTH_LOCK = threading.Lock()
+
+
+def _xvenue_enabled() -> bool:
+    """跨所提示词总开关。实现见 scripts/brain/xvenue.py。"""
+    return _xvenue_enabled_impl()
 
 
 def _xv_record(venue: str, name: str, ok: bool, latency_ms: float, err: str = "") -> None:
-    """记录场所级取数健康度（每 15 分钟周期覆盖式累计），落盘 venue_health.json。"""
-    with _XV_HEALTH_LOCK:
-        v = _XV_HEALTH.setdefault(venue, {"latency": {}, "failed": {}})
-        if ok:
-            v["latency"][name] = int(round(latency_ms))
-            v["failed"].pop(name, None)
-        else:
-            v["failed"][name] = (err or "unknown")[:160]
+    """记录场所级取数健康度（写入门面的 `_XV_HEALTH`）。实现见 scripts/brain/xvenue.py。
+
+    `_XV_HEALTH` 必须留在门面：`tests/test_xvenue_prompt.py:120` 直接断言
+    `abt._XV_HEALTH`，且门面被 `pin_baseline_risk_env()` 原地重载后
+    子模块持有的引用会与门面的那个不再是同一个对象。
+    """
+    _xv_record_impl(_XV_HEALTH, venue, name, ok, latency_ms, err)
 
 
 def _xv_flush_health(packages: List[Dict[str, Any]]) -> None:
-    try:
-        with _XV_HEALTH_LOCK:
-            snapshot = {k: {"latency": dict(v.get("latency", {})),
-                            "failed": dict(v.get("failed", {}))}
-                        for k, v in _XV_HEALTH.items()}
-        okx_ok = [p["name"] for p in packages if safe_float(p.get("price", 0)) > 0]
-        venues = {
-            "okx": {"ok": okx_ok, "failed": {p["name"]: "ticker/price unavailable" for p in packages
-                                              if safe_float(p.get("price", 0)) <= 0},
-                    "latency_ms": {}, "testnet": False},
-        }
-        for venue, v in snapshot.items():
-            failed = v["failed"]
-            venues[venue] = {
-                "ok": sorted(n for n in v["latency"] if n not in failed),
-                "failed": failed,
-                "latency_ms": v["latency"],
-                "avg_ms": round(sum(v["latency"].values()) / len(v["latency"])) if v["latency"] else 0,
-                "testnet": str(os.environ.get(f"R20_{venue.upper()}_TESTNET", "0")) == "1",
-            }
-        symbols: Dict[str, Any] = {}
-        try:  # 逐币跨所快照（US-007 前端消费源）——纯附加，异常不影响健康度落盘
-            for p in packages:
-                xv = p.get("xvenue") or {}
-                okx_px = safe_float(p.get("price", 0))
-                name = str(p.get("name") or "")
-                if okx_px <= 0 or not xv or not name:
-                    continue
+    """健康度 + 逐币跨所快照落盘。实现见 scripts/brain/xvenue.py。
 
-                def _basis(v, _ref=okx_px):
-                    try:
-                        v = float(v)
-                        return round((v - _ref) / _ref * 100, 3) if v > 0 else None
-                    except (TypeError, ValueError):
-                        return None
-                symbols[name] = {
-                    "okx": okx_px,
-                    "bin_last": xv.get("bin_last"), "bin_basis_pct": _basis(xv.get("bin_last")),
-                    "gate_last": xv.get("gate_last"), "gate_basis_pct": _basis(xv.get("gate_last")),
-                    "bin_ls": xv.get("bin_ls"), "gate_ls": xv.get("gate_ls"),
-                    "bin_funding_pct": xv.get("bin_funding_pct"),
-                    "gate_funding_pct": xv.get("gate_funding_pct"),
-                }
-        except Exception:
-            pass
-        out = {
-            "v": 1,  # G12 schema 版本：结构演进时消费端可按版本分派（当前消费端已 || {} 防御）
-            "updated_utc": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
-            "writer_pid": os.getpid(),
-            "package_count": len(packages),
-            "venues": venues,
-            "symbols": symbols,
-        }
-        # 审计③(2026-09-13)：同文件 :130 就有 fsync 版 atomic_write_json，这里却是
-        # 裸 open("w")——读者全在开仓执行链（reservation/选所/面板），撕裂窗=选所失真。
-        atomic_write_json(VENUE_HEALTH_FILE, out)
-    except Exception:
-        pass
+    依赖一律在**调用时**从门面全局取名（而不是 import 期绑定或设默认参数）——
+    目的是让 `patch.object(abt, "VENUE_HEALTH_FILE", …)` 与
+    `patch.object(abt, "atomic_write_json", …)` 在调用时被读到；
+    同时 `abt._xv_flush_health([...])` 这种只传 packages 的既有调用
+    （`tests/test_xvenue_prompt.py:129/144`）照旧成立。
+
+    注：不要把默认值写成同名形参（`safe_float=None` 之类）—— 那会让函数体里的
+    裸名解析到形参而不是模块全局，等于把补丁缝静默关掉。
+    """
+    _xv_flush_health_impl(
+        packages,
+        health=_XV_HEALTH,
+        safe_float=safe_float,
+        atomic_write_json=atomic_write_json,
+        venue_health_file=VENUE_HEALTH_FILE,
+    )
 
 
 def _get_xvenue_adapter(venue: str):
-    # 测试与故障注入缝：mock 此函数即可完全离线
-    from r20_backend.exchanges import get_adapter
-    return get_adapter(venue)
+    """适配器获取。实现见 scripts/brain/xvenue.py。
+
+    保留在门面：这是 `tests/test_xvenue_prompt.py` 4 处
+    `patch.object(abt, "_get_xvenue_adapter", …)` 的**既定 mock 缝**
+    （模块注释原话：「测试与故障注入缝：mock 此函数即可完全离线」）。
+    """
+    return _get_xvenue_adapter_impl(venue)
 
 
 def _xv_binance_snapshot(base: str):
-    t0 = time.time()
-    try:
-        ad = _get_xvenue_adapter("binance")
-        t = ad.fetch_ticker(base) or {}
-        ls = ad.fetch_top_trader_ratio(base)
-        # 费率经适配器实装取 premiumIndex（小数口径，挂载点统一 ×100）
-        try:
-            fund = ad.fetch_funding_rate(base)
-        except Exception:
-            fund = None
-        if not t.get("last"):
-            _xv_record("binance", base, False, (time.time() - t0) * 1000, "empty ticker (unreachable/blocked?)")
-            return None
-        _xv_record("binance", base, True, (time.time() - t0) * 1000)
-        return {"venue": "binance", "name": base, "last": t.get("last"), "ls": ls,
-                "funding_rate": fund}
-    except Exception as exc:
-        _xv_record("binance", base, False, (time.time() - t0) * 1000, str(exc))
-        return None
+    """单点取币安现价/大户比/费率。实现见 scripts/brain/xvenue.py。"""
+    return _xv_binance_snapshot_impl(
+        base,
+        get_adapter=_get_xvenue_adapter,
+        record=lambda venue, name, ok, ms, err="": _xv_record(venue, name, ok, ms, err),
+    )
 
 
 def _xv_gate_snapshot(base: str):
-    t0 = time.time()
-    try:
-        ad = _get_xvenue_adapter("gate")
-        t = ad.fetch_ticker(base) or {}
-        # Gate 大户比走 contract_stats top_lsr_size（适配器实装自带容错）
-        try:
-            ls = ad.fetch_top_trader_ratio(base)
-        except Exception:
-            ls = None
-        if not t.get("last"):
-            _xv_record("gate", base, False, (time.time() - t0) * 1000, "empty ticker (unreachable/blocked?)")
-            return None
-        _xv_record("gate", base, True, (time.time() - t0) * 1000)
-        return {"venue": "gate", "name": base, "last": t.get("last"),
-                "funding_rate": t.get("funding_rate"), "ls": ls}
-    except Exception as exc:
-        _xv_record("gate", base, False, (time.time() - t0) * 1000, str(exc))
-        return None
+    """单点取 Gate 现价/大户比/费率。实现见 scripts/brain/xvenue.py。"""
+    return _xv_gate_snapshot_impl(
+        base,
+        get_adapter=_get_xvenue_adapter,
+        record=lambda venue, name, ok, ms, err="": _xv_record(venue, name, ok, ms, err),
+    )
 
 
 def fetch_cross_venue_matrix(packages: List[Dict[str, Any]]) -> None:
-    """给每个 pkg 就地挂 xvenue：双所 现价/大户多空比/资金费率（US-003 对称化）。fail-soft。"""
-    if not _xvenue_enabled():
-        return
-    try:
-        by_name = {p["name"]: p for p in packages if p.get("name")}
-        with ThreadPoolExecutor(max_workers=6) as ex:
-            futures = []
-            for name in by_name:
-                futures.append(ex.submit(_xv_binance_snapshot, name))
-                futures.append(ex.submit(_xv_gate_snapshot, name))
-            for fut in futures:
-                try:
-                    val = fut.result(timeout=6)
-                except Exception:
-                    val = None
-                if not isinstance(val, dict):
-                    continue
-                pkg = by_name.get(val.get("name"))
-                if pkg is None:
-                    continue
-                xv = pkg.setdefault("xvenue", {})
-                prefix = "bin" if val.get("venue") == "binance" else "gate"
-                if val.get("last") is not None:
-                    xv[f"{prefix}_last"] = val["last"]
-                if val.get("ls") is not None:
-                    xv[f"{prefix}_ls"] = val["ls"]
-                if val.get("funding_rate") is not None:
-                    try:
-                        xv[f"{prefix}_funding_pct"] = round(float(val["funding_rate"]) * 100, 4)
-                    except (TypeError, ValueError):
-                        pass
-        _xv_flush_health(packages)
-    except Exception:
-        pass
+    """给每个 pkg 就地挂 xvenue（US-003 对称化）。实现见 scripts/brain/xvenue.py。"""
+    _fetch_cross_venue_matrix_impl(
+        packages,
+        enabled=_xvenue_enabled(),
+        snapshot_binance=_xv_binance_snapshot,
+        snapshot_gate=_xv_gate_snapshot,
+        flush_health=_xv_flush_health,
+    )
 
 
 def _xv_divergence_notes(xv: Dict[str, Any]) -> str:
-    """US-003 跨所分歧自动标注：博弈提示语（可多条，拼接于证据行尾）。"""
-    notes: List[str] = []
-    def _f(v: Any) -> Optional[float]:
-        if v is None:
-            return None
-        try:
-            return float(v)
-        except (TypeError, ValueError):
-            return None
-    b_ls, g_ls = _f(xv.get("bin_ls")), _f(xv.get("gate_ls"))
-    if b_ls and g_ls and b_ls > 0 and g_ls > 0:
-        conflict = (b_ls - 1.0) * (g_ls - 1.0) < 0     # 一所以为主导、另一所以空为主导
-        diff_ratio = abs(b_ls - g_ls) / min(b_ls, g_ls)
-        if conflict or diff_ratio >= XV_LS_DIVERGE_RATIO:
-            optimistic = "币安" if b_ls > g_ls else "Gate"
-            notes.append(f"大户比分歧{b_ls:g}vs{g_ls:g}→{optimistic}大户更乐观"
-                         f"(两所口径有异,作博弈提示非绝对)")
-    b_f, g_f = _f(xv.get("bin_funding_pct")), _f(xv.get("gate_funding_pct"))
-    if b_f is not None and g_f is not None and b_f * g_f > 0 \
-            and min(abs(b_f), abs(g_f)) > 0:
-        mult = max(abs(b_f), abs(g_f)) / min(abs(b_f), abs(g_f))
-        if mult >= XV_FUNDING_DIVERGE_MULT:
-            gate_hi = abs(g_f) > abs(b_f)
-            hi = "Gate" if gate_hi else "币安"
-            hi_val = g_f if gate_hi else b_f
-            side = "空" if hi_val > 0 else "多"       # 正费率=多头付费给空头
-            notes.append(f"费率背离{mult:.1f}x→{hi}费率更高({hi_val:g}%),"
-                         f"{side}向持仓为收费方向")
-    return (" | " + " | ".join(notes)) if notes else ""
+    """跨所分歧自动标注。实现见 scripts/brain/xvenue.py。"""
+    return _xv_divergence_notes_impl(xv)
 
 
 def _xvenue_prompt_line(p: Dict[str, Any]) -> str:
-    """归一跨所证据行（双所现价基差/大户比/费率+分歧标注）；数据不足返回空串。"""
-    xv = p.get("xvenue") or {}
-    okx_px = safe_float(p.get("price", 0))
-    bin_px = safe_float(xv.get("bin_last", 0))
-    gate_px = safe_float(xv.get("gate_last", 0))
-    if okx_px <= 0 or (bin_px <= 0 and gate_px <= 0):
-        return ""
-    seg = [f"OKX:{okx_px:g}"]
-    for label, px in (("币安", bin_px), ("Gate", gate_px)):
-        if px > 0:
-            basis = (px - okx_px) / okx_px * 100
-            seg.append(f"{label}:{px:g}(基差{basis:+.3f}%)")
-    if xv.get("bin_ls") is not None:
-        seg.append(f"币安大户比:{xv['bin_ls']}")
-    if xv.get("gate_ls") is not None:
-        seg.append(f"Gate大户比:{xv['gate_ls']}")
-    if xv.get("bin_funding_pct") is not None:
-        seg.append(f"币安费率:{xv['bin_funding_pct']}%")
-    if xv.get("gate_funding_pct") is not None:
-        seg.append(f"Gate费率:{xv['gate_funding_pct']}%")
-    return ("- 🌐 跨所比对 (基差=对OKX偏离，>0.05% 警惕插针/流动性分层): "
-            + " | ".join(seg) + _xv_divergence_notes(xv))
+    """归一跨所证据行。实现见 scripts/brain/xvenue.py。
+
+    `safe_float` 在调用时注入（它定义在本门面，不是共享叶子函数）。
+    """
+    return _xvenue_prompt_line_impl(p, safe_float=safe_float)
+
+
 
 
 # System 宪法保持静态：全部动态风控阈值由每轮 construct_full_market_prompt 注入的
