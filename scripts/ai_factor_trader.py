@@ -42,6 +42,9 @@ from scripts.trader.signals import clamp, evaluate_asset_signal as _evaluate_ass
 from scripts.trader.position_mgmt import (
     execute_ai_position_management as _execute_ai_position_management_impl,
 )
+from scripts.trader.pyramiding import (
+    pyramiding_gate,
+)
 from scripts.trader.brackets import (
     normalize_bracket_prices,
 )
@@ -2680,25 +2683,16 @@ def execute_portfolio():
                     p_cont = float(p_th.get("continuation_prob_pct", 50.0) or 50.0)
                     calculus_accel_ok = (c_accel >= -0.25 and p_cont >= 40.0)
 
-                    is_profit_or_breakeven = (pos_upl > 0 and pos_upl_ratio >= MIN_SCALE_IN_PROFIT_RATIO) or (trailing_sl > 0 and trailing_sl >= pos_avg_px)
-                    planned_margin = ai_margin if ai_margin > 0 else (actual_sz * ct_val * f["price"] / max(1.0, ai_lever))
-                    within_margin_cap = (curr_margin + planned_margin) <= ASSET_MARGIN_CAP
-
-                    if is_profit_or_breakeven and scale_count < MAX_SCALE_IN_COUNT and within_margin_cap and ai_conf >= MIN_SCALE_IN_CONFIDENCE and calculus_accel_ok:
-                        allow_entry = True
-                        is_scale_in = True
-                        print(f"[Pyramiding] {f['name']} 满足顺势浮盈加多条件: 底仓浮盈={pos_upl:+.2f}U ({pos_upl_ratio*100:+.1f}%), 已加仓{scale_count}次, 微积分加速度={c_accel:+.2f}, 延续概率={p_cont:.1f}%, 计划加仓{actual_sz}张")
-                    else:
-                        if not is_profit_or_breakeven:
-                            print(f"[Pyramiding 拦截] {f['name']} 底仓未达浮盈保本门禁 (浮盈={pos_upl:+.2f}U ROI={pos_upl_ratio*100:+.1f}%), 严禁逆势加仓")
-                        elif scale_count >= MAX_SCALE_IN_COUNT:
-                            print(f"[Pyramiding 拦截] {f['name']} 已达最大加仓次数 ({scale_count}/{MAX_SCALE_IN_COUNT})")
-                        elif not within_margin_cap:
-                            print(f"[Pyramiding 拦截] {f['name']} 加仓后总保证金将超限 ({curr_margin + planned_margin:.1f} > {ASSET_MARGIN_CAP}U)")
-                        elif ai_conf < MIN_SCALE_IN_CONFIDENCE:
-                            print(f"[Pyramiding 拦截] {f['name']} AI加仓置信度不足 ({ai_conf:.0f}% < {MIN_SCALE_IN_CONFIDENCE}%)")
-                        elif not calculus_accel_ok:
-                            print(f"[Pyramiding 拦截] {f['name']} 数理动能衰竭或延续概率偏低 (加速度={c_accel:+.2f}, 概率={p_cont:.1f}%)，禁止追多加仓")
+                    allow_entry, is_scale_in = pyramiding_gate(
+                        is_long=True, f=f, pos_upl=pos_upl, pos_upl_ratio=pos_upl_ratio,
+                        pos_avg_px=pos_avg_px, curr_margin=curr_margin, trailing_sl=trailing_sl,
+                        scale_count=scale_count, c_accel=c_accel, p_th=p_th,
+                        ai_margin=ai_margin, actual_sz=actual_sz, ct_val=ct_val,
+                        ai_lever=ai_lever, ai_conf=ai_conf,
+                        min_scale_in_profit_ratio=MIN_SCALE_IN_PROFIT_RATIO,
+                        max_scale_in_count=MAX_SCALE_IN_COUNT,
+                        min_scale_in_confidence=MIN_SCALE_IN_CONFIDENCE,
+                        asset_margin_cap=ASSET_MARGIN_CAP)
 
                 if allow_entry and entries_blocked:
                     print(f"[挂单对账] fail-closed 拦截 {f['name']} 新增多单下单（本周期对账失败）")
@@ -2791,31 +2785,20 @@ def execute_portfolio():
                     scale_count = int(tracker.get("scale_count", 0))
                     trailing_sl = float(tracker.get("trailingStopPx", 0.0) or 0.0)
 
-                    is_profit_or_breakeven = (pos_upl > 0 and pos_upl_ratio >= MIN_SCALE_IN_PROFIT_RATIO) or (trailing_sl > 0 and trailing_sl <= pos_avg_px)
-                    planned_margin = ai_margin if ai_margin > 0 else (actual_sz * ct_val * f["price"] / max(1.0, ai_lever))
-                    within_margin_cap = (curr_margin + planned_margin) <= ASSET_MARGIN_CAP
-
                     c_dyn = f.get("calculus", {})
                     c_accel = float(c_dyn.get("acceleration", 0.0) or 0.0)
                     p_th = c_dyn.get("probability_theory", {})
-                    p_break = float(p_th.get("breakdown_prob_pct", 50.0) or 50.0)
-                    calculus_accel_ok = (c_accel <= 0.25 and p_break >= 40.0)
 
-                    if is_profit_or_breakeven and scale_count < MAX_SCALE_IN_COUNT and within_margin_cap and ai_conf >= MIN_SCALE_IN_CONFIDENCE and calculus_accel_ok:
-                        allow_entry = True
-                        is_scale_in = True
-                        print(f"[Pyramiding] {f['name']} 满足顺势浮盈加空条件: 底仓浮盈={pos_upl:+.2f}U ({pos_upl_ratio*100:+.1f}%), 已加仓{scale_count}次, 微积分加速度={c_accel:+.2f}, 击穿概率={p_break:.1f}%, 计划加仓{actual_sz}张")
-                    else:
-                        if not is_profit_or_breakeven:
-                            print(f"[Pyramiding 拦截] {f['name']} 底仓未达浮盈保本门禁 (浮盈={pos_upl:+.2f}U ROI={pos_upl_ratio*100:+.1f}%), 严禁逆势加仓")
-                        elif scale_count >= MAX_SCALE_IN_COUNT:
-                            print(f"[Pyramiding 拦截] {f['name']} 已达最大加仓次数 ({scale_count}/{MAX_SCALE_IN_COUNT})")
-                        elif not within_margin_cap:
-                            print(f"[Pyramiding 拦截] {f['name']} 加仓后总保证金将超限 ({curr_margin + planned_margin:.1f} > {ASSET_MARGIN_CAP}U)")
-                        elif ai_conf < MIN_SCALE_IN_CONFIDENCE:
-                            print(f"[Pyramiding 拦截] {f['name']} AI加仓置信度不足 ({ai_conf:.0f}% < {MIN_SCALE_IN_CONFIDENCE}%)")
-                        elif not calculus_accel_ok:
-                            print(f"[Pyramiding 拦截] {f['name']} 数理动能失速企稳或击穿概率偏低 (加速度={c_accel:+.2f}, 概率={p_break:.1f}%)，禁止追空加仓")
+                    allow_entry, is_scale_in = pyramiding_gate(
+                        is_long=False, f=f, pos_upl=pos_upl, pos_upl_ratio=pos_upl_ratio,
+                        pos_avg_px=pos_avg_px, curr_margin=curr_margin, trailing_sl=trailing_sl,
+                        scale_count=scale_count, c_accel=c_accel, p_th=p_th,
+                        ai_margin=ai_margin, actual_sz=actual_sz, ct_val=ct_val,
+                        ai_lever=ai_lever, ai_conf=ai_conf,
+                        min_scale_in_profit_ratio=MIN_SCALE_IN_PROFIT_RATIO,
+                        max_scale_in_count=MAX_SCALE_IN_COUNT,
+                        min_scale_in_confidence=MIN_SCALE_IN_CONFIDENCE,
+                        asset_margin_cap=ASSET_MARGIN_CAP)
 
                 if allow_entry and entries_blocked:
                     print(f"[挂单对账] fail-closed 拦截 {f['name']} 新增空单下单（本周期对账失败）")
