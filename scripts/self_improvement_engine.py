@@ -56,6 +56,7 @@ from r20_gateway.telemetry import ModelCallTelemetry
 from scripts.evolution.memory_review import apply_memory_review
 from scripts.evolution.review_context import (
     build_host_constitution,
+    parse_review_json,
     summarize_closed_trades,
 )
 from scripts.evolution.observability import (  # noqa: E402,F401
@@ -522,16 +523,7 @@ def call_llm_evolution_review(closed_trades: List[Dict[str, Any]], existing_memo
                 raw_res = res
 
         content = (content or "").strip()
-        if content.startswith("```json"):
-            content = content[7:]
-        if content.startswith("```"):
-            content = content[3:]
-        if content.endswith("```"):
-            content = content[:-3]
-        
-        review_json = json.loads(content.strip())
-        if not isinstance(review_json, dict):
-            review_json = {}
+        content, review_json = parse_review_json(content=content)
         telemetry.finish("success", raw_res, output_chars=len(content))
         log_msg(f"✅ AI 大脑认知复盘完成 (耗时 {round(time.time() - t0, 2)}s)")
         return review_json

@@ -14,7 +14,10 @@
 两个函数都是**纯函数**（零副作用、零模块全局读取 —— 依赖全部显式入参）。
 """
 
+
 from __future__ import annotations
+
+import json
 
 from typing import Any, Dict, List, Tuple
 
@@ -49,3 +52,17 @@ def build_host_constitution(*,
     )
     return (host_constitution)
 
+
+def parse_review_json(*,
+        content):
+    if content.startswith("```json"):
+        content = content[7:]
+    if content.startswith("```"):
+        content = content[3:]
+    if content.endswith("```"):
+        content = content[:-3]
+
+    review_json = json.loads(content.strip())
+    if not isinstance(review_json, dict):
+        review_json = {}
+    return content, review_json

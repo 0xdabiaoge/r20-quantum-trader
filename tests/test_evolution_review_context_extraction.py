@@ -182,5 +182,96 @@ class EvolutionReviewContextTest(unittest.TestCase):
             ast.dump(ast.Module(body=seg, type_ignores=[]), include_attributes=False))
 
 
+class ParseReviewJsonTest(unittest.TestCase):
+    """第一百一十三刀：`call_llm_evolution_review` 里的**围栏剥离 + JSON 解析**出表。
+
+    该段原先在 63 行 `try` 的深处（103 行函数内），剥离 ```json 围栏这种"经典 bug 源"
+    只能靠读代码确认。抽成 `parse_review_json` 后可逐条钉住。
+
+    ⚠️ 助手**同时返回清洗后的 content**：门面随后用 `len(content)` 记 `output_chars`，
+    若只返回解析结果，那个长度就会把围栏算进去（静默改变遥测语义）。
+    """
+
+    PRE = "d301f31"
+    OWNER = "call_llm_evolution_review"
+
+    def _baseline(self) -> ast.FunctionDef:
+        r = subprocess.run(["git", "show", f"{self.PRE}:scripts/self_improvement_engine.py"],
+                           capture_output=True, text=True, cwd=str(ROOT))
+        assert r.returncode == 0, f"基线取不到：{r.stderr[:200]}"
+        return next(n for n in ast.parse(r.stdout).body
+                    if isinstance(n, ast.FunctionDef) and n.name == self.OWNER)
+
+    def test_segment_is_ast_identical_to_baseline(self):
+        seg = self._baseline().body[10].body[6:11]      # Try 内第 6..10 条
+        body = list(_impl("parse_review_json").body)[:-1]   # 去掉尾部 return
+        body = body[1:] if (body and isinstance(body[0], ast.Expr)
+                            and isinstance(body[0].value, ast.Constant)
+                            and isinstance(body[0].value.value, str)) else body
+        self.assertEqual(
+            ast.dump(ast.Module(body=body, type_ignores=[]), include_attributes=False),
+            ast.dump(ast.Module(body=list(seg), type_ignores=[]), include_attributes=False),
+            "parse_review_json 段体与抽取前**不再同一棵 AST**")
+
+    def test_module_defines_it_and_imports_json_itself(self):
+        mod = ast.parse(MOD.read_text(encoding="utf-8"))
+        self.assertIn("parse_review_json", {n.name for n in mod.body if isinstance(n, ast.FunctionDef)})
+        imported = set()
+        for n in mod.body:
+            if isinstance(n, (ast.Import, ast.ImportFrom)):
+                imported |= {a.asname or a.name.split(".")[0] for a in n.names}
+        self.assertIn("json", imported,
+                      "标准库名应由子模块自己 import（分析器第 11 条），不要当作参数注入")
+
+    def test_call_site_unpacks_two_values_in_order(self):
+        tree = ast.parse(FACADE.read_text(encoding="utf-8"))
+        fn = next(n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)
+                  and n.name == self.OWNER)
+        assigns = [n for n in ast.walk(fn) if isinstance(n, ast.Assign)
+                   and isinstance(n.value, ast.Call)
+                   and getattr(n.value.func, "id", "") == "parse_review_json"]
+        self.assertEqual(len(assigns), 1, "应当恰好一处调用")
+        call = assigns[0].value
+        self.assertEqual([k.arg for k in call.keywords], ["content"])
+        self.assertEqual(ast.unparse(call.keywords[0].value), "content")
+        self.assertEqual([e.id for e in assigns[0].targets[0].elts], ["content", "review_json"],
+                         "解包顺序必须是 (清洗后的 content, review_json)")
+
+    def _parse(self, content):
+        from scripts.evolution.review_context import parse_review_json
+        return parse_review_json(content=content)
+
+    def test_plain_json(self):
+        cleaned, obj = self._parse('{"action": "NO_CHANGE"}')
+        self.assertEqual(obj, {"action": "NO_CHANGE"})
+        self.assertEqual(cleaned, '{"action": "NO_CHANGE"}')
+
+    def test_fenced_json_is_stripped_and_cleaned_content_returned(self):
+        """**只去围栏、不去空白**：返回的 content 保留内层换行，解析时才 `.strip()`。
+
+        这个区别是实测出来的（我最初以为返回的是 trim 过的）：门面用 `len(cleaned)`
+        记 `output_chars`，因此那 2 个换行**照旧计入** —— 与抽取前逐字一致。
+        顺手钉住"解析用 strip、返回不 strip"这条容易在重构时被"顺手改统一"的差异。
+        """
+        raw = '```json\n{"a": 1}\n```'
+        cleaned, obj = self._parse(raw)
+        self.assertEqual(obj, {"a": 1})
+        self.assertEqual(cleaned, '\n{"a": 1}\n', "只裁围栏，保留内层空白")
+        self.assertEqual(cleaned.strip(), '{"a": 1}', "解析前才 strip")
+
+    def test_bare_fence_and_trailing_fence(self):
+        self.assertEqual(self._parse('```\n{"a": 1}```')[1], {"a": 1})
+        self.assertEqual(self._parse('{"a": 1}```')[1], {"a": 1})
+
+    def test_non_dict_json_becomes_empty_dict(self):
+        self.assertEqual(self._parse('[1, 2, 3]')[1], {},
+                         "解析成功但非对象 ⇒ 归一成 {}（既有行为）")
+
+    def test_invalid_json_propagates(self):
+        """不得在这里吞异常：门面靠 except 把它变成 `__llm_error__` 上报。"""
+        with self.assertRaises(Exception):
+            self._parse("not json at all")
+
+
 if __name__ == "__main__":
     unittest.main()
