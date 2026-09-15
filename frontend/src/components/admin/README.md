@@ -80,11 +80,12 @@ F7 的另一种解法（推广）对这三个组件目前**不成立**，理由�
 
 - `components/base/` —— 原语组件。`BaseDrawer`/`CopyButton`/`BaseDialog` 是多消费者，
   其余（`BaseSwitch`/`BaseSparkline`/`BaseTabs`）目前单消费者。
-- `components/dashboard/` —— 仪表盘。其中 **6 个 `.ts` 是纯逻辑模块**，
+- `components/dashboard/` —— 仪表盘。其中 **7 个 `.ts` 是纯逻辑模块**，
   与本目录的 `.vue` 组件分开：`chartCandles.ts`（蜡烛取数与归一）、
   `chartCountdown.ts`（周期倒计时）、`chartIndicators.ts`（指标目录）、
+  `chartLiveLevels.ts`（活动持仓/挂单 → 入场价、方向、止损、止盈）、
   `chartMath.ts`（风险收益与精度）、`chartOverlays.ts`（价格线规划）、
-  `chartStyles.ts`（图表主题）。前五个里除 `chartMath`/`chartStyles`
+  `chartStyles.ts`（图表主题）。除 `chartMath`/`chartStyles`
   各有 2 个消费者外，其余各 1 个（均为 `ChartWorkstation.vue`）。
   **纯逻辑外提的收益是"可被 node 直接测试"**，见
-  `frontend/tests/chartCandles.test.mjs`。
+  `frontend/tests/chartCandles.test.mjs` 与 `frontend/tests/chartLiveLevels.test.mjs`。

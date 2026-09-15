@@ -142,7 +142,7 @@ class ReadmeClaimTest(unittest.TestCase):
                     self.fail(f"README 更正表里找不到 {name} 的行")
 
     def test_readme_lists_the_dashboard_pure_logic_modules(self):
-        """`components/dashboard/` 的 6 个纯逻辑 `.ts` 必须在导航里点名。
+        """`components/dashboard/` 的纯逻辑 `.ts` 必须在导航里点名（现 7 个）。
 
         它们与同目录 `.vue` 混放，是接手人最容易看漏的一类文件。
         """
@@ -150,7 +150,7 @@ class ReadmeClaimTest(unittest.TestCase):
         ts_modules = sorted(p.name for p in dash.glob("*.ts"))
         self.assertEqual(ts_modules, [
             "chartCandles.ts", "chartCountdown.ts", "chartIndicators.ts",
-            "chartMath.ts", "chartOverlays.ts", "chartStyles.ts",
+            "chartLiveLevels.ts", "chartMath.ts", "chartOverlays.ts", "chartStyles.ts",
         ], "dashboard 的纯逻辑模块清单变了 —— 请同步 README 导航")
         for m in ts_modules:
             with self.subTest(module=m):

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { chartStyles } from './chartStyles'
 import { computeRiskReward, symbolPrecision } from './chartMath'
+import { deriveLiveEntry, deriveLiveSide, deriveLiveStopLoss, deriveLiveTakeProfit } from './chartLiveLevels'
 import { planPriceLines } from './chartOverlays'
 import { countdownLabel } from './chartCountdown'
 import { fetchCandles } from './chartCandles'
@@ -229,56 +230,22 @@ const activeOrder = computed(() => {
 // 真实最新价格 (纯从当前已加载的实时蜡烛最后一根获取，与K线和最新Tick 100% 同源)
 const currentPrice = ref<number>(0)
 
-// 真实开仓成本与方向
-const liveEntry = computed(() => {
-  if (activePosition.value) return Number(activePosition.value.avgPx || currentPrice.value)
-  if (activeOrder.value) return Number(activeOrder.value.px || currentPrice.value)
-  return currentPrice.value
-})
+// 真实开仓成本与方向（推导逻辑见 ./chartLiveLevels.ts，本处只负责读 ref 与响应式追踪）
+const liveEntry = computed(() => deriveLiveEntry({
+  position: activePosition.value, order: activeOrder.value, price: currentPrice.value,
+}))
 
-const liveSide = computed<'long' | 'short'>(() => {
-  if (activePosition.value) return activePosition.value.side === 'short' ? 'short' : 'long'
-  if (activeOrder.value) {
-    const s = String(activeOrder.value.side || activeOrder.value.side_raw || '').toLowerCase()
-    return s.includes('sell') || s.includes('空') ? 'short' : 'long'
-  }
-  return 'long'
-})
+const liveSide = computed<'long' | 'short'>(() => deriveLiveSide({
+  position: activePosition.value, order: activeOrder.value,
+}))
 
-const liveStopLoss = computed(() => {
-  if (activePosition.value) {
-    const s = Number(
-      activePosition.value.displayStop ??
-      activePosition.value.exchangeSl ??
-      activePosition.value.slTriggerPx ??
-      activePosition.value.trailingSl ??
-      0
-    )
-    if (s > 0) return s
-  }
-  if (activeOrder.value) {
-    const s = Number(activeOrder.value.sl_px ?? 0)
-    if (s > 0) return s
-  }
-  return 0
-})
+const liveStopLoss = computed(() => deriveLiveStopLoss({
+  position: activePosition.value, order: activeOrder.value,
+}))
 
-const liveTakeProfit = computed(() => {
-  if (activePosition.value) {
-    const tp = Number(
-      activePosition.value.displayTakeProfit ??
-      activePosition.value.exchangeTp ??
-      activePosition.value.tpTriggerPx ??
-      0
-    )
-    if (tp > 0) return tp
-  }
-  if (activeOrder.value) {
-    const tp = Number(activeOrder.value.tp_px ?? 0)
-    if (tp > 0) return tp
-  }
-  return 0
-})
+const liveTakeProfit = computed(() => deriveLiveTakeProfit({
+  position: activePosition.value, order: activeOrder.value,
+}))
 
 // ==========================================
 // 3. 调价试算控制器 (Sim Mode)
