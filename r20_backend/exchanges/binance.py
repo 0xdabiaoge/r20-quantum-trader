@@ -29,8 +29,8 @@ from urllib.request import Request, urlopen
 from .base import (BaseExchangeAdapter, ExchangeCapabilities,
                    ExchangeCapabilityError, InstrumentSpec)
 from .binance_orders import (
-    apply_protective_qty_policy,
     build_order_params,
+    send_protective_order,
 )
 from .binance_signing import build_signed_query
 from .binance_algo import BinanceAlgoRequestsMixin
@@ -469,37 +469,29 @@ class BinanceAdapter(BinanceAlgoRequestsMixin, BaseExchangeAdapter):
 
         res = {"tp": "", "sl": ""}
 
-        if tp_px is not None and float(tp_px) > 0:
-            req_kwargs: Dict[str, Any] = {
-                "symbol": inst,
-                "side": opp_side,
-                "type_": "TAKE_PROFIT_MARKET",
-                "trigger_price": tp_px,
-                "working_type": wt,
-                "position_side": position_side,
-            }
-            apply_protective_qty_policy(req_kwargs=req_kwargs, qty_str=qty_str)
+        res["tp"] = send_protective_order(
+            build_algo_order_request=self.build_algo_order_request,
+            inst=inst,
+            opp_side=opp_side,
+            position_side=position_side,
+            private_algo_send=self._private_algo_send,
+            qty_str=qty_str,
+            trigger_price=tp_px,
+            type_="TAKE_PROFIT_MARKET",
+            wt=wt,
+        )
 
-            req = self.build_algo_order_request(**req_kwargs)
-            tp_data = self._private_algo_send(req)
-            if isinstance(tp_data, dict):
-                res["tp"] = str(tp_data.get("algoId") or tp_data.get("orderId") or "")
-
-        if sl_px is not None and float(sl_px) > 0:
-            req_kwargs = {
-                "symbol": inst,
-                "side": opp_side,
-                "type_": "STOP_MARKET",
-                "trigger_price": sl_px,
-                "working_type": wt,
-                "position_side": position_side,
-            }
-            apply_protective_qty_policy(req_kwargs=req_kwargs, qty_str=qty_str)
-
-            req = self.build_algo_order_request(**req_kwargs)
-            sl_data = self._private_algo_send(req)
-            if isinstance(sl_data, dict):
-                res["sl"] = str(sl_data.get("algoId") or sl_data.get("orderId") or "")
+        res["sl"] = send_protective_order(
+            build_algo_order_request=self.build_algo_order_request,
+            inst=inst,
+            opp_side=opp_side,
+            position_side=position_side,
+            private_algo_send=self._private_algo_send,
+            qty_str=qty_str,
+            trigger_price=sl_px,
+            type_="STOP_MARKET",
+            wt=wt,
+        )
 
         return res
 

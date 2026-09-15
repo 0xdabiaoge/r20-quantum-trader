@@ -99,21 +99,43 @@ class BinanceOrdersExtractionTest(unittest.TestCase):
                          ast.dump(m.body[11].body[1], include_attributes=False))
 
     def test_call_sites_pass_every_parameter_once_same_name(self):
-        for name in ("build_order_params", "apply_protective_qty_policy"):
-            with self.subTest(fn=name):
-                params = [a.arg for a in _impl(name).args.kwonlyargs]
-                calls = _facade_calls(name)
-                self.assertTrue(calls, f"{name} 在门面没有调用点")
-                for call in calls:
-                    self.assertEqual(call.args, [])
-                    self.assertEqual([k.arg for k in call.keywords], params)
-                    for k in call.keywords:
-                        self.assertEqual(ast.unparse(k.value), k.arg)
+        """**第一百一十六刀后**：门面只直接调用 `build_order_params`；
+        `apply_protective_qty_policy` 的调用点移到了同模块的 `send_protective_order` 内部
+        （仍是"同名注入"形态），故这里分两处校验，意图不变：**没有位置参数、没有漏传、没有改名**。
+        """
+        params = [a.arg for a in _impl("build_order_params").args.kwonlyargs]
+        for call in _facade_calls("build_order_params"):
+            self.assertEqual(call.args, [])
+            self.assertEqual([k.arg for k in call.keywords], params)
+            for k in call.keywords:
+                self.assertEqual(ast.unparse(k.value), k.arg)
+        # 模块内调用点：`send_protective_order` 调 `apply_protective_qty_policy`
+        inner = [n for n in ast.walk(_impl("send_protective_order"))
+                 if isinstance(n, ast.Call) and getattr(n.func, "id", "") == "apply_protective_qty_policy"]
+        self.assertEqual(len(inner), 1)
+        self.assertEqual([k.arg for k in inner[0].keywords], ["req_kwargs", "qty_str"])
+        for k in inner[0].keywords:
+            self.assertEqual(ast.unparse(k.value), k.arg)
+        self.assertEqual(_facade_calls("apply_protective_qty_policy"), [],
+                         "门面不应再直接调用它（调用点已下沉到 send_protective_order）")
 
     def test_both_protective_branches_share_one_helper(self):
-        """TP/SL 必须都用同一个函数 —— 否则又会各自漂移。"""
-        self.assertEqual(len(_facade_calls("apply_protective_qty_policy")), 2,
-                         "止盈/止损两处都必须调用该助手")
+        """TP/SL 必须都走**同一个**发单函数 —— 否则又会各自漂移。
+
+        第一百一十六刀把两段近乎逐字重复的代码（只差 type_/触发价/结果键）合并成
+        `send_protective_order`；本判据的**意图不变**，只是从"两处都调数量策略"
+        升级为"两处都调发单助手，且各自传对了 type_ 与结果键"。
+        """
+        calls = _facade_calls("send_protective_order")
+        self.assertEqual(len(calls), 2, "止盈/止损两处都必须调用该助手")
+        seen = {}
+        for call in calls:
+            kw = {k.arg: ast.unparse(k.value) for k in call.keywords}
+            seen[kw["type_"]] = kw
+        self.assertEqual(sorted(seen), ["'STOP_MARKET'", "'TAKE_PROFIT_MARKET'"],
+                         "ast.unparse 输出单引号字符串常量")
+        self.assertEqual(seen["'TAKE_PROFIT_MARKET'"]["trigger_price"], "tp_px")
+        self.assertEqual(seen["'STOP_MARKET'"]["trigger_price"], "sl_px")
 
     def test_no_undeclared_free_names(self):
         module = ast.parse(MOD.read_text(encoding="utf-8"))
@@ -222,6 +244,74 @@ class BinanceOrdersExtractionTest(unittest.TestCase):
         self.assertNotEqual(
             ast.dump(ast.Module(body=list(seg) + [ast.Pass()], type_ignores=[]), include_attributes=False),
             ast.dump(ast.Module(body=list(seg), type_ignores=[]), include_attributes=False))
+
+
+class SendProtectiveOrderTest(unittest.TestCase):
+    """第一百一十六刀：TP/SL 两段重复代码合并成 `send_protective_order`。
+
+    本类钉住合并后**必须保持**的行为：触发价无效 ⇒ 不发单、返回 `""`；
+    有效 ⇒ 用正确的 `type_`/触发价/仓位方向构造请求并发出；返回 `algoId`，
+    缺则 `orderId`，都不是则 `""`；数量策略照旧生效。
+
+    另一条同样重要（写在 docstring 里但值得被断言）：**无条件赋值等价于原实现** ——
+    `res` 初值为 `""`、返回值恒为 `str`，故 `res[key] = helper(...)` 与原
+    `if isinstance(data, dict): res[key] = ...` 的最终结果完全一致。
+    """
+
+    def _send(self, trigger, type_="TAKE_PROFIT_MARKET", data=None, qty_str=None):
+        from r20_backend.exchanges.binance_orders import send_protective_order
+        sent = []
+
+        def build(**kw):
+            sent.append(kw)
+            return {"built": kw}
+
+        def priv(req):
+            return data
+
+        out = send_protective_order(build_algo_order_request=build, inst="BTCUSDT",
+                                    opp_side="SELL", position_side=None, private_algo_send=priv,
+                                    qty_str=qty_str, trigger_price=trigger, type_=type_, wt="CONTRACT_PRICE")
+        return out, sent
+
+    def test_invalid_trigger_sends_nothing(self):
+        for bad in (None, 0, 0.0, -5):
+            with self.subTest(bad=bad):
+                out, sent = self._send(bad)
+                self.assertEqual(out, "")
+                self.assertEqual(sent, [], "触发价无效时**不得**发单")
+
+    def test_valid_trigger_builds_expected_kwargs(self):
+        out, sent = self._send(65000.0, data={"algoId": 701})
+        self.assertEqual(out, "701")
+        self.assertEqual(len(sent), 1)
+        assert sent[0] == {"symbol": "BTCUSDT", "side": "SELL", "type_": "TAKE_PROFIT_MARKET",
+                           "trigger_price": 65000.0, "working_type": "CONTRACT_PRICE",
+                           "position_side": None, "close_position": True}
+        self.assertNotIn("quantity", sent[0])
+
+    def test_qty_policy_is_applied(self):
+        _out, sent = self._send(65000.0, data={"algoId": 1}, qty_str="0.5")
+        self.assertEqual(sent[0]["quantity"], "0.5")
+        self.assertTrue(sent[0]["reduce_only"])
+        self.assertFalse(sent[0]["close_position"])
+
+    def test_id_fallback_order_and_empty(self):
+        # 两键同时存在时必须**优先 algoId**（只喂单键的断言没有牙：负向实测发现 B 例抓不住顺序颠倒）
+        self.assertEqual(self._send(65000.0, data={"algoId": 701, "orderId": 88})[0], "701",
+                         "algoId 优先于 orderId")
+        self.assertEqual(self._send(65000.0, data={"orderId": 88})[0], "88", "缺 algoId 时用 orderId")
+        self.assertEqual(self._send(65000.0, data={"algoId": None, "orderId": 88})[0], "88",
+                         "algoId 为 None ⇒ 回退 orderId")
+        self.assertEqual(self._send(65000.0, data={"algoId": "", "orderId": ""})[0], "")
+        self.assertEqual(self._send(65000.0, data={})[0], "")
+        self.assertEqual(self._send(65000.0, data="not-a-dict")[0], "", "响应非 dict ⇒ 空串")
+
+    def test_sl_type_and_value_are_forwarded(self):
+        out, sent = self._send(58000.0, type_="STOP_MARKET", data={"algoId": 702})
+        self.assertEqual(out, "702")
+        self.assertEqual(sent[0]["type_"], "STOP_MARKET")
+        self.assertEqual(sent[0]["trigger_price"], 58000.0)
 
 
 if __name__ == "__main__":

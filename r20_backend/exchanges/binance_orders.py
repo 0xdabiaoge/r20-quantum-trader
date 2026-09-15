@@ -71,3 +71,38 @@ def apply_protective_qty_policy(*,
     else:
         req_kwargs["close_position"] = True
 
+
+def send_protective_order(*, build_algo_order_request, inst, opp_side, position_side,
+                          private_algo_send, qty_str, trigger_price, type_, wt):
+    """按触发价是否有效决定是否发单；返回 algoId（缺则 orderId，皆无则 `""`）。
+
+    本函数由 `BinanceAdapter.attach_protective_orders` 的两段**近乎逐字重复**的代码合并而来
+    （第一百一十六刀）：两段只差 `type_`（TAKE_PROFIT_MARKET / STOP_MARKET）、触发价与结果键，
+    合并后不会再各自漂移。
+
+    ## 与原实现的行为等价性（写给后来者，避免"看起来变了"的误判）
+
+    原实现是 `if trigger 有效: ... if isinstance(data, dict): res[key] = str(...)`，
+    即"仅在响应是 dict 时赋值（可能是空串）"；本函数返回 `""` 时调用方**无条件赋值**。
+    因为 `res` 的初值就是 `""`、且返回值恒为 `str`，两种情况下的最终 `res` **完全相同**；
+    触发价无效时原实现根本不动 `res`（仍是 `""`），等价性同样成立。
+
+    `build_algo_order_request` / `private_algo_send` 由调用方**按实例属性取出后传入**
+    ⇒ 实例级覆盖（含测试里的 stub）仍然生效。
+    """
+    if trigger_price is not None and float(trigger_price) > 0:
+        req_kwargs = {
+            "symbol": inst,
+            "side": opp_side,
+            "type_": type_,
+            "trigger_price": trigger_price,
+            "working_type": wt,
+            "position_side": position_side,
+        }
+        apply_protective_qty_policy(req_kwargs=req_kwargs, qty_str=qty_str)
+
+        req = build_algo_order_request(**req_kwargs)
+        data = private_algo_send(req)
+        if isinstance(data, dict):
+            return str(data.get("algoId") or data.get("orderId") or "")
+    return ""
