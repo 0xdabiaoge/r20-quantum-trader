@@ -73,7 +73,7 @@ def mask(value: str, visible: int = 4) -> str:
 
     ⚠️ 名字**必须**保留在本模块：`tests/test_audit_batch1_credentials_trust_boundary.py`
     直接 `from r20_backend.settings_store import mask`，且
-    `r20_backend/routers/gateway.py` 也从这里导入。
+    `r20_backend/routers/gateway/notifications.py` 也从这里导入。
     """
     return _redact_mask(value, visible)
 

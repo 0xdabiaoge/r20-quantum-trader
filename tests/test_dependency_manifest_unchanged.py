@@ -171,7 +171,7 @@ class DependencyManifestUnchangedTest(unittest.TestCase):
         #: - `starlette` / `websockets`：fastapi / uvicorn 的传递依赖，
         #:   实测本 venv 内可导入（starlette 1.6.0、websockets 17.1）；
         #: - `urllib3`：requests 的传递依赖，实测可导入（2.7.0）；
-        #: - `segno`：**实测未安装**，但 `routers/gateway.py` 里是
+        #: - `segno`：**实测未安装**，但 `routers/gateway/backups.py` 里是
         #:   `try: import segno … except Exception: pass` 的**可选**导入，
         #:   失败时 `qr_data_uri` 退化为 `""`（二维码是可选增强，不影响绑定流程）。
         #: 以上都不是本阶段引入的，也不属本阶段授权范围，故如实登记。

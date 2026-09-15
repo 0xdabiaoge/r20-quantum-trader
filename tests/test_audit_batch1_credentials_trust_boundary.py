@@ -23,6 +23,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from r20_backend.settings_store import mask, mask_url, is_masked  # noqa: E402
 import r20_backend.routers.system as sysmod  # noqa: E402
 import r20_backend.routers.gateway as gwmod  # noqa: E402
+# 第九十七刀：gateway 拆包 ⇒ patch/调用必须落到**归属子模块**
+from r20_backend.routers.gateway import channels as gw_channels  # noqa: E402
+from r20_backend.routers.gateway import notifications as gw_notifications  # noqa: E402
 import r20_gateway.secrets as gws  # noqa: E402
 from r20_backend.schemas import ChannelToggleRequest, NotificationConfigUpdate  # noqa: E402
 import r20_backend.notifications as notif  # noqa: E402
@@ -65,7 +68,7 @@ class TestA1AdminRuntimeWhitelist(unittest.TestCase):
 
 class TestA2MaskedWriteback(unittest.TestCase):
     def setUp(self) -> None:
-        # 批1 P0-2 配套：toggle_channel 会调 gwmod.update_env（真实 settings_store），
+        # 批1 P0-2 配套：toggle_channel 会调 channels.update_env（真实 settings_store），
         # 此前直接把测试 URL 写进生产 .env（tests/__init__ 的写闸现已拦下）→ 显式沙箱化。
         import r20_backend.settings_store as settings_store
         self._env_tmp = tempfile.TemporaryDirectory(prefix="r20-gwtest-")
@@ -87,11 +90,11 @@ class TestA2MaskedWriteback(unittest.TestCase):
     def _toggle(self, req, channel="webhook"):
         saved: dict = {}
         removed: list = []
-        with patch.object(gwmod, "require_admin_header", return_value={"username": "t"}), \
-             patch.object(gwmod, "refresh_settings"), \
+        with patch.object(gw_channels, "require_admin_header", return_value={"username": "t"}), \
+             patch.object(gw_channels, "refresh_settings"), \
              patch.object(gws, "save_secrets", side_effect=lambda v: saved.update(v)), \
-             patch.object(gwmod, "remove_env", side_effect=lambda ks: removed.extend(ks)):
-            _raw(gwmod.toggle_channel)(channel, req)
+             patch.object(gw_channels, "remove_env", side_effect=lambda ks: removed.extend(ks)):
+            _raw(gw_channels.toggle_channel)(channel, req)
         return saved, removed
 
     def test_toggle_does_not_overwrite_with_masked_url(self):
@@ -108,21 +111,21 @@ class TestA2MaskedWriteback(unittest.TestCase):
     def test_put_sanitizes_masked_and_routes_secrets_to_encrypted_store(self):
         env_writes: dict = {}
         sec_writes: dict = {}
-        with patch.object(gwmod, "require_superadmin", return_value={"username": "root"}), \
-             patch.object(gwmod, "refresh_settings"), \
-             patch.object(gwmod, "notification_env", return_value={
+        with patch.object(gw_notifications, "require_superadmin", return_value={"username": "root"}), \
+             patch.object(gw_notifications, "refresh_settings"), \
+             patch.object(gw_notifications, "notification_env", return_value={
                  "R20_NOTIFICATION_WEBHOOK": "https://hooks.example/send?key=realtoken999",
                  "R20_QQ_APP_ID": "app1", "R20_QQ_OPENID": "oid1"}), \
-             patch.object(gwmod, "update_env", side_effect=lambda d: env_writes.update(d)), \
-             patch.object(gwmod, "save_secrets", side_effect=lambda d: sec_writes.update(d)), \
-             patch.object(gwmod, "remove_env"), \
-             patch.object(gwmod, "audit_record"):
+             patch.object(gw_notifications, "update_env", side_effect=lambda d: env_writes.update(d)), \
+             patch.object(gw_notifications, "save_secrets", side_effect=lambda d: sec_writes.update(d)), \
+             patch.object(gw_notifications, "remove_env"), \
+             patch.object(gw_notifications, "audit_record"):
             payload = NotificationConfigUpdate(
                 webhook_enabled=True,
                 webhook_url=mask_url("https://hooks.example/send?key=realtoken999"),   # 未动 → 整体跳过
                 wechat_webhook="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=NEW-REAL",  # 新值 → 密文库
             )
-            _raw(gwmod.admin_update_notifications)(payload)
+            _raw(gw_notifications.admin_update_notifications)(payload)
         self.assertNotIn("R20_NOTIFICATION_WEBHOOK", env_writes)   # 掩码未回写 env
         self.assertNotIn("R20_NOTIFICATION_WEBHOOK", sec_writes)   # 掩码未回写密文库
         self.assertEqual(sec_writes.get("R20_WECHAT_WEBHOOK"),

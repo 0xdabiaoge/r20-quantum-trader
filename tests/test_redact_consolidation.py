@@ -6,7 +6,7 @@
 
 | 位置 | 名字 | 消费者 |
 |---|---|---|
-| `r20_backend/settings_store.py` L65 | `mask(value, visible=4)` | 后台设置页（`routers/gateway.py`） |
+| `r20_backend/settings_store.py` L65 | `mask(value, visible=4)` | 后台设置页（`routers/gateway/notifications.py`） |
 | `r20_backend/llm/util.py` L32 | `mask_secret(value, visible=4)` | LLM 配置页（`llm/store.py`、`llm_manager.py`） |
 
 函数体各 6 行、**逐字节相同**，签名一致；行为对拍 50 组用例**零差异**。
