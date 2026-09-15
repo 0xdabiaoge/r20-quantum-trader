@@ -494,6 +494,7 @@ def _holding_row(p, venue, *, env, trackers, tz_bj, allowed, council_by_inst):
 
 
 from scripts.ledger.okx_history import build_okx_trade
+from scripts.ledger.merge import merge_lifecycle_trades
 
 
 def build_lifecycle_ledger():
@@ -640,25 +641,11 @@ def build_lifecycle_ledger():
             _mark(_v, "ok", rows=len(_rows), truncated=len(_rows) >= 100)
 
     # 聚合去重合并（按 id 去重，按 close_time 降序）
-    trades_map = {}
-    for t in old_trades:
-        if t.get("id"):
-            trades_map[t["id"]] = t
-
-    # 审计 D8 迁移：去重键由 u_ts 换为 posId 后首跑，同一笔持仓的新旧行 id 不同
-    # 会并存双计。对 okx 历史行按 (venue, inst, open_time, close_time) 稳定签名
-    # 撞键——旧键行让位于本轮再生成的新键行；窗口外无法再生的旧行一律不动（防迁移误删）。
-    def _sig(t):
-        return (str(t.get("venue") or ""), str(t.get("inst") or ""),
-                str(t.get("open_time") or ""), str(t.get("close_time") or ""))
-    _new_sigs = {_sig(t) for t in trades_lifecycle}
-    for _oid in [k for k, v in trades_map.items()
-                 if str(k).startswith("pos_hist_") and isinstance(v, dict) and _sig(v) in _new_sigs]:
-        trades_map.pop(_oid)
-
-    for t in (trades_lifecycle + binance_trades + gate_trades):
-        if t.get("id"):
-            trades_map[t["id"]] = t
+    trades_map = merge_lifecycle_trades(
+        binance_trades=binance_trades,
+        gate_trades=gate_trades,
+        old_trades=old_trades,
+        trades_lifecycle=trades_lifecycle    )
 
     # 批E·幽灵持仓清理：台账 holding 行必须以「本轮成功取数的场所的实时持仓」为准。
     # 旧实现只按 id 覆盖新行、从不删除失效行 → 平仓后 holding 行永久留存（实测
