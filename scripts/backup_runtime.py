@@ -50,7 +50,9 @@ MANDATORY_EXCLUDES = (
 SCOPE_PATHS = {
     "data": ("data",),
     "scripts": ("scripts",),
-    "dashboard": ("dashboard",),
+    # 第 143 刀：dashboard/ 已并入 r20_backend/。范围名**保持不变**（任务配置里存的就是这个
+    # 字符串，改名即接口破坏），只把路径指向新位置——否则只勾选该范围的任务会静默备份 0 文件。
+    "dashboard": ("r20_backend/dashboard_cache.py", "r20_backend/templates", "r20_backend/static"),
     "r20_backend": ("r20_backend",),
     "r20_gateway": ("r20_gateway",),
     "tests": ("tests",),

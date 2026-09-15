@@ -9,7 +9,7 @@ import json
 import unittest
 from unittest.mock import patch
 
-import dashboard.app as dashboard
+import r20_backend.dashboard_cache as dashboard
 import scripts.okx_rest as okx_rest
 from scripts.okx_runtime import freeze_environment, unfreeze_environment
 

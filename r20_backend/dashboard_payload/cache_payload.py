@@ -1,7 +1,7 @@
 """仪表盘 LIVE 载荷装配（结构优化阶段 4·B3 第三十六刀）。
 
-原样搬自 `dashboard/app.py::update_cache_cycle` 的 92 行 `CACHE_DATA` 字面量 ——
-该函数里最大的一块，也是 `dashboard/app.py` 里唯一的大块（其余没有超过 100 行的函数）。
+原样搬自 `r20_backend/dashboard_cache.py::update_cache_cycle` 的 92 行 `CACHE_DATA` 字面量 ——
+该函数里最大的一块，也是 `r20_backend/dashboard_cache.py` 里唯一的大块（其余没有超过 100 行的函数）。
 
 ## 为什么整体搬成一个「载荷装配」函数
 
@@ -30,7 +30,7 @@
 ⚠️ 我第一版写成"函数体内 `from dashboard import app as _app` 再 `getattr`"，
 被既有闸 `tests/ui/test_dashboard_payload_seam.py::
 test_core_modules_do_not_import_dashboard_app` **当场拦下**
-（那种 import 会与 `routers/dashboard.py` 的 `import dashboard.app` 构成循环）。
+（那种 import 会与 `routers/dashboard.py` 的 `import r20_backend.dashboard_cache` 构成循环）。
 **是那道闸纠正了我，不是我事后自己想到的** —— 记在这里免得后人再走一遍。
 
 ## 三处易错点（均原样保留）

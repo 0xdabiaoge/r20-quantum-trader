@@ -3,7 +3,7 @@
 原样搬自 update_cache_cycle 的「Parallel Phase 2」段（51 行）：
 - 就地修改传入的 positions（写 exchangeSl/exchangeTp/protectionStatus 等），
   并把失败原因 append 进 source_errors —— 两者都是**入参原地改**，故无需回传；
-- fetch_json 与 enrich_risk_fields 由门面注入（分别是 dashboard/app.py 的
+- fetch_json 与 enrich_risk_fields 由门面注入（分别是 r20_backend/dashboard_cache.py 的
   `_fetch_json` 与 `enrich_position_risk_fields` —— 后者本身是薄壳，
   注入它才能让 POSITION_TRACKER_FILE 的 patch 继续生效）；trackers 是调用方局部量；
 - 段内 `else: algo_results = {}` 这支在原文里就是**死赋值**（其后再无使用），

@@ -30,7 +30,7 @@
 | 文件 | 前 | 后 | 说明 |
 |---|---:|---:|---|
 | `scripts/ai_factor_trader.py` | 3565 | 1108 | 最大函数 1021 行级 → 142 行 |
-| `dashboard/app.py` | 2047 | 533 | `update_cache_cycle` **1021 → 185 行**（全仓最大单函数） |
+| `r20_backend/dashboard_cache.py` | 2047 | 533 | `update_cache_cycle` **1021 → 185 行**（全仓最大单函数） |
 | `r20_backend/llm_manager.py` | 2105 | 281 | 最大函数 19 行 |
 | `r20_backend/council_manager.py` | 1194 | 416 | 最大函数 66 行 |
 | `r20_backend/policy_snapshot.py` | 1101 | 295 | 最大函数 61 行 |
@@ -47,7 +47,7 @@
 
 | 编号 | 问题 | 状态 |
 |---|---|---|
-| B1 | 双路由层：`dashboard/app.py` 影子 handler 永不执行 | ✅ 已修 |
+| B1 | 双路由层：`r20_backend/dashboard_cache.py` 影子 handler 永不执行 | ✅ 已修 |
 | B2 | `update_cache_cycle` 1021 行单函数 | ✅ 已拆（现 185 行，载荷字节基准回归） |
 | B3 | 实盘交易员单文件 3565 行 | ✅ 已拆（现 1108 行，`scripts/trader/` 27 模块） |
 | B4 | LLM 管理器三段混住 | ✅ 薄壳 + 核心抽离（现 281 行，`r20_backend/llm/` 12 模块） |

@@ -76,9 +76,12 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DASHBOARD_DIR = BASE_DIR
-WORKSPACE_DIR = os.path.dirname(BASE_DIR)
+# 第 143 刀：本模块从 r20_backend/dashboard_cache.py 迁到 r20_backend/dashboard_cache.py。
+# 位置深了一层，故**显式**上溯到仓库根（原来靠 dirname 恰好也对，但不写清楚就是隐患：
+# 路径常量算错 ⇒ 读到不存在的 data/ ⇒ 正是 §136 那次 P0 的同款事故）。
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # 仓库根
+DASHBOARD_DIR = os.path.join(BASE_DIR, "r20_backend")                    # 本包（模板/静态资源所在）
+WORKSPACE_DIR = BASE_DIR
 DATA_DIR = os.path.join(WORKSPACE_DIR, "data")
 LOGS_DIR = os.path.join(WORKSPACE_DIR, "logs")
 
@@ -483,7 +486,7 @@ start_dashboard_background_worker()
 # --- SEO Endpoints ---
 #
 # 结构优化阶段 1（2026-09-14）· 拆除被遮蔽的重复注册。
-# 背景：本项目有两套路由层 —— r20_backend/routers/*（模块化）与 dashboard/app.py
+# 背景：本项目有两套路由层 —— r20_backend/routers/*（模块化）与 r20_backend/dashboard_cache.py
 # （legacy 整包）。r20_backend/app.py 是「先 include_router(...) 再
 # mount("/", dashboard_app)」，Starlette 按注册顺序匹配，故凡两边同路径者，
 # 一律 routers 那套生效，本文件的同名 handler 函数体永不执行 —— 改它不会

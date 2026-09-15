@@ -30,7 +30,7 @@ from pathlib import Path
 from r20_backend.dashboard_payload.position_view import collect_position_rows
 
 ROOT = Path(__file__).resolve().parents[2]
-APP = ROOT / "dashboard" / "app.py"
+APP = ROOT / "r20_backend" / "dashboard_cache.py"
 MODULE = ROOT / "r20_backend" / "dashboard_payload" / "position_view.py"
 COLLECT = ROOT / "r20_backend" / "dashboard_payload" / "collect.py"   # 第九十四刀：相位 1 现住此
 
@@ -436,10 +436,10 @@ class WiringTest(unittest.TestCase):
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
                 for a in node.names:
-                    self.assertFalse(a.name.startswith("dashboard"),
+                    self.assertFalse(a.name.startswith("r20_backend.dashboard_cache"),
                                      f"反向 import {a.name}")
             elif isinstance(node, ast.ImportFrom):
-                self.assertFalse((node.module or "").startswith("dashboard"),
+                self.assertFalse((node.module or "").startswith("r20_backend.dashboard_cache"),
                                  f"反向 import {node.module}")
 
 

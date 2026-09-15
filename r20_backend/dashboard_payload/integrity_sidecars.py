@@ -1,6 +1,6 @@
 """数据完整性旁车 → `source_errors`（结构优化阶段 4·B3 第二十七刀）。
 
-原样搬自 `dashboard/app.py::update_cache_cycle` 的两段「旁车并入」块（共 37 行）。
+原样搬自 `r20_backend/dashboard_cache.py::update_cache_cycle` 的两段「旁车并入」块（共 37 行）。
 
 ## 这两段在做什么
 

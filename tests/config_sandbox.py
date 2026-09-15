@@ -42,8 +42,8 @@ def isolate_config(test):
             _os.environ[_env_key] = _prev
     test.addCleanup(_restore_env)
     # ⚠️⚠️ 第八十刀（顺序即 bug）：必须发生在**下面的白名单 import 之前** ——
-    # `dashboard/app.py` 模块**顶层末尾**就有 `start_dashboard_background_worker()`
-    # （L549，实测），于是"import dashboard.app"这个动作本身就点起
+    # `r20_backend/dashboard_cache.py` 模块**顶层末尾**就有 `start_dashboard_background_worker()`
+    # （L549，实测），于是"import r20_backend.dashboard_cache"这个动作本身就点起
     # **每 2 秒跑一次 `update_cache_cycle()` 的 daemon worker**：
     #   · 非离线：worker 在**任何测试的 patch 窗口之外**真外呼
     #     www.okx.com（balances/positions/pending_orders ×每 2s）——
@@ -56,7 +56,7 @@ def isolate_config(test):
     # 且测试进程里这个 worker 从来不是被测对象。
     # 要真测 fetch 的文件自己再 patch.object 覆盖（mock 栈 LIFO，后装优先）。
     try:
-        import dashboard.app as _dash_mod
+        import r20_backend.dashboard_cache as _dash_mod
     except Exception:
         _dash_mod = None
     if _dash_mod is not None:
@@ -73,13 +73,13 @@ def isolate_config(test):
                  'r20_backend.policy_snapshot', 'r20_backend.interceptor_manager',
                  'scripts.prompt_library', 'scripts.evolution_shield',
                  'r20_gateway.secrets',
-                 # `dashboard.app` 的一批大写路径常量（DASHBOARD_CACHE_FILE、
+                 # `r20_backend.dashboard_cache` 的一批大写路径常量（DASHBOARD_CACHE_FILE、
                  # LOG_FILE、STATE_JSON_FILE、LEDGER_JSON_FILE…）此前**不在任何
                  # 白名单里**，于是直调 `update_cache_cycle()` 的测试会写生产
                  # `data/dashboard_last_good.json`（实测有告警但无人处理）。
                  # 它内部会调 `load_persisted_dashboard_cache()`，但那只是读一个
                  # JSON，且所有跑过仪表盘的测试本来就会 import 它。
-                 'dashboard.app',
+                 'r20_backend.dashboard_cache',
                  # ---- 第七十三刀补：下面 15 个模块用内联 `ROOT / "data" / …`
                  # 拼生产路径。**沙箱只 patch 已 import 模块的大写常量**，
                  # 所以"模块不在这个白名单里"就等于"它的路径常量不受管辖"

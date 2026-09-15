@@ -1,6 +1,6 @@
 """分币种战绩榜（结构优化阶段 4·B3 第二十六刀）。
 
-原样搬自 `dashboard/app.py::update_cache_cycle` 的 `inst_leaderboard` 计算块。
+原样搬自 `r20_backend/dashboard_cache.py::update_cache_cycle` 的 `inst_leaderboard` 计算块。
 
 ## 这段在算什么
 

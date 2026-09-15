@@ -358,7 +358,7 @@ class ExtractedModulesHaveTestsTest(unittest.TestCase):
     | `dashboard_payload/reset_state.py` | 27 | **0** |
     | `dashboard_payload/ledger_view.py` | 79 | 1（仅间接） |
 
-    它们只经 `dashboard/app.py` 门面被调用，而门面级用例只验证
+    它们只经 `r20_backend/dashboard_cache.py` 门面被调用，而门面级用例只验证
     "载荷非空 / 某几个键在"，**从不验证这些模块内部的取值优先级链**。
     这三个模块的 docstring 都写着"路径由门面注入（测试会指向沙箱）" ——
     **为可测性做了准备，却始终没人测。**

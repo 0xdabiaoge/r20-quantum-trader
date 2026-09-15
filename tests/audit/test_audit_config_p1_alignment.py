@@ -318,8 +318,8 @@ class PortfolioBudgetHonestyTests(_SandboxBase):
 
     @classmethod
     def setUpClass(cls):
-        # 同 test_venue_accounts_endpoint：dashboard.app 导入即点火 2s 后台线程（真调 OKX）→ 永久钉死
-        import dashboard.app as dashboard_app
+        # 同 test_venue_accounts_endpoint：r20_backend.dashboard_cache 导入即点火 2s 后台线程（真调 OKX）→ 永久钉死
+        import r20_backend.dashboard_cache as dashboard_app
         dashboard_app.stop_dashboard_background_worker()
         dashboard_app.update_cache_cycle = lambda *a, **k: None
         cls.dashboard = dashboard_app

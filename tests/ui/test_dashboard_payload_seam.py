@@ -2,7 +2,7 @@
 
 ## 背景：为什么需要这道闸
 
-`dashboard/app.py` 的域代码正被逐步迁到 `r20_backend/dashboard_payload/`。迁移用
+`r20_backend/dashboard_cache.py` 的域代码正被逐步迁到 `r20_backend/dashboard_payload/`。迁移用
 **薄壳 + 核心**：核心收显式参数，门面薄壳在**调用时**解析门面模块全局（路径常量、
 甚至可调用对象）并注入。
 
@@ -23,8 +23,8 @@
    `(AI_DECISIONS_FILE, FACTOR_LIBRARY_FILE, STATE_JSON_FILE)` ——
    三个路径整体错配，症状是"因子库读到了决策文件"，而**单测全绿**
    （单测要么只喂 tracker、要么不校验这三个文件的具体来源），只有逐例差分才发现。
-4. **核心模块不得反向 import `dashboard.app`**（会与 `routers/dashboard.py` 的
-   `import dashboard.app` 构成循环）。
+4. **核心模块不得反向 import `r20_backend.dashboard_cache`**（会与 `routers/dashboard.py` 的
+   `import r20_backend.dashboard_cache` 构成循环）。
 
 另外钉住门面公开面：测试直接经 `dashboard.<name>` 调用的那批符号必须仍在。
 """
@@ -41,7 +41,7 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-import dashboard.app as app  # noqa: E402
+import r20_backend.dashboard_cache as app  # noqa: E402
 from r20_backend import dashboard_payload as payload_pkg  # noqa: E402
 from r20_backend.dashboard_payload import (  # noqa: E402
     bills as bills_mod, cache, cache_payload, factors, health, integrity_sidecars,
@@ -58,7 +58,7 @@ FACADE_SURFACE = [
     "AI_DECISIONS_FILE", "AI_HISTORY_FILE", "AI_LAST_PROMPT_FILE", "AI_MEMORY_MD_FILE",
     "NEWS_SENTIMENT_FILE", "REPORT_JSON_FILE", "LEDGER_JSON_FILE",
     "POSITION_TRACKER_FILE", "FACTOR_LIBRARY_FILE", "SNAPSHOTS_JSON_FILE",
-    # 已迁出的函数（必须仍可从 dashboard.app 取到）
+    # 已迁出的函数（必须仍可从 r20_backend.dashboard_cache 取到）
     "slim_payload", "load_position_trackers", "enrich_position_risk_fields",
     "_load_local_factor_library", "_build_factors_from_local_files",
     "_load_cross_venue_data", "load_trading_memory_md", "build_ai_health",
@@ -77,7 +77,7 @@ CORE_MODULES = (slim, market, factors, health, cache, local_reads, bills_mod,
 
 
 def _core_aliases() -> dict[str, object]:
-    """收集 dashboard.app 里 `from ...dashboard_payload.X import Y as _core_...` 的别名。"""
+    """收集 r20_backend.dashboard_cache 里 `from ...dashboard_payload.X import Y as _core_...` 的别名。"""
     out: dict[str, object] = {}
     for name, value in vars(app).items():
         if name.startswith("_core") and callable(value):
@@ -98,7 +98,7 @@ def _tokens(name: str) -> set[str]:
 class ShellDisciplineTests(unittest.TestCase):
     def setUp(self):
         self.aliases = _core_aliases()
-        self.assertTrue(self.aliases, "dashboard.app 里找不到任何 _core_* 薄壳别名")
+        self.assertTrue(self.aliases, "r20_backend.dashboard_cache 里找不到任何 _core_* 薄壳别名")
 
     # ── 1/2/3. 薄壳调用形态 ────────────────────────────────────
     @staticmethod
@@ -126,11 +126,11 @@ class ShellDisciplineTests(unittest.TestCase):
     def test_every_shell_forwards_correctly(self):
         problems: list[str] = []
         checked = 0
-        app_module_name = getattr(app, "__name__", "dashboard.app")
+        app_module_name = getattr(app, "__name__", "r20_backend.dashboard_cache")
         for fname, fobj in vars(app).items():
             if fname.startswith("__") or not inspect.isfunction(fobj):
                 continue
-            # 只审查**定义在本门面模块**里的函数：全量跑时别的测试会往 dashboard.app
+            # 只审查**定义在本门面模块**里的函数：全量跑时别的测试会往 r20_backend.dashboard_cache
             # 上挂函数（inspect.getsource 拿到的首语句是赋值而非 def），
             # 单独跑该用例时不存在 → 曾导致"单跑通过、全量失败"。
             if getattr(fobj, "__module__", None) != app_module_name:
@@ -205,7 +205,7 @@ class ShellDisciplineTests(unittest.TestCase):
             for node in ast.walk(tree):
                 if isinstance(node, ast.Import):
                     for a in node.names:
-                        if a.name == "dashboard.app" or a.name.startswith("dashboard."):
+                        if a.name == "r20_backend.dashboard_cache" or a.name.startswith("dashboard."):
                             offenders.append(f"{path.name}:{node.lineno} import {a.name}")
                 elif isinstance(node, ast.ImportFrom):
                     mod = node.module or ""
@@ -219,11 +219,11 @@ class ShellDisciplineTests(unittest.TestCase):
         missing = [m.__name__ for m in CORE_MODULES
                    if not any(getattr(v, "__module__", None) == m.__name__
                               for v in vars(app).values())]
-        self.assertEqual(missing, [], f"这些域模块未被 dashboard.app 导入，沙箱覆盖不到: {missing}")
+        self.assertEqual(missing, [], f"这些域模块未被 r20_backend.dashboard_cache 导入，沙箱覆盖不到: {missing}")
 
     # ── 4b. 迁移完整性：导入的 _core_* 别名必须真的被调用 ──────────
     def test_every_core_alias_is_used(self):
-        """门面导入的每个 `_core_*` 别名，必须在 dashboard/app.py 里被**真正引用**。
+        """门面导入的每个 `_core_*` 别名，必须在 r20_backend/dashboard_cache.py 里被**真正引用**。
 
         来历：第九刀替换 Phase 2 段落时，替换区间误把夹在中间的
         「2.5 Multi-Venue Parity」调用点一并删掉 —— 导入语句还在、函数也还在，
@@ -234,7 +234,7 @@ class ShellDisciplineTests(unittest.TestCase):
         实测是靠"直调适配器返回 2 条仓位 vs 线上 payload 0 条"才坐实的，
         故这里把它钉死：只导入不调用 = 迁移没做完。
         """
-        src = (ROOT / "dashboard" / "app.py").read_text(encoding="utf-8")
+        src = (ROOT / "r20_backend" / "dashboard_cache.py").read_text(encoding="utf-8")
         # 按 AST 行号精确剔除导入语句本身（含括号多行形态），再数引用
         tree = ast.parse(src)
         drop: set[int] = set()
@@ -251,14 +251,14 @@ class ShellDisciplineTests(unittest.TestCase):
                 unused.append(alias)
         self.assertEqual(
             unused, [],
-            "这些 _core_* 别名只被导入、在 dashboard/app.py 里从不引用 —— "
+            "这些 _core_* 别名只被导入、在 r20_backend/dashboard_cache.py 里从不引用 —— "
             "很可能是替换段落时把调用点一起删掉了（静默丢失该域数据）: " + str(unused),
         )
 
     # ── 5. 公开面 ─────────────────────────────────────────────
     def test_facade_surface_intact(self):
         missing = [n for n in FACADE_SURFACE if not hasattr(app, n)]
-        self.assertEqual(missing, [], f"dashboard.app 缺少测试直接引用的符号: {missing}")
+        self.assertEqual(missing, [], f"r20_backend.dashboard_cache 缺少测试直接引用的符号: {missing}")
 
     # ── 6. 接缝传导（最关键）：patch 门面路径常量必须影响已迁出的核心 ──
     def test_path_constant_patch_reaches_moved_cores(self):

@@ -17,7 +17,7 @@ import copy
 import json
 import unittest
 
-from dashboard.app import (
+from r20_backend.dashboard_cache import (
     SLIM_HISTORY_DROP_KEYS,
     SLIM_HISTORY_FULL_ENTRIES,
     SLIM_LOGS,

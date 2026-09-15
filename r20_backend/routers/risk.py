@@ -49,7 +49,7 @@ def _live_holdings(inst_id: str) -> tuple[bool, list[str], str]:
     """
     coin = inst_id.split("-", 1)[0].upper()
     try:
-        import dashboard.app as dashboard_app
+        import r20_backend.dashboard_cache as dashboard_app
         cache = getattr(dashboard_app, "CACHE_DATA", None)
     except Exception as exc:  # 模块不可用/导入失败
         return False, [], f"持仓快照模块不可用：{exc}"

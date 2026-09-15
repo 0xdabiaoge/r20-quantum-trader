@@ -262,7 +262,7 @@ class TestNoPhantomModuleAttributes(unittest.TestCase):
     """把「调了不存在的函数」整族变测试期红：全仓 X.y( 调用点 hasattr(X) 核对。"""
 
     def _iter_py(self):
-        for d in ("r20_backend", "scripts", "r20_gateway", "dashboard"):
+        for d in ("r20_backend", "scripts", "r20_gateway"):
             for f in sorted((ROOT / d).rglob("*.py")):
                 if "test" in f.name.lower():
                     continue

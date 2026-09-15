@@ -1,6 +1,6 @@
 """平仓单聚合 → 当日/累计胜负统计（结构优化阶段 4·B3 第二十四刀）。
 
-原样搬自 `dashboard/app.py::update_cache_cycle` 的「平仓聚合」循环（29 行）。
+原样搬自 `r20_backend/dashboard_cache.py::update_cache_cycle` 的「平仓聚合」循环（29 行）。
 
 ## 这段在算什么
 

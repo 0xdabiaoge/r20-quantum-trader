@@ -1,6 +1,6 @@
 """OKX 挂单 → 仪表盘挂单行（结构优化阶段 4·B3 第二十三刀）。
 
-原样搬自 `dashboard/app.py::update_cache_cycle` 的「挂单遍历」段（71 行）。
+原样搬自 `r20_backend/dashboard_cache.py::update_cache_cycle` 的「挂单遍历」段（71 行）。
 与 `position_view.py` 同构：把交易所原始行规范化成前端直接消费的行。
 
 ## 这段在做什么

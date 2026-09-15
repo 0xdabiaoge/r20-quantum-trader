@@ -1,6 +1,6 @@
 """OKX 持仓 → 仪表盘持仓行（结构优化阶段 4·B3 第二十二刀）。
 
-原样搬自 `dashboard/app.py::update_cache_cycle` 的「持仓遍历」段（71 行）。
+原样搬自 `r20_backend/dashboard_cache.py::update_cache_cycle` 的「持仓遍历」段（71 行）。
 
 ## 这段在做什么
 

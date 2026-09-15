@@ -41,7 +41,7 @@ sys.path.insert(0, str(ROOT / "tests"))
 
 from _free_names_scan import free_names  # noqa: E402
 
-SCAN_ROOTS = ("scripts", "r20_backend", "dashboard", "r20_gateway")
+SCAN_ROOTS = ("scripts", "r20_backend", "r20_gateway")   # 第 143 刀：dashboard/ 并入 r20_backend
 
 ALLOWLIST = {
     "scripts/brain/prompt.py": {

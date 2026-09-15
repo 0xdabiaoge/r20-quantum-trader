@@ -43,8 +43,8 @@ class TrackerKeyTests(_Base):
     def test_holdings_report_uses_cache_positions(self):
         cache = {"positions": [{"instId": "ALGO-USDT-SWAP", "venue": "binance", "pos": "6431.5"}],
                  "data_health": {"cache_age_seconds": 1}}
-        with patch.dict("sys.modules", {}), patch("dashboard.app.CACHE_DATA", cache, create=True):
-            import dashboard.app as dash
+        with patch.dict("sys.modules", {}), patch("r20_backend.dashboard_cache.CACHE_DATA", cache, create=True):
+            import r20_backend.dashboard_cache as dash
             with patch.object(dash, "CACHE_DATA", cache):
                 report = self.risk._holdings_report("ALGO-USDT-SWAP", {})
         self.assertTrue(report["held_live"])
@@ -52,7 +52,7 @@ class TrackerKeyTests(_Base):
         self.assertIsNone(report["holdings_unknown"])
 
     def test_stale_cache_is_unknown_not_empty(self):
-        import dashboard.app as dash
+        import r20_backend.dashboard_cache as dash
         cache = {"positions": [], "data_health": {"cache_age_seconds": 600}}
         with patch.object(dash, "CACHE_DATA", cache):
             report = self.risk._holdings_report("DOGE-USDT-SWAP", {})
@@ -61,7 +61,7 @@ class TrackerKeyTests(_Base):
         self.assertFalse(report["held"], "过期快照不得被当作「无持仓」")
 
     def test_missing_positions_key_is_unknown(self):
-        import dashboard.app as dash
+        import r20_backend.dashboard_cache as dash
         with patch.object(dash, "CACHE_DATA", {"data_health": {"cache_age_seconds": 0}}):
             report = self.risk._holdings_report("DOGE-USDT-SWAP", {})
         self.assertIn("缺失", report["holdings_unknown"] or "")
@@ -108,7 +108,7 @@ class DeleteGuardRouteTests(_Base):
         return [item["instId"] for item in rows]
 
     def _live(self, positions, age=1):
-        import dashboard.app as dash
+        import r20_backend.dashboard_cache as dash
         cache = {"positions": positions, "data_health": {"cache_age_seconds": age}}
         return patch.object(dash, "CACHE_DATA", cache)
 
@@ -612,7 +612,7 @@ class CouncilTestDebateContextTests(_Base):
     def test_debate_prompt_uses_live_snapshot_and_marks_missing(self):
         import json as _json
         from r20_backend.routers.strategy import council as strategy_council   # 第九十六刀：议会端点现住此
-        import dashboard.app as dash
+        import r20_backend.dashboard_cache as dash
 
         snap = self.root / "data" / "factor_library_snapshot.json"
         snap.parent.mkdir(parents=True, exist_ok=True)
@@ -664,7 +664,7 @@ class CouncilTestDebateContextTests(_Base):
 
     def test_missing_sources_are_declared_not_fabricated(self):
         from r20_backend.routers.strategy import council as strategy_council   # 第九十六刀：议会端点现住此
-        import dashboard.app as dash
+        import r20_backend.dashboard_cache as dash
         captured = {}
 
         def fake_debate(**kwargs):

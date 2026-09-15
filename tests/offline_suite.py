@@ -119,7 +119,7 @@ class OfflineGuard:
                 executable == 'grep' and tokens[1:] == [
                     '-rn', 'gemini-3.8-flash-high', '--include=*.py',
                     '--include=*.ts', '--include=*.vue', 'r20_backend',
-                    'scripts', 'frontend/src', 'dashboard']) or (
+                    'scripts', 'frontend/src']) or (
                 executable in ('python3', 'python', Path(sys.executable).name)
                 and len(tokens) == 3 and tokens[1] == '-c'
                 and hashlib.sha256(tokens[2].encode()).hexdigest() ==

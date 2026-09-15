@@ -84,7 +84,7 @@ BASELINE_PUBLIC_NAMES: set[str] = {
 
 
 def _iter_source_files():
-    for sub in ("r20_backend", "scripts", "r20_gateway", "dashboard"):
+    for sub in ("r20_backend", "scripts", "r20_gateway"):
         base = ROOT / sub
         if base.is_dir():
             yield from base.rglob("*.py")

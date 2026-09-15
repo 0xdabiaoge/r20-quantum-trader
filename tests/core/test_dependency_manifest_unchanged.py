@@ -156,7 +156,7 @@ class DependencyManifestUnchangedTest(unittest.TestCase):
         #    ⚠️ 注意 `rglob("__init__.py")` 的 `d` 就是**包目录本身**
         #    （`__init__.py` 在包里，不在它的父目录里）—— 第一版写成
         #    `d.parent.name in (...)` 于是只捞到仓根一层，仍误报。
-        for sub in ("r20_backend", "scripts", "r20_gateway", "dashboard"):
+        for sub in ("r20_backend", "scripts", "r20_gateway"):
             base = ROOT / sub
             local.add(sub)
             if not base.is_dir():
@@ -181,7 +181,7 @@ class DependencyManifestUnchangedTest(unittest.TestCase):
         }
 
         unknown: dict[str, set] = {}
-        for sub in ("r20_backend", "scripts", "r20_gateway", "dashboard"):
+        for sub in ("r20_backend", "scripts", "r20_gateway"):
             base = ROOT / sub
             if not base.is_dir():
                 continue

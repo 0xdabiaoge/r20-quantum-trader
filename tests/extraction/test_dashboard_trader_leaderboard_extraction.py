@@ -30,7 +30,7 @@ from pathlib import Path
 from r20_backend.dashboard_payload.trader_leaderboard import build_inst_leaderboard
 
 ROOT = Path(__file__).resolve().parents[2]
-APP = ROOT / "dashboard" / "app.py"
+APP = ROOT / "r20_backend" / "dashboard_cache.py"
 MODULE = ROOT / "r20_backend" / "dashboard_payload" / "trader_leaderboard.py"
 STATS = ROOT / "r20_backend" / "dashboard_payload" / "trade_stats.py"   # 第九十五刀：调用点现住此
 
@@ -282,7 +282,7 @@ class WiringTest(unittest.TestCase):
     def test_payload_key_still_present(self):
         """接口不变：载荷里仍要有 `leaderboard` 键。
 
-        ⚠️ 这段字面量**已经没有**在 `dashboard/app.py` 里了 ——
+        ⚠️ 这段字面量**已经没有**在 `r20_backend/dashboard_cache.py` 里了 ——
         阶段 4·B3 第三十六刀把整个 `CACHE_DATA` 字面量（92 行）搬进了
         `r20_backend/dashboard_payload/cache_payload.py`。
         故断言必须**同时**接受"在载荷装配模块里"这个位置，
@@ -361,9 +361,9 @@ class WiringTest(unittest.TestCase):
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
                 for a in node.names:
-                    self.assertFalse(a.name.startswith("dashboard"))
+                    self.assertFalse(a.name.startswith("r20_backend.dashboard_cache"))
             elif isinstance(node, ast.ImportFrom):
-                self.assertFalse((node.module or "").startswith("dashboard"))
+                self.assertFalse((node.module or "").startswith("r20_backend.dashboard_cache"))
 
 
 if __name__ == "__main__":

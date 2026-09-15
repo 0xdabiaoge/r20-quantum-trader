@@ -1,6 +1,6 @@
 r"""dashboard 相位 1 抽取对拍门（结构优化阶段 2·B2 续刀·第九十四刀）。
 
-`dashboard/app.py::update_cache_cycle` 的相位 1（并发抓取余额/持仓/挂单 +
+`r20_backend/dashboard_cache.py::update_cache_cycle` 的相位 1（并发抓取余额/持仓/挂单 +
 失败语义 + 连接缺失判定 + 基础解析，58 行）**纯搬家**到
 `r20_backend/dashboard_payload/collect.py::collect_core_account_state`。
 
@@ -18,18 +18,23 @@ import types
 import unittest
 from pathlib import Path
 
+# 第 143 刀：本模块从 `dashboard/app.py` 迁到 `r20_backend/dashboard_cache.py`。
+# **对拍基线必须按历史路径取**（旧 revision 里只有 dashboard/app.py），
+# LIVE 文件走新路径 —— 两者不可混用，否则基线取不到、对拍门必然失真。
+PRE_MOVE_PATH = "dashboard/app.py"
+
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 PRE = "a4f310a"                      # 本刀动工前最后提交（第九十三刀收口）
-APP = ROOT / "dashboard" / "app.py"
+APP = ROOT / "r20_backend" / "dashboard_cache.py"
 MOD = ROOT / "r20_backend" / "dashboard_payload" / "collect.py"
 FN = "collect_core_account_state"
 SEG = (6, 26)                        # 基线 update_cache_cycle 的语句下标区间
 
 
 def _baseline_cycle() -> ast.FunctionDef:
-    r = subprocess.run(["git", "show", f"{PRE}:dashboard/app.py"],
+    r = subprocess.run(["git", "show", f"{PRE}:{PRE_MOVE_PATH}"],
                        capture_output=True, text=True, cwd=str(ROOT))
     assert r.returncode == 0, f"基线取不到：{r.stderr[:200]}"
     t = ast.parse(r.stdout)

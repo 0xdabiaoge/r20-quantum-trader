@@ -1,6 +1,6 @@
 """市场/组合数据装配（结构优化阶段 2 / B2 第二刀）。
 
-从 dashboard/app.py 迁出的**无接缝依赖**的一组函数：它们不读 LOG_FILE / AI_*_FILE /
+从 r20_backend/dashboard_cache.py 迁出的**无接缝依赖**的一组函数：它们不读 LOG_FILE / AI_*_FILE /
 STATE_JSON_FILE / DATA_DIR / CACHE_DATA 等会被测试 patch 的门面常量，只做纯计算或
 走 scripts.okx_rest，故门面直接重导出即可（无需薄壳）。
 """

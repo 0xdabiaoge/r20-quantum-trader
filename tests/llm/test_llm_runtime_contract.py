@@ -39,7 +39,7 @@ class LlmRuntimeContractTests(unittest.TestCase):
         root = Path(__file__).resolve().parents[2]
         out = subprocess.run(
             ["grep", "-rn", "gemini-3.8-flash-high", "--include=*.py", "--include=*.ts", "--include=*.vue",
-             "r20_backend", "scripts", "frontend/src", "dashboard"],
+             "r20_backend", "scripts", "frontend/src"],
             cwd=root, capture_output=True, text=True,
         )
         hits = [line for line in out.stdout.splitlines() if line.strip()]

@@ -136,13 +136,13 @@ async def lifespan(_: FastAPI):
     admin_auth.initialize_from_legacy(settings.admin_token or settings.setup_token)
     start_gateway_supervisor()
     try:
-        from dashboard.app import start_dashboard_background_worker
+        from r20_backend.dashboard_cache import start_dashboard_background_worker
         start_dashboard_background_worker()
     except Exception:
         pass
     yield
     try:
-        from dashboard.app import stop_dashboard_background_worker
+        from r20_backend.dashboard_cache import stop_dashboard_background_worker
         stop_dashboard_background_worker()
     except Exception:
         pass
@@ -278,8 +278,8 @@ app.include_router(gateway_router)
 app.include_router(dashboard_router)
 
 # 静态资源与 SPA 壳（结构优化阶段 2·B2 收尾）：原先是 "
-# from dashboard.app import app as dashboard_app; app.mount("/", dashboard_app)"
-# 的双层路由。dashboard/app.py 已降为纯库（不再持有 FastAPI 实例），
+# from r20_backend.dashboard_cache import app as dashboard_app; app.mount("/", dashboard_app)"
+# 的双层路由。r20_backend/dashboard_cache.py 已降为纯库（不再持有 FastAPI 实例），
 # 故静态目录直接挂到真正的应用对象上。
 from r20_backend.web_shell import mount_static_assets  # noqa: E402
 

@@ -1,6 +1,6 @@
 """仪表盘载荷装配 —— 相位 1：核心账户状态抓取（结构优化阶段 2·B2 续刀）。
 
-从 `dashboard/app.py::update_cache_cycle`（拆分前 1021 行）中**纯搬家**相位 1：
+从 `r20_backend/dashboard_cache.py::update_cache_cycle`（拆分前 1021 行）中**纯搬家**相位 1：
 
 平衡/持仓/挂单三项**并发**私有查询 → 单项失败只记 `source_errors` 并降级 →
 三项同时报 `_NOT_READY_TEXT` 时判为「连接方式缺失」（专属 NOT_READY 语义）→
@@ -11,7 +11,7 @@ USDT 余额四元组解析 → 追踪器加载 → 持仓行/挂单行装配。
 - 段体 **AST 逐字**（对拍门 `tests/extraction/test_dashboard_collect_extraction.py` 直接比 AST）；
 - 所有自由名（`_fetch_json` / `_core_*` / `okx_rest` / `_NOT_READY_TEXT` …）**同名 kw-only 入参**
   ⇒ 门面调用期解析，`patch.object(app, "okx_rest", …)` 这类测试缝照常生效；
-- **不 import `dashboard.app`**（会与 `routers/dashboard.py` 的 `import dashboard.app` 成环）。
+- **不 import `r20_backend.dashboard_cache`**（会与 `routers/dashboard.py` 的 `import r20_backend.dashboard_cache` 成环）。
 """
 from __future__ import annotations
 

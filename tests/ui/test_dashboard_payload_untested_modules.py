@@ -12,7 +12,7 @@
 | `dashboard_payload/reset_state.py` | 27 | **0** |
 | `dashboard_payload/ledger_view.py` | 79 | 1（仅间接） |
 
-它们**只经 `dashboard/app.py` 门面**被间接调用，而门面级用例只验证
+它们**只经 `r20_backend/dashboard_cache.py` 门面**被间接调用，而门面级用例只验证
 "载荷非空 / 某几个键在"（`test_dashboard_payload_seam.py` 等），
 **从不验证这些模块内部的取值优先级**。
 

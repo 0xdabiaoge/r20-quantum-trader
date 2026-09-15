@@ -21,7 +21,7 @@
    对一个正在跑实盘的进程做强搬迁，风险与收益不成比例。
 4. **B7 的实质收益已提前拿到。** 四个真正膨胀的巨型模块已经拆成子包，
    根文件从 2105 / 1194 / 1101 / 1968 行降到 281 / 416 / 295 / 904 行
-   （`llm_manager.py` / `council_manager.py` / `policy_snapshot.py` / `dashboard/app.py`）。
+   （`llm_manager.py` / `council_manager.py` / `policy_snapshot.py` / `r20_backend/dashboard_cache.py`）。
    **"根目录不再膨胀、新代码进子包"这条实质目标已经实现。**
 
 ## 2. 分层（按职责，不按目录）
@@ -36,7 +36,7 @@
 | `llm_manager.py` | ~281 | `llm/`（util / capabilities / providers / transport / policy / store / failover / call） |
 | `council_manager.py` | ~416 | `council/`（debate / policy / roster / presets） |
 | `policy_snapshot.py` | ~295 | `policy/`（paths / schema / fingerprints / io / capture / restore / archive） |
-| `dashboard/app.py` | ~904 | `dashboard_payload/`（12 模块）；**0 条路由**（纯库，路由在 `routers/dashboard.py`） |
+| `dashboard_cache.py` | 536 | `dashboard_payload/`（12 模块）；**0 条路由**（纯库，路由在 `routers/dashboard.py`） |
 
 **判据**：一个模块如果"只剩转发/薄壳"，它就是门面，新逻辑一律进它对应的子包。
 
@@ -53,7 +53,7 @@
 `auth` / `system` / `exchanges` / `risk` / `strategy` / `llm` / `gateway` /
 `dashboard`。**路由层只做参数校验与调用编排，不放业务逻辑。**
 路由瘦身的正确做法是把业务下沉到 `exchanges/`、`execution/`、
-`dashboard_payload/`，路由保留薄壳（与 `dashboard/app.py` 降为纯库同一手法）。
+`dashboard_payload/`，路由保留薄壳（与 `r20_backend/dashboard_cache.py` 降为纯库同一手法）。
 
 `gateway` 也已按此手法拆成**包**（第九十七刀）：`gateway/` =
 `gateway/channels.py`（渠道开关）/ `gateway/gateway_ops.py`（状态·投递重放·作业执行）/
@@ -88,7 +88,7 @@
 
 #### `dashboard_payload/` 模块清单
 
-`dashboard/app.py::update_cache_cycle` 曾是 581 行的单函数，载荷各段按域搬进此处。
+`r20_backend/dashboard_cache.py::update_cache_cycle` 曾是 581 行的单函数，载荷各段按域搬进此处。
 **新加的载荷段请进这个子包，不要再往 `app.py` 堆。**
 
 | 模块 | 内容 |
@@ -114,7 +114,7 @@
 | `integrity_sidecars.py` | 完整性旁车并入 `source_errors`（台账同步状态 / AI 连败） |
 | `reset_state.py` | 状态重置 |
 
-> 约定的"注入面"铁律见 §5：这些模块**不得**在 import 期绑定 `dashboard.app`
+> 约定的"注入面"铁律见 §5：这些模块**不得**在 import 期绑定 `r20_backend.dashboard_cache`
 > 的模块级名字（它们会被测试 `patch.object`）。
 
 ## 3. 新文件该放哪：决策树

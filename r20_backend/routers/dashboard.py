@@ -13,7 +13,7 @@ from r20_backend.time_utils import beijing_day
 from r20_backend.dependencies import (
     ROOT, DATA_DIR, VUE_DIST, okx, read_json, require_admin_header,
 )
-import dashboard.app as dash_app
+import r20_backend.dashboard_cache as dash_app
 from r20_backend.web_shell import serve_vue_spa, templates
 
 router = APIRouter(tags=["dashboard"])
@@ -273,10 +273,10 @@ def admin_page(subpath: str = "") -> FileResponse:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Web 外壳路由（结构优化阶段 2·B2 收尾，从 dashboard/app.py 迁入）
+# Web 外壳路由（结构优化阶段 2·B2 收尾，从 r20_backend/dashboard_cache.py 迁入）
 #
 # 这四条是阶段 1 拆除 15 条「被本 router 遮蔽、永不命中」的重复注册后，**仅存于
-# dashboard/app.py** 的真实路由。现随外壳一起搬到 router：
+# r20_backend/dashboard_cache.py** 的真实路由。现随外壳一起搬到 router：
 #   /favicon.svg  仅此处实现
 #   /             仅此处实现（先给 Vue 壳，dist 缺失时回退 Jinja 模板）
 #   /doc          路由器只注册了 /docs，没有 /doc（线上实测 200），故保留

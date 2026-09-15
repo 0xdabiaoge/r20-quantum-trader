@@ -129,7 +129,7 @@ def admin_test_council_debate(payload: CouncilTestRequest, x_r20_session: str | 
 
         account = positions = pending = None
         try:
-            import dashboard.app as dashboard_app
+            import r20_backend.dashboard_cache as dashboard_app
             cache = getattr(dashboard_app, "CACHE_DATA", None)
             if isinstance(cache, dict):
                 account = cache.get("account") if isinstance(cache.get("account"), dict) else None

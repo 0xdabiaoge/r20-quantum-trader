@@ -10,7 +10,7 @@
 - **因子计算与同步守护**：`scripts/daemon_web_sync.py`（60 秒并发计算动量趋势、波动通道、资金流向、微观盘口与 Top100 聪明钱五大量化因子库）
 - **自进化心法引擎**：`scripts/self_improvement_engine.py`（每日 20:00 深度复盘真实流水，提炼 3 大启发式心法沉淀至 `data/AI_TRADING_MEMORY.md`）
 - **全网快讯情报流**：`scripts/news_sentiment_harvester.py`（OKX 最新与重大快讯双路聚合）
-- **Web 监控大屏**：`dashboard/app.py` + `dashboard/templates/index.html`（Bloomberg/Linear 级 Dark Glassmorphism 极客交易终端，支持全局 Prompt 悬浮透视抽屉）
+- **Web 监控大屏**：`r20_backend/dashboard_cache.py` + `r20_backend/templates/index.html`（Bloomberg/Linear 级 Dark Glassmorphism 极客交易终端，支持全局 Prompt 悬浮透视抽屉）
 - **插件化灾备**：`scripts/backup_runtime.py` + 后台“灾备中心”（按任务配置本地、百度官方 OAuth/ByPy、S3 兼容、阿里云 OSS、WebDAV/OpenList、阿里云盘桥接与实验性夸克桥接；凭证独立加密，任务导出不含密钥）
 - **核心数据资产清单**：
   - `data/trading_ledger.json` & `trading_ledger.xlsx`（全量交易流水账本与资金费记录）

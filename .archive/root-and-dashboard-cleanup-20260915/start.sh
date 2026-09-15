@@ -42,7 +42,7 @@ if [ -f "$PID_FILE" ]; then
 fi
 
 echo "Starting OKX Quant Dashboard Web Monitor on http://0.0.0.0:$PORT ..."
-nohup $PYTHON_BIN -m uvicorn dashboard.app:app --host 0.0.0.0 --port $PORT > "$LOG_FILE" 2>&1 &
+nohup $PYTHON_BIN -m uvicorn r20_backend.dashboard_cache:app --host 0.0.0.0 --port $PORT > "$LOG_FILE" 2>&1 &
 PID=$!
 echo $PID > "$PID_FILE"
 sleep 1.5

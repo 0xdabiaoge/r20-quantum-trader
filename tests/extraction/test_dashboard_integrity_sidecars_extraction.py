@@ -379,7 +379,7 @@ class OrderTest(_TmpDir):
 
 
 class WiringTest(unittest.TestCase):
-    APP = ROOT / "dashboard" / "app.py"
+    APP = ROOT / "r20_backend" / "dashboard_cache.py"
 
     def test_impl_in_submodule_not_facade(self):
         app_src = self.APP.read_text(encoding="utf-8")
@@ -415,9 +415,9 @@ class WiringTest(unittest.TestCase):
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
                 for a in node.names:
-                    self.assertFalse(a.name.startswith("dashboard"))
+                    self.assertFalse(a.name.startswith("r20_backend.dashboard_cache"))
             elif isinstance(node, ast.ImportFrom):
-                self.assertFalse((node.module or "").startswith("dashboard"))
+                self.assertFalse((node.module or "").startswith("r20_backend.dashboard_cache"))
 
     def test_constants_are_named_not_magic(self):
         """2700 / 2 / 120 三个魔数须具名 —— 它们是行为契约的一部分。"""

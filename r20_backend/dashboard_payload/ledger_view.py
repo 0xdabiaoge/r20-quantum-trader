@@ -39,7 +39,7 @@ def load_ledger_lifecycle_trades(ledger_file, workspace_dir, autosync_enabled, r
     # 打真网络并改写生产台账（违反「测试不触生产文件」）。
     # 注意：仅在调用时读 os.environ 不够——多个测试用 patch.dict(..., clear=True)
     # 清空整个环境，会把标志一起抹掉。故以**模块导入时快照**为准（tests/__init__.py
-    # 在任何测试模块导入 dashboard.app 之前置位），生产不设该变量 → 行为不变。
+    # 在任何测试模块导入 r20_backend.dashboard_cache 之前置位），生产不设该变量 → 行为不变。
     _ledger_sync_disabled = (
         not autosync_enabled
         or str(os.environ.get("R20_LEDGER_SYNC_DISABLED", "")).strip().lower() in ("1", "true", "yes")

@@ -56,7 +56,7 @@ class PidfileStructureTest(unittest.TestCase):
                 and isinstance(node.value.value, str)
 
         offenders = []
-        roots = [ROOT / d for d in ("r20_backend", "r20_gateway", "scripts", "dashboard", "tests")]
+        roots = [ROOT / d for d in ("r20_backend", "r20_gateway", "scripts", "tests")]
         for root in roots:
             if not root.exists():
                 continue
