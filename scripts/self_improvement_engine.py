@@ -56,6 +56,7 @@ from r20_gateway.telemetry import ModelCallTelemetry
 from scripts.evolution.memory_review import apply_memory_review
 from scripts.evolution.review_context import (
     build_host_constitution,
+    normalize_asset_multipliers,
     parse_review_json,
     summarize_closed_trades,
 )
@@ -659,13 +660,10 @@ def run_self_evolution(force: bool = False):
     insights = [s for s in (_coerce_display_str(x) for x in insights) if s]
     actions_taken = [s for s in (_coerce_display_str(x) for x in actions_taken) if s]
     
-    raw_asset_mults = llm_review.get("asset_multipliers", {})
-    if not isinstance(raw_asset_mults, dict):
-        raw_asset_mults = {}
-    asset_mults = {
-        asset: clamp(raw_asset_mults.get(asset, 1.0), 0.5, 1.5, 1.0)
-        for asset in TARGET_INSTRUMENTS
-    }
+    asset_mults = normalize_asset_multipliers(
+        TARGET_INSTRUMENTS=TARGET_INSTRUMENTS,
+        clamp=clamp,
+        llm_review=llm_review    )
     change_status, long_term_memory, preserve_existing_memory = resolve_memory_update(
         change_status, llm_review.get("ai_long_term_memory", []), existing_core_lessons
     )

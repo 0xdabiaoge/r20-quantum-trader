@@ -273,5 +273,112 @@ class ParseReviewJsonTest(unittest.TestCase):
             self._parse("not json at all")
 
 
+class NormalizeAssetMultipliersTest(unittest.TestCase):
+    """第一百一十四刀：`run_self_evolution` 里的**资产乘数归一**出表。
+
+    7 行段，钉的是一条**影响仓位规模**的安全规则：只认标的池内的币、
+    每档夹到 [0.5, 1.5]、缺值/不可比较一律回落到 1.0（等价"不调整"）。
+    原先夹在 157 行编排函数中段（前后都是 LLM 调用与落盘），无法单独验证。
+    """
+
+    PRE = "25f6a69"
+    OWNER = "run_self_evolution"
+
+    def _baseline(self) -> ast.FunctionDef:
+        r = subprocess.run(["git", "show", f"{self.PRE}:scripts/self_improvement_engine.py"],
+                           capture_output=True, text=True, cwd=str(ROOT))
+        assert r.returncode == 0, f"基线取不到：{r.stderr[:200]}"
+        return next(n for n in ast.parse(r.stdout).body
+                    if isinstance(n, ast.FunctionDef) and n.name == self.OWNER)
+
+    def test_segment_is_ast_identical_to_baseline(self):
+        seg = self._baseline().body[33:36]
+        body = list(_impl("normalize_asset_multipliers").body)[:-1]
+        body = body[1:] if (body and isinstance(body[0], ast.Expr)
+                            and isinstance(body[0].value, ast.Constant)
+                            and isinstance(body[0].value.value, str)) else body
+        self.assertEqual(
+            ast.dump(ast.Module(body=body, type_ignores=[]), include_attributes=False),
+            ast.dump(ast.Module(body=list(seg), type_ignores=[]), include_attributes=False),
+            "normalize_asset_multipliers 段体与抽取前**不再同一棵 AST**")
+
+    def test_call_site_passes_every_parameter_once_same_name(self):
+        params = [a.arg for a in _impl("normalize_asset_multipliers").args.kwonlyargs]
+        tree = ast.parse(FACADE.read_text(encoding="utf-8"))
+        fn = next(n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == self.OWNER)
+        calls = [n for n in ast.walk(fn) if isinstance(n, ast.Call)
+                 and getattr(n.func, "id", "") == "normalize_asset_multipliers"]
+        self.assertEqual(len(calls), 1)
+        self.assertEqual([k.arg for k in calls[0].keywords], params)
+        for k in calls[0].keywords:
+            self.assertEqual(ast.unparse(k.value), k.arg)
+
+    def test_no_undeclared_free_names(self):
+        mod = ast.parse(MOD.read_text(encoding="utf-8"))
+        mod_names = set()
+        for n in mod.body:
+            if isinstance(n, (ast.FunctionDef, ast.ClassDef)):
+                mod_names.add(n.name)
+            elif isinstance(n, (ast.Import, ast.ImportFrom)):
+                mod_names |= {a.asname or a.name.split(".")[0] for a in n.names}
+        fn = _impl("normalize_asset_multipliers")
+        local = {a.arg for a in fn.args.kwonlyargs}
+        for n in ast.walk(fn):
+            if isinstance(n, ast.comprehension):
+                tg = n.target
+                for e in (tg.elts if isinstance(tg, (ast.Tuple, ast.List)) else [tg]):
+                    if isinstance(e, ast.Name):
+                        local.add(e.id)
+            if isinstance(n, ast.Name) and isinstance(n.ctx, (ast.Store, ast.Del)):
+                local.add(n.id)
+        reads = {n.id for n in ast.walk(fn) if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Load)}
+        self.assertEqual(sorted(reads - local - set(dir(builtins)) - mod_names), [])
+
+    # ---------- 行为例：安全规则 ----------
+
+    def _norm(self, llm_review, targets=("BTC", "ETH")):
+        from scripts.evolution.review_context import normalize_asset_multipliers
+        from r20_backend.math_utils import clamp
+        return normalize_asset_multipliers(TARGET_INSTRUMENTS=list(targets), clamp=clamp,
+                                           llm_review=llm_review)
+
+    def test_facade_clamp_is_the_math_utils_one(self):
+        """门面的 `clamp` 只是别名（名字必须留在门面：`patch.object(模块,"clamp")` 是既有接缝）。"""
+        src = (ROOT / "scripts" / "self_improvement_engine.py").read_text(encoding="utf-8")
+        self.assertIn("from r20_backend.math_utils import clamp as _clamp", src)
+        self.assertIn("return _clamp(value, lower, upper, default)", src)
+
+    def test_only_pool_assets_and_default_one(self):
+        got = self._norm({"asset_multipliers": {"BTC": 0.8, "DOGE": 9.9}})
+        self.assertEqual(got, {"BTC": 0.8, "ETH": 1.0},
+                         "只认标的池内的币；池内缺值 ⇒ 1.0（等价不调整）")
+
+    def test_values_are_clamped_to_half_and_one_point_five(self):
+        got = self._norm({"asset_multipliers": {"BTC": 0.01, "ETH": 99}})
+        self.assertEqual(got, {"BTC": 0.5, "ETH": 1.5}, "乘数必须夹在 [0.5, 1.5]")
+
+    def test_non_dict_multipliers_falls_back_to_all_ones(self):
+        for bad in ("nope", [1, 2], None, 3):
+            with self.subTest(bad=bad):
+                self.assertEqual(self._norm({"asset_multipliers": bad}), {"BTC": 1.0, "ETH": 1.0})
+
+    def test_missing_key_entirely(self):
+        self.assertEqual(self._norm({}), {"BTC": 1.0, "ETH": 1.0})
+
+    def test_uncomparable_value_falls_back_to_default(self):
+        self.assertEqual(self._norm({"asset_multipliers": {"BTC": "abc"}}), {"BTC": 1.0, "ETH": 1.0},
+                         "不可比较 ⇒ clamp 的 default（1.0），不得抛错")
+
+    def test_returns_exactly_the_pool_keys(self):
+        got = self._norm({"asset_multipliers": {"BTC": 1.0}}, targets=("BTC",))
+        self.assertEqual(list(got), ["BTC"])
+
+    def test_judgment_actually_notices_a_change(self):
+        seg = self._baseline().body[33:36]
+        self.assertNotEqual(
+            ast.dump(ast.Module(body=list(seg) + [ast.Pass()], type_ignores=[]), include_attributes=False),
+            ast.dump(ast.Module(body=list(seg), type_ignores=[]), include_attributes=False))
+
+
 if __name__ == "__main__":
     unittest.main()

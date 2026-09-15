@@ -66,3 +66,17 @@ def parse_review_json(*,
     if not isinstance(review_json, dict):
         review_json = {}
     return content, review_json
+
+
+def normalize_asset_multipliers(*,
+        TARGET_INSTRUMENTS,
+        clamp,
+        llm_review):
+    raw_asset_mults = llm_review.get("asset_multipliers", {})
+    if not isinstance(raw_asset_mults, dict):
+        raw_asset_mults = {}
+    asset_mults = {
+        asset: clamp(raw_asset_mults.get(asset, 1.0), 0.5, 1.5, 1.0)
+        for asset in TARGET_INSTRUMENTS
+    }
+    return asset_mults
