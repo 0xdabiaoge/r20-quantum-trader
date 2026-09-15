@@ -344,7 +344,12 @@ class WiringTest(unittest.TestCase):
         called = [n.func.id for n in ast.walk(tree)
                   if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)]
         self.assertEqual(called.count("collect_pending_inst_ids"), 1)
-        self.assertEqual(called.count("build_state_payload"), 1)
+        # 第九十一刀：`build_state_payload` 的调用随"相位 5"搬入 cycle_stages.py
+        stages = ast.parse((ROOT / "scripts" / "trader" / "cycle_stages.py").read_text(encoding="utf-8"))
+        stage_calls = [n.func.id for n in ast.walk(stages)
+                       if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)]
+        self.assertEqual(stage_calls.count("build_state_payload"), 1,
+                         "面板状态装配应恰有 1 处调用（现住 cycle_stages.persist_state_and_sync_ledger）")
         fn = next(n for n in ast.walk(tree)
                   if isinstance(n, ast.FunctionDef) and n.name == "execute_portfolio")
         lines = fn.end_lineno - fn.lineno + 1
@@ -364,21 +369,44 @@ class WiringTest(unittest.TestCase):
             self.assertIn(line, facade)
 
     def test_facade_keeps_the_atomic_write(self):
-        """原子写留在门面（异常语义是"照旧上抛"，属控制流不属装配）。"""
-        facade = FACADE.read_text(encoding="utf-8")
+        """原子写（异常语义"照旧上抛"，属控制流不属装配）。
+
+        ⚠️ 第九十一刀：该行随相位 5 整体搬入 `cycle_stages.py`
+        （异常照旧上抛的语义未变：段体 AST 逐字）。判定对象随实现迁移，
+        并加反证 —— 它不该出现在 `cycle_snapshot.py`（那是纯装配模块）。
+        """
+        stages = (ROOT / "scripts" / "trader" / "cycle_stages.py").read_text(encoding="utf-8")
         self.assertIn('_atomic_write_json(os.path.join(DATA_DIR, "trading_state.json")',
-                      facade)
+                      stages)
         self.assertNotIn("_atomic_write_json", SUBMODULE.read_text(encoding="utf-8"))
 
     def test_both_call_sites_define_every_name_they_pass(self):
         """路径感知判据：只沿到达该调用的唯一路径收集定义。"""
-        tree = ast.parse(FACADE.read_text(encoding="utf-8"))
-        func = next(n for n in ast.walk(tree)
-                    if isinstance(n, ast.FunctionDef) and n.name == "execute_portfolio")
         from tests.source_scan import names_defined_at_call
 
+        # 第九十一刀：两处调用分居两处 —— `collect_pending_inst_ids` 仍在门面
+        # `execute_portfolio`；`build_state_payload` 随相位 5 迁入
+        # `cycle_stages.persist_state_and_sync_ledger`。判据分别在其**所属**函数内跑。
+        plans = []
+        facade_tree = ast.parse(FACADE.read_text(encoding="utf-8"))
+        plans.append((facade_tree, next(n for n in ast.walk(facade_tree)
+                                        if isinstance(n, ast.FunctionDef)
+                                        and n.name == "execute_portfolio")))
+        stages_tree = ast.parse((ROOT / "scripts" / "trader" / "cycle_stages.py").read_text(encoding="utf-8"))
+        plans.append((stages_tree, next(n for n in ast.walk(stages_tree)
+                                        if isinstance(n, ast.FunctionDef)
+                                        and n.name == "persist_state_and_sync_ledger")))
+        tree = plans[0][0]
+        func = plans[0][1]
+
         checked = 0
-        for node in ast.walk(func):
+        work = []
+        for tr, fn in plans:
+            for node in ast.walk(fn):
+                if (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+                        and node.func.id in ("collect_pending_inst_ids", "build_state_payload")):
+                    work.append((tr, fn, node))
+        for tree, func, node in work:
             if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
                     and node.func.id in ("collect_pending_inst_ids",
                                          "build_state_payload")):
