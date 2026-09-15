@@ -13,7 +13,7 @@ import sys
 import unittest
 from pathlib import Path
 
-scripts_dir = str(Path(__file__).resolve().parent.parent / "scripts")
+scripts_dir = str(Path(__file__).resolve().parent.parent.parent / "scripts")
 if scripts_dir not in sys.path:
     sys.path.insert(0, scripts_dir)
 

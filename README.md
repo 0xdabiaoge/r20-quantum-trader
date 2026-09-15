@@ -253,12 +253,12 @@ v7.6.0 起，全部执行层硬风控参数从 py 源码中彻底剥离，收敛
 
 **本阶段（结构优化 4·B3）建立的三道自动门禁**——它们会在以下情况翻红：
 
-1. **子包模块漏登记**：`tests/test_directory_docs_current.py` 要求
+1. **子包模块漏登记**：`tests/audit/test_directory_docs_current.py` 要求
    13 个受管子包的每个模块都写进各自的 `__init__.py` 清单；
 2. **根层模块漏登记**：同上，`r20_backend/*.py`（38 个）与
    `scripts/*.py`（33 个）必须出现在对应 README 的表格/列举里，
    反向也查（文档提到的 `.py` 必须真实存在，防死引用）；
-3. **文档数字腐烂**：`tests/test_readme_baseline_numbers.py` 要求
+3. **文档数字腐烂**：`tests/core/test_readme_baseline_numbers.py` 要求
    `r20_backend/README.md` 里的测试基线数字与仓内用例数同量级（±10%）。
 
 判绿命令与当前基线见 `r20_backend/README.md` §6。

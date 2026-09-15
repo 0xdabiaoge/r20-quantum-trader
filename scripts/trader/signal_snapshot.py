@@ -8,13 +8,13 @@
 这是**自进化复盘**的观测面：开仓瞬间把因果动力学/数理/微观/舆情字段
 钉进 journal，供 `self_improvement_engine` 做真实因果归因（2026-09-09
 的 schema 错配事故让 22/24 字段恒 None —— 修复的兼容逻辑在函数体内，
-本次搬家一字未动，专测 `tests/test_signal_snapshot_schema.py`）。
+本次搬家一字未动，专测 `tests/trading/test_signal_snapshot_schema.py`）。
 
 ## 注入形状
 
 唯一外部依赖 `DATA_DIR`（因子库快照文件路径的根）由门面壳**调用期**
 注入 —— 专测的 `patch.object(aft, "DATA_DIR", tmp)` patch 面照常生效。
-对拍门：`tests/test_trader_signal_snapshot_extraction.py`。
+对拍门：`tests/extraction/test_trader_signal_snapshot_extraction.py`。
 """
 from __future__ import annotations
 

@@ -16,7 +16,7 @@
 
 ## 为什么这两段此前几乎没有覆盖（如实记录）
 
-`tests/test_prompt_rendering_isolated.py` 用 `packages=[]`、且**从不传**
+`tests/llm/test_prompt_rendering_isolated.py` 用 `packages=[]`、且**从不传**
 `active_positions_detail` / `pending_orders_detail` —— 所以两段的**主体逻辑
 （逐条渲染）此前完全没有被任何测试执行过**。本刀借抽离把它们补上。
 
@@ -42,7 +42,7 @@ from scripts.brain.account_text import (
     build_position_lines,
 )
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 MODULE = ROOT / "scripts" / "brain" / "account_text.py"
 PROMPT = ROOT / "scripts" / "brain" / "prompt.py"
 FACADE = ROOT / "scripts" / "ai_brain_trader.py"

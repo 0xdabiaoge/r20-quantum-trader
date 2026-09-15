@@ -157,7 +157,7 @@ def calculate_sha256(path: Path) -> str:
     """薄壳：转调 `scripts/backup_upload.py`（结构优化阶段 4·B3 第五十二刀）。
 
     ⚠️ 本名字**必须**留在门面：`patch.object(backup_runtime, "calculate_sha256")`
-    是既有接缝（`tests/test_open_source_control.py`），且门面内
+    是既有接缝（`tests/core/test_open_source_control.py`），且门面内
     `verify_archive` / `run_backup_job` 按全局名调用它。
     """
     return _up_calculate_sha256(path)
@@ -331,7 +331,7 @@ def _credentials(target: dict[str, Any]) -> dict[str, str]:
 def _urlencoded_json(url: str, data: dict[str, Any] | None = None, timeout: int = 60) -> dict[str, Any]:
     """薄壳：转调 `scripts/backup_upload.py`（第五十二刀）。
 
-    ⚠️ 本名字**必须**留在门面：`tests/test_audit_batch5_d_tails.py`
+    ⚠️ 本名字**必须**留在门面：`tests/audit/test_audit_batch5_d_tails.py`
     用 `patch.object(br, "_urlencoded_json", …)` 拦百度 OAuth 的网络调用。
     """
     return _up_urlencoded_json(url, data, timeout)
@@ -340,7 +340,7 @@ def _urlencoded_json(url: str, data: dict[str, Any] | None = None, timeout: int 
 def _multipart_upload(*args: Any, **kwargs: Any) -> Any:
     """薄壳：转调 `scripts/backup_upload.py`（第五十二刀）。
 
-    ⚠️ 本名字**必须**留在门面：`tests/test_audit_batch5_d_tails.py`
+    ⚠️ 本名字**必须**留在门面：`tests/audit/test_audit_batch5_d_tails.py`
     用 `patch.object(br, "_multipart_upload", …)`。
     """
     return _up_multipart_upload(*args, **kwargs)

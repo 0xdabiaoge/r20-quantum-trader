@@ -13,7 +13,7 @@ from unittest.mock import patch
 from pathlib import Path
 from urllib.request import Request
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from r20_backend.exchanges import listing as listing_mod
 from r20_backend.exchanges.listing import ensure_contract_listed

@@ -17,7 +17,7 @@
 ## ⚠️ 这个测试**不**覆盖门面的取数缝
 
 `fetch_candles` 留在门面，本模块只吃已取回的 K 线 —— 故这里喂构造数据。
-门面那条缝由 `tests/test_quant_system_calculus.py` 的 `patch.object` 守着。
+门面那条缝由 `tests/llm/test_quant_system_calculus.py` 的 `patch.object` 守着。
 """
 
 from __future__ import annotations
@@ -33,7 +33,7 @@ from scripts.factors.candles_15m import (
     derive_candle_series,
 )
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 MODULE = ROOT / "scripts" / "factors" / "candles_15m.py"
 FACADE = ROOT / "scripts" / "factor_library.py"
 

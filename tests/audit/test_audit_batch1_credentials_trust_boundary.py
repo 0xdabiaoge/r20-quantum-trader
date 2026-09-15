@@ -18,7 +18,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from r20_backend.settings_store import mask, mask_url, is_masked  # noqa: E402
 import r20_backend.routers.system as sysmod  # noqa: E402
@@ -135,7 +135,7 @@ class TestA2MaskedWriteback(unittest.TestCase):
 
 class TestA3BackupExclusions(unittest.TestCase):
     def test_credential_bearing_files_are_mandatory_excluded(self):
-        sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+        sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
         import backup_runtime  # noqa: PLC0415
         for rel in ("data/llm_models.json", "data/llm_providers.json", "data/admin_auth.db",
                     "data/backups/archive_x/trading_ledger.json", "backups/local/a.tar.gz"):

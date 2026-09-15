@@ -27,7 +27,7 @@ import scripts.prompt_library as prompts
 import scripts.risk_constants as risk_constants
 
 # Read code only, before installing the runtime IO fence.
-PROJECT = Path(__file__).resolve().parents[1]
+PROJECT = Path(__file__).resolve().parents[2]
 # 结构优化阶段 4：主脑的提示词函数已部分搬进 scripts/brain/。原先按**单文件**
 # ast.parse 再按函数名取节点，搬走即 StopIteration。现按「主脑域源码集」定位
 # （tests/source_scan.find_function_node 会顺带断言"同名节点唯一"，防止搬家
@@ -49,7 +49,7 @@ _EXTRA_NODES = {
 }
 
 APP_TREE = ast.parse((PROJECT / "r20_backend/app.py").read_text())
-OLD_TREE = ast.parse((PROJECT / "tests/test_control_plane_v2.py").read_text())
+OLD_TREE = ast.parse((PROJECT / "tests/ops/test_control_plane_v2.py").read_text())
 
 
 class Sandbox(unittest.TestCase):
@@ -239,7 +239,7 @@ class RenderingTests(Sandbox):
 old_class = next(n for n in OLD_TREE.body if isinstance(n, ast.ClassDef) and n.name == "PromptModuleTests")
 old_class.bases = [ast.Name(id="Sandbox", ctx=ast.Load())]
 ast.fix_missing_locations(old_class)
-exec(compile(ast.Module(body=[old_class], type_ignores=[]), "tests/test_control_plane_v2.py", "exec"), globals())
+exec(compile(ast.Module(body=[old_class], type_ignores=[]), "tests/ops/test_control_plane_v2.py", "exec"), globals())
 
 if __name__ == "__main__":
     unittest.main()

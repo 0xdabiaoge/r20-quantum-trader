@@ -37,7 +37,7 @@ import ast
 import unittest
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 MODULE = ROOT / "scripts" / "backtest" / "lifecycle.py"
 FACADE = ROOT / "scripts" / "backtest_engine.py"
 

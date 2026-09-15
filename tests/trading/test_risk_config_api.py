@@ -15,7 +15,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "scripts"))
 
@@ -295,7 +295,7 @@ class RiskExecutionWiringTests(unittest.TestCase):
     """执行层必须真的引用单一事实源，防止页面改了参数但代码没接线。"""
 
     def test_trader_sources_use_shared_constants(self):
-        root = Path(__file__).resolve().parents[1]
+        root = Path(__file__).resolve().parents[2]
         # 领域定位：下面 forbidden 是**负向**断言。单文件定位在搬家后会静默空转
         # （写死的风控常量跟着搬进子包，门面里查不到 → 永远通过）。
         from tests.source_scan import combined

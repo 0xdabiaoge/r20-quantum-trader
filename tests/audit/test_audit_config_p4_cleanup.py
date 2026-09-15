@@ -21,7 +21,7 @@ import scripts.instrument_pool  # noqa: F401
 import scripts.prompt_library  # noqa: F401
 from tests.config_sandbox import isolate_config
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 
 
 class _Base(unittest.TestCase):

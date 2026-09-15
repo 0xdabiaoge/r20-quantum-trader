@@ -21,7 +21,7 @@
 注入 kw 与门面全局同名 ⇒ 函数体逐字零改动，只多签名行。
 `patch.object(aft, "okx_rest"/"load_open_intents"/"_BROKEN_VENUES"/
 "load_instruments"/"current_environment"/"venue_registry")` 的既有 patch 面
-（`tests/test_audit_batch5_d_tails.py`、`test_audit_batch6_live_incidents.py`、
+（`tests/audit/test_audit_batch5_d_tails.py`、`test_audit_batch6_live_incidents.py`、
 `test_open_order_reconcile.py`）经门面壳调用期传参保真。
 
 ⚠️ `_BROKEN_VENUES` 是**模块级可变集合**，注入的是引用 ⇒ 子包内

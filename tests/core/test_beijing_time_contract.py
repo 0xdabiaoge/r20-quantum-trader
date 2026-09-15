@@ -12,7 +12,7 @@ from pathlib import Path
 # Same preamble as sibling scripts-importing tests (e.g. test_evolution_observability):
 # scripts modules use bare sibling imports (instrument_pool), so scripts/ must be
 # on sys.path before importing them.
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parent.parent.parent
 for _p in (str(ROOT), str(ROOT / "scripts")):
     if _p not in sys.path:
         sys.path.insert(0, _p)

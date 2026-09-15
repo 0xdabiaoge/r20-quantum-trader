@@ -29,7 +29,7 @@ from pathlib import Path
 
 from scripts.ledger.okx_history import build_okx_trade
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 FACADE = ROOT / "scripts" / "sync_full_ledger.py"
 SUBMODULE = ROOT / "scripts" / "ledger" / "okx_history.py"
 

@@ -17,7 +17,7 @@
 ## ⚠️ 为什么用 **mixin** 而不是"搬成自由函数"
 
 原实现全是 `@classmethod`，且大量通过 `cls.` 与 `BinanceAdapter.` 访问类常量。
-`tests/test_venue_capability_semantics.py` 用
+`tests/venues/test_venue_capability_semantics.py` 用
 `self.ad.build_algo_order_request(...)`（**实例上调用 classmethod**）与
 `binance.BinanceAdapter.WORKING_TYPES`（**类属性**）两种形态。
 
@@ -47,7 +47,7 @@ import sys
 import unittest
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 

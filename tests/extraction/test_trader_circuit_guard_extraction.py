@@ -21,7 +21,7 @@ import sys
 import unittest
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 #: 抽取前的基线（第七十九～八十刀收口提交，本刀动工前的最后状态）

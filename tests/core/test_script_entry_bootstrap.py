@@ -39,7 +39,7 @@ import ast
 import unittest
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 SCRIPTS = ROOT / "scripts"
 
 #: 被以 `python <script>` 子进程方式拉起的入口（实测调用方：

@@ -46,7 +46,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 for p in (str(ROOT), str(ROOT / "scripts")):
     if p not in sys.path:
         sys.path.insert(0, p)
@@ -124,7 +124,7 @@ class InjectionStillWorksTest(unittest.TestCase):
     def test_urlencoded_json_patch_reaches_the_moved_core(self):
         """`patch.object(br, "_urlencoded_json", …)` 必须拦住共享实现里的网络调用。
 
-        这正是 `tests/test_audit_batch5_d_tails.py` 的做法（拦百度 OAuth）。
+        这正是 `tests/audit/test_audit_batch5_d_tails.py` 的做法（拦百度 OAuth）。
         """
         def boom(*a, **k):
             raise self._Sentinel("patched _urlencoded_json was called")

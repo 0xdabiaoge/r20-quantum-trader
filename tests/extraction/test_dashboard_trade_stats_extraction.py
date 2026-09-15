@@ -28,7 +28,7 @@ from pathlib import Path
 
 from r20_backend.dashboard_payload.trade_stats import aggregate_trade_stats
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 APP = ROOT / "dashboard" / "app.py"
 MODULE = ROOT / "r20_backend" / "dashboard_payload" / "trade_stats.py"
 

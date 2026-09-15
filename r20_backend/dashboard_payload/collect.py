@@ -8,7 +8,7 @@ USDT 余额四元组解析 → 追踪器加载 → 持仓行/挂单行装配。
 
 ## 安全属性（与 trader 域同一套纪律）
 
-- 段体 **AST 逐字**（对拍门 `tests/test_dashboard_collect_extraction.py` 直接比 AST）；
+- 段体 **AST 逐字**（对拍门 `tests/extraction/test_dashboard_collect_extraction.py` 直接比 AST）；
 - 所有自由名（`_fetch_json` / `_core_*` / `okx_rest` / `_NOT_READY_TEXT` …）**同名 kw-only 入参**
   ⇒ 门面调用期解析，`patch.object(app, "okx_rest", …)` 这类测试缝照常生效；
 - **不 import `dashboard.app`**（会与 `routers/dashboard.py` 的 `import dashboard.app` 成环）。

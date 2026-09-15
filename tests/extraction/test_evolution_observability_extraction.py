@@ -34,7 +34,7 @@ import sys
 import unittest
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 MODULE = ROOT / "scripts" / "evolution" / "observability.py"
 FACADE = ROOT / "scripts" / "self_improvement_engine.py"
 
@@ -201,7 +201,7 @@ class ParseBjTest(unittest.TestCase):
 class FacadeWiringTest(unittest.TestCase):
     """⚠️ `scripts/self_improvement_engine.py` 内部用**裸模块名**导入
     （`from instrument_pool import ...`），故必须先把它所在目录放进 `sys.path`。
-    既有测试（如 `tests/test_evolution_observability.py`）也是这么做的。
+    既有测试（如 `tests/llm/test_evolution_observability.py`）也是这么做的。
     """
 
     @classmethod

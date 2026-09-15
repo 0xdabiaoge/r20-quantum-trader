@@ -1,6 +1,6 @@
 """R20 多交易所适配层（Phase 1）。
 
-⚠️ 下表带 `.py` 后缀是**刻意的**：`tests/test_directory_docs_current.py`
+⚠️ 下表带 `.py` 后缀是**刻意的**：`tests/audit/test_directory_docs_current.py`
 把"文档里出现过带后缀的模块名"当作登记凭据（第五十九刀把本子包纳入受管名单时
 发现原来的 `- base: …` 写法不带后缀，门禁识别不到）。
 

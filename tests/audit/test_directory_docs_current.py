@@ -40,7 +40,7 @@ import re
 import unittest
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 
 #: 受管子包 → 该子包的文件名出现形式。
 #: `allowed_extra` 是在文档里**有意**提到但不在本目录的文件（如门面、测试）。
@@ -384,7 +384,8 @@ class ExtractedModulesHaveTestsTest(unittest.TestCase):
         me = Path(__file__).resolve()
         return "\n".join(
             p.read_text(encoding="utf-8", errors="replace")
-            for p in sorted((ROOT / "tests").glob("test_*.py"))
+            # 第 138 刀：tests/ 已按域分子目录 ⇒ 必须递归扫描
+            for p in sorted((ROOT / "tests").rglob("test_*.py"))
             if p.resolve() != me)
 
     def test_every_managed_module_is_referenced_by_some_test(self):

@@ -10,7 +10,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 # Ensure scripts directory is in sys.path so okx_runtime can be imported
-scripts_dir = str(Path(__file__).resolve().parent.parent / "scripts")
+scripts_dir = str(Path(__file__).resolve().parent.parent.parent / "scripts")
 if scripts_dir not in sys.path:
     sys.path.insert(0, scripts_dir)
 

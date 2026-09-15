@@ -17,7 +17,7 @@ from pathlib import Path
 from contextlib import redirect_stdout
 from unittest.mock import patch
 
-_REPO_ROOT = str(Path(__file__).resolve().parent.parent)
+_REPO_ROOT = str(Path(__file__).resolve().parent.parent.parent)
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 _SCRIPTS_DIR = os.path.join(_REPO_ROOT, "scripts")

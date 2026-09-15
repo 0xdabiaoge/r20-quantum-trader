@@ -83,4 +83,4 @@
    （数量语义/触发价默认/限频/网络政策全部显式写进能力表）+ 实现公共行情切面；
 2. 未实装的私有切面**保持基类显式抛错**（fail-closed），不要写假实现；
 3. `registry._ADAPTERS` 注册；开闸执行前不动 `ADAPTER_EXECUTION_ENABLED`；
-4. 单测按 `tests/test_exchanges_adapter.py` 模式全 mock + 真机只读冒烟。
+4. 单测按 `tests/venues/test_exchanges_adapter.py` 模式全 mock + 真机只读冒烟。

@@ -21,7 +21,7 @@ import re
 import unittest
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 SRC = ROOT / "frontend" / "src"
 LOCALES = SRC / "locales"
 LANGS = ("zh", "en")

@@ -26,7 +26,7 @@ from pathlib import Path
 
 from scripts.trader import cycle_snapshot
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 FACADE = ROOT / "scripts" / "ai_factor_trader.py"
 SUBMODULE = ROOT / "scripts" / "trader" / "cycle_snapshot.py"
 

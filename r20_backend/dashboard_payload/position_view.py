@@ -29,7 +29,7 @@
 - 三个计数器（`long_count` / `short_count` / `total_pos_upl`）是**跨行累加**状态，
   留在门面；本函数只处理单行。
 - `load_instruments` 由调用方注入：门面同名函数会被测试 `patch.object`
-  （见 `tests/test_dashboard_payload_seam.py`），import 期绑定会让补丁失效。
+  （见 `tests/ui/test_dashboard_payload_seam.py`），import 期绑定会让补丁失效。
 """
 from __future__ import annotations
 

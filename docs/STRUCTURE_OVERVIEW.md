@@ -14,7 +14,7 @@
 
 | 检查 | 结果 |
 |---|---|
-| 后端全量 `unittest discover -s tests -t .` | **3121 OK**（skipped=1） |
+| 后端全量 `unittest discover -s tests -t .` | **3124 OK**（skipped=1） |
 | 离线套件 `tests/offline_suite.py` | **3102 OK**（skipped=27）；`CONFIG_WRITE_ATTEMPTS: []`；EGRESS 自检通过 |
 | 前端 `node --test tests/*.test.mjs` | **27 用例 / 136 断言，0 失败** |
 | 前端 `npx vue-tsc --noEmit` | 干净（无输出） |
@@ -85,9 +85,11 @@
 
 ## 6. 维护须知（本阶段沉淀的硬约束）
 
+> 测试目录已于 §138 按域分子目录，约定见 `tests/README.md`（域名不得与标准库/顶层包重名已由门钉死）。
+
 1. **抽段手法**：只搬「同一棵 AST 的语句段」，调用点用**同名关键字注入**（`name=name`），
    门面保留调用期全局查找 ⇒ `patch.object(模块, "名字")` 等既有测试接缝不失效。
-2. **结构门是自动的**：`tests/test_extraction_call_site_names.py` 自动发现全部
+2. **结构门是自动的**：`tests/extraction/test_extraction_call_site_names.py` 自动发现全部
    "参数全为 `name=name`" 的调用点（9 个门面 / 33+ 处），校验参数可解析 **且被调函数名可解析**
    —— 忘写 import 会被当场拦下。
 3. **两类 pin 必须区别对待**：
@@ -100,7 +102,7 @@
    —— 守卫专属检查只在离线套件里生效。
 6. **负向验证是门的一部分**：每条新门都要做"注入一处篡改 ⇒ 精确翻红"的验证；
    **在任何篡改下都绿的门等于没写**（本阶段靠这条抓出过"没牙的测试"）。
-7. **子模块内部自由名也必须静态可验**（`tests/test_module_free_names.py`，扫全仓 236 个模块）：
+7. **子模块内部自由名也必须静态可验**（`tests/audit/test_module_free_names.py`，扫全仓 236 个模块）：
    整段搬迁若漏带模块级 import，而该模块的 IO 又包在静默 `except: pass` 里，
    会**编译通过、导入通过、单测全绿、运行时静默归零**。
    这条门正是因一次真实事故（见 §9）而补的 —— 只验"调用点完整"不够。

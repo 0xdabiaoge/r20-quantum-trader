@@ -55,7 +55,7 @@ import re
 import unittest
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 
 #: 结构优化阶段基线（第六十九刀记录）
 BASELINE: dict[str, str] = {

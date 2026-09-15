@@ -22,7 +22,7 @@
 
 两个消费方各保留**自己的**薄壳，而不是 `mask_secret = mask` 这种别名赋值：
 
-1. `tests/test_audit_batch1_credentials_trust_boundary.py` 直接
+1. `tests/audit/test_audit_batch1_credentials_trust_boundary.py` 直接
    `from r20_backend.settings_store import mask`；
 2. `tests/test_llm_seam_discipline.py` 的公开面清单里钉着 `"mask_secret"`；
 3. 本仓约定：`patch.object(模块, "名字")` 是重要接缝，别名赋值会让
@@ -46,7 +46,7 @@ import sys
 import unittest
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 

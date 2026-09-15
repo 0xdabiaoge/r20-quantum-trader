@@ -45,7 +45,7 @@ import ast
 import unittest
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 
 #: 基线（`cc1666082d34`）实测路由数。逐条列出会很长，
 #: 故这里钉**数量下限** + 下面几张关键路由表（页面级 + 认证级）。

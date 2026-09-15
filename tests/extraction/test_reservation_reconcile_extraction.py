@@ -17,7 +17,7 @@
 
 子模块不在 reload 名单里，故它**不 import 门面任何东西**，四个依赖由门面
 在调用时传入。其中两个是**测试接缝**：
-`tests/test_reservation_reconcile.py` 用
+`tests/core/test_reservation_reconcile.py` 用
 `patch.object(trader, "reservation_manager", …)` 与
 `patch.object(trader, "fetch_other_venue_positions", …)` 换掉它们 ——
 本文件的 `CallTimeInjectionTest` 专门钉住这条，若改成 import 期绑定，
@@ -46,7 +46,7 @@ import sys
 import unittest
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 

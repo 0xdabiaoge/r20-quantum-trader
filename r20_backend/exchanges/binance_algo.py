@@ -20,7 +20,7 @@
 
 原实现全是 `@classmethod`，且**大量通过 `cls.` 与 `BinanceAdapter.` 访问类常量**
 （`cls.ALGO_ORDER_PATH` / `cls.ALGO_TYPES` / `BinanceAdapter.WORKING_TYPES`）。
-`tests/test_venue_capability_semantics.py` 也是 `self.ad.build_algo_order_request(...)`
+`tests/venues/test_venue_capability_semantics.py` 也是 `self.ad.build_algo_order_request(...)`
 （实例上调用 classmethod）与 `binance.BinanceAdapter.WORKING_TYPES` 这样用。
 
 若把方法搬成**自由函数**，上述 `cls` / 类属性访问**全部失效**；

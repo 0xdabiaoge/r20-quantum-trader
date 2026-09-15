@@ -1,7 +1,7 @@
 """议会（council）配置与辩论测试端点。
 
 从 `routers/strategy.py`（775 行 / 35 端点）按域拆出（B8）。
-URL、方法、处理器名与 tags 一字未改 —— 对拍门 `tests/test_strategy_router_split.py` 比对路由表。
+URL、方法、处理器名与 tags 一字未改 —— 对拍门 `tests/trading/test_strategy_router_split.py` 比对路由表。
 """
 from __future__ import annotations
 

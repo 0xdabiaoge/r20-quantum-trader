@@ -40,7 +40,7 @@ import re
 import unittest
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 README = ROOT / "r20_backend" / "README.md"
 TESTS = ROOT / "tests"
 
@@ -58,7 +58,7 @@ def _count_test_methods() -> int:
     也不 import 测试模块（那会触发它们的副作用）。
     """
     total = 0
-    for p in sorted(TESTS.glob("test_*.py")):
+    for p in sorted(TESTS.rglob("test_*.py")):   # 第 138 刀：tests/ 已按域分子目录
         try:
             tree = ast.parse(p.read_text(encoding="utf-8"))
         except (SyntaxError, UnicodeDecodeError):

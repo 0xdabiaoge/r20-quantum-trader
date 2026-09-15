@@ -89,7 +89,7 @@ def isolate_config(test):
                  #
                  # 逐个确认过：15 个都能在**零副作用**下 import
                  # （无网络、无起进程、无端口绑定），与既有白名单同性质。
-                 # 对应回归测试：`tests/test_production_data_isolation.py`。
+                 # 对应回归测试：`tests/audit/test_production_data_isolation.py`。
                  'r20_backend.account_baseline',
                  'r20_backend.admin_auth',
                  'r20_backend.backup_secrets',

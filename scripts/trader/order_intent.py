@@ -21,7 +21,7 @@
     "max_margin_usdt": equity_margin_cap(usdt_available),
 
 **这不是遗留，是有意设计。** 门面里有两条计数锚点
-（`tests/test_audit_config_p0_hardening.py`）专门数这两个名字在**门面文件里**的
+（`tests/audit/test_audit_config_p0_hardening.py`）专门数这两个名字在**门面文件里**的
 出现次数，用来证明"开多/开空两条路径都经过了保证金闸门与权益顶"。
 若把这两行搬进子包，门面就再也看不到它们，锚点要么翻红、要么（改成纯领域计数后）
 失去"两条路径都在主路径上"这一层含义。

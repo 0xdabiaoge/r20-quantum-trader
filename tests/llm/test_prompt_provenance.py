@@ -21,7 +21,7 @@ from unittest import mock
 import scripts.prompt_library as pl
 
 # 线上真实方案库路径：测试若指向它，说明沙箱没生效，必须立刻失败
-REAL_LIBRARY = (Path(__file__).resolve().parents[1] / "data" / "prompt_library.json").resolve()
+REAL_LIBRARY = (Path(__file__).resolve().parents[2] / "data" / "prompt_library.json").resolve()
 BASE_TITLE = "系统角色定位与核心使命"
 
 

@@ -28,7 +28,7 @@
 补丁会被**静默绕过**：测试仍绿，行为已变（见 `r20_backend/README.md` §5 铁律）。
 
 ⚠️ 我第一版写成"函数体内 `from dashboard import app as _app` 再 `getattr`"，
-被既有闸 `tests/test_dashboard_payload_seam.py::
+被既有闸 `tests/ui/test_dashboard_payload_seam.py::
 test_core_modules_do_not_import_dashboard_app` **当场拦下**
 （那种 import 会与 `routers/dashboard.py` 的 `import dashboard.app` 构成循环）。
 **是那道闸纠正了我，不是我事后自己想到的** —— 记在这里免得后人再走一遍。

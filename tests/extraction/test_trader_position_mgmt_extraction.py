@@ -32,8 +32,8 @@ from unittest.mock import patch
 import scripts.ai_factor_trader as aft
 from scripts.trader import position_mgmt
 
-FACADE = Path(__file__).resolve().parents[1] / "scripts" / "ai_factor_trader.py"
-SUBMODULE = Path(__file__).resolve().parents[1] / "scripts" / "trader" / "position_mgmt.py"
+FACADE = Path(__file__).resolve().parents[2] / "scripts" / "ai_factor_trader.py"
+SUBMODULE = Path(__file__).resolve().parents[2] / "scripts" / "trader" / "position_mgmt.py"
 
 
 class _FakeOkx:

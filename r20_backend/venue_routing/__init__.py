@@ -22,7 +22,7 @@
 
 1. **门面必须再导出**被搬走的名字（`_hard_filters` / `_score` / `_balanced_pick`
    / `_parse_iso_utc` / `_LISTING_FAILOPEN_MARK`）——
-   `tests/test_cross_process_hash_determinism.py` 在**子进程**里
+   `tests/audit/test_cross_process_hash_determinism.py` 在**子进程**里
    `from r20_backend.venue_router import _balanced_pick`。
 2. **`_parse_iso_utc` 必须住在 `selection.py`**：若留在门面由本子包反向导入，
    会形成「门面 → selection → 门面」的**循环导入**（实测 ImportError）。

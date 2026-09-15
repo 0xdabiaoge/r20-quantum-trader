@@ -29,7 +29,7 @@ from pathlib import Path
 
 from r20_backend.dashboard_payload.trader_leaderboard import build_inst_leaderboard
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 APP = ROOT / "dashboard" / "app.py"
 MODULE = ROOT / "r20_backend" / "dashboard_payload" / "trader_leaderboard.py"
 STATS = ROOT / "r20_backend" / "dashboard_payload" / "trade_stats.py"   # 第九十五刀：调用点现住此

@@ -41,7 +41,7 @@ class SelfEvolutionSafetyTests(unittest.TestCase):
             module.__dict__.update(attrs)
             dependencies[name] = module
         self.start_patch(patch.dict(sys.modules, dependencies))
-        source = Path(__file__).resolve().parents[1] / "scripts" / "self_improvement_engine.py"
+        source = Path(__file__).resolve().parents[2] / "scripts" / "self_improvement_engine.py"
         spec = importlib.util.spec_from_file_location("isolated_evolution_engine", source)
         self.engine = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(self.engine)
@@ -345,7 +345,7 @@ class UnifiedMemoryTests(unittest.TestCase):
 
     def test_backend_handlers_audit_crud_without_app_import(self):
         # Compile only reviewed endpoint functions: no app startup/auth/config reads.
-        source = Path(__file__).resolve().parents[1] / "r20_backend" / "app.py"
+        source = Path(__file__).resolve().parents[2] / "r20_backend" / "app.py"
         tree = ast.parse(source.read_text())
         names = {"_memory_service_call", "get_admin_memory", "add_admin_memory_item",
                  "delete_admin_memory_item", "update_admin_memory_all",
@@ -400,7 +400,7 @@ class UnifiedMemoryTests(unittest.TestCase):
         self.assertEqual(shield.render_trading_memory(), "")
 
     def test_read_render_entrypoints_without_runtime_imports(self):
-        root = Path(__file__).resolve().parents[1]
+        root = Path(__file__).resolve().parents[2]
         # 结构优化阶段 4：主脑源码已拆分到 scripts/brain/，原先按**单文件** ast.parse
         # 定位会在搬家后取不到那两个节点。改为扫「主脑域源码集」并把各文件的 AST
         # 拼起来 —— 断言强度不变（仍要求恰有 2 个匹配节点），且函数搬到哪都找得到。

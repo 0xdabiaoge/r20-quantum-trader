@@ -26,7 +26,7 @@ from pathlib import Path
 
 from scripts.factors.defaults import build_default_factors
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 MODULE = ROOT / "scripts" / "factors" / "defaults.py"
 FACADE = ROOT / "scripts" / "factor_library.py"
 

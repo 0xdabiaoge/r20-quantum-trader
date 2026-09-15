@@ -66,7 +66,7 @@ def _guard_offline() -> None:
             "离线套件禁用外部子进程（node/vite/vue-tsc 不在白名单）—— 见 tests/offline_suite.py"
         )
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 DASH = ROOT / "frontend" / "src" / "components" / "dashboard"
 COMPONENT = DASH / "ChartWorkstation.vue"
 MODULE = DASH / "chartCandles.ts"

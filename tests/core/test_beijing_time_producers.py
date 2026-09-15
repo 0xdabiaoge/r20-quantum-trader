@@ -16,7 +16,7 @@ from unittest.mock import MagicMock, mock_open
 
 import pytest
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 BJ = dt.timezone(dt.timedelta(hours=8))
 # UTC evening -> next day/year in Beijing (independent of host timezone).
 EPOCH = 1767198600  # 2025-12-31 16:30:00 UTC

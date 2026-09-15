@@ -4,7 +4,7 @@
 
 `views/admin/CouncilPage.vue`（873 行，script 302 行）此前**没有任何行为测试**。
 唯一的既有断言是
-`tests/test_audit_config_p1b_guards.py::test_ui_slots_are_real_variables`
+`tests/audit/test_audit_config_p1b_guards.py::test_ui_slots_are_real_variables`
 —— 它只对 `{ k: '…' }` 字面量做正则扫描。也就是说这个页面里
 "槽位是不是合法变量"有护栏，而**其余纯逻辑一条断言都没有**。
 
@@ -82,7 +82,7 @@ def _guard_offline() -> None:
             "离线套件禁用外部子进程（node/vite/vue-tsc 不在白名单）—— 见 tests/offline_suite.py"
         )
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 FRONTEND = ROOT / "frontend"
 PAGE = FRONTEND / "src" / "views" / "admin" / "CouncilPage.vue"
 LOGIC = FRONTEND / "src" / "views" / "admin" / "council" / "councilLogic.ts"

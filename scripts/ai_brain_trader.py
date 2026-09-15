@@ -271,7 +271,7 @@ def read_prompt_override() -> str:
 
 # 止损基准（审计 P2-5）：池条目 per-instrument 值优先——与 ai_factor_trader.instrument_profile
 # 同一优先级；TRADFI 等不在池内的标的回落到资产类别档（数值与 ai_factor_trader.
-# ASSET_CLASS_PROFILES 逐项对齐，tests/test_audit_config_p4_cleanup.py 有源码钉守着）。
+# ASSET_CLASS_PROFILES 逐项对齐，tests/audit/test_audit_config_p4_cleanup.py 有源码钉守着）。
 _SL_ATR_BY_ASSET_CLASS = {"commodity": 1.3, "index": 1.2, "stock": 1.3, "crypto": 1.4}
 
 
@@ -482,7 +482,7 @@ _SYSTEM_JSON_CONTRACT = """==== 【严格 JSON 规范契约与完整输出骨架
 # ---------------------------------------------------------------------------
 
 # 跨所取数健康度状态：**刻意留在门面**（不是实现细节）——
-# `tests/test_xvenue_prompt.py:120` 直接断言 `abt._XV_HEALTH`，且门面被
+# `tests/venues/test_xvenue_prompt.py:120` 直接断言 `abt._XV_HEALTH`，且门面被
 # `pin_baseline_risk_env()` 原地重载后，子模块 import 期持有的引用会与门面的
 # 那个不再是同一个对象。实现模块 scripts/brain/xvenue.py 只保留保护它的锁。
 _XV_HEALTH: Dict[str, Dict[str, Any]] = {}
@@ -496,7 +496,7 @@ def _xvenue_enabled() -> bool:
 def _xv_record(venue: str, name: str, ok: bool, latency_ms: float, err: str = "") -> None:
     """记录场所级取数健康度（写入门面的 `_XV_HEALTH`）。实现见 scripts/brain/xvenue.py。
 
-    `_XV_HEALTH` 必须留在门面：`tests/test_xvenue_prompt.py:120` 直接断言
+    `_XV_HEALTH` 必须留在门面：`tests/venues/test_xvenue_prompt.py:120` 直接断言
     `abt._XV_HEALTH`，且门面被 `pin_baseline_risk_env()` 原地重载后
     子模块持有的引用会与门面的那个不再是同一个对象。
     """
@@ -510,7 +510,7 @@ def _xv_flush_health(packages: List[Dict[str, Any]]) -> None:
     目的是让 `patch.object(abt, "VENUE_HEALTH_FILE", …)` 与
     `patch.object(abt, "atomic_write_json", …)` 在调用时被读到；
     同时 `abt._xv_flush_health([...])` 这种只传 packages 的既有调用
-    （`tests/test_xvenue_prompt.py:129/144`）照旧成立。
+    （`tests/venues/test_xvenue_prompt.py:129/144`）照旧成立。
 
     注：不要把默认值写成同名形参（`safe_float=None` 之类）—— 那会让函数体里的
     裸名解析到形参而不是模块全局，等于把补丁缝静默关掉。
@@ -527,7 +527,7 @@ def _xv_flush_health(packages: List[Dict[str, Any]]) -> None:
 def _get_xvenue_adapter(venue: str):
     """适配器获取。实现见 scripts/brain/xvenue.py。
 
-    保留在门面：这是 `tests/test_xvenue_prompt.py` 4 处
+    保留在门面：这是 `tests/venues/test_xvenue_prompt.py` 4 处
     `patch.object(abt, "_get_xvenue_adapter", …)` 的**既定 mock 缝**
     （模块注释原话：「测试与故障注入缝：mock 此函数即可完全离线」）。
     """

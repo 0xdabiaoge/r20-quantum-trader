@@ -53,7 +53,7 @@ import subprocess
 import unittest
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 MODULE = ROOT / "frontend" / "src" / "views" / "admin" / "securityLogic.ts"
 PAGE = ROOT / "frontend" / "src" / "views" / "admin" / "SecurityPage.vue"
 

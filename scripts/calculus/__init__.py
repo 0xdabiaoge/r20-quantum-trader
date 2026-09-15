@@ -31,7 +31,7 @@
 `_normalise` 签名完全不同、`classify_regime` 的形参个数都错了……）。
 **那会静默改坏交易逻辑却"看起来正常"。**
 
-故 `tests/test_calculus_package_extraction.py::VerbatimCopyTest`
+故 `tests/extraction/test_calculus_package_extraction.py::VerbatimCopyTest`
 用 AST 从 git 历史取出原函数，逐字比对新模块里的同名函数 ——
 **抽实现必须验证"逐字相同"，不能只验证"行为像我预期的那样"。**
 

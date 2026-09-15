@@ -4,13 +4,13 @@
 
 `ai_brain_trader.py` 原 L446-L676（231 行）的跨所采集链整段搬进
 `scripts/brain/xvenue.py`。与 `packages.py` 那块不同，**这块原本就有测试覆盖**
-（`tests/test_xvenue_prompt.py` 15 例），所以真正的风险不是"没人知道它坏了"，
+（`tests/venues/test_xvenue_prompt.py` 15 例），所以真正的风险不是"没人知道它坏了"，
 而是「**搬走时把测试缝一起搬没了**」—— 表现是既有测试静默变成空转或直接报错。
 
 因此这里专门守**注入契约**：
 
 1. `_XV_HEALTH` 状态必须仍住在门面，且**每次调用都是同一个 dict**
-   （不是子模块里的副本）—— `tests/test_xvenue_prompt.py:120` 直接断言
+   （不是子模块里的副本）—— `tests/venues/test_xvenue_prompt.py:120` 直接断言
    `abt._XV_HEALTH`，若状态被搬进子模块，那条断言会开始"看一个永远为空的字典"。
 2. `patch.object(abt, "_get_xvenue_adapter", …)` 必须仍能影响子模块内的取数。
 3. `patch.object(abt, "VENUE_HEALTH_FILE", …)` 必须仍能改到落盘路径。
@@ -28,7 +28,7 @@ from unittest.mock import patch
 import scripts.ai_brain_trader as abt
 from scripts.brain import xvenue
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 FACADE = ROOT / "scripts" / "ai_brain_trader.py"
 SUBMODULE = ROOT / "scripts" / "brain" / "xvenue.py"
 

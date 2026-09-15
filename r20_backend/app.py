@@ -96,7 +96,7 @@ def require_admin_token(token: str) -> None:
     app.py 的"可隔离执行"这个既有契约。
 
     已把这条约束钉成测试：见
-    `tests/test_admin_token_duplication_contract.py`。
+    `tests/audit/test_admin_token_duplication_contract.py`。
     """
     expected = settings.admin_token or settings.setup_token
     if not expected:

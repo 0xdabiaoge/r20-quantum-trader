@@ -289,7 +289,7 @@ def order_margin_gate(planned_margin: float, *, size: float, price: float, ct_va
 
     风控常量在**调用期**读取（`risk_constants` 的 .env 改参由门面重载刷新）。
     注意：本函数名在**本文件里**出现 3 次（1 定义 + 开多 + 开空），这是计数锚点
-    `tests/test_audit_config_p0_hardening.py::test_both_call_sites_pass_gate_and_equity_cap`
+    `tests/audit/test_audit_config_p0_hardening.py::test_both_call_sites_pass_gate_and_equity_cap`
     所依赖的。不要把本壳改成别名赋值；也不要在注释里写出带左括号的函数名
     —— 那会把自己也数进去，锚点会以"多了一次"的形式翻红（本轮就踩过这个坑）。
     """
@@ -367,7 +367,7 @@ def _read_stop_cooldowns_state():
 
     ⚠️ 文件路径**必须**在调用时从本模块全局解析：测试会
     `patch.object(aft, "STOP_COOLDOWN_FILE", f)`（见
-    `tests/test_audit_batch3_persistence_atomic.py`），import 期烘焙会让补丁静默失效。
+    `tests/audit/test_audit_batch3_persistence_atomic.py`），import 期烘焙会让补丁静默失效。
 
     审计③(2026-09-13)：返回 (data, corrupt)。损坏与缺失从此不同权——
     corrupt=True 时 is_in_stop_cooldown 按「在冷却」fail-closed（旧实现损坏→{}
@@ -736,7 +736,7 @@ def reconcile_reservation_ledger(real_pos_dict: Dict[str, Any],
                                  venue_snapshot: Optional[Dict[str, list]] = None) -> int:
     """薄壳：转调 `scripts/trader/reservation_reconcile.py`（第五十八刀）。
 
-    ⚠️ **签名对外一字未变**（`tests/test_reservation_reconcile.py` 用位置参数调用）。
+    ⚠️ **签名对外一字未变**（`tests/core/test_reservation_reconcile.py` 用位置参数调用）。
     四个依赖全部在**调用时**注入 —— 尤其 `reservation_manager` 与
     `fetch_other_venue_positions` 是本模块的模块级名字，测试用
     `patch.object(trader, …)` 替换它们；若子模块 import 期绑一份，

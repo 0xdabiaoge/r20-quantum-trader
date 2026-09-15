@@ -28,12 +28,12 @@ from unittest.mock import patch
 import scripts.ai_brain_trader as abt
 from scripts.brain import packages as brain_packages
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 FACADE = ROOT / "scripts" / "ai_brain_trader.py"
 SUBMODULE = ROOT / "scripts" / "brain" / "packages.py"
 
 # 搬走前门面里该函数的原文（提取时留档），用于逐行对拍。
-PRE_MOVE_SOURCE = Path(__file__).resolve().parent / "data" / "brain_package_pre_move.py"
+PRE_MOVE_SOURCE = Path(__file__).resolve().parent.parent / "data" / "brain_package_pre_move.py"
 
 
 def _submodule_function_lines() -> list[str]:

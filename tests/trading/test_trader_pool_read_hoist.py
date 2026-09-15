@@ -52,7 +52,7 @@ from pathlib import Path
 
 from scripts.trader import cycle_snapshot
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 MODULE = ROOT / "scripts" / "trader" / "cycle_snapshot.py"
 
 POOL = [

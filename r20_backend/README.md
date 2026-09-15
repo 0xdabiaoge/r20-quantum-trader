@@ -60,14 +60,14 @@
 `gateway/notifications.py`（通知配置·诊断·QQ 绑定·计划）/ `gateway/backups.py`
 （备份目标·凭据·作业·归档·恢复）+ `gateway/_shared.py`（`_get_root` 注入缝），
 `gateway/__init__.py` 只做**按原顺序**聚合。34 条 URL/方法/处理器名/tags 一字未改，
-路由表对拍门见 `tests/test_gateway_router_split.py`。
+路由表对拍门见 `tests/ops/test_gateway_router_split.py`。
 
 `strategy` 已按此手法拆成**包**（第九十六刀）：`strategy/` =
 `strategy/council.py`（议会配置与辩论）/ `strategy/interceptors.py`（拦截器 CRUD）/
 `strategy/policy.py`（策略快照）/ `strategy/prompts.py`（提示词库与档案），
 `strategy/__init__.py` 只做**按原顺序**聚合
 （顺序即匹配优先级）。35 条 URL/方法/处理器名/tags 一字未改，
-路由表对拍门见 `tests/test_strategy_router_split.py`。
+路由表对拍门见 `tests/trading/test_strategy_router_split.py`。
 
 ### L3 领域服务（根层，按域成组）
 
@@ -161,14 +161,14 @@
 ## 6. 每次拆分后必须过的两道闸
 
 ```bash
-# 1) 全量套件（当前基线：3109 例 OK, skipped=1）
-#    ⚠️ 这个数字由 tests/test_readme_baseline_numbers.py 钉住：
+# 1) 全量套件（当前基线：3124 例 OK, skipped=1）
+#    ⚠️ 这个数字由 tests/core/test_readme_baseline_numbers.py 钉住：
 #    它用 AST 数出仓里 test_* 方法数，再要求本行数字与之同量级。
 #    超过 ±10% 就会翻红 —— 忘了更新这里会当场被抓住，不会静默漂移。
 .venv/bin/python -m unittest discover -s tests -t .
 
 # 2) 纯逻辑搬家：旧实现差分对拍（抽到哪块，就为哪块写一条）
-#    参考 tests/test_trader_protection_extraction.py（把旧代码内联为 _legacy_* 逐值对拍）
+#    参考 tests/extraction/test_trader_protection_extraction.py（把旧代码内联为 _legacy_* 逐值对拍）
 ```
 
 > 注意 `python -m tests.offline_suite` 会**主动拦截 `git` / `python` / `node`

@@ -36,7 +36,7 @@ from scripts.factors.scoring import (
     score_composite_alpha,
 )
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 MODULE = ROOT / "scripts" / "factors" / "scoring.py"
 FACADE = ROOT / "scripts" / "factor_library.py"
 

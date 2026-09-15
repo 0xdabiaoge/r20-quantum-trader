@@ -9,7 +9,7 @@
 > 此前**没有任何 README**，其中 23 个在全仓文档里连一次都没被提到。
 > 新人（或下一个 Agent）只能靠逐个打开文件猜哪个是入口、哪个是库。
 >
-> 第六十六刀补上这份导航后，`tests/test_directory_docs_current.py`
+> 第六十六刀补上这份导航后，`tests/audit/test_directory_docs_current.py`
 > 会把「磁盘上的根层模块」与「本文档提到的模块」**双向对照**，
 > 漏登记或指向不存在的文件都会翻红 —— 与前几刀给 `r20_backend/` 加的是同一道闸。
 
@@ -65,7 +65,7 @@
 | `news/` | 新闻采集部件 |
 
 > 各子包的**模块清单**写在它自己的 `__init__.py` 里，
-> 并由 `tests/test_directory_docs_current.py` 强制（漏登记必红）。
+> 并由 `tests/audit/test_directory_docs_current.py` 强制（漏登记必红）。
 
 ## 提示词 / LLM
 

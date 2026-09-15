@@ -28,7 +28,7 @@
 - `scripts/ai_factor_trader.py`：`STOP_COOLDOWN_FILE`（**str**）
 - `r20_backend/execution/circuit_breaker.py`：`STOP_COOLDOWN_FILE`（**Path**）
 
-测试**同时** patch 两边（`tests/test_audit_batch3_persistence_atomic.py` 里
+测试**同时** patch 两边（`tests/audit/test_audit_batch3_persistence_atomic.py` 里
 `patch.object(aft, "STOP_COOLDOWN_FILE", f)` 与
 `patch.object(cb, "STOP_COOLDOWN_FILE", Path(f))` 并列出现）。
 
@@ -51,7 +51,7 @@ import time
 import unittest
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 for p in (str(ROOT), str(ROOT / "scripts")):
     if p not in sys.path:
         sys.path.insert(0, p)

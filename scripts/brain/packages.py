@@ -12,7 +12,7 @@
   两个**注入**进来的函数（见下），以及函数体内一处延迟导入的
   `calculus_engine.calculate_multi_timeframe`（保持延迟，测试环境里不一定可导入）；
 - 因此是「整段搬走」而非「消除抄写」，收益是行数，不需要逐值对拍 —— 但仍做了
-  两条路径的差分（见 `tests/test_brain_package_extraction.py`）。
+  两条路径的差分（见 `tests/extraction/test_brain_package_extraction.py`）。
 
 ## 为什么两个行情函数是注入而不是 import
 

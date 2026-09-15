@@ -45,7 +45,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 SCRIPTS = ROOT / "scripts"
 for p in (str(ROOT), str(SCRIPTS)):
     if p not in sys.path:

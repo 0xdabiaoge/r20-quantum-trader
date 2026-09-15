@@ -22,11 +22,11 @@
 
 | 依赖 | 为什么必须调用期注入 |
 |---|---|
-| `get_adapter` | `tests/test_xvenue_prompt.py` 4 处 `patch.object(abt, "_get_xvenue_adapter", …)` —— 板块内取数要用到补丁后的那个函数 |
+| `get_adapter` | `tests/venues/test_xvenue_prompt.py` 4 处 `patch.object(abt, "_get_xvenue_adapter", …)` —— 板块内取数要用到补丁后的那个函数 |
 | `safe_float` | 定义在门面本身（`ai_brain_trader.py:192`），不是共享叶子函数；且门面会被 `pin_baseline_risk_env()` 原地重载 |
 | `atomic_write_json` | 仓内 22 处测试引用该名字（`test_audit_batch3_persistence_atomic` 等） |
-| `venue_health_file` | `tests/test_xvenue_prompt.py` 3 处 `patch.object(abt, "VENUE_HEALTH_FILE", …)` |
-| `health`（`_XV_HEALTH` 字典） | `tests/test_xvenue_prompt.py:120` **直接断言** `abt._XV_HEALTH` —— 状态必须留在门面，由门面传入 |
+| `venue_health_file` | `tests/venues/test_xvenue_prompt.py` 3 处 `patch.object(abt, "VENUE_HEALTH_FILE", …)` |
+| `health`（`_XV_HEALTH` 字典） | `tests/venues/test_xvenue_prompt.py:120` **直接断言** `abt._XV_HEALTH` —— 状态必须留在门面，由门面传入 |
 
 **通例**（同 `r20_backend/README.md` §5）：`pin_baseline_risk_env()` 的重载名单
 只有 `risk_constants` / `ai_factor_trader` / `ai_brain_trader`，**不含子模块** ——
@@ -60,7 +60,7 @@ XV_LS_DIVERGE_RATIO = 0.50
 
 import threading
 
-# 状态**不在这里**：`_XV_HEALTH` 留在门面（`tests/test_xvenue_prompt.py:120`
+# 状态**不在这里**：`_XV_HEALTH` 留在门面（`tests/venues/test_xvenue_prompt.py:120`
 # 直接断言 `abt._XV_HEALTH`，且它必须与门面重载后的那个对象是同一个），
 # 由门面在每次调用时作为 `health` 传入。本模块只保留保护它的锁 ——
 # 锁是纯粹的序列化原语、无状态，多个副本不会丢失更新。

@@ -18,7 +18,7 @@
 ⇒ 函数体 AST **零例外全等**。三个模块对象（`risk_reservation` / `venue_router` /
 `routing_policy`）按**同一对象**注入；`VENUE_SUBMITTERS` 只读（成员判定）。
 
-⚠️ **源码锚点已同步**：`tests/test_audit_batch2_risk_gates_live.py::
+⚠️ **源码锚点已同步**：`tests/audit/test_audit_batch2_risk_gates_live.py::
 test_route_and_reserve_wires_guard` 用 `inspect.getsource(门面函数)` 断言
 "路由必须调用 `portfolio_budget_guard(`"（活线化防漂移锚）。搬壳后门面只剩转发，
 该锚改用 `tests/source_scan.find_function_node`（**优先实现体**）并加反证

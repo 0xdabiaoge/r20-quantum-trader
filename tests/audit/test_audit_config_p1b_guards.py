@@ -15,7 +15,7 @@ from unittest.mock import patch
 
 from tests.config_sandbox import isolate_config
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 
 
 class _Base(unittest.TestCase):

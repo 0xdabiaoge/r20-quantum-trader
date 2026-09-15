@@ -27,7 +27,7 @@ from pathlib import Path
 
 from r20_backend.dashboard_payload.order_view import collect_pending_order_rows
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 APP = ROOT / "dashboard" / "app.py"
 MODULE = ROOT / "r20_backend" / "dashboard_payload" / "order_view.py"
 COLLECT = ROOT / "r20_backend" / "dashboard_payload" / "collect.py"   # 第九十四刀：相位 1 现住此

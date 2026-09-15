@@ -27,7 +27,7 @@ from .exchanges import listing
 # 结构优化阶段 4·B3 第四十三刀：「选所质量」域（硬筛 / 评分 / 均衡选所 /
 # ISO 时间解析）已外提到 `r20_backend/venue_routing/selection.py`。
 # 门面**再导出**（不是搬空）——`route_signal` 在本文件内调用它们，
-# 且 `tests/test_cross_process_hash_determinism.py` 在**子进程**里
+# 且 `tests/audit/test_cross_process_hash_determinism.py` 在**子进程**里
 # `from r20_backend.venue_router import _balanced_pick`。
 #
 # ⚠️ `_parse_iso_utc` **必须住在子模块**（不能留在门面由子模块反向导入，

@@ -30,7 +30,7 @@ from unittest.mock import patch
 
 from r20_backend.dashboard_payload.bills import aggregate_bills
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 APP = ROOT / "dashboard" / "app.py"
 MODULE = ROOT / "r20_backend" / "dashboard_payload" / "bills.py"
 STATS = ROOT / "r20_backend" / "dashboard_payload" / "trade_stats.py"   # 第九十五刀：消费点现住此

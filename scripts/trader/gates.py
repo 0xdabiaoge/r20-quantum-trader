@@ -18,7 +18,7 @@
 
 ## 门面侧的锚点为什么不受影响
 
-`tests/test_audit_config_p0_hardening.py:186` 是一条**计数锚点**：
+`tests/audit/test_audit_config_p0_hardening.py:186` 是一条**计数锚点**：
 
     source.count("order_margin_gate(") == 3   # 1 定义 + 开多 + 开空
 

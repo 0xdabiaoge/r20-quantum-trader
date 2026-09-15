@@ -12,7 +12,7 @@
 
 - 三段**都是纯副作用**（0 个输出、0 个 `return`）—— 失败被各自的 `try/except` 吞掉并打印告警，
   控制流不依赖它们的产物；
-- 段体 **AST 逐字**（对拍门 `tests/test_brain_snapshots_extraction.py`）；
+- 段体 **AST 逐字**（对拍门 `tests/extraction/test_brain_snapshots_extraction.py`）；
 - 全部自由名**同名 kw-only 入参**（`os`/`sys`/`json` 亦按名注入）⇒ 门面调用期解析。
 
 ⚠️ `write_calculus_snapshot` 段内的 `with open(tmp_calc, "w") as f:` 是**段内局部句柄**：

@@ -31,7 +31,7 @@ from unittest.mock import patch
 import scripts.ai_brain_trader as abt
 from scripts.brain import decisions
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 FACADE = ROOT / "scripts" / "ai_brain_trader.py"
 SUBMODULE = ROOT / "scripts" / "brain" / "decisions.py"
 

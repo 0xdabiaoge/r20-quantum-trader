@@ -12,7 +12,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-scripts_dir = str(Path(__file__).resolve().parent.parent / "scripts")
+scripts_dir = str(Path(__file__).resolve().parent.parent.parent / "scripts")
 if scripts_dir not in sys.path:
     sys.path.insert(0, scripts_dir)
 

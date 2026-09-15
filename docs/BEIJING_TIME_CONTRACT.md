@@ -36,10 +36,10 @@ for zone in UTC Asia/Shanghai America/Los_Angeles Europe/London Asia/Kolkata; do
   TZ="$zone" node --test frontend/tests/time.test.mjs
 done
 PYTHONPATH=.:scripts TZ=UTC python -m pytest -q \
-  tests/test_beijing_time_contract.py tests/test_beijing_time_producers.py \
-  tests/test_gateway_runtime.py tests/test_evolution_observability.py \
-  tests/test_leverage_range_and_council.py tests/test_policy_snapshot_isolated.py \
-  tests/test_council_alignment_import_export.py
+  tests/core/test_beijing_time_contract.py tests/core/test_beijing_time_producers.py \
+  tests/ops/test_gateway_runtime.py tests/llm/test_evolution_observability.py \
+  tests/llm/test_leverage_range_and_council.py tests/ops/test_policy_snapshot_isolated.py \
+  tests/llm/test_council_alignment_import_export.py
 cd frontend && npx vue-tsc --noEmit && npm run build
 ```
 

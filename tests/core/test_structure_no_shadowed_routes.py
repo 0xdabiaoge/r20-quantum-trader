@@ -35,7 +35,7 @@ from pathlib import Path
 
 from starlette.routing import compile_path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 APP_MAIN = ROOT / "r20_backend" / "app.py"
 DASH_APP = ROOT / "dashboard" / "app.py"
 ROUTER_DIR = ROOT / "r20_backend" / "routers"

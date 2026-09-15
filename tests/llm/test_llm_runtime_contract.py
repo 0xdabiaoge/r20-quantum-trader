@@ -36,7 +36,7 @@ class LlmRuntimeContractTests(unittest.TestCase):
         import subprocess
         from pathlib import Path
 
-        root = Path(__file__).resolve().parents[1]
+        root = Path(__file__).resolve().parents[2]
         out = subprocess.run(
             ["grep", "-rn", "gemini-3.8-flash-high", "--include=*.py", "--include=*.ts", "--include=*.vue",
              "r20_backend", "scripts", "frontend/src", "dashboard"],

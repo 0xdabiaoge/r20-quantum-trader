@@ -19,7 +19,7 @@
 
 `_legacy_*` 是**测试内的副本**，不是被删的生产代码路径 —— 它不会随重构漂移，
 但会随"有人偷偷改了新实现"立刻报警。这与仓里既有的
-`tests/test_three_tier_ratchet_and_cloud_sync.py`（走真实 `aft` 集成路径）互补：
+`tests/ops/test_three_tier_ratchet_and_cloud_sync.py`（走真实 `aft` 集成路径）互补：
 那条测"接线没错"，这条测"数学没漂"。
 """
 from __future__ import annotations
@@ -29,7 +29,7 @@ import sys
 import unittest
 from pathlib import Path
 
-scripts_dir = str(Path(__file__).resolve().parent.parent / "scripts")
+scripts_dir = str(Path(__file__).resolve().parent.parent.parent / "scripts")
 if scripts_dir not in sys.path:
     sys.path.insert(0, scripts_dir)
 
@@ -405,7 +405,7 @@ class TraderFacadeWiringTest(unittest.TestCase):
     """门面必须真的用上新模块，而不是把旧内联代码悄悄留在原地。"""
 
     def setUp(self):
-        self.facade = Path(__file__).resolve().parent.parent / "scripts" / "ai_factor_trader.py"
+        self.facade = Path(__file__).resolve().parent.parent.parent / "scripts" / "ai_factor_trader.py"
         self.src = self.facade.read_text(encoding="utf-8")
 
     def test_facade_imports_protection_module(self):

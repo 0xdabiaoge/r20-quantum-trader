@@ -1,7 +1,7 @@
 """归档索引读写、归档文件解析与删除。
 
 `load_archive_index` 在无索引或需重建时调用 `_rebuild_index_from_archives` ——
-后者被 tests/test_beijing_time_producers.py 的 isolated() 按 AST 钉在门面，
+后者被 tests/core/test_beijing_time_producers.py 的 isolated() 按 AST 钉在门面，
 **不能搬走**（薄壳会因命名空间缺 open/logger 而 NameError）。故由门面薄壳在
 调用时解析后注入；`_resolve_archive_file` / `delete_archived_policy` 同理注入
 门面的 load_archive_index，使整条链都走门面的可打桩绑定。

@@ -6,7 +6,7 @@
 
 ## 安全属性（与 trader 域同一套纪律）
 
-- 段体 **AST 逐字**（对拍门 `tests/test_brain_dispatch_extraction.py`）；
+- 段体 **AST 逐字**（对拍门 `tests/extraction/test_brain_dispatch_extraction.py`）；
 - 全部自由名（`37` 个）**同名 kw-only 入参** ⇒ 门面调用期解析，
   `patch.object(ai_brain_trader, "assemble_decision_cache", ...)` 这类测试缝照常生效；
 - 段内两处 `return` 即函数终返 ⇒ 调用点 `return helper(...)` 直接透传（无哨兵）。

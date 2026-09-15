@@ -9,7 +9,7 @@ _rejection_focus_reason / portfolio_budget_guard / route_and_reserve_signal）
 - **壳签名必须与基线逐字相同**（本刀教训：手写壳签名把
   `_decision_payload(decision, preferred)` 写成单参，18 个用例报错；
   门里因此加"位置参数=基线"断言，钉死这类手写事故）。
-- 路由主流程的行为证明由既有 `tests/test_venue_wiring.py`（40 例，
+- 路由主流程的行为证明由既有 `tests/venues/test_venue_wiring.py`（40 例，
   全程 patch 门面全局驱动路由）承担，本门另钉四个小函数的注入面。
 """
 from __future__ import annotations
@@ -23,7 +23,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 PRE = "7ef5e53"  # 本刀动工前最后提交（第八十六刀收口）

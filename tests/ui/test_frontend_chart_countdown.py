@@ -30,7 +30,7 @@ import re
 import unittest
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 DASH = ROOT / "frontend" / "src" / "components" / "dashboard"
 COUNTDOWN = DASH / "chartCountdown.ts"
 INDICATORS = DASH / "chartIndicators.ts"

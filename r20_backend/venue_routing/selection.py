@@ -31,7 +31,7 @@
 同一标的在后端 / trader / 重启后的不同进程会轮入不同所，「均衡轮换」不可复现。
 `sha256` 摘要取模：任何进程任何时刻同输入恒定结果。
 
-⚠️ 本函数被 `tests/test_cross_process_hash_determinism.py` 在**子进程**里
+⚠️ 本函数被 `tests/audit/test_cross_process_hash_determinism.py` 在**子进程**里
 `from r20_backend.venue_router import _balanced_pick` 直接调用，故门面必须
 **再导出**该名字。
 """

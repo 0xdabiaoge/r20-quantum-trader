@@ -24,7 +24,7 @@ import types
 import unittest
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 PRE = "d90fac5"          # 本刀动工前最后提交（第九十刀收口）

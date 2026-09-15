@@ -32,7 +32,7 @@ def apply_memory_review(*,
     ⚠️ 本块是**宪法级保护**：基准心法不允许被进化输出物理删除（2026-09-10），
     遗漏/试图删除的基准心法由宿主补回并计数（`baseline_memory_protected` 报告位）。
 
-    段体 **AST 逐字**（对拍门 `tests/test_evolution_memory_review_extraction.py`）。
+    段体 **AST 逐字**（对拍门 `tests/extraction/test_evolution_memory_review_extraction.py`）。
     """
     if not preserve_existing_memory:
         # Safe extraction: convert potential dicts {"rule_text": "..."} to string safely

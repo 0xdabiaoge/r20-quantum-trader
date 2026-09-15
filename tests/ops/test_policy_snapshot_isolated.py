@@ -315,7 +315,7 @@ class TestPolicySnapshotIsolated(unittest.TestCase):
     def test_ai_brain_trader_assemble_decision_cache_binds_snapshot(self) -> None:
         """ai_brain_trader assemble_decision_cache must attach snapshot version and hash to decisions."""
         import sys
-        scripts_dir = str(Path(__file__).resolve().parents[1] / "scripts")
+        scripts_dir = str(Path(__file__).resolve().parents[2] / "scripts")
         if scripts_dir not in sys.path:
             sys.path.insert(0, scripts_dir)
 

@@ -18,7 +18,7 @@ import unittest.mock
 from pathlib import Path
 from unittest.mock import patch
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parent.parent.parent
 scripts_dir = str(ROOT / "scripts")
 if scripts_dir not in sys.path:
     sys.path.insert(0, scripts_dir)

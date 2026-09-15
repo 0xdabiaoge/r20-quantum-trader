@@ -10,7 +10,7 @@
 ## 同名注入（刻意为之）
 
 注入 kw 参数与门面全局**同名**（`MAKER_FEE_RATE`/`AI_DECISION_CACHE_FILE`…）：
-函数体因此**逐字零改动** —— `tests/test_audit_batch3_persistence_atomic.py::
+函数体因此**逐字零改动** —— `tests/audit/test_audit_batch3_persistence_atomic.py::
 TestDecisionsFlock` 的 tripwire 断言文本 `file_lock(AI_DECISION_CACHE_FILE)`
 原样可查（getsource 指向本模块实现即可）；`test_venue_wiring` 的
 `patch.object(trader, "…")` 面经"壳调用期解析门面全局传参"保真。

@@ -16,8 +16,8 @@
 
 | 依赖 | 缝在哪 |
 |---|---|
-| `data_dir`（门面 `DATA_DIR`） | `tests/test_ai_health_sidecar.py:20` `patch.object(abt, "DATA_DIR", …)`；本函数要读 `asset_multipliers.json` |
-| `max_leverage` / `min_leverage` | `tests/test_leverage_range_and_council.py:212` 同时 patch 两个门面名，并断言"模型给 3 被下限抬到 5"—— 夹取必须读到补丁后的值 |
+| `data_dir`（门面 `DATA_DIR`） | `tests/ops/test_ai_health_sidecar.py:20` `patch.object(abt, "DATA_DIR", …)`；本函数要读 `asset_multipliers.json` |
+| `max_leverage` / `min_leverage` | `tests/llm/test_leverage_range_and_council.py:212` 同时 patch 两个门面名，并断言"模型给 3 被下限抬到 5"—— 夹取必须读到补丁后的值 |
 | `safe_float` | 定义在门面自身（非共享叶子函数），且门面会被 `pin_baseline_risk_env()` 原地重载 |
 | `get_system_version_tag` | 门面私有函数，保持单一实现 |
 | `validate` | 把 `validate_and_filter_decision` 作为参数传入，使两块可独立测试。**契约：4 个位置参数** `(p, d_item, active_inst_ids, active_position_sides)`；门面负责把 `safe_float` curry 进去（保持该函数对外的 4 参签名不变） |

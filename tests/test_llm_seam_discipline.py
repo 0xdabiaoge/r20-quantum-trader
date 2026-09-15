@@ -197,7 +197,7 @@ class SeamDisciplineTests(unittest.TestCase):
                          + "\n  ".join(offenders))
 
     def test_record_failover_event_stays_in_facade_and_is_self_contained(self):
-        """tests/test_beijing_time_producers.py 的 isolated() 按 AST 从本文件取同名函数，
+        """tests/core/test_beijing_time_producers.py 的 isolated() 按 AST 从本文件取同名函数，
         且用裸名注入 FAILOVER_EVENTS_FILE / _atomic_write_json / _BJ。"""
         source = (ROOT / "r20_backend" / "llm_manager.py").read_text(encoding="utf-8")
         tree = ast.parse(source)
@@ -209,7 +209,7 @@ class SeamDisciplineTests(unittest.TestCase):
             self.assertIn(required, body_names, f"record_failover_event 不再以裸名引用 {required}")
 
     def test_save_llm_config_keeps_file_lock_anchor(self):
-        """tests/test_audit_config_p4_cleanup.py 断言本文件含该字符串（配置写互斥）。"""
+        """tests/audit/test_audit_config_p4_cleanup.py 断言本文件含该字符串（配置写互斥）。"""
         source = (ROOT / "r20_backend" / "llm_manager.py").read_text(encoding="utf-8")
         self.assertIn("with file_lock(LLM_CONFIG_FILE):", source)
 

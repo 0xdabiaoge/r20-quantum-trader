@@ -19,7 +19,7 @@
 
 ## 关于第 4 点（本块特有）
 
-`tests/test_prompt_rendering_isolated.py` 会把本函数的 AST 节点单独 `exec`，
+`tests/llm/test_prompt_rendering_isolated.py` 会把本函数的 AST 节点单独 `exec`，
 只传用户参数。为此子模块对注入项采用"同名回退到 `globals()`"：
 `None` 时从被 exec 的 globals 取。**两种形态都必须成立**，本文件各测一条。
 """
@@ -33,7 +33,7 @@ from unittest.mock import patch
 import scripts.ai_brain_trader as abt
 from scripts.brain import prompt as brain_prompt
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 FACADE = ROOT / "scripts" / "ai_brain_trader.py"
 SUBMODULE = ROOT / "scripts" / "brain" / "prompt.py"
 

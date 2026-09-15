@@ -7,7 +7,7 @@
 
 ## 安全属性
 
-- 段体 **AST 逐字**（对拍门 `tests/test_llm_store_normalize_extraction.py`）；
+- 段体 **AST 逐字**（对拍门 `tests/extraction/test_llm_store_normalize_extraction.py`）；
 - 自由名**同名 kw-only 入参** ⇒ 调用期解析，`patch.object(store, X)` 类接缝照常生效；
 - `resolve_brain_provider_attribution` 会**原地修改** `flat_models` 里的 dict（设计如此）
   ⇒ 门里用 `assertIs` 钉住"改的是同一个对象"，防有人改成返回新列表（那是行为变更）。

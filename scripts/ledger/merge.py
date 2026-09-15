@@ -25,7 +25,7 @@ def merge_lifecycle_trades(*,
     旧键行让位于本轮再生成的新键行；**窗口外无法再生的旧行一律不动**（防迁移误删）。
     这条"不动"是安全边界，行为例专门钉它。
 
-    段体 **AST 逐字**（对拍门 `tests/test_ledger_merge_extraction.py`）。
+    段体 **AST 逐字**（对拍门 `tests/extraction/test_ledger_merge_extraction.py`）。
     """
     trades_map = {}
     for t in old_trades:

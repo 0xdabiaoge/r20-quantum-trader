@@ -41,7 +41,7 @@ import re
 import unittest
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 MODULE = ROOT / "frontend" / "src" / "components" / "dashboard" / "chartOverlays.ts"
 COMPONENT = ROOT / "frontend" / "src" / "components" / "dashboard" / "ChartWorkstation.vue"
 GOLDEN = ROOT / "tests" / "data" / "chart_overlays_golden.json"

@@ -34,7 +34,7 @@ from scripts.trader.position_universe import (
     merge_cross_venue_positions,
 )
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 MODULE = ROOT / "scripts" / "trader" / "position_universe.py"
 FACADE = ROOT / "scripts" / "ai_factor_trader.py"
 

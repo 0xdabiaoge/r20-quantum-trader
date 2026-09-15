@@ -23,14 +23,14 @@ from pathlib import Path as _P
 # `ModuleNotFoundError: No module named 'scripts'`，**快讯采集静默停摆**
 # （news_sentiment.json mtime 停在 02:34，7 个周期零更新）。
 # 测试从未抓到：in-process import 永远成功，**"被当作脚本直跑"无人测** ——
-# 由 tests/test_script_entry_bootstrap.py 补门。
+# 由 tests/core/test_script_entry_bootstrap.py 补门。
 _ROOT = _P(__file__).resolve().parents[1]
 if str(_ROOT) not in _sys.path:
     _sys.path.insert(0, str(_ROOT))
 
 # 结构优化阶段 4·B3 第四十四刀：重要度分级与币种识别（纯判断逻辑）
 # 已外提到 `scripts/news/importance.py`。门面**再导出** ——
-# `tests/test_news_sentiment_harvester.py` 按门面名直接调用这两个函数。
+# `tests/core/test_news_sentiment_harvester.py` 按门面名直接调用这两个函数。
 from scripts.news.importance import (  # noqa: E402,F401
     _classify_importance,
     _extract_coins,

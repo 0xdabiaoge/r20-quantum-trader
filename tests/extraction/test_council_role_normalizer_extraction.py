@@ -40,7 +40,7 @@ from r20_backend.council.role_normalizer import (
     resolve_adopted_role,
 )
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 MODULE = ROOT / "r20_backend" / "council" / "role_normalizer.py"
 DEBATE = ROOT / "r20_backend" / "council" / "debate.py"
 

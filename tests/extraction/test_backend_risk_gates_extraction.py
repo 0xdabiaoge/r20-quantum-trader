@@ -27,7 +27,7 @@
 
 两个缺陷**互相掩盖**：既有测试断言 `ok is False` + `stage == "exposure"`，
 恰好被异常兜底满足 —— 断言全中，闸门却是死的。见
-`tests/test_audit_config_p4_cleanup.py::ExposureCapTests::test_router_refuses_when_projected_exposure_exceeds_cap`
+`tests/audit/test_audit_config_p4_cleanup.py::ExposureCapTests::test_router_refuses_when_projected_exposure_exceeds_cap`
 现已被改写为真正走闸门并断言理由文案。
 
 **实盘影响**：生产 `R20_MAX_TOTAL_EXPOSURE_USDT` 未配置 → `TOTAL_EXPOSURE_CAP = 0.0`
@@ -40,7 +40,7 @@ import ast
 import unittest
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 MODULE = ROOT / "r20_backend" / "execution" / "risk_gates.py"
 FACADE = ROOT / "r20_backend" / "execution_router.py"
 

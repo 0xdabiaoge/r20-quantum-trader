@@ -25,7 +25,7 @@ from pathlib import Path
 
 from scripts.trader import notifications
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 FACADE = ROOT / "scripts" / "ai_factor_trader.py"
 SUBMODULE = ROOT / "scripts" / "trader" / "notifications.py"
 CYCLE_STAGES = ROOT / "scripts" / "trader" / "cycle_stages.py"   # 第九十二刀：相位段现住此

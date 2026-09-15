@@ -168,10 +168,13 @@ class OfflineGuard:
         suppresses or alters the fail-closed raise above; writes outside the
         protected roots and never reads config bytes."""
         try:
+            import pathlib
             import traceback
             stack = traceback.extract_stack()[:-3]
             test_frames = [f for f in stack
-                           if '/tests/test_' in f.filename or '/unittest/case.py' in f.filename]
+                           # 支持 tests/ 下的子目录（第 138 刀按域分子目录）
+                           if ('/tests/' in f.filename and pathlib.Path(f.filename).name.startswith('test_'))
+                           or '/unittest/case.py' in f.filename]
             origin = (f'{test_frames[-1].filename.rsplit("/", 1)[-1]}:{test_frames[-1].lineno}'
                       f' in {test_frames[-1].name}' if test_frames else 'no-test-frame')
             with open(self.DIAG_LOG, 'a', encoding='utf-8') as handle:

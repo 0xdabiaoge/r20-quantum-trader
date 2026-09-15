@@ -19,7 +19,7 @@ from typing import Any, Dict, Iterable, List, Sequence
 #   scripts/trader/factors.py            from calculus_engine import calculate_multi_timeframe
 #   scripts/brain/packages.py            from calculus_engine import calculate_multi_timeframe
 #   scripts/factors/candles_15m.py       （同上）
-# 以及 tests/test_calculus_engine.py 与 tests/test_quant_system_calculus.py
+# 以及 tests/llm/test_calculus_engine.py 与 tests/llm/test_quant_system_calculus.py
 # 直接 `from calculus_engine import (...)`（含 `_normal_cdf` / `_ema` / `_diff`
 # / `_normalise` 等私有名，故私有名也必须再导出）。
 #

@@ -13,7 +13,7 @@
   必须把调用方当前值传进来，再随输出返回。
 
 **判据（第九十二刀规则）**：凡"非必然绑定"的输出，**必须**出现在入参里，
-否则未命中分支时 `UnboundLocalError`。段体 **AST 逐字**（对门 `tests/test_brain_runtime_extraction.py`）。
+否则未命中分支时 `UnboundLocalError`。段体 **AST 逐字**（对门 `tests/extraction/test_brain_runtime_extraction.py`）。
 """
 from __future__ import annotations
 

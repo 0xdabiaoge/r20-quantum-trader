@@ -30,7 +30,7 @@
 本函数是**纯计算**：不改任何外部状态，`orders_by_key` / `funding_history_list`
 都在函数内新建并随返回值给出。`reset_time_str`、`today_bj_str`、`tz_beijing`
 由门面在**调用时**解析并注入 —— 门面这些名字会被测试 `patch.object`
-（见 `tests/test_dashboard_payload_seam.py`），import 期绑定会让补丁静默失效。
+（见 `tests/ui/test_dashboard_payload_seam.py`），import 期绑定会让补丁静默失效。
 """
 from __future__ import annotations
 

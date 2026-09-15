@@ -15,7 +15,7 @@ US-007 环境维合约存在性对账 → 价格锚定 → **入场价穿价幻�
 `venue_registry` / `canonical_base` / `current_environment` / `MAX_LEVERAGE` /
 `MIN_LEVERAGE` 同名注入 ⇒ 函数体 AST **零例外全等**（`os` 由本模块自 import）。
 
-⚠️ **源码锚点已同步**：`tests/test_audit_batch2_risk_gates_live.py::
+⚠️ **源码锚点已同步**：`tests/audit/test_audit_batch2_risk_gates_live.py::
 TestPriceSanityAnchor::test_guard_code_landed_in_submit_path` 原用
 `inspect.getsource(aft)`（整门面）扫三段文本并检查**先后顺序**
 （几何复验 < 穿价闸 < 多所平权分发）——搬壳后门面里这三段一个都不在，

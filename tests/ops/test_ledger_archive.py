@@ -16,7 +16,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest import mock
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 BJ = timezone(timedelta(hours=8))
 
 _spec = importlib.util.spec_from_file_location("archive_ledger", ROOT / "scripts" / "archive_ledger.py")

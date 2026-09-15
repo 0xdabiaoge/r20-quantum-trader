@@ -10,7 +10,7 @@ import sys
 import unittest
 from pathlib import Path
 
-scripts_dir = str(Path(__file__).resolve().parent.parent / "scripts")
+scripts_dir = str(Path(__file__).resolve().parent.parent.parent / "scripts")
 if scripts_dir not in sys.path:
     sys.path.insert(0, scripts_dir)
 
@@ -64,8 +64,8 @@ class InstrumentPoolUniverseTests(unittest.TestCase):
 class PoolCapacityNotHardcodedTests(unittest.TestCase):
     """后台曾把标的池上限硬编码为 6，加第 7 个币直接被 409 拒绝 —— 部署者反馈「扩容跑不起来」的真凶。"""
 
-    APP = Path(__file__).resolve().parent.parent / "r20_backend" / "app.py"
-    SEC = Path(__file__).resolve().parent.parent / "frontend" / "src" / "views" / "admin" / "SecurityPage.vue"
+    APP = Path(__file__).resolve().parent.parent.parent / "r20_backend" / "app.py"
+    SEC = Path(__file__).resolve().parent.parent.parent / "frontend" / "src" / "views" / "admin" / "SecurityPage.vue"
 
     def test_backend_uses_configurable_pool_cap(self):
         src = self.APP.read_text(encoding="utf-8")

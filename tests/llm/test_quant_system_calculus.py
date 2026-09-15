@@ -13,7 +13,7 @@ from unittest.mock import patch
 from pathlib import Path
 
 # Add scripts directory
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
 
 from calculus_engine import (
     calculate_calculus,

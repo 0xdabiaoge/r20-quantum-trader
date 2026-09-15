@@ -56,7 +56,7 @@ def construct_full_market_prompt(packages: List[Dict[str, Any]], pos_summary: st
     # 两种调用方式必须都成立：
     #   a) 门面薄壳：显式传全部 15 项（生产路径）；
     #   b) 测试按 AST 抽取本函数体后 exec，只传用户参数 —— 此时从被 exec 的
-    #      globals 里对应名字取值（`tests/test_prompt_rendering_isolated.py` 就是这么做的，
+    #      globals 里对应名字取值（`tests/llm/test_prompt_rendering_isolated.py` 就是这么做的，
     #      它的 ns 里注入了 safe_float / 风控常量 / 文件路径 / 门面函数等）。
     # 因此这里用"同名回退"而不是设默认值：默认值会把解析结果固化成 import 期快照。
     _g = globals()
@@ -64,7 +64,7 @@ def construct_full_market_prompt(packages: List[Dict[str, Any]], pos_summary: st
     def _resolve(_name, _fallback=None):
         """按名解析注入项：`_g` 里没有时用 `_fallback`。
 
-        ⚠️ 为什么不是 `_g["NAME"]`：本函数体会被 `tests/test_prompt_rendering_isolated.py`
+        ⚠️ 为什么不是 `_g["NAME"]`：本函数体会被 `tests/llm/test_prompt_rendering_isolated.py`
         **按 AST 抽取后隔离 exec**，那个命名空间只注入它**已知**的名字。用裸下标
         会让"新增一个注入项"直接 KeyError 打挂隔离测试 —— 而隔离测试本来就
         **不该**知道实现细节（它测的是渲染，不是依赖清单）。

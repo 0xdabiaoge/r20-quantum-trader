@@ -28,7 +28,7 @@
 | 模块 | 需要在调用期注入的门面名 | 原因 |
 |---|---|---|
 | `packages.py` | `fetch_candles` / `fetch_single_indicator` | 门面重载后 import 期绑定会失配；且测试可能 patch 门面名 |
-| `xvenue.py` | `get_adapter`（门面 `_get_xvenue_adapter`）/ `safe_float` / `atomic_write_json` / `venue_health_file` / `health`（门面 `_XV_HEALTH`） | 前四个都是既有测试缝；`_XV_HEALTH` 被 `tests/test_xvenue_prompt.py:120` 直接断言，状态必须留在门面 |
+| `xvenue.py` | `get_adapter`（门面 `_get_xvenue_adapter`）/ `safe_float` / `atomic_write_json` / `venue_health_file` / `health`（门面 `_XV_HEALTH`） | 前四个都是既有测试缝；`_XV_HEALTH` 被 `tests/venues/test_xvenue_prompt.py:120` 直接断言，状态必须留在门面 |
 | `decisions.py` | `data_dir`（门面 `DATA_DIR`）/ `max_leverage` / `min_leverage` / `safe_float` / `get_system_version_tag` / `validate` |
 | `cycle_parts.py` | `safe_float`（只此一个） | 门面私有函数，且门面会被原地重载 |
 | `prompt.py` | `safe_float` / `sl_atr_mult_for` / `xvenue_prompt_line` / `build_risk_budget_text` / `active_profile` / `apply_module_layout` / `system_version` / 3 个文件路径 / 5 个风控常量 / `_build_position_lines` / `_build_pending_order_lines`（后两个见下） | **风控常量必须调用期取**：`risk_constants` 改参后由门面重载刷新，子模块 import 期绑定会变成过期快照，提示词口径就与执行层漂移 | 前三个都是既有测试缝（`test_ai_health_sidecar`、`test_leverage_range_and_council`）；`validate` 的契约是 **4 个位置参数**，由门面 curry 进 `safe_float` |

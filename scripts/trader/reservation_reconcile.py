@@ -31,7 +31,7 @@
 | `state_closed` | `risk_reservation.STATE_CLOSED` | 值为 `"closed"`；传值而非传模块，减少耦合面 |
 | `default_ttl_s` | 门面的 `RESERVATION_RECONCILE_TTL_S` | 配置面口径，留在门面以便调整 |
 
-`tests/test_reservation_reconcile.py` 的两处 `patch.object` 是本模块能安全
+`tests/core/test_reservation_reconcile.py` 的两处 `patch.object` 是本模块能安全
 外提的**前提** —— 若改成 import 期绑定，那 9 条用例会当场翻红。
 
 ## ⚠️ 语义红线（改这里前先读）

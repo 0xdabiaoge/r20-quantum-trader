@@ -19,7 +19,7 @@
    是**有意**的 —— 下一次评估要用新止损，且调用方持有同一个 dict。
 3. **`r_dist` 必须用"锁定前"的止损**：`ExitDecision.initial_stop_loss` 就是为此存在。
    用 `pos["stop_loss"]` 会在锁定发生后让 `R` 倍数退化成 0.0
-   （第三十九刀第一版就踩了这个坑，见 `tests/test_backtest_lifecycle_extraction.py`）。
+   （第三十九刀第一版就踩了这个坑，见 `tests/extraction/test_backtest_lifecycle_extraction.py`）。
 4. **`rr` 必须是显式形参**，不能图省事写成 `sig.get("rr")`：缺键时后者得 `None`
    而非 `0.0`，`None * float` 直接 `TypeError`（见 `metrics.build_entry_candidate`）。
 5. **开仓滑点与平仓滑点方向相反**（`lifecycle` 的多头平仓 `×(1-s)`；

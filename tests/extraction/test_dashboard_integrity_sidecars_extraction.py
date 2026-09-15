@@ -39,7 +39,7 @@ from r20_backend.dashboard_payload.integrity_sidecars import (
     merge_ledger_sync_status,
 )
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 MODULE = ROOT / "r20_backend" / "dashboard_payload" / "integrity_sidecars.py"
 
 BJ = datetime.timezone(datetime.timedelta(hours=8))

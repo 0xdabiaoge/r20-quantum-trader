@@ -20,9 +20,9 @@
 
 1. `patch.object(br, "_urlencoded_json", …)` 与
    `patch.object(br, "_multipart_upload", …)`
-   （`tests/test_audit_batch5_d_tails.py` 的百度 OAuth 用例）；
+   （`tests/audit/test_audit_batch5_d_tails.py` 的百度 OAuth 用例）；
 2. `patch.object(backup_runtime, "calculate_sha256", return_value="hash")`
-   （`tests/test_open_source_control.py` 的 `run_backup_job` 用例）。
+   （`tests/core/test_open_source_control.py` 的 `run_backup_job` 用例）。
 
 若这些函数在 import 期从本模块取名字，补丁就**静默失效** ——
 属于本仓已实证的"测试写进生产"事故类型。故：

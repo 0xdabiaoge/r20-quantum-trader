@@ -20,7 +20,7 @@ r"""全仓"未解析自由名"门（第一百一十九刀）。
 ## 白名单（两处**刻意**的例外，逐名列出）
 
 1. `scripts/brain/prompt.py`：`_resolve(name, lambda: NAME)` 是**有意**的接缝写法
-   —— 惰性回退只在 `_g` 里没有该名时求值；`tests/test_prompt_rendering_isolated.py`
+   —— 惰性回退只在 `_g` 里没有该名时求值；`tests/llm/test_prompt_rendering_isolated.py`
    按 AST 抽取函数体隔离 exec，故必须容忍"名字只存在于门面"。
 2. `r20_backend/app.py`：那些名字位于 `if False:` 块内，是
    `test_memory_routes_isolated` / `test_prompt_rendering_isolated` 的 **AST 锚点**，
@@ -35,7 +35,7 @@ import sys
 import unittest
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "tests"))
 

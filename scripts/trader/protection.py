@@ -23,7 +23,7 @@
 
 对比：搬走前长空两份 `if peak_profit_px >= tier2_lock_trigger / elif … tier1 …`
 共 20 行，数学相同、方向相反。合并后由 `is_long` 选 `max` / `min` 与
-`prec` 舍入方向，语义逐字对齐（见 `tests/test_trader_protection_extraction.py`
+`prec` 舍入方向，语义逐字对齐（见 `tests/extraction/test_trader_protection_extraction.py`
 的旧实现差分）。
 """
 
@@ -116,7 +116,7 @@ def ratcheted_trailing_stop(*, is_long, entry_px, atr, prec, peak_profit_px,
 
 
 # 载荷字段顺序由 `close_trade_payload` 的字面量保证，并由
-# `tests/test_trader_protection_extraction.py` 对旧载荷做逐键对拍。
+# `tests/extraction/test_trader_protection_extraction.py` 对旧载荷做逐键对拍。
 
 
 def close_fee(pos_sz, ct_val, cur_px, taker_fee_rate):

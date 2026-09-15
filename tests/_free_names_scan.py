@@ -1,4 +1,4 @@
-"""未解析自由名检查器（作用域链版）—— 由 tests/test_module_free_names.py 使用。
+"""未解析自由名检查器（作用域链版）—— 由 tests/audit/test_module_free_names.py 使用。
 
 第一版误报 28 处：没处理①模块级 if/try/for 内的绑定 ②闭包对外层函数参数/局部名的引用。
 本版按词法作用域逐层收集绑定名，再做 Load 检查。
