@@ -54,6 +54,10 @@ from r20_gateway.telemetry import ModelCallTelemetry
 # ⚠️ 注意：`SNAPSHOT_MAX_STALE_SECONDS` / `SIDE_ALIASES` **留在本文件** ——
 # 它们属于 join 侧（`_match_snapshot`），不属于可观测性判定。
 from scripts.evolution.memory_review import apply_memory_review
+from scripts.evolution.review_context import (
+    build_host_constitution,
+    summarize_closed_trades,
+)
 from scripts.evolution.observability import (  # noqa: E402,F401
     DYNAMICS_FIELDS,
     DYNAMICS_OBSERVED_MIN,
@@ -359,14 +363,10 @@ def compose_evolution_prompts(closed_trades: List[Dict[str, Any]], existing_memo
     tz_bj = datetime.timezone(datetime.timedelta(hours=8))
     now_bj_str = timestamp_str or datetime.datetime.now(tz_bj).strftime("%Y-%m-%d %H:%M:%S (北京时间)")
 
-    total = len(closed_trades)
-    wins = [t for t in closed_trades if t["net_pnl"] > 0]
-    losses = [t for t in closed_trades if t["net_pnl"] <= 0]
-    win_rate = round(len(wins) / total * 100, 1) if total > 0 else 0.0
-    total_net = round(sum(t["net_pnl"] for t in closed_trades), 2)
-    total_fees = round(sum(t["fee"] for t in closed_trades), 2)
-    snapshot_audit = audit_snapshot_observability(closed_trades)
-    observability_brief = render_observability_brief(snapshot_audit)
+    (total, wins, losses, win_rate, total_net, total_fees, snapshot_audit, observability_brief) = summarize_closed_trades(
+        audit_snapshot_observability=audit_snapshot_observability,
+        closed_trades=closed_trades,
+        render_observability_brief=render_observability_brief    )
 
     v_counts: Dict[str, int] = {}
     for t in closed_trades:
@@ -431,17 +431,8 @@ def compose_evolution_prompts(closed_trades: List[Dict[str, Any]], existing_memo
     effective_evolution_user = apply_module_layout(prompt, profile, "evolution_user", f"{profile.get('name', '稳健')}自进化用户提示词模板", context=runtime_context)
     # 宿主宪章：代码层硬约束，在风格档案 layout 之后强制追加——profile 只能调整
     # 措辞风格，永远无法删改证据纪律与基准心法保护（Code is Law，2026-09-10）。
-    host_constitution = (
-        "\n\n======================= 【宿主宪章·代码层硬约束（任何提示词风格档案不可覆盖）】 =======================\n"
-        f"1. 数理快照可观测性审计（宿主确定性统计，非模型推断）：{observability_brief}。\n"
-        "2. 逐单标注含义：DYNAMICS_OBSERVED=开仓动力学/积分/概率链完整，可作数理因果归因；"
-        "PARTIAL=仅可引用 entry_snapshot 中实际非空字段；PRICE_ONLY / NONE=数理快照不可观测，"
-        "严禁编造或倒推 v/a/j/I、energy_integral、deviation_area_integral、延续/击穿概率、VaR/CVaR 因果，"
-        "字段缺失本身不得解读为任何证据。\n"
-        "3. ai_long_term_memory 给出生效后完整清单时必须原样包含全部现有基准心法（is_baseline）："
-        "省略条目会被宿主原样补回并留痕；认定基准失效只能写入 diagnosis_insights 交人工复核，禁止静默删除。\n"
-        "4. 证据不足必须 NO_CHANGE；NO_CHANGE 永不覆盖或清空长期记忆。\n"
-    )
+    host_constitution = build_host_constitution(
+        observability_brief=observability_brief    )
     effective_evolution_system = effective_evolution_system.rstrip() + host_constitution
     effective_evolution_user = effective_evolution_user.rstrip() + host_constitution
     return effective_evolution_system, effective_evolution_user, now_bj_str, snapshot_audit

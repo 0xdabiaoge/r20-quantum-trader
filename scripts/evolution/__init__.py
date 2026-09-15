@@ -11,6 +11,7 @@
 |---|---|---|
 | `observability.py` | 数理快照**可观测性**审计：字段表 / 门槛 / 逐单分类 / 剔除 null / 汇总 / 渲染摘要 | 无（纯计算；仅依赖 `r20_backend.time_utils.parse_beijing`） |
 | `memory_review.py` | `apply_memory_review(...)` —— 复盘心法合并（**宪法级保护**：基准心法不得被进化输出删除，遗漏即补回并计数）+ 已学心法漏述即停用存档（审计 P1-8c）+ 发布到记忆服务（失败即保留既有权威） | `log_msg` / `merge_memory_with_constitution` 传入；`constitution_readded`/`preserve_existing_memory`/`retired_lessons` 三处 **in-out** |
+| `review_context.py` | `summarize_closed_trades(...)` 平仓统计 + 可观测性摘要（8 输出）；`build_host_constitution(...)` **宿主宪章**（Code is Law 代码层硬约束，profile 不可覆盖） —— 两者皆纯函数 | 依赖全部显式入参（零模块全局） |
 
 ## 约定
 
