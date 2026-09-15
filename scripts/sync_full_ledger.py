@@ -417,19 +417,9 @@ def _holding_row(p, venue, *, env, trackers, tz_bj, allowed, council_by_inst):
         return None
     inst = inst_id.replace("-USDT-SWAP", "")
     side_raw = str(p.get("posSide", p.get("side", ""))).lower()
-    # 审计 C8：net-mode 行 posSide="net"，旧式 `"long" in side_raw` 恒 False
-    # → 净模式多仓被系统性标成"空"（策略/追踪 join 全错位）。按符号回退判向，
-    # 符号不可判 → 诚实标"未知"，绝不猜。
-    if "long" in side_raw:
-        side = "多"
-    elif "short" in side_raw:
-        side = "空"
-    else:
-        try:
-            _signed = float(p.get("pos", 0) or 0)
-        except (TypeError, ValueError):
-            _signed = 0.0
-        side = "多" if _signed > 0 else ("空" if _signed < 0 else "未知")
+    side = judge_position_side(
+        p=p,
+        side_raw=side_raw    )
     avg_px = float(p.get("avgPx", 0) or 0)
     mark_px = float(p.get("markPx", 0) or 0)
     upl = float(p.get("upl", 0) or 0)
@@ -455,13 +445,10 @@ def _holding_row(p, venue, *, env, trackers, tz_bj, allowed, council_by_inst):
     t_info = trackers.get(pos_k, {})
     strat_tag = t_info.get("strategy_tag") or ("🌊 低吸" if side == "多" else "⚡ 高空")
 
-    try:
-        t1 = datetime.datetime.strptime(open_time, "%Y-%m-%d %H:%M:%S")
-        now_dt = datetime.datetime.now(tz_bj)
-        dur_mins = int((now_dt - t1).total_seconds() / 60)
-        duration_str = f"{dur_mins}分钟" if dur_mins < 60 else f"{dur_mins//60}时{dur_mins%60}分"
-    except Exception:
-        duration_str = "--"
+    duration_str = format_holding_duration(
+        datetime=datetime,
+        open_time=open_time,
+        tz_bj=tz_bj    )
 
     return {
         "id": f"holding_{venue}_{inst}_{side}",
@@ -495,6 +482,10 @@ def _holding_row(p, venue, *, env, trackers, tz_bj, allowed, council_by_inst):
 
 from scripts.ledger.okx_history import build_okx_trade
 from scripts.ledger.merge import merge_lifecycle_trades
+from scripts.ledger.holdings import (
+    format_holding_duration,
+    judge_position_side,
+)
 
 
 def build_lifecycle_ledger():

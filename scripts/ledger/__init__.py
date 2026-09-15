@@ -21,6 +21,7 @@
 |---|---|---|
 | `okx_history.py` | `build_okx_trade(...)` —— 把 OKX 成交/账单原始行折成台账行 | 无（纯转换） |
 | `merge.py` | `merge_lifecycle_trades(...)` —— 旧台账 + 三所新成交的**合并去重**（含审计 D8 迁移：撞键旧键行让位、窗口外旧行不动） | **零注入面**（纯入参） |
+| `holdings.py` | `judge_position_side(...)`（**审计 C8** 方向判定：net-mode 按符号回退，不可判即"未知"）/ `format_holding_duration(...)`（时长格式化；**本刀修掉 naive/aware 失配**） —— 本体 `_holding_row` 因既有 pin 仍留门面 | `datetime` 调用方注入 |
 
 ## 待办（如实记录）
 
