@@ -302,10 +302,11 @@ class AdminOverrideReachesModelTests(_SandboxBase):
 
     def test_admin_api_effective_prompt_uses_same_path(self):
         """接口返回的 effective_prompt 必须等于推演时用的那条（否则 UI 在骗人）。"""
-        from r20_backend.routers import strategy as strategy_router
-        with patch.object(strategy_router, "require_admin_header", lambda *a, **k: {"username": "t"}), \
-             patch.object(strategy_router, "refresh_settings", lambda: None):
-            payload = strategy_router.prompt_override(None, None)
+        # 第九十六刀：`prompt_override` 现住 strategy/prompts.py ⇒ patch/调用都指向它
+        from r20_backend.routers.strategy import prompts as strategy_prompts
+        with patch.object(strategy_prompts, "require_admin_header", lambda *a, **k: {"username": "t"}), \
+             patch.object(strategy_prompts, "refresh_settings", lambda: None):
+            payload = strategy_prompts.prompt_override(None, None)
         self.assertEqual(payload["effective_prompt"], self.brain.get_effective_system_prompt())
         self.assertTrue(payload["override_applied"])
         self.assertIn(self.MARK, payload["effective_prompt"])

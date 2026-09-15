@@ -524,7 +524,9 @@ class PolicyRestoreRouteTests(_SandboxBase):
         self.assertFalse(hasattr(PolicyRestoreRequest(policy_hash="abcdef12"), "hash"))
 
     def test_route_does_not_reference_payload_hash(self):
-        source = (ROOT / "r20_backend" / "routers" / "strategy.py").read_text(encoding="utf-8")
+        # 第九十六刀：strategy 已拆包 ⇒ 按**域**取源（不绑文件位置）
+        from tests.source_scan import router_domain_source
+        source = router_domain_source("strategy", root=ROOT)
         self.assertNotIn("payload.hash", source,
                          "回滚审计又用了不存在的 payload.hash（P0-4 回归）")
         self.assertIn('"policy_hash": p_hash', source)
@@ -537,8 +539,10 @@ class PolicyRestoreRouteTests(_SandboxBase):
         audit_rows: list[tuple] = []
         # strategy 路由持有自己的 audit_record 绑定（from ... import record as ...），
         # patch app 模块的绑定拦不到，必须打路由模块。
-        from r20_backend.routers import strategy as strategy_router
-        with patch.object(strategy_router, "audit_record",
+        # 第九十六刀：strategy 拆包 ⇒ patch 目标必须落到**归属子模块**
+        # （`policy.py` 持有自己的 audit_record 绑定；打包属性拦不到）
+        from r20_backend.routers.strategy import policy as strategy_policy
+        with patch.object(strategy_policy, "audit_record",
                           lambda action, status, payload=None, **kw: audit_rows.append((action, status, payload))):
             res = self.client.post("/api/v1/admin/policy/restore",
                                    headers=self._session(),

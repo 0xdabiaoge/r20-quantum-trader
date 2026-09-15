@@ -14,7 +14,7 @@
 ## 约定
 
 1. **门面必须继续提供被搬走的名字**（`from scripts.evolution.observability import …`
-   在门面里**再导出**）。外部（`r20_backend/routers/strategy.py`、
+   在门面里**再导出**）。外部（`r20_backend/routers/strategy/prompts.py`、
    `scripts/prompt_library.py`）与既有测试都按门面解析这些名字。
 2. **`SNAPSHOT_MAX_STALE_SECONDS` / `SIDE_ALIASES` 留在门面** ——
    它们属于 **join 侧**（`_match_snapshot` 的 6 小时窗口与多空别名），

@@ -52,9 +52,16 @@
 
 `auth` / `system` / `exchanges` / `risk` / `strategy` / `llm` / `gateway` /
 `dashboard`。**路由层只做参数校验与调用编排，不放业务逻辑。**
-`gateway.py`（977 行）与 `strategy.py`（775 行）是当前最大的两个 —— 若要继续瘦身，
-正确做法是把业务下沉到 `exchanges/`、`execution/`、`dashboard_payload/`，
-路由保留薄壳（与 `dashboard/app.py` 降为纯库同一手法）。
+`gateway.py`（977 行）是当前最大的一个 —— 若要继续瘦身，正确做法是把业务下沉到
+`exchanges/`、`execution/`、`dashboard_payload/`，路由保留薄壳（与
+`dashboard/app.py` 降为纯库同一手法）。
+
+`strategy` 已按此手法拆成**包**（第九十六刀）：`strategy/` =
+`strategy/council.py`（议会配置与辩论）/ `strategy/interceptors.py`（拦截器 CRUD）/
+`strategy/policy.py`（策略快照）/ `strategy/prompts.py`（提示词库与档案），
+`strategy/__init__.py` 只做**按原顺序**聚合
+（顺序即匹配优先级）。35 条 URL/方法/处理器名/tags 一字未改，
+路由表对拍门见 `tests/test_strategy_router_split.py`。
 
 ### L3 领域服务（根层，按域成组）
 
@@ -148,7 +155,7 @@
 ## 6. 每次拆分后必须过的两道闸
 
 ```bash
-# 1) 全量套件（当前基线：2907 例 OK, skipped=1）
+# 1) 全量套件（当前基线：2912 例 OK, skipped=1）
 #    ⚠️ 这个数字由 tests/test_readme_baseline_numbers.py 钉住：
 #    它用 AST 数出仓里 test_* 方法数，再要求本行数字与之同量级。
 #    超过 ±10% 就会翻红 —— 忘了更新这里会当场被抓住，不会静默漂移。

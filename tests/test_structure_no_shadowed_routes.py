@@ -107,20 +107,37 @@ def _router_include_order() -> list[str]:
         if name not in imported:
             raise AssertionError(f"include_router({name}) 未出现在 routers 导入清单中")
         mod = name[:-7] if name.endswith("_router") else name  # 'auth_router' → 'auth'
-        f = ROUTER_DIR / f"{mod}.py"
-        if not f.exists():
-            raise AssertionError(f"router→文件 约定映射失败：{name} → {f}")
+        if not _router_files(mod):
+            raise AssertionError(f"router→文件 约定映射失败：{name} → {ROUTER_DIR / mod}")
         if mod not in mods:
             mods.append(mod)
     return mods
+
+
+def _router_files(mod: str) -> list[Path]:
+    """路由域的文件清单 —— 单模块 `routers/<mod>.py` 或**包** `routers/<mod>/*.py`。
+
+    第九十六刀：`strategy` 从 775 行单模块拆成包（council/interceptors/policy/prompts）。
+    本门必须跟着解析包，否则会静默退化成"没有影子"（最危险的假阴性）。
+    """
+    single = ROUTER_DIR / f"{mod}.py"
+    if single.exists():
+        return [single]
+    pkg = ROUTER_DIR / mod
+    if pkg.is_dir():
+        return sorted(p for p in pkg.glob("*.py") if p.name != "__init__.py") or \
+            sorted(pkg.glob("*.py"))
+    return []
 
 
 def _front_routes() -> list[tuple[str, frozenset[str], str, object]]:
     """先注册、因而生效的那一套：[("<源位置>", 方法集, pattern, 编译后的正则), ...]。"""
     out: list[tuple[str, frozenset[str], str, object]] = []
     for mod in _router_include_order():
-        for line, methods, pattern in _routes(ROUTER_DIR / f"{mod}.py", "router"):
-            out.append((f"routers/{mod}.py:{line}", methods, pattern, compile_path(pattern)[0]))
+        for f in _router_files(mod):
+            for line, methods, pattern in _routes(f, "router"):
+                rel = f.relative_to(ROOT)
+                out.append((f"{rel}:{line}", methods, pattern, compile_path(pattern)[0]))
     if not out:
         raise AssertionError("前台路由表为空 —— 解析逻辑可疑，拒绝给结论")
     return out
@@ -223,8 +240,10 @@ class NoShadowedRouteTests(unittest.TestCase):
         seen: list[tuple[str, frozenset[str], str, object]] = []
         hits: list[str] = []
         for mod in _router_include_order():
-            for line, methods, pattern in _routes(ROUTER_DIR / f"{mod}.py", "router"):
-                src = f"routers/{mod}.py:{line}"
+            for _f in _router_files(mod):
+              rel = _f.relative_to(ROOT)
+              for line, methods, pattern in _routes(_f, "router"):
+                src = f"{rel}:{line}"
                 for p_src, p_methods, p_pattern, p_regex in seen:
                     if (methods & p_methods) and p_regex.match(pattern):
                         hits.append(

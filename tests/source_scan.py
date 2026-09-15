@@ -506,3 +506,27 @@ def missing_names_at_helper_calls(module_file, function_name, helper_names, *,
                 result.setdefault(call.func.id, []).append(
                     {"line": call.lineno, "missing": missing, "file": str(path)})
     return result
+
+
+def router_domain_source(router_name: str = "strategy", *, root=None) -> str:
+    """返回某路由域的**全部源码文本**：`routers/<name>.py` 或包 `routers/<name>/*.py`。
+
+    ## 为什么需要它
+
+    路由域可以从单模块**拆成包**（第九十六刀：`routers/strategy.py` →
+    `routers/strategy/{council,interceptors,policy,prompts}.py`）。按旧路径
+    `read_text()` 的判据会在拆分后直接抛 `FileNotFoundError` —— 那是"锚点绑死了
+    文件位置"，不是"行为回归"。凡"某段代码必须在路由域里"这类判据，一律用本函数
+    取域全文（与 `combined()` 同思路：判据绑**域**，不绑**文件**）。
+    """
+    from pathlib import Path as _P
+    base = _P(root) if root else _P(__file__).resolve().parents[1]
+    d = base / "r20_backend" / "routers"
+    single = d / f"{router_name}.py"
+    if single.exists():
+        return single.read_text(encoding="utf-8")
+    pkg = d / router_name
+    if pkg.is_dir():
+        return "\n".join(sorted(f.read_text(encoding="utf-8")
+                                for f in pkg.glob("*.py")))
+    raise AssertionError(f"路由域不存在：{single} 或 {pkg}/")

@@ -39,7 +39,7 @@
 3. **手写签名全错**：我以为 `base_template_text(profile, key)` 之类，
    实际签名逐个不同；改用 **AST 取真实签名** 生成薄壳。
 4. **忘了对外部调用者保持签名**：`pipeline_view` 等在
-   `r20_backend/routers/strategy.py` 有调用点，故新形参一律
+   `r20_backend/routers/strategy/prompts.py` 有调用点，故新形参一律
    **keyword-only 且由门面补齐**，公开签名对外不变。
 5. **漏了 `align_pipeline_sources` 也调 `base_template_text`** →
    最后改用 `base_text_resolver` 回调统一注入，而不是把
@@ -105,7 +105,7 @@ class FacadeSurfaceTest(unittest.TestCase):
             self.assertIn("_tpl_", ast.unparse(body[0]), f"{name} 未转调共享实现")
 
     def test_public_signatures_are_unchanged(self):
-        """⚠️ 外部调用者（`routers/strategy.py`）用位置参数调用，故门面签名
+        """⚠️ 外部调用者（`routers/strategy/prompts.py`）用位置参数调用，故门面签名
         **不得**新增必需参数。"""
         for name, expect in (
             ("text_to_modules", ["text", "source", "locked"]),

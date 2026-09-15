@@ -277,11 +277,12 @@ class CouncilConfigGateTests(_Base):
         self.assertEqual(ok["model"], "glm-5.3-flash")
 
     def test_config_route_exposes_model_health(self):
-        from r20_backend.routers import strategy as strategy_router
+        # 第九十六刀：议会端点现住 strategy/council.py ⇒ patch/调用都指向它
+        from r20_backend.routers.strategy import council as strategy_council
         self._write({"consensus_mode": "standard",
                      "roles": {"cio": {"id": "cio", "is_arbitrator": True, "model_id": "qwen3.8-flash"}}})
-        with patch.object(strategy_router, "require_admin_header", lambda *a, **k: {"username": "t"}):
-            payload = strategy_router.admin_get_council_config(None)
+        with patch.object(strategy_council, "require_admin_header", lambda *a, **k: {"username": "t"}):
+            payload = strategy_council.admin_get_council_config(None)
         self.assertEqual(payload["model_health"][0]["mode"], "missing")
         self.assertIn("model_health_note", payload)
 
@@ -610,7 +611,7 @@ class CouncilTestDebateContextTests(_Base):
 
     def test_debate_prompt_uses_live_snapshot_and_marks_missing(self):
         import json as _json
-        from r20_backend.routers import strategy as strategy_router
+        from r20_backend.routers.strategy import council as strategy_council   # 第九十六刀：议会端点现住此
         import dashboard.app as dash
 
         snap = self.root / "data" / "factor_library_snapshot.json"
@@ -633,13 +634,13 @@ class CouncilTestDebateContextTests(_Base):
                  "positions": [{"instId": "ETH-USDT-SWAP", "venue": "binance", "posSide": "long", "pos": "0.275"}],
                  "pending_orders": []}
         cls = type("T", (), {"mock_market_prompt": None})()
-        with patch.object(strategy_router, "require_admin_header", lambda *a, **k: {"username": "t"}), \
-             patch.object(strategy_router, "ROOT", self.root), \
+        with patch.object(strategy_council, "require_admin_header", lambda *a, **k: {"username": "t"}), \
+             patch.object(strategy_council, "ROOT", self.root), \
              patch.object(dash, "CACHE_DATA", cache), \
-             patch.object(strategy_router, "audit_record", lambda *a, **k: None), \
+             patch.object(strategy_council, "audit_record", lambda *a, **k: None), \
              patch("r20_backend.council_manager.execute_council_debate", fake_debate), \
-             patch.object(strategy_router, "load_council_config" if hasattr(strategy_router, "load_council_config") else "refresh_settings", lambda *a, **k: {}, create=True):
-            payload = strategy_router.admin_test_council_debate(cls)
+             patch.object(strategy_council, "load_council_config" if hasattr(strategy_council, "load_council_config") else "refresh_settings", lambda *a, **k: {}, create=True):
+            payload = strategy_council.admin_test_council_debate(cls)
         prompt = captured.get("market_prompt", "")
         self.assertIn("77226.3", prompt, "未使用真实因子快照")
         self.assertIn("36.52", prompt)
@@ -653,14 +654,16 @@ class CouncilTestDebateContextTests(_Base):
 
     def test_council_test_route_has_no_fabricated_market_literals(self):
         """源码钉：编造的行情/资金字面量不得回流（旧实现写死 1450/2280/77200/ord_10283）。"""
-        src = (ROOT / "r20_backend" / "routers" / "strategy.py").read_text(encoding="utf-8")
+        # 第九十六刀：strategy 已拆包 ⇒ 按**域**取源（不绑文件位置）
+        from tests.source_scan import router_domain_source
+        src = router_domain_source("strategy", root=ROOT)
         # 只查代码行：审计注释里会引用这些旧字面量（"旧实现写死了 1450/77200"），注释不是造假
         code = "\n".join(ln for ln in src.splitlines() if not ln.lstrip().startswith("#"))
         for literal in ("1,450.00", "2,280.00", "ord_10283", "77200.0", "2026-09-05 08:30:00"):
             self.assertNotIn(literal, code, f"测试辩论路由又出现编造字面量 {literal}")
 
     def test_missing_sources_are_declared_not_fabricated(self):
-        from r20_backend.routers import strategy as strategy_router
+        from r20_backend.routers.strategy import council as strategy_council   # 第九十六刀：议会端点现住此
         import dashboard.app as dash
         captured = {}
 
@@ -669,11 +672,11 @@ class CouncilTestDebateContextTests(_Base):
             return ({"action": "WAIT"}, {})
 
         cls = type("T", (), {"mock_market_prompt": None})()
-        with patch.object(strategy_router, "require_admin_header", lambda *a, **k: {"username": "t"}), \
-             patch.object(strategy_router, "ROOT", self.root), \
+        with patch.object(strategy_council, "require_admin_header", lambda *a, **k: {"username": "t"}), \
+             patch.object(strategy_council, "ROOT", self.root), \
              patch.object(dash, "CACHE_DATA", {}), \
              patch("r20_backend.council_manager.execute_council_debate", fake_debate):
-            payload = strategy_router.admin_test_council_debate(cls)
+            payload = strategy_council.admin_test_council_debate(cls)
         prompt = captured.get("market_prompt", "")
         self.assertIn("不可用", prompt)
         self.assertTrue(payload["market_context"]["missing"])
