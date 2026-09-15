@@ -34,6 +34,7 @@
 | `factor_library.py` | 298 | 多因子库：`compute_instrument_factors()` 逐标的装配因子 |
 | `instrument_pool.py` | 409 | 交易宇宙（标的池）的**校验后**单一来源 |
 | `market_data_service.py` | 525 | 零进程直连公共行情服务 |
+| `market_data_health.py` | 89 | 行情取数失败的**计数 + 每类一次性告警**（可观测性；第 137 刀因"静默 `except` 吞掉取数失败导致 30 小时无信号"而补） |
 | `calculus_engine.py` | 71 | 因果微积分 / 定积分 / 概率论引擎 |
 | `order_risk.py` | 60 | 报价与风控的**确定性**安全检查（共享） |
 | `backtest_engine.py` | 382 | 多资产回测与统计验证引擎（门面，部件在 `backtest/`） |

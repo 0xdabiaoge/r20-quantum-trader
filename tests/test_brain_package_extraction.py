@@ -19,6 +19,7 @@
 from __future__ import annotations
 
 import ast
+import re
 import unittest
 import urllib.request
 from pathlib import Path
@@ -44,16 +45,53 @@ def _submodule_function_lines() -> list[str]:
 
 
 class MoveIsLosslessTest(unittest.TestCase):
+    # 第 137 刀为 6 处**静默** except 接入了失败计数（可观测性；不改取值行为），
+    # 故"逐行等同"必须放行这批**文档化差异**。放行范围被刻意收得极窄：
+    #   ① 裸 `except Exception:` → `except Exception as exc:`（仅为拿到异常对象）
+    #   ② 恰为 `note_failure("<小写名>", exc)` 的**新增**行
+    # 其余任何一行差异仍然会红；并另有 `test_failure_counters_are_actually_wired`
+    # 正向钉住这 6 处接线确实存在 —— 白名单不能被用来掩盖真正的搬运错误。
+    _NOTE_RE = re.compile(r'^note_failure\("[a-z_0-9]+", exc\)$')
+
+    def _normalise(self, lines):
+        """把第 137 刀的接线**还原**成搬运时的样子，再逐行比对。
+
+        接线是"把 `pass` 换成 `note_failure(...)`"（不增行），故还原时把调用行
+        还原为 `pass`，而不是删掉它 —— 删掉会让两侧行数错位（我第一版就写错了，
+        靠打印真实 diff 才发现）。
+        """
+        out = []
+        for ln in lines:
+            stripped = ln.strip()
+            if self._NOTE_RE.match(stripped):
+                indent = ln[:len(ln) - len(ln.lstrip())]
+                ln = f"{indent}pass"
+            elif stripped == "except Exception:":
+                ln = ln.replace("except Exception:", "except Exception as exc:")
+            out.append(ln)
+        return out
+
     def test_body_is_line_identical_to_pre_move_source(self):
         original = PRE_MOVE_SOURCE.read_text(encoding="utf-8").splitlines()
         moved = _submodule_function_lines()
         # 允许的差异只有两处：签名展开（1 行 → 3 行）与新增 docstring（1 行）
         original_body = [ln for ln in original if not ln.startswith("def fetch_single_instrument_package")]
         moved_body = moved[4:]
-        self.assertEqual(len(original_body), len(moved_body),
-                         "函数体行数变了 —— 搬运过程中漏行或多行")
-        for i, (a, b) in enumerate(zip(original_body, moved_body)):
+        a_norm, b_norm = self._normalise(original_body), self._normalise(moved_body)
+        self.assertEqual(len(a_norm), len(b_norm),
+                         "函数体行数变了（除已记录的 6 行接线外）—— 搬运过程中漏行或多行")
+        for i, (a, b) in enumerate(zip(a_norm, b_norm)):
             self.assertEqual(a, b, f"函数体第 {i + 1} 行不一致（搬运被改动）")
+
+    def test_failure_counters_are_actually_wired(self):
+        """正向断言：6 处静默 except 必须各自接上失败计数（防止上一条的白名单被滥用）。"""
+        src = "\n".join(_submodule_function_lines())
+        kinds = sorted(re.findall(r'note_failure\("([a-z_0-9]+)", exc\)', src))
+        self.assertEqual(kinds, ["okx_adx_1h", "okx_funding_rate", "okx_ls_ratio",
+                                 "okx_open_interest", "okx_taker_volume", "okx_ticker"],
+                         "6 处取数失败的可观测性接线缺失或被改名")
+        # 6 处新接入 + 4 处搬运时就带 `as exc` 的（K线 15m/1H/4H 与 calculus）
+        self.assertEqual(src.count("except Exception as exc:"), 10)
 
     def test_submodule_takes_the_two_market_functions_as_parameters(self):
         fn = next(n for n in ast.parse(SUBMODULE.read_text(encoding="utf-8")).body

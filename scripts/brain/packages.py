@@ -29,6 +29,12 @@ import urllib.request
 
 from typing import Any, Dict
 
+# 行情取数失败的可观测性（第 137 刀）：只计数 + 每类一次性告警，绝不改变取值行为。
+try:                      # 以脚本方式运行（SCRIPTS_DIR 在 sys.path 上）
+    from market_data_health import note_failure
+except ImportError:       # 以 scripts.brain.* 包被导入（PROJECT_ROOT 在 sys.path 上）
+    from scripts.market_data_health import note_failure
+
 
 def fetch_single_instrument_package(item: Dict[str, Any], *,
                                    fetch_candles,
@@ -90,8 +96,8 @@ def fetch_single_instrument_package(item: Dict[str, Any], *,
                 op = float(t.get("open24h", 0) or 0)
                 pkg["chg24h"] = round(((pkg["price"] - op) / op * 100) if op > 0 else 0, 2)
                 pkg["vol24h"] = round(float(t.get("vol24h", 0) or 0), 2)
-    except Exception:
-        pass
+    except Exception as exc:
+        note_failure("okx_ticker", exc)
 
     # 2. 15M Candles (recent 24, about 6 hours) & Technical Indicators Calculation
     try:
@@ -225,8 +231,8 @@ def fetch_single_instrument_package(item: Dict[str, Any], *,
                 d = json.loads(resp.read().decode("utf-8"))
                 if d.get("code") == "0" and d.get("data"):
                     pkg["fundingRate"] = round(float(d["data"][0].get("fundingRate", 0)) * 100, 4)
-        except Exception:
-            pass
+        except Exception as exc:
+            note_failure("okx_funding_rate", exc)
 
         try:
             req = urllib.request.Request(f"https://www.okx.com/api/v5/public/open-interest?instType=SWAP&instId={inst_id}", headers=headers)
@@ -235,8 +241,8 @@ def fetch_single_instrument_package(item: Dict[str, Any], *,
                 if d.get("code") == "0" and d.get("data"):
                     usd = float(d["data"][0].get("oiUsd", 0) or 0)
                     pkg["oiUsd"] = f"{round(usd / 1e8, 2)}亿 U" if usd > 1e8 else f"{round(usd / 1e4, 1)}万 U"
-        except Exception:
-            pass
+        except Exception as exc:
+            note_failure("okx_open_interest", exc)
 
         if ccy:
             try:
@@ -245,8 +251,8 @@ def fetch_single_instrument_package(item: Dict[str, Any], *,
                     d = json.loads(resp.read().decode("utf-8"))
                     if d.get("code") == "0" and d.get("data") and len(d["data"]) > 0:
                         pkg["lsRatio"] = float(d["data"][0][1])
-            except Exception:
-                pass
+            except Exception as exc:
+                note_failure("okx_ls_ratio", exc)
 
             try:
                 req = urllib.request.Request(f"https://www.okx.com/api/v5/rubik/stat/taker-volume?ccy={ccy}&instType=CONTRACTS&period=5m", headers=headers)
@@ -257,16 +263,16 @@ def fetch_single_instrument_package(item: Dict[str, Any], *,
                         s_vol = float(d["data"][0][2])
                         net_diff = b_vol - s_vol
                         pkg["takerNetUsd"] = f"{round(net_diff / 1e4, 1)}万 U"
-            except Exception:
-                pass
+            except Exception as exc:
+                note_failure("okx_taker_volume", exc)
 
         # 6. OKX ADX Trend Strength Indicator (1H) via direct REST (zero Node CLI fork)
         try:
             adx_data = fetch_single_indicator(inst_id, "ADX", bar="1H")
             if adx_data and "adx" in adx_data:
                 pkg["adx_1h"] = float(adx_data.get("adx", 0.0) or 0.0)
-        except Exception:
-            pass
+        except Exception as exc:
+            note_failure("okx_adx_1h", exc)
 
     required_market_data = (
         pkg["price"] > 0
