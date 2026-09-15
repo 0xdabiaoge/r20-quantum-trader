@@ -32,6 +32,7 @@ from .binance_orders import (
     apply_protective_qty_policy,
     build_order_params,
 )
+from .binance_signing import build_signed_query
 from .binance_algo import BinanceAlgoRequestsMixin
 
 
@@ -224,13 +225,9 @@ class BinanceAdapter(BinanceAlgoRequestsMixin, BaseExchangeAdapter):
                        timeout: float = 15.0) -> Any:
         """Binance USDⓈ-M 私有请求（HMAC-SHA256 签名）。"""
         key, secret = self._keys()
-        query_dict = dict(params or {})
-        query_dict["timestamp"] = int(time.time() * 1000)
-        query_dict["recvWindow"] = 5000
-        clean_query = {k: v for k, v in query_dict.items() if v not in (None, "")}
-        query_string = urlencode(clean_query)
-        signature = hmac.new(secret.encode("utf-8"), query_string.encode("utf-8"), hashlib.sha256).hexdigest()
-        full_query = f"{query_string}&signature={signature}"
+        full_query = build_signed_query(
+            params=params,
+            secret=secret        )
 
         body_bytes = None
         headers = {
