@@ -482,9 +482,11 @@ def _holding_row(p, venue, *, env, trackers, tz_bj, allowed, council_by_inst):
 
 from scripts.ledger.okx_history import build_okx_trade
 from scripts.ledger.merge import merge_lifecycle_trades
+from scripts.ledger.notify import notify_newly_closed_trades
 from scripts.ledger.holdings import (
     format_holding_duration,
     judge_position_side,
+    purge_stale_holding_rows,
 )
 
 
@@ -638,18 +640,10 @@ def build_lifecycle_ledger():
         old_trades=old_trades,
         trades_lifecycle=trades_lifecycle    )
 
-    # 批E·幽灵持仓清理：台账 holding 行必须以「本轮成功取数的场所的实时持仓」为准。
-    # 旧实现只按 id 覆盖新行、从不删除失效行 → 平仓后 holding 行永久留存（实测
-    # holding_ALGO_多 标 venue=okx 而 OKX 已零持仓，前台台账里挂着一条不存在的仓）。
-    # 仅对 _queried_venues 内的场所生效：取数失败的场所保守保留旧行（缺失≠已平仓）。
-    _live_holding_ids = {t["id"] for t in _holding_rows}
-    _purged_holdings = []
-    for _oid in [k for k, v in trades_map.items()
-                 if isinstance(v, dict) and v.get("status") == "holding"
-                 and str(v.get("venue") or "").lower() in _queried_venues
-                 and k not in _live_holding_ids]:
-        trades_map.pop(_oid)
-        _purged_holdings.append(_oid)
+    _purged_holdings = purge_stale_holding_rows(
+        _holding_rows=_holding_rows,
+        _queried_venues=_queried_venues,
+        trades_map=trades_map    )
     if _purged_holdings:
         print(f"[sync_full_ledger] 清理失效持仓行 {len(_purged_holdings)} 条："
               f"{', '.join(_purged_holdings[:8])}")
@@ -674,21 +668,11 @@ def build_lifecycle_ledger():
     # 审计 A2：台账原子写成功后同步落逐所状态旁车（读侧容错缺文件）。
     _write_sync_status(env)
 
-    # Notify newly closed trades via QQ
-    try:
-        from qq_notifier import notify_trade_close
-        for t in (trades_lifecycle + binance_trades + gate_trades):
-            if t["id"] not in existing_closed_ids and t.get("status") == "closed":
-                notify_trade_close(
-                    inst=t.get("inst", "CRYPTO"),
-                    pnl=float(t.get("pnl", 0.0) or 0.0),
-                    stage=t.get("exit_reason", "平仓结清"),
-                    exit_px=float(t.get("close_px", 0.0) or 0.0),
-                    roi_pct=float(t.get("roi_pct", 0.0) or 0.0),
-                    duration_str=str(t.get("duration", "")),
-                )
-    except Exception as e:
-        print(f"[Ledger Sync Notify Warning] {e}")
+    notify_newly_closed_trades(
+        binance_trades=binance_trades,
+        existing_closed_ids=existing_closed_ids,
+        gate_trades=gate_trades,
+        trades_lifecycle=trades_lifecycle    )
 
     # 批E：trades_lifecycle 现含「OKX 平仓 + 全场所活动持仓」，输出必须分开报，
     # 否则「OKX: 12」会把 binance 的 6 条持仓算进 OKX 业绩里（口径自欺）。

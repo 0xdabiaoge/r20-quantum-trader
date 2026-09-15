@@ -50,3 +50,22 @@ def format_holding_duration(*,
         duration_str = "--"
     return duration_str
 
+
+
+def purge_stale_holding_rows(*,
+        _holding_rows,
+        _queried_venues,
+        trades_map):
+    # 批E·幽灵持仓清理：台账 holding 行必须以「本轮成功取数的场所的实时持仓」为准。
+    # 旧实现只按 id 覆盖新行、从不删除失效行 → 平仓后 holding 行永久留存（实测
+    # holding_ALGO_多 标 venue=okx 而 OKX 已零持仓，前台台账里挂着一条不存在的仓）。
+    # 仅对 _queried_venues 内的场所生效：取数失败的场所保守保留旧行（缺失≠已平仓）。
+    _live_holding_ids = {t["id"] for t in _holding_rows}
+    _purged_holdings = []
+    for _oid in [k for k, v in trades_map.items()
+                 if isinstance(v, dict) and v.get("status") == "holding"
+                 and str(v.get("venue") or "").lower() in _queried_venues
+                 and k not in _live_holding_ids]:
+        trades_map.pop(_oid)
+        _purged_holdings.append(_oid)
+    return _purged_holdings
