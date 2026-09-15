@@ -83,6 +83,11 @@ from scripts.brain.account_text import (
     build_position_lines as _build_position_lines,
     build_pending_order_lines as _build_pending_order_lines,
 )
+from scripts.brain.snapshots import (
+    update_factor_library_snapshot,
+    write_calculus_snapshot,
+    write_prompt_snapshot,
+)
 from scripts.brain.dispatch import (
     dispatch_llm_and_persist_decisions,
 )
@@ -857,31 +862,20 @@ def execute_batch_ai_brain_cycle(
     # 审计D(2026-09-13)：package_by_id 死构造清除（全函数无消费）
 
     # Automatically Update & Persist Comprehensive Factor Library Snapshot
-    try:
-        sys.path.append(os.path.join(WORKSPACE_DIR, "scripts"))
-        import factor_library
-        factor_library.update_factor_library()
-    except Exception as e:
-        print(f"[AI Brain Batch] Factor Library update warning: {e}")
+    update_factor_library_snapshot(
+        WORKSPACE_DIR=WORKSPACE_DIR,
+        os=os,
+        sys=sys    )
 
     # Fetch live pending limit orders from exchange（V5 直签 REST，行为契约见 fetch_pending_orders_list）
     pending_orders_list = fetch_pending_orders_list()
 
-    try:
-        calculus_snapshot = {
-            "timestamp": time_str,
-            "engine": "causal-calculus-v1",
-            "instruments": [
-                {"name": p.get("name"), "instId": p.get("instId"), "calculus": p.get("calculus", {})}
-                for p in packages
-            ],
-        }
-        tmp_calc = CALCULUS_SNAPSHOT_FILE + ".tmp"
-        with open(tmp_calc, "w", encoding="utf-8") as f:
-            json.dump(calculus_snapshot, f, ensure_ascii=False, indent=2)
-        os.replace(tmp_calc, CALCULUS_SNAPSHOT_FILE)
-    except Exception as exc:
-        print(f"[AI Brain] Calculus snapshot warning: {exc}")
+    write_calculus_snapshot(
+        CALCULUS_SNAPSHOT_FILE=CALCULUS_SNAPSHOT_FILE,
+        json=json,
+        os=os,
+        packages=packages,
+        time_str=time_str    )
 
     runtime_context = {}
     prompt = construct_full_market_prompt(packages, pos_summary, positions_context, pending_orders_detail=pending_orders_list, current_time_str=time_str, usdt_available=usdt_available, runtime_context_out=runtime_context, policy_snapshot=policy_snapshot)
@@ -891,15 +885,13 @@ def execute_batch_ai_brain_cycle(
     effective_system_prompt = get_effective_system_prompt(profile=profile, context=runtime_context)
 
     # Save Realtime Prompt Snapshot for Web Transparent Inspection
-    try:
-        tmp_prompt = AI_LAST_PROMPT_FILE + ".tmp"
-        with open(tmp_prompt, "w", encoding="utf-8") as f:
-            f.write(_build_effective_prompt_text(
-                effective_system_prompt=effective_system_prompt, policy_version="",
-                time_str=time_str, prompt=prompt))
-        os.replace(tmp_prompt, AI_LAST_PROMPT_FILE)
-    except Exception:
-        pass
+    write_prompt_snapshot(
+        AI_LAST_PROMPT_FILE=AI_LAST_PROMPT_FILE,
+        _build_effective_prompt_text=_build_effective_prompt_text,
+        effective_system_prompt=effective_system_prompt,
+        os=os,
+        prompt=prompt,
+        time_str=time_str    )
 
     model_name = os.environ.get("LLM_MODEL") or ""
     effort = os.environ.get("LLM_REASONING_EFFORT") or "high"

@@ -282,11 +282,17 @@ class FacadeWiringTest(unittest.TestCase):
         另钉反向哨：不得用 `.replace(...)` 在外面补格式 —— 那会把格式知识
         散回调用点（本块第一版就是这么写的，属于自己踩过的坑）。
         """
+        # 第九十九刀：快照调用点随"本地快照落盘"块迁入 brain/snapshots.py；
+        # 历史记录调用点随派发尾块迁入 brain/dispatch.py（判定对象随实现迁移）
+        snap = (ROOT / "scripts" / "brain" / "snapshots.py").read_text(encoding="utf-8")
+        self.assertIn('effective_system_prompt=effective_system_prompt, policy_version="",', snap,
+                      "快照写入必须传 policy_version 空串")
+        disp = (ROOT / "scripts" / "brain" / "dispatch.py").read_text(encoding="utf-8")
+        self.assertIn("policy_version=policy_version,", disp,
+                      "历史记录必须传真实 policy_version")
         src = FACADE.read_text(encoding="utf-8")
-        self.assertIn('effective_system_prompt=effective_system_prompt, policy_version="",', src,
-                      "快照调用点必须传 policy_version 空串")
-        self.assertIn("policy_version=policy_version,", src,
-                      "历史记录调用点必须传真实 policy_version")
+        self.assertNotIn('effective_system_prompt=effective_system_prompt, policy_version="",',
+                         src, "门面不得残留该调用点（残留=孪生）")
         self.assertNotIn('replace("【SYSTEM PROMPT ()】："', src)
 
 
