@@ -14,8 +14,8 @@
 
 | 检查 | 结果 |
 |---|---|
-| 后端全量 `unittest discover -s tests -t .` | **3112 OK**（skipped=1） |
-| 离线套件 `tests/offline_suite.py` | **3093 OK**（skipped=27）；`CONFIG_WRITE_ATTEMPTS: []`；EGRESS 自检通过 |
+| 后端全量 `unittest discover -s tests -t .` | **3121 OK**（skipped=1） |
+| 离线套件 `tests/offline_suite.py` | **3102 OK**（skipped=27）；`CONFIG_WRITE_ATTEMPTS: []`；EGRESS 自检通过 |
 | 前端 `node --test tests/*.test.mjs` | **27 用例 / 136 断言，0 失败** |
 | 前端 `npx vue-tsc --noEmit` | 干净（无输出） |
 | 前端 `npx vite build` | 成功（1.64s） |
@@ -138,3 +138,7 @@
 **为什么既有防线全失效**（详版见 `plan_local/` 台账 §136）：编译/导入/单测都碰不到运行期
 `NameError`；该模块当时零测试覆盖；抽取对拍门只验"段体 AST + 调用点传参 + 被调名可解析"，
 **没验子模块内部自由名**；静默 `except` 让失败零信号。
+
+**后续加固（§137）**：6 处静默取数 `except` 已接入 `scripts/market_data_health.py` 的
+**失败计数 + 每类一次性告警**（只加可观测性，取值行为一字不变），并有门用"6 处全失败必须
+留下 6 条痕"把这类"零信号"反过来钉死。
