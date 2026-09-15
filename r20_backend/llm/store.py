@@ -30,6 +30,10 @@ from r20_backend.llm.policy import (
 )
 from r20_backend.llm.providers import _provider_holds_active_model, _resolve_active_provider_id
 from r20_backend.llm.util import _atomic_write_json, mask_secret
+from r20_backend.llm.store_normalize import (
+    finalize_config_document,
+    resolve_brain_provider_attribution,
+)
 
 
 def init_llm_config(config_file: Path) -> Dict[str, Any]:
@@ -171,69 +175,30 @@ def init_llm_config(config_file: Path) -> Dict[str, Any]:
     # ── 主脑供应商归属：嵌套持有者为准（显式记录 > 唯一持有 > 顶层扁平缓存归属）──
     # models_map 按 id 去重（后出现的供应商覆盖先出现的），多供应商挂同名模型时
     # 顶层缓存的 base_url/api_key 会静默变成另一家的——必须把主脑条目钉回其供应商。
-    raw_active_pid = str(data.get("active_provider_id") or "").strip()
-    active_pid = _resolve_active_provider_id(
-        {
-            "active_model_id": active_m_id,
-            "active_provider_id": raw_active_pid,
-            "providers": merged_providers,
-            "models": flat_models,
-        }
-    )
-    if active_pid and active_m_id:
-        ap = next((p for p in merged_providers if str(p.get("id", "")) == active_pid), None)
-        if ap:
-            for m in flat_models:
-                if m.get("id") != active_m_id:
-                    continue
-                m["provider_id"] = active_pid
-                m["provider_name"] = ap.get("name", active_pid)
-                if ap.get("base_url"):
-                    m["base_url"] = ap["base_url"]
-                if ap.get("api_key"):
-                    m["api_key"] = ap["api_key"]
-                if not m.get("api_format"):
-                    m["api_format"] = ap.get("api_format", "openai_chat")
-                break
+    active_pid = resolve_brain_provider_attribution(
+        _resolve_active_provider_id=_resolve_active_provider_id,
+        active_m_id=active_m_id,
+        data=data,
+        flat_models=flat_models,
+        merged_providers=merged_providers    )
 
     # ── 韧性配置解析：请求次数 + 回退模型链（脏数据自愈）──
-    raw_attempts = data.get("request_attempts")
-    try:
-        env_attempts = int(os.getenv("LLM_REQUEST_ATTEMPTS", "") or 0)
-    except ValueError:
-        env_attempts = 0
-    try:
-        request_attempts = int(raw_attempts) if raw_attempts is not None else (env_attempts or DEFAULT_REQUEST_ATTEMPTS)
-    except (TypeError, ValueError):
-        request_attempts = DEFAULT_REQUEST_ATTEMPTS
-    request_attempts = max(MIN_REQUEST_ATTEMPTS, min(MAX_REQUEST_ATTEMPTS, request_attempts))
-
-    known_model_ids = {m["id"] for m in flat_models}
-    raw_fallbacks = data.get("fallback_model_ids")
-    fallback_model_ids: List[str] = []
-    if isinstance(raw_fallbacks, list):
-        for fid in raw_fallbacks:
-            fid = str(fid or "").strip()
-            if not fid or fid == active_m_id or fid not in known_model_ids:
-                continue
-            if fid not in fallback_model_ids:
-                fallback_model_ids.append(fid)
-    fallback_model_ids = fallback_model_ids[:MAX_FALLBACK_MODELS]
-
-    config = {
-        "version": "3.2",
-        "defaults_seeded": True,
-        "active_model_id": active_m_id,
-        "active_provider_id": active_pid,
-        "active_reasoning_effort": active_effort,
-        "thinking_timeout": thinking_timeout,
-        "request_attempts": request_attempts,
-        "fallback_model_ids": fallback_model_ids,
-        "providers": merged_providers,
-        "models": flat_models,
-    }
-    _atomic_write_json(config_file, config)
-    return config
+    return finalize_config_document(
+        DEFAULT_REQUEST_ATTEMPTS=DEFAULT_REQUEST_ATTEMPTS,
+        List=List,
+        MAX_FALLBACK_MODELS=MAX_FALLBACK_MODELS,
+        MAX_REQUEST_ATTEMPTS=MAX_REQUEST_ATTEMPTS,
+        MIN_REQUEST_ATTEMPTS=MIN_REQUEST_ATTEMPTS,
+        _atomic_write_json=_atomic_write_json,
+        active_effort=active_effort,
+        active_m_id=active_m_id,
+        active_pid=active_pid,
+        config_file=config_file,
+        data=data,
+        flat_models=flat_models,
+        merged_providers=merged_providers,
+        os=os,
+        thinking_timeout=thinking_timeout    )
 
 
 def load_llm_config(config: Dict[str, Any], mask_keys: bool = True) -> Dict[str, Any]:
