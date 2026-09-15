@@ -28,6 +28,10 @@ from urllib.request import Request, urlopen
 
 from .base import (BaseExchangeAdapter, ExchangeCapabilities,
                    ExchangeCapabilityError, InstrumentSpec)
+from .binance_orders import (
+    apply_protective_qty_policy,
+    build_order_params,
+)
 from .binance_algo import BinanceAlgoRequestsMixin
 
 
@@ -358,33 +362,16 @@ class BinanceAdapter(BinanceAlgoRequestsMixin, BaseExchangeAdapter):
             raise ValueError(f"下单数量必须为正数，收到: {contracts}")
 
         spec = self.fetch_instrument_spec(symbol)
-        step = Decimal(str(spec.step_size if spec else 1e-6))
-        qty_dec = (Decimal(str(qty)) / step).to_integral_value(rounding=ROUND_DOWN) * step
-        qty_str = format(qty_dec, "f").rstrip("0").rstrip(".") if "." in format(qty_dec, "f") else format(qty_dec, "f")
-
-        params: Dict[str, Any] = {
-            "symbol": inst,
-            "side": s,
-            "quantity": qty_str,
-        }
-
-        if price is not None and float(price) > 0:
-            params["type"] = "LIMIT"
-            params["timeInForce"] = tif.upper()
-            tick = Decimal(str(spec.tick_size if spec else 0.1))
-            px_dec = (Decimal(str(price)) / tick).to_integral_value(rounding=ROUND_DOWN) * tick
-            params["price"] = format(px_dec, "f").rstrip("0").rstrip(".") if "." in format(px_dec, "f") else format(px_dec, "f")
-        else:
-            params["type"] = "MARKET"
-
-        if text:
-            params["newClientOrderId"] = str(text).strip()
-        if position_side:
-            params["positionSide"] = str(position_side).upper()
-        if reduce_only:
-            if position_side:
-                raise ValueError("reduceOnly 与 positionSide 互斥（对冲模式禁 reduceOnly，审计 §2 契约）")
-            params["reduceOnly"] = "true"
+        params = build_order_params(
+            inst=inst,
+            position_side=position_side,
+            price=price,
+            qty=qty,
+            reduce_only=reduce_only,
+            s=s,
+            spec=spec,
+            text=text,
+            tif=tif        )
 
         data = self.signed_request("POST", "/fapi/v1/order", params=params)
         if not isinstance(data, dict):
@@ -494,12 +481,7 @@ class BinanceAdapter(BinanceAlgoRequestsMixin, BaseExchangeAdapter):
                 "working_type": wt,
                 "position_side": position_side,
             }
-            if qty_str:
-                req_kwargs["quantity"] = qty_str
-                req_kwargs["reduce_only"] = True
-                req_kwargs["close_position"] = False
-            else:
-                req_kwargs["close_position"] = True
+            apply_protective_qty_policy(req_kwargs=req_kwargs, qty_str=qty_str)
 
             req = self.build_algo_order_request(**req_kwargs)
             tp_data = self._private_algo_send(req)
@@ -515,12 +497,7 @@ class BinanceAdapter(BinanceAlgoRequestsMixin, BaseExchangeAdapter):
                 "working_type": wt,
                 "position_side": position_side,
             }
-            if qty_str:
-                req_kwargs["quantity"] = qty_str
-                req_kwargs["reduce_only"] = True
-                req_kwargs["close_position"] = False
-            else:
-                req_kwargs["close_position"] = True
+            apply_protective_qty_policy(req_kwargs=req_kwargs, qty_str=qty_str)
 
             req = self.build_algo_order_request(**req_kwargs)
             sl_data = self._private_algo_send(req)
