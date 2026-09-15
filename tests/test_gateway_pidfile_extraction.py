@@ -25,7 +25,6 @@ from __future__ import annotations
 import ast
 import os
 import re
-import subprocess
 import sys
 import tempfile
 import unittest
@@ -44,18 +43,38 @@ ROUTERS = [
 
 class PidfileStructureTest(unittest.TestCase):
     def test_path_literal_only_in_pidfile_module(self):
-        out = subprocess.run(
-            ["git", "grep", "-n", "r20_gateway.pid", "--", "*.py"],
-            capture_output=True, text=True, cwd=str(ROOT)).stdout.splitlines()
+        """路径字面量只允许出现在 `pidfile.py` 的**代码**里。
+
+        ⚠️ 原先这一例用 `subprocess.run(["git", "grep", ...])` 实现，被离线套件
+        （`tests/offline_suite.py`）的"外部子进程"守卫拦下 —— 守卫只放行
+        `git show <rev>:<path>` 与 `git rev-parse --short <ref>` 两种形状，拦得对。
+        改为**纯 AST 扫描**：找 `"r20_gateway.pid"` 字符串常量，跳过文档字符串
+        （`ast.Expr(Constant)`），因此注释/文档里提到该路径不会被误判。
+        """
+        def is_docstring(node) -> bool:
+            return isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant) \
+                and isinstance(node.value.value, str)
+
         offenders = []
-        for line in out:
-            f, _, rest = line.partition(":")
-            if f.endswith("r20_gateway/pidfile.py"):
+        roots = [ROOT / d for d in ("r20_backend", "r20_gateway", "scripts", "dashboard", "tests")]
+        for root in roots:
+            if not root.exists():
                 continue
-            if "r20_gateway.pid" in rest and not rest.lstrip().startswith("#") \
-                    and "pidfile import" not in rest and "`data/r20_gateway.pid`" not in rest:
-                offenders.append(line)
-        self.assertEqual(offenders, [], "路径字面量必须只留在 pidfile.py（其余处一律 import 常量）")
+            for path in sorted(root.rglob("*.py")):
+                if path.name == "pidfile.py" and path.parent.name == "r20_gateway":
+                    continue
+                if path == Path(__file__).resolve():   # 本门自身必须引用该字面量才能断言
+                    continue
+                try:
+                    tree = ast.parse(path.read_text(encoding="utf-8"))
+                except (OSError, SyntaxError, UnicodeDecodeError):
+                    continue
+                doc_values = {id(n.value) for n in ast.walk(tree) if is_docstring(n)}
+                for node in ast.walk(tree):
+                    if isinstance(node, ast.Constant) and node.value == "r20_gateway.pid" \
+                            and id(node) not in doc_values:
+                        offenders.append(f"{path.relative_to(ROOT)}:{node.lineno}")
+        self.assertEqual(offenders, [], "路径字面量必须只留在 pidfile.py 的代码里（其余处一律 import 常量）")
 
     def test_pid_file_points_at_data_dir(self):
         self.assertEqual(PID_FILE.name, "r20_gateway.pid")
