@@ -83,6 +83,10 @@ from scripts.brain.account_text import (
     build_position_lines as _build_position_lines,
     build_pending_order_lines as _build_pending_order_lines,
 )
+from scripts.brain.runtime import (
+    capture_policy_snapshot,
+    resolve_llm_runtime,
+)
 from scripts.brain.snapshots import (
     update_factor_library_snapshot,
     write_calculus_snapshot,
@@ -811,25 +815,9 @@ def execute_batch_ai_brain_cycle(
     time_str = now_bj.strftime("%Y-%m-%d %H:%M:%S")
 
     # Capture immutable Policy Snapshot at start of decision cycle
-    if policy_snapshot is None:
-        try:
-            from policy_snapshot import generate_policy_snapshot
-            policy_snapshot = generate_policy_snapshot()
-        except Exception:
-            try:
-                from r20_backend.policy_snapshot import generate_policy_snapshot
-                policy_snapshot = generate_policy_snapshot()
-            except Exception as exc:
-                print(f"[AI Brain Batch] Policy snapshot warning: {exc}")
-                policy_snapshot = {
-                    "policy_version": f"{_get_system_version_tag()}@unknown",
-                    "policy_hash": "unknown",
-                    "summary": "policy_snapshot_fallback",
-                    "units": {},
-                }
-    policy_version = policy_snapshot.get("policy_version", f"{_get_system_version_tag()}@unknown")
-    policy_hash = policy_snapshot.get("policy_hash", "unknown")
-    policy_summary = policy_snapshot.get("summary", "")
+    (policy_hash, policy_snapshot, policy_summary, policy_version) = capture_policy_snapshot(
+        _get_system_version_tag=_get_system_version_tag,
+        policy_snapshot=policy_snapshot    )
     print(f"[AI Brain Batch] 📌 当前决策策略快照: {policy_version} ({policy_hash})")
 
     print(f"[AI Brain Batch] 并行获取 {len(TARGET_INSTRUMENTS)} 币种原生行情、技术指标与顶级聪明钱数据...")
@@ -893,21 +881,10 @@ def execute_batch_ai_brain_cycle(
         prompt=prompt,
         time_str=time_str    )
 
-    model_name = os.environ.get("LLM_MODEL") or ""
-    effort = os.environ.get("LLM_REASONING_EFFORT") or "high"
-    api_format = "openai_chat"
-    thinking_timeout = float(os.environ.get("LLM_THINKING_TIMEOUT", os.environ.get("LLM_TIMEOUT_SECONDS", 120.0)))
-    try:
-        from r20_backend.llm_manager import get_active_llm_runtime, execute_llm_request
-        active_llm = get_active_llm_runtime()
-        model_name = os.environ.get("LLM_MODEL") or active_llm.get("model") or model_name
-        effort = os.environ.get("LLM_REASONING_EFFORT") or active_llm.get("reasoning_effort") or effort
-        api_format = active_llm.get("api_format", "openai_chat")
-        base_url = active_llm.get("base_url") or base_url
-        api_key = active_llm.get("api_key") or api_key
-        thinking_timeout = float(active_llm.get("thinking_timeout") or thinking_timeout)
-    except Exception:
-        execute_llm_request = None
+    (api_format, api_key, base_url, effort, execute_llm_request, model_name, thinking_timeout) = resolve_llm_runtime(
+        api_key=api_key,
+        base_url=base_url,
+        os=os    )
 
     telemetry = ModelCallTelemetry(
         "trading_brain", model_name, str(effort), effective_system_prompt, prompt
