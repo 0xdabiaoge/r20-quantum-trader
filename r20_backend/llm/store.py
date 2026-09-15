@@ -34,6 +34,10 @@ from r20_backend.llm.env_sync import (
     build_env_values,
     resolve_effective_endpoint,
 )
+from r20_backend.llm.store_upsert import (
+    write_model_into_providers_local_list,
+    write_model_into_top_level_list,
+)
 from r20_backend.llm.store_normalize import (
     finalize_config_document,
     flatten_models_into_result,
@@ -617,56 +621,31 @@ def upsert_model(config_file: Path, reload_config: Callable[[], Dict[str, Any]],
     models = config.setdefault("models", [])
     existing = next((m for m in models if m["id"] == mid), None)
 
-    if existing:
-        existing["name"] = name
-        existing["provider_id"] = provider_id or existing.get("provider_id", "openai")
-        existing["provider_name"] = provider_name or existing.get("provider_name", "自定义")
-        existing["base_url"] = base_url
-        if api_key:
-            existing["api_key"] = api_key
-        existing["api_format"] = api_format
-        existing["reasoning_type"] = reasoning_type
-        existing["reasoning_effort"] = default_effort
-        existing["capabilities"] = caps
-        existing["context_length"] = ctx_len
-        existing["description"] = desc
-    else:
-        models.append({
-            "id": mid,
-            "name": name,
-            "provider_id": provider_id or "openai",
-            "provider_name": provider_name or "自定义",
-            "base_url": base_url,
-            "api_key": api_key,
-            "api_format": api_format,
-            "reasoning_type": reasoning_type,
-            "reasoning_effort": default_effort,
-            "capabilities": caps,
-            "context_length": ctx_len,
-            "description": desc,
-        })
+    write_model_into_top_level_list(
+        api_format=api_format,
+        api_key=api_key,
+        base_url=base_url,
+        caps=caps,
+        ctx_len=ctx_len,
+        default_effort=default_effort,
+        desc=desc,
+        existing=existing,
+        mid=mid,
+        models=models,
+        name=name,
+        provider_id=provider_id,
+        provider_name=provider_name,
+        reasoning_type=reasoning_type    )
 
-    # Also update provider's local models array
-    if prov:
-        prov_models = prov.setdefault("models", [])
-        p_existing = next((m for m in prov_models if m.get("id") == mid), None)
-        if p_existing:
-            p_existing["name"] = name
-            p_existing["capabilities"] = caps
-            p_existing["reasoning_type"] = reasoning_type
-            p_existing["reasoning_effort"] = default_effort
-            p_existing["context_length"] = ctx_len
-            p_existing["description"] = desc
-        else:
-            prov_models.append({
-                "id": mid,
-                "name": name,
-                "capabilities": caps,
-                "reasoning_type": reasoning_type,
-                "reasoning_effort": default_effort,
-                "context_length": ctx_len,
-                "description": desc,
-            })
+    write_model_into_providers_local_list(
+        caps=caps,
+        ctx_len=ctx_len,
+        default_effort=default_effort,
+        desc=desc,
+        mid=mid,
+        name=name,
+        prov=prov,
+        reasoning_type=reasoning_type    )
 
     _atomic_write_json(config_file, config)
     return {
