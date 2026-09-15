@@ -33,6 +33,7 @@ from scripts.trader import order_intent
 ROOT = Path(__file__).resolve().parents[1]
 FACADE = ROOT / "scripts" / "ai_factor_trader.py"
 SUBMODULE = ROOT / "scripts" / "trader" / "order_intent.py"
+ENTRY = ROOT / "scripts" / "trader" / "entry_execution.py"   # 第九十刀：开多/开空两支现住此
 
 
 def _legacy_prices(*, is_long, ai_decision, f, prec, tp_dist, sl_dist):
@@ -238,13 +239,13 @@ class WiringTest(unittest.TestCase):
         self.assertNotIn("def build_order_intent(", facade)
 
     def test_both_directions_call_helpers(self):
-        facade = FACADE.read_text(encoding="utf-8")
-        self.assertEqual(facade.count("resolve_entry_prices("), 2,
+        entry = ENTRY.read_text(encoding="utf-8")
+        self.assertEqual(entry.count("resolve_entry_prices("), 2,
                          "开多/开空都必须走同一套定价实现")
-        self.assertEqual(facade.count("build_order_intent("), 2,
+        self.assertEqual(entry.count("build_order_intent("), 2,
                          "开多/开空都必须走同一套载荷装配")
-        self.assertIn("is_long=True,", facade)
-        self.assertIn("is_long=False,", facade)
+        self.assertIn("is_long=True,", entry)
+        self.assertIn("is_long=False,", entry)
 
     def test_both_call_sites_define_every_name_they_pass(self):
         """调用点必须在自己**这一支**里备好传给 helper 的每个名字。
@@ -257,9 +258,9 @@ class WiringTest(unittest.TestCase):
         `tp_dist` / `sl_dist` / `ai_margin` / `_inst_lever_cap` / `ai_info` 等
         **只在所属分支里才算得出**的量。
         """
-        tree = ast.parse(FACADE.read_text(encoding="utf-8"))
+        tree = ast.parse(ENTRY.read_text(encoding="utf-8"))
         func = next(n for n in ast.walk(tree)
-                    if isinstance(n, ast.FunctionDef) and n.name == "execute_portfolio")
+                    if isinstance(n, ast.FunctionDef) and n.name == "execute_entry_scan")
 
         from tests.source_scan import names_defined_at_call
 
@@ -288,19 +289,25 @@ class WiringTest(unittest.TestCase):
                          f"应有 2 处定价 + 2 处载荷装配调用，实际 {checked}")
 
     def test_facade_keeps_the_two_anchor_lines(self):
-        """门面必须保留保证金闸门与权益顶两行 —— 它们是既有计数锚点的载体。
+        """入场执行模块必须保留保证金闸门与权益顶两行 —— 它们是计数锚点的载体。
 
-        这是**刻意**不抽的部分：把它们搬进子包，锚点要么翻红，要么（改成纯领域
-        计数后）失去"两条路径都在门面主执行路径上"这一层含义。
+        这是**刻意**保留在调用点的部分（cut 15 的设计：把两行留在调用点，
+        以便锚点证明"两条路径都过闸"）。⚠️ 第九十刀：`execute_portfolio`
+        的入场循环整体搬入 `scripts/trader/entry_execution.py`，两行载体随之迁移
+        —— 计数与语义一字不变；门面侧改为**反证**（残留即搬家不彻底）。
         """
-        facade = FACADE.read_text(encoding="utf-8")
-        self.assertEqual(facade.count("_order_margin = order_margin_gate("), 2)
+        entry = ENTRY.read_text(encoding="utf-8")
+        self.assertEqual(entry.count("_order_margin = order_margin_gate("), 2)
+        self.assertNotIn("_order_margin = order_margin_gate(",
+                         FACADE.read_text(encoding="utf-8"),
+                         "门面残留该行 ⇒ 载体迁移不彻底（或出现孪生）")
         from tests.source_scan import count_keyword_argument
         self.assertEqual(
             count_keyword_argument("scripts/ai_factor_trader.py", "build_order_intent",
                                    "max_margin_usdt",
-                                   value_must_contain="equity_margin_cap(usdt_available)"),
-            2, "两处调用必须各自携带权益顶")
+                                   value_must_contain="equity_margin_cap(usdt_available)",
+                                   pkg_name="trader"),
+            2, "两处调用必须各自携带权益顶（域定位：载体已入子包）")
 
 
 if __name__ == "__main__":

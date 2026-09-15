@@ -34,6 +34,7 @@ from scripts.trader import brackets
 ROOT = Path(__file__).resolve().parents[1]
 FACADE = ROOT / "scripts" / "ai_factor_trader.py"
 SUBMODULE = ROOT / "scripts" / "trader" / "brackets.py"
+ENTRY = ROOT / "scripts" / "trader" / "entry_execution.py"   # 第九十刀：开多/开空两支现住此
 
 
 def _legacy(is_long, limit_px, tp_px, sl_px, sl_dist, tp_dist, price, prec):
@@ -61,11 +62,11 @@ class ImplementationMovedTest(unittest.TestCase):
             self.assertNotIn(marker, facade, f"门面仍留有内联钳制: {marker!r}")
 
     def test_both_branches_call_the_helper(self):
-        facade = FACADE.read_text(encoding="utf-8")
-        self.assertEqual(facade.count("sl_px, tp_px = normalize_bracket_prices("), 2,
+        entry = ENTRY.read_text(encoding="utf-8")
+        self.assertEqual(entry.count("sl_px, tp_px = normalize_bracket_prices("), 2,
                          "开多/开空都必须走同一个钳制实现")
-        self.assertIn("is_long=True,", facade)
-        self.assertIn("is_long=False,", facade)
+        self.assertIn("is_long=True,", entry)
+        self.assertIn("is_long=False,", entry)
 
 
 class ParityTest(unittest.TestCase):

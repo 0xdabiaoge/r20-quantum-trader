@@ -28,6 +28,7 @@ from scripts.trader import notifications
 ROOT = Path(__file__).resolve().parents[1]
 FACADE = ROOT / "scripts" / "ai_factor_trader.py"
 SUBMODULE = ROOT / "scripts" / "trader" / "notifications.py"
+ENTRY = ROOT / "scripts" / "trader" / "entry_execution.py"   # 第九十刀：开多/开空两支现住此
 
 # _STRAT / _REASON 是门面调用点的既有局部量
 STRAT = "AI_STRAT"
@@ -224,7 +225,7 @@ class WiringTest(unittest.TestCase):
                                    pkg_name="trader"), 4,
             "四处开仓通知必须携带钳制后的真实杠杆")
 
-        tree = ast.parse(FACADE.read_text(encoding="utf-8"))
+        tree = ast.parse(ENTRY.read_text(encoding="utf-8"))
         calls = [n for n in ast.walk(tree)
                  if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)
                  and n.func.id == "notify_trade_open"]
@@ -238,11 +239,11 @@ class WiringTest(unittest.TestCase):
                              f"实际 {rendered!r}（曾因此谎报杠杆）")
 
     def test_both_directions_call_helpers(self):
-        facade = FACADE.read_text(encoding="utf-8")
-        self.assertEqual(facade.count("entry_action_message("), 4,
+        entry = ENTRY.read_text(encoding="utf-8")
+        self.assertEqual(entry.count("entry_action_message("), 4,
                          "加仓/首发 × 多/空 = 4 处动作文案")
-        self.assertEqual(facade.count("entry_failure_message("), 2)
-        self.assertEqual(facade.count("trade_open_kwargs("), 4)
+        self.assertEqual(entry.count("entry_failure_message("), 2)
+        self.assertEqual(entry.count("trade_open_kwargs("), 4)
 
     def test_side_effects_stay_in_facade(self):
         """状态变更必须仍留在门面 —— 抽进子模块会藏起副作用。
@@ -283,9 +284,9 @@ class WiringTest(unittest.TestCase):
 
         判据同前几块：只沿**到达该调用的唯一路径**收集定义，绝不下钻进兄弟分支。
         """
-        tree = ast.parse(FACADE.read_text(encoding="utf-8"))
+        tree = ast.parse(ENTRY.read_text(encoding="utf-8"))
         func = next(n for n in ast.walk(tree)
-                    if isinstance(n, ast.FunctionDef) and n.name == "execute_portfolio")
+                    if isinstance(n, ast.FunctionDef) and n.name == "execute_entry_scan")
 
         from tests.source_scan import names_defined_at_call
 

@@ -196,8 +196,12 @@ class OrderMarginGateTests(_SandboxBase):
         | 断言 | 定位 | 表达的不变量 |
         |---|---|---|
         | 门面里恰有 1 个 `def order_margin_gate(` | 门面文本 | 门面仍暴露该闸门（调用点按全局名解析） |
-        | 门面里恰有 2 处 `_order_margin = order_margin_gate(` | 门面文本 | 开多/开空都在**门面主执行路径**上过闸 |
+        | 入场执行模块里恰有 2 处 `_order_margin = order_margin_gate(` | `scripts/trader/entry_execution.py` | 开多/开空都在**入场主执行路径**上过闸 |
         | 领域 AST：`defs == 2` 且 `refs == 2` | 领域（含 `scripts/trader/`） | 恰"一份薄壳 + 一份实现"、"开多 + 开空"两次调用 |
+
+        ⚠️ 第九十刀：`execute_portfolio` 的入场循环整体搬入
+        `scripts/trader/entry_execution.py` ⇒ 上述第二行判据的**载体随实现迁移**
+        （数字 2 与语义一字不变），门面侧加反证防"残留/孪生"虚 Hits。
 
         最后一行是关键：它把"搬家"变成**允许**（定义搬进子包 → defs 仍是 2），
         同时仍能抓住"漏了一条路径"（refs 变 1）或"又写了一份本地孪生"（defs 变 3）。
@@ -212,8 +216,12 @@ class OrderMarginGateTests(_SandboxBase):
         facade = (ROOT / "scripts" / "ai_factor_trader.py").read_text(encoding="utf-8")
         self.assertEqual(facade.count("def order_margin_gate("), 1,
                          "门面必须恰有一处 def order_margin_gate（否则全局名解析不到）")
-        self.assertEqual(facade.count("_order_margin = order_margin_gate("), 2,
-                         "开多/开空必须各自在门面主执行路径上经过 order_margin_gate")
+        entry = (ROOT / "scripts" / "trader" / "entry_execution.py").read_text(encoding="utf-8")
+        self.assertEqual(entry.count("_order_margin = order_margin_gate("), 2,
+                         "开多/开空必须各自在入场主执行路径上经过 order_margin_gate"
+                         "（第九十刀：载体随入场循环迁入 entry_execution.py）")
+        self.assertNotIn("_order_margin = order_margin_gate(", facade,
+                         "门面残留该行 ⇒ 载体迁移不彻底（或出现孪生）")
         # 权益顶：改走 AST 计数 —— 原来是整行字面量
         # `'"max_margin_usdt": equity_margin_cap(usdt_available)'`，
         # 抽取时只是把该行拆成两行，计数就从 2 变 0：**行为没变，排版一变就翻红**。
@@ -222,17 +230,27 @@ class OrderMarginGateTests(_SandboxBase):
         self.assertEqual(
             count_keyword_argument("scripts/ai_factor_trader.py", "build_order_intent",
                                    "max_margin_usdt",
-                                   value_must_contain="equity_margin_cap(usdt_available)"),
-            2, "开多/开空必须各自携带权益顶（AST 计数，不受换行影响）")
+                                   value_must_contain="equity_margin_cap(usdt_available)",
+                                   pkg_name="trader"),
+            2, "开多/开空必须各自携带权益顶（AST 计数，不受换行影响；域定位含子包）")
 
         counts = count_name_references("scripts/ai_factor_trader.py", "order_margin_gate",
                                        pkg_name="trader")
         self.assertEqual(counts["defs"], 2,
                          "全交易层领域必须恰有 2 个 order_margin_gate 定义"
                          "（门面薄壳 + 子包实现）；多了是本地孪生")
-        self.assertEqual(counts["refs"], 2,
-                         "全交易层领域必须恰有 2 次 order_margin_gate 调用"
-                         "（开多 + 开空）；少了说明有条路径被绕过")
+        self.assertEqual(counts["refs"], 3,
+                         "全交易层领域必须恰有 3 次 order_margin_gate 引用："
+                         "开多调用 1 + 开空调用 1（均在 entry_execution.py）"
+                         " + 第九十刀新增的**调用点注入** 1"
+                         "（`order_margin_gate=order_margin_gate`，证明闸门被传入入场模块）；"
+                         "少了说明有条路径被绕过，多了说明出现本地孪生")
+        entry_src = (ROOT / "scripts" / "trader" / "entry_execution.py").read_text(encoding="utf-8")
+        self.assertEqual(entry_src.count("order_margin_gate("), 2,
+                         "开多/开空必须各自在入场执行模块里调用闸门")
+        facade_src = (ROOT / "scripts" / "ai_factor_trader.py").read_text(encoding="utf-8")
+        self.assertIn("order_margin_gate=order_margin_gate", facade_src,
+                      "门面必须把闸门注入入场模块（调用期解析，patch 面有效）")
 
 
 class RouterMarginClampTests(_SandboxBase):

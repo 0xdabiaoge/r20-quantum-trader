@@ -38,6 +38,7 @@ from scripts.trader import sizing
 ROOT = Path(__file__).resolve().parents[1]
 FACADE = ROOT / "scripts" / "ai_factor_trader.py"
 SUBMODULE = ROOT / "scripts" / "trader" / "sizing.py"
+ENTRY = ROOT / "scripts" / "trader" / "entry_execution.py"   # 第九十刀：开多/开空两支现住此
 
 
 def _legacy(*, ai_margin, ai_lever, price, ct_val, step_sz, base_sz, usdt_available,
@@ -375,8 +376,8 @@ class WiringTest(unittest.TestCase):
         self.assertNotIn("def size_for_decision(", facade)
 
     def test_facade_calls_once_and_injects_shared_helpers(self):
-        facade = FACADE.read_text(encoding="utf-8")
-        tree = ast.parse(facade)
+        entry = ENTRY.read_text(encoding="utf-8")
+        tree = ast.parse(entry)
         calls = [n for n in ast.walk(tree)
                  if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)
                  and n.func.id == "size_for_decision"]
@@ -420,10 +421,10 @@ class WiringTest(unittest.TestCase):
 
     def test_skip_guard_still_follows_the_sizing_call(self):
         """`if actual_sz <= 0: continue` 必须紧跟其后（0 表示不可交易）。"""
-        facade = FACADE.read_text(encoding="utf-8")
-        tree = ast.parse(facade)
+        entry = ENTRY.read_text(encoding="utf-8")
+        tree = ast.parse(entry)
         func = next(n for n in ast.walk(tree)
-                    if isinstance(n, ast.FunctionDef) and n.name == "execute_portfolio")
+                    if isinstance(n, ast.FunctionDef) and n.name == "execute_entry_scan")
         call = next(n for n in ast.walk(func)
                     if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)
                     and n.func.id == "size_for_decision")

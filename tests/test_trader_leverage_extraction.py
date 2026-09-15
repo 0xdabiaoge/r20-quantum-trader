@@ -32,6 +32,7 @@ from scripts.trader import leverage
 ROOT = Path(__file__).resolve().parents[1]
 FACADE = ROOT / "scripts" / "ai_factor_trader.py"
 SUBMODULE = ROOT / "scripts" / "trader" / "leverage.py"
+ENTRY = ROOT / "scripts" / "trader" / "entry_execution.py"   # 第九十刀：开多/开空两支现住此
 
 
 def _legacy(ai_lever, *, min_leverage, max_leverage, inst_lever_cap):
@@ -155,8 +156,8 @@ class WiringTest(unittest.TestCase):
         self.assertNotIn("def clamp_ai_leverage(", facade)
 
     def test_facade_calls_it_once_with_injected_constants(self):
-        facade = FACADE.read_text(encoding="utf-8")
-        tree = ast.parse(facade)
+        entry = ENTRY.read_text(encoding="utf-8")
+        tree = ast.parse(entry)
         calls = [n for n in ast.walk(tree)
                  if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)
                  and n.func.id == "clamp_ai_leverage"]
@@ -171,10 +172,10 @@ class WiringTest(unittest.TestCase):
 
     def test_tightened_branch_still_logs(self):
         """被池值收紧时仍要打 `[杠杆闸门]` 日志（日志文案留在门面，逐字保留）。"""
-        facade = FACADE.read_text(encoding="utf-8")
-        self.assertIn("if _lever_tightened:", facade)
-        self.assertIn("已按池值收紧", facade)
-        self.assertIn("超出配置区间", facade)
+        entry = ENTRY.read_text(encoding="utf-8")
+        self.assertIn("if _lever_tightened:", entry)
+        self.assertIn("已按池值收紧", entry)
+        self.assertIn("超出配置区间", entry)
 
     def test_tightened_log_reports_pre_clamp_value(self):
         """日志里的"全局 Nx"必须是**夹取前**的原始 AI 杠杆。
@@ -182,10 +183,10 @@ class WiringTest(unittest.TestCase):
         原实现打印的是进入池值收紧那一刻的 `ai_lever`（已过配置区间夹取）。
         若换成夹取后的值，日志会自相矛盾（"上限 3x < 全局 3x"）。
         """
-        facade = FACADE.read_text(encoding="utf-8")
-        self.assertIn("_ai_lever_raw = ai_lever", facade,
+        entry = ENTRY.read_text(encoding="utf-8")
+        self.assertIn("_ai_lever_raw = ai_lever", entry,
                       "必须在夹取前留存原始值供日志使用")
-        self.assertIn("{_ai_lever_raw:g}x", facade,
+        self.assertIn("{_ai_lever_raw:g}x", entry,
                       "收紧日志必须报告夹取前的值")
 
     def test_call_site_names_are_defined(self):

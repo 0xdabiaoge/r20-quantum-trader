@@ -27,6 +27,7 @@ from scripts.trader import gates
 ROOT = Path(__file__).resolve().parents[1]
 FACADE = ROOT / "scripts" / "ai_factor_trader.py"
 SUBMODULE = ROOT / "scripts" / "trader" / "gates.py"
+ENTRY = ROOT / "scripts" / "trader" / "entry_execution.py"   # 第九十刀：开多/开空两支现住此
 
 _IMPL_ONLY_MARKERS = (
     "多所（gate/binance）下单保证金闸门",
@@ -55,13 +56,21 @@ class ImplementationMovedTest(unittest.TestCase):
 
         本测试**复刻**那条锚点的口径，但把失败信息说得更清楚 —— 它一旦翻红，
         要么是壳被改成别名赋值，要么是有注释写出了带左括号的函数名（两种都发生过）。
+
+        ⚠️ 第九十刀：开多/开空两支随入场循环搬入 `scripts/trader/entry_execution.py`
+        ⇒ "1 定义 + 2 调用 = 3"的算术**原样保留**，只是分别定位（定义=门面壳、
+        两处调用=入场执行模块），并加反证防"门面注释里写个带括号的函数名"虚 Hits。
         """
         facade = FACADE.read_text(encoding="utf-8")
-        hits = [i + 1 for i, line in enumerate(facade.splitlines())
-                if "order_margin_gate(" in line]
-        self.assertEqual(len(hits), 3,
-                         f"`order_margin_gate(` 应出现 3 次（1 定义 + 开多 + 开空），"
-                         f"实际在行 {hits}")
+        entry = ENTRY.read_text(encoding="utf-8")
+        def_hits = [i + 1 for i, line in enumerate(facade.splitlines())
+                    if "order_margin_gate(" in line]
+        call_hits = [i + 1 for i, line in enumerate(entry.splitlines())
+                     if "order_margin_gate(" in line]
+        self.assertEqual(len(def_hits), 1,
+                         f"门面应恰有 1 处（定义壳），实际在行 {def_hits}")
+        self.assertEqual(len(call_hits), 2,
+                         f"开多/开空应各调用一次（共 2），实际在行 {call_hits}")
 
 
 def _outcome(fn, kw, sam, mer):

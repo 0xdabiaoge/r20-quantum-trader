@@ -31,6 +31,7 @@ from scripts.trader import pyramiding
 ROOT = Path(__file__).resolve().parents[1]
 FACADE = ROOT / "scripts" / "ai_factor_trader.py"
 SUBMODULE = ROOT / "scripts" / "trader" / "pyramiding.py"
+ENTRY = ROOT / "scripts" / "trader" / "entry_execution.py"   # 第九十刀：开多/开空两支现住此
 
 # 门面的默认取值（与 execute_portfolio 调用点一致）
 DEF = dict(min_scale_in_profit_ratio=0.008, max_scale_in_count=1,
@@ -134,11 +135,11 @@ class ImplementationMovedTest(unittest.TestCase):
             self.assertNotIn(marker, facade, f"门面仍留有实现体 {marker!r}")
 
     def test_both_branches_call_the_helper(self):
-        facade = FACADE.read_text(encoding="utf-8")
-        self.assertEqual(facade.count("allow_entry, is_scale_in = pyramiding_gate("), 2,
+        entry = ENTRY.read_text(encoding="utf-8")
+        self.assertEqual(entry.count("allow_entry, is_scale_in = pyramiding_gate("), 2,
                          "开多/开空都必须走同一个门禁实现")
-        self.assertIn("is_long=True,", facade)
-        self.assertIn("is_long=False,", facade)
+        self.assertIn("is_long=True,", entry)
+        self.assertIn("is_long=False,", entry)
 
     def test_both_call_sites_define_every_local_the_gate_needs(self):
         """调用点必须在自己**这一支**里备好传给门禁的每一个名字。
@@ -162,9 +163,9 @@ class ImplementationMovedTest(unittest.TestCase):
         **绝不下钻进兄弟分支**。这样开多分支的赋值对开空调用不可见。
         """
         import ast
-        tree = ast.parse(FACADE.read_text(encoding="utf-8"))
+        tree = ast.parse(ENTRY.read_text(encoding="utf-8"))
         func = next(n for n in ast.walk(tree)
-                    if isinstance(n, ast.FunctionDef) and n.name == "execute_portfolio")
+                    if isinstance(n, ast.FunctionDef) and n.name == "execute_entry_scan")
 
         from tests.source_scan import names_defined_at_call
 
@@ -323,12 +324,12 @@ class ParityTest(unittest.TestCase):
 
     def test_facade_constants_are_passed_not_baked(self):
         """门面必须把风控常量作为实参传入（不得让子模块 import 期烘焙）。"""
-        facade = FACADE.read_text(encoding="utf-8")
+        entry = ENTRY.read_text(encoding="utf-8")
         for kw in ("min_scale_in_profit_ratio=MIN_SCALE_IN_PROFIT_RATIO,",
                    "max_scale_in_count=MAX_SCALE_IN_COUNT,",
                    "min_scale_in_confidence=MIN_SCALE_IN_CONFIDENCE,",
                    "asset_margin_cap=ASSET_MARGIN_CAP)"):
-            self.assertIn(kw, facade, f"门面未注入 {kw}")
+            self.assertIn(kw, entry, f"门面未注入 {kw}")
 
 
 if __name__ == "__main__":
