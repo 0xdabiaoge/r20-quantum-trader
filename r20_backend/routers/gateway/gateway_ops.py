@@ -4,18 +4,18 @@
 """
 from __future__ import annotations
 
-import os
 import subprocess
 import sys
 from typing import Any
 from fastapi import Body, Header, HTTPException
 from r20_backend.config import refresh_settings
 from r20_backend.audit import record as audit_record
-from r20_backend.dependencies import ROOT, DATA_DIR, SCRIPTS_DIR, require_admin_header
+from r20_backend.dependencies import ROOT, SCRIPTS_DIR, require_admin_header
 from r20_backend.schemas import GatewayReplayRequest
 from r20_gateway import __version__ as GATEWAY_VERSION
 from r20_gateway.publisher import DB_PATH as GATEWAY_DB_PATH
 from r20_gateway.scheduler import scheduler_snapshot
+from r20_gateway.pidfile import process_running, read_pid
 from r20_gateway.store import GatewayStore
 
 from fastapi import APIRouter
@@ -28,15 +28,8 @@ def gateway_status(x_r20_admin_token: str | None = Header(default=None), limit: 
     refresh_settings()
     require_admin_header(x_r20_admin_token)
     store = GatewayStore(GATEWAY_DB_PATH)
-    pid_file = DATA_DIR / "r20_gateway.pid"
-    pid = int(pid_file.read_text().strip()) if pid_file.exists() and pid_file.read_text().strip().isdigit() else 0
-    running = False
-    if pid:
-        try:
-            os.kill(pid, 0)
-            running = True
-        except OSError:
-            pass
+    pid = read_pid()
+    running = process_running(pid)
     return {"version": GATEWAY_VERSION, "running": running, "pid": pid or None, "stats": store.stats(), "event_health": store.event_health(), "deliveries": store.recent(limit), "scheduler": scheduler_snapshot(store)}
 
 

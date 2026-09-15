@@ -24,6 +24,7 @@ from r20_gateway.publisher import DB_PATH as GATEWAY_DB_PATH
 from r20_gateway.plugins import plugin_statuses
 from r20_gateway.agents import agent_statuses
 from r20_gateway.secrets import save_secrets, status as secret_store_status
+from r20_gateway.pidfile import process_running, read_pid
 from r20_gateway.store import GatewayStore
 from r20_gateway.scheduler import scheduler_snapshot
 
@@ -399,15 +400,8 @@ def admin_about(
     x_r20_session: str | None = Header(default=None, alias="X-R20-Session"),
 ) -> dict[str, Any]:
     require_admin_header(x_r20_admin_token, x_r20_session)
-    pid_file = DATA_DIR / "r20_gateway.pid"
-    pid = int(pid_file.read_text().strip()) if pid_file.exists() and pid_file.read_text().strip().isdigit() else 0
-    gw_running = False
-    if pid:
-        try:
-            os.kill(pid, 0)
-            gw_running = True
-        except OSError:
-            pass
+    pid = read_pid()
+    gw_running = process_running(pid)
     store = GatewayStore(GATEWAY_DB_PATH)
     gw_status = {"version": GATEWAY_VERSION, "running": gw_running, "pid": pid or None, "stats": store.stats(), "event_health": store.event_health(), "scheduler": scheduler_snapshot(store)}
     return {

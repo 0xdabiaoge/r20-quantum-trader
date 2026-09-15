@@ -9,7 +9,7 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-PID_FILE = ROOT / "data" / "r20_gateway.pid"
+from r20_gateway.pidfile import PID_FILE  # noqa: E402  (唯一定义处：pidfile.py)
 LOCK_FILE = ROOT / "data" / ".r20_gateway.lock"
 LOG_FILE = ROOT / "logs" / "r20_gateway_supervisor.log"
 _stop = threading.Event()

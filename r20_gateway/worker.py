@@ -13,6 +13,8 @@ from r20_gateway.scheduler import GatewayScheduler
 from r20_gateway.store import GatewayStore
 
 ROOT = Path(__file__).resolve().parents[1]
+from r20_gateway.pidfile import PID_FILE
+
 LOCK_FILE = ROOT / "data" / ".r20_gateway.lock"
 LOG_FILE = ROOT / "logs" / "r20_gateway.log"
 BJ_TZ = timezone(timedelta(hours=8))
@@ -53,9 +55,8 @@ def run() -> None:
     # supervisor 旧实现对注定秒退的子进程盲写 PID 文件 → 文件长期指向死 pid，
     # 活体持锁者反而不可见，每 10s 重生一次（logs/r20_gateway.log 948 条）。
     try:
-        _pid_file = ROOT / "data" / "r20_gateway.pid"
-        _pid_file.write_text(str(os.getpid()), encoding="utf-8")
-        os.chmod(_pid_file, 0o600)
+        PID_FILE.write_text(str(os.getpid()), encoding="utf-8")
+        os.chmod(PID_FILE, 0o600)
     except OSError:
         pass
     signal.signal(signal.SIGTERM, stop)
