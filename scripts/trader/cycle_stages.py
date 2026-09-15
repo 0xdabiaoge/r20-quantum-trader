@@ -7,6 +7,7 @@
 |---|---|---|
 | `fetch_universe_and_manage_positions` | 14 行 | 相位 2-3：并发取标的池因子 + 逐仓追踪止损退出 |
 | `persist_state_and_sync_ledger` | 30 行 | 相位 5-6：面板状态持久化 + 生命周期台账/SQLite 实时同步 |
+| `scan_risk_gates_and_ai_brain` | 50 行 | 相位 4 前段：熔断判定 + 单标的保证金上限自适应 + 主脑批量扫描（LLM 批次 + 持仓全景装配 + AI 健康告警）+ 池可信闸（**无 return；4 项输出**） |
 | `fetch_positions_and_reconcile` | 115 行 | 相位 1：取真实持仓 + 合约对账 + 跨所汇总 + 挂单盲区守卫 + 预留对账（**4 处 `return None` = 本周期中止**；13 项输出） |
 | `preflight_reconcile_and_housekeeping` | 26 行 | 相位 0/0a：引擎就绪闸 + 挂单对账 + 陈旧单回收 + 舆情采集（**段内 `return None` = 本周期中止**） |
 
@@ -286,3 +287,85 @@ def fetch_positions_and_reconcile(*,
                 usdt_available = float(d.get("availBal", 0.0))
                 break
     return (_xv_total, active_pos_count, all_positions, entries_blocked, long_count, pending_inst_ids, real_pos_dict, reserved_long_count, reserved_short_count, reserved_slot_count, short_count, usdt_available, xv_positions_by_venue)
+
+
+def scan_risk_gates_and_ai_brain(*,
+        _xv_total,
+        active_pos_count,
+        all_factors,
+        executed_actions,
+        long_count,
+        short_count,
+        timestamp_full,
+        trackers,
+        usdt_available,
+        xv_positions_by_venue,
+        MAX_CONCURRENT_POSITIONS,
+        _collect_okx_position_payloads,
+        _merge_cross_venue_positions,
+        effective_single_asset_margin,
+        execute_ai_position_management,
+        execute_batch_ai_brain_cycle,
+        is_circuit_breaker_active,
+        pool_is_trustworthy,
+        pool_state,
+        query_positions,
+        read_cycle_health,
+        save_trackers):
+    """相位 4 前段：熔断判定 + 单标的保证金上限自适应 + 主脑批量扫描 + 池可信闸。
+
+    段内不动控制流（无 return/break）：`executed_actions` 由**原地 append** 回传
+    （故只入参、不返回）；`brain_cache` 在段内顶层初始化为 `{}` ⇒ 必然绑定。
+    4 项输出见调用点解包。
+    """
+    cb_active, cb_reason = is_circuit_breaker_active(usdt_available)
+    # 单标的累计保证金上限按可用余额自适应，与提示词 {{risk_budget}} 同口径
+    ASSET_MARGIN_CAP = effective_single_asset_margin(usdt_available)
+
+    brain_cache = {}
+    # One LLM call covers the full six-instrument universe and all active positions.
+    if not cb_active and execute_batch_ai_brain_cycle:
+        try:
+            pos_desc = f"当前系统总持仓 OKX {active_pos_count}/{MAX_CONCURRENT_POSITIONS} (多{long_count}/空{short_count})｜跨所持仓 {_xv_total if _xv_total is not None else '未知(拉取失败)'} 笔"
+            # 持仓全景装配（阶段 4·B3 第三十一刀：迁至 scripts/trader/position_universe.py）
+            active_pos_list = _collect_okx_position_payloads(all_factors, trackers)
+            # 汇入多所（Binance / Gate）在管持仓，形成三所平权持仓全景。
+            # 审计(2026-09-13)：必须复用 1a 已冻结的周期快照（零重复出网）。
+            _merge_cross_venue_positions(active_pos_list, xv_positions_by_venue, all_factors)
+            brain_cache = execute_batch_ai_brain_cycle(pos_desc, active_pos_list, usdt_available=usdt_available) or {}
+            if brain_cache:
+                refreshed_ok, refreshed_positions, refreshed_error = query_positions()
+                if not refreshed_ok:
+                    executed_actions.append(f"AI持仓管理跳过：无法刷新真实仓位 ({refreshed_error})")
+                else:
+                    refreshed_pos_dict = {
+                        p.get("instId"): p for p in refreshed_positions
+                        if float(p.get("pos", 0) or 0) > 0
+                    }
+                    execute_ai_position_management(refreshed_pos_dict, trackers, timestamp_full, executed_actions)
+                    save_trackers(trackers)
+            else:
+                _hf = read_cycle_health() if read_cycle_health else {}
+                if _hf.get("last_status") == "failed":
+                    _cf = int(_hf.get("consecutive_failures", 0) or 0)
+                    _warn = f"本轮AI推理失败（连续{_cf}轮｜{_hf.get('last_error') or '未知原因'}），禁止复用旧持仓指令"
+                    if _cf >= 3:
+                        _warn = "🔴 AI决策链连续" + str(_cf) + "轮失败——非并发跳过，模型/密钥/额度需人工核查！" + _warn
+                    executed_actions.append(_warn)
+                    if _cf >= 3:
+                        print(f"[AI Health] 🔴 连续 {_cf} 轮批次决策失败，最近错误: {_hf.get('last_error')}")
+                else:
+                    executed_actions.append("本轮AI推理并发跳过（旧指令不违规复用），禁止复用旧持仓指令")
+        except Exception as e:
+            print(f"[AI Brain Batch Scan Warning] {e}")
+
+    # 审计 P2-11：标的池不可信（文件损坏/为空/条目非法）时，旧实现会拿 10 币出厂默认
+    # 清单继续开新仓 —— 管理员删掉的标的会因"文件坏了"重新被交易。这里 fail-closed：
+    # 只保留持仓风控接管（止损/移动止损/AI 平仓在上面的分支已跑完），不开新仓。
+    if not cb_active and not pool_is_trustworthy():
+        _ps = pool_state()
+        _pool_warn = (f"⛔ 标的池不可信（{_ps.get('status')}: {_ps.get('detail')}）"
+                      f"——本轮只做持仓风控接管，禁止开新仓")
+        print(f"[交易池闸门] {_pool_warn}")
+        executed_actions.append(_pool_warn)
+    return (ASSET_MARGIN_CAP, brain_cache, cb_active, cb_reason)

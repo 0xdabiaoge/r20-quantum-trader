@@ -459,10 +459,16 @@ class WiringTest(unittest.TestCase):
             self.assertNotIn(f"def {fn}(", facade_src)
 
     def test_facade_calls_both(self):
+        """两处装配调用必须都在**主执行路径**上（第九十三刀后住 cycle_stages）。"""
         facade_src = FACADE.read_text(encoding="utf-8")
-        self.assertIn("_collect_okx_position_payloads(all_factors, trackers)", facade_src)
+        stages_src = (ROOT / "scripts" / "trader" / "cycle_stages.py").read_text(encoding="utf-8")
+        self.assertIn("_collect_okx_position_payloads(all_factors, trackers)", stages_src,
+                      "持仓载荷装配的调用点应随相位 4 前段迁入 cycle_stages")
         self.assertIn("_merge_cross_venue_positions(active_pos_list, xv_positions_by_venue, all_factors)",
-                      facade_src)
+                      stages_src, "三所汇总的调用点同上")
+        # 门面仍须把这两个实现注入阶段函数（调用期解析 ⇒ patch 面有效）
+        self.assertIn("_collect_okx_position_payloads=_collect_okx_position_payloads", facade_src)
+        self.assertIn("_merge_cross_venue_positions=_merge_cross_venue_positions", facade_src)
         self.assertIn("from scripts.trader.position_universe import (", facade_src)
 
     def test_facade_no_longer_contains_inline_bodies(self):

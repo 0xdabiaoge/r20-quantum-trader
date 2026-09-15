@@ -282,9 +282,13 @@ class TestVenueSnapshotSingleSource(unittest.TestCase):
                       "全景块复活现拉=同周期两次外所读取撕裂的老病")
         self.assertNotIn("fetch_other_venue_positions(", impl,
                          "实现体不得自己发起外所读取（必须吃冻结快照）")
-        facade = (ROOT / "scripts" / "ai_factor_trader.py").read_text(encoding="utf-8")
+        # ⚠️ 第九十三刀：相位 4 前段（含此处调用点）已迁入 cycle_stages.py
+        # ⇒ 判据对象随实现迁移（"必须传入 1a 冻结的快照"这条不变量不变）。
+        stages = ROOT / "scripts" / "trader" / "cycle_stages.py"
+        snode, _w2 = find_function_node(stages, "scan_risk_gates_and_ai_brain")
+        simp = ast.get_source_segment(stages.read_text(encoding="utf-8"), snode)
         self.assertIn("_merge_cross_venue_positions(active_pos_list, xv_positions_by_venue",
-                      facade, "门面调用点必须传入 1a 冻结的快照")
+                      simp, "调用点必须传入 1a 冻结的快照（不得现拉）")
 
 
 if __name__ == "__main__":

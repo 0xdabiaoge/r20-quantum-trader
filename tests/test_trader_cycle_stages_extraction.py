@@ -29,18 +29,20 @@ sys.path.insert(0, str(ROOT))
 
 PRE = "d90fac5"          # 本刀动工前最后提交（第九十刀收口）
 MOD = "scripts/trader/cycle_stages.py"
-SPECS = {  # 函数名 -> 基线 execute_portfolio 的语句下标区间
-    "fetch_positions_and_reconcile": (11, 39),   # 第九十二刀：相位 1（115 行）
-    "preflight_reconcile_and_housekeeping": (0, 10),
-    "fetch_universe_and_manage_positions": (40, 46),
-    "persist_state_and_sync_ledger": (53, 58),
+SPECS = {  # 函数名 -> (该刀动工前的提交, 基线 execute_portfolio 的语句下标区间)
+    # 每刀基线不同（分段逐个抽出，下标随之前移）⇒ 每项自带版本，避免"用错基线"。
+    "scan_risk_gates_and_ai_brain": ("672b3e5", 7, 11),        # 第九十三刀：相位 4 前段
+    "fetch_positions_and_reconcile": ("d90fac5", 11, 39),      # 第九十二刀：相位 1
+    "preflight_reconcile_and_housekeeping": ("d90fac5", 0, 10),  # 第九十一刀
+    "fetch_universe_and_manage_positions": ("d90fac5", 40, 46),  # 第九十一刀
+    "persist_state_and_sync_ledger": ("d90fac5", 53, 58),        # 第九十一刀
 }
 
 
-def _baseline_portfolio() -> ast.FunctionDef:
-    r = subprocess.run(["git", "show", f"{PRE}:scripts/ai_factor_trader.py"],
+def _baseline_portfolio(rev: str = PRE) -> ast.FunctionDef:
+    r = subprocess.run(["git", "show", f"{rev}:scripts/ai_factor_trader.py"],
                        capture_output=True, text=True, cwd=str(ROOT))
-    assert r.returncode == 0, f"基线取不到：{r.stderr[:200]}"
+    assert r.returncode == 0, f"基线取不到({rev})：{r.stderr[:200]}"
     t = ast.parse(r.stdout)
     return next(n for n in t.body if isinstance(n, ast.FunctionDef)
                 and n.name == "execute_portfolio")
@@ -71,9 +73,9 @@ def _seg_stmts(fn: ast.FunctionDef) -> list:
 
 class CycleStagesVerbatimTest(unittest.TestCase):
     def test_segments_are_ast_identical_to_baseline(self):
-        base = _baseline_portfolio()
-        for name, (lo, hi) in SPECS.items():
+        for name, (rev, lo, hi) in SPECS.items():
             with self.subTest(fn=name):
+                base = _baseline_portfolio(rev)
                 seg = base.body[lo:hi + 1]
                 got = _seg_stmts(_func(name))
                 self.assertEqual(
@@ -220,8 +222,67 @@ class CycleStagesVerbatimTest(unittest.TestCase):
         self.assertEqual(got[2], [], "all_positions 应为空")
         self.assertFalse(got[3], "entries_blocked 应为 False（对账成功）")
 
+    def _scan_kwargs(self, **over):
+        """相位 4 前段的替身集合（照实现体调用形状抄，§104.2）。"""
+        from scripts.trader import cycle_stages as _cs  # noqa: F401
+        base = dict(
+            _xv_total=0, active_pos_count=0, all_factors=[], executed_actions=[],
+            long_count=0, short_count=0, timestamp_full="2026-09-15 09:00:00",
+            trackers={}, usdt_available=1000.0, xv_positions_by_venue={},
+            MAX_CONCURRENT_POSITIONS=6,
+            _collect_okx_position_payloads=lambda *a, **k: [],
+            _merge_cross_venue_positions=lambda *a, **k: [],
+            effective_single_asset_margin=lambda u: 123.0,
+            execute_ai_position_management=lambda *a, **k: None,
+            execute_batch_ai_brain_cycle=None,
+            is_circuit_breaker_active=lambda u: (False, ""),
+            pool_is_trustworthy=lambda: True, pool_state=lambda: {},
+            query_positions=lambda: (True, [], ""), read_cycle_health=lambda: {},
+            save_trackers=lambda t: None)
+        base.update(over)
+        return base
+
+    def test_scan_circuit_breaker_active_skips_llm(self):
+        from scripts.trader import cycle_stages as cs
+        acts = []
+        got = cs.scan_risk_gates_and_ai_brain(**self._scan_kwargs(
+            is_circuit_breaker_active=lambda u: (True, "黑天鹅"),
+            executed_actions=acts))
+        self.assertEqual(len(got), 4, "返回 (ASSET_MARGIN_CAP, brain_cache, cb_active, cb_reason)")
+        self.assertEqual(got[0], 123.0, "单标的保证金上限由 effective_single_asset_margin 决定")
+        self.assertEqual(got[1], {}, "熔断时不得调用 LLM（brain_cache 保持空）")
+        self.assertTrue(got[2]); self.assertEqual(got[3], "黑天鹅")
+        self.assertEqual(acts, [], "熔断时不应产生池闸告警")
+
+    def test_scan_pool_untrusted_appends_failclosed_warning(self):
+        from scripts.trader import cycle_stages as cs
+        acts = []
+        got = cs.scan_risk_gates_and_ai_brain(**self._scan_kwargs(
+            executed_actions=acts, pool_is_trustworthy=lambda: False,
+            pool_state=lambda: {"status": "corrupt", "detail": "坏"}))
+        self.assertFalse(got[2], "非熔断")
+        self.assertEqual(len(acts), 1, "池不可信必须留一条告警（fail-closed 可追溯）")
+        self.assertIn("标的池不可信", acts[0])
+        self.assertIn("禁止开新仓", acts[0])
+
+    def test_scan_brain_cache_path_manages_positions(self):
+        """LLM 有返回 ⇒ 必须刷新真实持仓并交给主脑执行器（深路径）。"""
+        from scripts.trader import cycle_stages as cs
+        seen = {}
+        acts = []
+        got = cs.scan_risk_gates_and_ai_brain(**self._scan_kwargs(
+            executed_actions=acts,
+            execute_batch_ai_brain_cycle=lambda desc, pos, usdt_available=None: {"BTC": {"action": "hold"}},
+            query_positions=lambda: (True, [{"instId": "BTC-USDT-SWAP", "pos": "1", "posSide": "long"}], ""),
+            execute_ai_position_management=lambda d, t, ts, a: seen.update(d=d, a=a),
+            _collect_okx_position_payloads=lambda f, t: [{"instId": "BTC-USDT-SWAP"}]))
+        self.assertEqual(got[1], {"BTC": {"action": "hold"}}, "brain_cache 必须回传")
+        self.assertEqual(list(seen.get("d", {})), ["BTC-USDT-SWAP"],
+                         "刷新后的持仓字典应交给主脑执行器")
+        self.assertIs(seen.get("a"), acts, "executed_actions 必须**原地**传入（副作用回传）")
+
     def test_judgment_actually_notices_a_change(self):
-        base = _baseline_portfolio()
+        base = _baseline_portfolio("d90fac5")
         got = _seg_stmts(_func("fetch_universe_and_manage_positions"))
         seg = base.body[40:47]
         self.assertEqual(ast.dump(ast.Module(body=got, type_ignores=[]), include_attributes=False),
