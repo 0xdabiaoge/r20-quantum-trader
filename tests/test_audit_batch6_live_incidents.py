@@ -257,12 +257,34 @@ class TestVenueSnapshotSingleSource(unittest.TestCase):
         self.assertIn("纳入本周期仓位配额", owner, "唯一归属打印必须在主周期 1a 块")
 
     def test_panorama_reuses_frozen_snapshot(self):
-        from tests.source_scan import combined
-        src = combined("scripts/ai_factor_trader.py", pkg_name="trader")
-        pano = src.split("# 汇入多所（Binance / Gate）在管持仓")[1].split("except Exception as _xv_e")[0]
-        self.assertIn("_xv_snap = xv_positions_by_venue", pano,
+        """全景装配必须复用 1a 已冻结的周期快照（零重复出网）。
+
+        ## 第九十二刀为什么重写这条判据
+
+        原写法是**跨文件文本切片**：
+        `combined(facade, pkg_name="trader").split(标记)[1].split("except Exception as _xv_e")[0]`
+        —— 它依赖"标记之后、下一个 `_xv_e` 之前"这段**跨文件拼接文本**恰好延伸到
+        `position_universe.py` 的实现（`_xv_snap = xv_positions_by_venue`）。
+        `cycle_stages.py` 一加入域文本，切片就在它那里的 `_xv_e` 提前截断 ⇒ 翻红。
+        这是 §103.2 同一类坑：**别拿跨文件文本切片当判据**。
+
+        现改为两处**各自精确定位**（语义不变）：
+        1. 实现体 `merge_cross_venue_positions`（`position_universe.py`）必须
+           冻结快照再遍历，且**不得**自己现拉外所；
+        2. 门面相位 4 的调用点必须传入 `xv_positions_by_venue`（1a 冻结的那份）。
+        """
+        import ast
+        from tests.source_scan import find_function_node
+        uni = ROOT / "scripts" / "trader" / "position_universe.py"
+        node, _where = find_function_node(uni, "merge_cross_venue_positions")
+        impl = ast.get_source_segment(uni.read_text(encoding="utf-8"), node)
+        self.assertIn("_xv_snap = xv_positions_by_venue", impl,
                       "全景块复活现拉=同周期两次外所读取撕裂的老病")
-        self.assertNotIn("fetch_other_venue_positions(", pano)
+        self.assertNotIn("fetch_other_venue_positions(", impl,
+                         "实现体不得自己发起外所读取（必须吃冻结快照）")
+        facade = (ROOT / "scripts" / "ai_factor_trader.py").read_text(encoding="utf-8")
+        self.assertIn("_merge_cross_venue_positions(active_pos_list, xv_positions_by_venue",
+                      facade, "门面调用点必须传入 1a 冻结的快照")
 
 
 if __name__ == "__main__":

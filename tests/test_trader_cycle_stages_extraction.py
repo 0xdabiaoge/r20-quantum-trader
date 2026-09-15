@@ -30,6 +30,7 @@ sys.path.insert(0, str(ROOT))
 PRE = "d90fac5"          # 本刀动工前最后提交（第九十刀收口）
 MOD = "scripts/trader/cycle_stages.py"
 SPECS = {  # 函数名 -> 基线 execute_portfolio 的语句下标区间
+    "fetch_positions_and_reconcile": (11, 39),   # 第九十二刀：相位 1（115 行）
     "preflight_reconcile_and_housekeeping": (0, 10),
     "fetch_universe_and_manage_positions": (40, 46),
     "persist_state_and_sync_ledger": (53, 58),
@@ -180,6 +181,44 @@ class CycleStagesVerbatimTest(unittest.TestCase):
                              "面板状态必须写进（被替身捕获的）目标路径")
             self.assertFalse(os.path.exists(os.path.join(td, "trading_state.json")),
                              "替身后不得真的落盘")
+
+    def test_positions_abort_sentinel_returns_none(self):
+        """相位 1：查持仓失败必须中止本周期（段内 `return None` 语义）。"""
+        from scripts.trader import cycle_stages as cs
+        with tempfile.TemporaryDirectory() as td:
+            got = cs.fetch_positions_and_reconcile(
+                entries_blocked=False,
+                _BROKEN_VENUES=set(), collect_pending_inst_ids=lambda **k: (set(), 0, 0),
+                current_environment=lambda: types.SimpleNamespace(mode="demo", simulated=False),
+                fetch_other_venue_positions=lambda env: (True, {}, ""),
+                load_instruments=lambda: [], okx_rest=types.SimpleNamespace(),
+                query_positions=lambda: (False, [], "no creds"),
+                reconcile_reservation_ledger=lambda *a, **k: None,
+                venue_execution_ready=lambda v, e: False,
+                venue_registry=types.SimpleNamespace())
+        self.assertIsNone(got, "查持仓失败必须中止（返回 None）")
+
+    def test_positions_empty_world_returns_thirteen_outputs(self):
+        """空世界 smoke：10 项注入全活 ⇒ 必须产出 13 项输出（含持仓/额度/预留计数）。"""
+        from scripts.trader import cycle_stages as cs
+        okx = types.SimpleNamespace(balances=lambda: None, positions=lambda: None,
+                                    pending_orders=lambda *a: [])
+        reg = types.SimpleNamespace(execution_open=lambda v, e: False,
+                                    get_adapter=lambda v, environment=None: None,
+                                    is_registered=lambda k: False)
+        got = cs.fetch_positions_and_reconcile(
+            entries_blocked=False,
+            _BROKEN_VENUES=set(), collect_pending_inst_ids=lambda **k: (set(), 0, 0),
+            current_environment=lambda: types.SimpleNamespace(mode="demo", simulated=False),
+            fetch_other_venue_positions=lambda env: (True, {}, ""),
+            load_instruments=lambda: [], okx_rest=okx,
+            query_positions=lambda: (True, [], ""),
+            reconcile_reservation_ledger=lambda *a, **k: None,
+            venue_execution_ready=lambda v, e: False, venue_registry=reg)
+        self.assertIsNotNone(got)
+        self.assertEqual(len(got), 13, "13 项输出必须齐（调用点按序解包）")
+        self.assertEqual(got[2], [], "all_positions 应为空")
+        self.assertFalse(got[3], "entries_blocked 应为 False（对账成功）")
 
     def test_judgment_actually_notices_a_change(self):
         base = _baseline_portfolio()

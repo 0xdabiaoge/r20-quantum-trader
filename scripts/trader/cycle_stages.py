@@ -7,6 +7,7 @@
 |---|---|---|
 | `fetch_universe_and_manage_positions` | 14 行 | 相位 2-3：并发取标的池因子 + 逐仓追踪止损退出 |
 | `persist_state_and_sync_ledger` | 30 行 | 相位 5-6：面板状态持久化 + 生命周期台账/SQLite 实时同步 |
+| `fetch_positions_and_reconcile` | 115 行 | 相位 1：取真实持仓 + 合约对账 + 跨所汇总 + 挂单盲区守卫 + 预留对账（**4 处 `return None` = 本周期中止**；13 项输出） |
 | `preflight_reconcile_and_housekeeping` | 26 行 | 相位 0/0a：引擎就绪闸 + 挂单对账 + 陈旧单回收 + 舆情采集（**段内 `return None` = 本周期中止**） |
 
 ## 准入判据（沿用第九十刀定式）
@@ -147,3 +148,141 @@ def preflight_reconcile_and_housekeeping(*,
     except Exception as e:
         print(f"News Harvester sync warning: {e}")
     return (entries_blocked, timestamp_full)
+
+
+def fetch_positions_and_reconcile(*,
+        entries_blocked,
+        _BROKEN_VENUES,
+        collect_pending_inst_ids,
+        current_environment,
+        fetch_other_venue_positions,
+        load_instruments,
+        okx_rest,
+        query_positions,
+        reconcile_reservation_ledger,
+        venue_execution_ready,
+        venue_registry):
+    """相位 1：取真实持仓 + 合约对账 + 跨所汇总 + 挂单盲区守卫 + 预留对账。
+
+    段内 4 处 `return None` 语义 = **本周期中止**（调用点判 None 后 `return None`）。
+    `entries_blocked` 是 **in-out**：段内只在"跨所读取失败"分支里被置 True，
+    其余路径不碰它 —— 若不把上游（preflight）的值传进来，未命中分支时它会
+    **未绑定**（首版即如此，空世界 smoke 当场抓出 `UnboundLocalError`）。
+    其余 12 项输出在本段内均"必然绑定"（确定赋值分析），无需入参。
+    """
+    positions_ok, all_positions, positions_error = query_positions()
+    if not positions_ok:
+        print(f"[Trader] Abort: unable to verify exchange positions: {positions_error}")
+        return None
+    real_pos_dict = {}
+    real_long_count = 0
+    real_short_count = 0
+
+    if isinstance(all_positions, list):
+        for p in all_positions:
+            pos_sz = float(p.get("pos", 0) or 0)
+            if pos_sz > 0:
+                side = p.get("posSide", "net").lower()
+                inst_id = p.get("instId")
+                if inst_id in real_pos_dict:
+                    print(f"[Trader] Abort: simultaneous long/short positions for {inst_id} are not supported")
+                    return None
+                real_pos_dict[inst_id] = p
+                if "long" in side:
+                    real_long_count += 1
+                elif "short" in side:
+                    real_short_count += 1
+
+    active_pos_count = len(real_pos_dict)
+    long_count = real_long_count
+    short_count = real_short_count
+
+    try:
+        pending_orders = okx_rest.pending_orders()
+    except Exception as pending_exc:
+        print(f"[Trader] Abort: unable to verify pending orders: {pending_exc}")
+        return None
+    pending_inst_ids = set()
+    pending_long_count = 0
+    pending_short_count = 0
+    if isinstance(pending_orders, list):
+        for order in pending_orders:
+            if str(order.get("state", "live")).lower() not in {"live", "partially_filled"}:
+                continue
+            inst_id = str(order.get("instId", ""))
+            if inst_id:
+                pending_inst_ids.add(inst_id)
+            pos_side = str(order.get("posSide", "")).lower()
+            if pos_side == "long":
+                pending_long_count += 1
+            elif pos_side == "short":
+                pending_short_count += 1
+    # 审计(2026-09-13)·外所挂单盲区修复：本守卫此前只数 OKX 在途单，路由派往
+    # binance/gate 的单对周期不可见 → 同信号逐轮在外所重复挂单（实锤：binance
+    # demo BTC/SUI 各成对）。执行闸开的场并入同一把尺；凭证已死的场收侧已吼
+    # CRITICAL 且 router 同样发不出单，此处静默跳过不重复报警。
+    _auth_markers = ("INVALID_KEY", "Invalid key", "Invalid API-key", "-2015", "50111",
+                     "signature", "Signature", "not exist", "invalid timestamp")
+    try:
+        _gv_mode = str(current_environment().mode or "")
+    except Exception:
+        _gv_mode = ""
+    pending_inst_ids, pending_long_count, pending_short_count = \
+        collect_pending_inst_ids(
+            venues=("gate", "binance"), venue_mode=_gv_mode,
+            broken_venues=_BROKEN_VENUES, venue_registry=venue_registry,
+            load_instruments=load_instruments, auth_markers=_auth_markers,
+            warn=print)
+    reserved_slot_count = active_pos_count + len(pending_inst_ids)
+    reserved_long_count = long_count + pending_long_count
+    reserved_short_count = short_count + pending_short_count
+
+    # 1a. 跨所封顶（三所平权开单后的风控收口）：开闸所（gate/binance）的
+    # 活跃持仓计入总仓/同向配额；读取失败 → 本周期禁止新增开仓（fail-closed，
+    # 与挂单对账同一把尺——宁停不错）。孤儿仓只计数不处置（可能是用户手动仓）。
+    try:
+        _xv_env = str(current_environment().mode)
+    except Exception as _xv_exc:
+        _xv_env = ""
+        print(f"[跨所封顶] warn 周期冻结环境不可得（{_xv_exc}），按不可信环境处理")
+    xv_ok, xv_positions_by_venue, xv_error = fetch_other_venue_positions(_xv_env)
+    # 巡检文案口径（审计 D 级）：持仓数历来只报 OKX，跨所持仓仅在封顶逻辑里
+    # 出现——面板/日志读起来「0/8」像全空，实际外所可能有数笔。此处统一算出
+    # 跨所笔数供 AI 提示词与巡检日志；拉取失败显式标「未知」，绝不装 0。
+    _xv_total = sum(len(v or []) for v in (xv_positions_by_venue or {}).values()) if xv_ok else None
+    xv_enabled = bool(_xv_env) and any(venue_execution_ready(v, _xv_env)
+                                       for v in ("gate", "binance"))
+    if (xv_enabled or not _xv_env) and not xv_ok:
+        print(f"[跨所封顶] fail-closed 本周期禁止新增开仓: {xv_error or '环境轴不可得'}")
+        entries_blocked = True
+    else:
+        for _v, _rows in (xv_positions_by_venue or {}).items():
+            for _p in _rows:
+                print(f"[跨所封顶] {_v} {_p.get('inst_id')} {_p.get('side')} "
+                      f"size={_p.get('size_signed')} 纳入本周期仓位配额（只计数不处置）")
+                reserved_slot_count += 1
+                if str(_p.get("side", "")).lower() == "long":
+                    reserved_long_count += 1
+                else:
+                    reserved_short_count += 1
+
+    # 1b. US-010 预留对账：基于本周期刚核验的持仓/挂单实况回笼陈旧占用
+    #     （活仓/在途挂单一律保留；无仓无挂且超 TTL 才 closed——宁慢不错杀）。
+    try:
+        reconcile_reservation_ledger(real_pos_dict, pending_inst_ids, _xv_env,
+                                     venue_snapshot=xv_positions_by_venue)
+    except Exception as _rc_exc:
+        print(f"[预留对账] warn 对账器异常（不影响本周期交易）: {_rc_exc}")
+
+    try:
+        bal_res = okx_rest.balances()
+    except Exception as bal_exc:
+        print(f"[Trader] Abort: unable to verify account balance: {bal_exc}")
+        return None
+    usdt_available = 0.0
+    if bal_res:
+        for d in bal_res[0].get("details", []):
+            if d.get("ccy") == "USDT":
+                usdt_available = float(d.get("availBal", 0.0))
+                break
+    return (_xv_total, active_pos_count, all_positions, entries_blocked, long_count, pending_inst_ids, real_pos_dict, reserved_long_count, reserved_short_count, reserved_slot_count, short_count, usdt_available, xv_positions_by_venue)

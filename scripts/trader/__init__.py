@@ -19,7 +19,7 @@
 | `notifications.py` | `entry_action_message` / `entry_failure_message` / `trade_open_kwargs` 方向文案与通知参数（12 个方向常量收成单一来源） | 全部入参；`leverage` 与全部状态变更刻意留在门面 |
 | `cycle_snapshot.py` | `collect_pending_inst_ids` 外所挂单枚举与去重计数 + `build_state_payload` 面板状态快照 | venue_registry/load_instruments/信号求值函数，均调用期 |
 | `signal_snapshot.py` | `build_signal_snapshot` 开仓时刻因果/数理/舆情观测组装（自进化复盘数据源；B3 第八十二刀，零交易动作） | 唯一外部依赖 `DATA_DIR`（因子库快照路径根），门面壳调用期注入；专测 patch 面保真 |
-| `cycle_stages.py` | `execute_portfolio` 的三个相位段：`preflight_reconcile_and_housekeeping`（0/0a 就绪闸+对账+回收+舆情）/ `fetch_universe_and_manage_positions`（2-3 并发取因子+逐仓退出）/ `persist_state_and_sync_ledger`（5-6 面板持久化+台账同步）（B3 第九十一刀） | 全同名 kw-only 入参；段体 **AST 逐字**；段内 `return None` = 本周期中止（调用点判 None 后 `return None`）|
+| `cycle_stages.py` | `execute_portfolio` 的四个相位段：`fetch_positions_and_reconcile`（相位 1：取真实持仓+合约对账+跨所汇总+挂单盲区守卫+预留对账，B3 第九十二刀）+ `preflight_reconcile_and_housekeeping`（0/0a 就绪闸+对账+回收+舆情）/ `fetch_universe_and_manage_positions`（2-3 并发取因子+逐仓退出）/ `persist_state_and_sync_ledger`（5-6 面板持久化+台账同步）（B3 第九十一刀） | 全同名 kw-only 入参；段体 **AST 逐字**；段内 `return None` = 本周期中止（调用点判 None 后 `return None`）|
 | `entry_execution.py` | `execute_entry_scan` —— `execute_portfolio` **相位 4 入场循环**（300 行：逐标的信号评估→置信度/流动性/加仓闸→定价与载荷→受保护下单→通知与追踪器）（B3 第九十刀） | 41 项同名入参（12 外围局部量 + 29 门面全局）；**AST 逐字**、无返回值（0 return/0 break；3 个计数器循环后不再被读） |
 | `position_exit.py` | `manage_position_tp_and_trailing` 持仓**机械退出**主流程（硬止损 / 三档追踪棘轮 / 时间止损 / 云端保护同步 / 平仓确认 / 台账；与 `position_mgmt.py` 的"主脑指令执行"是两个关注点）（B3 第八十九刀） | 同名注入 18 项；`time` 子包自 import |
 | `order_submit.py` | `submit_protected_limit_order` 受保护限价单提交（决策面前置闸→合约对账→价格锚定→**入场价穿价幻觉闸**→demo rescale→多所平权分发）（B3 第八十八刀，唯一落单函数） | 同名注入 11 项；审计④ 价格理智锚点的三段文本随实现迁入本模块（锚点已工具化） |

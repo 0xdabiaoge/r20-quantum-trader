@@ -28,6 +28,7 @@ from scripts.trader import notifications
 ROOT = Path(__file__).resolve().parents[1]
 FACADE = ROOT / "scripts" / "ai_factor_trader.py"
 SUBMODULE = ROOT / "scripts" / "trader" / "notifications.py"
+CYCLE_STAGES = ROOT / "scripts" / "trader" / "cycle_stages.py"   # 第九十二刀：相位段现住此
 ENTRY = ROOT / "scripts" / "trader" / "entry_execution.py"   # 第九十刀：开多/开空两支现住此
 
 # _STRAT / _REASON 是门面调用点的既有局部量
@@ -272,11 +273,16 @@ class WiringTest(unittest.TestCase):
                         found.add(t.id)
             return found
 
-        facade_eff = side_effect_names(FACADE)
+        # 第九十二刀：相位 1（取持仓/挂单枚举/跨所封顶/预留对账）整体搬入
+        # `scripts/trader/cycle_stages.py` ⇒ 它的副作用（`pending_inst_ids.add`、
+        # `reserved_* += 1`）随之迁移。**原意不变**：状态变更必须留在
+        # 「门面主执行路径」（门面本体 ∪ 它的阶段函数），不得藏进 notifications 域。
+        facade_eff = side_effect_names(FACADE) | side_effect_names(CYCLE_STAGES)
         sub_eff = side_effect_names(SUBMODULE)
         for name in ("save_trackers", "add", "reserved_slot_count",
                      "reserved_long_count", "reserved_short_count"):
-            self.assertIn(name, facade_eff, f"门面应保留副作用 {name!r}")
+            self.assertIn(name, facade_eff,
+                          f"门面主执行路径应保留副作用 {name!r}（门面或 cycle_stages）")
             self.assertNotIn(name, sub_eff, f"子模块不得包含副作用 {name!r}（AST 判定）")
 
     def test_both_call_sites_define_every_name_they_pass(self):

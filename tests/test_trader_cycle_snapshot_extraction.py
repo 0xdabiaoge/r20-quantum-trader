@@ -343,13 +343,17 @@ class WiringTest(unittest.TestCase):
         # （`from ... import collect_pending_inst_ids`），得到的 2 没有意义。
         called = [n.func.id for n in ast.walk(tree)
                   if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)]
-        self.assertEqual(called.count("collect_pending_inst_ids"), 1)
+        # 第九十二刀：`collect_pending_inst_ids` 的调用随相位 1 迁入 cycle_stages.py
+        self.assertEqual(called.count("collect_pending_inst_ids"), 0,
+                         "门面主流程已不再直接调用（随相位 1 迁出）")
         # 第九十一刀：`build_state_payload` 的调用随"相位 5"搬入 cycle_stages.py
         stages = ast.parse((ROOT / "scripts" / "trader" / "cycle_stages.py").read_text(encoding="utf-8"))
         stage_calls = [n.func.id for n in ast.walk(stages)
                        if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)]
         self.assertEqual(stage_calls.count("build_state_payload"), 1,
                          "面板状态装配应恰有 1 处调用（现住 cycle_stages.persist_state_and_sync_ledger）")
+        self.assertEqual(stage_calls.count("collect_pending_inst_ids"), 1,
+                         "外所挂单枚举应恰有 1 处调用（现住 cycle_stages.fetch_positions_and_reconcile）")
         fn = next(n for n in ast.walk(tree)
                   if isinstance(n, ast.FunctionDef) and n.name == "execute_portfolio")
         lines = fn.end_lineno - fn.lineno + 1
@@ -361,12 +365,19 @@ class WiringTest(unittest.TestCase):
         self.assertNotIn('_gv_mode and venue_registry.execution_open', facade)
 
     def test_facade_keeps_the_reserved_count_arithmetic(self):
-        """预占槽位算式留在门面 —— 它是"能不能再开仓"的直接依据，必须一眼可见。"""
+        """预占槽位算式 —— 它是"能不能再开仓"的直接依据，必须一眼可见。
+
+        ⚠️ 第九十二刀：该算式随相位 1 整体搬入 `scripts/trader/cycle_stages.py`
+        （`fetch_positions_and_reconcile` 段体 AST 逐字）。判定对象随实现迁移，
+        并加反证：门面不得残留副本（残留=孪生）。
+        """
+        stages = (ROOT / "scripts" / "trader" / "cycle_stages.py").read_text(encoding="utf-8")
         facade = FACADE.read_text(encoding="utf-8")
         for line in ("reserved_slot_count = active_pos_count + len(pending_inst_ids)",
                      "reserved_long_count = long_count + pending_long_count",
                      "reserved_short_count = short_count + pending_short_count"):
-            self.assertIn(line, facade)
+            self.assertIn(line, stages, f"cycle_stages 缺 {line!r}")
+            self.assertNotIn(line, facade, "门面残留该算式 ⇒ 出现孪生")
 
     def test_facade_keeps_the_atomic_write(self):
         """原子写（异常语义"照旧上抛"，属控制流不属装配）。
@@ -384,20 +395,17 @@ class WiringTest(unittest.TestCase):
         """路径感知判据：只沿到达该调用的唯一路径收集定义。"""
         from tests.source_scan import names_defined_at_call
 
-        # 第九十一刀：两处调用分居两处 —— `collect_pending_inst_ids` 仍在门面
-        # `execute_portfolio`；`build_state_payload` 随相位 5 迁入
-        # `cycle_stages.persist_state_and_sync_ledger`。判据分别在其**所属**函数内跑。
-        plans = []
-        facade_tree = ast.parse(FACADE.read_text(encoding="utf-8"))
-        plans.append((facade_tree, next(n for n in ast.walk(facade_tree)
-                                        if isinstance(n, ast.FunctionDef)
-                                        and n.name == "execute_portfolio")))
+        # 第九十二刀：两处调用现**同在** `cycle_stages.py` ——
+        # `collect_pending_inst_ids` 随相位 1 入 `fetch_positions_and_reconcile`，
+        # `build_state_payload` 随相位 5 入 `persist_state_and_sync_ledger`。
+        # 判据分别在其**所属**函数内跑（路径感知：只看到达该调用的那条路径）。
         stages_tree = ast.parse((ROOT / "scripts" / "trader" / "cycle_stages.py").read_text(encoding="utf-8"))
-        plans.append((stages_tree, next(n for n in ast.walk(stages_tree)
-                                        if isinstance(n, ast.FunctionDef)
-                                        and n.name == "persist_state_and_sync_ledger")))
-        tree = plans[0][0]
-        func = plans[0][1]
+        plans = [(stages_tree, next(n for n in ast.walk(stages_tree)
+                                    if isinstance(n, ast.FunctionDef)
+                                    and n.name == "fetch_positions_and_reconcile")),
+                 (stages_tree, next(n for n in ast.walk(stages_tree)
+                                    if isinstance(n, ast.FunctionDef)
+                                    and n.name == "persist_state_and_sync_ledger"))]
 
         checked = 0
         work = []
