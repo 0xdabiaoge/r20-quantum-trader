@@ -4,6 +4,9 @@ Web Dashboard Application Module
 from __future__ import annotations
 from typing import Any
 from r20_backend.time_utils import beijing_text
+from r20_backend.dashboard_payload.collect import (  # noqa: E402
+    collect_core_account_state,
+)
 from r20_backend.dashboard_payload.cache import (  # noqa: E402
     load_persisted_dashboard_cache as _core_load_persisted_dashboard_cache,
     persist_dashboard_cache as _core_persist_dashboard_cache,
@@ -265,64 +268,18 @@ def update_cache_cycle():
     source_errors = []
 
     # Parallel Phase 1: Fetch Balance, Positions, and Maker Orders concurrently
-    with ThreadPoolExecutor(max_workers=3) as pool:
-        f_bal = pool.submit(_fetch_json, okx_rest.balances)
-        f_pos = pool.submit(_fetch_json, okx_rest.positions)
-        f_ord = pool.submit(_fetch_json, okx_rest.pending_orders)
-        balance_ok, bal_data, balance_error = f_bal.result()
-        positions_ok, pos_data, positions_error = f_pos.result()
-        orders_ok, orders_data, orders_error = f_ord.result()
-
-    if not balance_ok:
-        source_errors.append(f"balance: {balance_error}")
-        bal_data = []
-    if not positions_ok:
-        source_errors.append(f"positions: {positions_error}")
-        pos_data = []
-    if not orders_ok:
-        source_errors.append(f"orders: {orders_error}")
-        orders_data = []
-
-    # 三项核心私有查询同时因未配置凭证失败 → 这是「连接方式缺失」而非网络抖动，
-    # data_health 用专属 NOT_READY 状态，页面区块据此显示人话文案。
-    _private_not_ready = (
-        not balance_ok and not positions_ok and not orders_ok
-        and balance_error == _NOT_READY_TEXT
-        and positions_error == _NOT_READY_TEXT
-        and orders_error == _NOT_READY_TEXT
-    )
-
-    total_eq = 0.0
-    avail_eq = 0.0
-    cash_bal = 0.0
-    upl_acc = 0.0
-
-    if isinstance(bal_data, list) and bal_data:
-        for d in bal_data[0].get("details", []):
-            if d.get("ccy") == "USDT":
-                total_eq = float(d.get("eq", 0.0) or 0.0)
-                avail_eq = float(d.get("availBal", 0.0) or 0.0)
-                cash_bal = float(d.get("cashBal", 0.0) or 0.0)
-                upl_acc = float(d.get("upl", 0.0) or 0.0)
-                break
-
-    positions = []
-    total_pos_upl = 0.0
-    long_count = 0
-    short_count = 0
-
-    trackers = load_position_trackers()
-
-    _pos_delta = _core_collect_position_rows(pos_data, positions, trackers,
-                                            load_instruments=load_instruments)
-    long_count += _pos_delta[0]
-    short_count += _pos_delta[1]
-    total_pos_upl += _pos_delta[2]
-
-    # Parse Pending Maker Orders
-    pending_orders_list = []
-    _core_collect_pending_order_rows(
-        orders_data, pending_orders_list, tz_beijing=tz_beijing, datetime=datetime)
+    (_private_not_ready, avail_eq, balance_ok, cash_bal, long_count, orders_data, pending_orders_list, positions, positions_ok, short_count, total_eq, total_pos_upl, trackers, upl_acc) = collect_core_account_state(
+        source_errors=source_errors,
+        tz_beijing=tz_beijing,
+        ThreadPoolExecutor=ThreadPoolExecutor,
+        _NOT_READY_TEXT=_NOT_READY_TEXT,
+        _core_collect_pending_order_rows=_core_collect_pending_order_rows,
+        _core_collect_position_rows=_core_collect_position_rows,
+        _fetch_json=_fetch_json,
+        datetime=datetime,
+        load_instruments=load_instruments,
+        load_position_trackers=load_position_trackers,
+        okx_rest=okx_rest    )
 
     # A failed core account query must never overwrite last-known-good data with zeros.
     if not balance_ok or not positions_ok:

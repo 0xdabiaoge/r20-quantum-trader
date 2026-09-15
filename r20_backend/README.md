@@ -94,6 +94,7 @@
 | `trader_leaderboard.py` | `build_inst_leaderboard` —— 分币种战绩榜（按 pnl 降序） |
 | `position_view.py` | `collect_position_rows` —— 持仓行（含 `ctVal` 折算与 `lever<=0` 守卫） |
 | `order_view.py` | `collect_pending_order_rows` —— 在途挂单行 |
+| `collect.py` | `collect_core_account_state` —— `update_cache_cycle` **相位 1**：余额/持仓/挂单三路并发抓取 + 单项失败降级 + 「三项同时 NOT_READY ⇒ 连接方式缺失」判定 + USDT 余额解析 + 追踪器/持仓行/挂单行装配（B2 第九十四刀；段体 AST 逐字、11 项同名注入、14 项输出） |
 | `algo_protection.py` | 算法保护单视图 |
 | `ledger_view.py` | 台账视图 |
 | `multi_venue.py` | 三所组合视图 |
@@ -147,7 +148,7 @@
 ## 6. 每次拆分后必须过的两道闸
 
 ```bash
-# 1) 全量套件（当前基线：2892 例 OK, skipped=1）
+# 1) 全量套件（当前基线：2899 例 OK, skipped=1）
 #    ⚠️ 这个数字由 tests/test_readme_baseline_numbers.py 钉住：
 #    它用 AST 数出仓里 test_* 方法数，再要求本行数字与之同量级。
 #    超过 ±10% 就会翻红 —— 忘了更新这里会当场被抓住，不会静默漂移。

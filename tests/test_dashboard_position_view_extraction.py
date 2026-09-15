@@ -32,6 +32,7 @@ from r20_backend.dashboard_payload.position_view import collect_position_rows
 ROOT = Path(__file__).resolve().parents[1]
 APP = ROOT / "dashboard" / "app.py"
 MODULE = ROOT / "r20_backend" / "dashboard_payload" / "position_view.py"
+COLLECT = ROOT / "r20_backend" / "dashboard_payload" / "collect.py"   # 第九十四刀：相位 1 现住此
 
 INSTRUMENTS = [
     {"instId": "BTC-USDT-SWAP", "ctVal": 0.01},
@@ -391,7 +392,10 @@ class WiringTest(unittest.TestCase):
         mod_src = MODULE.read_text(encoding="utf-8")
         self.assertIn("def collect_position_rows(", mod_src)
         self.assertNotIn("def collect_position_rows(", app_src)
-        self.assertIn("_core_collect_position_rows(", app_src)
+        # 第九十四刀：调用点随相位 1 迁入 collect.py（门面只留注入）
+        collect_src = COLLECT.read_text(encoding="utf-8")
+        self.assertIn("_core_collect_position_rows(", collect_src)
+        self.assertIn("_core_collect_position_rows=_core_collect_position_rows", app_src)
 
     def test_facade_no_longer_contains_the_inline_loop(self):
         app_src = APP.read_text(encoding="utf-8")
@@ -400,15 +404,16 @@ class WiringTest(unittest.TestCase):
 
     def test_counters_accumulated_in_facade(self):
         """三个计数器是**跨行累加**状态，留在门面。"""
-        app_src = APP.read_text(encoding="utf-8")
+        # 第九十四刀：三个计数器随相位 1 迁入 collect.py（跨行累加语义不变）
+        collect_src = COLLECT.read_text(encoding="utf-8")
         for acc in ("long_count += _pos_delta[0]",
                     "short_count += _pos_delta[1]",
                     "total_pos_upl += _pos_delta[2]"):
-            self.assertIn(acc, app_src)
+            self.assertIn(acc, collect_src)
 
     def test_load_instruments_is_injected(self):
-        app_src = APP.read_text(encoding="utf-8")
-        tree = ast.parse(app_src)
+        # 第九十四刀：调用点迁入 collect.py ⇒ 判定对象随实现迁移
+        tree = ast.parse(COLLECT.read_text(encoding="utf-8"))
         call = next(n for n in ast.walk(tree)
                     if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)
                     and n.func.id == "_core_collect_position_rows")
