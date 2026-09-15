@@ -20,6 +20,7 @@ from r20_backend.dashboard_payload.order_view import (  # noqa: E402
 )
 from r20_backend.dashboard_payload.trade_stats import (  # noqa: E402
     aggregate_trade_stats as _core_aggregate_trade_stats,
+    aggregate_bills_and_metrics,
 )
 from r20_backend.dashboard_payload.trader_leaderboard import (  # noqa: E402
     build_inst_leaderboard as _core_build_inst_leaderboard,
@@ -336,46 +337,18 @@ def update_cache_cycle():
     
     # Process Real Orders Aggregation (Minute + Inst + Action)
     # 六项初值由 `_core_aggregate_bills` 内部建立并随返回值给出，此处不再重复初始化。
-    _bills = _core_aggregate_bills(
-        bills_data, reset_time_str=reset_time_str, today_bj_str=today_bj_str,
-        tz_beijing=tz_beijing, datetime=datetime)
-    orders_by_key = _bills["orders_by_key"]
-    # 注意：这一项在下方「平仓聚合」段会被继续累加（`+= o["gross_pnl"]`），
-    # 故此处取值是真赋值，不是可省的纯转发。
-    today_realized_gross = _bills["today_realized_gross"]
-    today_fees = _bills["today_fees"]
-    cum_total_fees = _bills["cum_total_fees"]
-    today_funding = _bills["today_funding"]
-    funding_history_list = _bills["funding_history_list"]
-
-    _stats = _core_aggregate_trade_stats(orders_by_key, today_bj_str=today_bj_str)
-    by_inst = _stats["by_inst"]
-    today_realized_gross += _stats["today_realized_gross"]
-    today_win_trades = _stats["today_win_trades"]
-    today_loss_trades = _stats["today_loss_trades"]
-    all_win_trades = _stats["all_win_trades"]
-    all_loss_trades = _stats["all_loss_trades"]
-    all_win_amt = _stats["all_win_amt"]
-    all_loss_amt = _stats["all_loss_amt"]
-
-    today_closed = today_win_trades + today_loss_trades
-    today_win_rate = round((today_win_trades / today_closed) * 100, 1) if today_closed > 0 else 0.0
-
-    all_closed = all_win_trades + all_loss_trades
-    all_win_rate = round((all_win_trades / all_closed) * 100, 1) if all_closed > 0 else 0.0
-    profit_factor = round((all_win_amt / all_loss_amt), 2) if all_loss_amt > 0 else (99.0 if all_win_amt > 0 else 0.0)
-    avg_win = round(all_win_amt / all_win_trades, 2) if all_win_trades > 0 else 0.0
-    avg_loss = round(all_loss_amt / all_loss_trades, 2) if all_loss_trades > 0 else 0.0
-
-    # Strict Realized PnL strictly from settled trades + settled fundings (Fixed, not jumping with mark price)
-    today_net_realized_pnl = round(today_realized_gross + today_fees + today_funding, 2)
-    
-    # Strict Total Cumulative Net PnL strictly from Equity vs Base Capital
-    total_cum_net_pnl = round(total_eq - initial_capital_val, 2)
-    cum_roi_pct = round((total_cum_net_pnl / initial_capital_val * 100) if initial_capital_val > 0 else 0.0, 2)
-    total_cum_realized_pnl = round(total_cum_net_pnl - total_pos_upl, 2)
-
-    inst_leaderboard = _core_build_inst_leaderboard(by_inst)
+    (all_closed, all_loss_amt, all_loss_trades, all_win_amt, all_win_rate, all_win_trades, avg_loss, avg_win, cum_roi_pct, cum_total_fees, funding_history_list, inst_leaderboard, profit_factor, today_fees, today_funding, today_loss_trades, today_net_realized_pnl, today_realized_gross, today_win_rate, today_win_trades, total_cum_net_pnl, total_cum_realized_pnl) = aggregate_bills_and_metrics(
+        bills_data=bills_data,
+        initial_capital_val=initial_capital_val,
+        reset_time_str=reset_time_str,
+        today_bj_str=today_bj_str,
+        total_eq=total_eq,
+        total_pos_upl=total_pos_upl,
+        tz_beijing=tz_beijing,
+        _core_aggregate_bills=_core_aggregate_bills,
+        _core_aggregate_trade_stats=_core_aggregate_trade_stats,
+        _core_build_inst_leaderboard=_core_build_inst_leaderboard,
+        datetime=datetime    )
 
     # 5. Load Log Lines
     log_lines = read_text_lines(LOG_FILE, 60)

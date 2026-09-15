@@ -90,7 +90,7 @@
 | `readers.py` | 本地文件读取的容错包装（存在性 → 解析 → 降级） |
 | `local_reads.py` | 本地只读数据装配 |
 | `bills.py` | `aggregate_bills` —— OKX 账单聚合 |
-| `trade_stats.py` | `aggregate_trade_stats` —— 累计胜率/盈亏/分币种 |
+| `trade_stats.py` | `aggregate_trade_stats` —— 累计胜率/盈亏/分币种；`aggregate_bills_and_metrics` —— `update_cache_cycle` **相位 4 聚合段**：票据聚合 + 交易统计派生指标（胜率/盈亏比/均值/累计 ROI，含全部除零分支）+ 标的排行榜（B2 第九十五刀；段体 AST 逐字、11 项同名注入、22 项输出） |
 | `trader_leaderboard.py` | `build_inst_leaderboard` —— 分币种战绩榜（按 pnl 降序） |
 | `position_view.py` | `collect_position_rows` —— 持仓行（含 `ctVal` 折算与 `lever<=0` 守卫） |
 | `order_view.py` | `collect_pending_order_rows` —— 在途挂单行 |
@@ -148,7 +148,7 @@
 ## 6. 每次拆分后必须过的两道闸
 
 ```bash
-# 1) 全量套件（当前基线：2899 例 OK, skipped=1）
+# 1) 全量套件（当前基线：2907 例 OK, skipped=1）
 #    ⚠️ 这个数字由 tests/test_readme_baseline_numbers.py 钉住：
 #    它用 AST 数出仓里 test_* 方法数，再要求本行数字与之同量级。
 #    超过 ±10% 就会翻红 —— 忘了更新这里会当场被抓住，不会静默漂移。

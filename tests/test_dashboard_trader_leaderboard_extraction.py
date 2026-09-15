@@ -32,6 +32,7 @@ from r20_backend.dashboard_payload.trader_leaderboard import build_inst_leaderbo
 ROOT = Path(__file__).resolve().parents[1]
 APP = ROOT / "dashboard" / "app.py"
 MODULE = ROOT / "r20_backend" / "dashboard_payload" / "trader_leaderboard.py"
+STATS = ROOT / "r20_backend" / "dashboard_payload" / "trade_stats.py"   # 第九十五刀：调用点现住此
 
 
 def _legacy(by_inst):
@@ -267,7 +268,11 @@ class WiringTest(unittest.TestCase):
         mod_src = MODULE.read_text(encoding="utf-8")
         self.assertIn("def build_inst_leaderboard(", mod_src)
         self.assertNotIn("def build_inst_leaderboard(", app_src)
-        self.assertIn("_core_build_inst_leaderboard(by_inst)", app_src)
+        # 第九十五刀：调用点随相位 4 聚合段迁入 trade_stats.aggregate_bills_and_metrics
+        stats_src = STATS.read_text(encoding="utf-8")
+        self.assertIn("_core_build_inst_leaderboard(by_inst)", stats_src)
+        self.assertIn("_core_build_inst_leaderboard=_core_build_inst_leaderboard", app_src,
+                      "门面仍须注入实现（调用期解析 ⇒ patch 面有效）")
 
     def test_facade_no_longer_contains_the_inline_loop(self):
         app_src = APP.read_text(encoding="utf-8")

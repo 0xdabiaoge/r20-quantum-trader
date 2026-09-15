@@ -33,6 +33,7 @@ from r20_backend.dashboard_payload.bills import aggregate_bills
 ROOT = Path(__file__).resolve().parents[1]
 APP = ROOT / "dashboard" / "app.py"
 MODULE = ROOT / "r20_backend" / "dashboard_payload" / "bills.py"
+STATS = ROOT / "r20_backend" / "dashboard_payload" / "trade_stats.py"   # 第九十五刀：消费点现住此
 
 TZ = datetime.timezone(datetime.timedelta(hours=8))
 RESET = "2026-09-01 00:00:00"
@@ -361,7 +362,11 @@ class WiringTest(unittest.TestCase):
         mod_src = MODULE.read_text(encoding="utf-8")
         self.assertIn("def aggregate_bills(", mod_src)
         self.assertNotIn("def aggregate_bills(", app_src)
-        self.assertIn("_core_aggregate_bills(", app_src)
+        # 第九十五刀：调用点随相位 4 聚合段迁入 trade_stats.aggregate_bills_and_metrics
+        stats_src = STATS.read_text(encoding="utf-8")
+        self.assertIn("_core_aggregate_bills(", stats_src)
+        self.assertIn("_core_aggregate_bills=_core_aggregate_bills", app_src,
+                      "门面仍须注入实现（调用期解析 ⇒ patch 面有效）")
 
     def test_facade_no_longer_contains_the_inline_loop(self):
         app_src = APP.read_text(encoding="utf-8")
@@ -392,8 +397,8 @@ class WiringTest(unittest.TestCase):
                                  "子模块不得 import datetime（须调用期注入）")
 
     def test_facade_injects_all_four_params_by_name(self):
-        app_src = APP.read_text(encoding="utf-8")
-        tree = ast.parse(app_src)
+        # 第九十五刀：调用点迁入 STATS ⇒ 判定对象随实现迁移
+        tree = ast.parse(STATS.read_text(encoding="utf-8"))
         call = next(n for n in ast.walk(tree)
                     if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)
                     and n.func.id == "_core_aggregate_bills")
@@ -402,10 +407,11 @@ class WiringTest(unittest.TestCase):
 
     def test_result_keys_are_consumed_by_facade(self):
         """门面必须把六个返回键都接出来 —— 漏一个就是静默丢数据。"""
-        app_src = APP.read_text(encoding="utf-8")
+        # 第九十五刀：六个键的接出点随聚合段迁入 trade_stats（原意不变：一个都不能漏）
+        stats_src = STATS.read_text(encoding="utf-8")
         for key in ("orders_by_key", "today_realized_gross", "today_fees",
                     "cum_total_fees", "today_funding", "funding_history_list"):
-            self.assertIn(f'_bills["{key}"]', app_src, f"门面未取用 {key}")
+            self.assertIn(f'_bills["{key}"]', stats_src, f"聚合段未取用 {key}")
 
     def test_patch_seam_still_selects_the_core(self):
         """经 `dashboard.app` 打到核心的补丁必须生效（薄壳接缝）。"""
