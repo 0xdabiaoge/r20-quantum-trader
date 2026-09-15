@@ -33,6 +33,27 @@ def stop(*_: object) -> None:
     RUNNING = False
 
 
+
+#: 作业历史清理周期（worker 启动时清一次，之后每 6 小时一次）。
+PRUNE_INTERVAL_SECONDS = 6 * 3600
+
+
+def _prune_job_history(store: GatewayStore) -> None:
+    """清理过期作业历史（可观测性维护）——**失败绝不能拖垮调度循环**。
+
+    该表按分钟级增长（`factor_library` 每分钟一条）：没有任何清理机制时
+    15 天即 2.2 万行 / 23M（实测）。保留窗口见 `GatewayStore.prune_job_runs`。
+    """
+    try:
+        result = store.prune_job_runs()
+    except Exception as exc:
+        log(f"job_runs 清理失败（不影响调度）: {type(exc).__name__}: {exc}")
+        return
+    if result.get("deleted"):
+        log(f"job_runs 清理：删除 {result['deleted']} 条"
+            f"（保留 {result['keep_days']} 天，VACUUM={'是' if result['vacuumed'] else '否'}）")
+
+
 def format_message(row: dict[str, object]) -> str:
     created = str(row.get("created_at", ""))
     # Format cleaner timestamp if ISO format
@@ -69,6 +90,8 @@ def run() -> None:
     scheduler = GatewayScheduler(store)
     scheduler.initialize_migration_baseline()
     log("gateway worker started with scheduler ownership")
+    _prune_job_history(store)                       # 启动清一次
+    _next_prune_at = time.time() + PRUNE_INTERVAL_SECONDS
     while RUNNING:
         # 审计#4(2026-09-13)·tick 饥饿修复：旧循环一次批量领 20 条投递并**串行**
         # HTTP 发送（webhook 卡死时每发可达超时秒级），期间 scheduler.tick() 无人喂——
@@ -78,6 +101,9 @@ def run() -> None:
         launched = scheduler.tick()
         for job_name in launched:
             log(f"scheduled job={job_name}")
+        if time.time() >= _next_prune_at:           # 之后每 6 小时一次
+            _next_prune_at = time.time() + PRUNE_INTERVAL_SECONDS
+            _prune_job_history(store)
         deliveries = store.claim_due(1)
         if not deliveries:
             time.sleep(1)

@@ -8,14 +8,14 @@
 
 **接口、页面、业务逻辑零变更**：全部改动都是「同一棵 AST 的搬家 + 同名注入」，
 每刀都有对拍门（段体与改造前逐字同源、调用点传参完整、行为例、负向验证）兜底。
-后端测试从基线 **1299 → 3109 例**，前端 27 用例 / 136 断言全绿。重构期间实盘交易周期**零异常**。
+后端测试从基线 **1299 → 3133 例**，前端 27 用例 / 136 断言全绿。重构期间实盘交易周期**零异常**。
 
 ## 2. 验证矩阵（收口实测）
 
 | 检查 | 结果 |
 |---|---|
-| 后端全量 `unittest discover -s tests -t .` | **3124 OK**（skipped=1） |
-| 离线套件 `tests/offline_suite.py` | **3102 OK**（skipped=27）；`CONFIG_WRITE_ATTEMPTS: []`；EGRESS 自检通过 |
+| 后端全量 `unittest discover -s tests -t .` | **3133 OK**（skipped=1） |
+| 离线套件 `tests/offline_suite.py` | **3114 OK**（skipped=27）；`CONFIG_WRITE_ATTEMPTS: []`；EGRESS 自检通过 |
 | 前端 `node --test tests/*.test.mjs` | **27 用例 / 136 断言，0 失败** |
 | 前端 `npx vue-tsc --noEmit` | 干净（无输出） |
 | 前端 `npx vite build` | 成功（1.64s） |
