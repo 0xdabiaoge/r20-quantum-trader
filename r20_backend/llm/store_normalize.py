@@ -105,3 +105,91 @@ def finalize_config_document(*,
     _atomic_write_json(config_file, config)
     return config
 
+def normalize_providers_into_result(*,
+        _detect_capabilities,
+        _detect_reasoning_type,
+        active_mid,
+        active_pid,
+        mask_keys,
+        mask_secret,
+        providers_list,
+        res):
+    for p in providers_list:
+        pid = p.get("id", "")
+        # ONLY return models that are explicitly registered under this specific provider
+        models_in_p = list(p.get("models", []))
+        formatted_p_models = []
+        for m in models_in_p:
+            m_id = m.get("id", "")
+            formatted_p_models.append({
+                "id": m_id,
+                "name": m.get("name") or m_id,
+                "capabilities": m.get("capabilities") or _detect_capabilities(m_id),
+                "reasoning_type": m.get("reasoning_type") or _detect_reasoning_type(m_id),
+                "reasoning_effort": m.get("reasoning_effort") or "high",
+                "context_length": m.get("context_length"),
+                "description": m.get("description", ""),
+                # 同名模型挂多家供应商时，主脑徽标只打给归属供应商的那一份；
+                # 归属无法判定（active_pid 为空）时保留全打，避免误导为"没启用"
+                "is_active": bool(m_id == active_mid and (not active_pid or pid == active_pid)),
+            })
+
+        p_copy = {
+            "id": pid,
+            "name": p.get("name", pid),
+            "type": p.get("type", p.get("name", pid)),
+            "group": p.get("group", "其他"),
+            "enabled": bool(p.get("enabled", False)),
+            "multi_key_enabled": bool(p.get("multi_key_enabled", False)),
+            "response_api_enabled": bool(p.get("response_api_enabled", False)),
+            "base_url": p.get("base_url", ""),
+            "api_format": p.get("api_format", "openai_chat"),
+            "api_path": p.get("api_path", "/chat/completions"),
+            "description": p.get("description", ""),
+            "has_key": bool(p.get("api_key")),
+            "models_count": len(models_in_p),
+            "models": formatted_p_models,
+        }
+        if mask_keys:
+            p_copy["api_key_masked"] = mask_secret(p.get("api_key", ""))
+        else:
+            p_copy["api_key"] = p.get("api_key", "")
+        res["providers"].append(p_copy)
+
+
+def flatten_models_into_result(*,
+        _detect_capabilities,
+        active_mid,
+        config,
+        mask_keys,
+        mask_secret,
+        providers_list,
+        res):
+    # Flattened models for backward compatibility
+    for m in config.get("models", []):
+        m_pid = m.get("provider_id", "openai")
+        p_entry = next((p for p in providers_list if p.get("id") == m_pid), None)
+        m_key = m.get("api_key", "")
+        has_key = bool(m_key or (p_entry and p_entry.get("api_key")))
+
+        m_copy = {
+            "id": m["id"],
+            "name": m.get("name", m["id"]),
+            "provider_id": m_pid,
+            "provider_name": m.get("provider_name") or (p_entry.get("name") if p_entry else "自定义"),
+            "base_url": m.get("base_url", "") or (p_entry.get("base_url", "") if p_entry else ""),
+            "api_format": m.get("api_format", "openai_chat"),
+            "reasoning_type": m.get("reasoning_type", "auto"),
+            "reasoning_effort": m.get("reasoning_effort", "high"),
+            "capabilities": m.get("capabilities") or _detect_capabilities(m["id"]),
+            "context_length": m.get("context_length"),
+            "description": m.get("description", ""),
+            "has_key": has_key,
+            "is_active": m["id"] == active_mid,
+        }
+        if mask_keys:
+            m_copy["api_key_masked"] = mask_secret(m_key) if m_key else (mask_secret(p_entry.get("api_key", "")) if p_entry and p_entry.get("api_key") else "")
+        else:
+            m_copy["api_key"] = m_key
+        res["models"].append(m_copy)
+

@@ -37,7 +37,13 @@ sys.path.insert(0, str(ROOT))
 FACADES = (
     "scripts/ai_factor_trader.py",
     "scripts/ai_brain_trader.py",
+    "scripts/sync_full_ledger.py",
+    "scripts/self_improvement_engine.py",
     "dashboard/app.py",
+    "r20_backend/llm/store.py",
+    "r20_backend/llm_manager.py",
+    "r20_backend/council_manager.py",
+    "r20_backend/policy_snapshot.py",
 )
 PKG_HINT = ("scripts.trader.", "scripts.brain.", "r20_backend.dashboard_payload.",
             "scripts.")
@@ -90,6 +96,48 @@ def _extraction_calls(path: str):
             yield fn, call
 
 
+def _module_level_names(tree: ast.Module) -> set:
+    """门面模块级可解析的名字（def / import / 赋值目标）。"""
+    got = set()
+    for n in tree.body:
+        if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            got.add(n.name)
+        elif isinstance(n, (ast.Import, ast.ImportFrom)):
+            for a in n.names:
+                got.add(a.asname or a.name.split(".")[0])
+        elif isinstance(n, ast.Assign):
+            for tg in n.targets:
+                if isinstance(tg, ast.Name):
+                    got.add(tg.id)
+        elif isinstance(n, ast.AnnAssign) and isinstance(n.target, ast.Name):
+            got.add(n.target.id)
+    return got
+
+
+def _names_bound_before(fn: ast.AST, call: ast.Call) -> set:
+    got = set()
+    a = getattr(fn, "args", None)
+    if a is not None:
+        for arg in list(a.args) + list(a.kwonlyargs):
+            got.add(arg.arg)
+        if a.vararg:
+            got.add(a.vararg.arg)
+        if a.kwarg:
+            got.add(a.kwarg.arg)
+    for st in fn.body:
+        if st.lineno >= call.lineno:
+            break
+        for n in ast.walk(st):
+            if isinstance(n, ast.Name) and isinstance(n.ctx, (ast.Store, ast.Del)):
+                got.add(n.id)
+            if isinstance(n, ast.ExceptHandler) and n.name:
+                got.add(n.name)
+            if isinstance(n, (ast.Import, ast.ImportFrom)):
+                for al in n.names:
+                    got.add(al.asname or al.name.split(".")[0])
+    return got
+
+
 class ExtractionCallSiteNamesTest(unittest.TestCase):
     def test_every_injected_name_resolves_at_the_call_site(self):
         checked_calls = checked_names = 0
@@ -114,6 +162,26 @@ class ExtractionCallSiteNamesTest(unittest.TestCase):
                          + "\n  ".join(problems))
         # 防空：确认确实检查了足量名字
         self.assertGreater(checked_names, 100)
+
+    def test_every_extraction_callee_name_is_resolvable(self):
+        """**被调用名**也必须可解析。
+
+        这条是第一百零八刀的教训换来的：那次抽完两段后忘了把新函数 import 进门面，
+        调用点 `normalize_providers_into_result(...)` 直接 NameError。
+        上面那条"kwarg 值可解析"看不见它 —— 因为被调用名**不是** kwarg。
+        """
+        problems = []
+        for rel in FACADES:
+            tree = ast.parse((ROOT / rel).read_text(encoding="utf-8"))
+            mod_names = _module_level_names(tree)
+            for fn, call in _extraction_calls(rel):
+                callee = call.func.id
+                if callee in mod_names or callee in _names_bound_before(fn, call):
+                    continue
+                problems.append(f"{rel}::{fn.name} → {callee}() L{call.lineno}")
+        self.assertEqual(problems, [],
+                         "抽取调用点的**被调用名**在门面/函数内在调用处不可解析：\n  "
+                         + "\n  ".join(problems))
 
 
 if __name__ == "__main__":
