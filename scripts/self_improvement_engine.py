@@ -60,6 +60,7 @@ from scripts.evolution.review_context import (
     parse_review_json,
     summarize_closed_trades,
 )
+from scripts.evolution.report import build_evolution_report
 from scripts.evolution.observability import (  # noqa: E402,F401
     DYNAMICS_FIELDS,
     DYNAMICS_OBSERVED_MIN,
@@ -704,26 +705,21 @@ def run_self_evolution(force: bool = False):
     _, _, long_term_memory = memory_service.read_trading_context(AI_MEMORY_MD_FILE, AI_MEMORY_FILE)
 
     # 4. Save Dashboard Report
-    report_payload = {
-        "timestamp": timestamp_str,
-        "ledger_revision": ledger_revision,
-        "total_trades": total_trades,
-        "win_rate": win_rate,
-        "profit_factor": profit_factor,
-        "mode": "R20 Native Heuristic Memory (启发式长期记忆)",
-        "change_status": change_status,
-        "retired_lessons": retired_lessons,
-        "retired_count": len(retired_lessons),
-        "memory_preserved": preserve_existing_memory,
-        "insights": insights,
-        "diagnosis_insights": insights,
-        "memory_overwrites_reason": llm_review.get("memory_overwrites_reason", ""),
-        "actions_taken": actions_taken,
-        "core_lessons": long_term_memory,
-        "snapshot_audit": snapshot_audit,
-        "baseline_memory_protected": len(constitution_readded),
-        "llm_error": str(llm_review.get("__llm_error__") or ""),
-    }
+    report_payload = build_evolution_report(
+        actions_taken=actions_taken,
+        change_status=change_status,
+        constitution_readded=constitution_readded,
+        insights=insights,
+        ledger_revision=ledger_revision,
+        llm_review=llm_review,
+        long_term_memory=long_term_memory,
+        preserve_existing_memory=preserve_existing_memory,
+        profit_factor=profit_factor,
+        retired_lessons=retired_lessons,
+        snapshot_audit=snapshot_audit,
+        timestamp_str=timestamp_str,
+        total_trades=total_trades,
+        win_rate=win_rate    )
 
     atomic_write_json(REPORT_JSON_FILE, report_payload)
 
