@@ -30,6 +30,10 @@ from r20_backend.llm.policy import (
 )
 from r20_backend.llm.providers import _provider_holds_active_model, _resolve_active_provider_id
 from r20_backend.llm.util import _atomic_write_json, mask_secret
+from r20_backend.llm.env_sync import (
+    build_env_values,
+    resolve_effective_endpoint,
+)
 from r20_backend.llm.store_normalize import (
     finalize_config_document,
     resolve_brain_provider_attribution,
@@ -509,31 +513,18 @@ def activate_provider_model(config_file: Path, reload_config: Callable[[], Dict[
     _atomic_write_json(config_file, config)
 
     # Sync to .env and secrets
-    base_url = target_model.get("base_url", "")
-    api_key = target_model.get("api_key", "")
-    m_pid = target_model.get("provider_id")
-    if m_pid:
-        prov = next((p for p in config.get("providers", []) if p.get("id") == m_pid), None)
-        if prov:
-            if not api_key:
-                api_key = prov.get("api_key", "")
-            if not base_url:
-                base_url = prov.get("base_url", "")
+    (base_url, api_key) = resolve_effective_endpoint(
+        config=config,
+        os=os,
+        target_model=target_model    )
 
-    base_url = (base_url or os.getenv("LLM_BASE_URL") or os.getenv("OPENAI_BASE_URL") or "https://api.openai.com/v1").rstrip("/")
-
-    env_values = {
-        "LLM_BASE_URL": base_url,
-        "LLM_MODEL": model_id,
-        "LLM_REASONING_EFFORT": effort,
-    }
-    if thinking_timeout is not None:
-        timeout_val = max(5.0, min(float(thinking_timeout), 1800.0))
-        env_values["LLM_THINKING_TIMEOUT"] = str(int(timeout_val) if timeout_val.is_integer() else timeout_val)
-    if api_key:
-        env_values["LLM_API_KEY"] = api_key
-        if save_secrets:
-            save_secrets({"LLM_API_KEY": api_key})
+    env_values = build_env_values(
+        api_key=api_key,
+        base_url=base_url,
+        effort=effort,
+        model_id=model_id,
+        save_secrets=save_secrets,
+        thinking_timeout=thinking_timeout    )
 
     update_env(env_values)
     refresh_settings()
