@@ -270,8 +270,14 @@ class TestDecisionsFlock(unittest.TestCase):
         self.assertNotIn("file_lock(AI_DECISION_CACHE_FILE)",
                          inspect.getsource(aft.persist_venue_decision),
                          "门面壳里出现 flock 文本会虚 Hits 上面断言")
+        # 第九十八刀：该 flock 随"派发+落盘"尾块迁入 scripts/brain/dispatch.py
+        # （判定对象随实现迁移；原意不变：写路径必须真的被 flock 包裹）
+        import scripts.brain.dispatch as _bd
         self.assertIn("file_lock(AI_DECISION_CACHE_FILE)",
-                      inspect.getsource(abr.execute_batch_ai_brain_cycle))
+                      inspect.getsource(_bd.dispatch_llm_and_persist_decisions))
+        self.assertNotIn("file_lock(AI_DECISION_CACHE_FILE)",
+                         inspect.getsource(abr.execute_batch_ai_brain_cycle),
+                         "门面函数里出现 flock 文本会虚 Hits 上面断言")
 
     def test_lock_mutual_exclusion_semantics(self):
         from r20_backend.file_locks import file_lock

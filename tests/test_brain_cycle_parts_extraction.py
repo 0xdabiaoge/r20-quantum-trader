@@ -253,14 +253,18 @@ class NormalizePositionManagementParityTest(unittest.TestCase):
 
 class FacadeWiringTest(unittest.TestCase):
     def test_facade_delegates_and_has_no_inline_copies(self):
+        # 第九十八刀：三个 helper 的**调用点**随"派发+落盘"尾块迁入
+        # `scripts/brain/dispatch.py`（原意不变：必须仍被调用，内联实现不得复活）
+        disp = (ROOT / "scripts" / "brain" / "dispatch.py").read_text(encoding="utf-8")
+        for call in ("_normalize_position_management(", "_build_effective_prompt_text(",
+                     "_build_history_record("):
+            self.assertIn(call, disp, f"派发模块未调用 {call}")
         src = FACADE.read_text(encoding="utf-8")
-        self.assertIn("_normalize_position_management(", src)
-        self.assertIn("_build_effective_prompt_text(", src)
-        self.assertIn("_build_history_record(", src)
-        # 反向哨：内联实现不得复活
-        self.assertNotIn("validated_pos_mgmt = []", src)
-        self.assertNotIn('"top_opportunities": [', src)
-        self.assertNotIn("模型遗漏该持仓，安全降级为 HOLD", src)
+        # 反向哨：内联实现不得复活（门面与派发模块都查）
+        for text in (src, disp):
+            self.assertNotIn("validated_pos_mgmt = []", text)
+            self.assertNotIn('"top_opportunities": [', text)
+            self.assertNotIn("模型遗漏该持仓，安全降级为 HOLD", text)
 
     def test_safe_float_is_injected_at_call_time(self):
         """`safe_float` 是门面私有函数，必须调用期注入（否则门面重载后会失配）。"""

@@ -83,6 +83,9 @@ from scripts.brain.account_text import (
     build_position_lines as _build_position_lines,
     build_pending_order_lines as _build_pending_order_lines,
 )
+from scripts.brain.dispatch import (
+    dispatch_llm_and_persist_decisions,
+)
 from scripts.brain.cycle_parts import (
     normalize_position_management as _normalize_position_management,
     build_effective_prompt_text as _build_effective_prompt_text,
@@ -917,179 +920,43 @@ def execute_batch_ai_brain_cycle(
     telemetry = ModelCallTelemetry(
         "trading_brain", model_name, str(effort), effective_system_prompt, prompt
     )
-    try:
-        t0 = time.time()
-        raw_res = None
-        brain_output = None
-
-        # Transparent check: is Multi-Agent Council enabled?
-        council_enabled = False
-        try:
-            from r20_backend.council_manager import load_council_config, execute_council_debate
-            c_cfg = load_council_config()
-            council_enabled = bool(c_cfg.get("enabled"))
-        except Exception:
-            council_enabled = False
-
-        # 委员会运行状态对前台透明（2026-09-10）：此前静默降级——50 周期 0 成功也
-        # 无处诊断。ran=False 必带降级原因，进 per-symbol 缓存与历史审计。
-        council_status: Dict[str, Any] = {"ran": False, "reason": "未启用（后台投委会开关关闭）"}
-        if council_enabled:
-            council_status = {"ran": False, "reason": "辩论未返回"}
-            print("[AI Brain Council] 🏛️ 多模型委员会已开启，正在启动各专家参谋现场辩论与首席仲裁...")
-            try:
-                # 审计 P1-4d：席位提示词里的 {{account_balance}}/{{market_matrix}}/{{trading_memory}}
-                # 等占位符此前从不渲染（render_variables 在委员会全文 0 次）→ 模型只看得到花括号。
-                # 这里把本轮真实运行上下文交给委员会，让席位提示词与交易提示词同源渲染。
-                brain_output, council_transcript = execute_council_debate(
-                    market_prompt=prompt,
-                    original_system_prompt=effective_system_prompt,
-                    timeout=float(c_cfg.get("timeout_seconds", 240.0)),
-                    runtime_context=runtime_context,
-                )
-                council_status = {
-                    "ran": True,
-                    "duration_ms": int(council_transcript.get("total_duration_ms") or 0),
-                    "consensus_mode": council_transcript.get("consensus_mode"),
-                    "advisors_ok": sum(
-                        1 for v in (council_transcript.get("advisors") or {}).values()
-                        if isinstance(v, dict) and v.get("status") != "error"
-                    ),
-                    "advisors_total": len(council_transcript.get("advisors") or {}),
-                }
-                print(f"[AI Brain Council] ✅ 委员会辩论与终审完成，耗时: {council_status['duration_ms']}ms"
-                      f"（参谋 {council_status['advisors_ok']}/{council_status['advisors_total']} 提案有效）")
-            except Exception as e:
-                council_status = {"ran": False, "reason": f"{type(e).__name__}: {str(e)[:300]}"}
-                print(f"[AI Brain Council] ⚠️ 委员会决策超时或异常: {e}，自动降级为单模型极速决策！")
-                brain_output = None
-
-        if brain_output is None:
-            print(f"[AI Brain Batch] 🚀 正在发起单次全市场大模型宏观决策推演 ({model_name} / {api_format} / 思考上限 {thinking_timeout:.0f}s)...")
-            if execute_llm_request:
-                content, _, usage_dict, _ = execute_llm_request(
-                    messages=[
-                        {"role": "system", "content": effective_system_prompt},
-                        {"role": "user", "content": prompt}
-                    ],
-                    model=model_name,
-                    base_url=base_url,
-                    api_key=api_key,
-                    api_format=api_format,
-                    reasoning_effort=effort,
-                    temperature=0.2,
-                    response_format={"type": "json_object"},
-                    timeout=thinking_timeout,
-                )
-                raw_res = {"usage": usage_dict} if isinstance(usage_dict, dict) else {}
-            else:
-                payload = {
-                    "model": model_name,
-                    "messages": [
-                        {"role": "system", "content": effective_system_prompt},
-                        {"role": "user", "content": prompt}
-                    ],
-                    "temperature": 0.2,
-                    "response_format": {"type": "json_object"}
-                }
-                if effort not in ("none", "auto"):
-                    payload["reasoning_effort"] = effort
-                req = urllib.request.Request(
-                    f"{base_url}/chat/completions",
-                    data=json.dumps(payload).encode("utf-8"),
-                    headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json", "User-Agent": "Mozilla/5.0"}
-                )
-                with urllib.request.urlopen(req, timeout=thinking_timeout) as resp:
-                    res = json.loads(resp.read().decode("utf-8"))
-                    content = res["choices"][0]["message"]["content"].strip()
-                    raw_res = res
-
-            if content.startswith("```json"): content = content[7:]
-            if content.startswith("```"): content = content[3:]
-            if content.endswith("```"): content = content[:-3]
-
-            brain_output = json.loads(content.strip())
-            if not isinstance(brain_output, dict):
-                raise ValueError("LLM response root must be an object")
-        decisions_dict = brain_output.get("decisions", {})
-        pos_mgmt_list = brain_output.get("position_management", [])
-        macro_summary = str(brain_output.get("macro_assessment", "宏观中性震荡"))[:120]
-        if not isinstance(decisions_dict, dict):
-            decisions_dict = {}
-        if not isinstance(pos_mgmt_list, list):
-            pos_mgmt_list = []
-
-        # 白名单归一 + 遗漏持仓安全兜底，见 scripts/brain/cycle_parts.py
-        pos_mgmt_list = _normalize_position_management(
-            pos_mgmt_list, active_inst_ids, safe_float=safe_float)
-
-        # Execute Pending Orders Cancellation if AI Brain decides CANCEL
-        pending_mgmt_list = brain_output.get("pending_orders_management", [])
-        if isinstance(pending_mgmt_list, list):
-            execute_brain_pending_cancels(pending_mgmt_list)
-
-        standard_cache = assemble_decision_cache(
-            packages=packages,
-            decisions_dict=decisions_dict,
-            active_inst_ids=active_inst_ids,
-            active_position_sides=active_position_sides,
-            time_str=time_str,
-            macro_summary=macro_summary,
-            policy_snapshot=policy_snapshot,
-            council_status=council_status,
-        )
-
-        # 审计③(2026-09-13)：整档覆盖与 trader 的 venue-decision 读-改-写互斥
-        # （r20_backend.file_locks，同锁文件路径即同临界区），防互相回退。
-        from r20_backend.file_locks import file_lock
-        with file_lock(AI_DECISION_CACHE_FILE):
-            atomic_write_json(AI_DECISION_CACHE_FILE, standard_cache)
-        atomic_write_json(AI_POSITION_MANAGEMENT_FILE, {
-            "timestamp": int(time.time()),
-            "time_str": time_str,
-            "policy_version": policy_version,
-            "policy_hash": policy_hash,
-            "instructions": pos_mgmt_list
-        })
-
-        # Record durable history for Web Audit
-        full_prompt_text = _build_effective_prompt_text(
-            effective_system_prompt=effective_system_prompt, policy_version=policy_version,
-            time_str=time_str, prompt=prompt)
-        history_record = _build_history_record(
-            time_str=time_str, policy_version=policy_version, policy_hash=policy_hash,
-            policy_snapshot=policy_snapshot, policy_summary=policy_summary,
-            macro_summary=macro_summary, council_status=council_status,
-            ai_last_prompt=full_prompt_text, pos_mgmt_list=pos_mgmt_list,
-            council_transcript=(brain_output.get("council_transcript")
-                                if isinstance(brain_output, dict) else None),
-            packages=packages, standard_cache=standard_cache,
-        )
-
-        history_list = []
-        if os.path.exists(AI_DECISION_HISTORY_FILE):
-            try:
-                with open(AI_DECISION_HISTORY_FILE, "r", encoding="utf-8") as f:
-                    history_list = json.load(f)
-            except Exception:
-                pass
-
-        history_list.insert(0, history_record)
-        history_list = history_list[:50] # Keep recent 50 rounds
-
-        atomic_write_json(AI_DECISION_HISTORY_FILE, history_list)
-
-        latency = round(time.time() - t0, 2)
-        telemetry.finish("success", raw_res, output_chars=len(content))
-        print(f"[AI Brain Batch] ✅ 全标的池({len(packages)} 币种)全景决策完成 (耗时 {latency}s, 宏观基调: {macro_summary})")
-        _record_cycle_health("ok")
-        return standard_cache
-
-    except Exception as e:
-        telemetry.finish("failed", error=e)
-        print(f"[AI Brain Batch] Error in batch inference: {e}")
-        _record_cycle_health("failed", str(e))
-        return None
+    return dispatch_llm_and_persist_decisions(
+        AI_DECISION_CACHE_FILE=AI_DECISION_CACHE_FILE,
+        AI_DECISION_HISTORY_FILE=AI_DECISION_HISTORY_FILE,
+        AI_POSITION_MANAGEMENT_FILE=AI_POSITION_MANAGEMENT_FILE,
+        Any=Any,
+        Dict=Dict,
+        _build_effective_prompt_text=_build_effective_prompt_text,
+        _build_history_record=_build_history_record,
+        _normalize_position_management=_normalize_position_management,
+        _record_cycle_health=_record_cycle_health,
+        active_inst_ids=active_inst_ids,
+        active_position_sides=active_position_sides,
+        api_format=api_format,
+        api_key=api_key,
+        assemble_decision_cache=assemble_decision_cache,
+        atomic_write_json=atomic_write_json,
+        base_url=base_url,
+        effective_system_prompt=effective_system_prompt,
+        effort=effort,
+        execute_brain_pending_cancels=execute_brain_pending_cancels,
+        execute_llm_request=execute_llm_request,
+        json=json,
+        model_name=model_name,
+        os=os,
+        packages=packages,
+        policy_hash=policy_hash,
+        policy_snapshot=policy_snapshot,
+        policy_summary=policy_summary,
+        policy_version=policy_version,
+        prompt=prompt,
+        runtime_context=runtime_context,
+        safe_float=safe_float,
+        telemetry=telemetry,
+        thinking_timeout=thinking_timeout,
+        time=time,
+        time_str=time_str,
+        urllib=urllib    )
 
 def get_latest_ai_decision(inst_id: str, max_age_seconds: int = DECISION_MAX_AGE_SECONDS) -> Optional[Dict[str, Any]]:
     """Read a validated decision only while its cache timestamp is fresh."""
