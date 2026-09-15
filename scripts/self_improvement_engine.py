@@ -53,6 +53,7 @@ from r20_gateway.telemetry import ModelCallTelemetry
 # EVOLUTION_SYSTEM_PROMPT` 式的引用与既有测试都按门面名解析，故门面必须继续提供。
 # ⚠️ 注意：`SNAPSHOT_MAX_STALE_SECONDS` / `SIDE_ALIASES` **留在本文件** ——
 # 它们属于 join 侧（`_match_snapshot`），不属于可观测性判定。
+from scripts.evolution.memory_review import apply_memory_review
 from scripts.evolution.observability import (  # noqa: E402,F401
     DYNAMICS_FIELDS,
     DYNAMICS_OBSERVED_MIN,
@@ -687,39 +688,17 @@ def run_self_evolution(force: bool = False):
     )
 
     retired_lessons: List[str] = []
-    if not preserve_existing_memory:
-        # Safe extraction: convert potential dicts {"rule_text": "..."} to string safely
-        safe_long_term = []
-        for item in long_term_memory:
-            if isinstance(item, dict):
-                val = str(item.get("rule_text") or item.get("text") or item.get("lesson") or "").strip()
-            else:
-                val = str(item or "").strip()
-            if val:
-                safe_long_term.append(val)
-        # 宪法级保护：基准心法不允许被进化输出物理删除（2026-09-10）
-        safe_long_term, constitution_readded = merge_memory_with_constitution(
-            change_status, safe_long_term, memory_snapshot.get("lessons") or [])
-        if constitution_readded:
-            log_msg(f"🛡️ 进化输出遗漏/试图删除 {len(constitution_readded)} 条基准心法，宿主已按宪法补回保留")
-        # 审计 P1-8c：被模型省略的**已学（非基准）**心法不再是"静默消失"，而是停用存档；
-        # 这里把条数写进日志，报告口径不再只统计基准补回。
-        _already = {t.strip() for t in safe_long_term}
-        _dropped = [str(l.get("rule_text") or "").strip() for l in (memory_snapshot.get("lessons") or [])
-                    if l.get("enabled") and not l.get("is_baseline")
-                    and str(l.get("rule_text") or "").strip() and str(l.get("rule_text") or "").strip() not in _already]
-        if _dropped:
-            retired_lessons = _dropped
-            log_msg(f"📦 {len(_dropped)} 条既学心法本轮未被复述：已按停用存档保留（不注入提示词，可在面板复核恢复）")
-
-        try:
-            published = memory_service.publish_review(
-                safe_long_term, expected_version=memory_snapshot["version"],
-                sample_size=total_trades, change_status=change_status)
-            preserve_existing_memory = not published
-        except Exception as exc:
-            preserve_existing_memory = True
-            log_msg(f"Memory publication rejected; retaining authority: {exc}")
+    (constitution_readded, preserve_existing_memory, retired_lessons) = apply_memory_review(
+        change_status=change_status,
+        constitution_readded=constitution_readded,
+        log_msg=log_msg,
+        long_term_memory=long_term_memory,
+        memory_service=memory_service,
+        memory_snapshot=memory_snapshot,
+        merge_memory_with_constitution=merge_memory_with_constitution,
+        preserve_existing_memory=preserve_existing_memory,
+        retired_lessons=retired_lessons,
+        total_trades=total_trades    )
 
     # Keep the legacy markdown mirror in lock-step with the authority so the
     # public dashboard can never freeze on a hand-edited snapshot.
