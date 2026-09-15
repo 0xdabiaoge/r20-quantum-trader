@@ -24,6 +24,9 @@
 
 正因如此，本模块**不 import 门面的任何东西**，只在调用期接收依赖。
 """
+import json
+import urllib.request
+
 from typing import Any, Dict
 
 

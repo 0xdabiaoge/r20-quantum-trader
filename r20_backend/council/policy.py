@@ -1,6 +1,8 @@
 """委员会策略常量（不含任何文件路径）。结构优化阶段 2（B5）。"""
 from __future__ import annotations
 
+from typing import Any, Dict
+
 VALID_CONSENSUS_MODES = {"standard", "cross_examination"}
 DEFAULT_CONSENSUS_MODE = "standard"
 
