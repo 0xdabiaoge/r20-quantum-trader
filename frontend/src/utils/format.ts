@@ -32,10 +32,18 @@ export function fmtPct(v: number | null | undefined, digits = 2, signed = true):
   return `${signed && n > 0 ? '+' : ''}${n.toFixed(digits)}%`;
 }
 
-/** 价格自适应精度：大数 2 位、小币 4~6 位 */
+/** 价格自适应精度：大数 2 位、小币 4~6 位
+ *
+ * 批 20：**0 视为「无值」→ `--`**。
+ * 旧实现把 0 当普通数字，`abs < 0.01` 落到 6 位精度，于是台账/持仓/矩阵里
+ * 缺数据的行渲染成 `0.000000` —— 既占位又像真值（实测 34 笔台账里有多行如此）。
+ * 加密资产不存在价格恰为 0 的标的，故 0 与 null / NaN 同档处理。
+ * 精度档保持不变：≥1000→2 / ≥10→3 / ≥1→4 / ≥0.01→5 / 其余→6。
+ * 该规则由 `tests/format.test.mjs` 钉住。
+ */
 export function fmtPrice(v: number | string | null | undefined): string {
   const n = Number(v);
-  if (!Number.isFinite(n)) return '--';
+  if (!Number.isFinite(n) || n === 0) return '--';
   const abs = Math.abs(n);
   const digits = abs >= 1000 ? 2 : abs >= 10 ? 3 : abs >= 1 ? 4 : abs >= 0.01 ? 5 : 6;
   return fmtNum(n, digits);

@@ -100,7 +100,7 @@ onUnmounted(() => {
           <span
             class="dsh-pill font-mono text-3xs"
           >
-            v{{ APP_VERSION }} 文档中心
+            {{ APP_VERSION }} 文档中心
           </span>
         </div>
       </div>

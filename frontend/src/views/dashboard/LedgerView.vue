@@ -429,10 +429,10 @@ const truncation = computed<{ kept: number; total: number } | null>(() => {
                     <span class="block text-3xs text-[var(--ink-3)]">{{ fmtPct(x.roi_pct) }}</span>
                   </td>
                   <td class="col-num font-mono text-[var(--ink-2)]">
-                    <span>{{ fmtNum(Math.abs(Number(x.fee) || 0), 2) }}</span>
+                    <span class="whitespace-nowrap">{{ fmtNum(Math.abs(Number(x.fee) || 0), 2) }}</span>
                     <span
                       v-if="Number(x.funding_fee || 0) !== 0"
-                      class="block text-3xs"
+                      class="block text-3xs whitespace-nowrap"
                       :class="Number(x.funding_fee) >= 0 ? 'text-[var(--up)]' : 'text-[var(--down)]'"
                     >
                       {{ t('dash.ledger.fundingTag') }} {{ Number(x.funding_fee) >= 0 ? '+' : '' }}{{ fmtNum(x.funding_fee, 2) }}

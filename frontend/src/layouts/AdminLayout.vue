@@ -86,7 +86,7 @@ watch(() => route.path, () => (drawerOpen.value = false));
         <img src="/favicon.svg" class="wb-logo" alt="" />
         <div v-if="!collapsed" class="wb-brand-text">
           <span class="wb-brand-name">{{ APP_NAME }}</span>
-          <span class="wb-version">v{{ APP_VERSION }}</span>
+          <span class="wb-version">{{ APP_VERSION }}</span>
         </div>
         <button
           v-if="!collapsed"

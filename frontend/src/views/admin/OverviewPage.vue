@@ -253,7 +253,7 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
         <header class="ov-card-header">
           <div class="ov-ch-main">
             <h3 class="ov-ch-title">
-              <ScrollText :size="15" class="ov-ch-icon" />
+              <ScrollText :size="14" class="ov-ch-icon" />
               <span>{{ t('admin.overview.decisions') }}</span>
             </h3>
             <p class="ov-ch-desc">{{ t('admin.overview.decisionsDesc') }}</p>
@@ -338,7 +338,7 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
           <header class="ov-card-header">
             <div class="ov-ch-main">
               <h3 class="ov-ch-title">
-                <Database :size="15" class="ov-ch-icon" />
+                <Database :size="14" class="ov-ch-icon" />
                 <span>{{ t('admin.overview.dataHealth') }}</span>
               </h3>
               <p class="ov-ch-desc">{{ t('admin.overview.dataHealthDesc') }}</p>
@@ -384,7 +384,7 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
           <header class="ov-card-header">
             <div class="ov-ch-main">
               <h3 class="ov-ch-title">
-                <LayoutGrid :size="15" class="ov-ch-icon" />
+                <LayoutGrid :size="14" class="ov-ch-icon" />
                 <span>{{ t('admin.overview.quickTitle') }}</span>
               </h3>
             </div>
@@ -416,7 +416,7 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
       <header class="ov-card-header">
         <div class="ov-ch-main">
           <h3 class="ov-ch-title">
-            <History :size="15" class="ov-ch-icon" />
+            <History :size="14" class="ov-ch-icon" />
             <span>{{ t('admin.overview.recentAudit') }}</span>
           </h3>
           <p class="ov-ch-desc">系统鉴权、风控策略变更与接口交互运行审计记录</p>
