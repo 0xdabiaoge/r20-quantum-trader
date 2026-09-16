@@ -345,9 +345,12 @@ function actionBadgeClass(action: string) {
 </template>
 
 <style scoped>
+/* 批 93：`0.24s cubic-bezier(0.16, 1, 0.3, 1)` 就是 `--dur-slow` + `--ease-out`
+   的字面写法（曲线逐字相同）—— 改用令牌后**时序完全不变**。
+   `.fade-*` 的 `0.2s ease` 一并收到 `--dur-base` + `--ease-out`。 */
 .slide-right-enter-active,
 .slide-right-leave-active {
-  transition: transform 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform var(--dur-slow) var(--ease-out);
 }
 .slide-right-enter-from,
 .slide-right-leave-to {
@@ -356,7 +359,7 @@ function actionBadgeClass(action: string) {
 
 .fade-enter-active,
 .fade-leave-active {
-  transition: opacity 0.2s ease;
+  transition: opacity var(--dur-base) var(--ease-out);
 }
 .fade-enter-from,
 .fade-leave-to {

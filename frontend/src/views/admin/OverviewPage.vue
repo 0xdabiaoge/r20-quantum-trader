@@ -876,7 +876,8 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
 .ov-gauge-fill {
   height: 100%;
   border-radius: var(--r-pill);
-  transition: width var(--dur-base) ease;
+  /* 批 93：同上，显式缓动一律用令牌（原为裸 ease）。 */
+  transition: width var(--dur-base) var(--ease-out);
 }
 .ov-gauge-num {
   font-size: var(--text-3xs);

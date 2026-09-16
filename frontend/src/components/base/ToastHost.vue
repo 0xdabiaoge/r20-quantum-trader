@@ -51,9 +51,13 @@ const colors = {
 </template>
 
 <style scoped>
-.toast-enter-active { transition: transform 0.22s var(--ease-out), opacity 0.22s var(--ease-out); }
-.toast-leave-active { transition: all 0.18s ease; position: absolute; width: 100%; }
+/* 批 93：过渡时长/缓动一律取令牌（--dur-fast/base/slow、--ease-out）。
+   全站 59 条 transition 里 55 条本就用令牌，只有 ToastHost 与 TrajectoryPanel
+   两个文件写了刻度外的字面值（0.18 / 0.2 / 0.22 / 0.24s 与裸 ease）——
+   同一个 toast 的进 / 出 / 移动竟用三个不同时长。已收敛。 */
+.toast-enter-active { transition: transform var(--dur-base) var(--ease-out), opacity var(--dur-base) var(--ease-out); }
+.toast-leave-active { transition: all var(--dur-base) var(--ease-out); position: absolute; width: 100%; }
 .toast-enter-from { transform: translateX(24px); opacity: 0; }
 .toast-leave-to { transform: translateX(16px); opacity: 0; }
-.toast-move { transition: transform 0.2s ease; }
+.toast-move { transition: transform var(--dur-base) var(--ease-out); }
 </style>
