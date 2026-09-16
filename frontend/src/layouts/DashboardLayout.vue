@@ -173,14 +173,21 @@ const venueHealth = computed(() => {
           {{ t('dash.shell.nav.groupCore') }}
         </div>
 
+        <!-- 批 100：这一组频道按钮**没有任何 hover 反馈**，而同一列表下面的「文档」
+             按钮有 `hover:bg-[var(--surface-2)] hover:text-[var(--ink-1)]`
+             —— 相邻两项 hover 行为不同。
+             不能直接加 `hover:` 类：原来活动/非活动态写在内联 `:style` 上，
+             **内联样式优先级高于工具类**，hover 类不会生效。故改成 `:class`，
+             并把 hover 只加在**非活动**项上 —— 与全站既有语汇
+             `.seg button:hover:not(.seg-on)` 一致（选中项不因悬停变样）。 -->
         <button
           v-for="tab in publicTabs"
           :key="tab.key"
           class="w-full flex items-center gap-2.5 rounded px-2.5 py-2 text-xs font-medium cursor-pointer transition-colors"
-          :style="
+          :class="
             activeTab === tab.key
-              ? { backgroundColor: 'var(--surface-3)', color: 'var(--ink-strong)', fontWeight: '600' }
-              : { color: 'var(--ink-2)' }
+              ? 'bg-[var(--surface-3)] text-[var(--ink-strong)] font-semibold'
+              : 'text-[var(--ink-2)] hover:bg-[var(--surface-2)] hover:text-[var(--ink-1)]'
           "
           :title="navCompact ? t(tab.labelKey) : undefined"
           :aria-current="activeTab === tab.key ? 'page' : undefined"

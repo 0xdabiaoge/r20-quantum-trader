@@ -213,7 +213,11 @@ const processedRows = computed(() => {
             ] as const"
             :key="m.key"
             class="px-2 py-1 rounded text-3xs font-medium cursor-pointer transition-colors"
-            :style="filterMode === m.key ? { backgroundColor: 'var(--surface-3)', color: 'var(--ink-strong)', fontWeight: '600' } : { color: 'var(--ink-3)' }"
+            :class="
+              filterMode === m.key
+                ? 'bg-[var(--surface-3)] text-[var(--ink-strong)] font-semibold'
+                : 'text-[var(--ink-3)] hover:bg-[var(--ds-color-bg-hover)] hover:text-[var(--ink-1)]'
+            "
             @click="filterMode = m.key"
           >
             {{ m.label }}

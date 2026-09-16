@@ -932,6 +932,19 @@ kbd {
   transition: background-color var(--dur-fast) var(--ease-out),
     border-color var(--dur-fast) var(--ease-out);
 }
+/* 批 100：全站 16 个开关此前只有「点下去旋钮位移」这一种反馈，悬停毫无变化。
+   补一条极轻的边色变化（既有令牌 `--ds-color-border-hover`），
+   与 `.btn` / `.seg` / `.dsh-log-entry` 一样在悬停时给出可点信号。
+
+   ⚠️ 必须显式写 `:not([aria-checked="true"])`：开着的时候
+   `.switch[aria-checked="true"]` 与本规则**同权重**，靠「谁在后面谁赢」
+   决定结果 —— 行为正确但**依赖书写顺序**，改一处顺序就会静默失效。
+   写成 `:not(...)` 后意图明确，且与全站既有语汇
+   `.seg button:hover:not(.seg-on)` 完全一致：**选中态不因悬停变样**。 */
+.switch:hover:not([aria-checked="true"]) {
+  border-color: var(--ds-color-border-hover);
+}
+
 .switch::after {
   content: '';
   position: absolute;
@@ -1061,12 +1074,21 @@ kbd {
   padding: 0;
   border: 0;
   background: none;
+  transition: color var(--dur-fast);
   font: inherit;
   letter-spacing: inherit;
   text-transform: inherit;
   color: inherit;
   cursor: pointer;
 }
+/* 批 100：排序按钮此前**一点 hover 反馈都没有**（实测 computed style 零变化），
+   所在表头是整表唯一入口，用户看不出它可点。用全站既有语汇
+   （`.seg button:hover` 的 `--ds-color-text-primary`）补上。
+   transition 并进上面的基础规则里 —— 同一个类不要开两个块。 */
+.sort-btn:hover {
+  color: var(--ds-color-text-primary);
+}
+
 .sort-btn:focus-visible {
   outline: 2px solid var(--ds-color-brand);
   outline-offset: 2px;
