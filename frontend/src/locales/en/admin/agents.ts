@@ -38,4 +38,20 @@ export const enAdminAgents = {
   bandLatency: 'Avg. latency',
   callsTitle: 'Call stream',
   emptyCalls: 'No calls recorded',
-  promptPolicy: 'Prompt policy',};
+  promptPolicy: 'Prompt policy',
+
+  status: {
+    healthy: 'Healthy',
+    degraded: 'Degraded',
+    down: 'Down',
+    offline: 'Offline',
+    online: 'Online',
+    idle: 'Idle',
+    running: 'Running',
+    success: 'Success',
+    failed: 'Failed',
+    error: 'Error',
+    'not-run': 'Not run',
+    never: 'Not run',
+  },
+};

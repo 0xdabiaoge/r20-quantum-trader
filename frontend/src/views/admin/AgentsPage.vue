@@ -44,6 +44,11 @@ function statusTone(s: string): string {
   return 'badge-warn';
 }
 
+/** 状态文案：查表本地化，未登记枚举原样回退（批 27）。 */
+function statusLabel(s: string): string {
+  return t(`admin.agents.status.${s}`, s);
+}
+
 const healthyCount = computed(
   () => agents.value.filter((a) => ['success', 'running', 'online', 'idle'].includes(a.health)).length,
 );
@@ -176,13 +181,13 @@ function ageText(a: any): string {
               <span class="ag-role">{{ a.role }}</span>
             </div>
 
-            <span class="badge" :class="statusTone(a.health)">{{ a.health }}</span>
+            <span class="badge" :class="statusTone(a.health)" :title="a.health">{{ statusLabel(a.health) }}</span>
 
             <div class="ag-run">
               <span class="ag-run-time mono">
                 {{ a.last_run_at ? fmtDateTime(a.last_run_at) : t('admin.agents.notScheduled') }}
               </span>
-              <span class="badge" :class="statusTone(a.last_run_status)">{{ a.last_run_status }}</span>
+              <span class="badge" :class="statusTone(a.last_run_status)" :title="a.last_run_status">{{ statusLabel(a.last_run_status) }}</span>
             </div>
 
             <span class="ag-age num">{{ ageText(a) }}</span>
@@ -230,7 +235,7 @@ function ageText(a: any): string {
             <div v-for="c in calls" :key="c.id" class="ag-call">
               <span class="ag-call-caller truncate" :title="c.caller">{{ c.caller || '--' }}</span>
               <span class="ag-call-model mono truncate" :title="c.model">{{ c.model || '--' }}</span>
-              <span class="badge" :class="statusTone(c.status)">{{ c.status }}</span>
+              <span class="badge" :class="statusTone(c.status)" :title="c.status">{{ statusLabel(c.status) }}</span>
               <span class="ag-call-n num">{{ c.total_tokens ?? '--' }}</span>
               <span class="ag-call-n num">{{ c.duration_ms ? Math.round(c.duration_ms) + 'ms' : '--' }}</span>
             </div>

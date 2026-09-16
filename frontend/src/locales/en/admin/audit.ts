@@ -25,4 +25,15 @@ export const enAdminAudit = {
   recordsTitle: 'Audit stream',
   actorLabel: 'Actor',
   rawJson: 'Raw record JSON',
-  noMatch: 'No matching records',};
+  noMatch: 'No matching records',
+
+  status: {
+    success: 'Success',
+    completed: 'Completed',
+    accepted: 'Accepted',
+    failed: 'Failed',
+    denied: 'Denied',
+    error: 'Error',
+    confirmed_closed: 'Confirmed closed',
+  },
+};

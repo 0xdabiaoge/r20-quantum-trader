@@ -39,4 +39,22 @@ export const zhAdminAgents = {
   bandLatency: '平均时延',
   callsTitle: '调用流水',
   emptyCalls: '暂无调用记录',
-  promptPolicy: '提示词策略',};
+  promptPolicy: '提示词策略',
+
+  // 批 27：健康 / 运行状态 / 调用状态此前都是原样印后端枚举
+  // （healthy、success、not-run），而同页 KPI 带写的是「健康 / 异常」。查表本地化。
+  status: {
+    healthy: '健康',
+    degraded: '降级',
+    down: '离线',
+    offline: '离线',
+    online: '在线',
+    idle: '空闲',
+    running: '运行中',
+    success: '成功',
+    failed: '失败',
+    error: '异常',
+    'not-run': '未运行',
+    never: '未运行',
+  },
+};

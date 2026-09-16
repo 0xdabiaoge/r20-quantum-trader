@@ -44,6 +44,21 @@ export const zhAdminGateway = {
     replayExpected: '确认短语',
     replaySubmit: '确认重放',
   },
+  // 批 27：投递行徽章原样印后端枚举（delivered / dead / …），
+  // 而同页状态带是中文「待处理 / 重试 / 死信」。查表本地化，未登记值回退原样。
+  status: {
+    pending: '待处理',
+    processing: '投递中',
+    retry: '重试中',
+    retrying: '重试中',
+    accepted: '已受理',
+    delivered: '已投递',
+    success: '成功',
+    ok: '正常',
+    dead: '死信',
+    failed: '失败',
+    error: '异常',
+  },
   msgs: {
     loadFailed: '加载失败：{msg}',
     replayPrompt: '重放投递 #{id} 需精确输入确认短语：REPLAY {id}',

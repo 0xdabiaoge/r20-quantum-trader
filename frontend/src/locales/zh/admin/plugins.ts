@@ -23,4 +23,19 @@ export const zhAdminPlugins = {
   bandIssues: '异常',
   registryTitle: '插件清单',
   registryDesc: '内置插件及其健康状态；实盘控制面仅允许随仓库审计过的内置插件',
-  policyTitle: '安装策略',};
+  policyTitle: '安装策略',
+
+  // 批 27：类型列的表头是中文「类型」，值却是后端枚举（channel / scheduler / …）。
+  // 查表本地化，未登记的类型原样回退（新插件类型不会因此变成空白）。
+  type: {
+    channel: '渠道',
+    scheduler: '调度器',
+    runtime: '运行时',
+    telemetry: '遥测',
+    security: '安全',
+    exchange: '交易所',
+    notify: '通知',
+    storage: '存储',
+    strategy: '策略',
+  },
+};

@@ -54,6 +54,13 @@ function fmtBackupTime(latest: any): string {
   if (!raw) return '--'
   return fmtDateTime(raw)
 }
+/** 最近一次备份的状态文案（批 27）：查表本地化，未登记枚举原样回退。
+ *  此前徽章直接印后端枚举 `success`，同卡片其它字段却都是中文。 */
+function statusLabelOf(s?: string): string {
+  if (!s) return t('admin.backup.statusSuccess')
+  const key = `admin.backup.status${s.charAt(0).toUpperCase()}${s.slice(1)}`
+  return t(key, s)
+}
 const targetTypes = ref<any[]>([])
 const status = ref<any>(null)
 const uploadFileInput = ref<HTMLInputElement | null>(null)
@@ -521,8 +528,8 @@ onMounted(load)
               </div>
               <div class="bk-kv-row">
                 <span class="bk-kv-k">{{ t('admin.backup.status') }}</span>
-                <span class="badge" :class="simple.latest.status === 'failed' ? 'badge-down' : 'badge-up'">
-                  {{ simple.latest.status || t('admin.backup.statusSuccess') }}
+                <span class="badge" :class="simple.latest.status === 'failed' ? 'badge-down' : 'badge-up'" :title="simple.latest.status">
+                  {{ statusLabelOf(simple.latest.status) }}
                 </span>
               </div>
             </div>

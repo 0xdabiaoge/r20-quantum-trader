@@ -102,6 +102,11 @@ function statusTone(s: string): string {
   if (s === 'pending' || s === 'retrying') return 'badge-warn';
   return '';
 }
+
+/** 投递状态文案：查表本地化，未登记枚举原样回退（批 27）。 */
+function statusLabel(s: string): string {
+  return t(`admin.gateway.status.${s}`, s);
+}
 </script>
 
 <template>
@@ -275,7 +280,7 @@ function statusTone(s: string): string {
               <td class="gw-topic">{{ d.topic }}</td>
               <td class="mono gw-target truncate" :title="d.target">{{ d.target }}</td>
               <td>
-                <span class="badge" :class="statusTone(d.status)">{{ d.status }}</span>
+                <span class="badge" :class="statusTone(d.status)" :title="d.status">{{ statusLabel(d.status) }}</span>
               </td>
               <td class="gw-r mono gw-dim">{{ d.attempts ?? 0 }}</td>
               <td class="mono gw-dim">{{ d.updated_at ? fmtJobTime(d.updated_at) : '--' }}</td>

@@ -48,6 +48,10 @@ function healthLabel(h: string): string {
   if (h === 'disabled') return t('admin.plugins.healthDisabled');
   return h;
 }
+/** 类型文案：查表本地化，未登记类型原样回退（批 27）。 */
+function typeLabel(v: string): string {
+  return t(`admin.plugins.type.${v}`, v);
+}
 </script>
 
 <template>
@@ -142,7 +146,7 @@ function healthLabel(h: string): string {
             <div class="pl-main">
               <div class="pl-title">
                 <span class="pl-name">{{ p.name }}</span>
-                <span class="badge">{{ p.plugin_type }}</span>
+                <span class="badge" :title="p.plugin_type">{{ typeLabel(p.plugin_type) }}</span>
                 <span class="badge mono">v{{ p.version }}</span>
               </div>
               <span class="pl-id mono">{{ p.plugin_id }}</span>

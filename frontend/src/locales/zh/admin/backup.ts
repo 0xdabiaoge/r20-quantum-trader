@@ -53,5 +53,8 @@ export const zhAdminBackup = {
   notConfigured: '未配置',
   statusSuccess: '成功',
   statusFailed: '失败',
+  // 批 27：徽章原来直接印后端枚举（success），而同卡片其它字段都是中文。
+  statusRunning: '进行中',
+  statusPending: '待执行',
   legacyTag: "旧版 bypy 配置",
 };

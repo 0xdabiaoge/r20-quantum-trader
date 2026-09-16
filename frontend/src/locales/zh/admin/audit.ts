@@ -25,4 +25,17 @@ export const zhAdminAudit = {
   recordsTitle: '审计流水',
   actorLabel: '操作者',
   rawJson: '原始记录 JSON',
-  noMatch: '没有匹配的记录',};
+  noMatch: '没有匹配的记录',
+
+  // ── 批 27：行内状态徽章此前直接印后端枚举（success / failed / …），
+  // 与同页 KPI 带的中文「成功 / 异常」自相矛盾。改为查表，未登记的值原样回退。
+  status: {
+    success: '成功',
+    completed: '已完成',
+    accepted: '已受理',
+    failed: '失败',
+    denied: '已拒绝',
+    error: '异常',
+    confirmed_closed: '已确认平仓',
+  },
+};

@@ -53,5 +53,7 @@ export const enAdminBackup = {
   notConfigured: 'Not configured',
   statusSuccess: 'Success',
   statusFailed: 'Failed',
+  statusRunning: 'Running',
+  statusPending: 'Pending',
   legacyTag: "Legacy bypy config",
 };

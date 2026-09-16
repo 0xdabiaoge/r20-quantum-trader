@@ -79,6 +79,12 @@ function statusIcon(s: string) {
   if (BAD_STATUSES.includes(s)) return Ban
   return HelpCircle
 }
+/** 状态文案：查表本地化，未登记的枚举**原样回退**（不吞数据）。
+ *  批 27：此前直接把 `r.status` 印在徽章上，于是同一页 KPI 带写「成功 / 异常」、
+ *  表格里却是 `success / failed`，中英混排。 */
+function statusLabel(s: string): string {
+  return t(`admin.audit.status.${s}`, s)
+}
 /** 操作者：原实现取 detail.actor || detail.username || 'system' */
 function actorOf(r: any): string {
   return r?.detail?.actor || r?.detail?.username || 'system'
@@ -212,9 +218,9 @@ onMounted(load)
           >
             <span class="au-time mono num">{{ fmtDateTime(r.timestamp) }}</span>
 
-            <span class="badge" :class="statusTone(r.status)">
+            <span class="badge" :class="statusTone(r.status)" :title="r.status">
               <component :is="statusIcon(r.status)" :size="10" />
-              {{ r.status }}
+              {{ statusLabel(r.status) }}
             </span>
 
             <span class="au-action mono truncate" :title="r.action">{{ r.action }}</span>
@@ -256,7 +262,7 @@ onMounted(load)
           </div>
           <div class="au-dlg-cell">
             <span class="label-caps">{{ t('admin.audit.colStatus') }}</span>
-            <span class="badge" :class="statusTone(detailRec.status)">{{ detailRec.status }}</span>
+            <span class="badge" :class="statusTone(detailRec.status)" :title="detailRec.status">{{ statusLabel(detailRec.status) }}</span>
           </div>
           <div class="au-dlg-cell">
             <span class="label-caps">{{ t('admin.audit.actorLabel') }}</span>

@@ -23,4 +23,17 @@ export const enAdminPlugins = {
   bandIssues: 'Issues',
   registryTitle: 'Plugin inventory',
   registryDesc: 'Built-in plugins and their health; the live control plane only allows repository-audited built-ins',
-  policyTitle: 'Installation policy',};
+  policyTitle: 'Installation policy',
+
+  type: {
+    channel: 'Channel',
+    scheduler: 'Scheduler',
+    runtime: 'Runtime',
+    telemetry: 'Telemetry',
+    security: 'Security',
+    exchange: 'Exchange',
+    notify: 'Notify',
+    storage: 'Storage',
+    strategy: 'Strategy',
+  },
+};
