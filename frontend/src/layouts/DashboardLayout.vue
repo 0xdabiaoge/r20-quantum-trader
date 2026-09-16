@@ -129,11 +129,20 @@ const venueHealth = computed(() => {
         style="border-color: var(--line-1)"
       >
         <!-- 批 43：品牌区此前是 `<div @click>` —— 键盘用户回不到首页，
-             屏幕阅读器也不知道它是链接。改成真 `<RouterLink>`（外观靠 a 的类保留）。 -->
+             屏幕阅读器也不知道它是链接。改成真 `<RouterLink>`（外观靠 a 的类保留）。
+
+             批 98：**折叠态下这个链接没有可访问名** —— 品牌字由
+             `v-if="!navCompact"` 控制，折叠时整个字标不渲染，链接里只剩下
+             `<img alt="">`（空 alt = 明确声明装饰性）。批 43 的初衷
+             （「屏幕阅读器也知道它是链接」）在折叠态其实落空了。
+             补 `aria-label` 取品牌名：折叠态有名字；展开态可访问名
+             **恰好等于可见字标**，满足 WCAG 2.5.3（Label in Name）。
+             用 `brand.name` 而不是新造键 —— 它已是品牌名的单一事实源。 -->
         <RouterLink
           to="/"
           class="flex items-center gap-2.5 min-w-0 cursor-pointer no-underline"
           style="color: inherit"
+          :aria-label="t('brand.name')"
         >
           <img src="/favicon.svg" alt="" class="h-6 w-6 shrink-0 rounded" />
           <div v-if="!navCompact" class="min-w-0 truncate">
