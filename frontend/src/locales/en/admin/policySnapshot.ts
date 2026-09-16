@@ -3,6 +3,10 @@ export const enAdminPolicySnapshot = {
   desc: 'Archive the strategy pack; roll back with per-unit verification (auto-revert on mismatch)',
   loading: 'Computing and aggregating live fingerprints of the four policy units...',
   notRecorded: 'Not recorded',
+  // batch 72: a successful fetch with no snapshot used to fall into the
+  // "fetch failed + network error" branch, which misreported the state.
+  emptySnapshot: 'No policy snapshot yet',
+  emptySnapshotDesc: 'The backend has not produced a policy snapshot yet. Use "Refresh fingerprint" in the top-right corner, or archive one first.',
   btn: {
     archive: 'Archive as policy version',
     refreshing: 'Fetching...',

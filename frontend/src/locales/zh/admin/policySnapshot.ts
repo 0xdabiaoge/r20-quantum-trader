@@ -3,6 +3,9 @@ export const zhAdminPolicySnapshot = {
   desc: '归档当前策略整包；回滚时逐单元校验，含风控/路由',
   loading: '正在计算并聚合四大策略单元实时指纹...',
   notRecorded: '未记录',
+  // 批 72：拉取成功但尚无快照，此前会误落到「拉取失败 + 网络异常」分支（语义谎报）
+  emptySnapshot: '当前还没有策略快照',
+  emptySnapshotDesc: '后台尚未生成策略快照；可点击右上角「刷新指纹」重新抓取，或先「归档为策略版本」。',
   btn: {
     archive: '归档为策略版本',
     refreshing: '抓取中...',

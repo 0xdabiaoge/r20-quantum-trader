@@ -122,7 +122,7 @@ function syncFromServer(values: Record<string, number>) {
 
 // F2：动作类样板（busy + 统一错误出口）。error → toast 与原实现一致；
 // initialBusy: true 保持"首帧即加载态"（原为 loading = ref(true)）。
-const { run: loadData, busy: loading } = useAsyncAction(async () => {
+const { run: loadData, busy: loading, error: loadError } = useAsyncAction(async () => {
   // 带上页面上展示的可用权益，让后端派生"引擎此刻的口径"（权益未知时后端会如实标 None）
   const eq = Number((store as any)?.data?.account?.avail_eq)
   const query = Number.isFinite(eq) && eq > 0 ? `?equity=${eq}` : ''
@@ -492,7 +492,7 @@ onMounted(loadData)
       />
     </template>
 
-    <BaseEmpty v-else :text="t('common.loadFailed')" :desc="t('common.networkError')">
+    <BaseEmpty v-else :text="t('common.loadFailed')" :desc="loadError || t('common.networkError')">
       <template #action>
         <button class="btn btn-ghost btn-sm" :disabled="loading" @click="loadData">
           <Loader2 v-if="loading" :size="14" class="rk-spin" />

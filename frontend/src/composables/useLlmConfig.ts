@@ -41,6 +41,8 @@ const { api } = useApi()
 
 // State
 const cfg = ref<any>(null)
+/** 批 72：配置拉取失败的真实原因（此前只进 console，界面只能显示通用文案） */
+const cfgError = ref('')
 const loading = ref(true)
 const searchQuery = ref('')
 
@@ -177,6 +179,9 @@ async function saveGlobalSettings() {
 // ----------------- Data Loading -----------------
 async function loadConfig() {
   loading.value = true
+  // 批 72：此前失败只 console.error，真实原因被丢弃 —— 三个消费方页面的错误块
+  // 因此只能显示一句通用的「网络异常」，运维看不到 401/500 之类的真实原因。
+  cfgError.value = ''
   try {
     cfg.value = await api('/api/v1/admin/llm/models')
     if (cfg.value?.thinking_timeout) {
@@ -195,6 +200,7 @@ async function loadConfig() {
       }
     }
   } catch (e: any) {
+    cfgError.value = String(e?.message || e)
     console.error('Failed to load LLM config:', e)
   } finally {
     loading.value = false
@@ -560,6 +566,7 @@ onMounted(() => {
     activateModel,
     availableEffortOptions,
     cfg,
+    cfgError,
     clearCurrentProviderModels,
     currentView,
     customFetchKey,

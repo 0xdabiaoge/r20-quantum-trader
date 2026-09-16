@@ -34,6 +34,7 @@ const {
   fallbackIds,
   fallbackOptions,
   filteredProviders,
+  cfgError,
   loadConfig,
   loadFailoverEvents,
   loading,
@@ -359,7 +360,7 @@ const bandFacts = () => [
       <div v-else-if="cfgFailed" role="alert" class="state-block is-error pv-gate-err">
         <span class="state-icon"><ShieldAlert :size="17" /></span>
         <p class="state-title">{{ t('common.loadFailed') }}</p>
-        <p class="state-desc">{{ t('common.networkError') }}</p>
+        <p class="state-desc">{{ cfgError || t('common.networkError') }}</p>
         <button class="btn btn-ghost btn-sm" :disabled="loading" @click="loadConfig">
           <RefreshCw :size="14" />
           <span>{{ t('common.retry') }}</span>

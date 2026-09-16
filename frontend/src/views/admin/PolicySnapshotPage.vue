@@ -438,16 +438,33 @@ onMounted(() => {
       </section>
     </template>
 
-    <!-- 无快照 -->
+    <!-- 拉取失败：透出真实原因（此前这里显示一句通用的「网络异常」，
+         401/500 之类的真实原因只存在于 toast 里，toast 一消失就无从查起）。 -->
     <BaseEmpty
-      v-else
+      v-else-if="errorMsg"
       :text="t('admin.policySnapshot.err.fetchFailed')"
-      :desc="t('common.networkError')"
+      :desc="errorMsg"
     >
       <template #action>
         <button class="btn btn-ghost btn-sm" :disabled="refreshing" @click="fetchSnapshot">
           <RefreshCw :size="14" :class="refreshing && 'pol-spin'" />
           <span>{{ t('common.retry') }}</span>
+        </button>
+      </template>
+    </BaseEmpty>
+
+    <!-- 批 72：拉取**成功**但后台尚无快照 —— 这是「没有数据」，不是「拉取失败」。
+         此前它落进上面的失败分支，页面会声称「获取策略版本快照失败 + 网络异常」，
+         把一次正常响应谎报成故障，运维会去排查根本不存在的网络问题。 -->
+    <BaseEmpty
+      v-else
+      :text="t('admin.policySnapshot.emptySnapshot')"
+      :desc="t('admin.policySnapshot.emptySnapshotDesc')"
+    >
+      <template #action>
+        <button class="btn btn-ghost btn-sm" :disabled="refreshing" @click="fetchSnapshot">
+          <RefreshCw :size="14" :class="refreshing && 'pol-spin'" />
+          <span>{{ t('admin.policySnapshot.btn.refresh') }}</span>
         </button>
       </template>
     </BaseEmpty>

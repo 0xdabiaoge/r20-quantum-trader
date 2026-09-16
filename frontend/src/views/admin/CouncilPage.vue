@@ -434,7 +434,7 @@ onMounted(loadData);
     <div v-if="loadError" role="alert" class="state-block is-error cn-error">
       <span class="state-icon"><AlertTriangle :size="17" /></span>
       <p class="state-title">{{ t('common.loadFailed') }}</p>
-      <p class="state-desc">{{ t('common.networkError') }}</p>
+      <p class="state-desc">{{ loadError || t('common.networkError') }}</p>
       <button class="btn btn-ghost btn-sm" style="margin-top: 4px" :disabled="loading" @click="loadData">
         <Loader2 v-if="loading" :size="14" class="cn-spin" />
         <RotateCcw v-else :size="14" />
