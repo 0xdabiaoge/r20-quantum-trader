@@ -185,7 +185,7 @@ function dirOf(a: string): 'long' | 'short' | 'flat' {
               <DirTag :dir="dirOf(o.action)" />
               <ConfBadge :value="o.confidence" />
             </div>
-            <span class="rounded px-1.5 py-0.2 border text-3xs font-mono text-[var(--ink-2)]" style="background-color: var(--surface-2); border-color: var(--line-1)">
+            <span class="rounded px-1.5 py-0.5 border text-3xs font-mono text-[var(--ink-2)]" style="background-color: var(--surface-2); border-color: var(--line-1)">
               {{ o.suggested_leverage || '5x' }}
             </span>
           </div>
@@ -235,7 +235,7 @@ function dirOf(a: string): 'long' | 'short' | 'flat' {
             <span class="text-xs font-bold text-[var(--ink-strong)]">CIO 终审裁决</span>
             <span
               v-if="transcript?.adopted_role"
-              class="rounded px-1.5 py-0.2 border text-3xs font-mono text-[var(--up)] border-[var(--up-line)] bg-[var(--up-bg)]"
+              class="rounded px-1.5 py-0.5 border text-3xs font-mono text-[var(--up)] border-[var(--up-line)] bg-[var(--up-bg)]"
             >
               采纳提案: {{ seatLabel(transcript.adopted_role) }}
             </span>

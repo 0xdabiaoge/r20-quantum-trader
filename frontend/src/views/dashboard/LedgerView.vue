@@ -186,7 +186,7 @@ const truncation = computed<{ kept: number; total: number } | null>(() => {
             {{ t('dash.ledger.title') }}
           </h1>
           <span
-            class="rounded px-1.5 py-0.2 border text-3xs font-mono font-medium"
+            class="rounded px-1.5 py-0.5 border text-3xs font-mono font-medium"
             style="background-color: var(--surface-2); border-color: var(--line-1); color: var(--ink-2)"
           >
             {{ filtered.length }} / {{ all.length }} 笔记录
@@ -270,7 +270,7 @@ const truncation = computed<{ kept: number; total: number } | null>(() => {
         </span>
         <span
           v-if="truncation"
-          class="rounded border px-1.5 py-0.2 font-medium"
+          class="rounded border px-1.5 py-0.5 font-medium"
           style="color: var(--warn, var(--ink-2)); border-color: var(--line-1); background-color: var(--surface-2)"
           :title="t('dash.ledger.truncatedHint')"
         >
@@ -278,7 +278,7 @@ const truncation = computed<{ kept: number; total: number } | null>(() => {
         </span>
         <span
           v-if="snapshotAudit.unobservable"
-          class="rounded border px-1.5 py-0.2 font-medium"
+          class="rounded border px-1.5 py-0.5 font-medium"
           style="color: var(--ink-2); border-color: var(--line-1); background-color: var(--surface-2)"
         >
           {{ t('dash.ledger.observability.unobservable', undefined, { n: snapshotAudit.unobservable, total: snapshotAudit.total }) }}
@@ -378,20 +378,20 @@ const truncation = computed<{ kept: number; total: number } | null>(() => {
                       <span class="num font-mono font-semibold text-xs text-[var(--ink-strong)]">{{ x.inst }}</span>
                       <DirTag :dir="x.side" />
                       <span
-                        class="rounded px-1 py-0.2 text-3xs font-mono border"
+                        class="rounded px-1 py-0.5 text-3xs font-mono border"
                         style="background-color: var(--surface-2); border-color: var(--line-1); color: var(--ink-2)"
                       >
                         {{ x.lever }}
                       </span>
                       <span
                         v-if="x.venue"
-                        class="rounded px-1 py-0.2 text-3xs font-mono font-semibold uppercase border"
+                        class="rounded px-1 py-0.5 text-3xs font-mono font-semibold uppercase border"
                         :class="venueToneCls(x.venue)"
                       >
                         {{ venueLabel(x.venue) }}
                       </span>
                       <span
-                        class="rounded px-1 py-0.2 text-3xs font-mono font-medium border"
+                        class="rounded px-1 py-0.5 text-3xs font-mono font-medium border"
                         :class="String(x.account_mode || x.environment || 'live').toUpperCase() === 'LIVE' ? 'text-[var(--up)] border-[var(--up-line)] bg-[var(--up-bg)]' : 'text-[var(--warn)] border-[var(--warn-line)] bg-[var(--warn-bg)]'"
                       >
                         {{ String(x.account_mode || x.environment || 'live').toUpperCase() }}
@@ -412,7 +412,7 @@ const truncation = computed<{ kept: number; total: number } | null>(() => {
                       </span>
                       <!-- 数理快照可观测性：不可观测时**明确标注**，不留白也不编造 -->
                       <span
-                        class="rounded px-1 py-0.2 text-3xs font-medium border"
+                        class="rounded px-1 py-0.5 text-3xs font-medium border"
                         :class="obsToneCls(x)"
                         :title="`${obsLabel(x)} · ${t('dash.ledger.observability.missingFields')} ${t('dash.ledger.observability.noBackfill')}`"
                       >

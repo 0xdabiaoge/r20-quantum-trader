@@ -950,3 +950,23 @@ kbd {
   border-color: var(--info-line);
   background-color: var(--info-bg);
 }
+
+/* =========================================================================
+   批 28 · 补两个「模板里在用、CSS 里没有」的类
+   -------------------------------------------------------------------------
+   用脚本把「模板静态 class」与「编译产物里的选择器」对差集后发现的真缺陷：
+   `.clickable`（4 处，可点击行）与 `.link`（1 处，关于弹窗的社区外链）
+   在模板里写了、全站却没有任何规则 —— 前者鼠标不变手型，后者就是普通文字。
+   ========================================================================= */
+.clickable {
+  cursor: pointer;
+}
+
+.link {
+  color: var(--ds-color-brand);
+  text-decoration: none;
+}
+.link:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}

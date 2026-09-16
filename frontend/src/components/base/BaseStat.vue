@@ -68,7 +68,9 @@ const toneVar = {
   background: var(--surface-2);
   color: var(--ink-3);
   font-family: var(--font-mono);
-  font-size: 9px;
+  /* 批 28：原为写死的 9px（全站唯一 9px 文本），改回档位；
+     与工具栏其它小字同档，也是「不再有 11px 以下文本」的一部分。 */
+  font-size: var(--text-4xs);
   font-style: italic;
   font-weight: 700;
   line-height: 1;

@@ -283,7 +283,7 @@ async function handleLogin() {
   height: 22px;
 }
 .auth-title {
-  font-size: 18px;
+  font-size: var(--text-xl);
   font-weight: 600;
   letter-spacing: -0.01em;
   color: #fff;
@@ -298,7 +298,7 @@ async function handleLogin() {
   margin-top: 5px;
 }
 .auth-version-tag {
-  font-size: 10px;
+  font-size: var(--text-4xs);
   padding: 1px 5px;
   border-radius: var(--r-xs);
   background: rgba(255, 255, 255, 0.05);
@@ -433,7 +433,7 @@ async function handleLogin() {
   margin-top: 20px;
   padding-top: 14px;
   border-top: 1px solid rgba(255, 255, 255, 0.05);
-  font-size: 11px;
+  font-size: var(--text-4xs);
   color: var(--ds-color-text-placeholder);
   line-height: 1.4;
 }
@@ -448,7 +448,7 @@ async function handleLogin() {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  font-size: 10px;
+  font-size: var(--text-4xs);
   letter-spacing: 0.04em;
   color: rgba(255, 255, 255, 0.3);
 }

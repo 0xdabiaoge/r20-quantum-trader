@@ -28,3 +28,30 @@
   --radius-3xl: 16px;
   --radius-full: 100px;
 }
+
+/* =========================================================================
+   批 28 · 补齐小字号档位的工具类（`text-4xs` / `text-3xs` / `text-2xs`）
+   -------------------------------------------------------------------------
+   缺陷（实测）：模板里 385 个节点写着 `text-3xs`、29 个写着 `text-2xs`，
+   但 @theme 从未声明这三个档位 → Tailwind **一个都没生成**，
+   这些节点实际继承父级 12px。公开页（大盘/因子/舆情/推演/台账/文档）
+   因此普遍比后台"大 1.5px"，同一类小字两种尺寸。
+
+   修法：声明档位让工具类生成。`inline` 让 Tailwind 把值原样内联为
+   `var(--text-3xs)`，于是**运行时取值仍来自 tokens.css**（唯一真源），
+   这里不复制任何数字；`--text-*-‑line-height` 另给，避免 line-height
+   解析出 `var(--text-3xs--line-height)` 空引用。
+   ========================================================================= */
+@theme inline {
+  --text-4xs: var(--text-4xs);
+  --text-4xs--line-height: 1.45;
+  --text-3xs: var(--text-3xs);
+  --text-3xs--line-height: 1.45;
+  --text-2xs: var(--text-2xs);
+  --text-2xs--line-height: 1.45;
+  /* `md` 档 Tailwind 默认主题里没有（默认只有 xs/sm/base/lg/xl…），
+     而模型连接的抽屉标题写着 `text-md` → 那个 h3 此前一直继承父级字号。
+     同一张对差集表里查出来的，一并补上。 */
+  --text-md: var(--text-md);
+  --text-md--line-height: 1.5;
+}

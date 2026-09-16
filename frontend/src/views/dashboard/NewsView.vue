@@ -109,13 +109,13 @@ function toggleCoinFilter(sym: string) {
             {{ t('dash.news.title') }}
           </h1>
           <span
-            class="rounded px-1.5 py-0.2 border text-3xs font-mono font-medium"
+            class="rounded px-1.5 py-0.5 border text-3xs font-mono font-medium"
             style="background-color: var(--surface-2); border-color: var(--line-1); color: var(--ink-2)"
           >
             {{ t('dash.news.count', undefined, { n: rawNews.length }) }}
           </span>
           <span
-            class="rounded px-1.5 py-0.2 border text-3xs font-medium"
+            class="rounded px-1.5 py-0.5 border text-3xs font-medium"
             :class="macro.includes('多') ? 'text-[var(--up)] border-[var(--up-line)] bg-[var(--up-bg)]' : macro.includes('空') ? 'text-[var(--down)] border-[var(--down-line)] bg-[var(--down-bg)]' : 'text-[var(--ink-2)] border-[var(--line-1)] bg-[var(--surface-2)]'"
           >
             {{ macro }}
@@ -198,7 +198,7 @@ function toggleCoinFilter(sym: string) {
                 <span class="font-mono font-bold text-xs text-[var(--ink-strong)]">{{ c.sym }}</span>
               </div>
               <span
-                class="rounded px-1 py-0.2 text-4xs font-mono font-semibold uppercase border"
+                class="rounded px-1 py-0.5 text-4xs font-mono font-semibold uppercase border"
                 :class="c.label === 'bullish' ? 'text-[var(--up)] border-[var(--up-line)] bg-[var(--up-bg)]' : c.label === 'bearish' ? 'text-[var(--down)] border-[var(--down-line)] bg-[var(--down-bg)]' : 'text-[var(--ink-3)] border-[var(--line-1)] bg-[var(--surface-2)]'"
               >
                 {{ c.label === 'bullish' ? t('common.dir.long') : c.label === 'bearish' ? t('common.dir.short') : t('common.dir.flat') }}
@@ -264,7 +264,7 @@ function toggleCoinFilter(sym: string) {
                 <!-- 重要度 -->
                 <span
                   v-if="item.importance === 'high'"
-                  class="rounded px-1.5 py-0.2 text-4xs font-mono font-bold uppercase text-[var(--down)] border border-[var(--down-line)] bg-[var(--down-bg)]"
+                  class="rounded px-1.5 py-0.5 text-4xs font-mono font-bold uppercase text-[var(--down)] border border-[var(--down-line)] bg-[var(--down-bg)]"
                 >
                   HIGH
                 </span>
@@ -273,7 +273,7 @@ function toggleCoinFilter(sym: string) {
                 <span
                   v-for="p in (item.platforms || [])"
                   :key="p"
-                  class="rounded px-1.5 py-0.2 text-4xs font-mono text-[var(--ink-2)] border border-[var(--line-1)] bg-[var(--surface-2)]"
+                  class="rounded px-1.5 py-0.5 text-4xs font-mono text-[var(--ink-2)] border border-[var(--line-1)] bg-[var(--surface-2)]"
                 >
                   {{ p }}
                 </span>
@@ -282,7 +282,7 @@ function toggleCoinFilter(sym: string) {
                 <span
                   v-for="coin in (item.coins || [])"
                   :key="coin"
-                  class="rounded px-1.5 py-0.2 text-4xs font-mono font-bold text-[var(--accent)] border border-[var(--line-2)] cursor-pointer hover:bg-[var(--surface-3)]"
+                  class="rounded px-1.5 py-0.5 text-4xs font-mono font-bold text-[var(--accent)] border border-[var(--line-2)] cursor-pointer hover:bg-[var(--surface-3)]"
                   @click="toggleCoinFilter(coin)"
                 >
                   ${{ coin }}

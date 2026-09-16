@@ -96,10 +96,17 @@
   --ds-blur-glass: 12px;
 
   /* —— 字阶 · 控制台尺度（对应 DSH heading1 28/36 · subtitle 20 · title 18 · body 16 · caption 14）——
-     控制台整体下移两档，字距沿用 DSH 的负字距梯度 */
-  --text-4xs: 9.5px;
-  --text-3xs: 10.5px;
-  --text-2xs: 11px;
+     控制台整体下移两档，字距沿用 DSH 的负字距梯度。
+
+     批 28：地板从 9.5px 抬到 11px（方案 §3.2 的目标下限）。
+     起因是实测发现：`text-3xs / text-4xs / text-2xs` 三个 Tailwind 工具类
+     **根本没被生成**（@theme 里没声明这三个档位），于是 385 个带该类的节点
+     不是按 10.5px 渲染，而是继承父级 12px —— 这正是"同一类小字在不同页
+     大小不一"的真凶之一。抬地板与修工具类必须同批做：
+     工具类一旦生效，那些节点会从 12px 掉到档位值，所以档位值不能低于 11px。 */
+  --text-4xs: 11px;
+  --text-3xs: 11.5px;
+  --text-2xs: 12px;
   --text-xs: 12px;
   --text-sm: 12.5px;
   --text-base: 13px;

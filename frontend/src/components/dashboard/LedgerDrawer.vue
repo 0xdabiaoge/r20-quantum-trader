@@ -97,7 +97,7 @@ const cells = computed(() => [
             <span class="text-sm font-bold font-mono text-[var(--ink-strong)]">{{ x.inst }}</span>
             <DirTag :dir="x.side" />
             <span
-              class="rounded px-1.5 py-0.2 border text-3xs font-mono font-semibold"
+              class="rounded px-1.5 py-0.5 border text-3xs font-mono font-semibold"
               style="background-color: var(--surface-2); border-color: var(--line-1); color: var(--ink-2)"
             >
               {{ x.lever || '10x' }}
@@ -141,7 +141,7 @@ const cells = computed(() => [
             {{ t('dash.ledger.observability.title') }}
           </h4>
           <span
-            class="rounded px-1.5 py-0.2 text-3xs font-semibold border"
+            class="rounded px-1.5 py-0.5 text-3xs font-semibold border"
             :class="obsUnobservable
               ? 'text-[var(--ink-2)] border-[var(--line-1)] bg-[var(--surface-2)]'
               : 'text-[var(--up)] border-[var(--up-line)] bg-[var(--up-bg)]'"

@@ -131,13 +131,13 @@ function symOf(x: { instId?: string; name?: string }): string {
                 <span class="num font-mono font-semibold text-xs text-[var(--ink-strong)]">{{ symOf(p) }}</span>
                 <DirTag :dir="p.side" />
                 <span
-                  class="rounded px-1 py-0.2 text-3xs font-mono font-semibold uppercase border"
+                  class="rounded px-1 py-0.5 text-3xs font-mono font-semibold uppercase border"
                   :class="venueToneCls(getVenueOf(p))"
                 >
                   {{ getVenueOf(p).toUpperCase() }}
                 </span>
                 <span
-                  class="rounded px-1 py-0.2 text-3xs font-mono font-medium border"
+                  class="rounded px-1 py-0.5 text-3xs font-mono font-medium border"
                   :class="getModeOf(p) === 'LIVE' ? 'text-[var(--up)] border-[var(--up-line)] bg-[var(--up-bg)]' : 'text-[var(--warn)] border-[var(--warn-line)] bg-[var(--warn-bg)]'"
                 >
                   {{ getModeOf(p) }}
@@ -207,13 +207,13 @@ function symOf(x: { instId?: string; name?: string }): string {
                 <span class="num font-mono font-semibold text-xs text-[var(--ink-strong)]">{{ symOf(o) }}</span>
                 <DirTag :dir="orderDir(o)" />
                 <span
-                  class="rounded px-1 py-0.2 text-3xs font-mono font-semibold uppercase border"
+                  class="rounded px-1 py-0.5 text-3xs font-mono font-semibold uppercase border"
                   :class="venueToneCls(getVenueOf(o))"
                 >
                   {{ getVenueOf(o).toUpperCase() }}
                 </span>
                 <span
-                  class="rounded px-1 py-0.2 text-3xs font-mono font-medium border"
+                  class="rounded px-1 py-0.5 text-3xs font-mono font-medium border"
                   :class="getModeOf(o) === 'LIVE' ? 'text-[var(--up)] border-[var(--up-line)] bg-[var(--up-bg)]' : 'text-[var(--warn)] border-[var(--warn-line)] bg-[var(--warn-bg)]'"
                 >
                   {{ getModeOf(o) }}

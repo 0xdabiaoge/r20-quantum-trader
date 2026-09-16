@@ -671,7 +671,8 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
   margin: 12px 0 8px;
 }
 .ov-hud-val {
-  font-size: 16px;
+  /* 批 28：16px 不在字阶上（档位是 15 / 18），落到 lg。 */
+  font-size: var(--text-lg);
   font-weight: 600;
   color: #fff;
   letter-spacing: -0.01em;
@@ -802,7 +803,7 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
   letter-spacing: 0.02em;
 }
 .ov-sym-market {
-  font-size: 9px;
+  font-size: var(--text-4xs);
   color: var(--ds-color-text-placeholder);
 }
 
@@ -1011,7 +1012,7 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
   text-overflow: ellipsis;
 }
 .ov-nt-desc {
-  font-size: 10px;
+  font-size: var(--text-4xs);
   color: var(--ds-color-text-placeholder);
   white-space: nowrap;
   overflow: hidden;
@@ -1077,7 +1078,7 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
   padding: 1px 6px;
   border-radius: var(--r-xs);
   font-family: var(--ds-font-mono);
-  font-size: 9px;
+  font-size: var(--text-4xs);
   font-weight: 600;
   text-transform: uppercase;
 }
@@ -1117,7 +1118,7 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
   color: var(--ds-color-text-placeholder);
 }
 .ov-ar-toggle {
-  font-size: 10px;
+  font-size: var(--text-4xs);
   color: var(--ds-color-brand);
   padding: 1px 5px;
   border-radius: var(--r-xs);
@@ -1134,7 +1135,7 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
 }
 .ov-json-code {
   margin: 0;
-  font-size: 11px;
+  font-size: var(--text-4xs);
   line-height: 1.5;
   color: #8bb2ff;
   white-space: pre-wrap;

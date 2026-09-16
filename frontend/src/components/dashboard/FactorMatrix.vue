@@ -146,7 +146,7 @@ const processedRows = computed(() => {
             {{ t('dash.matrix.matrix.title') }}
           </h2>
           <span
-            class="rounded px-1.5 py-0.2 border text-3xs font-mono font-medium"
+            class="rounded px-1.5 py-0.5 border text-3xs font-mono font-medium"
             style="background-color: var(--surface-2); border-color: var(--line-1); color: var(--ink-2)"
           >
             {{ processedRows.length }} / {{ rows.length }} {{ t('common.unitCoin') }}
@@ -309,7 +309,7 @@ const processedRows = computed(() => {
               <td>
                 <div class="flex items-center gap-1.5">
                   <span
-                    class="rounded border px-1.5 py-0.2 text-3xs font-semibold uppercase"
+                    class="rounded border px-1.5 py-0.5 text-3xs font-semibold uppercase"
                     :class="actionMeta(actionOf(f)).cls"
                   >
                     {{ actionMeta(actionOf(f)).label }}
@@ -346,7 +346,7 @@ const processedRows = computed(() => {
             </span>
             <div class="flex items-center gap-1">
               <span
-                class="rounded border px-1.5 py-0.2 text-3xs font-semibold uppercase"
+                class="rounded border px-1.5 py-0.5 text-3xs font-semibold uppercase"
                 :class="actionMeta(actionOf(f)).cls"
               >
                 {{ actionMeta(actionOf(f)).label }}

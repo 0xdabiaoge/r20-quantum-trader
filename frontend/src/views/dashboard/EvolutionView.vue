@@ -104,7 +104,7 @@ const md = computed(() => (store.data as any)?.ai_trading_memory_md || '');
             {{ t('dash.evolution.title') }}
           </h1>
           <span
-            class="rounded px-1.5 py-0.2 border text-3xs font-mono font-medium"
+            class="rounded px-1.5 py-0.5 border text-3xs font-mono font-medium"
             style="background-color: var(--surface-2); border-color: var(--line-1); color: var(--ink-2)"
           >
             每 6 小时自主覆写迭代

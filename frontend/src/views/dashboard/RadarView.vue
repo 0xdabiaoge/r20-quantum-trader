@@ -102,7 +102,7 @@ function actionsOf(c: any): { inst: string; dir: string; conf: number }[] {
             {{ t('dash.radar.title') }}
           </h1>
           <span
-            class="rounded px-1.5 py-0.2 border text-3xs font-mono font-medium"
+            class="rounded px-1.5 py-0.5 border text-3xs font-mono font-medium"
             style="background-color: var(--surface-2); border-color: var(--line-1); color: var(--ink-2)"
           >
             {{ t('dash.radar.cycles', undefined, { n: history.length }) }}

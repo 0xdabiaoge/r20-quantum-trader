@@ -721,7 +721,7 @@ onUnmounted(() => {
               @click="selectSymbol(sym); symbolMenu = false"
             >
               <span class="num font-mono">{{ sym }}</span>
-              <span v-if="holdingSet.has(sym)" class="badge badge-accent !h-4 !px-1 !text-[10px]">{{ t('dash.matrix.chart.holding') }}</span>
+              <span v-if="holdingSet.has(sym)" class="badge badge-accent !h-4 !px-1 !text-4xs">{{ t('dash.matrix.chart.holding') }}</span>
             </button>
           </div>
         </Transition>

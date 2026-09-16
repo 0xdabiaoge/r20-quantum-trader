@@ -222,7 +222,7 @@ function refreshAll(): void {
           </p>
           <span
             v-if="pEnvMismatch"
-            class="rounded px-1.5 py-0.2 border text-3xs font-medium text-[var(--warn)] border-[var(--warn)]"
+            class="rounded px-1.5 py-0.5 border text-3xs font-medium text-[var(--warn)] border-[var(--warn)]"
             data-test="portfolio-env-mismatch"
           >
             {{ t('dash.venueAccounts.portfolio.envMismatch') }}

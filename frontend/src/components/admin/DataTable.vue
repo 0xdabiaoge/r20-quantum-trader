@@ -39,7 +39,7 @@
  * ## `#head` 槽包住**整个 `<tr>`**
  *
  * 这是为迁移刻意选的形状：各页原有 `<thead><tr class="…">` 上的样式
- * （`border-b` / `text-[11px] uppercase tracking-wider font-bold` / 背景色）挂在 **tr** 上，
+ * （`border-b` / `text-4xs uppercase tracking-wider font-bold` / 背景色）挂在 **tr** 上，
  * 若槽只包 `<th>`，迁移时就得把这些类拆到每个 th 上 —— 既繁琐又容易改出视觉差异。
  * 让槽包整个 tr，页面即可**原样搬入自己的表头行**，做到外观零变化。
  */
@@ -156,7 +156,7 @@ const colCount = computed(() => props.columns.length + (has('actions') ? 1 : 0))
             <th
               v-for="col in columns"
               :key="col.key"
-              class="px-3 py-2 text-[11px] font-bold uppercase tracking-wider border-b whitespace-nowrap"
+              class="px-3 py-2 text-4xs font-bold uppercase tracking-wider border-b whitespace-nowrap"
               :class="sortable && col.sortable ? 'cursor-pointer select-none' : ''"
               :style="{ color: 'var(--ink-3)', borderColor: 'var(--line-1)', textAlign: col.align || 'left', width: col.width || 'auto' }"
               @click="toggleSort(col)"
@@ -170,7 +170,7 @@ const colCount = computed(() => props.columns.length + (has('actions') ? 1 : 0))
                 </template>
               </span>
             </th>
-            <th v-if="has('actions')" class="px-3 py-2 text-[11px] font-bold uppercase tracking-wider border-b text-right" style="color: var(--ink-3); border-color: var(--line-1);">
+            <th v-if="has('actions')" class="px-3 py-2 text-4xs font-bold uppercase tracking-wider border-b text-right" style="color: var(--ink-3); border-color: var(--line-1);">
               ·
             </th>
           </tr>

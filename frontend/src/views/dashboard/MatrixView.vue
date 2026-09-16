@@ -58,7 +58,7 @@ function pick(instId: string) {
             {{ t('dash.matrix.title') }}
           </h1>
           <span
-            class="rounded px-1.5 py-0.2 border text-3xs font-mono font-medium"
+            class="rounded px-1.5 py-0.5 border text-3xs font-mono font-medium"
             style="background-color: var(--surface-2); border-color: var(--line-1); color: var(--ink-2)"
           >
             PROD · 15M 动力学中枢

@@ -189,7 +189,7 @@ const vdBudgetText = computed(() => {
       <div class="card-flat p-3.5" data-test="venue-decision">
         <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
           <p class="t-label">{{ t('dash.matrix.venue.title') }}</p>
-          <span v-if="vd?.decided_utc" class="num text-[10px]" style="color: var(--ink-3)">
+          <span v-if="vd?.decided_utc" class="num text-4xs" style="color: var(--ink-3)">
             {{ utcStrToBj(String(vd.decided_utc), true) }} {{ t('dash.matrix.venue.beijing') }}
           </span>
         </div>
@@ -209,7 +209,7 @@ const vdBudgetText = computed(() => {
             <li v-for="(r, i) in vdReasons" :key="'vd-r-' + i" class="text-xs leading-relaxed" style="color: var(--ink-2)">{{ r }}</li>
           </ul>
           <div v-if="vdAllocation.length" class="mt-2 flex flex-wrap gap-1.5">
-            <span v-for="(a, i) in vdAllocation" :key="'vd-a-' + i" class="badge num text-[10px]">
+            <span v-for="(a, i) in vdAllocation" :key="'vd-a-' + i" class="badge num text-4xs">
               {{ t('dash.matrix.venue.allocPrefix') }} {{ venueLabel(a.venue) }} {{ fmtNum(numOrNull(a.amount_usdt), 2) }}U
             </span>
           </div>
@@ -231,7 +231,7 @@ const vdBudgetText = computed(() => {
               </table>
             </div>
           </div>
-          <p v-if="vdBudgetText" class="mt-2 border-t pt-2 text-[11px] leading-relaxed" style="border-color: var(--line-1); color: var(--ink-3)">{{ vdBudgetText }}</p>
+          <p v-if="vdBudgetText" class="mt-2 border-t pt-2 text-4xs leading-relaxed" style="border-color: var(--line-1); color: var(--ink-3)">{{ vdBudgetText }}</p>
         </template>
         <p v-else class="t-muted text-xs">{{ t('dash.matrix.venue.noEvidence') }}</p>
       </div>
@@ -266,11 +266,11 @@ const vdBudgetText = computed(() => {
       <div class="card-flat p-3">
         <div class="mb-2 flex items-baseline justify-between gap-2">
           <p class="t-label">{{ t('dash.matrix.venue.crossTitle') }}</p>
-          <span v-if="cvUpdated" class="num text-[10px]" style="color: var(--ink-3)">{{ utcStrToBj(cvUpdated, true) }} {{ t('dash.matrix.venue.beijing') }}</span>
+          <span v-if="cvUpdated" class="num text-4xs" style="color: var(--ink-3)">{{ utcStrToBj(cvUpdated, true) }} {{ t('dash.matrix.venue.beijing') }}</span>
         </div>
         <div class="mb-2 flex flex-wrap gap-1.5">
           <span v-for="h in cvHealth" :key="h.key"
-                class="badge num text-[10px]"
+                class="badge num text-4xs"
                 :style="h.testnet ? 'color:var(--info);border-color:currentColor' : (h.fail > 0 ? 'color:var(--warn);border-color:currentColor' : (h.fresh ? 'color:var(--up);border-color:currentColor' : 'color:var(--ink-3);border-color:currentColor'))">
             {{ h.key.toUpperCase() }} {{ h.fresh ? `${h.ok}/${h.ok + h.fail}` : '--' }}<template v-if="h.avg"> · {{ h.avg }}ms</template><template v-if="h.testnet"> · TN</template>
           </span>
@@ -281,7 +281,7 @@ const vdBudgetText = computed(() => {
             <dd class="num font-semibold" :class="r.cls" style="color: var(--ink-1)">{{ r.value }}</dd>
           </div>
         </dl>
-        <p v-if="!cvSymbol" class="t-muted mt-2 text-[11px]">{{ t('dash.matrix.venue.crossEmpty') }}</p>
+        <p v-if="!cvSymbol" class="t-muted mt-2 text-4xs">{{ t('dash.matrix.venue.crossEmpty') }}</p>
       </div>
 
       <!-- 推演过程 -->
