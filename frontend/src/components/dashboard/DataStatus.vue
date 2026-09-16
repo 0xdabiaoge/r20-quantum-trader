@@ -32,13 +32,32 @@ const cycleMinutes = computed<number | null>(() => {
 
 <template>
   <div class="flex items-center gap-1.5">
+    <!-- 批 73：这是全站**唯一**呈现「三级熔断已生效」的地方，而熔断原因此前只挂在
+         :title 上 —— 一个不可聚焦的 <span>，键盘与触摸根本够不到。
+         熔断是硬性安全停机，操作员必须能当场知道为什么被停。
+         修法三重：① role="alert" 让熔断发生时被读屏器立刻通报；
+         ② tabindex="0" + aria-label 让键盘可达、读屏器读得到完整原因；
+         ③ 桌面端把原因**直接显示出来**（截断），不必悬停。 -->
     <span
       v-if="breaker.active"
       class="dsh-pill text-[var(--down)] border-[var(--down-line)] bg-[var(--down-bg)]"
+      role="alert"
+      tabindex="0"
       :title="breaker.reason"
+      :aria-label="breaker.reason
+        ? `${t('dash.shell.breaker')}${t('common.punct.colon')}${breaker.reason}`
+        : t('dash.shell.breaker')"
     >
       <span class="dsh-status-dot error" aria-hidden="true" />
       {{ t('dash.shell.breaker') }}
+    </span>
+    <span
+      v-if="breaker.active && breaker.reason"
+      class="hidden max-w-[18rem] truncate align-middle text-3xs md:inline-block"
+      style="color: var(--ink-3)"
+      aria-hidden="true"
+    >
+      {{ breaker.reason }}
     </span>
 
     <div

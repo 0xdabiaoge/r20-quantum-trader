@@ -139,6 +139,16 @@ function toggleCoinFilter(sym: string) {
           <span class="dsh-status-dot" :class="isSourceActive ? 'active' : 'warn'" aria-hidden="true" />
           <span class="text-[var(--ink-2)]">{{ isSourceActive ? sourceReason : t('status.attention') }}</span>
         </span>
+        <!-- 批 73：信源**非活跃**时胶囊只显示"需注意"，而"为什么需注意"（source_reason）
+             此前只挂在上面的 :title 上 —— 恰好在最需要它的时刻键盘与触摸够不到。 -->
+        <span
+          v-if="!isSourceActive && sourceReason"
+          class="text-3xs"
+          style="color: var(--warn)"
+          data-test="news-source-reason"
+        >
+          {{ sourceReason }}
+        </span>
         <span v-if="freshAt" class="dsh-pill text-3xs font-mono text-[var(--ink-3)]">
           <span>{{ t('dash.news.freshness') }}</span>
           <TimeAgo :time="freshAt" />

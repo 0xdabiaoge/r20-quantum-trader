@@ -60,6 +60,14 @@ const cfgFirstLoad = computed(() => loading.value && !cfg.value)
  *  纯展示层判定：成功时 `cfg` 必为对象（endpoint 返回配置对象），故 `!cfg` 即失败。 */
 const cfgFailed = computed(() => !loading.value && !cfg.value)
 
+/** 批 73：一次失败链可能有 N 条错误。把全部错误拼成可读文本放进 DOM，
+ *  视觉上由 `.truncate` 截断，读屏器与复制粘贴拿到的是完整内容。
+ *  `ev.chain` 仅在前者为空时兜底（链因模型全挂而断时没有 errors 数组）。 */
+function failoverErrText(ev: any): string {
+  const joined = (ev?.errors || []).filter(Boolean).join(' | ')
+  return joined || String(ev?.chain || '')
+}
+
 /** 思考超时预设（旧版把这一段按钮块逐字复制了 5 遍）
  *  注：这里存**完整键路径**并直接 `t(p.labelKey)`，不使用拼接式键名——
  *  拼接出来的键无法被 i18n 静态校验识别，且缺键时会在界面渲染出裸键名。 */
@@ -333,8 +341,11 @@ const bandFacts = () => [
             {{ ev.from_model }}<template v-if="ev.to_model"> → {{ ev.to_model }}</template>
           </span>
           <span class="pv-audit-time mono">{{ fmtDateTime(ev.ts || ev.time_str) }} · {{ ev.elapsed_seconds }}s</span>
-          <span class="pv-audit-err truncate" :title="(ev.errors || []).join(' | ')">
-            {{ (ev.errors || [])[0] || ev.chain || '' }}
+          <!-- 批 73：此前只显示 errors[0]，第 2..n 条只存在于 :title ——
+               读屏器读不到、键盘够不到。改为把全部错误放进 DOM，
+               由既有的 truncate 负责视觉截断（读屏器仍能读全）。 -->
+          <span class="pv-audit-err truncate" :title="failoverErrText(ev)">
+            {{ failoverErrText(ev) }}
           </span>
         </div>
       </div>

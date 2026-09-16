@@ -111,6 +111,18 @@ const listingTitle = computed(() => {
       </div>
     </dl>
 
+    <!-- 批 73：场所**为什么**不可用此前只挂在上方胶囊的 :title 上 ——
+         键盘与触摸够不到，而"未接入 / 降级"这句话本身不说明任何问题。
+         与同卡片 listing 的既有语汇一致：非就绪态把原因直接显示出来。 -->
+    <p
+      v-if="account?.reason && account.status !== 'ready'"
+      class="rounded px-1.5 py-1 text-3xs leading-snug"
+      :class="account.status === 'degraded' ? 'text-[var(--warn)]' : 'text-[var(--ink-2)]'"
+      data-test="venue-reason"
+    >
+      {{ account.reason }}
+    </p>
+
     <!-- 合约对账徽标与底栏说明 -->
     <div
       class="mt-auto flex min-w-0 items-center justify-between gap-2 border-t pt-1.5 text-3xs"
