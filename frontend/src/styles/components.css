@@ -1052,6 +1052,12 @@ kbd {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  /* 批 99：命中区补齐 WCAG 2.5.8 的 24×24。
+     原来 `padding: 0` + 12px/16px 行高 → 按钮实测只有 **132×16**，
+     而所在 `th` 高 33px（padding 8px 12px）—— 表头上下各 8px 是**点不到的空白**。
+     用既有的 `--h-sm`（24px，正好是 AA 下限），不再自造数字。
+     代价：表头行 33px → 41px（唯一的可见变化，换来整格可点）。 */
+  min-height: var(--h-sm);
   padding: 0;
   border: 0;
   background: none;

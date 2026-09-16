@@ -1174,6 +1174,9 @@ onMounted(loadData);
   border: 0;
   border-bottom: 1px dashed var(--ds-color-border-strong);
   outline: none;
+  /* 批 99：12px 字号 + `padding: 0 0 2px` 实测只有 **173×22.2**，
+     不到 WCAG 2.5.8 的 24px。补 `--h-sm` 后只长高 1.8px，外观无感。 */
+  min-height: var(--h-sm);
   font-size: var(--text-sm);
   font-weight: 600;
   color: var(--ds-color-text-primary);
