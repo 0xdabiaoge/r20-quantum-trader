@@ -318,6 +318,7 @@ function statusLabel(s: string): string {
           class="field"
           type="text"
           autocomplete="off"
+          spellcheck="false"
           :placeholder="replayExpected"
           @keyup.enter="confirmReplay"
         />

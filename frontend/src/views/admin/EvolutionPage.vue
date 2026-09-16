@@ -628,6 +628,7 @@ onMounted(loadData);
           type="text"
           class="field mono"
           autocomplete="off"
+          spellcheck="false"
           :placeholder="RUN_PHRASE"
           @keyup.enter="confirmRun"
         />

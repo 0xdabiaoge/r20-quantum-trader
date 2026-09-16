@@ -52,7 +52,7 @@ function onConfirm() {
       <label class="form-label">
         {{ t('common.confirmPhraseHint', undefined, { phrase: state.confirmPhrase }) }}
       </label>
-      <input v-model="phraseInput" class="field mono" :placeholder="state.confirmPhrase" @keyup.enter="onConfirm" />
+      <input v-model="phraseInput" type="text" autocomplete="off" spellcheck="false" class="field mono" :aria-label="t('common.confirmPhraseHint', undefined, { phrase: state.confirmPhrase })" :placeholder="state.confirmPhrase" @keyup.enter="onConfirm" />
     </div>
 
     <template #footer>

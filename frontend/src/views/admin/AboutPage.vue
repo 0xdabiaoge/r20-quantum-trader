@@ -347,6 +347,9 @@ const bandFacts = computed(() => {
         </p>
         <input
           v-model="confirmPhrase"
+          type="text"
+          autocomplete="off"
+          spellcheck="false"
           :placeholder="t('admin.about.phrasePlaceholder')"
           class="field mono ab-confirm-input"
           @keyup.enter="executeUpdate"

@@ -177,6 +177,8 @@ function tone(level: string): string {
         <input
           v-model="query"
           type="search"
+          autocomplete="off"
+          spellcheck="false"
           class="field dc-search"
           :aria-label="t('admin.decisions.searchPlaceholder')"
           :placeholder="t('admin.decisions.searchPlaceholder')"

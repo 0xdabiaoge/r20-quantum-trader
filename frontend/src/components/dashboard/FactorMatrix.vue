@@ -184,6 +184,8 @@ const processedRows = computed(() => {
             ref="searchInput"
             v-model="searchQuery"
             type="search"
+            autocomplete="off"
+            spellcheck="false"
             :aria-label="t('dash.matrix.searchPlaceholder')"
             :placeholder="t('dash.matrix.searchPlaceholder')"
             class="h-6 w-36 rounded border border-[var(--line-1)] pl-6 pr-6 text-3xs transition-colors focus:outline-none focus:border-[var(--ds-color-border-input-focus)] focus:ring-1 focus:ring-[var(--ds-color-border-input-focus)]"

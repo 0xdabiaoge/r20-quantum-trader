@@ -78,7 +78,7 @@ const {
       <template v-if="remoteFetchResult?.ok">
         <div class="rf-search focus-ring">
           <Search :size="13" />
-          <input v-model="remoteSearch" type="search" :aria-label="t('admin.llm.filterPlaceholder')" :placeholder="t('admin.llm.filterPlaceholder')" class="rf-search-input" />
+          <input v-model="remoteSearch" type="search" autocomplete="off" spellcheck="false" :aria-label="t('admin.llm.filterPlaceholder')" :placeholder="t('admin.llm.filterPlaceholder')" class="rf-search-input" />
         </div>
 
         <BaseEmpty v-if="!filteredRemoteModels.length" :text="t('common.noRecords')" />

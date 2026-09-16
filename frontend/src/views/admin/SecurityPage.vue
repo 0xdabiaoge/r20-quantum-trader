@@ -820,7 +820,7 @@ onMounted(() => { loadAll(); loadMx() })
             </label>
             <label class="sc-field">
               <span class="form-label">{{ t('admin.security.capitalConfirmLabel') }}</span>
-              <input v-model="capitalConfirm" class="field mono" placeholder="UPDATE CAPITAL" />
+              <input v-model="capitalConfirm" type="text" autocomplete="off" spellcheck="false" class="field mono" placeholder="UPDATE CAPITAL" />
             </label>
           </div>
 
@@ -996,7 +996,7 @@ onMounted(() => { loadAll(); loadMx() })
         <form id="sc-close-form" class="sc-close-fields" @submit.prevent="confirmClose">
           <label class="sc-field">
             <span class="form-label">{{ t('admin.security.adminPasswordLabel') }}</span>
-            <input v-model="closePassword" type="password" class="field" />
+            <input v-model="closePassword" type="password" autocomplete="current-password" class="field" />
           </label>
 
           <label class="sc-field">
@@ -1006,6 +1006,9 @@ onMounted(() => { loadAll(); loadMx() })
             </span>
             <input
               v-model="closePhraseInput"
+              type="text"
+              autocomplete="off"
+              spellcheck="false"
               :placeholder="closeModal.pos.close_confirmation"
               class="field mono"
             />
