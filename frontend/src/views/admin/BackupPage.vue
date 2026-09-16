@@ -446,7 +446,7 @@ onMounted(load)
               <span class="form-label">
                 {{ t('admin.backup.secRetention') }}{{ destination === 'local' ? t('admin.backup.retentionLocal') : '' }}
               </span>
-              <input v-model="retention" type="number" min="1" max="365" :disabled="!auth.isSuperadmin" class="field num" />
+              <input v-model="retention" type="number" inputmode="numeric" min="1" max="365" :disabled="!auth.isSuperadmin" class="field num" />
             </label>
           </div>
 

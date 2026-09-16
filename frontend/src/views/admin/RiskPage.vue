@@ -408,6 +408,7 @@ onMounted(loadData)
               <input
                 v-model="disp[levMinP.key]"
                 type="number"
+                inputmode="decimal"
                 class="rk-input"
                 :aria-label="t('admin.risk.levLowerAria')"
                 :aria-invalid="outOfRange(levMinP) || levInverted ? 'true' : undefined"
@@ -422,6 +423,7 @@ onMounted(loadData)
               <input
                 v-model="disp[levMaxP.key]"
                 type="number"
+                inputmode="decimal"
                 class="rk-input"
                 :aria-label="t('admin.risk.levUpperAria')"
                 :aria-invalid="outOfRange(levMaxP) || levInverted ? 'true' : undefined"
@@ -455,6 +457,7 @@ onMounted(loadData)
                 <input
                   v-model="disp[p.key]"
                   type="number"
+                  inputmode="decimal"
                   class="rk-input"
                   :aria-label="p.label"
                   :aria-invalid="outOfRange(p) ? 'true' : undefined"

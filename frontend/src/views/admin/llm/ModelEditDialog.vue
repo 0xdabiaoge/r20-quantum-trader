@@ -100,6 +100,7 @@ const title = computed(() =>
         <input
           v-model.number="modelForm.context_length"
           type="number"
+          inputmode="numeric"
           placeholder="1048576"
           class="field num"
         />

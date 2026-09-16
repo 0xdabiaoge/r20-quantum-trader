@@ -181,6 +181,7 @@ const bandFacts = () => [
             <input
               v-model.number="thinkingTimeoutInput"
               type="number"
+              inputmode="numeric"
               min="10"
               max="1800"
               step="5"
@@ -242,6 +243,7 @@ const bandFacts = () => [
               <input
                 v-model.number="requestAttemptsInput"
                 type="number"
+                inputmode="numeric"
                 min="1"
                 max="10"
                 step="1"

@@ -534,6 +534,7 @@ onMounted(loadData);
             <input
               v-model="councilConfig.timeout_seconds"
               type="number"
+              inputmode="numeric"
               :min="30"
               :max="420"
               step="10"
@@ -679,6 +680,7 @@ onMounted(loadData);
                   <input
                     v-model="selectedRole.weight"
                     type="number"
+                    inputmode="decimal"
                     step="0.05"
                     min="0.1"
                     max="1.0"
@@ -692,6 +694,7 @@ onMounted(loadData);
                   <input
                     v-model="selectedRole.temperature"
                     type="number"
+                    inputmode="decimal"
                     step="0.05"
                     min="0.0"
                     max="1.0"
