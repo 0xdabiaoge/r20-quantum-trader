@@ -505,7 +505,8 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 3px 10px;
+  height: 20px;
+  padding: 0 8px;
   border-radius: var(--r-pill);
   background: rgba(72, 199, 142, 0.08);
   border: 1px solid rgba(72, 199, 142, 0.25);
@@ -524,14 +525,17 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
 }
 .ov-live-text {
   font-family: var(--ds-font-mono);
-  font-size: var(--text-4xs);
+  font-size: var(--text-3xs);
   font-weight: 600;
   letter-spacing: 0.06em;
   color: var(--up);
 }
 
 .ov-version-badge {
-  padding: 3px 8px;
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 8px;
   border-radius: var(--r-xs);
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--ds-color-border-default);
@@ -636,15 +640,19 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
   color: var(--ds-color-text-placeholder);
   text-transform: uppercase;
 }
+  /* 批 35：全站徽标/胶囊的规范盒模型是 .badge/.chip/.dsh-pill ——
+     高 20px、左右 8px、字号 --text-3xs。本页此前有 6 种手写盒模型
+     （24/24/26/26/22/24），同一个「状态胶囊」角色出现 4 种几何。 */
 .ov-hud-badge {
   margin-left: auto;
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 2px 7px;
+  gap: 6px;
+  height: 20px;
+  padding: 0 8px;
   border-radius: var(--r-pill);
   font-family: var(--ds-font-mono);
-  font-size: var(--text-4xs);
+  font-size: var(--text-3xs);
   font-weight: 600;
 }
 .ov-hud-badge.is-up {
@@ -693,11 +701,12 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
 .ov-hud-pill {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  font-size: var(--text-4xs);
+  gap: 6px;
+  height: 20px;
+  font-size: var(--text-3xs);
   color: var(--ds-color-text-placeholder);
   background: rgba(255, 255, 255, 0.03);
-  padding: 2px 6px;
+  padding: 0 8px;
   border-radius: var(--r-xs);
   border: 1px solid rgba(255, 255, 255, 0.05);
 }
@@ -817,7 +826,8 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
 .ov-act-tag {
   display: inline-flex;
   align-items: center;
-  padding: 3px 8px;
+  height: 20px;
+  padding: 0 8px;
   border-radius: var(--r-xs);
   font-size: var(--text-3xs);
   font-weight: 600;
@@ -912,11 +922,12 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
 .ov-chip-status {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 2px 8px;
+  gap: 6px;
+  height: 20px;
+  padding: 0 8px;
   border-radius: var(--r-pill);
   font-family: var(--ds-font-mono);
-  font-size: var(--text-4xs);
+  font-size: var(--text-3xs);
   font-weight: 600;
 }
 .ov-chip-status.is-live {
@@ -1101,10 +1112,13 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
   gap: 8px;
 }
 .ov-tag-chip {
-  padding: 1px 6px;
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 6px;
   border-radius: var(--r-xs);
   font-family: var(--ds-font-mono);
-  font-size: var(--text-4xs);
+  font-size: var(--text-3xs);
   font-weight: 600;
   text-transform: uppercase;
 }

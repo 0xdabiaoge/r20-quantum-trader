@@ -374,8 +374,10 @@ watch(() => route.path, () => (drawerOpen.value = false));
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  /* 批 35：写死 28px。全站控件高度梯队是 --h-sm/md/lg = 24/30/36，
+     28 不在梯队上，且同一行里的 .btn（30）比它高 2px。改用 --h-md。 */
+  width: var(--h-md);
+  height: var(--h-md);
   border: 1px solid transparent;
   border-radius: var(--r-ctl);
   background: transparent;

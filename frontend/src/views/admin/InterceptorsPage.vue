@@ -627,11 +627,16 @@ onMounted(loadPlugins)
   gap: 4px;
 }
 .ip-tag {
-  padding: 1px 6px;
+  /* 批 35：全站徽标规范盒模型是 20px 高 / --text-3xs（见 .badge）；
+     这条此前是 22px / 11px，是最后一处不在规范上的实体徽标。 */
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 6px;
   border-radius: var(--r-xs);
   border: 1px solid var(--ds-color-border-default);
   background-color: var(--ds-color-bg-surface-1);
-  font-size: var(--text-4xs);
+  font-size: var(--text-3xs);
   color: var(--ds-color-text-placeholder);
 }
 .ip-err {

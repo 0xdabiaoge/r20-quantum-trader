@@ -48,7 +48,7 @@ const activeTab = computed(() => {
     <!-- 左侧：侧栏切换 + 面包屑 + 核心聚合状态 -->
     <div class="flex items-center gap-2.5 sm:gap-3.5">
       <button
-        class="btn btn-quiet btn-icon h-8 w-8 cursor-pointer text-[var(--ink-2)] hover:text-[var(--ink-strong)]"
+        class="btn btn-quiet btn-icon h-[var(--h-md)] w-[var(--h-md)] cursor-pointer text-[var(--ink-2)] hover:text-[var(--ink-strong)]"
         :title="navExpanded ? t('dash.shell.nav.closeNav') : t('dash.shell.nav.openNav')"
         :aria-label="navExpanded ? t('dash.shell.nav.closeNav') : t('dash.shell.nav.openNav')"
         :aria-expanded="!!navExpanded"
@@ -78,7 +78,7 @@ const activeTab = computed(() => {
     <div class="flex items-center gap-2">
       <!-- 决策轨迹流入口 -->
       <button
-        class="inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium cursor-pointer transition-colors hover:border-[var(--line-2)]"
+        class="inline-flex h-[var(--h-md)] items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium cursor-pointer transition-colors hover:border-[var(--line-2)]"
         style="background-color: var(--surface-2); border-color: var(--line-1); color: var(--ink-1)"
         @click="trajectoryOpen = true"
       >

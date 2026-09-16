@@ -346,12 +346,16 @@ function typeLabel(v: string): string {
   margin-top: 2px;
 }
 .pl-tag {
-  padding: 1px 6px;
+  /* 批 35：与 .ip-tag 同一处偏离 —— 22px/11px → 全站规范 20px/--text-3xs */
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 6px;
   border-radius: var(--r-xs);
   border: 1px solid var(--ds-color-border-default);
   background-color: var(--ds-color-bg-surface-1);
   font-family: var(--ds-font-mono);
-  font-size: var(--text-4xs);
+  font-size: var(--text-3xs);
   color: var(--ds-color-text-secondary);
 }
 .pl-none {
