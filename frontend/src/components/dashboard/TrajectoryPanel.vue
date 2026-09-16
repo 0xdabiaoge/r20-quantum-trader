@@ -3,9 +3,10 @@
  * TrajectoryPanel.vue · DeepSeek Harness 决策轨迹与执行日志面板
  * 实时白盒化展示多模型委员会决策推演、动力学裁决与底层执行日志
  */
-import { ref, computed } from 'vue';
+import { ref, computed, onBeforeUnmount, watch } from 'vue';
 import { useDashboardStore } from '../../stores/dashboard';
 import { useI18n } from '../../composables/useI18n';
+import { useModalFocus } from '../../composables/useModalFocus';
 import {
   X,
   Activity,
@@ -24,6 +25,17 @@ const emit = defineEmits<{
 
 const store = useDashboardStore();
 const { t } = useI18n();
+
+/**
+ * 批 42：本面板声明了 `role="dialog" aria-modal="true"`，却**一样焦点行为都没有** ——
+ * Escape 关不掉（全站唯一关不掉的模态）、Tab 会走到遮罩后的背景页、
+ * 打开后焦点仍在顶栏触发按钮上、背景还能滚。改为接上 `useModalFocus`
+ * （与 BaseDialog / BaseDrawer 同一份实现）。
+ */
+const panel = ref<HTMLElement | null>(null);
+const { sync: syncModalFocus, release: releaseModalFocus } = useModalFocus(panel, () => emit('close'));
+watch(() => props.open, syncModalFocus);
+onBeforeUnmount(releaseModalFocus);
 
 const activeTab = ref<'decisions' | 'logs'>('decisions');
 const logFilter = ref<'all' | 'warn' | 'error'>('all');
@@ -94,7 +106,9 @@ function actionBadgeClass(action: string) {
     <Transition name="slide-right">
       <aside
         v-if="open"
-        class="fixed inset-y-0 right-0 z-[var(--z-drawer)] flex w-full max-w-[500px] flex-col border-s shadow-2xl transition-transform"
+        ref="panel"
+        tabindex="-1"
+        class="fixed inset-y-0 right-0 z-[var(--z-drawer)] flex w-full max-w-[500px] flex-col border-s shadow-2xl outline-none transition-transform"
         style="background-color: var(--surface-1); border-color: var(--line-1); color: var(--ink-1)"
         role="dialog"
         aria-modal="true"

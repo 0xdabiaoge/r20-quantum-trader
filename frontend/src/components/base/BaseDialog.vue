@@ -3,9 +3,10 @@
  * 全局对话框原语：Teleport 挂 body、焦点陷阱、ESC/遮罩关闭、滚动锁。
  * 规则：编辑/表单用 Dialog，详情透视用 Drawer，删除确认用 useConfirm。
  */
-import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { X } from 'lucide-vue-next';
 import { useI18n } from '../../composables/useI18n';
+import { useModalFocus } from '../../composables/useModalFocus';
 
 const { t } = useI18n();
 
@@ -30,99 +31,14 @@ const width = computed(
 );
 
 const panel = ref<HTMLElement | null>(null);
-let lastFocused: Element | null = null;
 
-/** 批 23：Escape 的监听从 panel 挪到 document。
- *  原实现挂在 panel 上，只有「焦点正好在面板内」时才收到按键；而用户只要点一下
- *  面板里的标题、说明文字这类**不可聚焦**元素，焦点就回到 body，
- *  此后 Escape 关不掉对话框（实测台账抽屉复现）。
- *  模块级栈保证嵌套时只有最上层响应 Escape。 */
-const stack: symbol[] = [];
-let token: symbol | null = null;
+/* 批 42：焦点陷阱 / Escape 栈 / 滚动锁 / 焦点交接 提取到 useModalFocus，
+   与 BaseDrawer、TrajectoryPanel 共用同一份实现（此前三处各写或干脆没有）。 */
+const { sync: syncModalFocus, release: releaseModalFocus } = useModalFocus(panel, () => emit('close'));
 
-function focusables(): HTMLElement[] {
-  if (!panel.value) return [];
-  return Array.from(
-    panel.value.querySelectorAll<HTMLElement>(
-      'a[href],button:not([disabled]),textarea:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex="-1"])',
-    ),
-  ).filter((el) => el.offsetParent !== null);
-}
+watch(() => props.open, syncModalFocus);
 
-function onKeydown(e: KeyboardEvent) {
-  if (e.key === 'Escape') {
-    if (stack[stack.length - 1] !== token) return;
-    e.stopPropagation();
-    emit('close');
-    return;
-  }
-  if (e.key === 'Tab') {
-    const els = focusables();
-    if (!els.length) return;
-    // 焦点已经不在面板里（例如刚点了面板内的纯文本）→ 把焦点拉回来，别漏到背景页
-    if (!panel.value || !panel.value.contains(document.activeElement)) {
-      e.preventDefault();
-      (els[0] || panel.value)?.focus?.();
-      return;
-    }
-    // 焦点停在面板容器上（打开时的默认落点）：正向 Tab 交给浏览器自然进第一个可聚焦项，
-    // 反向 Tab 必须拦住，否则会退到遮罩后面的背景页
-    if (document.activeElement === panel.value) {
-      if (e.shiftKey) {
-        e.preventDefault();
-        els[els.length - 1].focus();
-      }
-      return;
-    }
-    const first = els[0];
-    const last = els[els.length - 1];
-    if (e.shiftKey && document.activeElement === first) {
-      e.preventDefault();
-      last.focus();
-    } else if (!e.shiftKey && document.activeElement === last) {
-      e.preventDefault();
-      first.focus();
-    }
-  }
-}
-
-function detach() {
-  document.removeEventListener('keydown', onKeydown, true);
-  if (token) {
-    const i = stack.indexOf(token);
-    if (i >= 0) stack.splice(i, 1);
-    token = null;
-  }
-}
-
-watch(
-  () => props.open,
-  async (open) => {
-    if (open) {
-      lastFocused = document.activeElement;
-      document.body.style.overflow = 'hidden';
-      await nextTick();
-      token = Symbol('dialog');
-      stack.push(token);
-      document.addEventListener('keydown', onKeydown, true);
-      // 批 23：焦点落在**面板容器**上（tabindex="-1" + outline-none），不再抢第一个按钮。
-      // 原来把焦点给 els[0]（确定/取消按钮、关闭按钮），实测真实鼠标点击后
-      // `:focus-visible` 依然匹配，于是每开一次弹窗，那个按钮就顶着一圈蓝色焦点环 ——
-      // 鼠标用户看到的是"莫名其妙的蓝框"。容器聚焦是 aria-modal 对话框的标准做法：
-      // 读屏会播报标题，键盘用户按一次 Tab 进第一个可聚焦项（Tab 陷阱已按容器处理）。
-      panel.value?.focus?.();
-    } else {
-      document.body.style.overflow = '';
-      detach();
-      (lastFocused as HTMLElement | null)?.focus?.();
-    }
-  },
-);
-
-onBeforeUnmount(() => {
-  document.body.style.overflow = '';
-  detach();
-});
+onBeforeUnmount(releaseModalFocus);
 </script>
 
 <template>

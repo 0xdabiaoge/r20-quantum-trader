@@ -3,9 +3,10 @@
  * 右侧滑出抽屉 —— 详情透视专用：列表上下文不丢，看完即关。
  * 规则：任何"看详情"一律 Drawer，禁止全屏跳转或嵌套弹窗。
  */
-import { nextTick, onBeforeUnmount, ref, watch } from 'vue';
+import { onBeforeUnmount, ref, watch } from 'vue';
 import { X } from 'lucide-vue-next';
 import { useI18n } from '../../composables/useI18n';
+import { useModalFocus } from '../../composables/useModalFocus';
 
 const { t } = useI18n();
 
@@ -23,100 +24,13 @@ const props = withDefaults(
 const emit = defineEmits<{ (e: 'close'): void }>();
 
 const panel = ref<HTMLElement | null>(null);
-let lastFocused: Element | null = null;
 
-/** 批 23：Escape 的监听从 panel 挪到 document。
- *  原实现挂在 panel 上，只有「焦点正好在面板内」时才收到按键；而用户只要点一下
- *  面板里的标题、说明文字这类**不可聚焦**元素，焦点就回到 body，
- *  此后 Escape/遮罩都关不掉抽屉（实测：焦点在 body 时按 Esc 无反应，抽屉不关）。
- *  模块级栈保证嵌套时只有最上层响应 Escape。 */
-const stack: symbol[] = [];
-let token: symbol | null = null;
+/* 批 42：与 BaseDialog / TrajectoryPanel 共用同一份焦点管理（见 useModalFocus 头注）。 */
+const { sync: syncModalFocus, release: releaseModalFocus } = useModalFocus(panel, () => emit('close'));
 
-/** 可聚焦元素收集 —— 与 BaseDialog 同一判据（可见性用 offsetParent 过滤隐藏项）。
- *  批D(2026-09-13)：抽屉此前只有 Escape + 焦点归位，**没有焦点陷阱**——Tab 会一路
- *  走出抽屉落到被遮罩盖住的页面上（键盘用户"点进空气"，屏幕阅读器也会跑到背景内容）。
- *  抽屉是详情透视的主入口（台账/持仓/快讯详情全走它），补 Tab 环绕。 */
-function focusables(): HTMLElement[] {
-  if (!panel.value) return [];
-  return Array.from(
-    panel.value.querySelectorAll<HTMLElement>(
-      'a[href],button:not([disabled]),textarea:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex="-1"])',
-    ),
-  ).filter((el) => el.offsetParent !== null);
-}
+watch(() => props.open, syncModalFocus);
 
-function onKeydown(e: KeyboardEvent) {
-  if (e.key === 'Escape') {
-    if (stack[stack.length - 1] !== token) return;
-    e.stopPropagation();
-    emit('close');
-    return;
-  }
-  if (e.key === 'Tab') {
-    const els = focusables();
-    if (!els.length) return;
-    // 焦点已经不在面板里（例如刚点了面板内的纯文本）→ 把焦点拉回来，别漏到背景页
-    if (!panel.value || !panel.value.contains(document.activeElement)) {
-      e.preventDefault();
-      (els[0] || panel.value)?.focus?.();
-      return;
-    }
-    // 焦点停在面板容器上（打开时的默认落点）：正向 Tab 交给浏览器自然进第一个可聚焦项，
-    // 反向 Tab 必须拦住，否则会退到遮罩后面的背景页
-    if (document.activeElement === panel.value) {
-      if (e.shiftKey) {
-        e.preventDefault();
-        els[els.length - 1].focus();
-      }
-      return;
-    }
-    const first = els[0];
-    const last = els[els.length - 1];
-    if (e.shiftKey && document.activeElement === first) {
-      e.preventDefault();
-      last.focus();
-    } else if (!e.shiftKey && document.activeElement === last) {
-      e.preventDefault();
-      first.focus();
-    }
-  }
-}
-
-function detach() {
-  document.removeEventListener('keydown', onKeydown, true);
-  if (token) {
-    const i = stack.indexOf(token);
-    if (i >= 0) stack.splice(i, 1);
-    token = null;
-  }
-}
-
-watch(
-  () => props.open,
-  async (open) => {
-    if (open) {
-      lastFocused = document.activeElement;
-      document.body.style.overflow = 'hidden';
-      await nextTick();
-      token = Symbol('drawer');
-      stack.push(token);
-      document.addEventListener('keydown', onKeydown, true);
-      // 批 23：焦点落在面板容器（outline-none）而不是第一个按钮 —— 详见 BaseDialog 同处注释：
-      // 把焦点给按钮会让关闭按钮每次都顶着一圈蓝环（真实鼠标点击后 :focus-visible 仍匹配）。
-      panel.value?.focus?.();
-    } else {
-      document.body.style.overflow = '';
-      detach();
-      (lastFocused as HTMLElement | null)?.focus?.();
-    }
-  },
-);
-
-onBeforeUnmount(() => {
-  document.body.style.overflow = '';
-  detach();
-});
+onBeforeUnmount(releaseModalFocus);
 </script>
 
 <template>
