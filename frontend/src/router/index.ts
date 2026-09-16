@@ -1,5 +1,7 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import { useI18n } from '../composables/useI18n'
+import { allAdminItems } from '../config/nav'
 
 /**
  * 路由表：path 与后端钉扎路由严格一致（SEO/CF 缓存/test_docs_images_route）。
@@ -98,13 +100,27 @@ const PUBLIC_TITLES: Record<string, string> = {
   '/docs': '官方文档 | R20量子交易系统',
 }
 
-router.afterEach((to) => {
+export function updateDocumentTitle(to = router.currentRoute.value) {
+  const { t } = useI18n()
   let title = 'R20 量子交易系统'
   let isNoIndex = false
 
-  if (to.path.startsWith('/admin')) {
+  if (to.name === 'not-found') {
     isNoIndex = true
-    title = '管理控制台 · R20'
+    const notFoundText = t('common.notFound.title') || '页面不存在'
+    title = to.path.startsWith('/admin')
+      ? `${notFoundText} · ${t('nav.actions.console')} · R20`
+      : `${notFoundText} · R20`
+  } else if (to.path === '/admin/login' || to.name === 'admin-login') {
+    isNoIndex = true
+    title = `${t('admin.login.submit')} · ${t('nav.actions.console')} · R20`
+  } else if (to.path.startsWith('/admin')) {
+    isNoIndex = true
+    const hit = allAdminItems.find((item) => item.path === to.path || item.key === to.name)
+    const pageName = hit ? t(hit.labelKey) : ''
+    title = pageName
+      ? `${pageName} · ${t('nav.actions.console')} · R20`
+      : `${t('nav.actions.console')} · R20`
   } else if (PUBLIC_TITLES[to.path]) {
     title = PUBLIC_TITLES[to.path]
   }
@@ -123,6 +139,14 @@ router.afterEach((to) => {
   } else if (robotsMeta) {
     robotsMeta.content = 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1'
   }
+}
+
+router.afterEach((to) => {
+  updateDocumentTitle(to)
 })
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('r20:locale-changed', () => updateDocumentTitle())
+}
 
 export default router

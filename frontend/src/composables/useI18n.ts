@@ -32,6 +32,9 @@ export function useI18n() {
       } catch {
         // ignore storage error in private browsing
       }
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('r20:locale-changed'))
+      }
     }
   }
 
