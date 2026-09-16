@@ -160,7 +160,13 @@
   --ds-color-text-primary: #f8fafc;
   --ds-color-text-secondary: #cbd5e1;
   --ds-color-text-description: #94a3b8;
-  --ds-color-text-placeholder: #64748b;
+  /* 批 19：placeholder 原为 DSH 的 #64748b，但本仓把它当"第三级正文色"在用
+     （表头 / 卡片副标题 / 时间戳 / 表单标签…全站 300+ 处）。实测它在
+     卡片 #151821 上只有 3.73:1、在 surface-2 #212634 上 3.17:1、
+     在选中态 #20293e 上 3.05:1 —— **全站第三级文字都不达 AA(4.5:1)**。
+     改为 #8894a7：在上述全部实测底色上 ≥4.72:1，且与 description
+     (#94a3b8, ≥5.66:1) 仍差 1.2 倍，第三级/第四级层级不塌。 */
+  --ds-color-text-placeholder: #8894a7;
   --ds-color-text-inverse: #0a0a0a;
 
   --ds-color-bg-page: #0d0f14;
@@ -217,7 +223,7 @@
   --ds-color-text-primary: #1e232c;
   --ds-color-text-secondary: rgba(0, 0, 0, 0.7);
   --ds-color-text-description: rgba(0, 0, 0, 0.65);
-  --ds-color-text-placeholder: #8691a1;
+  --ds-color-text-placeholder: #666f7d;
   --ds-color-text-inverse: #fff;
 
   --ds-color-bg-page: #f9f8f8;

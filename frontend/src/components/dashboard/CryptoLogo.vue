@@ -22,8 +22,11 @@ const hue = computed(() => {
       height: size + 'px',
       fontSize: Math.max(9, size * 0.52) + 'px',
       lineHeight: 1,
+      /* 批 19：字母色 62% → 74% 明度。原值在蓝/紫色相上只有 4.37~4.45:1
+         （低于 AA 4.5），而这是 9~10px 的小字母，压暗更看不清。
+         74% 在全部 10 个色相 × 常用底色上 ≥5.68:1。 */
       backgroundColor: `hsl(${hue} 60% 50% / 0.14)`,
-      color: `hsl(${hue} 70% 62%)`,
+      color: `hsl(${hue} 72% 74%)`,
       border: `1px solid hsl(${hue} 60% 55% / 0.3)`,
     }"
     aria-hidden="true"
