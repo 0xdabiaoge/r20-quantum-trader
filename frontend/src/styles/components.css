@@ -819,6 +819,23 @@ textarea.input {
   flex-shrink: 0;
 }
 
+/* 批 87：大号 32px 变体。此前供应商列表/详情各自手写了 32px 与 34px 两套
+   （`.pd-avatar`/`.pd-model-icon` 32px、`.pv-avatar` 34px），同一枚字母组合头像
+   在列表与详情里差 2px；尺寸取值收敛到本变体，与 `.state-block .state-icon` 一致。 */
+.icon-box.is-md {
+  width: 32px;
+  height: 32px;
+}
+
+/* 批 87：字母组合（monogram）盒 —— 内容是文字不是图标，故不加描边以外的图标契约。
+   `.pv-avatar` 曾多带一条 `letter-spacing: 0.02em`，而它的孪生 `.pd-avatar` 没有，
+   同一枚头像在列表与详情里字距不同；现统一为原件的默认字距。 */
+.icon-box.is-mono {
+  border: 1px solid var(--ds-color-border-default);
+  font-size: var(--text-4xs);
+  font-weight: 600;
+}
+
 /* =========================================================================
    10 · 状态占位：加载 / 空 / 报错
    —— 三态统一骨架，所有页面共用，禁止各页自造

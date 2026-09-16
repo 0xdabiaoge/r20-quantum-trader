@@ -67,7 +67,7 @@ function monogram(name: string): string {
       </button>
 
       <div class="pd-id">
-        <span class="pd-avatar mono">{{ monogram(selectedProvider.name) }}</span>
+        <span class="icon-box is-md is-mono mono">{{ monogram(selectedProvider.name) }}</span>
         <div class="pd-id-text">
           <span class="pd-name">{{ selectedProvider.name }}</span>
           <span class="pd-sub mono">{{ selectedProvider.id || providerForm.id }}</span>
@@ -232,7 +232,7 @@ function monogram(name: string): string {
 
         <div v-else class="pd-models">
           <article v-for="m in selectedProvider.models" :key="m.id" class="pd-model">
-            <span class="pd-model-icon"><Cpu :size="15" /></span>
+            <span class="icon-box is-md"><Cpu :size="14" /></span>
 
             <div class="pd-model-main">
               <div class="pd-model-title">
@@ -353,20 +353,6 @@ function monogram(name: string): string {
   gap: 10px;
   min-width: 0;
 }
-.pd-avatar {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: var(--r-ctl);
-  border: 1px solid var(--ds-color-border-default);
-  background-color: var(--ds-color-bg-surface-1);
-  font-size: var(--text-4xs);
-  font-weight: 600;
-  color: var(--ds-color-text-description);
-  flex-shrink: 0;
-}
 .pd-id-text {
   display: flex;
   flex-direction: column;
@@ -479,17 +465,6 @@ function monogram(name: string): string {
 }
 .pd-model:hover {
   background-color: var(--ds-color-bg-hover);
-}
-.pd-model-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: var(--r-ctl);
-  background-color: var(--ds-color-bg-surface-1);
-  color: var(--ds-color-text-description);
-  flex-shrink: 0;
 }
 .pd-model-main {
   display: flex;

@@ -392,7 +392,7 @@ const bandFacts = () => [
           @keydown.enter="selectProvider(prov)"
           @keydown.space.prevent="selectProvider(prov)"
         >
-          <span class="pv-avatar mono">{{ monogram(prov.name) }}</span>
+          <span class="icon-box is-md is-mono mono">{{ monogram(prov.name) }}</span>
 
           <div class="pv-main">
             <div class="pv-title">
@@ -759,7 +759,7 @@ const bandFacts = () => [
 }
 .pv-row {
   display: grid;
-  grid-template-columns: 34px minmax(0, 1fr) auto;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--ds-space-3);
   padding: var(--ds-space-3) var(--ds-space-4);
@@ -775,21 +775,6 @@ const bandFacts = () => [
 }
 .pv-row.is-off {
   opacity: 0.6;
-}
-.pv-avatar {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  border-radius: var(--r-ctl);
-  border: 1px solid var(--ds-color-border-default);
-  background-color: var(--ds-color-bg-surface-1);
-  font-size: var(--text-4xs);
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  color: var(--ds-color-text-description);
-  flex-shrink: 0;
 }
 .pv-main {
   display: flex;
@@ -829,7 +814,7 @@ const bandFacts = () => [
 
 @media (max-width: 720px) {
   .pv-row {
-    grid-template-columns: 34px minmax(0, 1fr);
+    grid-template-columns: 32px minmax(0, 1fr);
   }
   .pv-actions {
     grid-column: 2;

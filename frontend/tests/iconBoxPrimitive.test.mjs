@@ -56,7 +56,18 @@ function styleFiles(dir, out = []) {
   return out;
 }
 
-/** 找出所有「图标盒形状」的规则：flex 居中 + 26×26。 */
+/**
+ * 找出所有「图标盒形状」的规则。
+ *
+ * 批 78 只认 26×26，于是**漏掉了另外三个手写的图标盒**：
+ * `.pd-avatar`(32) / `.pd-model-icon`(32) / `.pv-avatar`(34) ——
+ * 同一枚供应商字母组合头像在列表与详情里差 2px，且 `.pv-avatar` 还多一条
+ * `letter-spacing: 0.02em`（它的孪生 `.pd-avatar` 没有）。
+ *
+ * 批 87 把判据泛化为「flex 居中 + 固定宽高 + `--r-ctl` 圆角 + surface-1 底」，
+ * 与具体像素无关。用 `--r-ctl` 而不是任意圆角来区分**圆形**徽标
+ * （`.pv-chain-n` 是 `border-radius: 50%` 的计数圆点，本就不是图标盒）。
+ */
 export function iconBoxShapedRules(text) {
   const out = [];
   for (const m of text.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
@@ -65,8 +76,10 @@ export function iconBoxShapedRules(text) {
       /display:\s*flex/.test(body) &&
       /align-items:\s*center/.test(body) &&
       /justify-content:\s*center/.test(body) &&
-      /width:\s*26px/.test(body) &&
-      /height:\s*26px/.test(body);
+      /width:\s*\d+px/.test(body) &&
+      /height:\s*\d+px/.test(body) &&
+      /border-radius:\s*var\(--r-ctl\)/.test(body) &&
+      /background-color:\s*var\(--ds-color-bg-surface-1\)/.test(body);
     if (shaped) {
       out.push({
         selector: m[1].trim().split('\n').pop().trim(),
@@ -77,24 +90,61 @@ export function iconBoxShapedRules(text) {
   return out;
 }
 
-test('26px 图标盒只允许有一处定义，且必须是 .icon-box 原件', () => {
+/**
+ * 允许在原件之外存在的「图标盒形状」规则（值=理由）。
+ * 原件的变体（`.icon-box.is-md` / `.is-mono`）只补尺寸/描边，本身不是完整形状，故不入此表。
+ */
+export const SHAPE_ALLOWED = {
+  '.state-block .state-icon':
+    '状态占位的图标位：与 .icon-box.is-md 同为 32px，写在原件同一个文件里，属原件的另一形态',
+};
+
+test('图标盒形状的规则只允许出现在原件里（任意尺寸，不再只查 26px）', () => {
   const bad = [];
-  let found = 0;
+  const found = [];
   for (const file of styleFiles(SRC)) {
     const rel = path.relative(SRC, file);
+    const inPrimitive = rel === path.join('styles', 'components.css');
     for (const r of iconBoxShapedRules(readFileSync(file, 'utf8'))) {
-      found += 1;
-      if (rel !== path.join('styles', 'components.css') || r.selector !== '.icon-box') {
-        bad.push(`${rel}:${r.line} ${r.selector}`);
-      }
+      found.push(`${rel}::${r.selector}`);
+      if (SHAPE_ALLOWED[r.selector] && inPrimitive) continue;
+      if (inPrimitive && r.selector === '.icon-box') continue;
+      bad.push(`${rel}:${r.line} ${r.selector}`);
     }
   }
   assert.deepEqual(
     bad,
     [],
-    `26px 图标盒被重复定义（应改用全站 .icon-box 原件）：\n  ${bad.join('\n  ')}`,
+    `图标盒被各页重复定义（应改用全站 .icon-box 原件 + .is-md / .is-mono 变体）：\n  ${bad.join('\n  ')}`,
   );
-  assert.equal(found, 1, `全站应有且仅有 1 处图标盒定义，实测 ${found} 处`);
+  // 原件 + 已登记的例外
+  assert.equal(
+    found.length,
+    1 + Object.keys(SHAPE_ALLOWED).length,
+    `全站图标盒形状定义数应为 1+例外，实测 ${found.length} 处：${found.join(' / ')}`,
+  );
+});
+
+test('批 87 归一：供应商头像与模型图标不得再各页自造（32/34px 漂移的回归锚点）', () => {
+  const pv = readFileSync(path.join(SRC, 'views/admin/llm/ProviderListView.vue'), 'utf8');
+  const pd = readFileSync(path.join(SRC, 'views/admin/llm/ProviderDetailView.vue'), 'utf8');
+  for (const [rel, text] of [['ProviderListView', pv], ['ProviderDetailView', pd]]) {
+    assert.doesNotMatch(text, /\.pv-avatar\s*\{|\.pd-avatar\s*\{|\.pd-model-icon\s*\{/, `${rel} 仍自带自造的图标盒规则`);
+  }
+  // 34px 曾经只出现在这里，全站不该再有
+  assert.doesNotMatch(pv + pd, /\b34px\b/, '供应商页不该再出现 34px（应统一为原件的 .is-md=32px）');
+  // 原件的两个变体必须存在且取值正确
+  const css = readFileSync(COMPONENTS_CSS, 'utf8');
+  const md = css.match(/\.icon-box\.is-md\s*\{([^}]*)\}/);
+  assert.ok(md, 'components.css 缺少 .icon-box.is-md');
+  assert.match(md[1], /width:\s*32px/);
+  assert.match(md[1], /height:\s*32px/);
+  const mono = css.match(/\.icon-box\.is-mono\s*\{([^}]*)\}/);
+  assert.ok(mono, 'components.css 缺少 .icon-box.is-mono');
+  assert.match(mono[1], /border:\s*1px solid var\(--ds-color-border-default\)/);
+  assert.match(mono[1], /font-size:\s*var\(--text-4xs\)/);
+  // 字距不得再被某个页面单独改掉
+  assert.doesNotMatch(mono[1], /letter-spacing/, '.is-mono 不得带 letter-spacing（列表与详情必须一致）');
 });
 
 /**
@@ -107,6 +157,8 @@ test('26px 图标盒只允许有一处定义，且必须是 .icon-box 原件', (
  * 新增图标盒时在这里登记；数量不符即翻红。
  */
 export const BOX_USERS = {
+  'views/admin/llm/ProviderListView.vue': 1,
+  'views/admin/llm/ProviderDetailView.vue': 2,
   'components/admin/page-parts/DangerZone.vue': 1,
   'views/admin/AgentsPage.vue': 1,
   'views/admin/BackupPage.vue': 1,
@@ -130,7 +182,7 @@ test('每个图标盒用户都必须挂着 icon-box（清册逐文件钉数量�
   }
 
   assert.deepEqual(bad, [], `图标盒用户在模板上丢了 icon-box：\n  ${bad.join('\n  ')}`);
-  assert.equal(total, 8, `全站图标盒实例应为 8 个，实测 ${total} 个`);
+  assert.equal(total, 11, `全站图标盒实例应为 11 个（批 87 并入 3 个），实测 ${total} 个`);
 });
 
 test('.icon-box 原件必须完整（9 条属性一个不少）', () => {
@@ -154,6 +206,8 @@ test('挂了 icon-box 的元素，盒内图标必须是 14px（.is-lg 大号变�
       const m = line.match(/class="([^"]*\bicon-box\b[^"]*)"/);
       if (!m) return;
       const classes = m[1].split(/\s+/);
+      // `.is-mono` 盒里是**文字**（字母组合 monogram），没有图标 —— 无 :size 可核对。
+      if (classes.includes('is-mono')) return; // forEach 回调里只能用 return
       // 图标可能在同行，也可能在下一行（子元素换行）
       const window = line + ' ' + (lines[i + 1] || '');
       const size = window.match(/:size="(\d+)"/);
@@ -169,7 +223,7 @@ test('挂了 icon-box 的元素，盒内图标必须是 14px（.is-lg 大号变�
     });
   }
 
-  assert.ok(checked >= 6, `核对到的图标盒过少（${checked}）`);
+  assert.ok(checked >= 9, `核对到的图标盒过少（${checked}）`);
   assert.deepEqual(bad, [], `图标盒内图标尺寸不一致：\n  ${bad.join('\n  ')}`);
 });
 
@@ -203,24 +257,32 @@ test('已删的死 CSS（.trace 家族）不得回潮', () => {
   }
 });
 
-test('闸自检：能识别重复的图标盒，且不误伤其它 26px 规则', () => {
+test('闸自检：能识别任意尺寸的重复图标盒，且不误伤圆形徽标/缩略图', () => {
+  const BOX = 'display: flex; align-items: center; justify-content: center; border-radius: var(--r-ctl); background-color: var(--ds-color-bg-surface-1);';
   const dup = `
-.icon-box { display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; }
-.other-icon { display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; }`;
+.icon-box { ${BOX} width: 26px; height: 26px; }
+.other-icon { ${BOX} width: 26px; height: 26px; }
+.big-box { ${BOX} width: 32px; height: 32px; }`;
   const hits = iconBoxShapedRules(dup);
-  assert.equal(hits.length, 2, '应识别出两处图标盒形状的规则');
-  assert.deepEqual(hits.map((h) => h.selector), ['.icon-box', '.other-icon']);
+  assert.equal(hits.length, 3, '应识别出三处图标盒形状的规则（含 32px 的大号）');
+  assert.deepEqual(hits.map((h) => h.selector), ['.icon-box', '.other-icon', '.big-box']);
 
-  // 不误伤：26×26 但没有 flex 居中的（例如图片缩略图）
+  // 不误伤：有尺寸和圆角但没有 flex 居中的（例如图片缩略图）
   assert.deepEqual(
-    iconBoxShapedRules('.thumb { width: 26px; height: 26px; border-radius: var(--r-ctl); }'),
+    iconBoxShapedRules('.thumb { width: 26px; height: 26px; border-radius: var(--r-ctl); background-color: var(--ds-color-bg-surface-1); }'),
     [],
-    '不带 flex 居中的 26×26 不该被当作图标盒',
+    '不带 flex 居中的盒子不该被当作图标盒',
   );
-  // 不误伤：flex 居中但尺寸不同的
+  // 不误伤：圆形计数徽标（.pv-chain-n 是 border-radius: 50% 的 18px 圆点，本就不是图标盒）
   assert.deepEqual(
-    iconBoxShapedRules('.box32 { display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; }'),
+    iconBoxShapedRules('.chain-n { display: flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; background-color: var(--ds-color-bg-surface-1); }'),
     [],
-    '32px 的盒子不该被当作 26px 图标盒',
+    '圆形徽标不该被当作图标盒（用 --r-ctl 而非任意圆角来区分）',
+  );
+  // 不误伤：没有 surface-1 底色的
+  assert.deepEqual(
+    iconBoxShapedRules('.ghost { display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: var(--r-ctl); }'),
+    [],
+    '没有 surface-1 底色的不该被当作图标盒',
   );
 });
