@@ -65,6 +65,15 @@ function onKeydown(e: KeyboardEvent) {
       (els[0] || panel.value)?.focus?.();
       return;
     }
+    // 焦点停在面板容器上（打开时的默认落点）：正向 Tab 交给浏览器自然进第一个可聚焦项，
+    // 反向 Tab 必须拦住，否则会退到遮罩后面的背景页
+    if (document.activeElement === panel.value) {
+      if (e.shiftKey) {
+        e.preventDefault();
+        els[els.length - 1].focus();
+      }
+      return;
+    }
     const first = els[0];
     const last = els[els.length - 1];
     if (e.shiftKey && document.activeElement === first) {
@@ -96,8 +105,12 @@ watch(
       token = Symbol('dialog');
       stack.push(token);
       document.addEventListener('keydown', onKeydown, true);
-      const els = focusables();
-      (els[0] || panel.value)?.focus?.();
+      // 批 23：焦点落在**面板容器**上（tabindex="-1" + outline-none），不再抢第一个按钮。
+      // 原来把焦点给 els[0]（确定/取消按钮、关闭按钮），实测真实鼠标点击后
+      // `:focus-visible` 依然匹配，于是每开一次弹窗，那个按钮就顶着一圈蓝色焦点环 ——
+      // 鼠标用户看到的是"莫名其妙的蓝框"。容器聚焦是 aria-modal 对话框的标准做法：
+      // 读屏会播报标题，键盘用户按一次 Tab 进第一个可聚焦项（Tab 陷阱已按容器处理）。
+      panel.value?.focus?.();
     } else {
       document.body.style.overflow = '';
       detach();

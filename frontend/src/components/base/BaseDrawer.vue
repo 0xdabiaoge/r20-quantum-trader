@@ -62,6 +62,15 @@ function onKeydown(e: KeyboardEvent) {
       (els[0] || panel.value)?.focus?.();
       return;
     }
+    // 焦点停在面板容器上（打开时的默认落点）：正向 Tab 交给浏览器自然进第一个可聚焦项，
+    // 反向 Tab 必须拦住，否则会退到遮罩后面的背景页
+    if (document.activeElement === panel.value) {
+      if (e.shiftKey) {
+        e.preventDefault();
+        els[els.length - 1].focus();
+      }
+      return;
+    }
     const first = els[0];
     const last = els[els.length - 1];
     if (e.shiftKey && document.activeElement === first) {
@@ -93,8 +102,9 @@ watch(
       token = Symbol('drawer');
       stack.push(token);
       document.addEventListener('keydown', onKeydown, true);
-      const els = focusables();
-      (els[0] || panel.value)?.focus?.();
+      // 批 23：焦点落在面板容器（outline-none）而不是第一个按钮 —— 详见 BaseDialog 同处注释：
+      // 把焦点给按钮会让关闭按钮每次都顶着一圈蓝环（真实鼠标点击后 :focus-visible 仍匹配）。
+      panel.value?.focus?.();
     } else {
       document.body.style.overflow = '';
       detach();
