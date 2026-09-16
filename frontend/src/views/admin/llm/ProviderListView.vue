@@ -396,6 +396,7 @@ const bandFacts = () => [
             <BaseSwitch
               :model-value="prov.enabled === true"
               :disabled="false"
+              :label="`${prov.name || prov.id} · ${t('admin.llm.enabledField')}`"
               @update:model-value="() => onToggleProvider(prov)"
             />
           </div>
@@ -589,7 +590,11 @@ const bandFacts = () => [
   min-width: 0;
 }
 .pv-preset {
-  padding:4px 10px;
+  /* 批 18：热区补到 24px 高（原 23px，正好卡在可点下限之下） */
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 4px 10px;
   border: 1px solid var(--ds-color-border-default);
   border-radius: var(--r-ctl);
   background-color: transparent;

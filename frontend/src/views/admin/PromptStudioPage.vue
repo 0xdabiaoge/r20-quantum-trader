@@ -586,10 +586,10 @@ onMounted(loadLib)
               @click="selectProfile(p.id)"
             >
               <span class="ps-profile-top">
-                <span class="ps-profile-name truncate">{{ p.name }}</span>
+                <span class="ps-profile-name truncate" :title="p.name">{{ p.name }}</span>
                 <span v-if="p.id === lib.active_profile_id" class="dsh-status-dot active" />
               </span>
-              <span class="ps-profile-desc truncate">
+              <span class="ps-profile-desc truncate" :title="p.description || t('admin.promptStudio.profiles.noDesc')">
                 {{ p.description || t('admin.promptStudio.profiles.noDesc') }}
               </span>
             </button>
@@ -635,6 +635,7 @@ onMounted(loadLib)
                 <BaseSwitch
                   :model-value="m.enabled"
                   :disabled="!auth.isSuperadmin"
+                  :label="m.enabled ? t('admin.promptStudio.modules.enabledTip') : t('admin.promptStudio.modules.disabledTip')"
                   @update:model-value="() => toggleModule(m)"
                 />
                 <span class="ps-mod-title truncate" :title="m.title">{{ m.title }}</span>
@@ -1072,6 +1073,13 @@ onMounted(loadLib)
   .ps-grid {
     grid-template-columns: 250px minmax(0, 1fr) 380px;
     grid-template-areas: 'lib center prev';
+    /* 批 18：三栏等高，方案库不再在下方留一大片空白（原 align-items:start） */
+    align-items: stretch;
+  }
+  .ps-profiles {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: none;
   }
 }
 .ps-lib {

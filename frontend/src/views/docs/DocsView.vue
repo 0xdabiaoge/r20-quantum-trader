@@ -171,7 +171,7 @@ onUnmounted(() => {
               ? { backgroundColor: 'var(--surface-3)', color: 'var(--ink-strong)', borderColor: 'var(--line-3)', fontWeight: 'bold' }
               : { backgroundColor: 'transparent', borderColor: 'transparent', color: 'var(--ink-2)' }"
           >
-            <div class="flex items-center space-x-2.5 truncate">
+            <div class="flex items-center space-x-2.5 truncate" :title="s.title">
               <component :is="s.icon" class="w-3.5 h-3.5 shrink-0" />
               <span class="truncate">{{ s.title }}</span>
             </div>

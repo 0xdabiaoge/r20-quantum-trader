@@ -507,6 +507,7 @@ onMounted(loadData);
                 <BaseSwitch
                   :model-value="item.enabled === true"
                   :disabled="busy !== '' || loading || !auth.isSuperadmin"
+                  :label="`${item.category} · ${t('admin.evolution.score')} ${item.health_score}`"
                   @update:model-value="() => toggleLessonStatus(item.id)"
                 />
                 <button
@@ -583,6 +584,7 @@ onMounted(loadData);
                 <BaseSwitch
                   :model-value="mod.enabled === true"
                   :disabled="!auth.isSuperadmin"
+                  :label="mod.title"
                   @update:model-value="(v: boolean) => (mod.enabled = v)"
                 />
                 <span class="evo-mod-state">

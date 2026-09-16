@@ -295,7 +295,7 @@ function toggleCoinFilter(sym: string) {
                 :href="item.url"
                 target="_blank"
                 rel="noopener noreferrer"
-                class="text-3xs text-[var(--ink-3)] hover:text-[var(--accent)] inline-flex items-center gap-1 transition-colors"
+                class="text-3xs text-[var(--ink-3)] hover:text-[var(--accent)] inline-flex items-center gap-1 transition-colors px-1 -mx-1 py-1 -my-1"
               >
                 <span>{{ t('common.more') }}</span>
                 <ExternalLink class="h-3 w-3" />

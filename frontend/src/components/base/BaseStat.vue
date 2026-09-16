@@ -56,6 +56,7 @@ const toneVar = {
 
 <style scoped>
 .kpi-hint {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -72,6 +73,12 @@ const toneVar = {
   font-weight: 700;
   line-height: 1;
   transition: all var(--dur-fast);
+}
+/* 批 18：可见圆点保持 13px（不破坏指标行节奏），命中区用透明伪元素撑到 25px */
+.kpi-hint::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
 }
 .kpi-hint:hover {
   background: var(--surface-3);

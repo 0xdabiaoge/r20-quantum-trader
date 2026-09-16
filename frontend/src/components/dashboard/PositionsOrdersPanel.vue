@@ -69,7 +69,7 @@ function symOf(x: { instId?: string; name?: string }): string {
 </script>
 
 <template>
-  <div class="dsh-card flex h-full max-h-[58dvh] flex-col overflow-hidden xl:max-h-none">
+  <div class="dsh-card pop-panel flex h-full max-h-[58dvh] flex-col overflow-hidden xl:max-h-none">
     <!-- 面板头部：选项卡与场所过滤条 -->
     <div class="dsh-card-header flex flex-col sm:flex-row sm:items-center justify-between gap-2">
       <div class="flex items-center gap-2">
@@ -106,15 +106,15 @@ function symOf(x: { instId?: string; name?: string }): string {
     <!-- 持仓列表 -->
     <div v-if="tab === 'positions'" class="scroll-y flex-1 min-h-0 overflow-x-auto">
       <BaseEmpty v-if="!filteredPositions.length" :text="t('dash.matrix.positions.empty')" />
-      <table v-else class="table w-full">
+      <table v-else class="table pop-table w-full">
         <thead>
           <tr>
             <th>{{ t('dash.matrix.positions.col.symbol') }}</th>
-            <th class="col-num hidden sm:table-cell">{{ t('dash.matrix.positions.col.entry') }}</th>
+            <th class="col-num pop-col-entry">{{ t('dash.matrix.positions.col.entry') }}</th>
             <th class="col-num">{{ t('dash.matrix.positions.col.mark') }}</th>
-            <th class="col-num hidden md:table-cell">{{ t('dash.matrix.positions.col.lev') }}</th>
+            <th class="col-num pop-col-lev">{{ t('dash.matrix.positions.col.lev') }}</th>
             <th class="col-num">{{ t('dash.matrix.positions.col.pnl') }}</th>
-            <th class="col-num hidden 2xl:table-cell">{{ t('dash.matrix.positions.col.sl') }} / {{ t('dash.matrix.positions.col.tp') }}</th>
+            <th class="col-num">{{ t('dash.matrix.positions.col.sl') }} / {{ t('dash.matrix.positions.col.tp') }}</th>
             <th class="text-center">{{ t('dash.matrix.positions.col.oco') }}</th>
           </tr>
         </thead>
@@ -145,14 +145,14 @@ function symOf(x: { instId?: string; name?: string }): string {
               </div>
               <p v-if="p.stageDesc" class="text-3xs text-[var(--ink-3)] leading-tight mt-0.5">{{ p.stageDesc }}</p>
             </td>
-            <td class="col-num font-mono hidden sm:table-cell">{{ fmtPrice(p.avgPx) }}</td>
+            <td class="col-num font-mono pop-col-entry">{{ fmtPrice(p.avgPx) }}</td>
             <td class="col-num font-mono">{{ fmtPrice(p.markPx ?? p.last) }}</td>
-            <td class="col-num font-mono hidden md:table-cell">{{ p.lever }}x</td>
+            <td class="col-num font-mono pop-col-lev">{{ p.lever }}x</td>
             <td class="col-num font-mono" :class="posPnl(p) >= 0 ? 'up' : 'down'">
               {{ arrow(posPnl(p)) }} {{ fmtSigned(posPnl(p)) }}
               <span class="text-3xs block text-[var(--ink-3)]">{{ fmtPct(posRoi(p)) }}</span>
             </td>
-            <td class="col-num font-mono text-[var(--ink-3)] hidden 2xl:table-cell">
+            <td class="col-num font-mono text-[var(--ink-3)]">
               <span class="down">{{ fmtPrice(p.exchangeSl ?? p.displayStop) }}</span>
               <span class="mx-1">/</span>
               <span class="up">{{ fmtPrice(p.exchangeTp ?? p.displayTakeProfit) }}</span>
@@ -183,14 +183,14 @@ function symOf(x: { instId?: string; name?: string }): string {
     <!-- 挂单列表 -->
     <div v-else class="scroll-y flex-1 min-h-0 overflow-x-auto">
       <BaseEmpty v-if="!filteredOrders.length" :text="t('dash.matrix.orders.empty')" />
-      <table v-else class="table w-full">
+      <table v-else class="table pop-table w-full">
         <thead>
           <tr>
             <th>{{ t('dash.matrix.orders.col.symbol') }}</th>
             <th class="col-num">{{ t('dash.matrix.orders.col.price') }}</th>
             <th class="col-num">{{ t('dash.matrix.orders.col.qty') }}</th>
-            <th class="col-num hidden sm:table-cell">{{ t('dash.matrix.orders.col.sl') }} / {{ t('dash.matrix.orders.col.tp') }}</th>
-            <th class="hidden md:table-cell">{{ t('dash.matrix.orders.col.placed') }}</th>
+            <th class="col-num">{{ t('dash.matrix.orders.col.sl') }} / {{ t('dash.matrix.orders.col.tp') }}</th>
+            <th class="pop-col-time">{{ t('dash.matrix.orders.col.placed') }}</th>
             <th class="text-center">{{ t('dash.matrix.orders.col.state') }}</th>
           </tr>
         </thead>
@@ -222,14 +222,14 @@ function symOf(x: { instId?: string; name?: string }): string {
             </td>
             <td class="col-num font-mono">{{ fmtPrice(o.px) }}</td>
             <td class="col-num font-mono">{{ fmtNum(Number(o.sz), 0) }}</td>
-            <td class="col-num font-mono text-[var(--ink-3)] hidden sm:table-cell">
+            <td class="col-num font-mono text-[var(--ink-3)]">
               <span class="down">{{ o.slTriggerPx ? fmtPrice(o.slTriggerPx) : '--' }}</span>
               <span class="mx-1">/</span>
               <span class="up">{{ o.tpTriggerPx ? fmtPrice(o.tpTriggerPx) : '--' }}</span>
             </td>
-            <td class="hidden md:table-cell text-3xs text-[var(--ink-3)]"><TimeAgo :time="Number(o.cTime) || o.cTime" /></td>
+            <td class="pop-col-time text-3xs text-[var(--ink-3)]"><TimeAgo :time="Number(o.cTime) || o.cTime" /></td>
             <td class="text-center">
-              <span class="rounded px-1.5 py-0.5 text-3xs border border-[var(--line-1)] bg-[var(--surface-2)] text-[var(--ink-2)]">
+              <span class="inline-block whitespace-nowrap rounded px-1.5 py-0.5 text-3xs border border-[var(--line-1)] bg-[var(--surface-2)] text-[var(--ink-2)]">
                 {{ o.state === 'live' ? t('status.waiting') : o.state }}
               </span>
             </td>
@@ -242,3 +242,64 @@ function symOf(x: { instId?: string; name?: string }): string {
     </div>
   </div>
 </template>
+
+<style scoped>
+/* =========================================================================
+   批 18 · 列显隐改跟「面板宽度」，不再跟「视口宽度」
+   -------------------------------------------------------------------------
+   缺陷（实测）：本面板在 1600px 视口下宽 433px，而列显隐用的是 Tailwind
+   视口断点 —— `hidden 2xl:table-cell` 在 1600 ≥ 1536 时判定为「可见」，
+   于是 7 列硬塞进 433px，表格宽 564px 被容器裁掉："止损 / 止盈"（风险
+   关键列）只剩半个「止」字，且没有任何滚动提示。
+
+   修法：面板自身作为容器（container-type: inline-size），列显隐与内边距
+   改由容器宽度决定，并按「信息重要性」排序取舍：
+     始终保留 标的 / 标记价 / 未实现盈亏 / 止损·止盈 / 云端防线
+     ≥520px  再放出 开仓均价（与标记价高度冗余）
+     ≥600px  再放出 杠杆（静态值）与挂单时间
+   ========================================================================= */
+.pop-panel {
+  container-type: inline-size;
+}
+
+.pop-col-entry,
+.pop-col-lev,
+.pop-col-time {
+  display: none;
+}
+
+@container (min-width: 520px) {
+  .pop-col-entry,
+  .pop-col-time {
+    display: table-cell;
+  }
+}
+@container (min-width: 600px) {
+  .pop-col-lev {
+    display: table-cell;
+  }
+}
+
+/* 窄容器收紧单元格内边距：让「止损 / 止盈」也能一屏放下，不出现横向滚动 */
+@container (max-width: 559px) {
+  .pop-table th,
+  .pop-table td {
+    padding-left: var(--sp-4);
+    padding-right: var(--sp-4);
+  }
+}
+
+/* 极窄（手机）：仍可能出现横向滚动，此时把标的列钉在左侧，滚到哪都认得出是谁 */
+@container (max-width: 419px) {
+  .pop-table th:first-child,
+  .pop-table td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background-color: var(--ds-color-bg-surface-card);
+  }
+  .pop-table tbody tr:hover td:first-child {
+    background-color: var(--ds-color-bg-surface-2);
+  }
+}
+</style>

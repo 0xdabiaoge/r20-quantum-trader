@@ -752,16 +752,21 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  /* 批 18：原热区 82×17px；负外边距抵消内边距，视觉位置不变，命中区 25px 高 */
+  padding: 4px 8px;
+  margin: -4px -8px;
+  border-radius: var(--r-xs);
   font-family: var(--ds-font-mono);
   font-size: var(--text-3xs);
   color: var(--ds-color-brand);
   text-decoration: none;
   white-space: nowrap;
-  transition: opacity var(--dur-fast);
+  transition: opacity var(--dur-fast), background-color var(--dur-fast);
 }
 .ov-ch-link:hover {
   text-decoration: underline;
   opacity: 0.85;
+  background-color: var(--r20-brand-bg);
 }
 
 /* 决策流 */

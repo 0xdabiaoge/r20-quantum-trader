@@ -129,7 +129,7 @@ function refreshAll(): void {
           data-test="env-switch"
         >
           <button
-            class="px-2 py-0.5 rounded text-3xs font-medium cursor-pointer transition-colors flex items-center gap-1"
+            class="px-2 py-1 rounded text-3xs font-medium cursor-pointer transition-colors flex items-center gap-1"
             :style="isDemo ? { backgroundColor: 'var(--surface-3)', color: 'var(--ink-strong)', fontWeight: '600' } : { color: 'var(--ink-3)' }"
             :aria-pressed="isDemo"
             data-test="env-demo"
@@ -139,7 +139,7 @@ function refreshAll(): void {
             {{ t('dash.venueAccounts.envDemo') }}
           </button>
           <button
-            class="px-2 py-0.5 rounded text-3xs font-medium cursor-pointer transition-colors flex items-center gap-1"
+            class="px-2 py-1 rounded text-3xs font-medium cursor-pointer transition-colors flex items-center gap-1"
             :style="!isDemo ? { backgroundColor: 'var(--surface-3)', color: 'var(--ink-strong)', fontWeight: '600' } : { color: 'var(--ink-3)' }"
             :aria-pressed="!isDemo"
             data-test="env-live"
@@ -174,7 +174,7 @@ function refreshAll(): void {
         <div class="flex items-center justify-between text-2xs mb-1.5">
           <span class="font-bold text-[var(--ink-1)]">{{ t('dash.venueAccounts.mobileSummary') }}</span>
           <button
-            class="text-3xs font-medium px-2 py-0.5 rounded cursor-pointer transition-colors"
+            class="text-3xs font-medium px-2 py-1 rounded cursor-pointer transition-colors"
             style="background-color: var(--surface-3); color: var(--ink-2)"
             @click="isMobileExpanded = !isMobileExpanded"
           >

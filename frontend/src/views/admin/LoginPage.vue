@@ -226,11 +226,20 @@ async function handleLogin() {
   font-size: var(--text-3xs);
   color: var(--ds-color-text-placeholder);
   cursor: pointer;
-  padding: 2px 4px;
-  transition: color var(--dur-fast);
+  /* 批 18：热区提到 24px 高（原 29×21 / 22×21） */
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 2px 6px;
+  border-radius: var(--r-xs);
+  transition: color var(--dur-fast), background-color var(--dur-fast);
+}
+.auth-lang-opt:hover {
+  color: var(--ds-color-text-secondary);
+  background: rgba(255, 255, 255, 0.06);
 }
 .auth-lang-opt.is-active {
-  color: #fff;
+  color: var(--ds-color-text-primary);
   font-weight: 600;
 }
 .auth-lang-sep {
@@ -367,15 +376,23 @@ async function handleLogin() {
 }
 .auth-eye-btn {
   position: absolute;
-  right: 10px;
+  right: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
   border: 0;
+  border-radius: var(--r-xs);
   background: transparent;
   color: var(--ds-color-text-placeholder);
   cursor: pointer;
-  transition: color var(--dur-fast);
+  transition: color var(--dur-fast), background-color var(--dur-fast);
 }
 .auth-eye-btn:hover {
-  color: #fff;
+  color: var(--ds-color-text-primary);
+  background-color: var(--ds-color-bg-hover);
 }
 
 /* 提交主按钮 */

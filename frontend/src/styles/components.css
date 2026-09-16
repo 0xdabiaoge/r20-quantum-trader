@@ -372,7 +372,8 @@ textarea.input {
   align-items: center;
   justify-content: center;
   gap: 4px;
-  height: 22px;
+  /* 批 18：22 → 24px，全站分段控件统一到可点下限（此前低于 24px 命中区） */
+  height: 24px;
   padding: 0 10px;
   border-radius: var(--r-xs);
   border: 1px solid transparent;
@@ -850,14 +851,16 @@ kbd {
   overflow-wrap: anywhere;
 }
 
-/* 开关（BaseSwitch：按钮自身即轨道，滑块走 ::after） */
+/* 开关（BaseSwitch：按钮自身即轨道，滑块走 ::after）
+   批 18：20 → 24px 高，对齐控件阶梯（24/30/36）与 WCAG 2.5.8 的 24px 命中下限。
+   全站 23 处开关本体此前都是 34×20，是页面上最小的一类可点目标。 */
 .switch {
   position: relative;
   display: inline-flex;
   align-items: center;
   flex-shrink: 0;
-  width: 34px;
-  height: 20px;
+  width: 40px;
+  height: 24px;
   padding: 0;
   border: 1px solid var(--ds-color-border-default);
   border-radius: var(--r-pill);
@@ -871,8 +874,8 @@ kbd {
   position: absolute;
   left: 2px;
   top: 50%;
-  width: 14px;
-  height: 14px;
+  width: 18px;
+  height: 18px;
   border-radius: var(--r-pill);
   background-color: var(--ds-color-text-placeholder);
   transform: translateY(-50%);
@@ -884,7 +887,7 @@ kbd {
   border-color: var(--ds-color-brand);
 }
 .switch[aria-checked='true']::after {
-  left: 17px;
+  left: 20px;
   background-color: #fff;
 }
 .switch:disabled {

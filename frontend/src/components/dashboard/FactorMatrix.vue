@@ -182,7 +182,7 @@ const processedRows = computed(() => {
               { key: 'wait', label: '观望' },
             ] as const"
             :key="m.key"
-            class="px-2 py-0.5 rounded text-3xs font-medium cursor-pointer transition-colors"
+            class="px-2 py-1 rounded text-3xs font-medium cursor-pointer transition-colors"
             :style="filterMode === m.key ? { backgroundColor: 'var(--surface-3)', color: 'var(--ink-strong)', fontWeight: '600' } : { color: 'var(--ink-3)' }"
             @click="filterMode = m.key"
           >

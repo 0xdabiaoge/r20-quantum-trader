@@ -41,7 +41,10 @@ registerIndicator({
   shortName: 'VWAP',
   series: 'price',
   precision: 2,
-  figures: [{ key: 'vwap', title: 'VWAP: ', type: 'line' }],
+  // 批 18：图例由 klinecharts 渲染为「shortName + figure.title + 值」，
+  // 原先 title 也是 'VWAP: ' → 图例出现「VWAP VWAP: 97.740」这种重复。
+  // 去掉 figure.title 的前缀，图例变为「VWAP 97.740」。
+  figures: [{ key: 'vwap', title: '', type: 'line' }],
   styles: {
     // ⚠️ 批 13 说明：此处是本仓**唯一**刻意保留的颜色字面量。
     // `registerIndicator` 在模块求值时执行，而 `tok()` 依赖 document 与已生效的

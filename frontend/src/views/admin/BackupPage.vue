@@ -402,7 +402,7 @@ onMounted(load)
               <span class="bk-switch-text" :class="enabled ? 'is-on' : ''">
                 {{ enabled ? t('admin.backup.enabledOn') : t('admin.backup.enabledOff') }}
               </span>
-              <BaseSwitch v-model="enabled" :disabled="!auth.isSuperadmin" />
+              <BaseSwitch v-model="enabled" :disabled="!auth.isSuperadmin" :label="t('admin.backup.configTitle')" />
             </div>
           </header>
 

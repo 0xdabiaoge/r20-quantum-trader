@@ -112,12 +112,12 @@ function monogram(name: string): string {
 
           <div class="pd-kv-row">
             <span class="pd-kv-k">{{ t('admin.llm.enabledField') }}</span>
-            <BaseSwitch v-model="providerForm.enabled" />
+            <BaseSwitch v-model="providerForm.enabled" :label="t('admin.llm.enabledField')" />
           </div>
 
           <div class="pd-kv-row">
             <span class="pd-kv-k">{{ t('admin.llm.multiKey') }}</span>
-            <BaseSwitch v-model="providerForm.multi_key_enabled" />
+            <BaseSwitch v-model="providerForm.multi_key_enabled" :label="t('admin.llm.multiKey')" />
           </div>
         </div>
       </section>

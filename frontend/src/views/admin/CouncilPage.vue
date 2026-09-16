@@ -408,7 +408,11 @@ onMounted(loadData);
               {{ councilConfig.enabled ? t('admin.council.chipInSession') : t('admin.council.chipDirect') }}
             </span>
             <span class="cn-fact-foot">
-              <BaseSwitch v-model="councilConfig.enabled" :disabled="!auth.isSuperadmin" />
+              <BaseSwitch
+                v-model="councilConfig.enabled"
+                :disabled="!auth.isSuperadmin"
+                :label="t('admin.council.bandStatus')"
+              />
               <span>{{ councilConfig.enabled ? t('admin.council.enabledOn') : t('admin.council.enabledOff') }}</span>
             </span>
           </div>
@@ -519,8 +523,11 @@ onMounted(loadData);
                 <component :is="roleIcons[roleIconKeyOf(String(roleId))]" :size="14" />
               </span>
               <span class="cn-seat-text">
-                <span class="cn-seat-name truncate">{{ role.name || roleId }}</span>
-                <span class="cn-seat-sub truncate">
+                <span class="cn-seat-name truncate" :title="role.name || String(roleId)">{{ role.name || roleId }}</span>
+                <span
+                  class="cn-seat-sub truncate"
+                  :title="roleTitleOf(role, isCioSeat(role, String(roleId)) ? t('admin.council.cioTitle') : 'Senior Trader')"
+                >
                   {{ roleTitleOf(role, isCioSeat(role, String(roleId)) ? t('admin.council.cioTitle') : 'Senior Trader') }}
                 </span>
               </span>
@@ -646,6 +653,7 @@ onMounted(loadData);
                     <BaseSwitch
                       :model-value="selectedRole.enabled !== false"
                       :disabled="!auth.isSuperadmin"
+                      :label="t('admin.council.seatActive')"
                       @update:model-value="(v: boolean) => (selectedRole.enabled = v)"
                     />
                     <span>{{ selectedRole.enabled !== false ? t('admin.council.seatActive') : t('admin.council.seatMuted') }}</span>
