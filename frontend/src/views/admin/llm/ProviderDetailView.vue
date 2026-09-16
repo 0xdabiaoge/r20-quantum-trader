@@ -419,6 +419,8 @@ function monogram(name: string): string {
   display: flex;
   align-items: center;
 }
+/* 批 97：38px = 右侧 `.pd-eye`（absolute right 4）按钮宽 + 间隙
+   —— 推导几何，刻意离格。 */
 .pd-key .field {
   padding-right: 38px;
 }

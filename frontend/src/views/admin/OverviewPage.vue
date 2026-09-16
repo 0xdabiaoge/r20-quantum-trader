@@ -619,7 +619,7 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
   flex-direction: column;
   justify-content: space-between;
   min-height: 128px;
-  padding: 16px 18px;
+  padding: var(--ds-space-4) var(--sp-8);
   border-radius: var(--r-card);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.01) 100%), rgba(14, 17, 24, 0.72);
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -702,7 +702,7 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
 .ov-hud-sub {
   font-size: var(--text-3xs);
   color: var(--ds-color-text-description);
-  margin-top: 3px;
+  margin-top: var(--sp-1);
 }
 
 .ov-hud-foot {
@@ -747,7 +747,7 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 20px;
+  padding: var(--sp-7) var(--sp-8);
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   background: transparent;
 }
@@ -770,7 +770,7 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
 .ov-ch-desc {
   font-size: var(--text-3xs);
   color: var(--ds-color-text-placeholder);
-  margin-top: 3px;
+  margin-top: var(--sp-1);
 }
 .ov-ch-link {
   display: inline-flex;
@@ -802,8 +802,8 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
   display: grid;
   grid-template-columns: 100px 100px 90px 1fr 70px;
   align-items: center;
-  gap: 14px;
-  padding: 11px 20px;
+  gap: var(--sp-6);
+  padding: var(--sp-6) var(--sp-8);
   border-bottom: 1px solid rgba(255, 255, 255, 0.04);
   transition: background-color var(--dur-fast);
 }
@@ -970,7 +970,7 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
 .ov-pipe-info {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: var(--sp-4);
   min-width: 0;
 }
 .ov-pipe-dot {
@@ -1023,7 +1023,7 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 13px 16px;
+  padding: var(--sp-6) var(--ds-space-4);
   background: rgba(15, 18, 25, 0.7);
   text-decoration: none;
   color: inherit;
@@ -1172,7 +1172,7 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
 .ov-ar-toggle {
   font-size: var(--text-4xs);
   color: var(--ds-color-brand);
-  padding: 1px 5px;
+  padding: var(--sp-hair) var(--sp-2);
   border-radius: var(--r-xs);
   background: rgba(103, 153, 254, 0.08);
 }
@@ -1180,7 +1180,7 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
 .ov-ar-json-panel {
   grid-column: 1 / -1;
   margin-top: 6px;
-  padding: 12px 14px;
+  padding: var(--sp-6) var(--ds-space-4);
   border-radius: var(--r-xs);
   background: rgba(0, 0, 0, 0.4);
   border: 1px solid rgba(255, 255, 255, 0.06);

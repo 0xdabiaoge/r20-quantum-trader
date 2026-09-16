@@ -164,6 +164,9 @@ const hint = computed(() => t('admin.shell.danger.confirmHint', undefined, { phr
 .dz-input-icon.is-armed {
   color: var(--down);
 }
+/* 批 97：27px = 左侧 `.dz-input-icon`（absolute left 9）+ 图标宽 12 + 间隙 6
+   —— **推导几何**，不是间距口味。实测图标占 x 9~21、文字从 28 起，不重叠。
+   此值随图标尺寸走，故刻意留在 2px 刻度之外（spacing 判据里已登记）。 */
 .dz-input {
   width: 100%;
   padding-left: 27px;

@@ -515,6 +515,8 @@ onMounted(loadData)
 </template>
 
 <style scoped>
+/* 批 97：72px = 悬浮保存条 `.rk-savebar`（position:fixed，bottom 16 + 自身高约 46）
+   + 间隙 —— 为固定条预留的可视余量，属推导几何，刻意离格。 */
 .rk {
   display: flex;
   flex-direction: column;

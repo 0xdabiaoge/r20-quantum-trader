@@ -213,7 +213,7 @@ async function handleLogin() {
 .auth-lang-pill {
   display: inline-flex;
   align-items: center;
-  padding: 3px 8px;
+  padding: var(--sp-1) var(--sp-4);
   border-radius: var(--r-pill);
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -249,7 +249,7 @@ async function handleLogin() {
 
 /* 卡片本体 */
 .auth-card {
-  padding: 32px 28px;
+  padding: var(--ds-space-6) var(--ds-space-5);
   /* 批 94：原为 `14px` —— **整个半径刻度（4/8/10/12/16/胶囊）里没有这个值**，
      是全站唯一的 14px 圆角。登录卡也是「卡片」，收敛到 `--r-card`(10px)，
      与其余 9 处卡片一致。⚠️ 这是本批唯一的**可见变化**（卡片圆角 14px→10px）。 */
@@ -297,11 +297,11 @@ async function handleLogin() {
   gap: 6px;
   font-size: var(--text-xs);
   color: var(--ds-color-text-description);
-  margin-top: 5px;
+  margin-top: var(--sp-2);
 }
 .auth-version-tag {
   font-size: var(--text-4xs);
-  padding: 1px 5px;
+  padding: var(--sp-hair) var(--sp-2);
   border-radius: var(--r-xs);
   background: rgba(255, 255, 255, 0.05);
   color: var(--ds-color-text-placeholder);
@@ -318,7 +318,7 @@ async function handleLogin() {
   border: 1px solid var(--down-line);
   color: var(--down);
   font-size: var(--text-xs);
-  margin-bottom: 18px;
+  margin-bottom: var(--ds-space-4);
 }
 .auth-alert-icon {
   flex-shrink: 0;
@@ -369,6 +369,8 @@ async function handleLogin() {
   display: flex;
   align-items: center;
 }
+/* 批 97：36px = 右侧 `.auth-eye-btn`（absolute right 6）+ 按钮宽 24 + 间隙 6
+   —— 推导几何，刻意离格。实测按钮 24×24、距右 6。 */
 .auth-input-pwd-wrap .auth-input {
   padding-right: 36px;
 }
@@ -429,7 +431,7 @@ async function handleLogin() {
   align-items: center;
   gap: 6px;
   margin-top: 20px;
-  padding-top: 14px;
+  padding-top: var(--sp-6);
   border-top: 1px solid rgba(255, 255, 255, 0.05);
   font-size: var(--text-4xs);
   color: var(--ds-color-text-placeholder);
