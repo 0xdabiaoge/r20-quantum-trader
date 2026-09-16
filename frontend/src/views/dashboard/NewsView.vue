@@ -14,6 +14,7 @@ import {
 import { useDashboardStore } from '../../stores/dashboard';
 import DataGate from '../../components/dashboard/DataGate.vue';
 import { useI18n } from '../../composables/useI18n';
+import { useRovingTabs } from '../../composables/useRovingTabs';
 import { fmtHM } from '../../utils/format';
 import BaseEmpty from '../../components/base/BaseEmpty.vue';
 import TimeAgo from '../../components/base/TimeAgo.vue';
@@ -30,6 +31,12 @@ const sourceFilters = computed(() => [
   { key: '金十数据', label: t('dash.news.source.jin10') },
   { key: '全球宏观', label: t('dash.news.source.macro') },
 ]);
+
+/** 批 66：来源筛选分段的漫游 tabindex 与方向键导航。 */
+const { setRef: setSourceRef, onKeydown: onSourceKey, roving: sourceRoving } = useRovingTabs(
+  () => sourceFilters.value.length,
+  (i) => { selectedSource.value = sourceFilters.value[i].key; },
+);
 
 const ni = computed<any>(() => (store.data as any)?.news_intelligence || {});
 const macro = computed(() => ni.value.macro_sentiment || t('dash.news.macroDefault'));
@@ -239,12 +246,16 @@ function toggleCoinFilter(sym: string) {
         <header class="dsh-card-header flex flex-wrap items-center justify-between gap-2">
           <div class="seg" role="tablist" :aria-label="t('dash.news.feed.source')">
             <button
-              v-for="f in sourceFilters"
+              v-for="(f, fi) in sourceFilters"
               :key="f.key"
+              :ref="setSourceRef(fi)"
+              type="button"
               role="tab"
               :aria-selected="selectedSource === f.key"
+              :tabindex="sourceRoving(selectedSource === f.key)"
               :class="{ 'seg-on': selectedSource === f.key }"
               @click="selectedSource = f.key"
+              @keydown="onSourceKey($event, fi)"
             >
               {{ f.label }}
             </button>

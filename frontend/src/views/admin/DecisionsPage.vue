@@ -21,6 +21,7 @@
  */
 import { computed, onMounted, ref } from 'vue';
 import { useI18n } from '../../composables/useI18n';
+import { useRovingTabs } from '../../composables/useRovingTabs';
 import { useApi } from '../../composables/useApi';
 import { Terminal, RefreshCw, AlertCircle } from 'lucide-vue-next';
 import PageHeader from '../../components/admin/PageHeader.vue';
@@ -109,6 +110,19 @@ onMounted(() => {
 const query = ref('');
 const levelFilter = ref<'all' | 'warn' | 'error'>('all');
 
+/* 批 66：日志来源与日志级别两条分段条此前都没有漫游 tabindex，方向键也无响应。 */
+const LOG_TABS = ['trader', 'backend', 'scheduler'] as const;
+const { setRef: setLogTabRef, onKeydown: onLogTabKey, roving: logTabRoving } = useRovingTabs(
+  () => LOG_TABS.length,
+  (i) => { fetchLogStream(LOG_TABS[i]); },
+);
+
+const LEVEL_TABS = ['all', 'warn', 'error'] as const;
+const { setRef: setLevelRef, onKeydown: onLevelKey, roving: levelRoving } = useRovingTabs(
+  () => LEVEL_TABS.length,
+  (i) => { levelFilter.value = LEVEL_TABS[i]; },
+);
+
 const warnPlusCount = computed(
   () => entries.value.filter((e) => (LEVEL_RANK[e.level] ?? 1) >= 2).length,
 );
@@ -160,13 +174,40 @@ function tone(level: string): string {
         </div>
 
         <div class="seg" role="tablist" :aria-label="t('admin.decisions.logSourceAria')">
-          <button role="tab" :aria-selected="activeLogTab === 'trader'" :class="{ 'seg-on': activeLogTab === 'trader' }" @click="fetchLogStream('trader')">
+          <button
+            type="button"
+            role="tab"
+            :ref="setLogTabRef(0)"
+            :aria-selected="activeLogTab === 'trader'"
+            :tabindex="logTabRoving(activeLogTab === 'trader')"
+            :class="{ 'seg-on': activeLogTab === 'trader' }"
+            @click="fetchLogStream('trader')"
+            @keydown="onLogTabKey($event, 0)"
+          >
             {{ t('admin.decisions.tabTrader') }}
           </button>
-          <button role="tab" :aria-selected="activeLogTab === 'backend'" :class="{ 'seg-on': activeLogTab === 'backend' }" @click="fetchLogStream('backend')">
+          <button
+            type="button"
+            role="tab"
+            :ref="setLogTabRef(1)"
+            :aria-selected="activeLogTab === 'backend'"
+            :tabindex="logTabRoving(activeLogTab === 'backend')"
+            :class="{ 'seg-on': activeLogTab === 'backend' }"
+            @click="fetchLogStream('backend')"
+            @keydown="onLogTabKey($event, 1)"
+          >
             {{ t('admin.decisions.tabBackend') }}
           </button>
-          <button role="tab" :aria-selected="activeLogTab === 'scheduler'" :class="{ 'seg-on': activeLogTab === 'scheduler' }" @click="fetchLogStream('scheduler')">
+          <button
+            type="button"
+            role="tab"
+            :ref="setLogTabRef(2)"
+            :aria-selected="activeLogTab === 'scheduler'"
+            :tabindex="logTabRoving(activeLogTab === 'scheduler')"
+            :class="{ 'seg-on': activeLogTab === 'scheduler' }"
+            @click="fetchLogStream('scheduler')"
+            @keydown="onLogTabKey($event, 2)"
+          >
             {{ t('admin.decisions.tabScheduler') }}
           </button>
         </div>
@@ -185,15 +226,42 @@ function tone(level: string): string {
         />
 
         <div class="seg" role="tablist" :aria-label="t('admin.decisions.logLevelAria')">
-          <button role="tab" :aria-selected="levelFilter === 'all'" :class="{ 'seg-on': levelFilter === 'all' }" @click="levelFilter = 'all'">
+          <button
+            type="button"
+            role="tab"
+            :ref="setLevelRef(0)"
+            :aria-selected="levelFilter === 'all'"
+            :tabindex="levelRoving(levelFilter === 'all')"
+            :class="{ 'seg-on': levelFilter === 'all' }"
+            @click="levelFilter = 'all'"
+            @keydown="onLevelKey($event, 0)"
+          >
             {{ t('admin.decisions.filterAll') }}
             <span class="dc-seg-n num">{{ entries.length }}</span>
           </button>
-          <button role="tab" :aria-selected="levelFilter === 'warn'" :class="{ 'seg-on': levelFilter === 'warn' }" @click="levelFilter = 'warn'">
+          <button
+            type="button"
+            role="tab"
+            :ref="setLevelRef(1)"
+            :aria-selected="levelFilter === 'warn'"
+            :tabindex="levelRoving(levelFilter === 'warn')"
+            :class="{ 'seg-on': levelFilter === 'warn' }"
+            @click="levelFilter = 'warn'"
+            @keydown="onLevelKey($event, 1)"
+          >
             {{ t('admin.decisions.filterWarn') }}
             <span class="dc-seg-n num">{{ warnPlusCount }}</span>
           </button>
-          <button role="tab" :aria-selected="levelFilter === 'error'" :class="{ 'seg-on': levelFilter === 'error' }" @click="levelFilter = 'error'">
+          <button
+            type="button"
+            role="tab"
+            :ref="setLevelRef(2)"
+            :aria-selected="levelFilter === 'error'"
+            :tabindex="levelRoving(levelFilter === 'error')"
+            :class="{ 'seg-on': levelFilter === 'error' }"
+            @click="levelFilter = 'error'"
+            @keydown="onLevelKey($event, 2)"
+          >
             {{ t('admin.decisions.filterError') }}
             <span class="dc-seg-n num">{{ errorCount }}</span>
           </button>

@@ -39,6 +39,7 @@ const toast = useToast();
 const { ask } = useConfirm();
 import { ref, computed, onMounted } from 'vue';
 import { useI18n } from '../../composables/useI18n';
+import { useRovingTabs } from '../../composables/useRovingTabs';
 import PageHeader from '../../components/admin/PageHeader.vue';
 import BaseDialog from '../../components/base/BaseDialog.vue';
 import BaseSwitch from '../../components/base/BaseSwitch.vue';
@@ -164,6 +165,18 @@ async function selectProfile(id: string) {
   activeEditingIdx.value = 0;
   loadWorkingModules();
 }
+
+/* 批 66：模块编排页签与预览模式的漫游 tabindex/方向键导航。 */
+const { setRef: setPipeRef, onKeydown: onPipeKey, roving: pipeRoving } = useRovingTabs(
+  () => pipelines.value.length,
+  (i) => { switchPipeline(pipelines.value[i].id) },
+)
+
+const PREVIEW_MODES = ['rendered', 'template'] as const
+const { setRef: setPrevRef, onKeydown: onPrevKey, roving: prevRoving } = useRovingTabs(
+  () => PREVIEW_MODES.length,
+  (i) => { previewMode.value = PREVIEW_MODES[i] },
+)
 
 async function switchPipeline(id: any) {
   if (!(await confirmDiscard(t('admin.promptStudio.unsavedSwitchPipeline')))) return;
@@ -610,12 +623,16 @@ onMounted(loadLib)
           <header class="card-head">
             <div class="seg" role="tablist" :aria-label="t('admin.promptStudio.pipelineTabsAria')">
               <button
-                v-for="p in pipelines"
+                v-for="(p, pi) in pipelines"
                 :key="p.id"
+                :ref="setPipeRef(pi)"
+                type="button"
                 role="tab"
                 :aria-selected="activePipeline === p.id"
+                :tabindex="pipeRoving(activePipeline === p.id)"
                 :class="{ 'seg-on': activePipeline === p.id }"
                 @click="switchPipeline(p.id)"
+                @keydown="onPipeKey($event, pi)"
               >
                 {{ p.label }}
               </button>
@@ -748,10 +765,28 @@ onMounted(loadLib)
             <h2 class="card-title"><Eye :size="14" />{{ t('admin.promptStudio.preview.title') }}</h2>
             <div class="ps-prev-actions">
               <div class="seg" role="tablist" :aria-label="t('admin.promptStudio.preview.title')">
-                <button role="tab" :aria-selected="previewMode === 'rendered'" :class="{ 'seg-on': previewMode === 'rendered' }" @click="previewMode = 'rendered'">
+                <button
+                  type="button"
+                  role="tab"
+                  :ref="setPrevRef(0)"
+                  :aria-selected="previewMode === 'rendered'"
+                  :tabindex="prevRoving(previewMode === 'rendered')"
+                  :class="{ 'seg-on': previewMode === 'rendered' }"
+                  @click="previewMode = 'rendered'"
+                  @keydown="onPrevKey($event, 0)"
+                >
                   {{ t('admin.promptStudio.preview.rendered') }}
                 </button>
-                <button role="tab" :aria-selected="previewMode === 'template'" :class="{ 'seg-on': previewMode === 'template' }" @click="previewMode = 'template'">
+                <button
+                  type="button"
+                  role="tab"
+                  :ref="setPrevRef(1)"
+                  :aria-selected="previewMode === 'template'"
+                  :tabindex="prevRoving(previewMode === 'template')"
+                  :class="{ 'seg-on': previewMode === 'template' }"
+                  @click="previewMode = 'template'"
+                  @keydown="onPrevKey($event, 1)"
+                >
                   {{ t('admin.promptStudio.preview.template') }}
                 </button>
               </div>

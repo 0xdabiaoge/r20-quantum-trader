@@ -15,6 +15,7 @@
  * ⚠️ 逻辑模块 `useLlmConfig.ts` / `llmLogic.ts` 未触碰；本组件只接 `useLlmCtx()`。
  */
 import { useI18n } from '../../../composables/useI18n'
+import { useRovingTabs } from '../../../composables/useRovingTabs'
 import { useLlmCtx } from './injection'
 import BaseSwitch from '../../../components/base/BaseSwitch.vue'
 import BaseEmpty from '../../../components/base/BaseEmpty.vue'
@@ -44,6 +45,13 @@ const {
   testingModelId,
 } = useLlmCtx()
 
+/** 批 66：详情页两页签的漫游 tabindex 与方向键导航（此前全在 Tab 键顺序里）。 */
+const DETAIL_TABS: Array<'config' | 'models'> = ['config', 'models']
+const { setRef: setDetailRef, onKeydown: onDetailKey, roving: detailRoving } = useRovingTabs(
+  () => DETAIL_TABS.length,
+  (i) => { detailTab.value = DETAIL_TABS[i] },
+)
+
 function monogram(name: string): string {
   return String(name || '?').trim().slice(0, 2).toUpperCase()
 }
@@ -68,12 +76,30 @@ function monogram(name: string): string {
 
       <div class="pd-tabs">
         <div class="seg seg-lg" role="tablist" :aria-label="t('admin.llm.detailTabsAria')">
-          <button role="tab" :aria-selected="detailTab === 'config'" :class="{ 'seg-on': detailTab === 'config' }" @click="detailTab = 'config'">
-            <Settings :size="13" />
+          <button
+            type="button"
+            role="tab"
+            :ref="setDetailRef(0)"
+            :aria-selected="detailTab === 'config'"
+            :tabindex="detailRoving(detailTab === 'config')"
+            :class="{ 'seg-on': detailTab === 'config' }"
+            @click="detailTab = 'config'"
+            @keydown="onDetailKey($event, 0)"
+          >
+            <Settings :size="13" aria-hidden="true" />
             <span>{{ t('admin.llm.tabConfig') }}</span>
           </button>
-          <button role="tab" :aria-selected="detailTab === 'models'" :class="{ 'seg-on': detailTab === 'models' }" @click="detailTab = 'models'">
-            <Layers :size="13" />
+          <button
+            type="button"
+            role="tab"
+            :ref="setDetailRef(1)"
+            :aria-selected="detailTab === 'models'"
+            :tabindex="detailRoving(detailTab === 'models')"
+            :class="{ 'seg-on': detailTab === 'models' }"
+            @click="detailTab = 'models'"
+            @keydown="onDetailKey($event, 1)"
+          >
+            <Layers :size="13" aria-hidden="true" />
             <span>{{ t('admin.llm.tabModels') }} ({{ selectedProvider.models?.length || 0 }})</span>
           </button>
         </div>

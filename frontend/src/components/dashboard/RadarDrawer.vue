@@ -104,10 +104,23 @@ function dirOf(a: string): 'long' | 'short' | 'flat' {
     :subtitle="cycle?.policy_version || 'R20 Multi-Agent System'"
     @close="emit('close')"
   >
-    <BaseTabs v-model="tab" :items="tabs" :label="t('dash.radar.detail.tabsAria')" class="mb-3.5" />
+    <BaseTabs
+      v-model="tab"
+      base-id="radar-detail"
+      :items="tabs"
+      :label="t('dash.radar.detail.tabsAria')"
+      class="mb-3.5"
+    />
 
     <!-- 1. 宏观综合研判 -->
-    <div v-if="tab === 'macro'" class="space-y-3">
+    <div
+      v-if="tab === 'macro'"
+      id="radar-detail-panel-macro"
+      role="tabpanel"
+      tabindex="0"
+      aria-labelledby="radar-detail-tab-macro"
+      class="space-y-3"
+    >
       <!-- 委员会运行状态 -->
       <div class="flex flex-wrap items-center gap-2">
         <span
@@ -145,7 +158,14 @@ function dirOf(a: string): 'long' | 'short' | 'flat' {
     </div>
 
     <!-- 2. 机会与持仓调度 -->
-    <div v-else-if="tab === 'quotes'" class="space-y-3">
+    <div
+      v-else-if="tab === 'quotes'"
+      id="radar-detail-panel-quotes"
+      role="tabpanel"
+      tabindex="0"
+      aria-labelledby="radar-detail-tab-quotes"
+      class="space-y-3"
+    >
       <!-- 持仓管理指令 -->
       <div v-if="posMgmt.length" class="space-y-2">
         <h4 class="text-3xs font-bold uppercase tracking-wider text-[var(--ink-3)] flex items-center gap-1.5">
@@ -216,7 +236,14 @@ function dirOf(a: string): 'long' | 'short' | 'flat' {
     </div>
 
     <!-- 3. 投委会博弈纪要 -->
-    <div v-else-if="tab === 'council'" class="space-y-3">
+    <div
+      v-else-if="tab === 'council'"
+      id="radar-detail-panel-council"
+      role="tabpanel"
+      tabindex="0"
+      aria-labelledby="radar-detail-tab-council"
+      class="space-y-3"
+    >
       <div class="flex items-center justify-between border-b pb-2" style="border-color: var(--line-1)">
         <span class="text-xs font-bold uppercase tracking-wider text-[var(--ink-strong)]">
           {{ modeLabel }}
@@ -269,7 +296,14 @@ function dirOf(a: string): 'long' | 'short' | 'flat' {
     </div>
 
     <!-- 4. 三所价差与费率 -->
-    <div v-else-if="tab === 'xvenue'" class="space-y-3">
+    <div
+      v-else-if="tab === 'xvenue'"
+      id="radar-detail-panel-xvenue"
+      role="tabpanel"
+      tabindex="0"
+      aria-labelledby="radar-detail-tab-xvenue"
+      class="space-y-3"
+    >
       <div class="overflow-x-auto">
         <table class="table w-full" :aria-label="t('dash.radar.posMgmt')">
           <thead>
@@ -301,7 +335,13 @@ function dirOf(a: string): 'long' | 'short' | 'flat' {
     </div>
 
     <!-- 5. 原始记录 -->
-    <div v-else-if="tab === 'raw'">
+    <div
+      v-else-if="tab === 'raw'"
+      id="radar-detail-panel-raw"
+      role="tabpanel"
+      tabindex="0"
+      aria-labelledby="radar-detail-tab-raw"
+    >
       <BaseCodeBlock :code="JSON.stringify(c, null, 2)" />
     </div>
   </BaseDrawer>

@@ -7,6 +7,7 @@ import { ref, computed, onBeforeUnmount, watch } from 'vue';
 import { useDashboardStore } from '../../stores/dashboard';
 import { useI18n } from '../../composables/useI18n';
 import { useModalFocus } from '../../composables/useModalFocus';
+import { useRovingTabs } from '../../composables/useRovingTabs';
 import {
   X,
   Activity,
@@ -38,6 +39,13 @@ watch(() => props.open, syncModalFocus);
 onBeforeUnmount(releaseModalFocus);
 
 const activeTab = ref<'decisions' | 'logs'>('decisions');
+
+/** 批 66：两个页签的漫游 tabindex 与方向键导航（此前两者都缺）。 */
+const TAB_ORDER: Array<'decisions' | 'logs'> = ['decisions', 'logs'];
+const { setRef: setTabRef, onKeydown: onTabKey, roving: tabRoving } = useRovingTabs(
+  () => TAB_ORDER.length,
+  (i) => { activeTab.value = TAB_ORDER[i]; },
+);
 const logFilter = ref<'all' | 'warn' | 'error'>('all');
 
 // 决策流列表提取
@@ -157,7 +165,10 @@ function actionBadgeClass(action: string) {
           <!-- Tabs（批 44：页签给语义，读屏器才知道"当前在第几个视图"） -->
           <div class="flex items-center gap-1" role="tablist" :aria-label="t('dash.shell.panel.decisionFlow')">
             <button
+              type="button"
               role="tab"
+              :ref="setTabRef(0)"
+              :tabindex="tabRoving(activeTab === 'decisions')"
               :aria-selected="activeTab === 'decisions'"
               class="flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-medium cursor-pointer transition-colors"
               :style="
@@ -166,6 +177,7 @@ function actionBadgeClass(action: string) {
                   : { color: 'var(--ink-2)' }
               "
               @click="activeTab = 'decisions'"
+              @keydown="onTabKey($event, 0)"
             >
               <Zap class="h-3.5 w-3.5" />
               {{ t('dash.shell.panel.decisionFlow') }}
@@ -175,7 +187,10 @@ function actionBadgeClass(action: string) {
             </button>
 
             <button
+              type="button"
               role="tab"
+              :ref="setTabRef(1)"
+              :tabindex="tabRoving(activeTab === 'logs')"
               :aria-selected="activeTab === 'logs'"
               class="flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-medium cursor-pointer transition-colors"
               :style="
@@ -184,6 +199,7 @@ function actionBadgeClass(action: string) {
                   : { color: 'var(--ink-2)' }
               "
               @click="activeTab = 'logs'"
+              @keydown="onTabKey($event, 1)"
             >
               <Terminal class="h-3.5 w-3.5" />
               {{ t('dash.shell.panel.liveLog') }}

@@ -6,6 +6,7 @@
 import { computed, ref } from 'vue';
 import { useDashboardStore } from '../../stores/dashboard';
 import { useI18n } from '../../composables/useI18n';
+import { useRovingTabs } from '../../composables/useRovingTabs';
 import { fmtNum, fmtSigned, fmtPct, fmtPrice, arrow } from '../../utils/format';
 import { venueToneCls } from '../../utils/venueMeta';
 import { ShieldCheck, ShieldAlert } from 'lucide-vue-next';
@@ -23,6 +24,20 @@ const tab = ref<'positions' | 'orders'>('positions');
 
 type VenueFilter = 'all' | 'okx' | 'binance' | 'gate';
 const selectedVenue = ref<VenueFilter>('all');
+
+/** 批 66：场所过滤胶囊的选项表（原为模板内联字面量，无法索引，故上提为 computed）。 */
+const venueTabs = computed<{ key: VenueFilter; label: string }[]>(() => [
+  { key: 'all', label: t('common.all') },
+  { key: 'okx', label: 'OKX' },
+  { key: 'binance', label: 'Binance' },
+  { key: 'gate', label: 'Gate' },
+]);
+
+// 漫游 tabindex + ←/→/Home/End：此前一组 4 个 role="tab" 全在 Tab 键顺序里且方向键无响应。
+const { setRef: setVenueRef, onKeydown: onVenueKey, roving: venueRoving } = useRovingTabs(
+  () => venueTabs.value.length,
+  (i) => { selectedVenue.value = venueTabs.value[i].key; },
+);
 
 const positions = computed(() => store.positions);
 const orders = computed(() => store.pendingOrders);
@@ -88,17 +103,16 @@ function symOf(x: { instId?: string; name?: string }): string {
       <!-- 交易所过滤小胶囊 -->
       <div class="seg w-full sm:w-auto" role="tablist" :aria-label="t('dash.matrix.pop.venueLabel')">
         <button
+          v-for="(v, vi) in venueTabs"
+          :key="v.key"
+          :ref="setVenueRef(vi)"
+          type="button"
           role="tab"
           :aria-selected="selectedVenue === v.key"
-          v-for="v in [
-            { key: 'all', label: t('common.all') },
-            { key: 'okx', label: 'OKX' },
-            { key: 'binance', label: 'Binance' },
-            { key: 'gate', label: 'Gate' },
-          ]"
-          :key="v.key"
+          :tabindex="venueRoving(selectedVenue === v.key)"
           :class="{ 'seg-on': selectedVenue === v.key }"
-          @click="selectedVenue = v.key as any"
+          @click="selectedVenue = v.key"
+          @keydown="onVenueKey($event, vi)"
         >
           {{ v.label }}
         </button>

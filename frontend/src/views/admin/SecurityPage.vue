@@ -34,6 +34,7 @@ import { ref, computed, onMounted } from 'vue'
 import PageHeader from '../../components/admin/PageHeader.vue'
 import SettingsSection from '../../components/admin/page-parts/SettingsSection.vue'
 import { useI18n } from '../../composables/useI18n'
+import { useRovingTabs } from '../../composables/useRovingTabs';
 import { useApi } from '../../composables/useApi'
 import { useAuthStore } from '../../stores/auth'
 import { fmtDateTime } from '../../utils/format'
@@ -60,6 +61,12 @@ const loadError = ref('')
 type TabKey = 'venues' | 'pool' | 'emergency'
 const activeTab = ref<TabKey>('venues')
 const positionsLoadedOnce = ref(false)
+
+/* 批 66：页签栏的漫游 tabindex 与方向键导航。 */
+const { setRef: setSecTabRef, onKeydown: onSecTabKey, roving: secTabRoving } = useRovingTabs(
+  () => TABS.value.length,
+  (i) => { switchTab(TABS.value[i].key) },
+)
 
 function switchTab(tab: TabKey) {
   activeTab.value = tab
@@ -548,14 +555,18 @@ onMounted(() => { loadAll(); loadMx() })
       <!-- ══ 页签 ══ -->
       <div class="seg seg-lg sc-tabs" role="tablist" :aria-label="t('admin.security.tabsLabel')">
         <button
-          v-for="tab in TABS"
+          v-for="(tab, ti) in TABS"
           :key="tab.key"
+          :ref="setSecTabRef(ti)"
+          type="button"
           role="tab"
           :aria-selected="activeTab === tab.key"
+          :tabindex="secTabRoving(activeTab === tab.key)"
           :class="{ 'seg-on': activeTab === tab.key }"
           @click="switchTab(tab.key)"
+          @keydown="onSecTabKey($event, ti)"
         >
-          <component :is="tab.icon" :size="13" />
+          <component :is="tab.icon" :size="13" aria-hidden="true" />
           <span>{{ tab.label }}</span>
         </button>
       </div>

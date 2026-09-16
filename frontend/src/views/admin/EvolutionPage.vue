@@ -38,6 +38,7 @@ import BaseDialog from '../../components/base/BaseDialog.vue';
 import BaseSwitch from '../../components/base/BaseSwitch.vue';
 import BaseEmpty from '../../components/base/BaseEmpty.vue';
 import { useI18n } from '../../composables/useI18n';
+import { useRovingTabs } from '../../composables/useRovingTabs';
 import { useApi } from '../../composables/useApi';
 import { useAuthStore } from '../../stores/auth';
 import { Brain, Sparkles, RefreshCw, Clock, Plus, Trash2, Save,
@@ -108,6 +109,12 @@ function syncWorkingModules() {
   const views = selectedProfile.value?.pipeline_views?.[activeTab.value] || [];
   workingModules.value = JSON.parse(JSON.stringify(views));
 }
+
+/* 批 66：标签栏的漫游 tabindex 与方向键导航。 */
+const { setRef: setEvoTabRef, onKeydown: onEvoTabKey, roving: evoTabRoving } = useRovingTabs(
+  () => tabs.value.length,
+  (i) => { switchTab(tabs.value[i].id) },
+)
 
 function switchTab(tab: 'settings' | 'evolution_system' | 'evolution_user') {
   activeTab.value = tab;
@@ -340,14 +347,18 @@ onMounted(loadData);
       <!-- 标签栏 -->
       <div class="seg evo-tabs" role="tablist" :aria-label="t('admin.evolution.tabsLabel')">
         <button
-          v-for="tb in tabs"
+          v-for="(tb, ti) in tabs"
           :key="tb.id"
+          :ref="setEvoTabRef(ti)"
+          type="button"
           role="tab"
           :aria-selected="activeTab === tb.id"
+          :tabindex="evoTabRoving(activeTab === tb.id)"
           :class="{ 'seg-on': activeTab === tb.id }"
           @click="switchTab(tb.id)"
+          @keydown="onEvoTabKey($event, ti)"
         >
-          <component :is="tb.icon" :size="13" />
+          <component :is="tb.icon" :size="13" aria-hidden="true" />
           <span>{{ tb.label }}</span>
         </button>
       </div>

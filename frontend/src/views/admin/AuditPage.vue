@@ -20,6 +20,7 @@
 import { fmtDateTime } from '../../utils/format';
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from '../../composables/useI18n'
+import { useRovingTabs } from '../../composables/useRovingTabs';
 const { t } = useI18n()
 import { useApi } from '../../composables/useApi'
 import PageHeader from '../../components/admin/PageHeader.vue'
@@ -98,6 +99,12 @@ const FILTERS = computed(() => [
   { key: 'ok' as const, label: t('admin.audit.filterSuccess') },
   { key: 'bad' as const, label: t('admin.audit.filterFailed') },
 ])
+
+/* 批 66：状态筛选分段的漫游 tabindex 与方向键导航。 */
+const { setRef: setFilterRef, onKeydown: onFilterKey, roving: filterRoving } = useRovingTabs(
+  () => FILTERS.value.length,
+  (i) => { statusFilter.value = FILTERS.value[i].key },
+)
 
 /** 审计统计带（4 项事实） */
 const bandFacts = computed(() => [
@@ -189,12 +196,16 @@ onMounted(load)
             </div>
             <div class="seg" role="tablist" :aria-label="t('admin.audit.filtersLabel')">
               <button
-                v-for="f in FILTERS"
+                v-for="(f, fi) in FILTERS"
                 :key="f.key"
+                :ref="setFilterRef(fi)"
+                type="button"
                 role="tab"
                 :aria-selected="statusFilter === f.key"
+                :tabindex="filterRoving(statusFilter === f.key)"
                 :class="{ 'seg-on': statusFilter === f.key }"
                 @click="statusFilter = f.key"
+                @keydown="onFilterKey($event, fi)"
               >{{ f.label }}</button>
             </div>
             <span class="badge mono">{{ filtered.length }}</span>
