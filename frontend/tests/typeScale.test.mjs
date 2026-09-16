@@ -26,6 +26,11 @@
  *      `font-size: var(--text-3xs)`（而非内联数字），否则 tokens.css 改不动它。
  *      这一条只能查 `@theme inline` 的写法：值写成 `var(--text-3xs)`。
  *
+ *   5. **不许有亚像素档位**（批 89，用户确认）：去重后的相邻档差必须 ≥ 1px。
+ *      实测曾有 11 / 11.5 / 12 / 12.5 四档挤在 1.5px 内（三对相邻档只差 0.5px），
+ *      0.5px 在屏幕上不可辨 —— 等于同一视觉档位有四个名字。已把 11.5 与 12.5
+ *      并入 12px，生效字阶去重后为 11/12/13/14/15/18/22/26。
+ *
  * 运行：`node --test tests/*.test.mjs`
  */
 import { test } from 'node:test';
@@ -130,4 +135,40 @@ test('字号：模板里用到的"像档位"的字号类都真实存在', () => 
     [],
     `模板里出现刻度外的字号工具类（生成不出 CSS，会被静默吞掉）：\n${offenders.join('\n')}`,
   );
+});
+
+
+test('字阶：不许有亚像素档位（去重后相邻档差 ≥ 1px，批 89）', () => {
+  const scale = readScale();
+  const uniq = [...new Set(Object.values(scale))].sort((a, b) => a - b);
+  const tooClose = [];
+  for (let i = 1; i < uniq.length; i++) {
+    const gap = uniq[i] - uniq[i - 1];
+    if (gap < 1) tooClose.push(`${uniq[i - 1]}px → ${uniq[i]}px（差 ${gap}px）`);
+  }
+  assert.deepEqual(
+    tooClose,
+    [],
+    `字阶里出现亚像素相邻档（0.5px 级差肉眼不可辨，等于同一档位多个名字）：\n  ${tooClose.join('\n  ')}`,
+  );
+  // 生效字阶钉死：改动这里必须是有意的
+  assert.deepEqual(uniq, [11, 12, 13, 14, 15, 18, 22, 26], `生效字阶变化：${uniq.join('/')}`);
+});
+
+test('字阶：12px 同值别名组必须保持（批 89 有意保留的语义名）', () => {
+  const scale = readScale();
+  const aliases = Object.entries(scale).filter(([, v]) => v === 12).map(([k]) => k).sort();
+  assert.deepEqual(
+    aliases,
+    ['2xs', '3xs', 'sm', 'xs'],
+    `12px 别名组变化（增删都要有意为之，并同步 tokens.css 的说明）：${aliases.join('/')}`,
+  );
+  // 曾经的亚像素档不得回潮
+  for (const [name, v] of Object.entries(scale)) {
+    assert.equal(
+      Number.isInteger(v),
+      true,
+      `--text-${name} = ${v}px 是亚像素值，字阶只允许整像素档`,
+    );
+  }
 });
