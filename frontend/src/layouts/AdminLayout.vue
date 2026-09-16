@@ -143,7 +143,13 @@ watch(() => route.path, () => (drawerOpen.value = false));
     <div class="wb-stage">
       <!-- 顶栏 -->
       <header class="wb-topbar">
-        <button class="wb-icon-btn wb-burger" @click="drawerOpen = !drawerOpen">
+        <button
+          class="wb-icon-btn wb-burger"
+          :title="drawerOpen ? t('admin.shell.collapse') : t('admin.shell.expand')"
+          :aria-label="drawerOpen ? t('admin.shell.collapse') : t('admin.shell.expand')"
+          :aria-expanded="drawerOpen"
+          @click="drawerOpen = !drawerOpen"
+        >
           <Menu :size="16" />
         </button>
 
@@ -183,7 +189,14 @@ watch(() => route.path, () => (drawerOpen.value = false));
       <aside class="wb-drawer">
         <div class="wb-drawer-head">
           <span class="wb-brand-name">{{ t('brand.name') }} {{ t('admin.shell.brand') }}</span>
-          <button class="wb-icon-btn" @click="drawerOpen = false"><X :size="15" /></button>
+          <button
+            class="wb-icon-btn"
+            :title="t('common.close')"
+            :aria-label="t('common.close')"
+            @click="drawerOpen = false"
+          >
+            <X :size="15" />
+          </button>
         </div>
         <nav class="wb-nav scroll-area">
           <div v-for="g in adminGroups" :key="g.key" class="wb-group">

@@ -114,6 +114,8 @@ onUnmounted(() => {
           @click="mobileMenuOpen = !mobileMenuOpen"
           class="sm:hidden btn btn-quiet btn-icon h-7 w-7 cursor-pointer"
           :title="t('docs.tocBtn')"
+          :aria-label="t('docs.tocBtn')"
+          :aria-expanded="mobileMenuOpen"
         >
           <Menu v-if="!mobileMenuOpen" class="w-3.5 h-3.5" />
           <X v-else class="w-3.5 h-3.5" />
@@ -161,6 +163,7 @@ onUnmounted(() => {
             @click="mobileMenuOpen = false"
             class="sm:hidden btn btn-quiet btn-icon h-6 w-6"
             :title="t('docs.closeToc')"
+            :aria-label="t('docs.closeToc')"
           >
             <X class="w-3.5 h-3.5" />
           </button>

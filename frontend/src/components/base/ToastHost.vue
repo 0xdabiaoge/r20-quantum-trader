@@ -2,8 +2,10 @@
 /** Toast 渲染宿主：右上角堆叠，App.vue 挂一次。 */
 import { CheckCircle2, AlertTriangle, XCircle, Info, X } from 'lucide-vue-next';
 import { useToast } from '../../composables/useToast';
+import { useI18n } from '../../composables/useI18n';
 
 const { items, dismiss } = useToast();
+const { t } = useI18n();
 
 const icons = { ok: CheckCircle2, err: XCircle, warn: AlertTriangle, info: Info } as const;
 const colors = {
@@ -34,7 +36,12 @@ const colors = {
             <p class="text-sm font-semibold leading-snug" style="color: var(--ink-1)">{{ item.title }}</p>
             <p v-if="item.desc" class="mt-0.5 text-xs leading-body" style="color: var(--ink-2)">{{ item.desc }}</p>
           </div>
-          <button class="-me-1 mt-px rounded p-1 opacity-60 transition-opacity hover:opacity-100" @click="dismiss(item.id)">
+          <button
+            class="-me-1 mt-px rounded p-1 opacity-60 transition-opacity hover:opacity-100 focus:opacity-100"
+            :title="t('common.close')"
+            :aria-label="t('common.close')"
+            @click="dismiss(item.id)"
+          >
             <X class="h-3.5 w-3.5" />
           </button>
         </div>
