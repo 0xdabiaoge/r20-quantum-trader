@@ -176,10 +176,10 @@ const processedRows = computed(() => {
         >
           <button
             v-for="m in [
-              { key: 'all', label: '全部' },
-              { key: 'long', label: '做多' },
-              { key: 'short', label: '做空' },
-              { key: 'wait', label: '观望' },
+              { key: 'all', label: t('dash.matrix.filterAll') },
+              { key: 'long', label: t('dash.matrix.filterLong') },
+              { key: 'short', label: t('dash.matrix.filterShort') },
+              { key: 'wait', label: t('dash.matrix.filterWait') },
             ] as const"
             :key="m.key"
             class="px-2 py-1 rounded text-3xs font-medium cursor-pointer transition-colors"
@@ -273,7 +273,7 @@ const processedRows = computed(() => {
                   <ArrowDown v-else-if="sortKey === 'conf' && sortOrder === 'desc'" class="h-3 w-3" />
                 </div>
               </th>
-              <th class="text-right">工位操作</th>
+              <th class="text-right">{{ t('dash.matrix.colActions') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -320,11 +320,11 @@ const processedRows = computed(() => {
               <td class="text-right" @click.stop>
                 <button
                   class="btn btn-quiet h-6 px-2 text-3xs font-medium cursor-pointer inline-flex items-center gap-1"
-                  title="在主图切换到该标的"
+                  :title="t('dash.matrix.chartTip')"
                   @click="onQuickChart($event, f.instId)"
                 >
                   <Crosshair class="h-3 w-3 text-[var(--accent)]" />
-                  <span>看主图</span>
+                  <span>{{ t('dash.matrix.chartBtn') }}</span>
                 </button>
               </td>
             </tr>
@@ -353,7 +353,7 @@ const processedRows = computed(() => {
               </span>
               <button
                 class="btn btn-quiet btn-icon h-6 w-6 cursor-pointer"
-                title="看主图"
+                :title="t('dash.matrix.chartBtn')"
                 @click="onQuickChart($event, f.instId)"
               >
                 <Crosshair class="h-3 w-3 text-[var(--accent)]" />

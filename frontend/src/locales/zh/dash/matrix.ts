@@ -186,4 +186,16 @@ export const zhMatrix = {
     crossFund: 'Fund% 币安/Gate',
     crossEmpty: '该币暂无跨所快照——等待下一个 15 分钟决策周期生成。',
   },
+
+  // ── 批 29：大盘页此前有 6 处中文写死在模板里（多空过滤标签、工位操作表头、
+  //    两个 title 提示），英文模式下仍是中文。 ──
+  filterAll: '全部',
+  filterLong: '做多',
+  filterShort: '做空',
+  filterWait: '观望',
+  colActions: '工位操作',
+  chartTip: '在主图切换到该标的',
+  chartBtn: '看主图',
+  focusTip: '进入纯工位沉浸模式',
+  focusRestoreTip: '恢复全量监控看板',
 };

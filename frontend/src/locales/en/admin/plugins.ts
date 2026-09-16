@@ -13,6 +13,7 @@ export const enAdminPlugins = {
   defaultEnabled: "Enabled by default",
   healthNormal: "Normal",
   healthDisabled: "Disabled",
+  healthOutside: 'outside {a} / {b}',
   installPolicy: "Installation policy: ",
   policyBuiltinOnly: "Built-in plugins only",
 

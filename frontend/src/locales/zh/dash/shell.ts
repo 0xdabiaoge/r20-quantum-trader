@@ -40,4 +40,22 @@ export const zhShell = {
   gateStaleTitle: '数据已停止更新',
   gateStaleDesc: '当前展示的是 {t} 的最后一次成功快照，数值可能已经过时。',
   gateNoSnapshot: '尚未收到任何行情快照',
+
+  // ── 批 29：壳层此前有 11 处中文写死在模板里（导航分组名、三所网关、
+  //    折叠按钮 title/aria、关于系统按钮、实时流指示灯 title）。
+  //    英文模式下这些位置仍然是中文，逐条收进语言包。 ──
+  nav: {
+    liveDot: '实时流在线',
+    groupCore: '核心工作台',
+    groupRef: '工程与参考',
+    docs: '开发与系统文档',
+    docsTitle: '系统文档',
+    venues: '三所网关',
+    collapse: '折叠侧边栏',
+    expand: '展开侧边栏',
+    closeMobile: '收起导航',
+    openNav: '展开导航栏',
+    closeNav: '收起导航栏',
+    about: '关于系统',
+  },
 };

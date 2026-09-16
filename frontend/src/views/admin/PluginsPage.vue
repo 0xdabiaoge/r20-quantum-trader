@@ -113,7 +113,7 @@ function typeLabel(v: string): string {
           <div class="pl-fact">
             <span class="pl-fact-label"><ShieldAlert :size="12" />{{ t('admin.plugins.bandIssues') }}</span>
             <span class="pl-fact-value num" :class="issueCount ? 'is-warn' : 'is-up'">{{ issueCount }}</span>
-            <span class="pl-fact-foot">{{ t('admin.plugins.healthNormal') }} / {{ t('admin.plugins.healthDisabled') }} 之外</span>
+            <span class="pl-fact-foot">{{ t('admin.plugins.healthOutside', undefined, { a: t('admin.plugins.healthNormal'), b: t('admin.plugins.healthDisabled') }) }}</span>
           </div>
         </template>
       </section>

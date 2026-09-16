@@ -13,6 +13,7 @@ export const zhAdminPlugins = {
   defaultEnabled: "默认启用",
   healthNormal: "正常",
   healthDisabled: "已禁用",
+  healthOutside: '{a} / {b} 之外',
   installPolicy: "安装策略：",
   policyBuiltinOnly: "仅内置插件",
 

@@ -7,7 +7,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useDashboardStore } from '../stores/dashboard';
 import { useI18n } from '../composables/useI18n';
-import { APP_NAME, APP_VERSION } from '../config/version';
+import { APP_VERSION } from '../config/version';
 import { useUi } from '../composables/useUi';
 import { useHotkeys } from '../composables/useHotkeys';
 import { useLocalStorage } from '../composables/useLocalStorage';
@@ -132,9 +132,9 @@ const venueHealth = computed(() => {
           <div v-if="!navCompact" class="min-w-0 truncate">
             <div class="flex items-center gap-1.5">
               <span class="font-bold tracking-tight text-sm text-[var(--ink-strong)]">
-                {{ APP_NAME }}
+                {{ t('brand.name') }}
               </span>
-              <span class="dsh-status-dot active" title="实时流在线" />
+              <span class="dsh-status-dot active" :title="t('dash.shell.nav.liveDot')" />
             </div>
           </div>
         </div>
@@ -154,7 +154,7 @@ const venueHealth = computed(() => {
           v-if="!navCompact"
           class="px-2 py-1 text-3xs font-semibold uppercase tracking-wider text-[var(--ink-3)]"
         >
-          核心工作台
+          {{ t('dash.shell.nav.groupCore') }}
         </div>
 
         <button
@@ -183,16 +183,16 @@ const venueHealth = computed(() => {
           v-if="!navCompact"
           class="px-2 py-1 text-3xs font-semibold uppercase tracking-wider text-[var(--ink-3)]"
         >
-          工程与参考
+          {{ t('dash.shell.nav.groupRef') }}
         </div>
 
         <button
           class="w-full flex items-center gap-2.5 rounded px-2.5 py-2 text-xs font-medium text-[var(--ink-2)] hover:bg-[var(--surface-2)] hover:text-[var(--ink-1)] cursor-pointer transition-colors"
-          :title="navCompact ? '系统文档' : undefined"
+          :title="navCompact ? t('dash.shell.nav.docsTitle') : undefined"
           @click="go('/docs')"
         >
           <BookOpen class="h-4 w-4 shrink-0" />
-          <span v-if="!navCompact">开发与系统文档</span>
+          <span v-if="!navCompact">{{ t('dash.shell.nav.docs') }}</span>
         </button>
       </div>
 
@@ -209,7 +209,7 @@ const venueHealth = computed(() => {
         >
           <div class="flex items-center justify-between mb-1.5 text-[var(--ink-3)]">
             <span class="flex items-center gap-1 font-semibold uppercase tracking-wider">
-              <Shield class="h-3 w-3 text-[var(--up)]" /> 三所网关
+              <Shield class="h-3 w-3 text-[var(--up)]" /> {{ t('dash.shell.nav.venues') }}
             </span>
             <span class="font-mono">Fail-Closed</span>
           </div>
@@ -233,8 +233,8 @@ const venueHealth = computed(() => {
         <div class="flex items-center justify-between">
           <button
             class="btn btn-quiet btn-icon h-7 w-7 cursor-pointer"
-            :title="isNarrow ? '收起导航' : (navCompact ? '展开侧边栏' : '折叠侧边栏')"
-            :aria-label="isNarrow ? '收起导航' : (navCompact ? '展开侧边栏' : '折叠侧边栏')"
+            :title="isNarrow ? t('dash.shell.nav.closeMobile') : (navCompact ? t('dash.shell.nav.expand') : t('dash.shell.nav.collapse'))"
+            :aria-label="isNarrow ? t('dash.shell.nav.closeMobile') : (navCompact ? t('dash.shell.nav.expand') : t('dash.shell.nav.collapse'))"
             @click="toggleNav"
           >
             <X v-if="isNarrow" class="h-3.5 w-3.5" />
@@ -247,7 +247,7 @@ const venueHealth = computed(() => {
             class="btn btn-quiet h-7 px-2 text-3xs font-medium cursor-pointer"
             @click="aboutOpen = true"
           >
-            关于系统
+            {{ t('dash.shell.nav.about') }}
           </button>
         </div>
       </div>

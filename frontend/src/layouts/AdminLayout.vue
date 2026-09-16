@@ -25,7 +25,7 @@ import { useAuthStore } from '../stores/auth';
 import { useI18n } from '../composables/useI18n';
 import { useLocalStorage } from '../composables/useLocalStorage';
 import { adminGroups } from '../config/nav';
-import { APP_VERSION, APP_NAME } from '../config/version';
+import { APP_VERSION } from '../config/version';
 import BeijingClock from '../components/base/BeijingClock.vue';
 
 const route = useRoute();
@@ -85,13 +85,13 @@ watch(() => route.path, () => (drawerOpen.value = false));
       <div class="wb-brand">
         <img src="/favicon.svg" class="wb-logo" alt="" />
         <div v-if="!collapsed" class="wb-brand-text">
-          <span class="wb-brand-name">{{ APP_NAME }}</span>
+          <span class="wb-brand-name">{{ t('brand.name') }}</span>
           <span class="wb-version">{{ APP_VERSION }}</span>
         </div>
         <button
           v-if="!collapsed"
           class="wb-icon-btn wb-collapse"
-          title="折叠侧栏"
+          :title="t('admin.shell.collapse')"
           @click="collapsed = true"
         >
           <PanelLeftClose :size="15" />
@@ -122,7 +122,7 @@ watch(() => route.path, () => (drawerOpen.value = false));
         <button
           v-if="collapsed"
           class="wb-icon-btn wb-expand"
-          title="展开侧栏"
+          :title="t('admin.shell.expand')"
           @click="collapsed = false"
         >
           <PanelLeftOpen :size="15" />
@@ -143,7 +143,7 @@ watch(() => route.path, () => (drawerOpen.value = false));
         </button>
 
         <nav class="wb-crumbs" aria-label="Breadcrumb">
-          <span class="wb-crumb-root">控制台</span>
+          <span class="wb-crumb-root">{{ t('admin.shell.breadcrumbRoot') }}</span>
           <template v-if="currentMeta">
             <span class="wb-crumb-sep">/</span>
             <span class="wb-crumb-dim">{{ t(currentMeta.group.labelKey) }}</span>
@@ -177,7 +177,7 @@ watch(() => route.path, () => (drawerOpen.value = false));
       <div class="wb-scrim" @click="drawerOpen = false" />
       <aside class="wb-drawer">
         <div class="wb-drawer-head">
-          <span class="wb-brand-name">{{ APP_NAME }} 控制台</span>
+          <span class="wb-brand-name">{{ t('brand.name') }} {{ t('admin.shell.brand') }}</span>
           <button class="wb-icon-btn" @click="drawerOpen = false"><X :size="15" /></button>
         </div>
         <nav class="wb-nav scroll-area">

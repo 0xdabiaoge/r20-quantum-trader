@@ -175,4 +175,14 @@ export const enMatrix = {
     crossFund: 'Fund% Binance/Gate',
     crossEmpty: 'No cross-venue snapshot for this coin yet — generated on the next 15-minute decision cycle.',
   },
+
+  filterAll: 'All',
+  filterLong: 'Long',
+  filterShort: 'Short',
+  filterWait: 'Wait',
+  colActions: 'Actions',
+  chartTip: 'Switch the main chart to this symbol',
+  chartBtn: 'Chart',
+  focusTip: 'Enter focused workstation mode',
+  focusRestoreTip: 'Restore the full monitoring board',
 };

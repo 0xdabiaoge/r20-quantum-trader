@@ -25,8 +25,10 @@ import {
   BookOpen,
 } from 'lucide-vue-next';
 import { APP_VERSION, APP_NAME } from '../../config/version';
+import { useI18n } from '../../composables/useI18n';
 
 const router = useRouter();
+const { t } = useI18n();
 
 const activeSection = ref('overview');
 const mobileMenuOpen = ref(false);
@@ -86,10 +88,10 @@ onUnmounted(() => {
         <button
           @click="router.push('/')"
           class="btn btn-quiet h-7 px-2.5 text-xs font-medium cursor-pointer inline-flex items-center gap-1.5"
-          title="返回实盘终端"
+          :title="t('docs.backTerminal')"
         >
           <ArrowLeft class="w-3.5 h-3.5" />
-          <span class="hidden sm:inline">返回终端</span>
+          <span class="hidden sm:inline">{{ t('docs.backTerminalShort') }}</span>
         </button>
         <div class="h-4 w-px hidden sm:block shrink-0" style="background-color: var(--line-1);" />
         <div class="flex items-center space-x-2 min-w-0">
@@ -109,7 +111,7 @@ onUnmounted(() => {
         <button
           @click="mobileMenuOpen = !mobileMenuOpen"
           class="sm:hidden btn btn-quiet btn-icon h-7 w-7 cursor-pointer"
-          title="目录索引"
+          :title="t('docs.tocBtn')"
         >
           <Menu v-if="!mobileMenuOpen" class="w-3.5 h-3.5" />
           <X v-else class="w-3.5 h-3.5" />
@@ -151,12 +153,12 @@ onUnmounted(() => {
       >
         <div class="flex items-center justify-between mb-3 px-2">
           <div class="text-3xs font-bold uppercase tracking-wider text-[var(--ink-3)]">
-            目录索引 (TOC)
+            {{ t('docs.tocBtn') }} (TOC)
           </div>
           <button
             @click="mobileMenuOpen = false"
             class="sm:hidden btn btn-quiet btn-icon h-6 w-6"
-            title="关闭目录"
+            :title="t('docs.closeToc')"
           >
             <X class="w-3.5 h-3.5" />
           </button>

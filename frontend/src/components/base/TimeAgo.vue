@@ -47,7 +47,7 @@ const text = computed(() => {
   if (h < 24) return t('time.hoursAgo', undefined, { n: h });
   return t('time.daysAgo', undefined, { n: Math.floor(h / 24) });
 });
-const abs = computed(() => `${fmtDateTime(props.time)} 北京时间 (UTC+8)`);
+const abs = computed(() => `${fmtDateTime(props.time)} ${t('time.beijingTime')}`);
 </script>
 
 <template>

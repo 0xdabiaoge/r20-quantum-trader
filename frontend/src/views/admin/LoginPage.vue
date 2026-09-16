@@ -24,7 +24,7 @@ import {
 } from 'lucide-vue-next';
 import { useAuthStore } from '../../stores/auth';
 import { useI18n } from '../../composables/useI18n';
-import { APP_VERSION, APP_NAME } from '../../config/version';
+import { APP_VERSION } from '../../config/version';
 
 const auth = useAuthStore();
 const router = useRouter();
@@ -80,7 +80,7 @@ async function handleLogin() {
           <div class="auth-logo-box">
             <img src="/favicon.svg" class="auth-logo" alt="" />
           </div>
-          <h1 class="auth-title">{{ APP_NAME }}</h1>
+          <h1 class="auth-title">{{ t('brand.name') }}</h1>
           <p class="auth-subtitle">
             <span>{{ t('admin.login.panelTitle') }}</span>
             <span class="auth-version-tag mono">{{ APP_VERSION }}</span>
@@ -129,7 +129,7 @@ async function handleLogin() {
               <button
                 type="button"
                 class="auth-eye-btn"
-                :title="showPwd ? '隐藏密码' : '显示密码'"
+                :title="showPwd ? t('admin.login.hidePwd') : t('admin.login.showPwd')"
                 @click="showPwd = !showPwd"
               >
                 <EyeOff v-if="showPwd" :size="14" />

@@ -19,7 +19,6 @@ import {
 import { publicTabs } from '../../config/nav';
 import { useI18n } from '../../composables/useI18n';
 import { useUi } from '../../composables/useUi';
-import { APP_NAME } from '../../config/version';
 import DataStatus from './DataStatus.vue';
 import SettingsPopover from './SettingsPopover.vue';
 
@@ -50,8 +49,8 @@ const activeTab = computed(() => {
     <div class="flex items-center gap-2.5 sm:gap-3.5">
       <button
         class="btn btn-quiet btn-icon h-8 w-8 cursor-pointer text-[var(--ink-2)] hover:text-[var(--ink-strong)]"
-        :title="navExpanded ? '收起导航栏' : '展开导航栏'"
-        :aria-label="navExpanded ? '收起导航栏' : '展开导航栏'"
+        :title="navExpanded ? t('dash.shell.nav.closeNav') : t('dash.shell.nav.openNav')"
+        :aria-label="navExpanded ? t('dash.shell.nav.closeNav') : t('dash.shell.nav.openNav')"
         :aria-expanded="!!navExpanded"
         @click="emit('toggleSidebar')"
       >
@@ -61,7 +60,7 @@ const activeTab = computed(() => {
 
       <!-- 工作台面包屑与当前频道 -->
       <div class="flex items-center gap-2">
-        <span class="font-bold tracking-tight text-sm" style="color: var(--ink-strong)">{{ APP_NAME }}</span>
+        <span class="font-bold tracking-tight text-sm" style="color: var(--ink-strong)">{{ t('brand.name') }}</span>
         <span class="text-xs" style="color: var(--ink-3)">/</span>
         <span class="flex items-center gap-1.5 text-xs font-medium" style="color: var(--ink-1)">
           <component :is="activeTab.icon" class="h-3.5 w-3.5 text-blue-400" />

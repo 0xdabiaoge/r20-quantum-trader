@@ -74,7 +74,7 @@ function pick(instId: string) {
         <button
           class="btn btn-ghost h-7 px-2.5 text-xs font-medium cursor-pointer inline-flex items-center gap-1.5 transition-colors"
           :class="isFocusMode ? 'btn-primary' : ''"
-          :title="isFocusMode ? '恢复全量监控看板' : '进入纯工位沉浸模式'"
+          :title="isFocusMode ? t('dash.matrix.focusRestoreTip') : t('dash.matrix.focusTip')"
           @click="isFocusMode = !isFocusMode"
         >
           <Minimize2 v-if="isFocusMode" class="h-3.5 w-3.5" />

@@ -39,4 +39,19 @@ export const enShell = {
   gateStaleTitle: 'Data has stopped updating',
   gateStaleDesc: 'Showing the last successful snapshot from {t}; values may be out of date.',
   gateNoSnapshot: 'No market snapshot received yet',
+
+  nav: {
+    liveDot: 'Live stream online',
+    groupCore: 'Core workspace',
+    groupRef: 'Engineering & reference',
+    docs: 'Developer & system docs',
+    docsTitle: 'System docs',
+    venues: 'Venue gateways',
+    collapse: 'Collapse sidebar',
+    expand: 'Expand sidebar',
+    closeMobile: 'Close navigation',
+    openNav: 'Expand navigation',
+    closeNav: 'Collapse navigation',
+    about: 'About',
+  },
 };
