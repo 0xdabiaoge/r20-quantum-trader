@@ -810,6 +810,16 @@ textarea.input {
 .fact-foot {
   font-size: var(--text-4xs);
   color: var(--ds-color-text-placeholder);
+  /* 批 91：脚注与数值行的口径对齐（**声明性修正，非可见修复**）。
+     实测 25 条路由：`.fact-value` 含数字 41 处**全部**声明了 tabular-nums，
+     而 `.fact-foot` 含数字 18 处里 7 处没声明 —— 同一个统计单元两行口径不一致
+     （「1 启用」「20 / 200」「65%」「10 ~ 1800 秒」都在脚注行）。
+     ⚠️ 但**本环境下这不会改变任何像素**：离屏探针实测实际渲染字体
+     （Inter 栈）的 `1` 与 `8` 十连宽**本来就相等**（140px vs 140px，差 0），
+     而且 `tabular-nums` 在本浏览器对 Georgia / Times 也**完全无效**
+     （两者差 19.14px / 7.34px，开关该属性前后一模一样）。
+     保留此声明是为了**口径一致 + 换字体时兜底**，不要据此宣称修了抖动。 */
+  font-variant-numeric: tabular-nums;
 }
 .fact-foot.is-up {
   color: var(--up);

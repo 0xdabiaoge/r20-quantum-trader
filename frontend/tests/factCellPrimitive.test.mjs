@@ -84,6 +84,16 @@ test('字阶口径：数值 --text-md + 脚注 --text-4xs + tabular-nums（已�
   assert.ok(!/--text-3xs/.test(foot), '.fact-foot 又回到 --text-3xs（11.5px）');
   // 数字位必须开等宽数位，否则数值变化时整行横向抖动
   assert.match(val, /font-variant-numeric:\s*tabular-nums;/, '.fact-value 缺少 tabular-nums');
+  // 批 91：脚注行同样承载数字，口径必须与数值行一致。
+  // 实测（25 条路由）：`.fact-value` 含数字 41 处全部声明，
+  // 而 `.fact-foot` 含数字 18 处里 7 处没声明 —— 同一统计单元两行口径不一致。
+  // ⚠️ 本环境该属性**不可见**（实际字体数位本就等宽，tabular-nums 对
+  // Georgia/Times 也无效），此判据守的是「口径一致 + 换字体兜底」，不是抖动。
+  assert.match(
+    foot,
+    /font-variant-numeric:\s*tabular-nums;/,
+    '.fact-foot 缺少 tabular-nums（脚注里的「1 启用」「20 / 200」「65%」等会横向抖动）',
+  );
 
   // 脚注要比标签小一档，层次才成立
   const label = css.match(/\.fact-label\s*\{([^}]*)\}/)[1];
