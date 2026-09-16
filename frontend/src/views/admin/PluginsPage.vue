@@ -141,7 +141,7 @@ function typeLabel(v: string): string {
             class="pl-row"
             :class="{ 'is-off': p.health === 'disabled' }"
           >
-            <span class="pl-icon"><Blocks :size="14" /></span>
+            <span class="icon-box"><Blocks :size="14" /></span>
 
             <div class="pl-main">
               <div class="pl-title">
@@ -305,17 +305,6 @@ function typeLabel(v: string): string {
 }
 .pl-row.is-off {
   opacity: 0.6;
-}
-.pl-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  border-radius: var(--r-ctl);
-  background-color: var(--ds-color-bg-surface-1);
-  color: var(--ds-color-text-description);
-  flex-shrink: 0;
 }
 .pl-main {
   display: flex;

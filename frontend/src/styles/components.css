@@ -652,53 +652,32 @@ textarea.input {
   color: var(--warn);
 }
 
-/* 轨迹台阶：决策链 / 事件流 */
-.trace {
-  display: flex;
-  flex-direction: column;
-}
-.trace-step {
-  display: grid;
-  grid-template-columns: 26px 1fr;
-  gap: var(--ds-space-3);
-  padding: var(--ds-space-3) var(--ds-space-4);
-  border-bottom: 1px solid var(--ds-color-border-default);
-}
-.trace-step:last-child {
-  border-bottom: 0;
-}
-.trace-step.is-active {
-  background-color: var(--ds-color-bg-surface-inset);
-}
-.trace-marker {
-  width: 26px;
-  height: 26px;
-  border-radius: var(--r-ctl);
+/* ---------------------------------------------------------------------------
+   26px 方形图标盒 —— 全站单一事实源
+   ---------------------------------------------------------------------------
+   批 78：此前 6 个页面各自写了一份**逐字节相同**的 9 属性规则
+   （`.ag-icon` / `.bk-archive-icon` / `.cn-avatar` / `.nf-cat-icon` /
+   `.pl-icon` / `.pol-unit-icon`），另有 1 份危险色变体（`.dz-icon`）。
+   改一次盒径要改 7 个地方，且已经出现漂移（盒内图标 13 / 14 / 15px 三种）。
+
+   现收口为 `.icon-box`：各页模板挂上它，只有差异（危险配色、大号变体）
+   才另写 delta 规则。盒内图标统一 14px —— 多数决，且与 `.btn-sm` 的
+   图标契约同值。
+
+   同时删除本节上方**全站零引用**的死 CSS（`.trace` / `.trace-step` /
+   `.trace-marker` 及其 4 个语义变体，共 48 行）：实测 `src/` 下任何
+   `.vue` / `.ts` 都不引用它们。
+--------------------------------------------------------------------------- */
+.icon-box {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: var(--ds-font-mono);
-  font-size: var(--text-3xs);
-  font-weight: 600;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--r-ctl);
   background-color: var(--ds-color-bg-surface-1);
   color: var(--ds-color-text-description);
   flex-shrink: 0;
-}
-.trace-step.is-brand .trace-marker {
-  background-color: var(--r20-brand-bg);
-  color: var(--brand);
-}
-.trace-step.is-up .trace-marker {
-  background-color: var(--up-bg);
-  color: var(--up);
-}
-.trace-step.is-down .trace-marker {
-  background-color: var(--down-bg);
-  color: var(--down);
-}
-.trace-step.is-warn .trace-marker {
-  background-color: var(--warn-bg);
-  color: var(--warn);
 }
 
 /* =========================================================================

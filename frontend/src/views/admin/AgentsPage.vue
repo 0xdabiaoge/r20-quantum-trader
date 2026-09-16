@@ -174,7 +174,7 @@ function ageText(a: any): string {
           </div>
 
           <article v-for="a in agents" :key="a.id" class="ag-row">
-            <span class="ag-icon"><Cpu :size="14" /></span>
+            <span class="icon-box"><Cpu :size="14" /></span>
 
             <div class="ag-main">
               <span class="ag-name">{{ a.name }}</span>
@@ -410,17 +410,6 @@ function ageText(a: any): string {
   letter-spacing: var(--track-label);
   text-transform: uppercase;
   color: var(--ds-color-text-placeholder);
-}
-.ag-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  border-radius: var(--r-ctl);
-  background-color: var(--ds-color-bg-surface-1);
-  color: var(--ds-color-text-description);
-  flex-shrink: 0;
 }
 .ag-main {
   display: flex;

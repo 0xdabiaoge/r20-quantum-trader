@@ -54,7 +54,7 @@ const hint = computed(() => t('admin.shell.danger.confirmHint', undefined, { phr
 <template>
   <section class="dz" :class="{ 'is-armed': unlocked }">
     <header class="dz-head">
-      <span class="dz-icon"><ShieldAlert :size="15" /></span>
+      <span class="icon-box dz-icon"><ShieldAlert :size="14" /></span>
       <div class="dz-head-text">
         <h3 class="dz-title">{{ title }}</h3>
         <p class="dz-desc">{{ description }}</p>
@@ -108,16 +108,10 @@ const hint = computed(() => t('admin.shell.danger.confirmHint', undefined, { phr
   background-color: var(--down-bg);
   border-bottom: 1px solid var(--down-line);
 }
+/* 危险语义 delta：几何与配色基座来自全站 .icon-box 原件（styles/components.css） */
 .dz-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  border-radius: var(--r-ctl);
   background-color: var(--down-bg);
   color: var(--down);
-  flex-shrink: 0;
 }
 .dz-head-text {
   display: flex;

@@ -573,7 +573,7 @@ onMounted(loadData);
               :class="{ 'is-on': expandedRole === roleId }"
               @click="expandedRole = String(roleId)"
             >
-              <span class="cn-avatar" :class="seatTone(String(roleId), role)">
+              <span class="icon-box cn-avatar" :class="seatTone(String(roleId), role)">
                 <component :is="roleIcons[roleIconKeyOf(String(roleId))]" :size="14" />
               </span>
               <span class="cn-seat-text">
@@ -601,7 +601,7 @@ onMounted(loadData);
           <template v-else>
             <header class="card-head">
               <div class="cn-editor-id">
-                <span class="cn-avatar is-lg" :class="seatTone(expandedRole, selectedRole)">
+                <span class="icon-box cn-avatar is-lg" :class="seatTone(expandedRole, selectedRole)">
                   <component :is="roleIcons[roleIconKeyOf(expandedRole)]" :size="16" />
                 </span>
                 <div class="cn-editor-text">
@@ -1222,17 +1222,6 @@ onMounted(loadData);
 }
 
 /* 席位牌 */
-.cn-avatar {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  border-radius: var(--r-ctl);
-  background-color: var(--ds-color-bg-surface-1);
-  color: var(--ds-color-text-description);
-  flex-shrink: 0;
-}
 .cn-avatar.is-lg {
   width: 34px;
   height: 34px;

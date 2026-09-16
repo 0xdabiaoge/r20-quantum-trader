@@ -357,7 +357,7 @@ onMounted(() => {
 
           <div v-for="u in units" :key="u.key" class="pol-unit">
             <div class="pol-unit-id">
-              <span class="pol-unit-icon"><component :is="u.icon" :size="14" /></span>
+              <span class="icon-box"><component :is="u.icon" :size="14" /></span>
               <span class="pol-unit-name">{{ u.title }}</span>
             </div>
 
@@ -640,17 +640,6 @@ onMounted(() => {
   align-items: center;
   gap: var(--ds-space-2);
   min-width: 0;
-}
-.pol-unit-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  border-radius: var(--r-ctl);
-  background-color: var(--ds-color-bg-surface-1);
-  color: var(--ds-color-text-description);
-  flex-shrink: 0;
 }
 .pol-unit-name {
   font-size: var(--text-xs);

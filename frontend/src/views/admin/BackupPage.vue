@@ -551,7 +551,7 @@ onMounted(load)
 
             <div v-else class="bk-rows">
               <article v-for="a in archives" :key="a.name" class="bk-row">
-                <span class="bk-archive-icon"><Archive :size="13" /></span>
+                <span class="icon-box"><Archive :size="14" /></span>
 
                 <div class="bk-archive-main">
                   <span class="bk-archive-name mono truncate" :title="a.name">{{ a.name.split('/').pop() || a.name }}</span>
@@ -850,17 +850,6 @@ onMounted(load)
 }
 .bk-row:hover {
   background-color: var(--ds-color-bg-hover);
-}
-.bk-archive-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  border-radius: var(--r-ctl);
-  background-color: var(--ds-color-bg-surface-1);
-  color: var(--ds-color-text-description);
-  flex-shrink: 0;
 }
 .bk-archive-main {
   display: flex;

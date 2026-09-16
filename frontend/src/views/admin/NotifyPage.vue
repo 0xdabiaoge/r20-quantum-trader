@@ -537,7 +537,7 @@ onBeforeUnmount(() => {
 
           <div class="nf-cats">
             <article v-for="cat in categories" :key="cat.key" class="nf-cat">
-              <span class="nf-cat-icon"><component :is="cat.icon" :size="14" /></span>
+              <span class="icon-box"><component :is="cat.icon" :size="14" /></span>
               <div class="nf-cat-main">
                 <div class="nf-cat-title">
                   <span class="nf-cat-name">{{ cat.label }}</span>
@@ -894,17 +894,6 @@ onBeforeUnmount(() => {
   .nf-cat:not(:nth-child(3n + 1)) {
     border-left: 1px solid var(--ds-color-border-default);
   }
-}
-.nf-cat-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  border-radius: var(--r-ctl);
-  background-color: var(--ds-color-bg-surface-1);
-  color: var(--ds-color-text-description);
-  flex-shrink: 0;
 }
 .nf-cat-main {
   min-width: 0;
