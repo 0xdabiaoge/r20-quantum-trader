@@ -22,7 +22,7 @@ export const enAdminPolicySnapshot = {
       mode: 'Editor mode Mode:',
       slotGuard: 'Slot lazy-render guard:',
       slotGuardValue: 'Single lazy render · missing data explicitly flagged',
-      note: '✓ Template placeholders render once lazily; absent real data is clearly marked and never disguised as an empty position.',
+      note: 'Template placeholders render once lazily; absent real data is clearly marked and never disguised as an empty position.',
     },
     evolution: {
       title: 'Self-Evolving Doctrine',
@@ -32,7 +32,7 @@ export const enAdminPolicySnapshot = {
       reviewValue: 'Red-line defense · hard block on review rejection',
       concurrency: 'Concurrent version safety:',
       concurrencyValue: 'CAS optimistic lock · 428/409 reject stale overwrites',
-      note: '✓ Structured atomic publishing + optimistic version lock; NO_CHANGE and errors must not rewrite the trading doctrine.',
+      note: 'Structured atomic publishing + optimistic version lock; NO_CHANGE and errors must not rewrite the trading doctrine.',
     },
     interceptor: {
       title: 'Physical Interceptor Plugins',
@@ -43,7 +43,7 @@ export const enAdminPolicySnapshot = {
       enabledValue: '{n} / {t} plugins',
       recheck: 'Final order re-validation:',
       recheckValue: 'Re-validated after effective quote scaling/rounding',
-      note: '✓ Core safety fully decoupled from optional plugins; plugin params are deep-copied and tamper-isolated; missing files fail closed.',
+      note: 'Core safety fully decoupled from optional plugins; plugin params are deep-copied and tamper-isolated; missing files fail closed.',
     },
     council: {
       title: 'Model Council',
@@ -57,7 +57,7 @@ export const enAdminPolicySnapshot = {
       seatsValue: '{n} frontline traders + CIO',
       adopted: 'Adoption tracking Adopted Role:',
       adoptedValue: 'Machine-traceable · dynamic deadline protection',
-      note: '✓ Removes fake consensus options, real two-round peer review, millisecond-adaptive safe fallback on timeout.',
+      note: 'Removes fake consensus options, real two-round peer review, millisecond-adaptive safe fallback on timeout.',
     },
   },
   archive: {
@@ -87,7 +87,7 @@ export const enAdminPolicySnapshot = {
   toast: {
     archivedOk: 'Policy version archived: {name} (#{hash})',
     restoredOk: 'Policy atomically rolled back to {name} (#{hash}); effective from the next decision cycle',
-    deletedOk: '🗑️ Policy version {name} deleted',
+    deletedOk: 'Policy version {name} deleted',
   },
   confirm: {
     restore: 'Atomically roll the current policy back to [{name}] (#{hash})?\nThe prompts, doctrine, interceptors and council config will be restored together!',

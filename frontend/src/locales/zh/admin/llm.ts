@@ -14,6 +14,9 @@ export const zhAdminLlm = {
   effort: '思考强度:',
   timeoutLabel: '思考时间上限（秒）',
   validRange: '有效范围: 10 ~ 1800 秒',
+  // 批 26：状态带脚注原来复用下方表单的长提示，同屏出现两次；带内只留短口径。
+  validRangeFoot: '10 ~ 1800 秒',
+  noFallbackFoot: '未配置',
   secondsUnit: '秒 (s)',
   presetFast: '30s (极速)',
   presetStd: '60s (标准)',

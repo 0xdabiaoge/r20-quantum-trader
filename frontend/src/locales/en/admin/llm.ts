@@ -13,6 +13,8 @@ export const enAdminLlm = {
   effort: 'Reasoning effort:',
   timeoutLabel: 'Reasoning time ceiling (seconds)',
   validRange: 'Valid range: 10 – 1800 seconds',
+  validRangeFoot: '10 – 1800 s',
+  noFallbackFoot: 'not configured',
   secondsUnit: 'seconds (s)',
   presetFast: '30s (fastest)',
   presetStd: '60s (standard)',

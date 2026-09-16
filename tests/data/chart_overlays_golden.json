@@ -111,7 +111,7 @@
         "backgroundColor": "#F43F5E"
       }
     },
-    "extendData": "🛑 止损SL -5.0%"
+    "extendData": "▼ 止损SL -5.0%"
   },
   "sl_en": {
     "name": "priceLine",
@@ -137,7 +137,7 @@
         "backgroundColor": "#F43F5E"
       }
     },
-    "extendData": "🛑 SL -5.0%"
+    "extendData": "▼ SL -5.0%"
   },
   "sl_frac": {
     "name": "priceLine",
@@ -163,7 +163,7 @@
         "backgroundColor": "#F43F5E"
       }
     },
-    "extendData": "🛑 止损SL -5.7%"
+    "extendData": "▼ 止损SL -5.7%"
   },
   "tp_zh": {
     "name": "priceLine",
@@ -189,7 +189,7 @@
         "backgroundColor": "#10B981"
       }
     },
-    "extendData": "🎯 止盈TP +10.0%"
+    "extendData": "▲ 止盈TP +10.0%"
   },
   "tp_en": {
     "name": "priceLine",
@@ -215,7 +215,7 @@
         "backgroundColor": "#10B981"
       }
     },
-    "extendData": "🎯 TP +10.0%"
+    "extendData": "▲ TP +10.0%"
   },
   "tp_frac": {
     "name": "priceLine",
@@ -241,7 +241,7 @@
         "backgroundColor": "#10B981"
       }
     },
-    "extendData": "🎯 止盈TP +10.1%"
+    "extendData": "▲ 止盈TP +10.1%"
   },
   "plan_none": {},
   "plan_all": {
@@ -291,7 +291,7 @@
           "backgroundColor": "#F43F5E"
         }
       },
-      "extendData": "🛑 止损SL -5.0%"
+      "extendData": "▼ 止损SL -5.0%"
     },
     "tp": {
       "name": "priceLine",
@@ -317,7 +317,7 @@
           "backgroundColor": "#10B981"
         }
       },
-      "extendData": "🎯 止盈TP +10.0%"
+      "extendData": "▲ 止盈TP +10.0%"
     }
   },
   "plan_entry_guard": {
@@ -345,7 +345,7 @@
           "backgroundColor": "#F43F5E"
         }
       },
-      "extendData": "🛑 止损SL -5.0%"
+      "extendData": "▼ 止损SL -5.0%"
     },
     "tp": {
       "name": "priceLine",
@@ -371,7 +371,7 @@
           "backgroundColor": "#10B981"
         }
       },
-      "extendData": "🎯 止盈TP +10.0%"
+      "extendData": "▲ 止盈TP +10.0%"
     }
   },
   "plan_sl_only": {
@@ -399,7 +399,7 @@
           "backgroundColor": "#F43F5E"
         }
       },
-      "extendData": "🛑 止损SL -5.0%"
+      "extendData": "▼ 止损SL -5.0%"
     }
   }
 }

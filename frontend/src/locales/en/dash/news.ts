@@ -37,7 +37,7 @@ export const enNews = {
   justNow: 'just now',
   refreshTitle: 'Refresh sentiment data now',
   cb: {
-    badge: '🚨 Black-swan circuit breaker engaged',
+    badge: 'Black-swan circuit breaker engaged',
     headlineFallback: 'Extreme force-majeure market shock detected',
     keywordLabel: 'High-risk trigger keyword: ',
     keywordFallback: 'sudden malicious price move',
@@ -46,7 +46,7 @@ export const enNews = {
     frozen: 'New-entry channel hard-frozen',
   },
   breaking: {
-    badge: '🔥 Top Breaking',
+    badge: 'Top Breaking',
     macroPrefix: 'Macro: ',
     sentinel: 'Black-swan sentinel on 24/7 watch',
   },

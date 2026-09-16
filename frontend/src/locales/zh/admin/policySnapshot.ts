@@ -22,7 +22,7 @@ export const zhAdminPolicySnapshot = {
       mode: '编辑模式 Mode:',
       slotGuard: '插槽延迟渲染保护:',
       slotGuardValue: '单次延迟渲染 · 未提供数据显式标识',
-      note: '✓ 模板占位符单次延迟渲染，未提供真实数据明确标记，绝不伪装为空仓。',
+      note: '模板占位符单次延迟渲染，未提供真实数据明确标记，绝不伪装为空仓。',
     },
     evolution: {
       title: '自进化心法',
@@ -32,7 +32,7 @@ export const zhAdminPolicySnapshot = {
       reviewValue: '红线防御 · 审核拒绝硬阻断',
       concurrency: '并发版本安全保护:',
       concurrencyValue: 'CAS 乐观锁 · 428/409 拒绝过期覆盖',
-      note: '✓ 结构化原子发布 + 乐观版本锁，NO_CHANGE 与异常禁止重写交易心法。',
+      note: '结构化原子发布 + 乐观版本锁，NO_CHANGE 与异常禁止重写交易心法。',
     },
     interceptor: {
       title: '物理拦截插件',
@@ -43,7 +43,7 @@ export const zhAdminPolicySnapshot = {
       enabledValue: '{n} / {t} 个插件',
       recheck: '最终发单二次复验:',
       recheckValue: '生效报价缩放/舍入后复验',
-      note: '✓ 核心安全与可选插件彻底解耦，插件参数深拷贝隔离防篡改，缺失文件 Fail-Closed。',
+      note: '核心安全与可选插件彻底解耦，插件参数深拷贝隔离防篡改，缺失文件 Fail-Closed。',
     },
     council: {
       title: '模型委员会',
@@ -57,7 +57,7 @@ export const zhAdminPolicySnapshot = {
       seatsValue: '{n} 位一线交易员 + CIO',
       adopted: '决策采纳追踪 Adopted Role:',
       adoptedValue: '机器可追溯 · 动态截止时间保护',
-      note: '✓ 剔除虚假共识选项，实战双轮互评，超时毫秒级自适应安全降级。',
+      note: '剔除虚假共识选项，实战双轮互评，超时毫秒级自适应安全降级。',
     },
   },
   archive: {
@@ -87,7 +87,7 @@ export const zhAdminPolicySnapshot = {
   toast: {
     archivedOk: '策略版本已归档入库：{name} (#{hash})',
     restoredOk: '策略已原子回滚至【{name}】(#{hash})！下一决策周期将立即生效',
-    deletedOk: '🗑️ 策略版本【{name}】已成功删除',
+    deletedOk: '策略版本【{name}】已成功删除',
   },
   confirm: {
     restore: '确定要将当前策略原子回滚至【{name}】(#{hash}) 吗？\n将同时恢复对应的提示词、心法、拦截器及投委会配置！',

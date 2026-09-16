@@ -38,7 +38,7 @@ export const zhNews = {
   justNow: '刚刚',
   refreshTitle: '立即刷新舆情数据',
   cb: {
-    badge: '🚨 黑天鹅熔断机制已激活',
+    badge: '黑天鹅熔断机制已激活',
     headlineFallback: '检测到极端市场不可抗力冲击',
     keywordLabel: '触发高危识别词：',
     keywordFallback: '突发恶性异动',
@@ -47,7 +47,7 @@ export const zhNews = {
     frozen: '开仓通道已硬冻结',
   },
   breaking: {
-    badge: '🔥 置顶突发 BREAKING',
+    badge: '置顶突发 BREAKING',
     macroPrefix: '宏观：',
     sentinel: '黑天鹅哨兵 7×24H 防御中',
   },

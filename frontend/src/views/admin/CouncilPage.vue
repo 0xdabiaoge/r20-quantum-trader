@@ -428,7 +428,7 @@ onMounted(loadData);
           <div class="cn-fact">
             <span class="cn-fact-label"><Clock :size="12" />{{ t('admin.council.fieldTimeout') }}</span>
             <span class="cn-fact-value num">{{ councilConfig.timeout_seconds }}<span class="cn-fact-sub">s</span></span>
-            <span class="cn-fact-foot">{{ t('admin.council.timeoutHint') }}</span>
+            <span class="cn-fact-foot">{{ t('admin.council.timeoutFoot') }}</span>
           </div>
 
           <div class="cn-fact">

@@ -150,10 +150,12 @@ class GoldenTest(unittest.TestCase):
         self.assertEqual(self.golden["entry_short_en"]["extendData"], "Entry Short")
 
     def test_sl_tp_labels_and_percent_format(self):
-        self.assertEqual(self.golden["sl_zh"]["extendData"], "🛑 止损SL -5.0%")
-        self.assertEqual(self.golden["sl_en"]["extendData"], "🛑 SL -5.0%")
-        self.assertEqual(self.golden["tp_zh"]["extendData"], "🎯 止盈TP +10.0%")
-        self.assertEqual(self.golden["tp_en"]["extendData"], "🎯 TP +10.0%")
+        # 批 26：前缀由 emoji（🛑/🎯）改为全站表格同款方向字形 ▲▼ ——
+        # 设计清单禁 emoji 图标，且 emoji 在 canvas 文本里各家字体渲染不一致。
+        self.assertEqual(self.golden["sl_zh"]["extendData"], "▼ 止损SL -5.0%")
+        self.assertEqual(self.golden["sl_en"]["extendData"], "▼ SL -5.0%")
+        self.assertEqual(self.golden["tp_zh"]["extendData"], "▲ 止盈TP +10.0%")
+        self.assertEqual(self.golden["tp_en"]["extendData"], "▲ TP +10.0%")
 
     def test_percent_is_always_one_decimal(self):
         """`toFixed(1)` —— 5.678 → 5.7、10.123 → 10.1。"""
@@ -329,10 +331,14 @@ class DerivedBehaviourTest(unittest.TestCase):
         self.assertEqual(self.golden["entry_long_zh"]["extendData"], "多头入场")
 
     def test_sl_tp_label_prefixes(self):
-        self.assertIn("🛑", self._fn_body("buildSlOverlay"))
-        self.assertIn("🎯", self._fn_body("buildTpOverlay"))
-        self.assertTrue(self.golden["sl_zh"]["extendData"].startswith("🛑"))
-        self.assertTrue(self.golden["tp_zh"]["extendData"].startswith("🎯"))
+        """前缀仍是**必需的方向标记**，只是不再用 emoji（批 26 换成 ▲▼）。
+
+        这条不改判据强度：源码里必须有前缀、黄金样本必须也以它开头。
+        """
+        self.assertIn("▼", self._fn_body("buildSlOverlay"))
+        self.assertIn("▲", self._fn_body("buildTpOverlay"))
+        self.assertTrue(self.golden["sl_zh"]["extendData"].startswith("▼"))
+        self.assertTrue(self.golden["tp_zh"]["extendData"].startswith("▲"))
 
 
 class SourceShapeTest(unittest.TestCase):
@@ -352,7 +358,7 @@ class SourceShapeTest(unittest.TestCase):
         """黄金样本里的固定值必须能在 `.ts` 里找到（否则样本是"孤儿数据"）。"""
         for token in (LONG, SHORT, "'priceLine'", "'candle_pane'",
                       "[6, 4]", "多头入场", "空头入场", "Entry Long", "Entry Short",
-                      "止损SL", "止盈TP", "🛑", "🎯", "toFixed(1)"):
+                      "止损SL", "止盈TP", "▼", "▲", "toFixed(1)"):
             self.assertIn(token, self.src, f"源码缺少黄金样本里的 {token!r}")
 
     def test_guard_expressions_present(self):

@@ -75,7 +75,7 @@ async function applySuite(s: any) {
   try {
     const res = await api('/api/v1/admin/risk', { method: 'POST', body: JSON.stringify({ suite_id: s.id }) })
     syncFromServer(res.values)
-    toast.ok(`已一键应用「${s.name}」预设 ✓ ${res.effect}`)
+    toast.ok(`已一键应用「${s.name}」预设 · ${res.effect}`)
   } catch (e: any) {
     toast.err(`应用预设失败: ${e.message}`)
   } finally {
@@ -239,7 +239,7 @@ async function saveChanges() {
   try {
     const res = await api('/api/v1/admin/risk', { method: 'POST', body: JSON.stringify({ values, confirmation }) })
     syncFromServer(res.values)
-    toast.ok(`已保存 ${res.updated.length} 项修改 ✓ ${res.effect}`)
+    toast.ok(`已保存 ${res.updated.length} 项修改 · ${res.effect}`)
   } catch (e: any) {
     toast.err(`保存失败: ${e.message}`)
   } finally {
@@ -263,7 +263,7 @@ async function resetAll() {
   try {
     const res = await api('/api/v1/admin/risk/reset', { method: 'POST', body: JSON.stringify({ confirmation: 'RESET RISK' }) })
     syncFromServer(res.values)
-    toast.ok(`已恢复代码默认基线 ✓ ${res.effect}`)
+    toast.ok(`已恢复代码默认基线 · ${res.effect}`)
   } catch (e: any) {
     toast.err(`重置失败: ${e.message}`)
   } finally {

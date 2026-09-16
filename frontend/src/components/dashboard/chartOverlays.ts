@@ -101,7 +101,9 @@ export function buildSlOverlay(input: SlOverlayInput): PriceLineOverlay {
       },
       text: { size: TEXT_SIZE, color: textColor, backgroundColor: SHORT_COLOR },
     },
-    extendData: `🛑 ${isEn ? 'SL' : '止损SL'} -${riskPct.toFixed(1)}%`,
+    // 批 26：标签不再用 emoji（🛑/🎯 在 canvas 文本里各家字体渲染不一致，
+    // 且设计清单禁 emoji 图标）。改用全站表格同款的 ▲▼ 方向字形。
+    extendData: `▼ ${isEn ? 'SL' : '止损SL'} -${riskPct.toFixed(1)}%`,
   }
 }
 
@@ -129,7 +131,7 @@ export function buildTpOverlay(input: TpOverlayInput): PriceLineOverlay {
       },
       text: { size: TEXT_SIZE, color: textColor, backgroundColor: LONG_COLOR },
     },
-    extendData: `🎯 ${isEn ? 'TP' : '止盈TP'} +${rewardPct.toFixed(1)}%`,
+    extendData: `▲ ${isEn ? 'TP' : '止盈TP'} +${rewardPct.toFixed(1)}%`,
   }
 }
 

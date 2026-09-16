@@ -106,14 +106,14 @@ const bandFacts = () => [
     icon: Timer,
     label: t('admin.llm.bandTimeout'),
     value: `${cfg.value?.thinking_timeout || 120}s`,
-    foot: t('admin.llm.validRange'),
+    foot: t('admin.llm.validRangeFoot'),
     tone: '',
   },
   {
     icon: Route,
     label: t('admin.llm.bandFallback'),
     value: String(fallbackIds.value.length),
-    foot: fallbackIds.value.length ? modelNameOf(fallbackIds.value[0]) : t('admin.llm.noFallback'),
+    foot: fallbackIds.value.length ? modelNameOf(fallbackIds.value[0]) : t('admin.llm.noFallbackFoot'),
     tone: fallbackIds.value.length ? '' : 'is-off',
   },
 ]
