@@ -255,7 +255,7 @@ function ageText(a: any): string {
           </header>
 
           <div class="ag-kv">
-            <div class="ag-kv-row">
+            <div class="kv-row">
               <span class="ag-kv-k">{{ t('admin.agents.storeStatus') }}</span>
               <span class="ag-kv-v mono">
                 {{ t('admin.agents.cipherCount', undefined, { count: data?.secret_store?.count ?? 0 }) }}
@@ -263,7 +263,7 @@ function ageText(a: any): string {
               </span>
             </div>
 
-            <div class="ag-kv-row">
+            <div class="kv-row">
               <span class="ag-kv-k">{{ t('admin.agents.readPriority') }}</span>
               <span class="ag-kv-v mono">{{ data?.secret_store?.source_priority || 'encrypted-store-over-env' }}</span>
             </div>
@@ -271,7 +271,7 @@ function ageText(a: any): string {
             <div
               v-for="k in (data?.secret_store?.keys || [])"
               :key="k"
-              class="ag-kv-row"
+              class="kv-row"
             >
               <span class="ag-kv-k mono truncate" :title="k">{{ k }}</span>
               <span class="badge badge-up">{{ t('admin.agents.configured') }}</span>
@@ -477,17 +477,6 @@ function ageText(a: any): string {
 .ag-kv {
   display: flex;
   flex-direction: column;
-}
-.ag-kv-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--ds-space-3);
-  padding: 10px var(--ds-space-4);
-  border-bottom: 1px solid var(--ds-color-border-default);
-}
-.ag-kv-row:last-child {
-  border-bottom: 0;
 }
 .ag-kv-k {
   font-size: var(--text-xs);

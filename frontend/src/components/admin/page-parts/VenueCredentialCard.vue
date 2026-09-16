@@ -47,7 +47,7 @@ const toneClass = computed(
     </header>
 
     <!-- 资金档位 -->
-    <div class="vc-env">
+    <div class="kv-row vc-env">
       <span class="vc-env-label">{{ envLabelText }}</span>
       <span class="vc-env-value mono">{{ envText }}</span>
     </div>
@@ -107,13 +107,9 @@ const toneClass = computed(
 .vc-head .badge {
   flex-shrink: 0;
 }
+/* 批 90：凭证卡内更紧凑（8/12，行高 36px）—— 形态 delta，其余交给 .kv-row */
 .vc-env {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--ds-space-3);
-  padding:8px var(--ds-space-3);
-  border-bottom: 1px solid var(--ds-color-border-default);
+  padding: 8px var(--ds-space-3);
 }
 .vc-env-label {
   font-size: var(--text-4xs);

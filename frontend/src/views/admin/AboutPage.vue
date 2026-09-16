@@ -195,19 +195,19 @@ const bandFacts = computed(() => {
             </header>
 
             <div class="ab-kv">
-              <div class="ab-kv-row">
+              <div class="kv-row">
                 <span class="ab-kv-k">{{ t('admin.about.productArchitecture') }}</span>
                 <span class="ab-kv-v">{{ about.product?.name }}</span>
               </div>
-              <div class="ab-kv-row">
+              <div class="kv-row">
                 <span class="ab-kv-k">{{ t('admin.about.systemVersion') }}</span>
                 <span class="ab-kv-v mono is-accent">v{{ about.product?.version }}</span>
               </div>
-              <div class="ab-kv-row">
+              <div class="kv-row">
                 <span class="ab-kv-k">{{ t('admin.about.controlPlane') }}</span>
                 <span class="ab-kv-v mono">{{ about.product?.control_plane }} (v{{ about.product?.gateway_version }})</span>
               </div>
-              <div class="ab-kv-row">
+              <div class="kv-row">
                 <span class="ab-kv-k">{{ t('admin.about.runtime') }}</span>
                 <span class="ab-kv-v mono">Python {{ about.runtime?.python }}</span>
               </div>
@@ -237,7 +237,7 @@ const bandFacts = computed(() => {
             <BaseEmpty v-if="!(about.components || []).length" :text="t('common.noRecords')" />
 
             <div v-else class="ab-comps">
-              <div v-for="c in about.components" :key="c.name" class="ab-comp">
+              <div v-for="c in about.components" :key="c.name" class="kv-row">
                 <span class="ab-comp-name">{{ c.name }}</span>
                 <span class="ab-comp-ver mono num">{{ c.version }}</span>
               </div>
@@ -419,17 +419,6 @@ const bandFacts = computed(() => {
   display: flex;
   flex-direction: column;
 }
-.ab-kv-row {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--ds-space-3);
-  padding: 10px var(--ds-space-4);
-  border-bottom: 1px solid var(--ds-color-border-default);
-}
-.ab-kv-row:last-child {
-  border-bottom: 0;
-}
 .ab-kv-k {
   font-size: var(--text-xs);
   color: var(--ds-color-text-description);
@@ -454,14 +443,6 @@ const bandFacts = computed(() => {
 .ab-comps {
   display: flex;
   flex-direction: column;
-}
-.ab-comp {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--ds-space-3);
-  padding:10px var(--ds-space-4);
-  border-bottom: 1px solid var(--ds-color-border-default);
 }
 .ab-comp:last-child {
   border-bottom: 0;

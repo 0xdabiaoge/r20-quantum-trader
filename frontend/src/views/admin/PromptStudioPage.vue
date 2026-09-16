@@ -907,7 +907,7 @@ onMounted(loadLib)
       <BaseEmpty v-if="!historyList.length" :text="t('admin.promptStudio.history.empty')" />
 
       <div v-else class="ps-history">
-        <div v-for="h in historyList" :key="h.id || h.revision_id" class="ps-history-row">
+        <div v-for="h in historyList" :key="h.id || h.revision_id" class="kv-row ps-history-row">
           <div class="ps-history-text">
             <span class="ps-history-note">{{ h.note || h.summary || h.id || h.revision_id }}</span>
             <span class="ps-history-meta mono">{{ fmtDateTime(h.created_at || h.time) }} · {{ h.actor || 'system' }}</span>
@@ -1363,16 +1363,9 @@ onMounted(loadLib)
   display: flex;
   flex-direction: column;
 }
+/* 批 90：历史行左右贴边（外侧容器已有横向内边距）—— 形态 delta，其余交给 .kv-row */
 .ps-history-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--ds-space-3);
   padding: 10px 0;
-  border-bottom: 1px solid var(--ds-color-border-default);
-}
-.ps-history-row:last-child {
-  border-bottom: 0;
 }
 .ps-history-text {
   display: flex;

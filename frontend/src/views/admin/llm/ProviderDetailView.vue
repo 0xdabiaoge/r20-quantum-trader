@@ -114,12 +114,12 @@ function monogram(name: string): string {
         </header>
 
         <div class="pd-kv">
-          <div class="pd-kv-row">
+          <div class="kv-row">
             <span class="pd-kv-k">{{ t('admin.llm.providerType') }}</span>
             <span class="pd-kv-v mono">{{ providerForm.type }}</span>
           </div>
 
-          <div class="pd-kv-row">
+          <div class="kv-row">
             <div class="pd-kv-k-block">
               <span class="pd-kv-k">{{ t('admin.llm.apiProtocol') }}</span>
               <span class="pd-kv-hint">{{ t('admin.llm.apiProtocolDesc') }}</span>
@@ -136,17 +136,17 @@ function monogram(name: string): string {
             </select>
           </div>
 
-          <div class="pd-kv-row">
+          <div class="kv-row">
             <span class="pd-kv-k">{{ t('admin.llm.group') }}</span>
             <span class="pd-kv-v mono">{{ providerForm.group || '--' }}</span>
           </div>
 
-          <div class="pd-kv-row">
+          <div class="kv-row">
             <span class="pd-kv-k">{{ t('admin.llm.enabledField') }}</span>
             <BaseSwitch v-model="providerForm.enabled" :label="t('admin.llm.enabledField')" />
           </div>
 
-          <div class="pd-kv-row">
+          <div class="kv-row">
             <span class="pd-kv-k">{{ t('admin.llm.multiKey') }}</span>
             <BaseSwitch v-model="providerForm.multi_key_enabled" :label="t('admin.llm.multiKey')" />
           </div>
@@ -376,17 +376,6 @@ function monogram(name: string): string {
 .pd-kv {
   display: flex;
   flex-direction: column;
-}
-.pd-kv-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--ds-space-4);
-  padding:12px var(--ds-space-4);
-  border-bottom: 1px solid var(--ds-color-border-default);
-}
-.pd-kv-row:last-child {
-  border-bottom: 0;
 }
 .pd-kv-k {
   font-size: var(--text-xs);

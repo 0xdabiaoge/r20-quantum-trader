@@ -505,6 +505,39 @@ textarea.input {
   font-variant-numeric: tabular-nums;
 }
 
+/* 批 90：**键值行**（一行「标签 … 值」，底部分隔线）单一事实源。
+   用「跨文件近似规则聚类」实测出 5 条规则其实是**同一个组件** ——
+   除 padding 外逐字节相同（`display:flex; align-items:center;
+   justify-content:space-between; gap: var(--ds-space-3);
+   border-bottom: 1px solid var(--ds-color-border-default)`）：
+
+   | 规则 | padding | 实测行高 |
+   |---|---|---|
+   | `.ag-kv-row`（AgentsPage，11 个） | 10px 16px | 40px |
+   | `.ab-comp`（AboutPage，3 个） | 10px 16px | 40px |
+   | `.bk-kv-row`（BackupPage，2 个） | **12px** 16px | **44px** ← 离群 |
+   | `.vc-env`（VenueCredentialCard，3 个） | **8px** 12px | **36px** |
+   | `.ps-history-row`（PromptStudioPage，v-for） | **10px 0** | — |
+
+   同一个组件在四个页面渲染出 **36 / 40 / 44** 三种行高。
+   取值取多数决（10px / 16px，16 个可见元素中 14 个已是此值），
+   两个真正的形态差异留作 delta（见 `.vc-env` / `.ps-history-row` 的注释）。 */
+.kv-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ds-space-3);
+  padding: 10px var(--ds-space-4);
+  border-bottom: 1px solid var(--ds-color-border-default);
+}
+/* 批 90：末行不画底边框。AgentsPage / BackupPage / AboutPage / PromptStudioPage
+   **各自都写过这一条**（`border-bottom: 0`）—— 收进原件，避免改类名时静默丢掉
+   「末行不封口」的行为（本批实测就丢过一次：三页末行从 0px 变回 1px）。
+   ⚠️ 不要删：删了末行会多一条封口线。 */
+.kv-row:last-child {
+  border-bottom: 0;
+}
+
 /* =========================================================================
    7 · 页面骨架
    -------------------------------------------------------------------------

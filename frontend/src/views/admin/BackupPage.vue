@@ -522,11 +522,11 @@ onMounted(load)
             <BaseEmpty v-if="!simple.latest" :text="t('admin.backup.noLatest')" />
 
             <div v-else class="bk-kv">
-              <div class="bk-kv-row">
+              <div class="kv-row">
                 <span class="bk-kv-k">{{ t('admin.backup.time') }}</span>
                 <span class="bk-kv-v mono num">{{ fmtBackupTime(simple.latest) }}</span>
               </div>
-              <div class="bk-kv-row">
+              <div class="kv-row">
                 <span class="bk-kv-k">{{ t('admin.backup.status') }}</span>
                 <span class="badge" :class="simple.latest.status === 'failed' ? 'badge-down' : 'badge-up'" :title="simple.latest.status">
                   {{ statusLabelOf(simple.latest.status) }}
@@ -712,17 +712,6 @@ onMounted(load)
 .bk-kv {
   display: flex;
   flex-direction: column;
-}
-.bk-kv-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--ds-space-3);
-  padding:12px var(--ds-space-4);
-  border-bottom: 1px solid var(--ds-color-border-default);
-}
-.bk-kv-row:last-child {
-  border-bottom: 0;
 }
 .bk-kv-k {
   font-size: var(--text-xs);
