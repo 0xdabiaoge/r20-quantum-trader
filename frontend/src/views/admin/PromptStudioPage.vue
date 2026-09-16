@@ -610,6 +610,8 @@ onMounted(loadLib)
               <button
                 v-for="p in pipelines"
                 :key="p.id"
+                role="tab"
+                :aria-selected="activePipeline === p.id"
                 :class="{ 'seg-on': activePipeline === p.id }"
                 @click="switchPipeline(p.id)"
               >
@@ -744,10 +746,10 @@ onMounted(loadLib)
             <h2 class="card-title"><Eye :size="14" />{{ t('admin.promptStudio.preview.title') }}</h2>
             <div class="ps-prev-actions">
               <div class="seg">
-                <button :class="{ 'seg-on': previewMode === 'rendered' }" @click="previewMode = 'rendered'">
+                <button role="tab" :aria-selected="previewMode === 'rendered'" :class="{ 'seg-on': previewMode === 'rendered' }" @click="previewMode = 'rendered'">
                   {{ t('admin.promptStudio.preview.rendered') }}
                 </button>
-                <button :class="{ 'seg-on': previewMode === 'template' }" @click="previewMode = 'template'">
+                <button role="tab" :aria-selected="previewMode === 'template'" :class="{ 'seg-on': previewMode === 'template' }" @click="previewMode = 'template'">
                   {{ t('admin.promptStudio.preview.template') }}
                 </button>
               </div>

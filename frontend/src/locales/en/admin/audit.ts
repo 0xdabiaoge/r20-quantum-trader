@@ -36,4 +36,6 @@ export const enAdminAudit = {
     error: 'Error',
     confirmed_closed: 'Confirmed closed',
   },
+  // ── batch 44: accessible name for the status filter tablist ──
+  filtersLabel: 'Filter audit records by status',
 };

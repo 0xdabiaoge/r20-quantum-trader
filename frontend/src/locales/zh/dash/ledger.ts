@@ -27,6 +27,8 @@ export const zhLedger = {
     n: '{n} / {total} 笔',
   },
   col: {
+    // 批 44：状态筛选分段组名
+    status: '状态',
     symbol: '标的',
     dir: '方向',
     open: '开仓',

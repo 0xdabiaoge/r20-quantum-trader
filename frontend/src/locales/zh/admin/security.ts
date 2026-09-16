@@ -188,4 +188,6 @@ export const zhAdminSecurity = {
   toastRoutingSaved: '撮合路由已保存：{venue} · {mode}',
   toastVenueSaved: '{venue} 凭证与档位已保存',
   trackedRecord: '追踪记录',
+  // ── 批 44：页签栏的组名（role=tablist 的可访问名）──
+  tabsLabel: '安全配置视图切换',
 };

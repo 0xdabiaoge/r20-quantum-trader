@@ -76,6 +76,8 @@ export const zhCommon = {
       parenOpen: '（',
       parenClose: '）',
     },
+    // 批 44：语言选择组的可访问名（登录页 role=group）
+    language: '界面语言',
   },
   status: {
     normal: '正常',

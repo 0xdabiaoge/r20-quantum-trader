@@ -95,4 +95,6 @@ export const zhAdminEvolution = {
   phraseWrong: '确认短语错误，已取消执行',
   runOk: '自进化复盘已完成（已自动执行离群噪点过滤与宪法安全审查）！{detail}',
   runFailed: '执行复盘失败: {msg}',
+  // ── 批 44：页签栏的组名（role=tablist 的可访问名）──
+  tabsLabel: '自进化视图切换',
 };

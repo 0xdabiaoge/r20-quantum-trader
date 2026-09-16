@@ -109,6 +109,7 @@ watch(() => route.path, () => (drawerOpen.value = false));
             class="wb-item"
             :class="{ 'is-active': currentKey === item.key }"
             :title="collapsed ? t(item.labelKey) : undefined"
+            :aria-current="currentKey === item.key ? 'page' : undefined"
             @click="go(item.path)"
           >
             <component :is="item.icon" :size="15" class="wb-item-icon" />
@@ -188,6 +189,7 @@ watch(() => route.path, () => (drawerOpen.value = false));
               :key="item.key"
               class="wb-item"
               :class="{ 'is-active': currentKey === item.key }"
+              :aria-current="currentKey === item.key ? 'page' : undefined"
               @click="go(item.path)"
             >
               <component :is="item.icon" :size="15" class="wb-item-icon" />

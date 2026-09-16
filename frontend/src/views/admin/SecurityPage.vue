@@ -546,10 +546,12 @@ onMounted(() => { loadAll(); loadMx() })
       </section>
 
       <!-- ══ 页签 ══ -->
-      <div class="seg seg-lg sc-tabs">
+      <div class="seg seg-lg sc-tabs" role="tablist" :aria-label="t('admin.security.tabsLabel')">
         <button
           v-for="tab in TABS"
           :key="tab.key"
+          role="tab"
+          :aria-selected="activeTab === tab.key"
           :class="{ 'seg-on': activeTab === tab.key }"
           @click="switchTab(tab.key)"
         >

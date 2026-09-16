@@ -26,6 +26,8 @@ export const enLedger = {
     n: '{n} / {total} shown',
   },
   col: {
+    // batch 44: accessible name for the status filter tablist
+    status: 'Status',
     symbol: 'Symbol',
     dir: 'Side',
     open: 'Opened',

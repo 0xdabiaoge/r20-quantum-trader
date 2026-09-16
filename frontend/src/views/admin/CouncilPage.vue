@@ -877,17 +877,17 @@ onMounted(loadData);
             <div v-if="matrixRows.length" class="cn-matrix">
               <h4 class="cn-section-title">{{ t('admin.council.matrixTitle') }}</h4>
               <div class="cn-table-wrap">
-                <table class="table">
+                <table class="table" :aria-label="t('admin.council.seatsTitle')">
                   <thead>
                     <tr>
-                      <th>{{ t('admin.council.matrixColSymbol') }}</th>
-                      <th>{{ t('admin.council.matrixColAdopted') }}</th>
-                      <th>{{ t('admin.council.matrixColAction') }}</th>
-                      <th class="col-num">{{ t('admin.council.matrixColConf') }}</th>
-                      <th class="col-num">{{ t('admin.council.matrixColEntry') }}</th>
-                      <th class="col-num">{{ t('admin.council.matrixColStop') }}</th>
-                      <th class="col-num">{{ t('admin.council.matrixColTp') }}</th>
-                      <th>{{ t('admin.council.matrixColReason') }}</th>
+                      <th scope="col">{{ t('admin.council.matrixColSymbol') }}</th>
+                      <th scope="col">{{ t('admin.council.matrixColAdopted') }}</th>
+                      <th scope="col">{{ t('admin.council.matrixColAction') }}</th>
+                      <th scope="col" class="col-num">{{ t('admin.council.matrixColConf') }}</th>
+                      <th scope="col" class="col-num">{{ t('admin.council.matrixColEntry') }}</th>
+                      <th scope="col" class="col-num">{{ t('admin.council.matrixColStop') }}</th>
+                      <th scope="col" class="col-num">{{ t('admin.council.matrixColTp') }}</th>
+                      <th scope="col">{{ t('admin.council.matrixColReason') }}</th>
                     </tr>
                   </thead>
                   <tbody>

@@ -76,6 +76,8 @@ export const enCommon = {
       parenOpen: '(',
       parenClose: ')',
     },
+    // batch 44: accessible name for the language picker group
+    language: 'Interface language',
   },
   status: {
     normal: 'Normal',

@@ -76,6 +76,9 @@ const props = withDefaults(defineProps<{
   /** 追加到 <tr> 上的类（批 34：消费方需要自定义行样式时用它，
    *  不要在 #row 槽里再套一层 <tr> —— 那是无效嵌套，会让行高一分为二） */
   rowClass?: string
+  /** 表格的可访问名（批 44）。读屏器进入表格时应先播报"这是什么表"，
+   *  只靠周围的标题不可靠（标题在表格外，不构成关联）。 */
+  label?: string
 }>(), {
   columns: () => [],
   loading: false,
@@ -159,7 +162,7 @@ const colCount = computed(() => props.columns.length + (has('actions') ? 1 : 0))
     :class="flat ? '' : 'rounded-xl border'"
     :style="flat ? {} : { borderColor: 'var(--line-1)', backgroundColor: 'var(--surface-2)' }"
   >
-    <table class="w-full text-xs border-collapse">
+    <table class="w-full text-xs border-collapse" :aria-label="label">
       <thead>
         <slot name="head">
           <tr class="sticky top-0 z-10" style="background-color: var(--surface-2);">
@@ -168,7 +171,7 @@ const colCount = computed(() => props.columns.length + (has('actions') ? 1 : 0))
                  （`<th>` 不可聚焦、不响应 Enter），屏幕阅读器也不知道它能点。
                  现在：`<th>` 带 `aria-sort`（语义），里面是裸按钮（可聚焦 + Enter/Space）。
                  外观由 `.sort-btn` 保证与原来的纯文本一致。 -->
-            <th
+            <th scope="col"
               v-for="col in columns"
               :key="col.key"
               class="px-3 py-2 text-4xs font-bold uppercase tracking-wider border-b whitespace-nowrap"
@@ -190,7 +193,7 @@ const colCount = computed(() => props.columns.length + (has('actions') ? 1 : 0))
               </button>
               <span v-else class="inline-flex items-center gap-1">{{ col.label }}</span>
             </th>
-            <th v-if="has('actions')" class="px-3 py-2 text-4xs font-bold uppercase tracking-wider border-b text-right" style="color: var(--ink-3); border-color: var(--line-1);">
+            <th scope="col" v-if="has('actions')" class="px-3 py-2 text-4xs font-bold uppercase tracking-wider border-b text-right" style="color: var(--ink-3); border-color: var(--line-1);">
               ·
             </th>
           </tr>

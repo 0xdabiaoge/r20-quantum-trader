@@ -205,10 +205,10 @@ const processedRows = computed(() => {
     <template v-else>
       <!-- 桌面表格 -->
       <div class="hidden overflow-x-auto lg:block">
-        <table class="table w-full">
+        <table class="table w-full" :aria-label="t('dash.matrix.matrix.title')">
           <thead>
             <tr>
-              <th :aria-sort="ariaSortOf('name')">
+              <th scope="col" :aria-sort="ariaSortOf('name')">
                 <button type="button" class="sort-btn w-full" @click="toggleSort('name')">
                   <span class="inline-flex w-full items-center gap-1">
                     <span>{{ t('dash.matrix.matrix.col.symbol') }}</span>
@@ -218,7 +218,7 @@ const processedRows = computed(() => {
                   </span>
                 </button>
               </th>
-              <th class="col-num" :aria-sort="ariaSortOf('price')">
+              <th scope="col" class="col-num" :aria-sort="ariaSortOf('price')">
                 <button type="button" class="sort-btn w-full" @click="toggleSort('price')">
                   <span class="inline-flex w-full items-center justify-end gap-1">
                     <span>{{ t('dash.matrix.matrix.col.price') }}</span>
@@ -227,7 +227,7 @@ const processedRows = computed(() => {
                   </span>
                 </button>
               </th>
-              <th class="col-num" :aria-sort="ariaSortOf('chg24h')">
+              <th scope="col" class="col-num" :aria-sort="ariaSortOf('chg24h')">
                 <button type="button" class="sort-btn w-full" @click="toggleSort('chg24h')">
                   <span class="inline-flex w-full items-center justify-end gap-1">
                     <span>{{ t('dash.matrix.matrix.col.chg') }}</span>
@@ -236,7 +236,7 @@ const processedRows = computed(() => {
                   </span>
                 </button>
               </th>
-              <th class="col-num" :title="t('dash.matrix.matrix.col.vel') + ' · ' + t('dash.matrix.matrix.velTip')" :aria-sort="ariaSortOf('velocity')">
+              <th scope="col" class="col-num" :title="t('dash.matrix.matrix.col.vel') + ' · ' + t('dash.matrix.matrix.velTip')" :aria-sort="ariaSortOf('velocity')">
                 <button type="button" class="sort-btn w-full" @click="toggleSort('velocity')">
                   <span class="inline-flex w-full items-center justify-end gap-1">
                     <span>v (1H)</span>
@@ -245,7 +245,7 @@ const processedRows = computed(() => {
                   </span>
                 </button>
               </th>
-              <th class="col-num" :title="t('dash.matrix.matrix.col.acc') + ' · ' + t('dash.matrix.matrix.accTip')" :aria-sort="ariaSortOf('accel')">
+              <th scope="col" class="col-num" :title="t('dash.matrix.matrix.col.acc') + ' · ' + t('dash.matrix.matrix.accTip')" :aria-sort="ariaSortOf('accel')">
                 <button type="button" class="sort-btn w-full" @click="toggleSort('accel')">
                   <span class="inline-flex w-full items-center justify-end gap-1">
                     <span>a (1H)</span>
@@ -254,7 +254,7 @@ const processedRows = computed(() => {
                   </span>
                 </button>
               </th>
-              <th class="col-num" :title="t('dash.matrix.matrix.adxTip')" :aria-sort="ariaSortOf('adx')">
+              <th scope="col" class="col-num" :title="t('dash.matrix.matrix.adxTip')" :aria-sort="ariaSortOf('adx')">
                 <button type="button" class="sort-btn w-full" @click="toggleSort('adx')">
                   <span class="inline-flex w-full items-center justify-end gap-1">
                     <span>ADX</span>
@@ -263,7 +263,7 @@ const processedRows = computed(() => {
                   </span>
                 </button>
               </th>
-              <th class="col-num" :title="t('dash.matrix.matrix.lsTip')" :aria-sort="ariaSortOf('ls')">
+              <th scope="col" class="col-num" :title="t('dash.matrix.matrix.lsTip')" :aria-sort="ariaSortOf('ls')">
                 <button type="button" class="sort-btn w-full" @click="toggleSort('ls')">
                   <span class="inline-flex w-full items-center justify-end gap-1">
                     <span>{{ t('dash.matrix.matrix.col.ls') }}</span>
@@ -272,7 +272,7 @@ const processedRows = computed(() => {
                   </span>
                 </button>
               </th>
-              <th :aria-sort="ariaSortOf('conf')">
+              <th scope="col" :aria-sort="ariaSortOf('conf')">
                 <button type="button" class="sort-btn w-full" @click="toggleSort('conf')">
                   <span class="inline-flex w-full items-center gap-1">
                     <span>{{ t('dash.matrix.matrix.col.decision') }}</span>
@@ -281,7 +281,7 @@ const processedRows = computed(() => {
                   </span>
                 </button>
               </th>
-              <th class="text-right">{{ t('dash.matrix.colActions') }}</th>
+              <th scope="col" class="text-right">{{ t('dash.matrix.colActions') }}</th>
             </tr>
           </thead>
           <tbody>

@@ -292,6 +292,7 @@ const truncation = computed<{ kept: number; total: number } | null>(() => {
           <div class="flex flex-wrap items-center gap-2">
             <BaseSegmented
               v-model="fStatus"
+              :label="t('dash.ledger.col.status')"
               :options="[
                 { value: 'all', label: t('common.all') },
                 { value: 'closed', label: t('dash.ledger.status.closed') },
@@ -300,6 +301,7 @@ const truncation = computed<{ kept: number; total: number } | null>(() => {
             />
             <BaseSegmented
               v-model="fSide"
+              :label="t('dash.ledger.filters.dir')"
               :options="[
                 { value: 'all', label: t('common.all') },
                 { value: 'long', label: t('common.dir.long') },
@@ -308,6 +310,7 @@ const truncation = computed<{ kept: number; total: number } | null>(() => {
             />
             <BaseSegmented
               v-model="fResult"
+              :label="t('dash.ledger.filters.result')"
               :options="[
                 { value: 'all', label: t('common.all') },
                 { value: 'win', label: t('dash.ledger.filters.results.win') },
@@ -319,6 +322,7 @@ const truncation = computed<{ kept: number; total: number } | null>(() => {
           <div class="flex flex-wrap items-center gap-2 ms-auto">
             <select
               v-model="fVenue"
+              :aria-label="t('dash.ledger.venueAll')" 
               class="h-7 rounded border px-2 text-3xs outline-none transition-colors"
               style="background-color: var(--surface-2); border-color: var(--line-1); color: var(--ink-1)"
               @change="page = 1"
@@ -328,6 +332,7 @@ const truncation = computed<{ kept: number; total: number } | null>(() => {
 
             <select
               v-model="fMode"
+              :aria-label="t('dash.ledger.modeAll')" 
               class="h-7 rounded border px-2 text-3xs outline-none transition-colors"
               style="background-color: var(--surface-2); border-color: var(--line-1); color: var(--ink-1)"
               @change="page = 1"
@@ -337,6 +342,7 @@ const truncation = computed<{ kept: number; total: number } | null>(() => {
 
             <select
               v-model="fInst"
+              :aria-label="t('dash.ledger.filters.symbol')" 
               class="h-7 rounded border px-2 text-3xs outline-none transition-colors"
               style="background-color: var(--surface-2); border-color: var(--line-1); color: var(--ink-1)"
               @change="page = 1"
@@ -352,17 +358,17 @@ const truncation = computed<{ kept: number; total: number } | null>(() => {
         <!-- 数据表 -->
         <template v-else>
           <div class="overflow-x-auto">
-            <table class="table w-full">
+            <table class="table w-full" :aria-label="t('dash.ledger.title')">
               <thead>
                 <tr>
-                  <th>{{ t('dash.ledger.col.symbol') }}</th>
-                  <th class="col-num">{{ t('dash.ledger.col.entry') }}</th>
-                  <th class="col-num">{{ t('dash.ledger.col.exit') }}</th>
-                  <th class="col-num">{{ t('dash.ledger.col.pnl') }}</th>
-                  <th class="col-num">{{ t('dash.ledger.col.fees') }}</th>
-                  <th>{{ t('dash.ledger.col.hold') }}</th>
-                  <th>{{ t('dash.ledger.col.exitReason') }}</th>
-                  <th class="text-right">{{ t('dash.ledger.col.time') }}</th>
+                  <th scope="col">{{ t('dash.ledger.col.symbol') }}</th>
+                  <th scope="col" class="col-num">{{ t('dash.ledger.col.entry') }}</th>
+                  <th scope="col" class="col-num">{{ t('dash.ledger.col.exit') }}</th>
+                  <th scope="col" class="col-num">{{ t('dash.ledger.col.pnl') }}</th>
+                  <th scope="col" class="col-num">{{ t('dash.ledger.col.fees') }}</th>
+                  <th scope="col">{{ t('dash.ledger.col.hold') }}</th>
+                  <th scope="col">{{ t('dash.ledger.col.exitReason') }}</th>
+                  <th scope="col" class="text-right">{{ t('dash.ledger.col.time') }}</th>
                 </tr>
               </thead>
               <tbody>

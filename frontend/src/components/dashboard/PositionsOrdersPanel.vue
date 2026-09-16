@@ -86,8 +86,10 @@ function symOf(x: { instId?: string; name?: string }): string {
       </div>
 
       <!-- 交易所过滤小胶囊 -->
-      <div class="seg w-full sm:w-auto">
+      <div class="seg w-full sm:w-auto" role="tablist" :aria-label="t('dash.matrix.pop.venueLabel')">
         <button
+          role="tab"
+          :aria-selected="selectedVenue === v.key"
           v-for="v in [
             { key: 'all', label: t('common.all') },
             { key: 'okx', label: 'OKX' },
@@ -106,16 +108,16 @@ function symOf(x: { instId?: string; name?: string }): string {
     <!-- 持仓列表 -->
     <div v-if="tab === 'positions'" class="scroll-y flex-1 min-h-0 overflow-x-auto">
       <BaseEmpty v-if="!filteredPositions.length" :text="t('dash.matrix.positions.empty')" />
-      <table v-else class="table pop-table w-full">
+      <table v-else class="table pop-table w-full" :aria-label="t('dash.matrix.positions.title')">
         <thead>
           <tr>
-            <th>{{ t('dash.matrix.positions.col.symbol') }}</th>
-            <th class="col-num pop-col-entry">{{ t('dash.matrix.positions.col.entry') }}</th>
-            <th class="col-num">{{ t('dash.matrix.positions.col.mark') }}</th>
-            <th class="col-num pop-col-lev">{{ t('dash.matrix.positions.col.lev') }}</th>
-            <th class="col-num">{{ t('dash.matrix.positions.col.pnl') }}</th>
-            <th class="col-num">{{ t('dash.matrix.positions.col.sl') }} / {{ t('dash.matrix.positions.col.tp') }}</th>
-            <th class="text-center">{{ t('dash.matrix.positions.col.oco') }}</th>
+            <th scope="col">{{ t('dash.matrix.positions.col.symbol') }}</th>
+            <th scope="col" class="col-num pop-col-entry">{{ t('dash.matrix.positions.col.entry') }}</th>
+            <th scope="col" class="col-num">{{ t('dash.matrix.positions.col.mark') }}</th>
+            <th scope="col" class="col-num pop-col-lev">{{ t('dash.matrix.positions.col.lev') }}</th>
+            <th scope="col" class="col-num">{{ t('dash.matrix.positions.col.pnl') }}</th>
+            <th scope="col" class="col-num">{{ t('dash.matrix.positions.col.sl') }} / {{ t('dash.matrix.positions.col.tp') }}</th>
+            <th scope="col" class="text-center">{{ t('dash.matrix.positions.col.oco') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -193,15 +195,15 @@ function symOf(x: { instId?: string; name?: string }): string {
     <!-- 挂单列表 -->
     <div v-else class="scroll-y flex-1 min-h-0 overflow-x-auto">
       <BaseEmpty v-if="!filteredOrders.length" :text="t('dash.matrix.orders.empty')" />
-      <table v-else class="table pop-table w-full">
+      <table v-else class="table pop-table w-full" :aria-label="t('dash.matrix.orders.title')">
         <thead>
           <tr>
-            <th>{{ t('dash.matrix.orders.col.symbol') }}</th>
-            <th class="col-num">{{ t('dash.matrix.orders.col.price') }}</th>
-            <th class="col-num">{{ t('dash.matrix.orders.col.qty') }}</th>
-            <th class="col-num">{{ t('dash.matrix.orders.col.sl') }} / {{ t('dash.matrix.orders.col.tp') }}</th>
-            <th class="pop-col-time">{{ t('dash.matrix.orders.col.placed') }}</th>
-            <th class="text-center">{{ t('dash.matrix.orders.col.state') }}</th>
+            <th scope="col">{{ t('dash.matrix.orders.col.symbol') }}</th>
+            <th scope="col" class="col-num">{{ t('dash.matrix.orders.col.price') }}</th>
+            <th scope="col" class="col-num">{{ t('dash.matrix.orders.col.qty') }}</th>
+            <th scope="col" class="col-num">{{ t('dash.matrix.orders.col.sl') }} / {{ t('dash.matrix.orders.col.tp') }}</th>
+            <th scope="col" class="pop-col-time">{{ t('dash.matrix.orders.col.placed') }}</th>
+            <th scope="col" class="text-center">{{ t('dash.matrix.orders.col.state') }}</th>
           </tr>
         </thead>
         <tbody>

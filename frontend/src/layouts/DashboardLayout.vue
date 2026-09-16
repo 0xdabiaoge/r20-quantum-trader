@@ -170,6 +170,7 @@ const venueHealth = computed(() => {
               : { color: 'var(--ink-2)' }
           "
           :title="navCompact ? t(tab.labelKey) : undefined"
+          :aria-current="activeTab === tab.key ? 'page' : undefined"
           @click="go(tab.path)"
         >
           <component :is="tab.icon" class="h-4 w-4 shrink-0" />
@@ -192,6 +193,7 @@ const venueHealth = computed(() => {
         <button
           class="w-full flex items-center gap-2.5 rounded px-2.5 py-2 text-xs font-medium text-[var(--ink-2)] hover:bg-[var(--surface-2)] hover:text-[var(--ink-1)] cursor-pointer transition-colors"
           :title="navCompact ? t('dash.shell.nav.docsTitle') : undefined"
+          :aria-current="route.path === '/docs' ? 'page' : undefined"
           @click="go('/docs')"
         >
           <BookOpen class="h-4 w-4 shrink-0" />

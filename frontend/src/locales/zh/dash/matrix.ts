@@ -209,4 +209,6 @@ export const zhMatrix = {
     this: '本次预留 {v}',
     state: '态 {v}',
   },
+  // ── 批 44：场所过滤分段组名 ──
+  pop: { venueLabel: '按交易场所筛选' },
 };

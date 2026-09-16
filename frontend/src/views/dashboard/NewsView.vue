@@ -229,10 +229,12 @@ function toggleCoinFilter(sym: string) {
       <div class="dsh-card overflow-hidden">
         <!-- 筛选栏 -->
         <div class="dsh-card-header flex flex-wrap items-center justify-between gap-2">
-          <div class="seg">
+          <div class="seg" role="tablist" :aria-label="t('dash.news.feed.source')">
             <button
               v-for="f in sourceFilters"
               :key="f.key"
+              role="tab"
+              :aria-selected="selectedSource === f.key"
               :class="{ 'seg-on': selectedSource === f.key }"
               @click="selectedSource = f.key"
             >

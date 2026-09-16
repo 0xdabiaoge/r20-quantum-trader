@@ -160,13 +160,13 @@ function tone(level: string): string {
         </div>
 
         <div class="seg">
-          <button :class="{ 'seg-on': activeLogTab === 'trader' }" @click="fetchLogStream('trader')">
+          <button role="tab" :aria-selected="activeLogTab === 'trader'" :class="{ 'seg-on': activeLogTab === 'trader' }" @click="fetchLogStream('trader')">
             {{ t('admin.decisions.tabTrader') }}
           </button>
-          <button :class="{ 'seg-on': activeLogTab === 'backend' }" @click="fetchLogStream('backend')">
+          <button role="tab" :aria-selected="activeLogTab === 'backend'" :class="{ 'seg-on': activeLogTab === 'backend' }" @click="fetchLogStream('backend')">
             {{ t('admin.decisions.tabBackend') }}
           </button>
-          <button :class="{ 'seg-on': activeLogTab === 'scheduler' }" @click="fetchLogStream('scheduler')">
+          <button role="tab" :aria-selected="activeLogTab === 'scheduler'" :class="{ 'seg-on': activeLogTab === 'scheduler' }" @click="fetchLogStream('scheduler')">
             {{ t('admin.decisions.tabScheduler') }}
           </button>
         </div>
@@ -182,15 +182,15 @@ function tone(level: string): string {
         />
 
         <div class="seg">
-          <button :class="{ 'seg-on': levelFilter === 'all' }" @click="levelFilter = 'all'">
+          <button role="tab" :aria-selected="levelFilter === 'all'" :class="{ 'seg-on': levelFilter === 'all' }" @click="levelFilter = 'all'">
             {{ t('admin.decisions.filterAll') }}
             <span class="dc-seg-n num">{{ entries.length }}</span>
           </button>
-          <button :class="{ 'seg-on': levelFilter === 'warn' }" @click="levelFilter = 'warn'">
+          <button role="tab" :aria-selected="levelFilter === 'warn'" :class="{ 'seg-on': levelFilter === 'warn' }" @click="levelFilter = 'warn'">
             {{ t('admin.decisions.filterWarn') }}
             <span class="dc-seg-n num">{{ warnPlusCount }}</span>
           </button>
-          <button :class="{ 'seg-on': levelFilter === 'error' }" @click="levelFilter = 'error'">
+          <button role="tab" :aria-selected="levelFilter === 'error'" :class="{ 'seg-on': levelFilter === 'error' }" @click="levelFilter = 'error'">
             {{ t('admin.decisions.filterError') }}
             <span class="dc-seg-n num">{{ errorCount }}</span>
           </button>

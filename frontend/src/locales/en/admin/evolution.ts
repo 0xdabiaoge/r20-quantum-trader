@@ -94,4 +94,6 @@ export const enAdminEvolution = {
   phraseWrong: 'Confirmation phrase incorrect; execution cancelled',
   runOk: 'Self-evolution review finished (outlier filtering and constitutional safety review ran automatically)! {detail}',
   runFailed: 'Failed to run the review: {msg}',
+  // ── batch 44: accessible name for the tablist ──
+  tabsLabel: 'Self-evolution view switcher',
 };

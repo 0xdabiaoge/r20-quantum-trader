@@ -338,10 +338,12 @@ onMounted(loadData);
 
     <template v-else>
       <!-- 标签栏 -->
-      <div class="seg evo-tabs">
+      <div class="seg evo-tabs" role="tablist" :aria-label="t('admin.evolution.tabsLabel')">
         <button
           v-for="tb in tabs"
           :key="tb.id"
+          role="tab"
+          :aria-selected="activeTab === tb.id"
           :class="{ 'seg-on': activeTab === tb.id }"
           @click="switchTab(tb.id)"
         >

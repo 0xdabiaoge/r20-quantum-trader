@@ -196,4 +196,6 @@ export const enMatrix = {
     this: 'This reservation {v}',
     state: 'State {v}',
   },
+  // ── batch 44: accessible name for the venue filter tablist ──
+  pop: { venueLabel: 'Filter by venue' },
 };

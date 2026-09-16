@@ -68,11 +68,11 @@ function monogram(name: string): string {
 
       <div class="pd-tabs">
         <div class="seg seg-lg">
-          <button :class="{ 'seg-on': detailTab === 'config' }" @click="detailTab = 'config'">
+          <button role="tab" :aria-selected="detailTab === 'config'" :class="{ 'seg-on': detailTab === 'config' }" @click="detailTab = 'config'">
             <Settings :size="13" />
             <span>{{ t('admin.llm.tabConfig') }}</span>
           </button>
-          <button :class="{ 'seg-on': detailTab === 'models' }" @click="detailTab = 'models'">
+          <button role="tab" :aria-selected="detailTab === 'models'" :class="{ 'seg-on': detailTab === 'models' }" @click="detailTab = 'models'">
             <Layers :size="13" />
             <span>{{ t('admin.llm.tabModels') }} ({{ selectedProvider.models?.length || 0 }})</span>
           </button>

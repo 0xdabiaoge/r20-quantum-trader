@@ -53,10 +53,11 @@ async function handleLogin() {
         <span>{{ t('admin.login.backToScreen') }}</span>
       </button>
 
-      <div class="auth-lang-pill">
+      <div class="auth-lang-pill" role="group" :aria-label="t('common.language')">
         <button
           class="auth-lang-opt"
           :class="{ 'is-active': currentLocale === 'zh-CN' }"
+          :aria-pressed="currentLocale === 'zh-CN'"
           @click="setLocale('zh-CN')"
         >
           中文
@@ -65,6 +66,7 @@ async function handleLogin() {
         <button
           class="auth-lang-opt"
           :class="{ 'is-active': currentLocale === 'en-US' }"
+          :aria-pressed="currentLocale === 'en-US'"
           @click="setLocale('en-US')"
         >
           EN

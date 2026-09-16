@@ -152,9 +152,11 @@ function actionBadgeClass(action: string) {
           class="flex items-center justify-between border-b px-4 py-2"
           style="background-color: var(--surface-2); border-color: var(--line-1)"
         >
-          <!-- Tabs -->
-          <div class="flex items-center gap-1">
+          <!-- Tabs（批 44：页签给语义，读屏器才知道"当前在第几个视图"） -->
+          <div class="flex items-center gap-1" role="tablist" :aria-label="t('dash.shell.panel.decisionFlow')">
             <button
+              role="tab"
+              :aria-selected="activeTab === 'decisions'"
               class="flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-medium cursor-pointer transition-colors"
               :style="
                 activeTab === 'decisions'
@@ -171,6 +173,8 @@ function actionBadgeClass(action: string) {
             </button>
 
             <button
+              role="tab"
+              :aria-selected="activeTab === 'logs'"
               class="flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-medium cursor-pointer transition-colors"
               :style="
                 activeTab === 'logs'

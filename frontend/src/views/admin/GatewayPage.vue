@@ -261,17 +261,18 @@ function statusLabel(s: string): string {
           :rows="deliveries"
           :row-key="(d: any) => d.id"
           :empty-text="t('admin.gateway.deliveries.empty')"
+          :label="t('admin.gateway.deliveries.title')"
           row-class="gw-tr"
         >
           <template #head>
             <tr class="gw-th">
-              <th>{{ t('admin.gateway.deliveries.colId') }}</th>
-              <th>{{ t('admin.gateway.deliveries.colEventType') }}</th>
-              <th>{{ t('admin.gateway.deliveries.colChannel') }}</th>
-              <th>{{ t('admin.gateway.deliveries.colStatus') }}</th>
-              <th class="gw-r">{{ t('admin.gateway.deliveries.colAttempts') }}</th>
-              <th>{{ t('admin.gateway.deliveries.colTime') }}</th>
-              <th>{{ t('admin.gateway.deliveries.colActions') }}</th>
+              <th scope="col">{{ t('admin.gateway.deliveries.colId') }}</th>
+              <th scope="col">{{ t('admin.gateway.deliveries.colEventType') }}</th>
+              <th scope="col">{{ t('admin.gateway.deliveries.colChannel') }}</th>
+              <th scope="col">{{ t('admin.gateway.deliveries.colStatus') }}</th>
+              <th scope="col" class="gw-r">{{ t('admin.gateway.deliveries.colAttempts') }}</th>
+              <th scope="col">{{ t('admin.gateway.deliveries.colTime') }}</th>
+              <th scope="col">{{ t('admin.gateway.deliveries.colActions') }}</th>
             </tr>
           </template>
 

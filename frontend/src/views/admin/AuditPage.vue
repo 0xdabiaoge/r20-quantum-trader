@@ -187,10 +187,12 @@ onMounted(load)
               <Search :size="13" />
               <input v-model="search" :placeholder="t('admin.audit.searchPlaceholder')" class="au-search-input" />
             </div>
-            <div class="seg">
+            <div class="seg" role="tablist" :aria-label="t('admin.audit.filtersLabel')">
               <button
                 v-for="f in FILTERS"
                 :key="f.key"
+                role="tab"
+                :aria-selected="statusFilter === f.key"
                 :class="{ 'seg-on': statusFilter === f.key }"
                 @click="statusFilter = f.key"
               >{{ f.label }}</button>

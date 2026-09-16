@@ -272,6 +272,24 @@ class I18nParityTests(unittest.TestCase):
             "裸键名**（用户在界面上看到 a.b.c），必须补齐：\n  " + "\n  ".join(missing[:20]),
         )
 
+    def test_every_used_key_is_a_leaf_value(self):
+        """`t()` 取到**分支**键同样会渲染出裸键名（批 44 实测）。
+
+        `_tree()` 返回的路径里既有叶子也有分支，所以"键位存在"并不能保证 `t()` 拿到字符串：
+        `t('dash.news.source')` 在树上**存在**（那是个对象），运行时却渲染成
+        `aria-label="dash.news.source"` —— 静态闸放行、界面上露键名。
+        这条把判据收紧到"用到必须是叶子"。
+        """
+        zh = _tree("zh")
+        branches = {k.rsplit(".", 1)[0] for k in zh if "." in k}
+        leaves = zh - branches
+        object_keys = sorted(k for k in _used_keys() if k in zh and k not in leaves)
+        self.assertEqual(
+            object_keys, [],
+            "代码里 t() 取到的是**对象（分支）键**，运行时会渲染出裸键名，请改取叶子：\n  "
+            + "\n  ".join(object_keys[:20]),
+        )
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

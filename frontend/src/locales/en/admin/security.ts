@@ -186,4 +186,6 @@ export const enAdminSecurity = {
   toastRoutingSaved: 'Matching route saved: {venue} · {mode}',
   toastVenueSaved: '{venue} credentials and tier saved',
   trackedRecord: 'tracked record',
+  // ── batch 44: accessible name for the tablist ──
+  tabsLabel: 'Security configuration view switcher',
 };

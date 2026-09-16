@@ -350,12 +350,12 @@ onUnmounted(() => {
 
           <!-- Variable Table -->
           <div class="dsh-card overflow-x-auto">
-            <table class="table w-full text-xs">
+            <table class="table w-full text-xs" aria-label="语义变量插槽字段说明">
               <thead>
                 <tr>
-                  <th>变量占位符</th>
-                  <th>数据分类</th>
-                  <th>注入内容与实战用途</th>
+                  <th scope="col">变量占位符</th>
+                  <th scope="col">数据分类</th>
+                  <th scope="col">注入内容与实战用途</th>
                 </tr>
               </thead>
               <tbody>
@@ -485,7 +485,11 @@ onUnmounted(() => {
       class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm cursor-zoom-out"
       @click="zoomImage = null"
     >
-      <img :src="zoomImage" class="max-w-full max-h-[90vh] rounded-lg shadow-2xl" />
+      <img
+        :src="zoomImage"
+        alt="放大的文档插图"
+        class="max-w-full max-h-[90vh] rounded-lg shadow-2xl"
+      />
     </div>
   </div>
 </template>

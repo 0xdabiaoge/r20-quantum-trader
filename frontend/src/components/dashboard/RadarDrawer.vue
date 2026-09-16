@@ -271,14 +271,14 @@ function dirOf(a: string): 'long' | 'short' | 'flat' {
     <!-- 4. 三所价差与费率 -->
     <div v-else-if="tab === 'xvenue'" class="space-y-3">
       <div class="overflow-x-auto">
-        <table class="table w-full">
+        <table class="table w-full" :aria-label="t('dash.radar.posMgmt')">
           <thead>
             <tr>
-              <th>{{ t('dash.radar.thSymbol') }}</th>
-              <th class="col-num">{{ t('dash.radar.xvenue.okxPrice') }}</th>
-              <th class="col-num">{{ t('dash.radar.thBasis') }}</th>
-              <th class="col-num">{{ t('dash.radar.thBasisGate') }}</th>
-              <th class="col-num">{{ t('dash.radar.thLs') }}</th>
+              <th scope="col">{{ t('dash.radar.thSymbol') }}</th>
+              <th scope="col" class="col-num">{{ t('dash.radar.xvenue.okxPrice') }}</th>
+              <th scope="col" class="col-num">{{ t('dash.radar.thBasis') }}</th>
+              <th scope="col" class="col-num">{{ t('dash.radar.thBasisGate') }}</th>
+              <th scope="col" class="col-num">{{ t('dash.radar.thLs') }}</th>
             </tr>
           </thead>
           <tbody>

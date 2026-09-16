@@ -38,4 +38,6 @@ export const zhAdminAudit = {
     error: '异常',
     confirmed_closed: '已确认平仓',
   },
+  // ── 批 44：筛选分段组名（role=tablist 的可访问名）──
+  filtersLabel: '按状态筛选审计记录',
 };
