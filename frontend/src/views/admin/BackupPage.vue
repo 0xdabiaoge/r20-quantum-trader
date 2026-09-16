@@ -372,7 +372,7 @@ onMounted(load)
       <span class="state-icon"><AlertTriangle :size="17" /></span>
       <p class="state-title">{{ t('common.loadFailed') }}</p>
       <p class="state-desc">{{ loadError }}</p>
-      <button class="btn btn-ghost btn-sm" style="margin-top: 4px" :disabled="loading" @click="load">
+      <button class="btn btn-ghost btn-sm mt-1" :disabled="loading" @click="load">
         <RefreshCw :size="14" />
         <span>{{ t('common.retry') }}</span>
       </button>
@@ -384,7 +384,7 @@ onMounted(load)
         <template v-if="loading && !simple">
           <div v-for="i in 4" :key="i" class="fact">
             <div class="skeleton skeleton-text" style="width: 48%" />
-            <div class="skeleton skeleton-text" style="width: 62%; height: 16px" />
+            <div class="skeleton skeleton-text skeleton-value" style="width: 62%" />
             <div class="skeleton skeleton-text" style="width: 36%" />
           </div>
         </template>

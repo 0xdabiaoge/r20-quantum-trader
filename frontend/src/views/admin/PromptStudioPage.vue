@@ -497,7 +497,7 @@ onMounted(loadLib)
       <span class="state-icon"><AlertTriangle :size="17" /></span>
       <p class="state-title">{{ t('common.loadFailed') }}</p>
       <p class="state-desc">{{ loadError || t('common.networkError') }}</p>
-      <button class="btn btn-ghost btn-sm" style="margin-top: 4px" :disabled="loading" @click="loadLib">
+      <button class="btn btn-ghost btn-sm mt-1" :disabled="loading" @click="loadLib">
         <Loader2 v-if="loading" :size="14" class="animate-spin shrink-0" />
         <RotateCcw v-else :size="14" />
         <span>{{ t('common.retry') }}</span>
@@ -510,7 +510,7 @@ onMounted(loadLib)
         <template v-if="loading">
           <div v-for="i in 4" :key="i" class="fact">
             <div class="skeleton skeleton-text" style="width: 46%" />
-            <div class="skeleton skeleton-text" style="width: 70%; height: 16px" />
+            <div class="skeleton skeleton-text skeleton-value" style="width: 70%" />
             <div class="skeleton skeleton-text" style="width: 34%" />
           </div>
         </template>
@@ -579,11 +579,11 @@ onMounted(loadLib)
 
       <!-- ══ 三栏工作台 ══ -->
       <div v-if="loading" class="ps-skel-grid">
-        <div v-for="i in 3" :key="i" class="card" style="padding: 16px">
+        <div v-for="i in 3" :key="i" class="card p-4">
           <div class="skeleton skeleton-text" style="width: 40%" />
-          <div class="skeleton skeleton-row" style="margin-top: 12px" />
-          <div class="skeleton skeleton-row" style="margin-top: 8px" />
-          <div class="skeleton skeleton-row" style="margin-top: 8px" />
+          <div class="skeleton skeleton-row mt-3" />
+          <div class="skeleton skeleton-row mt-2" />
+          <div class="skeleton skeleton-row mt-2" />
         </div>
       </div>
 

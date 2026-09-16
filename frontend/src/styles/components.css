@@ -903,6 +903,23 @@ textarea.input {
   height: var(--row-h);
   border-radius: 0;
 }
+/* 批 82：骨架的「形状」此前由各页**内联** style 表达（`height: 16px` ×11、
+   `width: 6px; height: 6px; border-radius: 50%`、`width: 24px; height: 24px`），
+   共 13 处绕过 token 的裸 px。与既有 `.skeleton-row` 同一约定收口为形状类；
+   各页仍按需内联 `width: N%`（那是**有意的随机宽度**，不是 token）。 */
+.skeleton-value {
+  height: var(--ds-space-4);
+}
+.skeleton-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--r-pill);
+}
+.skeleton-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--r-xs);
+}
 
 /* =========================================================================
    11 · 辅助

@@ -289,7 +289,7 @@ onMounted(() => {
       <span class="state-icon"><AlertTriangle :size="17" /></span>
       <p class="state-title">{{ t('admin.policySnapshot.err.fetchFailed') }}</p>
       <p class="state-desc">{{ errorMsg }}</p>
-      <button class="btn btn-ghost btn-sm" style="margin-top: 4px" :disabled="refreshing" @click="fetchSnapshot">
+      <button class="btn btn-ghost btn-sm mt-1" :disabled="refreshing" @click="fetchSnapshot">
         <RefreshCw :size="14" :class="refreshing && 'animate-spin shrink-0'" />
         <span>{{ t('common.retry') }}</span>
       </button>
@@ -300,12 +300,12 @@ onMounted(() => {
       <section class="card band">
         <div v-for="i in 4" :key="i" class="fact">
           <div class="skeleton skeleton-text" style="width: 46%" />
-          <div class="skeleton skeleton-text" style="width: 72%; height: 16px" />
+          <div class="skeleton skeleton-text skeleton-value" style="width: 72%" />
           <div class="skeleton skeleton-text" style="width: 34%" />
         </div>
       </section>
-      <section class="card" style="padding: 16px">
-        <div v-for="i in 4" :key="i" class="skeleton skeleton-row" style="margin-top: 10px" />
+      <section class="card p-4">
+        <div v-for="i in 4" :key="i" class="skeleton skeleton-row mt-2.5" />
       </section>
     </template>
 

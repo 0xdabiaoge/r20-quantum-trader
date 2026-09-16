@@ -288,8 +288,7 @@ function tone(level: string): string {
           <p class="state-title">{{ t('common.loadFailed') }}</p>
           <p class="state-desc">{{ logError }}</p>
           <button
-            class="btn btn-ghost btn-sm"
-            style="margin-top: 4px"
+            class="btn btn-ghost btn-sm mt-1"
             :disabled="logLoading"
             @click="fetchLogStream(activeLogTab)"
           >

@@ -435,7 +435,7 @@ onMounted(loadData);
       <span class="state-icon"><AlertTriangle :size="17" /></span>
       <p class="state-title">{{ t('common.loadFailed') }}</p>
       <p class="state-desc">{{ loadError || t('common.networkError') }}</p>
-      <button class="btn btn-ghost btn-sm" style="margin-top: 4px" :disabled="loading" @click="loadData">
+      <button class="btn btn-ghost btn-sm mt-1" :disabled="loading" @click="loadData">
         <Loader2 v-if="loading" :size="14" class="animate-spin shrink-0" />
         <RotateCcw v-else :size="14" />
         <span>{{ t('common.retry') }}</span>
@@ -448,7 +448,7 @@ onMounted(loadData);
         <template v-if="loading">
           <div v-for="i in 4" :key="i" class="fact">
             <div class="skeleton skeleton-text" style="width: 48%" />
-            <div class="skeleton skeleton-text" style="width: 68%; height: 16px" />
+            <div class="skeleton skeleton-text skeleton-value" style="width: 68%" />
             <div class="skeleton skeleton-text" style="width: 36%" />
           </div>
         </template>
@@ -558,7 +558,7 @@ onMounted(loadData);
 
           <div v-if="loading" class="cn-seats">
             <div v-for="i in 4" :key="i" class="cn-seat">
-              <span class="skeleton" style="width: 24px; height: 24px; border-radius: var(--r-xs)" />
+              <span class="skeleton skeleton-avatar" />
               <span class="skeleton skeleton-text" style="flex: 1" />
             </div>
           </div>

@@ -129,7 +129,7 @@ function statusLabel(s: string): string {
            于是标题与说明连读成「加载失败 / 加载失败：stub failure」——同一句话说了两遍。
            toast 仍用带前缀的那条（toast 没有标题），这里只留原因。 -->
       <p class="state-desc">{{ error }}</p>
-      <button class="btn btn-ghost btn-sm" style="margin-top: 4px" :disabled="loading" @click="load">
+      <button class="btn btn-ghost btn-sm mt-1" :disabled="loading" @click="load">
         <RefreshCw :size="14" :class="loading && 'animate-spin shrink-0'" />
         <span>{{ t('common.retry') }}</span>
       </button>
@@ -151,7 +151,7 @@ function statusLabel(s: string): string {
         <template v-if="showSkeleton">
           <div v-for="i in 4" :key="i" class="fact">
             <div class="skeleton skeleton-text" style="width: 50%" />
-            <div class="skeleton skeleton-text" style="width: 70%; height: 16px" />
+            <div class="skeleton skeleton-text skeleton-value" style="width: 70%" />
             <div class="skeleton skeleton-text" style="width: 38%" />
           </div>
         </template>
@@ -209,7 +209,7 @@ function statusLabel(s: string): string {
 
         <div v-if="showSkeleton" class="gw-jobs">
           <div v-for="i in 5" :key="i" class="gw-job">
-            <span class="skeleton" style="width: 6px; height: 6px; border-radius: 50%" />
+            <span class="skeleton skeleton-dot" />
             <span class="skeleton skeleton-text" style="width: 40%" />
           </div>
         </div>

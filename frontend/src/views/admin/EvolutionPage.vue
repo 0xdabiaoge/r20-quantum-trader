@@ -337,7 +337,7 @@ onMounted(loadData);
       <span class="state-icon"><AlertTriangle :size="17" /></span>
       <p class="state-title">{{ t('common.loadFailed') }}</p>
       <p class="state-desc">{{ loadError }}</p>
-      <button class="btn btn-ghost btn-sm" style="margin-top: 4px" :disabled="loading" @click="loadData">
+      <button class="btn btn-ghost btn-sm mt-1" :disabled="loading" @click="loadData">
         <RefreshCw :size="14" :class="loading && 'animate-spin shrink-0'" />
         <span>{{ t('common.retry') }}</span>
       </button>
@@ -427,7 +427,7 @@ onMounted(loadData);
           <template v-if="loading">
             <div v-for="i in 4" :key="i" class="fact">
               <div class="skeleton skeleton-text" style="width: 48%" />
-              <div class="skeleton skeleton-text" style="width: 66%; height: 16px" />
+              <div class="skeleton skeleton-text skeleton-value" style="width: 66%" />
               <div class="skeleton skeleton-text" style="width: 34%" />
             </div>
           </template>

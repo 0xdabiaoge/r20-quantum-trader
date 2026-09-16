@@ -542,7 +542,7 @@ onMounted(() => { loadAll(); loadMx() })
       <span class="state-icon"><AlertTriangle :size="17" /></span>
       <p class="state-title">{{ t('common.loadFailed') }}</p>
       <p class="state-desc">{{ loadError }}</p>
-      <button class="btn btn-ghost btn-sm" style="margin-top: 4px" :disabled="loading" @click="loadAll">
+      <button class="btn btn-ghost btn-sm mt-1" :disabled="loading" @click="loadAll">
         <RefreshCw :size="14" />
         <span>{{ t('common.retry') }}</span>
       </button>
