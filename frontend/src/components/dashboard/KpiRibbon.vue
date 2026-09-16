@@ -108,7 +108,10 @@ onMounted(async () => {
           <Layers class="h-3.5 w-3.5 text-[var(--accent)]" />
           {{ t('dash.matrix.kpi.multiEquity') }}
         </span>
-        <span class="font-mono font-semibold" style="color: var(--ink-1)">$ {{ totalAggregatedEquity }} U</span>
+        <!-- 批 83：原为 `$ {{ … }} U` —— `$` 与后缀 `U` 同时表示币种，冗余。
+             全站约定是后缀 ` U`（FactorDrawer / LedgerDrawer 同款），同组件 KPI 单元
+             也用 `(U)` 标签，故去掉 `$`。 -->
+        <span class="font-mono font-semibold" style="color: var(--ink-1)">{{ totalAggregatedEquity }} U</span>
         <span
           class="rounded px-1.5 py-0.5 border text-3xs font-mono"
           style="background-color: var(--surface-2); border-color: var(--line-1); color: var(--ink-2)"
@@ -161,7 +164,7 @@ onMounted(async () => {
           :label="t('dash.matrix.kpi.todayPnl')"
           :value="fmtSigned(todayNet)"
           :delta="todayTrades ? `${todayTrades} ${t('common.unitCount')} · ${todayWinRate}%` : undefined"
-          :delta-tone="todayNet >= 0 ? 'up' : 'down'"
+          :delta-tone="todayWinRate === null ? 'muted' : todayWinRate >= 50 ? 'up' : 'down'"
           :hint="t('dash.matrix.kpi.todayTip')"
         />
       </div>

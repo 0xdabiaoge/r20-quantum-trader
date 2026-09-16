@@ -151,7 +151,6 @@ const md = computed(() => (store.data as any)?.ai_trading_memory_md || '');
             <BaseStat
               :label="t('dash.evolution.hud.winRate')"
               :value="review.win_rate != null ? fmtNum(review.win_rate, 1) + '%' : '--'"
-              :delta-tone="(review.win_rate ?? 0) >= 50 ? 'up' : 'down'"
             />
           </div>
           <div class="bg-[var(--surface-1)] p-3">

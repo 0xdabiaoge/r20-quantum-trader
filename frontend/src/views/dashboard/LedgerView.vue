@@ -226,10 +226,10 @@ const truncation = computed<{ kept: number; total: number } | null>(() => {
             />
           </div>
           <div class="bg-[var(--surface-1)] p-3">
-            <BaseStat :label="t('dash.ledger.summary.net')" :value="fmtSigned(netSum)" :delta-tone="netSum >= 0 ? 'up' : 'down'" />
+            <BaseStat :label="t('dash.ledger.summary.net')" :value="fmtSigned(netSum)" />
           </div>
           <div class="bg-[var(--surface-1)] p-3">
-            <BaseStat :label="t('dash.ledger.summary.fees')" :value="feeSum ? `-${fmtNum(feeSum, 2)}` : fmtNum(0, 2)" delta-tone="muted" />
+            <BaseStat :label="t('dash.ledger.summary.fees')" :value="feeSum ? `-${fmtNum(feeSum, 2)}` : fmtNum(0, 2)" />
           </div>
           <div class="bg-[var(--surface-1)] p-3">
             <BaseStat
