@@ -832,7 +832,7 @@ onMounted(loadLib)
               {{ t('admin.promptStudio.dictionary.insert') }}
             </button>
           </header>
-          <p class="ps-dict-desc">{{ v.description }}</p>
+          <p class="panel-desc">{{ v.description }}</p>
           <pre v-if="v.sample" class="code-block ps-dict-sample" tabindex="0">{{ v.sample }}</pre>
         </article>
 
@@ -1314,12 +1314,6 @@ onMounted(loadLib)
 }
 .ps-dict-insert {
   margin-left: auto;
-}
-.ps-dict-desc {
-  margin-top: 6px;
-  font-size: var(--text-3xs);
-  line-height: var(--leading-body);
-  color: var(--ds-color-text-description);
 }
 .ps-dict-sample {
   margin-top: var(--ds-space-2);

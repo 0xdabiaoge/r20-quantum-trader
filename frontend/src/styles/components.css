@@ -67,6 +67,19 @@
   max-width: 76ch;
   line-height: var(--leading-dense);
 }
+
+/* 批 88：**卡体内**「标题下的说明行」（`<p>` 紧跟标题 / `</header>` 之后）。
+   实测 NotifyPage / PluginsPage / PromptStudioPage 各写一份，前两份**逐字节相同**，
+   第三份只差 `margin-top`（6px vs 4px）。取值取多数决，第三份的 6px 归一到 4px。
+   与 `.card-sub` 的区别是**位置与可读性**：`.card-sub` 属于 `.card-head` 副标题
+   （`text-placeholder` + 2px + 1.45 行高），本原件属于正文区的说明段
+   （`text-description` + 4px + 1.6 行高）。 */
+.panel-desc {
+  margin-top: 4px;
+  font-size: var(--text-3xs);
+  line-height: var(--leading-body);
+  color: var(--ds-color-text-description);
+}
 .card-body,
 .section-body {
   padding: var(--ds-space-3) var(--ds-space-4);
@@ -494,32 +507,13 @@ textarea.input {
 
 /* =========================================================================
    7 · 页面骨架
+   -------------------------------------------------------------------------
+   批 88：删除 `.page-head` 家族（`.page-head` / `h1` / `.page-desc` / `.page-actions`，
+   24 行）—— 全站（.vue/.ts/任意扩展名）**零引用**。页头现在统一由
+   `components/admin/PageHeader.vue` 提供（70 处引用），它的说明行是 `.ph-desc`，
+   与已删的 `.page-head .page-desc` 是同角色同字号（`--text-xs` + `text-description`
+   + `max-width: 80ch`），仅 margin-top 6px vs 4px —— 死掉的那份是旧设计的遗留。
    ========================================================================= */
-.page-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--ds-space-4);
-  flex-wrap: wrap;
-  padding-bottom: var(--ds-space-3);
-}
-.page-head h1 {
-  font-size: var(--text-xl);
-  font-weight: 600;
-  letter-spacing: var(--track-display);
-}
-.page-head .page-desc {
-  margin-top: 4px;
-  font-size: var(--text-xs);
-  color: var(--ds-color-text-description);
-  max-width: 80ch;
-}
-.page-head .page-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--ds-space-2);
-  flex-wrap: wrap;
-}
 
 /* 工具栏：筛选 / 搜索 / 视图切换 */
 .toolbar {

@@ -543,7 +543,7 @@ onBeforeUnmount(() => {
                   <span class="nf-cat-name">{{ cat.label }}</span>
                   <code class="nf-cat-key">{{ cat.key }}</code>
                 </div>
-                <p class="nf-cat-desc">{{ cat.desc }}</p>
+                <p class="panel-desc">{{ cat.desc }}</p>
               </div>
             </article>
           </div>
@@ -838,12 +838,6 @@ onBeforeUnmount(() => {
   font-family: var(--ds-font-mono);
   font-size: var(--text-4xs);
   color: var(--ds-color-text-placeholder);
-}
-.nf-cat-desc {
-  margin-top:4px;
-  font-size: var(--text-3xs);
-  line-height: var(--leading-body);
-  color: var(--ds-color-text-description);
 }
 
 /* ══ 简报 ══ */

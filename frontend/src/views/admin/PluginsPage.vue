@@ -179,7 +179,7 @@ function typeLabel(v: string): string {
               ? t('admin.plugins.policyBuiltinOnly')
               : (data?.installation_policy || '--') }}
           </h3>
-          <p class="pl-policy-desc">{{ data?.reason }}</p>
+          <p class="panel-desc">{{ data?.reason }}</p>
         </div>
       </aside>
     </template>
@@ -316,12 +316,6 @@ function typeLabel(v: string): string {
   font-size: var(--text-xs);
   font-weight: 600;
   color: var(--ds-color-text-primary);
-}
-.pl-policy-desc {
-  margin-top:4px;
-  font-size: var(--text-3xs);
-  line-height: var(--leading-body);
-  color: var(--ds-color-text-description);
 }
 
 @media (max-width: 720px) {

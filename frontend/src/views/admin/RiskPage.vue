@@ -396,7 +396,7 @@ onMounted(loadData)
                 </span>
                 <span v-if="levInverted" class="badge badge-down">{{ t('admin.risk.levInverted') }}</span>
               </div>
-              <p class="rk-row-desc">{{ t('admin.risk.levRangeDesc') }}</p>
+              <p class="panel-desc">{{ t('admin.risk.levRangeDesc') }}</p>
               <p class="rk-row-meta mono">
                 {{ t('admin.risk.defaultWord') }} {{ toDisplay(levMinP, levMinP.default) }} ~ {{ toDisplay(levMaxP, levMaxP.default) }} x
                 · {{ t('admin.risk.configurableWord') }} {{ toDisplay(levMinP, levMinP.min) }} ~ {{ toDisplay(levMaxP, levMaxP.max) }} x
@@ -444,7 +444,7 @@ onMounted(loadData)
                 <span>{{ p.label }}</span>
                 <span v-if="isCustomized(p)" class="badge badge-warn">{{ t('admin.risk.customized') }}</span>
               </div>
-              <p class="rk-row-desc">{{ p.desc }}</p>
+              <p class="panel-desc">{{ p.desc }}</p>
               <p class="rk-row-meta mono">
                 {{ t('admin.risk.defaultWord') }} {{ toDisplay(p, p.default) }} {{ p.unit }}
                 · {{ t('admin.risk.rangeWord') }} {{ toDisplay(p, p.min) }} ~ {{ toDisplay(p, p.max) }} {{ p.unit }}
@@ -712,12 +712,6 @@ onMounted(loadData)
   font-size: var(--text-xs);
   font-weight: 600;
   color: var(--ds-color-text-primary);
-}
-.rk-row-desc {
-  margin-top:4px;
-  font-size: var(--text-3xs);
-  line-height: var(--leading-body);
-  color: var(--ds-color-text-description);
 }
 .rk-row-meta {
   margin-top: 2px;
