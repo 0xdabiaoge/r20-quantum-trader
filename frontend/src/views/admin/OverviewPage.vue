@@ -145,7 +145,7 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
           </div>
           <span class="ov-version-badge mono">{{ APP_VERSION }}</span>
           <button class="ov-btn-refresh" :disabled="loading" @click="load" :title="t('common.refresh')">
-            <RefreshCw :size="14" :class="loading && 'ov-spin'" />
+            <RefreshCw :size="14" :class="loading && 'animate-spin shrink-0'" />
             <span>{{ t('common.refresh') }}</span>
           </button>
         </div>
@@ -162,7 +162,7 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
         </div>
       </div>
       <button class="btn btn-primary btn-sm" :disabled="loading" @click="load">
-        <RefreshCw :size="14" :class="loading && 'ov-spin'" />
+        <RefreshCw :size="14" :class="loading && 'animate-spin shrink-0'" />
         <span>{{ t('common.retry') }}</span>
       </button>
     </div>
@@ -501,12 +501,6 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
   animation: r20-enter var(--dur-slow) var(--ease-out) backwards;
 }
 
-.ov-spin {
-  animation: ov-rotate 0.9s linear infinite;
-}
-@keyframes ov-rotate {
-  to { transform: rotate(360deg); }
-}
 
 /* 顶部操作区 */
 .ov-header-actions {

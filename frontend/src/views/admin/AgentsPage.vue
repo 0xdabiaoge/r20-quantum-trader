@@ -88,7 +88,7 @@ function ageText(a: any): string {
       <template #actions>
         <span class="badge badge-accent mono">{{ t('admin.agents.policyChip') }}</span>
         <button class="btn btn-ghost btn-sm" :disabled="loading" @click="load">
-          <Loader2 v-if="loading && loaded" :size="14" class="ag-spin" />
+          <Loader2 v-if="loading && loaded" :size="14" class="animate-spin shrink-0" />
           <RefreshCw v-else :size="14" />
           <span>{{ t('admin.agents.refresh') }}</span>
         </button>
@@ -96,7 +96,7 @@ function ageText(a: any): string {
     </PageHeader>
 
     <!-- 拉取失败 -->
-    <div v-if="error && !data" role="alert" class="state-block is-error ag-error">
+    <div v-if="error && !data" role="alert" class="state-block is-error">
       <span class="state-icon"><AlertTriangle :size="17" /></span>
       <p class="state-title">{{ t('common.loadFailed') }}</p>
       <p class="state-desc">{{ error }}</p>
@@ -288,19 +288,6 @@ function ageText(a: any): string {
   display: flex;
   flex-direction: column;
   gap: var(--ds-space-4);
-}
-.ag-spin {
-  animation: ag-rotate 0.9s linear infinite;
-}
-@keyframes ag-rotate {
-  to {
-    transform: rotate(360deg);
-  }
-}
-.ag-error {
-  border: 1px solid var(--down-line);
-  border-radius: var(--r-card);
-  background-color: var(--ds-color-bg-surface-card);
 }
 
 /* ══ 状态带 ══ */

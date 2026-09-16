@@ -55,7 +55,7 @@ const {
         </div>
         <span v-if="selectedProvider?.has_key" class="badge badge-up">{{ t('admin.llm.useStoredKey') }}</span>
         <button class="btn btn-primary btn-sm" :disabled="fetchingRemote" @click="executeRemoteFetch">
-          <RefreshCw :size="14" :class="fetchingRemote ? 'rf-spin' : ''" />
+          <RefreshCw :size="14" :class="fetchingRemote ? 'animate-spin shrink-0' : ''" />
           <span>{{ fetchingRemote ? t('admin.llm.probing') : t('admin.llm.reprobe') }}</span>
         </button>
       </div>
@@ -133,14 +133,6 @@ const {
   display: flex;
   align-items: center;
   gap: 8px;
-}
-.rf-spin {
-  animation: rf-rotate 0.9s linear infinite;
-}
-@keyframes rf-rotate {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 .rf-probe {

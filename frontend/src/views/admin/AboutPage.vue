@@ -147,7 +147,7 @@ const bandFacts = computed(() => {
       <template #actions>
         <span class="badge badge-accent mono">{{ t('admin.about.badge') }}</span>
         <button class="btn btn-ghost btn-sm" :disabled="loading" @click="load">
-          <Loader2 v-if="loading && loaded" :size="14" class="ab-spin" />
+          <Loader2 v-if="loading && loaded" :size="14" class="animate-spin shrink-0" />
           <RefreshCw v-else :size="14" />
           <span>{{ t('common.refresh') }}</span>
         </button>
@@ -155,7 +155,7 @@ const bandFacts = computed(() => {
     </PageHeader>
 
     <!-- 取数失败（旧版仅 console.error，页面完全不可见） -->
-    <div v-if="error && !about" role="alert" class="state-block is-error ab-error">
+    <div v-if="error && !about" role="alert" class="state-block is-error">
       <span class="state-icon"><AlertTriangle :size="17" /></span>
       <p class="state-title">{{ t('common.loadFailed') }}</p>
       <p class="state-desc">{{ error }}</p>
@@ -289,7 +289,7 @@ const bandFacts = computed(() => {
               :disabled="updateChecking || updateRunning"
               @click="checkUpdate"
             >
-              <Loader2 v-if="updateChecking" :size="14" class="ab-spin" />
+              <Loader2 v-if="updateChecking" :size="14" class="animate-spin shrink-0" />
               <RefreshCw v-else :size="14" />
               <span>{{ updateChecking ? t('admin.about.connecting') : t('admin.about.checkUpdate') }}</span>
             </button>
@@ -376,7 +376,7 @@ const bandFacts = computed(() => {
           :disabled="!phaseOk || updateRunning"
           @click="executeUpdate"
         >
-          <Loader2 v-if="updateRunning" :size="14" class="ab-spin" />
+          <Loader2 v-if="updateRunning" :size="14" class="animate-spin shrink-0" />
           <span>{{ updateRunning ? t('admin.about.updating') : t('admin.about.confirmNow') }}</span>
         </button>
       </template>
@@ -389,19 +389,6 @@ const bandFacts = computed(() => {
   display: flex;
   flex-direction: column;
   gap: var(--ds-space-4);
-}
-.ab-spin {
-  animation: ab-rotate 0.9s linear infinite;
-}
-@keyframes ab-rotate {
-  to {
-    transform: rotate(360deg);
-  }
-}
-.ab-error {
-  border: 1px solid var(--down-line);
-  border-radius: var(--r-card);
-  background-color: var(--ds-color-bg-surface-card);
 }
 
 /* ══ 状态带 ══ */

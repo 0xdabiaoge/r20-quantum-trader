@@ -312,7 +312,7 @@ onMounted(loadData);
           {{ t('admin.evolution.guardChip') }}
         </span>
         <button class="btn btn-ghost btn-sm" :disabled="busy !== '' || loading" @click="reloadMemory">
-          <RefreshCw :size="14" :class="loading && 'evo-spin'" />
+          <RefreshCw :size="14" :class="loading && 'animate-spin shrink-0'" />
           <span>{{ t('admin.evolution.reloadMemory') }}</span>
         </button>
         <button
@@ -333,12 +333,12 @@ onMounted(loadData);
     </PageHeader>
 
     <!-- 拉取失败 -->
-    <div v-if="loadError" role="alert" class="state-block is-error evo-error">
+    <div v-if="loadError" role="alert" class="state-block is-error">
       <span class="state-icon"><AlertTriangle :size="17" /></span>
       <p class="state-title">{{ t('common.loadFailed') }}</p>
       <p class="state-desc">{{ loadError }}</p>
       <button class="btn btn-ghost btn-sm" style="margin-top: 4px" :disabled="loading" @click="loadData">
-        <RefreshCw :size="14" :class="loading && 'evo-spin'" />
+        <RefreshCw :size="14" :class="loading && 'animate-spin shrink-0'" />
         <span>{{ t('common.retry') }}</span>
       </button>
     </div>
@@ -535,7 +535,7 @@ onMounted(loadData);
                   :disabled="busy !== '' || loading || !auth.isSuperadmin"
                   @click="deleteMemoryItem(idx, item.id)"
                 >
-                  <Loader2 v-if="busy === 'delete' && deletingIdx === idx" :size="13" class="evo-spin" />
+                  <Loader2 v-if="busy === 'delete' && deletingIdx === idx" :size="13" class="animate-spin shrink-0" />
                   <Trash2 v-else :size="13" />
                 </button>
               </div>
@@ -655,7 +655,7 @@ onMounted(loadData);
           :disabled="!runDialog.phrase.trim() || busy === 'run'"
           @click="confirmRun"
         >
-          <Loader2 v-if="busy === 'run'" :size="14" class="evo-spin" />
+          <Loader2 v-if="busy === 'run'" :size="14" class="animate-spin shrink-0" />
           <PlayCircle v-else :size="14" />
           <span>{{ t('admin.evolution.runConfirmSubmit') }}</span>
         </button>
@@ -669,19 +669,6 @@ onMounted(loadData);
   display: flex;
   flex-direction: column;
   gap: var(--ds-space-4);
-}
-.evo-spin {
-  animation: evo-rotate 0.9s linear infinite;
-}
-@keyframes evo-rotate {
-  to {
-    transform: rotate(360deg);
-  }
-}
-.evo-error {
-  border: 1px solid var(--down-line);
-  border-radius: var(--r-card);
-  background-color: var(--ds-color-bg-surface-card);
 }
 .evo-tabs {
   align-self: flex-start;

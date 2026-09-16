@@ -147,7 +147,7 @@ onMounted(load)
       <template #actions>
         <span class="badge badge-accent mono">{{ t('admin.audit.badge') }}</span>
         <button class="btn btn-ghost btn-sm" :disabled="loading" @click="load">
-          <Loader2 v-if="loading && records.length" :size="14" class="au-spin" />
+          <Loader2 v-if="loading && records.length" :size="14" class="animate-spin shrink-0" />
           <RefreshCw v-else :size="14" />
           <span>{{ t('admin.audit.refresh') }}</span>
         </button>
@@ -155,7 +155,7 @@ onMounted(load)
     </PageHeader>
 
     <!-- 拉取失败（旧版无错误位：请求抛错时页面停在空白） -->
-    <div v-if="loadError && !records.length" role="alert" class="state-block is-error au-error">
+    <div v-if="loadError && !records.length" role="alert" class="state-block is-error">
       <span class="state-icon"><AlertTriangle :size="17" /></span>
       <p class="state-title">{{ t('common.loadFailed') }}</p>
       <p class="state-desc">{{ loadError }}</p>
@@ -304,19 +304,6 @@ onMounted(load)
   display: flex;
   flex-direction: column;
   gap: var(--ds-space-4);
-}
-.au-spin {
-  animation: au-rotate 0.9s linear infinite;
-}
-@keyframes au-rotate {
-  to {
-    transform: rotate(360deg);
-  }
-}
-.au-error {
-  border: 1px solid var(--down-line);
-  border-radius: var(--r-card);
-  background-color: var(--ds-color-bg-surface-card);
 }
 
 /* ══ 统计带 ══ */

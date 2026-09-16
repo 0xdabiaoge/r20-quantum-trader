@@ -283,11 +283,11 @@ onMounted(loadData)
           {{ dirtyKeys.length ? t('admin.risk.pendingSave', undefined, { n: dirtyKeys.length }) : t('admin.risk.inSync') }}
         </span>
         <button class="btn btn-ghost btn-sm" :disabled="loading || busy !== ''" @click="loadData">
-          <RefreshCw :size="14" :class="loading && 'rk-spin'" />
+          <RefreshCw :size="14" :class="loading && 'animate-spin shrink-0'" />
           <span>{{ t('common.refresh') }}</span>
         </button>
         <button class="btn btn-primary btn-sm" :disabled="busy !== '' || !dirtyKeys.length" @click="saveChanges">
-          <Loader2 v-if="busy === 'save'" :size="14" class="rk-spin" />
+          <Loader2 v-if="busy === 'save'" :size="14" class="animate-spin shrink-0" />
           <Save v-else :size="14" />
           <span>{{ busy === 'save' ? t('admin.risk.saving') : t('admin.risk.saveApply') }}</span>
         </button>
@@ -495,7 +495,7 @@ onMounted(loadData)
     <BaseEmpty v-else :text="t('common.loadFailed')" :desc="loadError || t('common.networkError')">
       <template #action>
         <button class="btn btn-ghost btn-sm" :disabled="loading" @click="loadData">
-          <Loader2 v-if="loading" :size="14" class="rk-spin" />
+          <Loader2 v-if="loading" :size="14" class="animate-spin shrink-0" />
           <RefreshCw v-else :size="14" />
           <span>{{ t('common.retry') }}</span>
         </button>
@@ -506,7 +506,7 @@ onMounted(loadData)
     <div v-if="schema && dirtyKeys.length" class="rk-savebar">
       <span class="rk-savebar-text">{{ t('admin.risk.unsavedCount', undefined, { n: dirtyKeys.length }) }}</span>
       <button class="btn btn-primary btn-sm" :disabled="busy !== ''" @click="saveChanges">
-        <Loader2 v-if="busy === 'save'" :size="14" class="rk-spin" />
+        <Loader2 v-if="busy === 'save'" :size="14" class="animate-spin shrink-0" />
         <Save v-else :size="14" />
         <span>{{ busy === 'save' ? t('admin.risk.saving') : t('admin.risk.saveApply') }}</span>
       </button>
@@ -520,14 +520,6 @@ onMounted(loadData)
   flex-direction: column;
   gap: var(--ds-space-4);
   padding-bottom: 72px;
-}
-.rk-spin {
-  animation: rk-rotate 0.9s linear infinite;
-}
-@keyframes rk-rotate {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 /* 生效说明条 */

@@ -431,12 +431,12 @@ onMounted(loadData);
     </PageHeader>
 
     <!-- 载入失败 -->
-    <div v-if="loadError" role="alert" class="state-block is-error cn-error">
+    <div v-if="loadError" role="alert" class="state-block is-error">
       <span class="state-icon"><AlertTriangle :size="17" /></span>
       <p class="state-title">{{ t('common.loadFailed') }}</p>
       <p class="state-desc">{{ loadError || t('common.networkError') }}</p>
       <button class="btn btn-ghost btn-sm" style="margin-top: 4px" :disabled="loading" @click="loadData">
-        <Loader2 v-if="loading" :size="14" class="cn-spin" />
+        <Loader2 v-if="loading" :size="14" class="animate-spin shrink-0" />
         <RotateCcw v-else :size="14" />
         <span>{{ t('common.retry') }}</span>
       </button>
@@ -982,19 +982,6 @@ onMounted(loadData);
   display: flex;
   flex-direction: column;
   gap: var(--ds-space-4);
-}
-.cn-spin {
-  animation: cn-rotate 0.9s linear infinite;
-}
-@keyframes cn-rotate {
-  to {
-    transform: rotate(360deg);
-  }
-}
-.cn-error {
-  border: 1px solid var(--down-line);
-  border-radius: var(--r-card);
-  background-color: var(--ds-color-bg-surface-card);
 }
 
 /* ══ 议事状态带 ══ */

@@ -274,7 +274,7 @@ onMounted(() => {
           {{ snapshotData.policy_version }}
         </span>
         <button class="btn btn-ghost btn-sm" :disabled="refreshing" @click="fetchSnapshot">
-          <RefreshCw :size="14" :class="refreshing && 'pol-spin'" />
+          <RefreshCw :size="14" :class="refreshing && 'animate-spin shrink-0'" />
           <span>{{ refreshing ? t('admin.policySnapshot.btn.refreshing') : t('admin.policySnapshot.btn.refresh') }}</span>
         </button>
         <button class="btn btn-primary btn-sm" :disabled="!auth.isSuperadmin" @click="showArchiveModal = true">
@@ -285,12 +285,12 @@ onMounted(() => {
     </PageHeader>
 
     <!-- 拉取失败 -->
-    <div v-if="errorMsg" role="alert" class="state-block is-error pol-error">
+    <div v-if="errorMsg" role="alert" class="state-block is-error">
       <span class="state-icon"><AlertTriangle :size="17" /></span>
       <p class="state-title">{{ t('admin.policySnapshot.err.fetchFailed') }}</p>
       <p class="state-desc">{{ errorMsg }}</p>
       <button class="btn btn-ghost btn-sm" style="margin-top: 4px" :disabled="refreshing" @click="fetchSnapshot">
-        <RefreshCw :size="14" :class="refreshing && 'pol-spin'" />
+        <RefreshCw :size="14" :class="refreshing && 'animate-spin shrink-0'" />
         <span>{{ t('common.retry') }}</span>
       </button>
     </div>
@@ -418,7 +418,7 @@ onMounted(() => {
                 :disabled="restoring || !auth.isSuperadmin || isCurrentArc(arc)"
                 @click="restorePolicy(arcKey(arc), arc.name)"
               >
-                <RotateCcw :size="13" :class="restoring && 'pol-spin'" />
+                <RotateCcw :size="13" :class="restoring && 'animate-spin shrink-0'" />
                 <span>{{ isCurrentArc(arc) ? t('admin.policySnapshot.archive.isCurrent') : t('admin.policySnapshot.archive.restore') }}</span>
               </button>
 
@@ -428,7 +428,7 @@ onMounted(() => {
                 :title="t('admin.policySnapshot.archive.deleteTitle')"
                 @click="deleteArchive(arcKey(arc), arc.name)"
               >
-                <Loader2 v-if="deleting === arcKey(arc)" :size="13" class="pol-spin" />
+                <Loader2 v-if="deleting === arcKey(arc)" :size="13" class="animate-spin shrink-0" />
                 <Trash2 v-else :size="13" />
                 <span>{{ t('admin.policySnapshot.archive.delete') }}</span>
               </button>
@@ -447,7 +447,7 @@ onMounted(() => {
     >
       <template #action>
         <button class="btn btn-ghost btn-sm" :disabled="refreshing" @click="fetchSnapshot">
-          <RefreshCw :size="14" :class="refreshing && 'pol-spin'" />
+          <RefreshCw :size="14" :class="refreshing && 'animate-spin shrink-0'" />
           <span>{{ t('common.retry') }}</span>
         </button>
       </template>
@@ -463,7 +463,7 @@ onMounted(() => {
     >
       <template #action>
         <button class="btn btn-ghost btn-sm" :disabled="refreshing" @click="fetchSnapshot">
-          <RefreshCw :size="14" :class="refreshing && 'pol-spin'" />
+          <RefreshCw :size="14" :class="refreshing && 'animate-spin shrink-0'" />
           <span>{{ t('admin.policySnapshot.btn.refresh') }}</span>
         </button>
       </template>
@@ -509,7 +509,7 @@ onMounted(() => {
           :disabled="archiving || !archiveName.trim()"
           @click="saveArchive"
         >
-          <Loader2 v-if="archiving" :size="14" class="pol-spin" />
+          <Loader2 v-if="archiving" :size="14" class="animate-spin shrink-0" />
           <BookmarkPlus v-else :size="14" />
           <span>{{ archiving ? t('admin.policySnapshot.modal.archiving') : t('admin.policySnapshot.modal.confirm') }}</span>
         </button>
@@ -523,19 +523,6 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: var(--ds-space-4);
-}
-.pol-spin {
-  animation: pol-rotate 0.9s linear infinite;
-}
-@keyframes pol-rotate {
-  to {
-    transform: rotate(360deg);
-  }
-}
-.pol-error {
-  border: 1px solid var(--down-line);
-  border-radius: var(--r-card);
-  background-color: var(--ds-color-bg-surface-card);
 }
 
 /* ══ 策略身份带 ══ */

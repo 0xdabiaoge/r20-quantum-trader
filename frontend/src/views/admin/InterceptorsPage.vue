@@ -273,11 +273,11 @@ onMounted(loadPlugins)
           {{ t('admin.interceptors.failClosed') }}
         </span>
         <button class="btn btn-ghost btn-sm" :disabled="loading" @click="loadPlugins">
-          <RefreshCw :size="14" :class="loading && 'ip-spin'" />
+          <RefreshCw :size="14" :class="loading && 'animate-spin shrink-0'" />
           <span>{{ t('common.refresh') }}</span>
         </button>
         <button class="btn btn-ghost btn-sm" :disabled="testing" @click="runSandbox">
-          <Loader2 v-if="testing" :size="14" class="ip-spin" />
+          <Loader2 v-if="testing" :size="14" class="animate-spin shrink-0" />
           <Play v-else :size="14" />
           <span>{{ testing ? t('admin.interceptors.testing') : t('admin.interceptors.runSandbox') }}</span>
         </button>
@@ -289,12 +289,12 @@ onMounted(loadPlugins)
     </PageHeader>
 
     <!-- 拉取失败 -->
-    <div v-if="loadError" role="alert" class="state-block is-error ip-error">
+    <div v-if="loadError" role="alert" class="state-block is-error">
       <span class="state-icon"><AlertTriangle :size="17" /></span>
       <p class="state-title">{{ t('common.loadFailed') }}</p>
       <p class="state-desc">{{ loadError }}</p>
       <button class="btn btn-ghost btn-sm" style="margin-top: 4px" :disabled="loading" @click="loadPlugins">
-        <RefreshCw :size="14" :class="loading && 'ip-spin'" />
+        <RefreshCw :size="14" :class="loading && 'animate-spin shrink-0'" />
         <span>{{ t('common.retry') }}</span>
       </button>
     </div>
@@ -435,7 +435,7 @@ onMounted(loadPlugins)
         </button>
         <button class="btn btn-ghost btn-sm" @click="closeEditor">{{ t('admin.interceptors.cancel') }}</button>
         <button class="btn btn-primary btn-sm" :disabled="savingCode" @click="saveCode">
-          <Loader2 v-if="savingCode" :size="14" class="ip-spin" />
+          <Loader2 v-if="savingCode" :size="14" class="animate-spin shrink-0" />
           <Save v-else :size="14" />
           <span>{{ savingCode ? t('admin.interceptors.saving') : t('admin.interceptors.saveAndReload') }}</span>
         </button>
@@ -483,7 +483,7 @@ onMounted(loadPlugins)
       <template #footer>
         <button class="btn btn-ghost btn-sm" @click="closeCreate">{{ t('admin.interceptors.cancel') }}</button>
         <button class="btn btn-primary btn-sm" type="submit" form="ip-create-form" :disabled="creating" @click="submitCreate">
-          <Loader2 v-if="creating" :size="14" class="ip-spin" />
+          <Loader2 v-if="creating" :size="14" class="animate-spin shrink-0" />
           <Plus v-else :size="14" />
           <span>{{ t('admin.interceptors.createAndAdd') }}</span>
         </button>
@@ -550,19 +550,6 @@ onMounted(loadPlugins)
   display: flex;
   flex-direction: column;
   gap: var(--ds-space-4);
-}
-.ip-spin {
-  animation: ip-rotate 0.9s linear infinite;
-}
-@keyframes ip-rotate {
-  to {
-    transform: rotate(360deg);
-  }
-}
-.ip-error {
-  border: 1px solid var(--down-line);
-  border-radius: var(--r-card);
-  background-color: var(--ds-color-bg-surface-card);
 }
 .ip-skel {
   display: flex;

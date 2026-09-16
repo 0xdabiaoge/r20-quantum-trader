@@ -203,7 +203,7 @@ const colCount = computed(() => props.columns.length + (has('actions') ? 1 : 0))
         <tr v-if="loading">
           <td :colspan="Math.max(colCount, 1)" role="status" class="px-3 py-10 text-center" style="color: var(--ink-3);">
             <slot name="loading">
-              <Loader2 class="w-5 h-5 animate-spin inline mr-1.5" style="color: var(--accent);" />
+              <Loader2 class="w-5 h-5 animate-spin shrink-0 inline mr-1.5" style="color: var(--accent);" />
               {{ loadingText || '…' }}
             </slot>
           </td>

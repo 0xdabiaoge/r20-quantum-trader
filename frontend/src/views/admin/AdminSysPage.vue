@@ -238,7 +238,7 @@ onMounted(load)
 
         <div class="as-pwd-submit">
           <button class="btn btn-primary btn-sm" :disabled="changingPwd" @click="changePassword">
-            <Loader2 v-if="changingPwd" :size="13" class="as-spin" />
+            <Loader2 v-if="changingPwd" :size="13" class="animate-spin shrink-0" />
             <KeyRound v-else :size="13" />
             <span>{{ changingPwd ? t('admin.adminsys.password.updating') : t('admin.adminsys.password.submit') }}</span>
           </button>
@@ -270,7 +270,7 @@ onMounted(load)
         <p class="state-title">{{ t('common.loadFailed') }}</p>
         <p class="state-desc">{{ loadError }}</p>
         <button class="btn btn-ghost btn-sm" style="margin-top: 4px" :disabled="loading" @click="load">
-          <Loader2 v-if="loading" :size="14" class="as-spin" />
+          <Loader2 v-if="loading" :size="14" class="animate-spin shrink-0" />
           <RefreshCw v-else :size="14" />
           <span>{{ t('common.retry') }}</span>
         </button>
@@ -370,7 +370,7 @@ onMounted(load)
           {{ t('admin.adminsys.create.cancel') }}
         </button>
         <button class="btn btn-primary btn-sm" type="submit" form="as-create-form" :disabled="creating" @click="createUser">
-          <Loader2 v-if="creating" :size="13" class="as-spin" />
+          <Loader2 v-if="creating" :size="13" class="animate-spin shrink-0" />
           <Plus v-else :size="13" />
           <span>{{ t('admin.adminsys.create.submit') }}</span>
         </button>
@@ -384,14 +384,6 @@ onMounted(load)
   display: flex;
   flex-direction: column;
   gap: var(--ds-space-4);
-}
-.as-spin {
-  animation: as-rotate 0.9s linear infinite;
-}
-@keyframes as-rotate {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 /* ══ 状态带 ══ */

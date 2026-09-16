@@ -493,12 +493,12 @@ onMounted(loadLib)
     </PageHeader>
 
     <!-- 载入失败 -->
-    <div v-if="loadError" role="alert" class="state-block is-error ps-error">
+    <div v-if="loadError" role="alert" class="state-block is-error">
       <span class="state-icon"><AlertTriangle :size="17" /></span>
       <p class="state-title">{{ t('common.loadFailed') }}</p>
       <p class="state-desc">{{ loadError || t('common.networkError') }}</p>
       <button class="btn btn-ghost btn-sm" style="margin-top: 4px" :disabled="loading" @click="loadLib">
-        <Loader2 v-if="loading" :size="14" class="ps-spin" />
+        <Loader2 v-if="loading" :size="14" class="animate-spin shrink-0" />
         <RotateCcw v-else :size="14" />
         <span>{{ t('common.retry') }}</span>
       </button>
@@ -958,19 +958,6 @@ onMounted(loadLib)
   display: flex;
   flex-direction: column;
   gap: var(--ds-space-4);
-}
-.ps-spin {
-  animation: ps-rotate 0.9s linear infinite;
-}
-@keyframes ps-rotate {
-  to {
-    transform: rotate(360deg);
-  }
-}
-.ps-error {
-  border: 1px solid var(--down-line);
-  border-radius: var(--r-card);
-  background-color: var(--ds-color-bg-surface-card);
 }
 
 /* ══ 方案总览带 ══ */

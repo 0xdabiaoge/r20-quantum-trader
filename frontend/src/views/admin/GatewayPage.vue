@@ -115,14 +115,14 @@ function statusLabel(s: string): string {
       <template #actions>
         <span class="badge">{{ t('admin.gateway.opsBadge') }}</span>
         <button class="btn btn-ghost btn-sm" :disabled="loading" @click="load">
-          <RefreshCw :size="14" :class="loading && 'gw-spin'" />
+          <RefreshCw :size="14" :class="loading && 'animate-spin shrink-0'" />
           <span>{{ t('common.refresh') }}</span>
         </button>
       </template>
     </PageHeader>
 
     <!-- 拉取失败（无任何数据） -->
-    <div v-if="error && !gw" role="alert" class="state-block is-error gw-error">
+    <div v-if="error && !gw" role="alert" class="state-block is-error">
       <span class="state-icon"><AlertTriangle :size="17" /></span>
       <p class="state-title">{{ t('common.loadFailed') }}</p>
       <!-- 批 24：原来这里复用 `msgs.loadFailed`（值 = 「加载失败：{msg}」），
@@ -130,7 +130,7 @@ function statusLabel(s: string): string {
            toast 仍用带前缀的那条（toast 没有标题），这里只留原因。 -->
       <p class="state-desc">{{ error }}</p>
       <button class="btn btn-ghost btn-sm" style="margin-top: 4px" :disabled="loading" @click="load">
-        <RefreshCw :size="14" :class="loading && 'gw-spin'" />
+        <RefreshCw :size="14" :class="loading && 'animate-spin shrink-0'" />
         <span>{{ t('common.retry') }}</span>
       </button>
     </div>
@@ -141,7 +141,7 @@ function statusLabel(s: string): string {
         <AlertTriangle :size="13" />
         <span>{{ t('admin.gateway.msgs.loadFailed', undefined, { msg: error }) }}</span>
         <button class="btn btn-quiet btn-sm" :disabled="loading" @click="load">
-          <RefreshCw :size="14" :class="loading && 'gw-spin'" aria-hidden="true" />
+          <RefreshCw :size="14" :class="loading && 'animate-spin shrink-0'" aria-hidden="true" />
           {{ t('common.retry') }}
         </button>
       </div>
@@ -246,7 +246,7 @@ function statusLabel(s: string): string {
             <p class="card-sub">{{ t('admin.gateway.deliveries.records', undefined, { n: deliveries.length }) }}</p>
           </div>
           <button class="btn btn-ghost btn-sm" :disabled="loading" @click="load">
-            <RefreshCw :size="14" :class="loading && 'gw-spin'" />
+            <RefreshCw :size="14" :class="loading && 'animate-spin shrink-0'" />
             <span>{{ t('admin.gateway.deliveries.refresh') }}</span>
           </button>
         </header>
@@ -351,20 +351,7 @@ function statusLabel(s: string): string {
   flex-direction: column;
   gap: var(--ds-space-4);
 }
-.gw-spin {
-  animation: gw-rotate 0.9s linear infinite;
-}
-@keyframes gw-rotate {
-  to {
-    transform: rotate(360deg);
-  }
-}
 
-.gw-error {
-  border: 1px solid var(--down-line);
-  border-radius: var(--r-card);
-  background-color: var(--ds-color-bg-surface-card);
-}
 
 /* 刷新失败细条 */
 .gw-stale {

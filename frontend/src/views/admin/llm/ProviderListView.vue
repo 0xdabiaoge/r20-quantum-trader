@@ -133,7 +133,7 @@ const bandFacts = () => [
     <PageHeader :title="t('nav.admin.llm')" :description="t('admin.llm.desc')">
       <template #actions>
         <button class="btn btn-ghost btn-sm" :disabled="loading" @click="loadConfig">
-          <RefreshCw :size="14" :class="loading && 'pv-spin'" />
+          <RefreshCw :size="14" :class="loading && 'animate-spin shrink-0'" />
           <span>{{ t('admin.llm.refreshStatus') }}</span>
         </button>
         <button class="btn btn-primary btn-sm" :title="t('admin.llm.addProviderTitle')" @click="openAddProviderModal">
@@ -161,7 +161,7 @@ const bandFacts = () => [
         </div>
         <span class="badge mono">{{ t('admin.llm.currentLimit', undefined, { n: cfg?.thinking_timeout || 120 }) }}</span>
         <button class="btn btn-primary btn-sm" :disabled="savingSettings" @click="saveGlobalSettings">
-          <RefreshCw v-if="savingSettings" :size="14" class="pv-spin" />
+          <RefreshCw v-if="savingSettings" :size="14" class="animate-spin shrink-0" />
           <Save v-else :size="14" />
           <span>{{ savingSettings ? t('admin.llm.saving') : t('admin.llm.saveReasoning') }}</span>
         </button>
@@ -234,7 +234,7 @@ const bandFacts = () => [
           {{ t('admin.llm.attemptsChip', undefined, { n: cfg?.request_attempts || 3, m: (cfg?.fallback_model_ids || []).length }) }}
         </span>
         <button class="btn btn-primary btn-sm" :disabled="savingSettings" @click="saveGlobalSettings">
-          <RefreshCw v-if="savingSettings" :size="14" class="pv-spin" />
+          <RefreshCw v-if="savingSettings" :size="14" class="animate-spin shrink-0" />
           <Save v-else :size="14" />
           <span>{{ savingSettings ? t('admin.llm.saving') : t('admin.llm.saveResilience') }}</span>
         </button>
@@ -431,14 +431,6 @@ const bandFacts = () => [
   display: flex;
   flex-direction: column;
   gap: var(--ds-space-4);
-}
-.pv-spin {
-  animation: pv-rotate 0.9s linear infinite;
-}
-@keyframes pv-rotate {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 /* ══ 状态带 ══ */

@@ -364,7 +364,7 @@ onBeforeUnmount(() => {
           {{ t('admin.notify.channelsChip') }} {{ enabledChannelsCount }}/4
         </span>
         <button class="btn btn-ghost btn-sm" :disabled="loading" @click="loadConfig()">
-          <Loader2 v-if="loading && config" :size="14" class="nf-spin" />
+          <Loader2 v-if="loading && config" :size="14" class="animate-spin shrink-0" />
           <RefreshCw v-else :size="14" />
           <span>{{ t('common.refresh') }}</span>
         </button>
@@ -372,7 +372,7 @@ onBeforeUnmount(() => {
     </PageHeader>
 
     <!-- 拉取失败 -->
-    <div v-if="loadError && !config" role="alert" class="state-block is-error nf-error">
+    <div v-if="loadError && !config" role="alert" class="state-block is-error">
       <span class="state-icon"><AlertTriangle :size="17" /></span>
       <p class="state-title">{{ t('common.loadFailed') }}</p>
       <p class="state-desc">{{ loadError }}</p>
@@ -652,19 +652,6 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: var(--ds-space-4);
-}
-.nf-spin {
-  animation: nf-rotate 0.9s linear infinite;
-}
-@keyframes nf-rotate {
-  to {
-    transform: rotate(360deg);
-  }
-}
-.nf-error {
-  border: 1px solid var(--down-line);
-  border-radius: var(--r-card);
-  background-color: var(--ds-color-bg-surface-card);
 }
 
 /* ══ 状态带 ══ */

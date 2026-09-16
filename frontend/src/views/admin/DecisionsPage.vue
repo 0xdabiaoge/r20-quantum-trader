@@ -159,7 +159,7 @@ function tone(level: string): string {
           {{ t('admin.decisions.normalRun') }}
         </span>
         <button class="btn btn-ghost btn-sm" :disabled="logLoading" @click="fetchLogStream(activeLogTab)">
-          <RefreshCw :size="14" :class="logLoading && 'dc-spin'" />
+          <RefreshCw :size="14" :class="logLoading && 'animate-spin shrink-0'" />
           <span>{{ t('common.refresh') }}</span>
         </button>
       </template>
@@ -293,7 +293,7 @@ function tone(level: string): string {
             :disabled="logLoading"
             @click="fetchLogStream(activeLogTab)"
           >
-            <RefreshCw :size="14" :class="logLoading && 'dc-spin'" />
+            <RefreshCw :size="14" :class="logLoading && 'animate-spin shrink-0'" />
             <span>{{ t('common.retry') }}</span>
           </button>
         </div>
@@ -339,14 +339,6 @@ function tone(level: string): string {
   gap: var(--ds-space-4);
   flex: 1;
   min-height: 0;
-}
-.dc-spin {
-  animation: dc-rotate 0.9s linear infinite;
-}
-@keyframes dc-rotate {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 /* ══ 控制台容器：填满工作台高度 ══ */

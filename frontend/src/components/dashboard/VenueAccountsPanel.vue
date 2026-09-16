@@ -157,7 +157,7 @@ function refreshAll(): void {
           :disabled="store.loading || listing.loading"
           @click="refreshAll()"
         >
-          <RefreshCw class="h-3.5 w-3.5" :class="store.loading && 'animate-spin'" />
+          <RefreshCw class="h-3.5 w-3.5 shrink-0" :class="store.loading && 'animate-spin'" />
         </button>
       </div>
     </header>

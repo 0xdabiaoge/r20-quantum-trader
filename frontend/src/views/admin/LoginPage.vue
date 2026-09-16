@@ -143,7 +143,7 @@ async function handleLogin() {
             :disabled="loading || !username || !password"
           >
             <LogIn v-if="!loading" :size="15" />
-            <Loader2 v-else :size="15" class="auth-spin" />
+            <Loader2 v-else :size="15" class="animate-spin shrink-0" />
             <span>{{ loading ? t('admin.login.submitting') : t('admin.login.submit') }}</span>
           </button>
         </form>
@@ -461,10 +461,4 @@ async function handleLogin() {
   opacity: 0.5;
 }
 
-.auth-spin {
-  animation: auth-rotate 0.9s linear infinite;
-}
-@keyframes auth-rotate {
-  to { transform: rotate(360deg); }
-}
 </style>

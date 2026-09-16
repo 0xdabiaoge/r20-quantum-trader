@@ -277,7 +277,7 @@ function monogram(name: string): string {
                 :title="t('admin.llm.testConnTitle')"
                 @click="runTestModel(m)"
               >
-                <RefreshCw :size="14" :class="testLoading && testingModelId === m.id ? 'pd-spin' : ''" />
+                <RefreshCw :size="14" :class="testLoading && testingModelId === m.id ? 'animate-spin shrink-0' : ''" />
               </button>
 
               <button class="btn btn-ghost btn-icon btn-sm" :title="t('admin.llm.editParamsTitle')" @click="openEditModelModal(m)">
@@ -337,14 +337,6 @@ function monogram(name: string): string {
   display: flex;
   flex-direction: column;
   gap: var(--ds-space-4);
-}
-.pd-spin {
-  animation: pd-rotate 0.9s linear infinite;
-}
-@keyframes pd-rotate {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 /* ══ 详情头 ══ */

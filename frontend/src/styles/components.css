@@ -812,6 +812,19 @@ textarea.input {
   max-width: 52ch;
   line-height: var(--leading-body);
 }
+/* 批 80：错误状态块此前**只有卡片外观没有边框** —— 13 个页面各自补了一份
+   三属性 delta（`border` + `border-radius` + `background-color`），
+   另有 3 个页面（SecurityPage / AdminSysPage / DecisionsPage）**什么也没补**，
+   于是同一个错误状态在 13 个页面是带框卡片、在 3 个页面是裸块。
+   其中 DataGate 那份还用着遗留 token `--surface-2`(#1c202b) 而非
+   设计 token `--ds-color-bg-surface-card`(#151821)。
+   现把这三条并入 `.state-block.is-error` 本体，13 份 delta 全部删除，
+   3 个孤儿页随之对齐。 */
+.state-block.is-error {
+  border: 1px solid var(--down-line);
+  border-radius: var(--r-card);
+  background-color: var(--ds-color-bg-surface-card);
+}
 .state-block.is-error .state-icon {
   background-color: var(--down-bg);
   color: var(--down);

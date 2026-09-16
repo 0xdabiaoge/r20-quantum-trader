@@ -524,7 +524,7 @@ onMounted(() => { loadAll(); loadMx() })
           {{ t('admin.security.chipPreferred') }} {{ preferredVenue.toUpperCase() }}
         </span>
         <button class="btn btn-ghost btn-sm" :disabled="loading" @click="loadAll">
-          <Loader2 v-if="loading && config" :size="14" class="sc-spin" />
+          <Loader2 v-if="loading && config" :size="14" class="animate-spin shrink-0" />
           <RefreshCw v-else :size="14" />
           <span>{{ t('common.refresh') }}</span>
         </button>
@@ -582,7 +582,7 @@ onMounted(() => { loadAll(); loadMx() })
         <SettingsSection :title="t('admin.security.routingTitle')" :description="t('admin.security.routingDesc')" :icon="Route">
           <template #actions>
             <button class="btn btn-primary btn-sm" :disabled="savingMx" @click="saveRouting">
-              <Loader2 v-if="savingMx" :size="13" class="sc-spin" />
+              <Loader2 v-if="savingMx" :size="13" class="animate-spin shrink-0" />
               <Save v-else :size="13" />
               <span>{{ savingMx ? t('admin.security.saving') : t('admin.security.saveRouting') }}</span>
             </button>
@@ -675,13 +675,13 @@ onMounted(() => { loadAll(); loadMx() })
               </template>
               <template #probe>
                 <button class="btn btn-quiet btn-sm" :disabled="probingVenue === 'okx'" @click="probeVenue('okx')">
-                  <RefreshCw :size="14" :class="probingVenue === 'okx' ? 'sc-spin' : ''" />
+                  <RefreshCw :size="14" :class="probingVenue === 'okx' ? 'animate-spin shrink-0' : ''" />
                   <span>{{ probingVenue === 'okx' ? t('admin.security.probing') : t('admin.security.detect') }}</span>
                 </button>
               </template>
               <template #save>
                 <button class="btn btn-primary btn-sm" :disabled="savingOkx" @click="saveEnvironment">
-                  <Loader2 v-if="savingOkx" :size="12" class="sc-spin" />
+                  <Loader2 v-if="savingOkx" :size="12" class="animate-spin shrink-0" />
                   <Save v-else :size="12" />
                   <span>{{ savingOkx ? t('admin.security.saving') : t('admin.security.saveOkx') }}</span>
                 </button>
@@ -721,7 +721,7 @@ onMounted(() => { loadAll(); loadMx() })
               </template>
               <template #save>
                 <button class="btn btn-primary btn-sm" :disabled="savingVenue !== ''" @click="saveVenue('binance')">
-                  <Loader2 v-if="savingVenue === 'binance'" :size="12" class="sc-spin" />
+                  <Loader2 v-if="savingVenue === 'binance'" :size="12" class="animate-spin shrink-0" />
                   <Save v-else :size="12" />
                   <span>{{ savingVenue === 'binance' ? t('admin.security.saving') : t('admin.security.saveBinance') }}</span>
                 </button>
@@ -777,7 +777,7 @@ onMounted(() => { loadAll(); loadMx() })
               </template>
               <template #save>
                 <button class="btn btn-primary btn-sm" :disabled="savingVenue !== ''" @click="saveVenue('gate')">
-                  <Loader2 v-if="savingVenue === 'gate'" :size="12" class="sc-spin" />
+                  <Loader2 v-if="savingVenue === 'gate'" :size="12" class="animate-spin shrink-0" />
                   <Save v-else :size="12" />
                   <span>{{ savingVenue === 'gate' ? t('admin.security.saving') : t('admin.security.saveGate') }}</span>
                 </button>
@@ -825,7 +825,7 @@ onMounted(() => { loadAll(); loadMx() })
               :disabled="savingCapital || !auth.isSuperadmin"
               @click="saveCapital"
             >
-              <Loader2 v-if="savingCapital" :size="13" class="sc-spin" />
+              <Loader2 v-if="savingCapital" :size="13" class="animate-spin shrink-0" />
               <Save v-else :size="13" />
               <span>{{ savingCapital ? t('admin.security.capitalSaving') : t('admin.security.capitalSave') }}</span>
             </button>
@@ -943,7 +943,7 @@ onMounted(() => { loadAll(); loadMx() })
             :role="snapshotError ? 'alert' : 'status'"
             aria-live="polite"
           >
-            <Loader2 v-if="!snapshotError" :size="12" class="sc-spin" aria-hidden="true" />
+            <Loader2 v-if="!snapshotError" :size="12" class="animate-spin shrink-0" aria-hidden="true" />
             <AlertTriangle v-else :size="12" aria-hidden="true" />
             {{ snapshotState }}
           </p>
@@ -1050,7 +1050,7 @@ onMounted(() => { loadAll(); loadMx() })
           {{ t('admin.security.cancel') }}
         </button>
         <button class="btn btn-danger btn-sm" type="submit" form="sc-close-form" :disabled="closing" @click="confirmClose">
-          <Loader2 v-if="closing" :size="13" class="sc-spin" />
+          <Loader2 v-if="closing" :size="13" class="animate-spin shrink-0" />
           <span>{{ closing ? t('admin.security.closing') : t('admin.security.confirmClose') }}</span>
         </button>
       </template>
@@ -1063,14 +1063,6 @@ onMounted(() => { loadAll(); loadMx() })
   display: flex;
   flex-direction: column;
   gap: var(--ds-space-4);
-}
-.sc-spin {
-  animation: sc-rotate 0.9s linear infinite;
-}
-@keyframes sc-rotate {
-  to {
-    transform: rotate(360deg);
-  }
 }
 .sc-skel {
   display: flex;

@@ -836,7 +836,7 @@ onUnmounted(() => {
         </button>
 
         <button class="btn btn-ghost btn-icon btn-sm" :title="t('common.refresh')" @click="loadCandles(false, true)">
-          <RefreshCw :class="isLoading && 'animate-spin'" />
+          <RefreshCw :class="isLoading && 'animate-spin shrink-0'" />
         </button>
         <button
           class="btn btn-ghost btn-icon btn-sm"

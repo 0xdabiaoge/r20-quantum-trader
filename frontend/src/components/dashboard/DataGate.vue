@@ -63,7 +63,7 @@ async function retry() {
   <!-- ① 首次加载：骨架 -->
   <div v-if="firstLoad" class="dg" aria-busy="true">
     <p class="dg-loading">
-      <Loader2 :size="13" class="dg-spin" />
+      <Loader2 :size="13" class="animate-spin shrink-0" />
       <span>{{ t('dash.shell.gateLoading') }}</span>
     </p>
     <div class="dg-skel">
@@ -72,13 +72,13 @@ async function retry() {
   </div>
 
   <!-- ② 从未加载成功：报错 + 重试 -->
-  <div v-else-if="failed" role="alert" class="state-block is-error dg-error">
+  <div v-else-if="failed" role="alert" class="state-block is-error">
     <span class="state-icon"><AlertTriangle :size="17" /></span>
     <p class="state-title">{{ t('dash.shell.gateFailedTitle') }}</p>
     <p class="state-desc">{{ t('dash.shell.gateFailedDesc') }}</p>
     <p class="dg-error-raw mono">{{ store.error }}</p>
     <button class="btn btn-ghost btn-sm" :disabled="store.loading" @click="retry">
-      <Loader2 v-if="store.loading" :size="14" class="dg-spin" />
+      <Loader2 v-if="store.loading" :size="14" class="animate-spin shrink-0" />
       <RefreshCw v-else :size="14" />
       <span>{{ store.loading ? t('dash.shell.gateRetrying') : t('dash.shell.gateRetry') }}</span>
     </button>
@@ -93,7 +93,7 @@ async function retry() {
         <span>{{ t('dash.shell.gateStaleDesc', undefined, { t: staleAt }) }}</span>
       </span>
       <button class="btn btn-quiet btn-sm" :disabled="store.loading" @click="retry">
-        <Loader2 v-if="store.loading" :size="14" class="dg-spin" />
+        <Loader2 v-if="store.loading" :size="14" class="animate-spin shrink-0" />
         <RefreshCw v-else :size="14" />
         <span>{{ store.loading ? t('dash.shell.gateRetrying') : t('dash.shell.gateRetry') }}</span>
       </button>
@@ -108,15 +108,6 @@ async function retry() {
   display: flex;
   flex-direction: column;
   gap: var(--ds-space-3);
-}
-.dg-spin {
-  animation: dg-rotate 0.9s linear infinite;
-  flex-shrink: 0;
-}
-@keyframes dg-rotate {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 /* —— 骨架 —— */
@@ -147,11 +138,6 @@ async function retry() {
 }
 
 /* —— 报错 —— */
-.dg-error {
-  border: 1px solid var(--down-line);
-  border-radius: var(--r-card);
-  background-color: var(--surface-2);
-}
 .dg-error-raw {
   max-width: 640px;
   font-size: var(--text-4xs);

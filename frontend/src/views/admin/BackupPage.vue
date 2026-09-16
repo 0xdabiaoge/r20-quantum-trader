@@ -361,14 +361,14 @@ onMounted(load)
           {{ simple?.configured ? t('admin.backup.targetConfigured') : t('admin.backup.targetNotConfigured') }}
         </span>
         <button class="btn btn-ghost btn-sm" :disabled="loading" @click="load">
-          <Loader2 v-if="loading && simple" :size="14" class="bk-spin" />
+          <Loader2 v-if="loading && simple" :size="14" class="animate-spin shrink-0" />
           <RefreshCw v-else :size="14" />
           <span>{{ t('common.refresh') }}</span>
         </button>
       </template>
     </PageHeader>
 
-    <div v-if="loadError && !simple" role="alert" class="state-block is-error bk-error">
+    <div v-if="loadError && !simple" role="alert" class="state-block is-error">
       <span class="state-icon"><AlertTriangle :size="17" /></span>
       <p class="state-title">{{ t('common.loadFailed') }}</p>
       <p class="state-desc">{{ loadError }}</p>
@@ -485,17 +485,17 @@ onMounted(load)
           <footer class="bk-foot">
             <template v-if="auth.isSuperadmin">
               <button class="btn btn-ghost btn-sm" :disabled="busy !== ''" @click="testConnection">
-                <Loader2 v-if="busy === 'test'" :size="13" class="bk-spin" />
+                <Loader2 v-if="busy === 'test'" :size="13" class="animate-spin shrink-0" />
                 <PlugZap v-else :size="13" />
                 <span>{{ busy === 'test' ? t('admin.backup.testing') : t('admin.backup.testConnection') }}</span>
               </button>
               <button class="btn btn-primary btn-sm" :disabled="busy !== ''" @click="save">
-                <Loader2 v-if="busy === 'save'" :size="13" class="bk-spin" />
+                <Loader2 v-if="busy === 'save'" :size="13" class="animate-spin shrink-0" />
                 <Save v-else :size="13" />
                 <span>{{ busy === 'save' ? t('admin.backup.saving') : t('admin.backup.saveBackup') }}</span>
               </button>
               <button class="btn btn-danger btn-sm" :disabled="busy !== ''" @click="runNow">
-                <Loader2 v-if="busy === 'run'" :size="13" class="bk-spin" />
+                <Loader2 v-if="busy === 'run'" :size="13" class="animate-spin shrink-0" />
                 <PlayCircle v-else :size="13" />
                 <span>{{ busy === 'run' ? t('admin.backup.running') : t('admin.backup.backupNow') }}</span>
               </button>
@@ -503,7 +503,7 @@ onMounted(load)
               <!-- Hidden file input for upload -->
               <input ref="uploadFileInput" type="file" accept=".tar.gz,.tgz" class="hidden" @change="onFileSelected" />
               <button class="btn btn-ghost btn-sm" :disabled="busy !== ''" @click="triggerUpload">
-                <Loader2 v-if="busy === 'upload'" :size="13" class="bk-spin" />
+                <Loader2 v-if="busy === 'upload'" :size="13" class="animate-spin shrink-0" />
                 <Upload v-else :size="13" />
                 <span>{{ busy === 'upload' ? t('admin.backup.uploading') : t('admin.backup.uploadPackage') }}</span>
               </button>
@@ -565,7 +565,7 @@ onMounted(load)
                     :title="t('admin.backup.downloadTitle')"
                     @click="downloadArchive(a.name)"
                   >
-                    <Loader2 v-if="downloadingArchive === (a.name.split('/').pop() || a.name)" :size="13" class="bk-spin" />
+                    <Loader2 v-if="downloadingArchive === (a.name.split('/').pop() || a.name)" :size="13" class="animate-spin shrink-0" />
                     <Download v-else :size="13" />
                     <span>{{ t('admin.backup.downloadTitle') }}</span>
                   </button>
@@ -595,19 +595,6 @@ onMounted(load)
   display: flex;
   flex-direction: column;
   gap: var(--ds-space-4);
-}
-.bk-spin {
-  animation: bk-rotate 0.9s linear infinite;
-}
-@keyframes bk-rotate {
-  to {
-    transform: rotate(360deg);
-  }
-}
-.bk-error {
-  border: 1px solid var(--down-line);
-  border-radius: var(--r-card);
-  background-color: var(--ds-color-bg-surface-card);
 }
 
 /* ══ 状态带 ══ */
