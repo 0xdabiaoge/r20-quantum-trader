@@ -40,6 +40,7 @@ export const enShell = {
   gateStaleDesc: 'Showing the last successful snapshot from {t}; values may be out of date.',
   gateNoSnapshot: 'No market snapshot received yet',
 
+trajectoryBtn: 'Decision trail',
   nav: {
     liveDot: 'Live stream online',
     groupCore: 'Core workspace',
@@ -53,5 +54,21 @@ export const enShell = {
     openNav: 'Expand navigation',
     closeNav: 'Collapse navigation',
     about: 'About',
+  },
+  panel: {
+    aria: 'Decision trail and log panel',
+    closeAria: 'Close panel',
+    streamTitle: 'Decision trail & execution flow',
+    streamDesc: 'DeepSeek Harness agent decision panel',
+    decisionFlow: 'AI decision flow',
+    liveLog: 'Live log',
+    confidence: 'Confidence',
+    velocity: '1st deriv v:',
+    acceleration: '2nd deriv a:',
+    leverage: 'Leverage:',
+    noTrajectory: 'No decision trail yet — the model is polling…',
+    noLogMatch: 'No matching runtime logs',
+    guardReady: 'Triple Fail-Closed guard is armed',
+    computing: 'Computing multi-period momentum resonance',
   },
 };

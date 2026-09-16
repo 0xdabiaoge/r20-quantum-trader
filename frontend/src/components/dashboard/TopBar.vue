@@ -84,7 +84,7 @@ const activeTab = computed(() => {
       >
         <span class="dsh-status-dot active" />
         <Activity class="h-3.5 w-3.5 text-blue-400" />
-        <span>决策轨迹</span>
+        <span>{{ t('dash.shell.trajectoryBtn') }}</span>
       </button>
 
       <!-- 偏好设置 -->

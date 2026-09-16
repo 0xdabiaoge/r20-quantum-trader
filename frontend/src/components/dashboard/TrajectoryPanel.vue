@@ -5,6 +5,7 @@
  */
 import { ref, computed } from 'vue';
 import { useDashboardStore } from '../../stores/dashboard';
+import { useI18n } from '../../composables/useI18n';
 import {
   X,
   Activity,
@@ -22,6 +23,7 @@ const emit = defineEmits<{
 }>();
 
 const store = useDashboardStore();
+const { t } = useI18n();
 
 const activeTab = ref<'decisions' | 'logs'>('decisions');
 const logFilter = ref<'all' | 'warn' | 'error'>('all');
@@ -42,7 +44,7 @@ const decisionStream = computed(() => {
       action: act,
       confidence: conf,
       price: f.price,
-      reason: d.summary_reason || f.reason || '多周期动能共振计算中',
+      reason: d.summary_reason || f.reason || t('dash.shell.panel.computing'),
       velocity: f.calculus?.velocity_1h ?? 0,
       acceleration: f.calculus?.accel_1h ?? 0,
       adx: f.adx_1h ?? 0,
@@ -96,7 +98,7 @@ function actionBadgeClass(action: string) {
         style="background-color: var(--surface-1); border-color: var(--line-1); color: var(--ink-1)"
         role="dialog"
         aria-modal="true"
-        aria-label="决策轨迹与日志面板"
+        :aria-label="t('dash.shell.panel.aria')"
       >
         <!-- 面板头部 -->
         <header
@@ -110,12 +112,12 @@ function actionBadgeClass(action: string) {
             <div>
               <div class="flex items-center gap-2">
                 <h2 class="text-sm font-semibold tracking-tight" style="color: var(--ink-strong)">
-                  决策轨迹与执行流
+                  {{ t('dash.shell.panel.streamTitle') }}
                 </h2>
-                <span class="dsh-status-dot active" title="实时流在线" />
+                <span class="dsh-status-dot active" :title="t('dash.shell.nav.liveDot')" />
               </div>
               <p class="text-3xs" style="color: var(--ink-3)">
-                DeepSeek Harness 智能体决策透视面板
+                {{ t('dash.shell.panel.streamDesc') }}
               </p>
             </div>
           </div>
@@ -123,7 +125,7 @@ function actionBadgeClass(action: string) {
           <div class="flex items-center gap-1.5">
             <button
               class="btn btn-quiet btn-icon cursor-pointer h-7 w-7"
-              aria-label="关闭面板"
+              :aria-label="t('dash.shell.panel.closeAria')"
               @click="emit('close')"
             >
               <X class="h-4 w-4" />
@@ -148,7 +150,7 @@ function actionBadgeClass(action: string) {
               @click="activeTab = 'decisions'"
             >
               <Zap class="h-3.5 w-3.5" />
-              AI 决策流
+              {{ t('dash.shell.panel.decisionFlow') }}
               <span class="rounded px-1 text-3xs font-mono" style="background-color: var(--surface-1); color: var(--ink-2)">
                 {{ decisionStream.length }}
               </span>
@@ -164,7 +166,7 @@ function actionBadgeClass(action: string) {
               @click="activeTab = 'logs'"
             >
               <Terminal class="h-3.5 w-3.5" />
-              实时日志
+              {{ t('dash.shell.panel.liveLog') }}
             </button>
           </div>
 
@@ -211,7 +213,7 @@ function actionBadgeClass(action: string) {
 
                 <div class="flex items-center gap-2">
                   <div class="flex items-center gap-1 text-3xs" style="color: var(--ink-2)">
-                    <span>置信度</span>
+                    <span>{{ t('dash.shell.panel.confidence') }}</span>
                     <span class="font-mono font-semibold" style="color: var(--ink-strong)">{{ item.confidence }}%</span>
                   </div>
                   <div class="h-1.5 w-14 overflow-hidden rounded-full" style="background-color: var(--surface-3)">
@@ -236,17 +238,17 @@ function actionBadgeClass(action: string) {
                 class="mt-2.5 flex items-center justify-between rounded px-2 py-1 text-3xs font-mono"
                 style="background-color: var(--surface-head); border: 1px solid var(--line-1); color: var(--ink-2)"
               >
-                <div>一阶导 v: <span :class="item.velocity >= 0 ? 'text-[var(--up)]' : 'text-[var(--down)]'">{{ Number(item.velocity).toFixed(3) }}</span></div>
-                <div>二阶导 a: <span :class="item.acceleration >= 0 ? 'text-[var(--up)]' : 'text-[var(--down)]'">{{ Number(item.acceleration).toFixed(3) }}</span></div>
+                <div>{{ t('dash.shell.panel.velocity') }} <span :class="item.velocity >= 0 ? 'text-[var(--up)]' : 'text-[var(--down)]'">{{ Number(item.velocity).toFixed(3) }}</span></div>
+                <div>{{ t('dash.shell.panel.acceleration') }} <span :class="item.acceleration >= 0 ? 'text-[var(--up)]' : 'text-[var(--down)]'">{{ Number(item.acceleration).toFixed(3) }}</span></div>
                 <div>ADX: <span style="color: var(--ink-1)">{{ Number(item.adx).toFixed(1) }}</span></div>
-                <div v-if="item.leverage">杠杆: <span style="color: var(--ink-1)">{{ item.leverage }}x</span></div>
+                <div v-if="item.leverage">{{ t('dash.shell.panel.leverage') }} <span style="color: var(--ink-1)">{{ item.leverage }}x</span></div>
               </div>
             </div>
 
             <!-- 空态 -->
             <div v-if="decisionStream.length === 0" class="py-12 text-center" style="color: var(--ink-3)">
               <Activity class="mx-auto h-8 w-8 opacity-40" />
-              <p class="mt-2 text-xs">暂无最新决策轨迹，模型轮询中...</p>
+              <p class="mt-2 text-xs">{{ t('dash.shell.panel.noTrajectory') }}</p>
             </div>
           </div>
 
@@ -270,7 +272,7 @@ function actionBadgeClass(action: string) {
               </div>
 
               <div v-if="filteredLogs.length === 0" class="py-8 text-center" style="color: var(--ink-3)">
-                暂无匹配的运行日志
+                {{ t('dash.shell.panel.noLogMatch') }}
               </div>
             </div>
           </div>
@@ -283,7 +285,7 @@ function actionBadgeClass(action: string) {
         >
           <div class="flex items-center gap-2">
             <ShieldCheck class="h-3.5 w-3.5 text-[var(--up)]" />
-            <span>三位一体 Fail-Closed 硬防线已就绪</span>
+            <span>{{ t('dash.shell.panel.guardReady') }}</span>
           </div>
           <span class="font-mono">R20 Core Engine</span>
         </footer>

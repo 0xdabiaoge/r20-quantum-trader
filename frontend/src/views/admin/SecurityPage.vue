@@ -122,7 +122,7 @@ async function loadAll() {
   } catch (e: any) {
     // 批 24：除了 toast，还要把错误留在页面上（toast 3 秒即消失，用户回来只看到空白页）
     loadError.value = String(e?.message || e)
-    toast.err(`加载失败：${e.message}`)
+    toast.err(t('admin.security.errLoadFailed', undefined, { msg: e.message }))
   } finally {
     loading.value = false
   }
@@ -142,15 +142,15 @@ async function saveEnvironment() {
     // ——移动端 prompt 常被弱化，且样式/焦点不可控。改用项目危险操作确认框，
     // 要求逐字输入 LIVE（与其余危险操作同一套门禁语义）。
     const _ok = await ask({
-      title: '切换到 LIVE 实盘环境',
-      desc: '切换后所有交易将以真实资金执行',
-      detail: '请先核对实盘 Key 权限与 IP 白名单已配置正确',
+      title: t('admin.security.confirmLiveTitle'),
+      desc: t('admin.security.confirmLiveDesc'),
+      detail: t('admin.security.confirmLiveDetail'),
       danger: true,
       confirmPhrase: 'LIVE',
       okText: t('common.switchLive'),
     })
     if (!_ok) {
-      toast.warn('未确认 LIVE，环境未切换')
+      toast.warn(t('admin.security.warnNotConfirmed'))
       return
     }
   }
@@ -165,10 +165,10 @@ async function saveEnvironment() {
     if (keys.value.demo_pass) body.okx_demo_passphrase = keys.value.demo_pass
     await api('/api/v1/admin/config', { method: 'PUT', body: JSON.stringify(body) })
     keys.value = { live_key: '', live_secret: '', live_pass: '', demo_key: '', demo_secret: '', demo_pass: '' }
-    toast.ok(`OKX ${environment.toUpperCase()} 环境与凭证已安全保存`)
+    toast.ok(t('admin.security.toastEnvSaved', undefined, { env: environment.toUpperCase() }))
     await loadAll()
   } catch (e: any) {
-    toast.err(`保存失败：${e.message}`)
+    toast.err(t('admin.security.errSaveFailed', undefined, { msg: e.message }))
   } finally {
     savingOkx.value = false
   }
@@ -180,23 +180,23 @@ async function saveManualClose() {
     // 审计①#4(2026-09-13)：PUT 复用 admin_config()，manual_close_enabled 嵌在
     // editable 之下——旧读顶层恒 undefined → 保存后开关弹回 OFF + toast 谎报。
     manualClose.value = !!(d?.editable?.manual_close_enabled ?? d?.manual_close_enabled)
-    if (manualClose.value) toast.warn('后台手动平仓已启用'); else toast.ok('后台手动平仓已禁用')
+    if (manualClose.value) toast.warn(t('admin.security.toastManualCloseOn')); else toast.ok(t('admin.security.toastManualCloseOff'))
   } catch (e: any) {
     toast.err(e.message)
   }
 }
 
 async function saveCapital() {
-  if (!auth.isSuperadmin) { toast.err('仅超级管理员可修改初始本金'); return }
-  if (capitalConfirm.value.trim().toUpperCase() !== 'UPDATE CAPITAL') { toast.err('确认短语必须精确为：UPDATE CAPITAL'); return }
+  if (!auth.isSuperadmin) { toast.err(t('admin.security.errSuperadminOnly')); return }
+  if (capitalConfirm.value.trim().toUpperCase() !== 'UPDATE CAPITAL') { toast.err(t('admin.security.errPhraseCapital')); return }
   savingCapital.value = true
   try {
     const res = await api('/api/v1/admin/account-baseline', { method: 'PUT', body: JSON.stringify({ initial_capital: parseFloat(newCapital.value), confirmation: capitalConfirm.value }) })
-    toast.ok(res.effect || `初始本金已调整为 ${res.initial_capital} USDT`)
+    toast.ok(res.effect || t('admin.security.toastCapitalSet', undefined, { n: res.initial_capital }))
     capitalConfirm.value = ''
     await loadAll()
   } catch (e: any) {
-    toast.err(`更新失败：${e.message}`)
+    toast.err(t('admin.security.errUpdateFailed', undefined, { msg: e.message }))
   } finally {
     savingCapital.value = false
   }
@@ -204,33 +204,33 @@ async function saveCapital() {
 
 async function addInstrument() {
   const instId = newInstId.value.trim().toUpperCase()
-  if (!/^[A-Z0-9]{2,15}-USDT-SWAP$/.test(instId)) { toast.err('格式示例：XRP-USDT-SWAP（仅 USDT 永续）'); return }
+  if (!/^[A-Z0-9]{2,15}-USDT-SWAP$/.test(instId)) { toast.err(t('admin.security.errInstFormat')); return }
   try {
     const res = await api('/api/v1/admin/instruments', { method: 'POST', body: JSON.stringify({ inst_id: instId }) })
-    toast.ok(res.message || `${instId} 已成功加入交易池`)
+    toast.ok(res.message || t('admin.security.toastInstAdded', undefined, { inst: instId }))
     newInstId.value = ''
     await loadAll()
   } catch (e: any) {
-    toast.err(`添加失败：${e.message}`)
+    toast.err(t('admin.security.errAddFailed', undefined, { msg: e.message }))
   }
 }
 
 async function removeInstrument(item: any) {
-  if (item.protected) { toast.warn('系统保底标的不可删除'); return }
+  if (item.protected) { toast.warn(t('admin.security.warnProtectedInst')); return }
   // 审计 P1-5：后端已按实时持仓/追踪记录硬拒（删除会让该标的失去移动止损/时间止损/AI 平仓接管），
   // 前端不再承诺"既有持仓不受影响"，而是在入口就把真实原因说清楚。
   if (item.held_live || item.has_tracker) {
-    toast.warn(`该标的仍有持仓（${(item.held_venues || []).join('/') || '追踪记录'}），为防止失去风控接管，禁止移除`)
+    toast.warn(t('admin.security.warnHeldInst', undefined, { venues: (item.held_venues || []).join('/') || t('admin.security.trackedRecord') }))
     return
   }
-  if (item.holdings_unknown) { toast.warn('当前无法确认实时持仓，删除已暂停；请稍后重试'); return }
+  if (item.holdings_unknown) { toast.warn(t('admin.security.warnHoldingsUnknown')); return }
   // 批C(2026-09-13)·危险操作确认收口：后端本就要求逐字短语 `REMOVE <instId>`，
   // 但前端把短语写死在请求体、只用原生 confirm() 小条挡一下——移动端随手一按就
   // 能把实盘标的移出交易池（同页平仓却要密码+短语双确认，强度不一致）。现将同一
   // 短语要求显式抬到 UI：必须逐字输入才可确认，前后端确认语义就此一致。
   const _ok = await ask({
-    title: '从交易池移除标的',
-    desc: `${item.instId} 将不再参与选币与开仓（仅限当前无持仓、无追踪记录的标的）`,
+    title: t('admin.security.confirmRemoveInstTitle'),
+    desc: t('admin.security.confirmRemoveInstDesc', undefined, { inst: item.instId }),
     danger: true,
     confirmPhrase: `REMOVE ${item.instId}`,
     okText: t('common.remove'),
@@ -241,10 +241,10 @@ async function removeInstrument(item: any) {
       method: 'DELETE',
       body: JSON.stringify({ confirmation: `REMOVE ${item.instId}` })
     })
-    toast.ok(res.message || `${item.instId} 已从交易池移除`)
+    toast.ok(res.message || t('admin.security.toastInstRemoved', undefined, { inst: item.instId }))
     await loadAll()
   } catch (e: any) {
-    toast.err(`删除失败：${e.message}`)
+    toast.err(t('admin.security.errDeleteFailed', undefined, { msg: e.message }))
   }
 }
 
@@ -261,7 +261,7 @@ async function loadPositions() {
 }
 
 function openClose(pos: any) {
-  if (!manualClose.value) { toast.err('请先在「应急平仓」页启用手动平仓开关'); return }
+  if (!manualClose.value) { toast.err(t('admin.security.errEnableManualFirst')); return }
   closePhraseInput.value = ''
   closeModal.value = { show: true, pos }
 }
@@ -269,10 +269,10 @@ function openClose(pos: any) {
 async function confirmClose() {
   const pos = closeModal.value?.pos
   if (!pos) return
-  if (!closePassword.value) { toast.err('请输入当前管理员密码'); return }
-  if (!pos.close_token || !pos.close_confirmation) { toast.err('平仓令牌缺失，请刷新当前持仓'); return }
+  if (!closePassword.value) { toast.err(t('admin.security.errNeedPassword')); return }
+  if (!pos.close_token || !pos.close_confirmation) { toast.err(t('admin.security.errCloseTokenMissing')); return }
   if (closePhraseInput.value.trim().toUpperCase() !== pos.close_confirmation) {
-    toast.err(`确认短语必须精确为：${pos.close_confirmation}`)
+    toast.err(t('admin.security.errPhraseClose', undefined, { phrase: pos.close_confirmation }))
     return
   }
   closing.value = true
@@ -281,12 +281,12 @@ async function confirmClose() {
       method: 'POST',
       body: JSON.stringify({ close_token: pos.close_token, admin_password: closePassword.value, confirmation: closePhraseInput.value.trim().toUpperCase(), venue: pos.venue || 'okx' }),
     })
-    toast.ok(`已确认平仓：${d.instId} ${d.closed_size}`)
+    toast.ok(t('admin.security.toastCloseConfirmed', undefined, { inst: d.instId, size: d.closed_size }))
     closeModal.value = null
     closePassword.value = ''
     await loadPositions()
   } catch (e: any) {
-    toast.err(`平仓失败：${e.message}`)
+    toast.err(t('admin.security.errCloseFailed', undefined, { msg: e.message }))
     // 一次性令牌可能已被消费/过期：自动刷新快照，并把弹窗指向新令牌的同仓位行，允许直接重试
     await loadPositions()
     const fresh = (snapshot.value?.positions || []).find((x: any) => x.instId === pos.instId && (x.posSide || 'net') === (pos.posSide || 'net') && (x.venue || 'okx') === (pos.venue || 'okx'))
@@ -356,13 +356,13 @@ async function probeVenue(venue: 'binance' | 'gate' | 'okx') {
     })
 
     if (res?.ok) {
-      toast.ok(res.message || `${venue.toUpperCase()} 连接诊断成功`)
+      toast.ok(res.message || t('admin.security.toastProbeOk', undefined, { venue: venue.toUpperCase() }))
     } else {
-      toast.err(res?.message || `${venue.toUpperCase()} 连接诊断失败`)
+      toast.err(res?.message || t('admin.security.toastProbeFail', undefined, { venue: venue.toUpperCase() }))
     }
     await loadMx()
   } catch (e: any) {
-    toast.err(`检测失败：${e.message}`)
+    toast.err(t('admin.security.errProbeFailed', undefined, { msg: e.message }))
   } finally {
     probingVenue.value = ''
   }
@@ -376,10 +376,10 @@ async function saveRouting() {
       method: 'PUT',
       body: JSON.stringify({ preferred_venue: preferredVenue.value, routing_mode: routingMode.value }),
     })
-    toast.ok(`撮合路由已保存：${preferredVenue.value.toUpperCase()} · ${routingMode.value.toUpperCase()}`)
+    toast.ok(t('admin.security.toastRoutingSaved', undefined, { venue: preferredVenue.value.toUpperCase(), mode: routingMode.value.toUpperCase() }))
     await loadMx()
   } catch (e: any) {
-    toast.err(`保存失败：${e.message}`)
+    toast.err(t('admin.security.errSaveFailed', undefined, { msg: e.message }))
   } finally {
     savingMx.value = false
   }
@@ -408,12 +408,12 @@ async function saveVenue(venue: 'binance' | 'gate') {
       }
     }
     await api('/api/v1/admin/multi-exchange', { method: 'PUT', body: JSON.stringify(body) })
-    toast.ok(`${venue === 'binance' ? 'Binance' : 'Gate'} 凭证与档位已保存`)
+    toast.ok(t('admin.security.toastVenueSaved', undefined, { venue: venue === 'binance' ? 'Binance' : 'Gate' }))
     if (venue === 'binance') { mxForm.value.binance_api_key = ''; mxForm.value.binance_secret_key = '' }
     else { mxForm.value.gate_api_key = ''; mxForm.value.gate_secret_key = ''; gateExecPhrase.value = '' }
     await loadMx()
   } catch (e: any) {
-    toast.err(`保存失败：${e.message}`)
+    toast.err(t('admin.security.errSaveFailed', undefined, { msg: e.message }))
   } finally {
     savingVenue.value = ''
   }

@@ -143,7 +143,14 @@ function symOf(x: { instId?: string; name?: string }): string {
                   {{ getModeOf(p) }}
                 </span>
               </div>
-              <p v-if="p.stageDesc" class="text-3xs text-[var(--ink-3)] leading-tight mt-0.5">{{ p.stageDesc }}</p>
+              <!-- 批 32：后端 stageDesc 长度不一（「持有监控中」5 字 / 「云端双腿防护中」7 字），
+                   列宽 78px 只够 6 字 → 长的那条折成两行，行高跟着不齐、且从词中间断开。
+                   统一截断成一行 + title 兜住全文（与批 25 的截断纪律一致）。 -->
+              <p
+                v-if="p.stageDesc"
+                class="text-3xs text-[var(--ink-3)] leading-tight mt-0.5 truncate"
+                :title="p.stageDesc"
+              >{{ p.stageDesc }}</p>
             </td>
             <td class="col-num font-mono pop-col-entry">{{ fmtPrice(p.avgPx) }}</td>
             <td class="col-num font-mono">{{ fmtPrice(p.markPx ?? p.last) }}</td>

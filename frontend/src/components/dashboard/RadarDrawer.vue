@@ -37,16 +37,18 @@ const posMgmt = computed<any[]>(() => c.value.position_management || []);
 const transcript = computed(() => c.value.council_transcript);
 const councilStatus = computed<any>(() => c.value.council_status || null);
 
-const SEAT_LABELS: Record<string, string> = {
-  trader_trend: '交易员 A · 顺势',
-  trader_momentum: '交易员 B · 动能',
-  trader_quant: '交易员 C · 数理',
-  cio: 'CIO · 仲裁决策席',
-  REJECT_ALL: '全员驳回',
+/* 席位显示名（批 32：此前写死中文，英文模式下漏中文）。键仍是后端 id，
+   未知 id 原样回显，绝不显示空白。 */
+const SEAT_KEYS: Record<string, string> = {
+  trader_trend: 'dash.radar.seat.traderTrend',
+  trader_momentum: 'dash.radar.seat.traderMomentum',
+  trader_quant: 'dash.radar.seat.traderQuant',
+  cio: 'dash.radar.seat.cio',
+  REJECT_ALL: 'dash.radar.seat.rejectAll',
 };
 function seatLabel(id: any): string {
   const s = String(id || '');
-  return SEAT_LABELS[s] || s || '';
+  return SEAT_KEYS[s] ? t(SEAT_KEYS[s]) : (s || '');
 }
 
 const advisorList = computed<any[]>(() => Object.values(transcript.value?.advisors || {}));
@@ -132,7 +134,7 @@ function dirOf(a: string): 'long' | 'short' | 'flat' {
 
       <!-- 宏观综述 -->
       <div class="dsh-card-sub p-4 text-xs leading-relaxed text-[var(--ink-1)]">
-        <h4 class="text-3xs font-bold uppercase tracking-wider text-[var(--ink-3)] mb-2">宏观全景评述</h4>
+        <h4 class="text-3xs font-bold uppercase tracking-wider text-[var(--ink-3)] mb-2">{{ t('dash.radar.macroReview') }}</h4>
         <p class="whitespace-pre-wrap font-sans text-xs leading-relaxed">{{ c.macro_assessment || '--' }}</p>
 
         <p v-if="promptChars(c)" class="num font-mono text-3xs text-[var(--ink-3)] mt-3 border-t pt-2" style="border-color: var(--line-1)">
@@ -148,7 +150,7 @@ function dirOf(a: string): 'long' | 'short' | 'flat' {
       <div v-if="posMgmt.length" class="space-y-2">
         <h4 class="text-3xs font-bold uppercase tracking-wider text-[var(--ink-3)] flex items-center gap-1.5">
           <Activity class="h-3 w-3 text-[var(--accent)]" />
-          持仓调度与执行
+          {{ t('dash.radar.posMgmt') }}
         </h4>
         <div
           v-for="p in posMgmt"
@@ -171,7 +173,7 @@ function dirOf(a: string): 'long' | 'short' | 'flat' {
       <div v-if="opps.length" class="space-y-2">
         <h4 class="text-3xs font-bold uppercase tracking-wider text-[var(--ink-3)] flex items-center gap-1.5">
           <Zap class="h-3 w-3 text-[var(--accent)]" />
-          潜力机会 Top
+          {{ t('dash.radar.opportunities') }}
         </h4>
         <div
           v-for="o in opps"
@@ -195,15 +197,15 @@ function dirOf(a: string): 'long' | 'short' | 'flat' {
           <!-- 挂单点位 -->
           <div class="grid grid-cols-3 gap-2 pt-2 border-t text-3xs font-mono" style="border-color: var(--line-1)">
             <div>
-              <span class="text-[var(--ink-3)] block">建议入场:</span>
+              <span class="text-[var(--ink-3)] block">{{ t('dash.radar.entry') }}</span>
               <span class="font-bold text-[var(--ink-1)]">{{ fmtPrice(o.target_entry_price) }}</span>
             </div>
             <div>
-              <span class="text-[var(--ink-3)] block">建议止损:</span>
+              <span class="text-[var(--ink-3)] block">{{ t('dash.radar.stopLoss') }}</span>
               <span class="font-bold text-[var(--down)]">{{ fmtPrice(o.stop_loss_price) }}</span>
             </div>
             <div>
-              <span class="text-[var(--ink-3)] block">建议止盈:</span>
+              <span class="text-[var(--ink-3)] block">{{ t('dash.radar.takeProfit') }}</span>
               <span class="font-bold text-[var(--up)]">{{ fmtPrice(o.take_profit_price) }}</span>
             </div>
           </div>
@@ -223,7 +225,7 @@ function dirOf(a: string): 'long' | 'short' | 'flat' {
           v-if="councilStatus?.duration_ms"
           class="text-3xs font-mono text-[var(--ink-3)]"
         >
-          总耗时 {{ (councilStatus.duration_ms / 1000).toFixed(2) }}s
+          {{ t('dash.radar.totalTime', undefined, { n: (councilStatus.duration_ms / 1000).toFixed(2) }) }}
         </span>
       </div>
 
@@ -232,12 +234,12 @@ function dirOf(a: string): 'long' | 'short' | 'flat' {
         <div class="flex items-center justify-between mb-2">
           <div class="flex items-center gap-2">
             <Scale class="h-4 w-4 text-[var(--accent)]" />
-            <span class="text-xs font-bold text-[var(--ink-strong)]">CIO 终审裁决</span>
+            <span class="text-xs font-bold text-[var(--ink-strong)]">{{ t('dash.radar.cioVerdict') }}</span>
             <span
               v-if="transcript?.adopted_role"
               class="rounded px-1.5 py-0.5 border text-3xs font-mono text-[var(--up)] border-[var(--up-line)] bg-[var(--up-bg)]"
             >
-              采纳提案: {{ seatLabel(transcript.adopted_role) }}
+              {{ t('dash.radar.adopted', undefined, { role: seatLabel(transcript.adopted_role) }) }}
             </span>
           </div>
           <ConfBadge :value="arbitrator.confidence" />
@@ -247,7 +249,7 @@ function dirOf(a: string): 'long' | 'short' | 'flat' {
 
       <!-- 各交易员提案列表 -->
       <div class="space-y-2">
-        <h4 class="text-3xs font-bold uppercase tracking-wider text-[var(--ink-3)]">各席位交易员独立提案</h4>
+        <h4 class="text-3xs font-bold uppercase tracking-wider text-[var(--ink-3)]">{{ t('dash.radar.seatsIndependent') }}</h4>
         <div
           v-for="adv in advisorList"
           :key="adv.role_id || adv.name"
@@ -272,11 +274,11 @@ function dirOf(a: string): 'long' | 'short' | 'flat' {
         <table class="table w-full">
           <thead>
             <tr>
-              <th>标的</th>
-              <th class="col-num">OKX 现价</th>
-              <th class="col-num">BN 基差</th>
-              <th class="col-num">Gate 基差</th>
-              <th class="col-num">多空比 (BN/Gate)</th>
+              <th>{{ t('dash.radar.thSymbol') }}</th>
+              <th class="col-num">{{ t('dash.radar.xvenue.okxPrice') }}</th>
+              <th class="col-num">{{ t('dash.radar.thBasis') }}</th>
+              <th class="col-num">{{ t('dash.radar.thBasisGate') }}</th>
+              <th class="col-num">{{ t('dash.radar.thLs') }}</th>
             </tr>
           </thead>
           <tbody>

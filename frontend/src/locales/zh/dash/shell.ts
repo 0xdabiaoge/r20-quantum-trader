@@ -44,6 +44,7 @@ export const zhShell = {
   // ── 批 29：壳层此前有 11 处中文写死在模板里（导航分组名、三所网关、
   //    折叠按钮 title/aria、关于系统按钮、实时流指示灯 title）。
   //    英文模式下这些位置仍然是中文，逐条收进语言包。 ──
+trajectoryBtn: '决策轨迹',
   nav: {
     liveDot: '实时流在线',
     groupCore: '核心工作台',
@@ -57,5 +58,21 @@ export const zhShell = {
     openNav: '展开导航栏',
     closeNav: '收起导航栏',
     about: '关于系统',
+  },
+  panel: {
+    aria: '决策轨迹与日志面板',
+    closeAria: '关闭面板',
+    streamTitle: '决策轨迹与执行流',
+    streamDesc: 'DeepSeek Harness 智能体决策透视面板',
+    decisionFlow: 'AI 决策流',
+    liveLog: '实时日志',
+    confidence: '置信度',
+    velocity: '一阶导 v:',
+    acceleration: '二阶导 a:',
+    leverage: '杠杆:',
+    noTrajectory: '暂无最新决策轨迹，模型轮询中...',
+    noLogMatch: '暂无匹配的运行日志',
+    guardReady: '三位一体 Fail-Closed 硬防线已就绪',
+    computing: '多周期动能共振计算中',
   },
 };
