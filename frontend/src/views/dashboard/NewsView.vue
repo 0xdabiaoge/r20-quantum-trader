@@ -236,7 +236,7 @@ function toggleCoinFilter(sym: string) {
       <!-- 舆情快讯情报流 -->
       <div class="dsh-card overflow-hidden">
         <!-- 筛选栏 -->
-        <div class="dsh-card-header flex flex-wrap items-center justify-between gap-2">
+        <header class="dsh-card-header flex flex-wrap items-center justify-between gap-2">
           <div class="seg" role="tablist" :aria-label="t('dash.news.feed.source')">
             <button
               v-for="f in sourceFilters"
@@ -253,7 +253,7 @@ function toggleCoinFilter(sym: string) {
           <div class="text-3xs text-[var(--ink-3)] font-mono">
             {{ t('dash.news.countNews', undefined, { a: filteredNews.length, b: rawNews.length }) }}
           </div>
-        </div>
+        </header>
 
         <!-- 空态 -->
         <BaseEmpty v-if="!filteredNews.length" :text="t('dash.news.feed.empty')" />

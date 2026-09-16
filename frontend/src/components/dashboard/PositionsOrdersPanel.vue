@@ -71,7 +71,7 @@ function symOf(x: { instId?: string; name?: string }): string {
 <template>
   <div class="dsh-card pop-panel flex h-full max-h-[58dvh] flex-col overflow-hidden xl:max-h-none">
     <!-- 面板头部：选项卡与场所过滤条 -->
-    <div class="dsh-card-header flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+    <header class="dsh-card-header flex flex-col sm:flex-row sm:items-center justify-between gap-2">
       <div class="flex items-center gap-2">
         <BaseSegmented
           v-model="tab"
@@ -103,7 +103,7 @@ function symOf(x: { instId?: string; name?: string }): string {
           {{ v.label }}
         </button>
       </div>
-    </div>
+    </header>
 
     <!-- 持仓列表 -->
     <div v-if="tab === 'positions'" class="scroll-y flex-1 min-h-0 overflow-x-auto">

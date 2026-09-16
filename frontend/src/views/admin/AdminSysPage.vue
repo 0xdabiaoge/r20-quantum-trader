@@ -351,7 +351,7 @@ onMounted(load)
 
         <label class="as-field">
           <span class="form-label">{{ t('admin.adminsys.create.role') }}</span>
-          <select v-model="newRole" class="field">
+          <select v-model="newRole" class="field" :aria-label="t('admin.adminsys.create.role')">
             <option value="admin">{{ t('admin.adminsys.create.roleAdmin') }}</option>
             <option value="superadmin">{{ t('admin.adminsys.create.roleSuperadmin') }}</option>
           </select>

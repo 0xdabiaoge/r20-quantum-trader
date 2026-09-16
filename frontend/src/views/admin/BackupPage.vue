@@ -421,14 +421,14 @@ onMounted(load)
           <div class="bk-fields">
             <label class="bk-field">
               <span class="form-label">{{ t('admin.backup.secContent') }}</span>
-              <select disabled class="field bk-readonly">
+              <select disabled class="field bk-readonly" :aria-label="t('admin.backup.secContent')">
                 <option>{{ t('admin.backup.scopeValue') }}</option>
               </select>
             </label>
 
             <label class="bk-field">
               <span class="form-label">{{ t('admin.backup.secLocation') }}</span>
-              <select v-model="destination" :disabled="!auth.isSuperadmin" class="field">
+              <select v-model="destination" :disabled="!auth.isSuperadmin" class="field" :aria-label="t('admin.backup.secLocation')">
                 <option value="local">{{ t('admin.backup.destLocal') }}</option>
                 <option value="s3">{{ t('admin.backup.destS3') }}</option>
                 <option value="oss">{{ t('admin.backup.destOss') }}</option>

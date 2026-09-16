@@ -288,7 +288,7 @@ const truncation = computed<{ kept: number; total: number } | null>(() => {
       <!-- 筛选工具栏与台账表格 -->
       <div class="dsh-card overflow-hidden">
         <!-- 筛选栏 -->
-        <div class="dsh-card-header flex flex-wrap items-center justify-between gap-2">
+        <header class="dsh-card-header flex flex-wrap items-center justify-between gap-2">
           <div class="flex flex-wrap items-center gap-2">
             <BaseSegmented
               v-model="fStatus"
@@ -350,7 +350,7 @@ const truncation = computed<{ kept: number; total: number } | null>(() => {
               <option v-for="o in instOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
             </select>
           </div>
-        </div>
+        </header>
 
         <!-- 数据为空 -->
         <BaseEmpty v-if="!filtered.length" :text="t('dash.ledger.empty')" />

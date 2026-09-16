@@ -661,6 +661,7 @@ onMounted(loadData);
                     class="field"
                     :class="{ 'is-warn': modelMissing(selectedRole) }"
                     :aria-invalid="modelMissing(selectedRole) ? 'true' : undefined"
+                    :aria-label="t('admin.council.fieldModel')"
                     :disabled="!auth.isSuperadmin"
                   >
                     <option value="">{{ t('admin.council.inheritGlobalBrain') }}</option>

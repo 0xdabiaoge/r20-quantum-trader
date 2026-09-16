@@ -632,7 +632,7 @@ onMounted(() => { loadAll(); loadMx() })
               <template #env>
                 <label class="sc-field">
                   <span class="form-label">{{ t('admin.security.envTier') }}</span>
-                  <select v-model="config.editable.okx_environment" class="field">
+                  <select v-model="config.editable.okx_environment" class="field" :aria-label="t('admin.security.envTier')">
                     <option value="demo">{{ t('admin.security.optDemo') }}</option>
                     <option value="live">{{ t('admin.security.optLive') }}</option>
                   </select>

@@ -88,7 +88,7 @@ const title = computed(() =>
 
       <label class="me-field">
         <span class="form-label">{{ t('admin.llm.effortLabel') }}</span>
-        <select v-model="modelForm.reasoning_effort" class="field me-select">
+        <select v-model="modelForm.reasoning_effort" class="field me-select" :aria-label="t('admin.llm.effortLabel')">
           <option v-for="opt in availableEffortOptions" :key="opt.value" :value="opt.value">
             {{ opt.label }}
           </option>

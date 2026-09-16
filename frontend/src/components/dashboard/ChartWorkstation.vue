@@ -695,7 +695,7 @@ onUnmounted(() => {
     ]"
   >
     <!-- 工具条：行情信息 + 工作站工具 -->
-    <div
+    <header
       class="dsh-card-header flex flex-wrap items-center gap-x-3 gap-y-2"
     >
       <!-- 选币下拉 -->
@@ -840,7 +840,7 @@ onUnmounted(() => {
           <Maximize v-else />
         </button>
       </div>
-    </div>
+    </header>
 
     <!-- 图表画布：高度响应式。旧固定 560px 在移动端占满整屏，把持仓面板顶到首屏外
          且自身吃满手势；改 dvh 自适应，全屏态仍走 calc(视口-顶栏)。 -->

@@ -99,7 +99,7 @@ onMounted(async () => {
 <template>
   <div class="dsh-card">
     <!-- 头部：多所组合分布与状态 -->
-    <div
+    <header
       v-if="hasMultiVenue"
       class="dsh-card-header text-3xs font-medium"
     >
@@ -135,7 +135,7 @@ onMounted(async () => {
           <span style="color: var(--ink-1)">{{ distGate }}%</span>
         </span>
       </div>
-    </div>
+    </header>
 
     <!-- 6 个核心指标单元格 -->
     <div class="grid grid-cols-2 gap-px bg-white/[0.04] sm:grid-cols-3 xl:grid-cols-6">
