@@ -87,12 +87,13 @@ test('表格排序按钮必须有 hover 反馈（批 100 修的 16 处）', () =
 });
 
 test('开关的 hover 必须显式排除「开着」的状态（去掉顺序依赖）', () => {
-  const body = ruleBody(CSS, '.switch:hover:not([aria-checked="true"])');
+  // 批 102 又加了 `:not(:disabled)`（禁用时不该有悬停反馈），故两个 :not 都要在。
+  const body = ruleBody(CSS, '.switch:hover:not(:disabled):not([aria-checked="true"])');
   assert.ok(
     body,
-    '找不到 .switch:hover:not([aria-checked="true"]) —— ' +
-      '若退回成裸 `.switch:hover`，它与 `.switch[aria-checked="true"]` 同权重，' +
-      '只能靠书写顺序决胜，动一处顺序就静默失效',
+    '找不到 .switch:hover:not(:disabled):not([aria-checked="true"]) —— ' +
+      '退回成裸 `.switch:hover` 会同时踩两个坑：与 `.switch[aria-checked="true"]` 同权重、' +
+      '只能靠书写顺序决胜；且被禁用的开关照样亮起悬停边色',
   );
   assert.match(body, /border-color\s*:\s*var\(--ds-color-border-hover\)/);
 });

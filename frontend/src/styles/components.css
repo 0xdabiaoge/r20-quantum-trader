@@ -941,7 +941,7 @@ kbd {
    决定结果 —— 行为正确但**依赖书写顺序**，改一处顺序就会静默失效。
    写成 `:not(...)` 后意图明确，且与全站既有语汇
    `.seg button:hover:not(.seg-on)` 完全一致：**选中态不因悬停变样**。 */
-.switch:hover:not([aria-checked="true"]) {
+.switch:hover:not(:disabled):not([aria-checked="true"]) {
   border-color: var(--ds-color-border-hover);
 }
 

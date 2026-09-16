@@ -566,7 +566,14 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
   cursor: pointer;
   transition: all var(--dur-fast) var(--ease-out);
 }
-.ov-btn-refresh:hover {
+/* 批 102：`loading` 期间这是**禁用**按钮，但此前它没有任何禁用样式 ——
+   看上去和可点的一样，而且 `:hover` 照样亮（点下去没反应）。
+   全仓 131 个可禁用控件里就漏了这一个。视觉沿用 `.btn:disabled` 的既有约定。 */
+.ov-btn-refresh:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.ov-btn-refresh:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.08);
   color: #fff;
   border-color: rgba(255, 255, 255, 0.2);
