@@ -444,7 +444,7 @@ onBeforeUnmount(() => {
               :class="{ 'is-on': channelOn(c.key) }"
             >
               <header class="nf-card-head">
-                <span class="nf-card-dot" :class="{ 'is-on': channelOn(c.key) }" />
+                <span class="nf-card-dot" :class="{ 'is-on': channelOn(c.key) }" aria-hidden="true" />
                 <h3 class="nf-card-title">{{ c.title }}</h3>
 
                 <div class="nf-card-actions">

@@ -140,7 +140,7 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
       <template #actions>
         <div class="ov-header-actions">
           <div class="ov-live-pill">
-            <span class="ov-live-dot" />
+            <span class="ov-live-dot" aria-hidden="true" />
             <span class="ov-live-text">TELEMETRY LIVE</span>
           </div>
           <span class="ov-version-badge mono">{{ APP_VERSION }}</span>
@@ -175,7 +175,7 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
           <span class="ov-hud-icon"><Server :size="14" /></span>
           <span class="ov-hud-label">{{ t('admin.overview.backend') }}</span>
           <span class="ov-hud-badge is-up">
-            <span class="pulse-dot" />
+            <span class="pulse-dot" aria-hidden="true" />
             ONLINE
           </span>
         </div>
@@ -347,7 +347,7 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
               class="ov-chip-status"
               :class="health.overall === 'LIVE' ? 'is-live' : 'is-warn'"
             >
-              <span class="pulse-dot" />
+              <span class="pulse-dot" aria-hidden="true" />
               {{ health.overall || 'SYNC' }}
             </span>
           </header>
@@ -366,7 +366,7 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
               class="ov-pipe-row"
             >
               <div class="ov-pipe-info">
-                <span class="ov-pipe-dot" :class="f.fresh ? 'is-fresh' : 'is-stale'" />
+                <span class="ov-pipe-dot" :class="f.fresh ? 'is-fresh' : 'is-stale'" aria-hidden="true" />
                 <span class="ov-pipe-filename mono truncate" :title="f.name">{{ f.name }}</span>
               </div>
               <div class="ov-pipe-meta">
@@ -448,7 +448,7 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
         >
           <!-- 状态点与时间 -->
           <div class="ov-ar-time">
-            <span class="ov-ar-dot" :class="a.status === 'success' ? 'is-ok' : 'is-fail'" />
+            <span class="ov-ar-dot" :class="a.status === 'success' ? 'is-ok' : 'is-fail'" aria-hidden="true" />
             <span class="mono">{{ fmtDateTime(a.timestamp) }}</span>
           </div>
 

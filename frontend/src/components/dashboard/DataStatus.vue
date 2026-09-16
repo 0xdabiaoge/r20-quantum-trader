@@ -37,7 +37,7 @@ const cycleMinutes = computed<number | null>(() => {
       class="dsh-pill text-[var(--down)] border-[var(--down-line)] bg-[var(--down-bg)]"
       :title="breaker.reason"
     >
-      <span class="dsh-status-dot error" />
+      <span class="dsh-status-dot error" aria-hidden="true" />
       {{ t('dash.shell.breaker') }}
     </span>
 
@@ -45,7 +45,7 @@ const cycleMinutes = computed<number | null>(() => {
       class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-3xs font-mono border"
       style="background-color: var(--surface-2); border-color: var(--line-1); color: var(--ink-2)"
     >
-      <span class="dsh-status-dot" :class="engine.dot" />
+      <span class="dsh-status-dot" :class="engine.dot" aria-hidden="true" />
       <span class="font-medium" style="color: var(--ink-1)">{{ engine.label }}</span>
       <span v-if="cycleMinutes" class="text-[var(--ink-3)]">· {{ cycleMinutes }}M</span>
       <span v-if="updated" class="hidden lg:inline text-[var(--ink-3)]">

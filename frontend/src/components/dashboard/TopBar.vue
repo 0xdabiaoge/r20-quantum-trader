@@ -83,7 +83,7 @@ const activeTab = computed(() => {
         style="background-color: var(--surface-2); border-color: var(--line-1); color: var(--ink-1)"
         @click="trajectoryOpen = true"
       >
-        <span class="dsh-status-dot active" />
+        <span class="dsh-status-dot active" aria-hidden="true" />
         <Activity class="h-3.5 w-3.5 text-blue-400" />
         <span>{{ t('dash.shell.trajectoryBtn') }}</span>
       </button>

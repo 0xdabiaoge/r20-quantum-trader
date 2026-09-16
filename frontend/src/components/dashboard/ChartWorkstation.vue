@@ -742,7 +742,7 @@ onUnmounted(() => {
         {{ liveChangePct >= 0 ? '+' : '' }}{{ liveChangePct.toFixed(2) }}%
       </span>
       <span class="dsh-pill hidden md:inline-flex">
-        <span class="dsh-status-dot active" />{{ t('dash.matrix.chart.live') }}
+        <span class="dsh-status-dot active" aria-hidden="true" />{{ t('dash.matrix.chart.live') }}
       </span>
       <span class="t-faint num font-mono hidden text-3xs lg:inline">1H ATR {{ currentAtr >= 100 ? '$' + currentAtr.toFixed(1) : (currentAtr * 100).toFixed(2) + '%' }}</span>
 

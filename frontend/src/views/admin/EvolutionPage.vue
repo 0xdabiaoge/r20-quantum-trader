@@ -301,7 +301,7 @@ onMounted(loadData);
     <PageHeader :title="t('nav.admin.evolution')" :description="t('admin.evolution.desc')">
       <template #actions>
         <span class="dsh-pill">
-          <span class="dsh-status-dot active" />
+          <span class="dsh-status-dot active" aria-hidden="true" />
           {{ t('admin.evolution.guardChip') }}
         </span>
         <button class="btn btn-ghost btn-sm" :disabled="busy !== '' || loading" @click="reloadMemory">

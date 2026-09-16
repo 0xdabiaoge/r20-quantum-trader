@@ -161,7 +161,7 @@ async function handleLogin() {
 
       <!-- 底部安全状态与版本 -->
       <div class="auth-meta-bar mono">
-        <span class="auth-meta-dot" />
+        <span class="auth-meta-dot" aria-hidden="true" />
         <span>FAIL-CLOSED HARD GATEWAYS READY</span>
         <span class="auth-meta-sep">·</span>
         <span>SESSION ENCRYPTED</span>

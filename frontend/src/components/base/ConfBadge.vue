@@ -16,7 +16,7 @@ const dot = computed(() => {
 
 <template>
   <span v-if="tier" class="badge" :title="`${Math.round((Number(value) || 0) * 100) / 100}`">
-    <span class="dot" :style="{ backgroundColor: dot }" />
+    <span class="dot" :style="{ backgroundColor: dot }" aria-hidden="true" />
     {{ t(`common.conf.${tier.tier}`) }}
   </span>
   <span v-else class="t-faint">--</span>

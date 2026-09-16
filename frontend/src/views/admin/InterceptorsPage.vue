@@ -269,7 +269,7 @@ onMounted(loadPlugins)
     <PageHeader :title="t('nav.admin.interceptors')" :description="t('admin.interceptors.desc')">
       <template #actions>
         <span class="dsh-pill">
-          <span class="dsh-status-dot active" />
+          <span class="dsh-status-dot active" aria-hidden="true" />
           {{ t('admin.interceptors.failClosed') }}
         </span>
         <button class="btn btn-ghost btn-sm" :disabled="loading" @click="loadPlugins">

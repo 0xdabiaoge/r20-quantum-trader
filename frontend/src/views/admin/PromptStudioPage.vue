@@ -594,7 +594,7 @@ onMounted(loadLib)
             >
               <span class="ps-profile-top">
                 <span class="ps-profile-name truncate" :title="p.name">{{ p.name }}</span>
-                <span v-if="p.id === lib.active_profile_id" class="dsh-status-dot active" />
+                <span v-if="p.id === lib.active_profile_id" class="dsh-status-dot active" :title="t('admin.promptStudio.profiles.active')" :aria-label="t('admin.promptStudio.profiles.active')" />
               </span>
               <span class="ps-profile-desc truncate" :title="p.description || t('admin.promptStudio.profiles.noDesc')">
                 {{ p.description || t('admin.promptStudio.profiles.noDesc') }}

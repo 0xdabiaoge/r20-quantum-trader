@@ -165,7 +165,7 @@ function refreshAll(): void {
     <!-- 主体：三所同构卡片与风控行 -->
     <div class="p-3 space-y-3">
       <div v-if="store.needsAuth" class="dsh-pill" data-test="needs-auth">
-        <span class="dsh-status-dot warn" />
+        <span class="dsh-status-dot warn" aria-hidden="true" />
         {{ t('dash.venueAccounts.needsAuth') }}
       </div>
 

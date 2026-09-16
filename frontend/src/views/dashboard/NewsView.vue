@@ -129,7 +129,7 @@ function toggleCoinFilter(sym: string) {
       <!-- 信源状态与新鲜度 -->
       <div class="flex flex-wrap items-center gap-1.5">
         <span class="dsh-pill" :title="sourceReason">
-          <span class="dsh-status-dot" :class="isSourceActive ? 'active' : 'warn'" />
+          <span class="dsh-status-dot" :class="isSourceActive ? 'active' : 'warn'" aria-hidden="true" />
           <span class="text-[var(--ink-2)]">{{ isSourceActive ? sourceReason : t('status.attention') }}</span>
         </span>
         <span v-if="freshAt" class="dsh-pill text-3xs font-mono text-[var(--ink-3)]">

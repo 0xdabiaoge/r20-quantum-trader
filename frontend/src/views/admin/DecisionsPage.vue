@@ -141,7 +141,7 @@ function tone(level: string): string {
     <PageHeader :title="t('nav.admin.decisions')" :description="t('admin.decisions.desc')">
       <template #actions>
         <span class="dsh-pill">
-          <span class="dsh-status-dot active" />
+          <span class="dsh-status-dot active" aria-hidden="true" />
           {{ t('admin.decisions.normalRun') }}
         </span>
         <button class="btn btn-ghost btn-sm" :disabled="logLoading" @click="fetchLogStream(activeLogTab)">

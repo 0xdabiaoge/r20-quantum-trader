@@ -54,7 +54,7 @@ function pick(instId: string) {
       <div>
         <div class="flex items-center gap-2">
           <h1 class="text-sm font-bold tracking-tight text-[var(--ink-strong)] flex items-center gap-1.5">
-            <span class="dsh-status-dot active" />
+            <span class="dsh-status-dot active" aria-hidden="true" />
             {{ t('dash.matrix.title') }}
           </h1>
           <span

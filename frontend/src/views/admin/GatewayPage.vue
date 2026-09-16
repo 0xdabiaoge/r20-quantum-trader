@@ -220,7 +220,7 @@ function statusLabel(s: string): string {
             <span>{{ t('admin.gateway.scheduler.colStatus') }}</span>
           </div>
           <div v-for="j in jobs" :key="j.name" class="gw-job" :class="{ 'is-overdue': j.overdue }">
-            <span class="dsh-status-dot" :class="j.overdue ? 'error' : 'active'" />
+            <span class="dsh-status-dot" :class="j.overdue ? 'error' : 'active'" aria-hidden="true" />
             <span class="gw-job-name mono truncate" :title="j.name">{{ j.name }}</span>
             <span class="gw-job-cell mono">{{ j.interval_seconds }}s</span>
             <span class="gw-job-cell mono">

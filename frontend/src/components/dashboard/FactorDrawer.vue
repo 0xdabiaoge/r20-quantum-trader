@@ -196,7 +196,7 @@ const vdBudgetText = computed(() => {
         <template v-if="vd">
           <div class="flex flex-wrap items-center gap-1.5">
             <span class="badge" :style="{ color: vd.venue ? venueColor(vd.venue) : 'var(--ink-3)', borderColor: 'currentColor' }">
-              <span class="dot" :style="{ backgroundColor: vd.venue ? venueColor(vd.venue) : 'var(--ink-3)' }" />
+              <span class="dot" :style="{ backgroundColor: vd.venue ? venueColor(vd.venue) : 'var(--ink-3)' }" aria-hidden="true" />
               {{ t('dash.matrix.venue.selectedPrefix') }} {{ vd.venue ? venueLabel(vd.venue) : t('dash.matrix.venue.notSelected') }}
             </span>
             <span :class="vdBadgeCls">{{ vd.reason_code || t('dash.matrix.venue.reasonCodeFallback') }}</span>

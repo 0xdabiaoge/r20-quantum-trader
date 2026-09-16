@@ -75,7 +75,7 @@ const listingTitle = computed(() => {
         class="dsh-pill"
         :title="account?.reason || ''"
       >
-        <span class="dsh-status-dot" :class="statusMeta.statusDot" />
+        <span class="dsh-status-dot" :class="statusMeta.statusDot" aria-hidden="true" />
         <span>{{ loading && !account ? t('dash.venueAccounts.loading') : statusMeta.label }}</span>
       </div>
     </div>
