@@ -158,4 +158,7 @@ export const zhAdminCouncil = {
   testFailed: '测试失败: {msg}',
   unknownError: '未知错误',
   testError: '测试出错: {msg}',
+  // ── 批 67：席位提示词与导入 JSON 文本域缺少程序化名称 ──
+  seatPromptAria: '席位提示词',
+  importJsonAria: '委员会配置 JSON',
 };

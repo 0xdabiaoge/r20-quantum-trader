@@ -709,6 +709,7 @@ onMounted(loadLib)
               </div>
               <input
                 v-model="selectedModule.title"
+                :aria-label="t('admin.promptStudio.modules.titlePlaceholder')"
                 class="field ps-title-input"
                 :readonly="!auth.isSuperadmin"
                 :placeholder="t('admin.promptStudio.modules.titlePlaceholder')"
@@ -717,6 +718,7 @@ onMounted(loadLib)
               <textarea
                 v-model="selectedModule.content"
                 rows="12"
+                :aria-label="t('admin.promptStudio.moduleEditor')"
                 class="field ps-textarea"
                 :readonly="!auth.isSuperadmin"
                 :placeholder="t('admin.promptStudio.modules.contentPlaceholder')"
@@ -847,7 +849,7 @@ onMounted(loadLib)
       @close="importVisible = false"
     >
       <div class="ps-import">
-        <div v-if="importFileError" class="ps-import-error">
+        <div v-if="importFileError" role="alert" class="ps-import-error">
           <AlertTriangle :size="13" />
           <span>{{ importFileError }}</span>
         </div>
@@ -877,6 +879,7 @@ onMounted(loadLib)
           <input
             v-model="importNameOverride"
             type="text"
+            :aria-label="t('admin.promptStudio.import.nameLabel')"
             class="field"
             :placeholder="t('admin.promptStudio.import.namePlaceholder')"
           />

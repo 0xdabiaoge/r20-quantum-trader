@@ -282,7 +282,7 @@ function refreshAll(): void {
           <span>{{ isDemo ? t('dash.venueAccounts.envDemo') : t('dash.venueAccounts.envLive') }}</span>
           <span v-if="store.capturedAt">· {{ t('dash.venueAccounts.captured') }} {{ new Date(store.capturedAt).toLocaleTimeString() }}</span>
         </div>
-        <span v-if="store.error && !store.needsAuth" data-test="fetch-error" class="text-[var(--warn)]">
+        <span v-if="store.error && !store.needsAuth" role="status" aria-live="polite" data-test="fetch-error" class="text-[var(--warn)]">
           {{ store.error }}
         </span>
       </div>

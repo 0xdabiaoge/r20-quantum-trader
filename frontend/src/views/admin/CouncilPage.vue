@@ -607,6 +607,7 @@ onMounted(loadData);
                 <div class="cn-editor-text">
                   <input
                     v-model="selectedRole.name"
+                    :aria-label="t('admin.council.seatNamePlaceholder')"
                     class="cn-name-input"
                     :readonly="!auth.isSuperadmin"
                     :placeholder="t('admin.council.seatNamePlaceholder')"
@@ -752,6 +753,7 @@ onMounted(loadData);
               <textarea
                 v-model="selectedRole.prompt"
                 rows="10"
+                :aria-label="t('admin.council.seatPromptAria')"
                 class="field cn-textarea"
                 :disabled="!auth.isSuperadmin"
                 :placeholder="t('admin.council.promptPlaceholder')"
@@ -952,10 +954,11 @@ onMounted(loadData);
         <textarea
           v-model="importRawJson"
           rows="10"
+          :aria-label="t('admin.council.importJsonAria')"
           class="field cn-textarea mono"
           :placeholder="t('admin.council.importPlaceholder')"
         />
-        <p v-if="importFileError" class="cn-warn">
+        <p v-if="importFileError" role="alert" class="cn-warn">
           <AlertTriangle :size="13" />
           <span>{{ importFileError }}</span>
         </p>

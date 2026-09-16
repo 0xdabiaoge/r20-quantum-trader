@@ -96,4 +96,7 @@ export const enAdminEvolution = {
   runFailed: 'Failed to run the review: {msg}',
   // ── batch 44: accessible name for the tablist ──
   tabsLabel: 'Self-evolution view switcher',
+  // ── batch 67: doctrine input and module content textarea lacked accessible names ──
+  memoryInputAria: 'New playbook doctrine',
+  moduleContentAria: 'Module prompt content',
 };

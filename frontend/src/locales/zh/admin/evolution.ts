@@ -97,4 +97,7 @@ export const zhAdminEvolution = {
   runFailed: '执行复盘失败: {msg}',
   // ── 批 44：页签栏的组名（role=tablist 的可访问名）──
   tabsLabel: '自进化视图切换',
+  // ── 批 67：心法输入框与模块内容文本域缺少程序化名称 ──
+  memoryInputAria: '新增实战心法',
+  moduleContentAria: '模块提示词内容',
 };

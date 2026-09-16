@@ -202,4 +202,11 @@ export const zhAdminSecurity = {
   phSecretKey: 'Secret Key',
   phPassphrase: 'Passphrase',
   phApiSecret: 'API Secret',
+  // ── 批 67：mxForm 六处凭证/短语输入原先只有可见 form-label，没有程序化名称 ──
+  binanceKeyAria: '币安 API Key',
+  binanceSecretAria: '币安 Secret Key',
+  gateKeyAria: 'Gate API Key',
+  gateSecretAria: 'Gate Secret Key',
+  gateExecPhraseAria: '开启 Gate 执行路由的确认短语',
+  instAria: '交易标的 ID',
 };

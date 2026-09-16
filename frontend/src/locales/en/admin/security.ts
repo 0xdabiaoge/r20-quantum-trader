@@ -199,4 +199,11 @@ export const enAdminSecurity = {
   phSecretKey: 'Secret Key',
   phPassphrase: 'Passphrase',
   phApiSecret: 'API Secret',
+  // ── batch 67: mxForm credential/phrase fields had a visible label but no accessible name ──
+  binanceKeyAria: 'Binance API key',
+  binanceSecretAria: 'Binance secret key',
+  gateKeyAria: 'Gate API key',
+  gateSecretAria: 'Gate secret key',
+  gateExecPhraseAria: 'Confirm phrase to open Gate execution routing',
+  instAria: 'Instrument ID',
 };

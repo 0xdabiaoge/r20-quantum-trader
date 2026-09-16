@@ -137,7 +137,7 @@ function statusLabel(s: string): string {
 
     <template v-else>
       <!-- 刷新失败但仍有旧数据：细条提示，不清空界面 -->
-      <div v-if="error" class="gw-stale">
+      <div v-if="error" role="status" aria-live="polite" class="gw-stale">
         <AlertTriangle :size="13" />
         <span>{{ t('admin.gateway.msgs.loadFailed', undefined, { msg: error }) }}</span>
         <button class="btn btn-quiet btn-sm" @click="load">{{ t('common.retry') }}</button>

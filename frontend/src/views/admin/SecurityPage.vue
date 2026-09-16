@@ -700,8 +700,8 @@ onMounted(() => { loadAll(); loadMx() })
 
               <div class="sc-creds">
                 <span class="form-label">{{ t('admin.security.binanceCredLabel') }}</span>
-                <input v-model="mxForm.binance_api_key" type="text" :placeholder="t('admin.security.apiKeyKeep')" class="field mono" />
-                <input v-model="mxForm.binance_secret_key" type="password" :placeholder="t('admin.security.phApiSecret')" class="field" />
+                <input v-model="mxForm.binance_api_key" type="text" :aria-label="t('admin.security.binanceKeyAria')" :placeholder="t('admin.security.apiKeyKeep')" class="field mono" />
+                <input v-model="mxForm.binance_secret_key" type="password" :aria-label="t('admin.security.binanceSecretAria')" :placeholder="t('admin.security.phApiSecret')" class="field" />
               </div>
 
               <template #extra>
@@ -740,8 +740,8 @@ onMounted(() => { loadAll(); loadMx() })
 
               <div class="sc-creds">
                 <span class="form-label">{{ t('admin.security.gateCredLabel') }}</span>
-                <input v-model="mxForm.gate_api_key" type="text" :placeholder="t('admin.security.apiKeyKeep')" class="field mono" />
-                <input v-model="mxForm.gate_secret_key" type="password" :placeholder="t('admin.security.phApiSecret')" class="field" />
+                <input v-model="mxForm.gate_api_key" type="text" :aria-label="t('admin.security.gateKeyAria')" :placeholder="t('admin.security.apiKeyKeep')" class="field mono" />
+                <input v-model="mxForm.gate_secret_key" type="password" :aria-label="t('admin.security.gateSecretAria')" :placeholder="t('admin.security.phApiSecret')" class="field" />
               </div>
 
               <template #extra>
@@ -756,6 +756,7 @@ onMounted(() => { loadAll(); loadMx() })
                   <input
                     v-if="gateExecDirty && gateExec"
                     v-model="gateExecPhrase"
+                    :aria-label="t('admin.security.gateExecPhraseAria')"
                     :placeholder="t('admin.security.gatePhrasePlaceholder')"
                     class="field mono"
                   />
@@ -842,6 +843,7 @@ onMounted(() => { loadAll(); loadMx() })
           <template #actions>
             <input
               v-model="newInstId"
+              :aria-label="t('admin.security.instAria')"
               :placeholder="t('admin.security.instPlaceholder')"
               class="field mono sc-inst-input"
               @keyup.enter="addInstrument"

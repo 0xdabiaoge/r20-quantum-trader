@@ -450,7 +450,7 @@ onMounted(loadPlugins)
       size="lg"
       @close="closeCreate"
     >
-      <div v-if="createError" class="ip-dlg-error">
+      <div v-if="createError" role="alert" class="ip-dlg-error">
         <AlertTriangle :size="13" />
         <span>{{ createError }}</span>
       </div>
@@ -461,6 +461,7 @@ onMounted(loadPlugins)
         <input
           v-model="newFilename"
           type="text"
+          :aria-label="t('admin.interceptors.filenameLabel')"
           class="field mono"
           :placeholder="t('admin.interceptors.filenamePlaceholder')"
         />

@@ -155,4 +155,7 @@ export const enAdminCouncil = {
   testFailed: 'Test failed: {msg}',
   unknownError: 'unknown error',
   testError: 'Test error: {msg}',
+  // ── batch 67: seat prompt and import JSON textareas lacked accessible names ──
+  seatPromptAria: 'Seat prompt',
+  importJsonAria: 'Council configuration JSON',
 };

@@ -483,6 +483,7 @@ onMounted(loadData);
           <div class="evo-add">
             <input
               v-model="newMemoryText"
+              :aria-label="t('admin.evolution.memoryInputAria')"
               class="field"
               :placeholder="t('admin.evolution.addPlaceholder')"
               @keydown.enter="addMemoryItem"
@@ -613,6 +614,7 @@ onMounted(loadData);
               <textarea
                 v-model="mod.content"
                 :disabled="!auth.isSuperadmin || mod.locked"
+                :aria-label="t('admin.evolution.moduleContentAria')"
                 rows="6"
                 class="field evo-textarea"
                 :placeholder="t('common.notConfigured')"

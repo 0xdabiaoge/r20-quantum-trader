@@ -350,6 +350,7 @@ const bandFacts = computed(() => {
           type="text"
           autocomplete="off"
           spellcheck="false"
+          :aria-label="t('admin.about.phrasePlaceholder')"
           :placeholder="t('admin.about.phrasePlaceholder')"
           class="field mono ab-confirm-input"
           @keyup.enter="executeUpdate"

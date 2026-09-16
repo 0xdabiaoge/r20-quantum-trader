@@ -153,7 +153,7 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
     </PageHeader>
 
     <!-- 错误恢复横幅 -->
-    <div v-if="loadError" class="ov-error-banner">
+    <div v-if="loadError" role="alert" class="ov-error-banner">
       <div class="ov-error-left">
         <AlertCircle :size="18" class="ov-error-icon" />
         <div>
