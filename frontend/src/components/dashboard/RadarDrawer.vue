@@ -129,7 +129,7 @@ function dirOf(a: string): 'long' | 'short' | 'flat' {
         v-if="councilStatus && !councilStatus.ran && councilStatus.reason"
         class="dsh-card-sub p-3 text-xs leading-body text-[var(--warn)] border-[var(--warn-line)]"
       >
-        {{ t('dash.radar.council.reason') }}：{{ councilStatus.reason }}
+        {{ t('dash.radar.council.reason') }}{{ t('common.punct.colon') }}{{ councilStatus.reason }}
       </p>
 
       <!-- 宏观综述 -->
@@ -139,7 +139,7 @@ function dirOf(a: string): 'long' | 'short' | 'flat' {
 
         <p v-if="promptChars(c)" class="num font-mono text-3xs text-[var(--ink-3)] mt-3 border-t pt-2" style="border-color: var(--line-1)">
           {{ t('dash.shell.peek.chars', undefined, { n: promptChars(c) ?? 0 }) }} · {{ t('dash.shell.peek.title') }}
-          <span v-if="c.ai_last_prompt_elided">（{{ t('dash.radar.detail.promptElided') }}）</span>
+          <span v-if="c.ai_last_prompt_elided">{{ t('common.punct.parenOpen') }}{{ t('dash.radar.detail.promptElided') }}{{ t('common.punct.parenClose') }}</span>
         </p>
       </div>
     </div>

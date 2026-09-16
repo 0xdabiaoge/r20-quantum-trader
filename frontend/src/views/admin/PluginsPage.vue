@@ -174,7 +174,7 @@ function typeLabel(v: string): string {
         <span class="pl-policy-icon"><ShieldAlert :size="15" /></span>
         <div class="pl-policy-text">
           <h3 class="pl-policy-title">
-            {{ t('admin.plugins.policyTitle') }}：
+            {{ t('admin.plugins.policyTitle') }}{{ t('common.punct.colon') }}
             {{ data?.installation_policy === 'builtin-only'
               ? t('admin.plugins.policyBuiltinOnly')
               : (data?.installation_policy || '--') }}

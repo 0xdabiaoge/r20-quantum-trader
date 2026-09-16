@@ -68,6 +68,14 @@ export const enCommon = {
     dir: { long: 'Long', short: 'Short', flat: 'Wait' },
     conf: { high: 'High conf.', mid: 'Mid conf.', low: 'Low conf.' },
     side: { all: 'All sides', long: 'Long only', short: 'Short only' },
+    // batch 39: fullwidth punctuation used to be hardcoded in templates and
+    // leaked into the English UI. Values now come per language; the English
+    // colon carries its own trailing space because the template adds none.
+    punct: {
+      colon: ': ',
+      parenOpen: '(',
+      parenClose: ')',
+    },
   },
   status: {
     normal: 'Normal',
@@ -101,4 +109,8 @@ export const enCommon = {
     official: 'Official',
     license: 'MIT License',
   },
+  // batch 39: fullwidth punctuation used to be hardcoded in templates
+  // (`}}：{{`, `（{{ ... }}）`), which leaked into the English UI. Values now
+  // come per language: CJK uses fullwidth, English uses ASCII with a trailing
+  // space after the colon (the template adds none).
 };

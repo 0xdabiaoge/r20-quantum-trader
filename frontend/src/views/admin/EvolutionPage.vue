@@ -97,7 +97,7 @@ async function loadData() {
     syncWorkingModules();
   } catch (e: any) {
     loadError.value = e.message;
-    toast.err(`加载失败: ${e.message}`);
+    toast.err(t('admin.evolution.loadFailed', undefined, { msg: e.message }));
   } finally {
     loading.value = false;
   }
@@ -116,7 +116,7 @@ function switchTab(tab: 'settings' | 'evolution_system' | 'evolution_user') {
 
 // Never retry writes: on failure require an explicit reload before another attempt.
 function expectedMemoryVersion() {
-  if (!memoryVersion.value) throw new Error('请重新加载心法后再操作');
+  if (!memoryVersion.value) throw new Error(t('admin.evolution.reloadFirst'));
   return memoryVersion.value;
 }
 
@@ -134,7 +134,7 @@ async function reloadMemory() {
   try {
     await refreshMemory();
   } catch (e: any) {
-    toast.err(`重新加载心法失败: ${e.message}`);
+    toast.err(t('admin.evolution.reloadFailed', undefined, { msg: e.message }));
   } finally {
     loading.value = false;
   }
@@ -146,10 +146,10 @@ async function toggleLessonStatus(lessonId: string) {
   try {
     await api(`/api/v1/admin/memory/toggle/${encodeURIComponent(lessonId)}?expected_version=${encodeURIComponent(expectedMemoryVersion())}`, { method: 'POST' });
     await refreshMemory();
-    toast.ok(`心法状态已切换（大模型下次决策立即感知）`);
+    toast.ok(t('admin.evolution.toggleOk'));
   } catch (e: any) {
     memoryVersion.value = null;
-    toast.err(`状态切换失败: ${e.message}`);
+    toast.err(t('admin.evolution.toggleFailed', undefined, { msg: e.message }));
   } finally {
     busy.value = '';
   }
@@ -159,8 +159,8 @@ async function rollbackToBaseline() {
   // 批C(2026-09-13)·破坏性操作收口：本操作清除非基准心法（含当日自进化成果），
   // 原生 confirm 在移动端易误触；改逐字短语确认。
   const _ok = await ask({
-    title: '防污染紧急回滚',
-    desc: '清除非基准的过期/被污染心法，重置回官方基准黄金心法库（当日自进化成果将被丢弃）',
+    title: t('admin.evolution.rollbackConfirmTitle'),
+    desc: t('admin.evolution.rollbackConfirmDesc'),
     danger: true,
     confirmPhrase: 'ROLLBACK',
     okText: t('common.rollbackRun'),
@@ -171,10 +171,10 @@ async function rollbackToBaseline() {
   try {
     await api(`/api/v1/admin/memory/rollback?expected_version=${encodeURIComponent(expectedMemoryVersion())}`, { method: 'POST' });
     await refreshMemory();
-    toast.ok('已成功执行宪法级防污染回滚，系统已重置为黄金基准认知');
+    toast.ok(t('admin.evolution.rollbackOk'));
   } catch (e: any) {
     memoryVersion.value = null;
-    toast.err(`回滚失败: ${e.message}`);
+    toast.err(t('admin.evolution.rollbackFailed', undefined, { msg: e.message }));
   } finally {
     busy.value = '';
   }
@@ -193,17 +193,22 @@ async function addMemoryItem() {
     // Reload full structured list
     await refreshMemory();
     newMemoryText.value = '';
-    toast.ok('新心法已通过防偏见审查，并成功同步写入决策注入层');
+    toast.ok(t('admin.evolution.addOk'));
   } catch (e: any) {
     memoryVersion.value = null;
-    toast.err(`添加心法失败: ${e.message}`);
+    toast.err(t('admin.evolution.addFailed', undefined, { msg: e.message }));
   } finally {
     busy.value = '';
   }
 }
 
 async function deleteMemoryItem(idx: number, lessonId: string) {
-  const _ok = await ask({ title: '删除自进化心法', desc: '该条心法将从认知库移除', danger: true, okText: t('common.del') });
+  const _ok = await ask({
+    title: t('admin.evolution.deleteConfirmTitle'),
+    desc: t('admin.evolution.deleteConfirmDesc'),
+    danger: true,
+    okText: t('common.del'),
+  });
   if (!_ok) return;
   if (busy.value || loading.value) return;
   busy.value = 'delete';
@@ -211,10 +216,10 @@ async function deleteMemoryItem(idx: number, lessonId: string) {
   try {
     await api(`/api/v1/admin/memory/${idx}?lesson_id=${encodeURIComponent(lessonId)}&expected_version=${encodeURIComponent(expectedMemoryVersion())}`, { method: 'DELETE' });
     await refreshMemory();
-    toast.ok('该条自进化心法已成功移除');
+    toast.ok(t('admin.evolution.deleteOk'));
   } catch (e: any) {
     memoryVersion.value = null;
-    toast.err(`删除失败: ${e.message}`);
+    toast.err(t('admin.evolution.deleteFailed', undefined, { msg: e.message }));
   } finally {
     busy.value = '';
     deletingIdx.value = null;
@@ -243,10 +248,10 @@ async function savePipelineModules() {
         pipelines: pipelinesMap,
       }),
     })
-    toast.ok(`自进化模版布局已成功保存，下一轮复盘自动生效`)
+    toast.ok(t('admin.evolution.layoutSaved'))
     await loadData()
   } catch (e: any) {
-    toast.err(`保存失败: ${e.message}`)
+    toast.err(t('admin.evolution.saveFailed', undefined, { msg: e.message }))
   } finally {
     busy.value = ''
   }
@@ -268,7 +273,7 @@ async function confirmRun() {
   // 与旧版等价：空输入视为取消
   if (!phrase) return;
   if (phrase.trim().toUpperCase() !== RUN_PHRASE) {
-    toast.err('确认短语错误，已取消执行');
+    toast.err(t('admin.evolution.phraseWrong'));
     closeRunDialog();
     return;
   }
@@ -278,11 +283,11 @@ async function confirmRun() {
       method: 'POST',
       body: JSON.stringify({ confirmation: 'RUN JOB' }),
     });
-    toast.ok(`自进化复盘已完成（已自动执行离群噪点过滤与宪法安全审查）！${res.detail || ''}`);
+    toast.ok(t('admin.evolution.runOk', undefined, { detail: res.detail || '' }));
     closeRunDialog();
     await loadData();
   } catch (e: any) {
-    toast.err(`执行复盘失败: ${e.message}`);
+    toast.err(t('admin.evolution.runFailed', undefined, { msg: e.message }));
   } finally {
     busy.value = '';
   }

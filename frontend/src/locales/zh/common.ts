@@ -69,6 +69,13 @@ export const zhCommon = {
     dir: { long: '做多', short: '做空', flat: '观望' },
     conf: { high: '高置信', mid: '中置信', low: '低置信' },
     side: { all: '全部方向', long: '仅多', short: '仅空' },
+    // 批 39：全角标点曾写死在模板里，英文界面因此出现全角冒号/括号。
+    // 改为按语言取值：中文全角；英文半角，且冒号自带一个尾空格（模板不加空格）。
+    punct: {
+      colon: '：',
+      parenOpen: '（',
+      parenClose: '）',
+    },
   },
   status: {
     normal: '正常',
@@ -102,4 +109,7 @@ export const zhCommon = {
     official: 'Official',
     license: 'MIT License',
   },
+  // 批 39：全角标点曾写死在模板里（`}}：{{`、`（{{ ... }}）`），
+  // 英文界面因此出现全角冒号/括号。改为按语言取值：中文用全角，
+  // 英文用半角且冒号带一个尾空格（模板里没有空格）。
 };

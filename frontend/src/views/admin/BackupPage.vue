@@ -102,7 +102,7 @@ async function load() {
     bucket.value = s.target?.bucket || ''
   } catch (e: any) {
     loadError.value = e.message
-    toast.err(`加载失败：${e.message}`)
+    toast.err(t('admin.backup.loadFailed', undefined, { msg: e.message }))
   } finally {
     loading.value = false
   }
@@ -126,7 +126,7 @@ async function testConnection() {
     const res = await api('/api/v1/admin/backups/simple/test', { method: 'POST', body: JSON.stringify(payload()) })
     toast.ok(`${res.detail}`)
   } catch (e: any) {
-    toast.err(`测试失败：${e.message}`)
+    toast.err(t('admin.backup.testFailed', undefined, { msg: e.message }))
   } finally {
     busy.value = ''
   }
@@ -136,10 +136,10 @@ async function save() {
   busy.value = 'save'
   try {
     await api('/api/v1/admin/backups/simple', { method: 'PUT', body: JSON.stringify(payload()) })
-    toast.ok('灾备配置已保存，每天北京时间 ' + scheduleTime.value + ' 自动执行')
+    toast.ok(t('admin.backup.configSaved', undefined, { time: scheduleTime.value }))
     await load()
   } catch (e: any) {
-    toast.err(`保存失败：${e.message}`)
+    toast.err(t('admin.backup.saveFailed', undefined, { msg: e.message }))
   } finally {
     busy.value = ''
   }
@@ -149,8 +149,8 @@ async function runNow() {
   // 批C(2026-09-13)：prompt() → 项目确认服务（移动端 prompt 常被浏览器弱化/难用），
   // 短语仍由用户逐字输入，与后端 `BACKUP R20` 契约一致。
   const _ok = await ask({
-    title: '立即执行完整灾备',
-    desc: '打包当前系统并按已启用目标上传',
+    title: t('admin.backup.runNowTitle'),
+    desc: t('admin.backup.runNowDesc'),
     danger: true,
     confirmPhrase: 'BACKUP R20',
     okText: t('common.execute'),
@@ -159,10 +159,10 @@ async function runNow() {
   busy.value = 'run'
   try {
     const res = await api('/api/v1/admin/backups/run', { method: 'POST', body: JSON.stringify({ confirmation: 'BACKUP R20' }) })
-    toast.ok(`灾备执行完成（${(res.output || '').length} 字符输出已记录）`)
+    toast.ok(t('admin.backup.runOk', undefined, { n: (res.output || '').length }))
     await load()
   } catch (e: any) {
-    toast.err(`灾备失败：${e.message}`)
+    toast.err(t('admin.backup.runFailed', undefined, { msg: e.message }))
   } finally {
     busy.value = ''
   }
@@ -171,7 +171,7 @@ async function runNow() {
 async function downloadArchive(archiveName: string) {
   const clean = archiveName.split('/').pop() || archiveName
   downloadingArchive.value = clean
-  toast.ok(`正在连接并准备下载归档文件 ${clean}...`)
+  toast.ok(t('admin.backup.connecting', undefined, { file: clean }))
 
   const token = auth.token || localStorage.getItem('r20.admin.session.id') || ''
   const directUrl = `/api/v1/admin/backups/download/${encodeURIComponent(clean)}${token ? `?token=${encodeURIComponent(token)}` : ''}`
@@ -205,7 +205,7 @@ async function downloadArchive(archiveName: string) {
       window.URL.revokeObjectURL(blobUrl)
     }, 2000)
 
-    toast.ok(`归档文件 ${clean} 已成功触发下载`)
+    toast.ok(t('admin.backup.downloadTriggered', undefined, { file: clean }))
   } catch (e: any) {
     // 双通道策略 2：若 Blob 或 Fetch 产生跨域或浏览器安全拦截，降级采用原生链接直连触发
     try {
@@ -216,9 +216,9 @@ async function downloadArchive(archiveName: string) {
       document.body.appendChild(fallbackA)
       fallbackA.click()
       setTimeout(() => fallbackA.remove(), 1000)
-      toast.ok(`已切换直接下载通道触发归档 ${clean} 下载`)
+      toast.ok(t('admin.backup.directChannel', undefined, { file: clean }))
     } catch (fallbackErr: any) {
-      toast.err(`下载失败：${e.message}`)
+      toast.err(t('admin.backup.downloadFailed', undefined, { msg: e.message }))
     }
   } finally {
     downloadingArchive.value = ''
@@ -248,12 +248,12 @@ async function onFileSelected(e: Event) {
     })
     const res = await resp.json()
     if (!resp.ok) {
-      throw new Error(res.detail || `上传失败 HTTP ${resp.status}`)
+      throw new Error(res.detail || t('admin.backup.uploadHttp', undefined, { status: resp.status }))
     }
-    toast.ok(`备份包 ${file.name} 上传成功！`)
+    toast.ok(t('admin.backup.uploadOk', undefined, { file: file.name }))
     await load()
   } catch (err: any) {
-    toast.err(`上传备份失败：${err.message}`)
+    toast.err(t('admin.backup.uploadFailed', undefined, { msg: err.message }))
   } finally {
     busy.value = ''
     if (target) target.value = ''
@@ -265,8 +265,8 @@ async function restoreArchive(archiveName: string) {
   // 批C(2026-09-13)：prompt+alert → 项目确认服务。恢复备份是覆盖式破坏操作
   // （解压覆盖当前配置/历史数据/策略），短语逐字输入，与后端 `RESTORE R20` 契约一致。
   const _ok = await ask({
-    title: '恢复备份（覆盖式，不可撤销）',
-    desc: `归档【${clean}】将解压覆盖当前系统配置、历史数据与策略`,
+    title: t('admin.backup.restoreConfirmTitle'),
+    desc: t('admin.backup.restoreConfirmDesc', undefined, { file: clean }),
     danger: true,
     confirmPhrase: 'RESTORE R20',
     okText: t('common.overwriteRestore'),
@@ -281,10 +281,10 @@ async function restoreArchive(archiveName: string) {
         confirmation: 'RESTORE R20'
       })
     })
-    toast.ok(`备份 ${clean} 恢复成功！共解压 ${res.restored_count} 个核心文件。请重启或刷新服务使新状态接管。`)
+    toast.ok(t('admin.backup.restoreOk', undefined, { file: clean, n: res.restored_count }))
     await load()
   } catch (e: any) {
-    toast.err(`恢复失败：${e.message}`)
+    toast.err(t('admin.backup.restoreFailed', undefined, { msg: e.message }))
   } finally {
     busy.value = ''
   }

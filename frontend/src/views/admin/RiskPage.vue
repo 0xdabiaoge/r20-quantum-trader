@@ -301,7 +301,7 @@ onMounted(loadData)
       <div class="rk-note-body">
         <p>{{ effectText || t('admin.risk.effectHint') }}</p>
         <p v-if="processFresh?.stale" class="rk-note-warn">
-          {{ t('admin.risk.processStale') }}（{{ t('admin.risk.processDiffCount', undefined, { n: driftCount.length }) }}）
+          {{ t('admin.risk.processStale') }}{{ t('common.punct.parenOpen') }}{{ t('admin.risk.processDiffCount', undefined, { n: driftCount.length }) }}{{ t('common.punct.parenClose') }}
         </p>
         <p v-else-if="driftCount.length" class="rk-note-warn">
           {{ t('admin.risk.processDiffCount', undefined, { n: driftCount.length }) }}
@@ -327,7 +327,7 @@ onMounted(loadData)
 
       <p v-if="driftCount.length" class="rk-drift">
         <AlertTriangle :size="12" class="shrink-0" />
-        <span>{{ t('admin.risk.engineDrift') }}：{{ driftLabels.join(t('admin.risk.itemSep')) }}</span>
+        <span>{{ t('admin.risk.engineDrift') }}{{ t('common.punct.colon') }}{{ driftLabels.join(t('admin.risk.itemSep')) }}</span>
       </p>
     </section>
 
