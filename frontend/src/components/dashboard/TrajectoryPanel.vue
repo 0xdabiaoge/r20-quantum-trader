@@ -235,7 +235,16 @@ function actionBadgeClass(action: string) {
                     <span>{{ t('dash.shell.panel.confidence') }}</span>
                     <span class="font-mono font-semibold" style="color: var(--ink-strong)">{{ item.confidence }}%</span>
                   </div>
-                  <div class="h-1.5 w-14 overflow-hidden rounded-full" style="background-color: var(--surface-3)">
+                  <div
+                    class="h-1.5 w-14 overflow-hidden rounded-full"
+                    style="background-color: var(--surface-3)"
+                    role="progressbar"
+                    :aria-valuenow="item.confidence"
+                    aria-valuemin="0"
+                    aria-valuemax="100"
+                    :aria-label="t('dash.shell.panel.confidence')"
+                    :aria-valuetext="`${item.confidence}%`"
+                  >
                     <div
                       class="h-full rounded-full transition-all duration-500"
                       :style="{

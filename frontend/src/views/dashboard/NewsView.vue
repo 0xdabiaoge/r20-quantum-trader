@@ -207,7 +207,15 @@ function toggleCoinFilter(sym: string) {
             </div>
 
             <!-- 多空力量条 -->
-            <div class="h-1.5 w-full overflow-hidden rounded bg-[var(--down)] flex mb-1.5">
+            <div
+              class="h-1.5 w-full overflow-hidden rounded bg-[var(--down)] flex mb-1.5"
+              role="progressbar"
+              :aria-valuenow="Math.round(c.bull)"
+              aria-valuemin="0"
+              aria-valuemax="100"
+              :aria-label="`${c.sym} ${t('dash.news.ratioLabel')}`"
+              :aria-valuetext="`${Math.round(c.bull)}% / ${Math.round(100 - c.bull)}%`"
+            >
               <div
                 class="h-full bg-[var(--up)] transition-all"
                 :style="{ width: `${c.bull}%` }"

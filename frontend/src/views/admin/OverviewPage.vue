@@ -306,7 +306,15 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
 
             <!-- 置信度进度量规 -->
             <div class="ov-stream-gauge">
-              <div class="ov-gauge-bar">
+              <div
+                class="ov-gauge-bar"
+                role="progressbar"
+                :aria-valuenow="Math.round(Number(d.confidence || 0))"
+                aria-valuemin="0"
+                aria-valuemax="100"
+                :aria-label="t('admin.overview.confidenceGauge')"
+                :aria-valuetext="`${fmtNum(d.confidence, 0)}%`"
+              >
                 <div
                   class="ov-gauge-fill"
                   :style="{

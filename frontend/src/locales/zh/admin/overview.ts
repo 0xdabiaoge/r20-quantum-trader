@@ -27,6 +27,7 @@ export const zhAdminOverview = {
   },
   decisions: 'AI 实时决策流',
   decisionsDesc: '最新决策周期动作与置信度，点击查看完整卷宗',
+  confidenceGauge: '置信度量规',
   viewAll: '查看全部',
   dataHealth: '数据管道实时健康',
   dataHealthDesc: '核心数据落盘时效与文件体积监控',

@@ -252,7 +252,16 @@ function refreshAll(): void {
         </div>
 
         <div v-if="pUsage !== null" class="mt-2">
-          <div class="h-1 w-full overflow-hidden rounded-full" style="background-color: var(--surface-3)">
+          <div
+            class="h-1 w-full overflow-hidden rounded-full"
+            style="background-color: var(--surface-3)"
+            role="progressbar"
+            :aria-valuenow="Math.round(pUsage)"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            :aria-label="t('dash.venueAccounts.portfolio.usage', undefined, { pct: pUsage })"
+            :aria-valuetext="`${pUsage}%`"
+          >
             <div class="h-full rounded-full transition-all duration-300" :style="{ width: `${pUsage}%`, backgroundColor: pUsageTone }" />
           </div>
           <p class="num mt-1 font-mono text-3xs" :style="{ color: pUsageTone }">

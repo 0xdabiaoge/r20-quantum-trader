@@ -26,6 +26,7 @@ export const enAdminOverview = {
   },
   decisions: 'Live Decision Stream',
   decisionsDesc: 'Latest cycle verdicts and confidence ratings; click row for dossier',
+  confidenceGauge: 'Confidence gauge',
   viewAll: 'View all',
   dataHealth: 'Pipeline Artifacts',
   dataHealthDesc: 'Telemetry update freshness and file sizes',
