@@ -162,7 +162,7 @@ const colCount = computed(() => props.columns.length + (has('actions') ? 1 : 0))
     :class="flat ? '' : 'rounded-xl border'"
     :style="flat ? {} : { borderColor: 'var(--line-1)', backgroundColor: 'var(--surface-2)' }"
   >
-    <table class="w-full text-xs border-collapse" :aria-label="label">
+    <table class="w-full text-xs border-collapse" :aria-label="label" :aria-busy="loading ? 'true' : undefined">
       <thead>
         <slot name="head">
           <tr class="sticky top-0 z-10" style="background-color: var(--surface-2);">
@@ -201,7 +201,7 @@ const colCount = computed(() => props.columns.length + (has('actions') ? 1 : 0))
       </thead>
       <tbody>
         <tr v-if="loading">
-          <td :colspan="Math.max(colCount, 1)" class="px-3 py-10 text-center" style="color: var(--ink-3);">
+          <td :colspan="Math.max(colCount, 1)" role="status" class="px-3 py-10 text-center" style="color: var(--ink-3);">
             <slot name="loading">
               <Loader2 class="w-5 h-5 animate-spin inline mr-1.5" style="color: var(--accent);" />
               {{ loadingText || '…' }}
@@ -241,7 +241,7 @@ const colCount = computed(() => props.columns.length + (has('actions') ? 1 : 0))
             </slot>
           </tr>
           <tr v-if="!displayRows.length">
-            <td :colspan="Math.max(colCount, 1)" class="px-3 py-10 text-center" style="color: var(--ink-3);">
+            <td :colspan="Math.max(colCount, 1)" role="status" class="px-3 py-10 text-center" style="color: var(--ink-3);">
               {{ emptyText || '—' }}
             </td>
           </tr>

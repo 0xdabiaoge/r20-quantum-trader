@@ -573,14 +573,14 @@ onMounted(() => { loadAll(); loadMx() })
 
           <div class="sc-group">
             <span class="form-label">{{ t('admin.security.routingModeLabel') }}</span>
-            <div class="sc-radios sc-radios-3">
+            <div class="sc-radios sc-radios-3" role="radiogroup" :aria-label="t('admin.security.routingModeLabel')">
               <label
                 v-for="m in ROUTING_MODES"
                 :key="m.value"
                 class="sc-radio"
                 :class="{ 'is-on': routingMode === m.value }"
               >
-                <input v-model="routingMode" type="radio" :value="m.value" />
+                <input v-model="routingMode" type="radio" name="routing-mode" :value="m.value" />
                 <span class="sc-radio-text">
                   <span class="sc-radio-title">{{ t(m.labelKey) }}</span>
                   <span class="sc-radio-desc">{{ t(m.descKey) }}</span>
@@ -591,14 +591,14 @@ onMounted(() => { loadAll(); loadMx() })
 
           <div class="sc-group">
             <span class="form-label">{{ t('admin.security.manualLabel') }}</span>
-            <div class="sc-radios sc-radios-4">
+            <div class="sc-radios sc-radios-4" role="radiogroup" :aria-label="t('admin.security.manualLabel')">
               <label
                 v-for="v in PREFERRED_VENUES"
                 :key="v.value"
                 class="sc-radio"
                 :class="{ 'is-on': preferredVenue === v.value }"
               >
-                <input v-model="preferredVenue" type="radio" :value="v.value" />
+                <input v-model="preferredVenue" type="radio" name="preferred-venue" :value="v.value" />
                 <span class="sc-radio-text">
                   <span class="sc-radio-title">{{ t(v.labelKey) }}</span>
                   <span class="sc-radio-desc">{{ t(v.descKey) }}</span>

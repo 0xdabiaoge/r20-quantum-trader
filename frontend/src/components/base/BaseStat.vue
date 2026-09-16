@@ -33,7 +33,7 @@ const toneVar = {
       <button
         v-if="hint"
         type="button"
-        class="kpi-hint shrink-0 cursor-pointer opacity-0 group-hover:opacity-60 hover:!opacity-100"
+        class="kpi-hint shrink-0 cursor-pointer opacity-0 group-hover:opacity-60 hover:!opacity-100 focus-visible:opacity-100 group-focus-within:opacity-60"
         :aria-label="hint"
         :aria-expanded="showHint"
         @click.stop="showHint = !showHint"
