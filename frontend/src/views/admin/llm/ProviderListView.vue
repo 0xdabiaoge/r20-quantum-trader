@@ -139,7 +139,7 @@ const bandFacts = () => [
       <div v-for="f in bandFacts()" :key="f.label" class="pv-fact">
         <span class="pv-fact-label"><component :is="f.icon" :size="12" />{{ f.label }}</span>
         <span class="pv-fact-value" :class="f.tone">{{ f.value }}</span>
-        <span class="pv-fact-foot truncate">{{ f.foot }}</span>
+        <span class="pv-fact-foot truncate" :title="f.foot">{{ f.foot }}</span>
       </div>
     </section>
 
@@ -324,7 +324,7 @@ const bandFacts = () => [
           <span class="badge" :class="ev.succeeded ? 'badge-up' : 'badge-down'">
             {{ ev.type === 'fallback_hit' ? t('admin.llm.fallbackHit') : t('admin.llm.chainDead') }}
           </span>
-          <span class="pv-audit-chain mono truncate">
+          <span class="pv-audit-chain mono truncate" :title="`${ev.from_model}${ev.to_model ? ' → ' + ev.to_model : ''}`">
             {{ ev.from_model }}<template v-if="ev.to_model"> → {{ ev.to_model }}</template>
           </span>
           <span class="pv-audit-time mono">{{ fmtDateTime(ev.ts || ev.time_str) }} · {{ ev.elapsed_seconds }}s</span>

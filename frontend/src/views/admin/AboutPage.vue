@@ -180,7 +180,7 @@ const bandFacts = computed(() => {
           <div v-for="f in bandFacts" :key="f.label" class="ab-fact">
             <span class="ab-fact-label"><component :is="f.icon" :size="12" />{{ f.label }}</span>
             <span class="ab-fact-value" :class="f.tone">{{ f.value }}</span>
-            <span class="ab-fact-foot mono truncate">{{ f.foot }}</span>
+            <span class="ab-fact-foot mono truncate" :title="f.foot">{{ f.foot }}</span>
           </div>
         </template>
       </section>

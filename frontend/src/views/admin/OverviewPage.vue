@@ -457,8 +457,8 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
             <span class="ov-tag-name">{{ parseAuditContext(a.action, a.detail).label }}</span>
           </div>
 
-          <!-- 人类可读上下文详情 -->
-          <div class="ov-ar-summary truncate">
+          <!-- 人类可读上下文详情（批 24：被截断时给出 title，否则长文案永远读不全） -->
+          <div class="ov-ar-summary truncate" :title="parseAuditContext(a.action, a.detail).summary">
             {{ parseAuditContext(a.action, a.detail).summary }}
           </div>
 

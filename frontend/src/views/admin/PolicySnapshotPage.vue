@@ -314,25 +314,25 @@ onMounted(() => {
       <section class="card pol-band">
         <div class="pol-fact">
           <span class="pol-fact-label"><Layers :size="12" />{{ t('admin.policySnapshot.identity.activeVersion') }}</span>
-          <span class="pol-fact-value truncate">{{ v(snapshotData.snapshot.policy_version) }}</span>
+          <span class="pol-fact-value truncate" :title="v(snapshotData.snapshot.policy_version)">{{ v(snapshotData.snapshot.policy_version) }}</span>
           <span class="pol-fact-foot mono">{{ snapshotData.policy_version || '--' }}</span>
         </div>
 
         <div class="pol-fact">
           <span class="pol-fact-label"><Hash :size="12" />{{ t('admin.policySnapshot.identity.hash') }}</span>
-          <span class="pol-fact-value truncate">#{{ v(snapshotData.snapshot.policy_hash) }}</span>
+          <span class="pol-fact-value truncate" :title="'#' + v(snapshotData.snapshot.policy_hash)">#{{ v(snapshotData.snapshot.policy_hash) }}</span>
           <span class="pol-fact-foot mono">{{ t('admin.policySnapshot.unitsTitle') }}</span>
         </div>
 
         <div class="pol-fact">
           <span class="pol-fact-label"><Package :size="12" />{{ t('admin.policySnapshot.bandPackageHash') }}</span>
-          <span class="pol-fact-value truncate">#{{ v(snapshotData.package_hash) }}</span>
+          <span class="pol-fact-value truncate" :title="'#' + v(snapshotData.package_hash)">#{{ v(snapshotData.package_hash) }}</span>
           <span class="pol-fact-foot">{{ t('admin.policySnapshot.bandPackageHashFoot') }}</span>
         </div>
 
         <div class="pol-fact">
           <span class="pol-fact-label"><Clock :size="12" />{{ t('admin.policySnapshot.identity.generatedAt') }}</span>
-          <span class="pol-fact-value num truncate">{{ formatTimestamp(snapshotData.snapshot.timestamp) }}</span>
+          <span class="pol-fact-value num truncate" :title="formatTimestamp(snapshotData.snapshot.timestamp)">{{ formatTimestamp(snapshotData.snapshot.timestamp) }}</span>
           <span class="pol-fact-foot mono">
             <Activity :size="12" /> {{ snapshotData.policy_version ? 'OK' : '--' }}
           </span>

@@ -401,7 +401,7 @@ onBeforeUnmount(() => {
             <span class="nf-fact-value" :class="channelOn('qq') ? 'is-up' : 'is-off'">
               {{ channelOn('qq') ? t('admin.notify.enabled') : t('admin.notify.disabled') }}
             </span>
-            <span class="nf-fact-foot mono truncate">{{ config.qq?.openid || t('admin.notify.notSet') }}</span>
+            <span class="nf-fact-foot mono truncate" :title="config.qq?.openid || t('admin.notify.notSet')">{{ config.qq?.openid || t('admin.notify.notSet') }}</span>
           </div>
 
           <div class="nf-fact">
@@ -414,7 +414,7 @@ onBeforeUnmount(() => {
 
           <div class="nf-fact">
             <span class="nf-fact-label"><CalendarClock :size="12" />{{ t('admin.notify.bandBriefing') }}</span>
-            <span class="nf-fact-value num truncate">{{ config._briefingTimes || t('admin.notify.notSet') }}</span>
+            <span class="nf-fact-value num truncate" :title="config._briefingTimes || t('admin.notify.notSet')">{{ config._briefingTimes || t('admin.notify.notSet') }}</span>
             <span class="nf-fact-foot">{{ t('admin.notify.scheduleTitle') }}</span>
           </div>
         </template>

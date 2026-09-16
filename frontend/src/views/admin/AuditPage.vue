@@ -166,7 +166,7 @@ onMounted(load)
           <div v-for="f in bandFacts" :key="f.label" class="au-fact">
             <span class="au-fact-label"><component :is="f.icon" :size="12" />{{ f.label }}</span>
             <span class="au-fact-value" :class="f.tone">{{ f.value }}</span>
-            <span class="au-fact-foot truncate">{{ f.foot }}</span>
+            <span class="au-fact-foot truncate" :title="f.foot">{{ f.foot }}</span>
           </div>
         </template>
       </section>
