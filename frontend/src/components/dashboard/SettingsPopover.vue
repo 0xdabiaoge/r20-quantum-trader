@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /** 偏好弹层：主题 / 语言 / 色盲配色 —— 收进一个 ⚙，顶栏不再散落按钮 */
-import { onBeforeUnmount, onMounted, ref } from 'vue';
+import { onBeforeUnmount, onMounted, ref, useId } from 'vue';
 import { SlidersHorizontal, BookOpen, LayoutDashboard, Eye } from 'lucide-vue-next';
 import { useRouter } from 'vue-router';
 import { useUi } from '../../composables/useUi';
@@ -17,6 +17,7 @@ const { peekOpen } = useUi();
 const open = ref(false);
 const trigger = ref<HTMLElement | null>(null);
 const panel = ref<HTMLElement | null>(null);
+const panelId = useId();
 
 function onDocDown(e: MouseEvent) {
   const el = e.target as Node;
@@ -42,6 +43,8 @@ onBeforeUnmount(() => {
       ref="trigger"
       class="btn btn-quiet btn-icon"
       :aria-expanded="open"
+      aria-haspopup="dialog"
+      :aria-controls="panelId"
       :aria-label="t('dash.shell.settings.title')"
       :title="t('dash.shell.settings.title')"
       @click="open = !open"
@@ -53,9 +56,11 @@ onBeforeUnmount(() => {
            竖屏矮窗内容够不着。限宽到视口 -24px，并给纵向滚动（对齐 ToastHost 既有约定）。 -->
       <div
         v-if="open"
+        :id="panelId"
         ref="panel"
         class="float-panel absolute end-0 top-10 w-64 max-w-[calc(100vw-24px)] max-h-[70vh] overflow-y-auto p-3"
-        role="menu"
+        role="dialog"
+        :aria-label="t('dash.shell.settings.title')"
       >
         <div class="space-y-3">
           <div>

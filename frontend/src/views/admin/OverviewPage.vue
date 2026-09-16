@@ -441,6 +441,7 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
           role="button"
           tabindex="0"
           :aria-expanded="inspectingAuditIndex === idx"
+          :aria-controls="'audit-detail-' + idx"
           @click="inspectingAuditIndex = inspectingAuditIndex === idx ? null : idx"
           @keydown.enter="inspectingAuditIndex = inspectingAuditIndex === idx ? null : idx"
           @keydown.space.prevent="inspectingAuditIndex = inspectingAuditIndex === idx ? null : idx"
@@ -474,7 +475,7 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
           </div>
 
           <!-- 展开的原始 JSON 结构 -->
-          <div v-if="inspectingAuditIndex === idx" class="ov-ar-json-panel" @click.stop>
+          <div v-if="inspectingAuditIndex === idx" :id="'audit-detail-' + idx" class="ov-ar-json-panel" @click.stop>
             <pre class="ov-json-code mono">{{ JSON.stringify(a.detail || {}, null, 2) }}</pre>
           </div>
         </div>

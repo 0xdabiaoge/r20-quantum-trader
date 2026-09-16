@@ -116,6 +116,7 @@ onUnmounted(() => {
           :title="t('docs.tocBtn')"
           :aria-label="t('docs.tocBtn')"
           :aria-expanded="mobileMenuOpen"
+          :aria-controls="'docs-mobile-drawer'"
         >
           <Menu v-if="!mobileMenuOpen" class="w-3.5 h-3.5" />
           <X v-else class="w-3.5 h-3.5" />
@@ -152,6 +153,7 @@ onUnmounted(() => {
     <div class="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 flex gap-8">
       <!-- Left Sticky Sidebar (TOC) -->
       <aside
+        id="docs-mobile-drawer"
         class="w-64 shrink-0 fixed inset-y-12 left-0 z-50 sm:z-30 sm:bg-transparent p-4 sm:p-0 border-r sm:border-r-0 transition-transform duration-200 sm:translate-x-0 sm:sticky sm:top-16 sm:h-[calc(100vh-5rem)] overflow-y-auto"
         :class="mobileMenuOpen ? 'translate-x-0 bg-[var(--surface-1)] shadow-2xl' : '-translate-x-full sm:translate-x-0 invisible sm:visible'"
         style="border-color: var(--line-1);"

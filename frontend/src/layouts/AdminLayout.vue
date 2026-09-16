@@ -148,6 +148,7 @@ watch(() => route.path, () => (drawerOpen.value = false));
           :title="drawerOpen ? t('admin.shell.collapse') : t('admin.shell.expand')"
           :aria-label="drawerOpen ? t('admin.shell.collapse') : t('admin.shell.expand')"
           :aria-expanded="drawerOpen"
+          :aria-controls="'admin-mobile-drawer'"
           @click="drawerOpen = !drawerOpen"
         >
           <Menu :size="16" />
@@ -186,7 +187,7 @@ watch(() => route.path, () => (drawerOpen.value = false));
     <!-- ═══ 移动端抽屉 ═══ -->
     <div v-if="drawerOpen" class="wb-drawer-root">
       <div class="wb-scrim" @click="drawerOpen = false" />
-      <aside class="wb-drawer">
+      <aside id="admin-mobile-drawer" class="wb-drawer" :aria-label="t('admin.shell.brand')">
         <div class="wb-drawer-head">
           <span class="wb-brand-name">{{ t('brand.name') }} {{ t('admin.shell.brand') }}</span>
           <button

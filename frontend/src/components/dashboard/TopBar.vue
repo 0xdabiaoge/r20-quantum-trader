@@ -52,6 +52,7 @@ const activeTab = computed(() => {
         :title="navExpanded ? t('dash.shell.nav.closeNav') : t('dash.shell.nav.openNav')"
         :aria-label="navExpanded ? t('dash.shell.nav.closeNav') : t('dash.shell.nav.openNav')"
         :aria-expanded="!!navExpanded"
+        :aria-controls="'dashboard-sidebar'"
         @click="emit('toggleSidebar')"
       >
         <PanelLeftClose v-if="navExpanded" class="h-4 w-4" />

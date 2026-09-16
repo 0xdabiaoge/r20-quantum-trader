@@ -115,6 +115,7 @@ const venueHealth = computed(() => {
          层级：遮罩 z-30 < 抽屉 z-50 < 顶栏 z-[60] —— 顶栏必须压在抽屉之上，
          否则抽屉展开后会把顶栏那颗「展开/收起导航」按钮自己盖住，点不回去。 -->
     <aside
+      id="dashboard-sidebar"
       class="flex flex-col shrink-0 border-e transition-all duration-200 z-50 select-none backdrop-blur-xl fixed inset-y-0 left-0 w-[var(--w-sidebar)] md:static"
       :class="[
         sidebarCollapsed ? 'md:w-[var(--w-sidebar-collapsed)]' : 'md:w-[var(--w-sidebar)]',

@@ -3,7 +3,7 @@
  * BaseStat.vue · DeepSeek Harness 风格 KPI 指标单元
  * 包含：微标头、大号等宽数理数值、动态变动副值、走势图插槽与可展开释义
  */
-import { ref } from 'vue';
+import { ref, useId } from 'vue';
 
 withDefaults(
   defineProps<{
@@ -17,6 +17,7 @@ withDefaults(
 );
 
 const showHint = ref(false);
+const hintId = useId();
 
 const toneVar = {
   up: 'var(--up)',
@@ -36,6 +37,7 @@ const toneVar = {
         class="kpi-hint shrink-0 cursor-pointer opacity-0 group-hover:opacity-60 hover:!opacity-100 focus-visible:opacity-100 group-focus-within:opacity-60"
         :aria-label="hint"
         :aria-expanded="showHint"
+        :aria-controls="hintId"
         @click.stop="showHint = !showHint"
       >
         i
@@ -50,7 +52,7 @@ const toneVar = {
       </div>
     </div>
 
-    <p v-if="hint && showHint" class="text-4xs leading-snug font-sans text-[var(--ink-2)] mt-0.5">{{ hint }}</p>
+    <p v-if="hint && showHint" :id="hintId" class="text-4xs leading-snug font-sans text-[var(--ink-2)] mt-0.5">{{ hint }}</p>
   </div>
 </template>
 

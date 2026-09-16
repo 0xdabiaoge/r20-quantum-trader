@@ -7,7 +7,7 @@ import { countdownLabel } from './chartCountdown'
 import { fetchCandles } from './chartCandles'
 import { mainIndicators, subIndicators, DEFAULT_ACTIVE_INDICATORS } from './chartIndicators'
 import { fmtDate, fmtHM, fmtClock } from '../../utils/format';
-import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, nextTick, useId } from 'vue'
 import { useDashboardStore } from '../../stores/dashboard'
 import { symOf, instIdOf } from '../../utils/instId'
 import { useTheme } from '../../composables/useTheme'
@@ -176,6 +176,8 @@ const chartContainer = ref<HTMLElement | null>(null)
 // ==========================================
 const showIndicatorMenu = ref<boolean>(false)
 const symbolMenu = ref<boolean>(false)
+const symbolMenuId = useId()
+const indicatorMenuId = useId()
 
 /** 持仓/挂单中的币种（选币下拉的徽标） */
 const holdingSet = computed(() => {
@@ -702,6 +704,8 @@ onUnmounted(() => {
           class="flex h-7 cursor-pointer items-center gap-1.5 rounded border px-2.5 transition-colors"
           style="border-color: var(--line-1); background-color: var(--surface-2)"
           :aria-expanded="symbolMenu"
+          aria-haspopup="listbox"
+          :aria-controls="symbolMenuId"
           @click="symbolMenu = !symbolMenu"
         >
           <span class="text-xs font-bold" style="color: var(--ink-strong)">{{ currentSymbol }}</span>
@@ -711,6 +715,9 @@ onUnmounted(() => {
         <Transition name="pop">
           <div
             v-if="symbolMenu"
+            :id="symbolMenuId"
+            role="listbox"
+            :aria-label="t('dash.matrix.chart.perp')"
             class="float-panel absolute left-0 top-8 z-[var(--z-float)] max-h-80 w-56 overflow-y-auto p-1.5"
           >
             <button
@@ -758,6 +765,8 @@ onUnmounted(() => {
             class="btn btn-sm"
             :class="showIndicatorMenu || activeIndicatorCount > 0 ? 'bg-[var(--accent-bg)] text-[var(--accent)] border border-[var(--accent-line)]' : 'btn-ghost'"
             :aria-expanded="showIndicatorMenu"
+            aria-haspopup="dialog"
+            :aria-controls="indicatorMenuId"
             @click="showIndicatorMenu = !showIndicatorMenu"
           >
             <SlidersHorizontal />
@@ -766,7 +775,7 @@ onUnmounted(() => {
             <ChevronDown class="h-3 w-3 transition-transform" :class="showIndicatorMenu && 'rotate-180'" />
           </button>
           <Transition name="pop">
-            <div v-if="showIndicatorMenu" class="float-panel absolute right-0 top-9 z-[var(--z-float)] max-h-[65vh] w-72 overflow-y-auto p-3 max-md:fixed max-md:inset-x-2 max-md:top-auto max-md:bottom-2 max-md:w-auto max-md:max-h-[70vh]">
+            <div v-if="showIndicatorMenu" :id="indicatorMenuId" role="dialog" :aria-label="t('dash.matrix.chart.indicators')" class="float-panel absolute right-0 top-9 z-[var(--z-float)] max-h-[65vh] w-72 overflow-y-auto p-3 max-md:fixed max-md:inset-x-2 max-md:top-auto max-md:bottom-2 max-md:w-auto max-md:max-h-[70vh]">
               <p class="t-label mb-2">{{ t('dash.matrix.chart.indicatorHint') }}</p>
               <p class="t-label mb-1.5">{{ t('dash.matrix.chart.overlays') }}</p>
               <div class="mb-3 grid grid-cols-2 gap-1.5">
