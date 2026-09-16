@@ -270,6 +270,7 @@ const md = computed(() => (store.data as any)?.ai_trading_memory_md || '');
             <div class="p-3">
               <pre
                 class="rounded p-3 font-mono text-3xs leading-body whitespace-pre-wrap select-text max-h-96 overflow-y-auto"
+                tabindex="0"
                 style="background-color: var(--surface-input); border: 1px solid var(--line-1); color: var(--ink-2)"
               >{{ md }}</pre>
             </div>

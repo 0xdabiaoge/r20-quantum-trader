@@ -762,7 +762,7 @@ onMounted(loadLib)
             <span class="num ps-prev-count">{{ t('admin.promptStudio.preview.charCount', undefined, { n: compiledPreview.length }) }}</span>
           </div>
 
-          <pre class="ps-preview">{{ compiledPreview || t('admin.promptStudio.preview.empty') }}</pre>
+          <pre class="ps-preview" tabindex="0">{{ compiledPreview || t('admin.promptStudio.preview.empty') }}</pre>
 
           <button class="btn btn-ghost btn-sm ps-prev-copy" @click="copyPreview">
             <Copy :size="13" />
@@ -794,7 +794,7 @@ onMounted(loadLib)
             </button>
           </header>
           <p class="ps-dict-desc">{{ v.description }}</p>
-          <pre v-if="v.sample" class="code-block ps-dict-sample">{{ v.sample }}</pre>
+          <pre v-if="v.sample" class="code-block ps-dict-sample" tabindex="0">{{ v.sample }}</pre>
         </article>
 
         <BaseEmpty v-if="!templateVariables.length" :text="t('common.noData')" />

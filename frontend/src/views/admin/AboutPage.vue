@@ -321,7 +321,7 @@ const bandFacts = computed(() => {
               <Terminal :size="12" />
               <span>{{ t('admin.about.gitOutput') }}</span>
             </div>
-            <pre class="ab-git-pre">{{ updateResult.git_output }}</pre>
+            <pre class="ab-git-pre" tabindex="0">{{ updateResult.git_output }}</pre>
           </div>
 
           <footer class="ab-note">

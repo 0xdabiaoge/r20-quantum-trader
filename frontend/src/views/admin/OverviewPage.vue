@@ -484,7 +484,7 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
 
           <!-- 展开的原始 JSON 结构 -->
           <div v-if="inspectingAuditIndex === idx" :id="'audit-detail-' + idx" class="ov-ar-json-panel" @click.stop>
-            <pre class="ov-json-code mono">{{ JSON.stringify(a.detail || {}, null, 2) }}</pre>
+            <pre class="ov-json-code mono" tabindex="0">{{ JSON.stringify(a.detail || {}, null, 2) }}</pre>
           </div>
         </div>
       </div>

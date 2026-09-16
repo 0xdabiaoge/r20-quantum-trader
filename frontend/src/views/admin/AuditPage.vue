@@ -276,7 +276,7 @@ onMounted(load)
           <FileJson :size="12" />
           <span>{{ t('admin.audit.rawJson') }}</span>
         </div>
-        <pre class="code-block au-json">{{ JSON.stringify(detailRec, null, 2) }}</pre>
+        <pre class="code-block au-json" tabindex="0">{{ JSON.stringify(detailRec, null, 2) }}</pre>
       </template>
 
       <template #footer>

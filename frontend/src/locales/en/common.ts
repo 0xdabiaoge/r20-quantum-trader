@@ -37,6 +37,7 @@ export const enCommon = {
     networkError: 'Network error, please retry',
     sessionExpired: 'Session expired, please sign in again',
     pageInfo: 'Page {page} / {pages} · {total} items',
+    pageNav: 'Pagination',
     prevPage: 'Previous',
     nextPage: 'Next',
     remove: 'Remove',

@@ -32,7 +32,7 @@ const tokens = computed(() => Math.round(prompt.value.length / 2.6)); // 中英�
     </template>
 
     <BaseEmpty v-if="!prompt" :text="t('dash.shell.peek.empty')" />
-    <pre v-else class="code-block max-h-[62vh] whitespace-pre-wrap">{{ prompt }}</pre>
+    <pre v-else class="code-block max-h-[62vh] whitespace-pre-wrap" tabindex="0">{{ prompt }}</pre>
 
     <div v-if="prompt" class="mt-2 flex items-center justify-between text-xs" style="color: var(--ink-3)">
       <span>{{ t('dash.shell.peek.chars', undefined, { n: fmtNum(chars, 0) }) }} · {{ t('dash.shell.peek.tokens', undefined, { n: fmtNum(tokens, 0) }) }}</span>

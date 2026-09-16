@@ -823,7 +823,7 @@ onMounted(loadData);
                   >
                     {{ expandedReasoning[String(key)] ? t('admin.council.collapseReasoning') : t('admin.council.expandReasoning') }}
                   </button>
-                  <pre v-if="expandedReasoning[String(key)]" class="code-block">{{ adv.reasoning }}</pre>
+                  <pre v-if="expandedReasoning[String(key)]" class="code-block" tabindex="0">{{ adv.reasoning }}</pre>
                 </div>
               </article>
             </div>

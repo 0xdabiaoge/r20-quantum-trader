@@ -38,6 +38,7 @@ export const zhCommon = {
     networkError: '网络异常，请检查连接后重试',
     sessionExpired: '会话已过期，请重新登录',
     pageInfo: '第 {page} / {pages} 页 · 共 {total} 条',
+    pageNav: '分页导航',
     prevPage: '上一页',
     nextPage: '下一页',
     remove: '移除',
