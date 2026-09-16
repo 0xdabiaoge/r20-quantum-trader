@@ -244,6 +244,8 @@ const venueHealth = computed(() => {
             class="btn btn-quiet btn-icon h-7 w-7 cursor-pointer"
             :title="isNarrow ? t('dash.shell.nav.closeMobile') : (navCompact ? t('dash.shell.nav.expand') : t('dash.shell.nav.collapse'))"
             :aria-label="isNarrow ? t('dash.shell.nav.closeMobile') : (navCompact ? t('dash.shell.nav.expand') : t('dash.shell.nav.collapse'))"
+            :aria-expanded="navExpanded"
+            :aria-controls="'dashboard-sidebar'"
             @click="toggleNav"
           >
             <X v-if="isNarrow" class="h-3.5 w-3.5" />

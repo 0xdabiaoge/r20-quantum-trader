@@ -84,7 +84,7 @@ watch(() => route.path, () => (drawerOpen.value = false));
     <SkipLink />
 
     <!-- ═══ 侧边导航 ═══ -->
-    <aside class="wb-rail" :class="{ 'is-collapsed': collapsed }">
+    <aside id="admin-desktop-sidebar" class="wb-rail" :class="{ 'is-collapsed': collapsed }">
       <!-- 品牌 -->
       <div class="wb-brand">
         <img src="/favicon.svg" class="wb-logo" alt="" />
@@ -96,6 +96,8 @@ watch(() => route.path, () => (drawerOpen.value = false));
           v-if="!collapsed"
           class="wb-icon-btn wb-collapse"
           :title="t('admin.shell.collapse')"
+          :aria-expanded="!collapsed"
+          :aria-controls="'admin-desktop-sidebar'"
           @click="collapsed = true"
         >
           <PanelLeftClose :size="15" />
@@ -128,6 +130,8 @@ watch(() => route.path, () => (drawerOpen.value = false));
           v-if="collapsed"
           class="wb-icon-btn wb-expand"
           :title="t('admin.shell.expand')"
+          :aria-expanded="!collapsed"
+          :aria-controls="'admin-desktop-sidebar'"
           @click="collapsed = false"
         >
           <PanelLeftOpen :size="15" />

@@ -457,6 +457,8 @@ onMounted(loadLib)
           class="btn btn-sm"
           :class="showVarRibbon ? 'btn-primary' : 'btn-ghost'"
           :title="t('admin.promptStudio.toolbar.varRibbonTitle')"
+          :aria-expanded="showVarRibbon"
+          :aria-controls="'ps-var-ribbon'"
           @click="showVarRibbon = !showVarRibbon"
         >
           <Layers :size="14" />
@@ -545,7 +547,7 @@ onMounted(loadLib)
       </p>
 
       <!-- 变量快捷条 -->
-      <section v-if="showVarRibbon" class="card ps-ribbon">
+      <section v-if="showVarRibbon" id="ps-var-ribbon" class="card ps-ribbon">
         <div class="ps-ribbon-head">
           <Layers :size="13" />
           <span class="label-caps">{{ t('admin.promptStudio.ribbon.title') }}</span>

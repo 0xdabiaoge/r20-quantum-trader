@@ -176,6 +176,8 @@ function refreshAll(): void {
           <button
             class="text-3xs font-medium px-2 py-1 rounded cursor-pointer transition-colors"
             style="background-color: var(--surface-3); color: var(--ink-2)"
+            :aria-expanded="isMobileExpanded"
+            :aria-controls="'venue-accounts-grid'"
             @click="isMobileExpanded = !isMobileExpanded"
           >
             {{ isMobileExpanded ? t('dash.venueAccounts.collapseCards') : t('dash.venueAccounts.expandCards') }}
@@ -198,7 +200,7 @@ function refreshAll(): void {
       </div>
 
       <!-- 三所卡片网格 -->
-      <div :class="['gap-2.5 md:grid md:grid-cols-3', isMobileExpanded ? 'grid grid-cols-1' : 'hidden md:grid']">
+      <div id="venue-accounts-grid" :class="['gap-2.5 md:grid md:grid-cols-3', isMobileExpanded ? 'grid grid-cols-1' : 'hidden md:grid']">
         <VenueAccountCard
           v-for="v in VENUES"
           :key="`${store.environment}-${v}`"

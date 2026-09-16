@@ -819,11 +819,18 @@ onMounted(loadData);
                 <div v-if="adv.reasoning" class="cn-adv-reason">
                   <button
                     class="btn btn-quiet btn-sm"
+                    :aria-expanded="Boolean(expandedReasoning[String(key)])"
+                    :aria-controls="`cn-reasoning-${key}`"
                     @click="expandedReasoning[String(key)] = !expandedReasoning[String(key)]"
                   >
                     {{ expandedReasoning[String(key)] ? t('admin.council.collapseReasoning') : t('admin.council.expandReasoning') }}
                   </button>
-                  <pre v-if="expandedReasoning[String(key)]" class="code-block" tabindex="0">{{ adv.reasoning }}</pre>
+                  <pre
+                    v-if="expandedReasoning[String(key)]"
+                    :id="`cn-reasoning-${key}`"
+                    class="code-block"
+                    tabindex="0"
+                  >{{ adv.reasoning }}</pre>
                 </div>
               </article>
             </div>
