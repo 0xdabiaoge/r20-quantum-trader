@@ -323,8 +323,8 @@ const truncation = computed<{ kept: number; total: number } | null>(() => {
             <select
               v-model="fVenue"
               :aria-label="t('dash.ledger.venueAll')" 
-              class="h-7 rounded border px-2 text-3xs outline-none transition-colors"
-              style="background-color: var(--surface-2); border-color: var(--line-1); color: var(--ink-1)"
+              class="h-7 rounded border border-[var(--line-1)] px-2 text-3xs transition-colors focus:outline-none focus:border-[var(--ds-color-border-input-focus)] focus:ring-1 focus:ring-[var(--ds-color-border-input-focus)]"
+              style="background-color: var(--surface-2); color: var(--ink-1)"
               @change="page = 1"
             >
               <option v-for="vo in venueOptions" :key="vo.value" :value="vo.value">{{ vo.label }}</option>
@@ -333,8 +333,8 @@ const truncation = computed<{ kept: number; total: number } | null>(() => {
             <select
               v-model="fMode"
               :aria-label="t('dash.ledger.modeAll')" 
-              class="h-7 rounded border px-2 text-3xs outline-none transition-colors"
-              style="background-color: var(--surface-2); border-color: var(--line-1); color: var(--ink-1)"
+              class="h-7 rounded border border-[var(--line-1)] px-2 text-3xs transition-colors focus:outline-none focus:border-[var(--ds-color-border-input-focus)] focus:ring-1 focus:ring-[var(--ds-color-border-input-focus)]"
+              style="background-color: var(--surface-2); color: var(--ink-1)"
               @change="page = 1"
             >
               <option v-for="mo in modeOptions" :key="mo.value" :value="mo.value">{{ mo.label }}</option>
@@ -343,8 +343,8 @@ const truncation = computed<{ kept: number; total: number } | null>(() => {
             <select
               v-model="fInst"
               :aria-label="t('dash.ledger.filters.symbol')" 
-              class="h-7 rounded border px-2 text-3xs outline-none transition-colors"
-              style="background-color: var(--surface-2); border-color: var(--line-1); color: var(--ink-1)"
+              class="h-7 rounded border border-[var(--line-1)] px-2 text-3xs transition-colors focus:outline-none focus:border-[var(--ds-color-border-input-focus)] focus:ring-1 focus:ring-[var(--ds-color-border-input-focus)]"
+              style="background-color: var(--surface-2); color: var(--ink-1)"
               @change="page = 1"
             >
               <option v-for="o in instOptions" :key="o.value" :value="o.value">{{ o.label }}</option>

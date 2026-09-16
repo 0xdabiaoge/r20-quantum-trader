@@ -776,7 +776,7 @@ onMounted(loadData)
   left: 50%;
   bottom: var(--ds-space-4);
   transform: translateX(-50%);
-  z-index: 40;
+  z-index: var(--z-float);
   display: flex;
   align-items: center;
   gap: var(--ds-space-3);

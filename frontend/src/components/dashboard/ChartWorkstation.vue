@@ -711,7 +711,7 @@ onUnmounted(() => {
         <Transition name="pop">
           <div
             v-if="symbolMenu"
-            class="float-panel absolute left-0 top-8 z-50 max-h-80 w-56 overflow-y-auto p-1.5"
+            class="float-panel absolute left-0 top-8 z-[var(--z-float)] max-h-80 w-56 overflow-y-auto p-1.5"
           >
             <button
               v-for="sym in availableSymbols"
@@ -766,7 +766,7 @@ onUnmounted(() => {
             <ChevronDown class="h-3 w-3 transition-transform" :class="showIndicatorMenu && 'rotate-180'" />
           </button>
           <Transition name="pop">
-            <div v-if="showIndicatorMenu" class="float-panel absolute right-0 top-9 z-50 max-h-[65vh] w-72 overflow-y-auto p-3 max-md:fixed max-md:inset-x-2 max-md:top-auto max-md:bottom-2 max-md:w-auto max-md:max-h-[70vh]">
+            <div v-if="showIndicatorMenu" class="float-panel absolute right-0 top-9 z-[var(--z-float)] max-h-[65vh] w-72 overflow-y-auto p-3 max-md:fixed max-md:inset-x-2 max-md:top-auto max-md:bottom-2 max-md:w-auto max-md:max-h-[70vh]">
               <p class="t-label mb-2">{{ t('dash.matrix.chart.indicatorHint') }}</p>
               <p class="t-label mb-1.5">{{ t('dash.matrix.chart.overlays') }}</p>
               <div class="mb-3 grid grid-cols-2 gap-1.5">

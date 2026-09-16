@@ -81,7 +81,7 @@ onUnmounted(() => {
   <div class="min-h-screen font-sans selection:bg-[var(--accent)] selection:text-white" style="background-color: var(--surface-0); color: var(--ink-1);">
     <!-- Top Header Navigation -->
     <header
-      class="sticky top-0 z-40 border-b px-3 sm:px-6 h-12 flex items-center justify-between"
+      class="sticky top-0 z-[var(--z-header)] border-b px-3 sm:px-6 h-12 flex items-center justify-between"
       style="background-color: var(--surface-header); border-color: var(--line-1);"
     >
       <div class="flex items-center space-x-2 sm:space-x-3 min-w-0">
@@ -484,7 +484,7 @@ onUnmounted(() => {
     <!-- Zoom Image Modal -->
     <div
       v-if="zoomImage"
-      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm cursor-zoom-out"
+      class="fixed inset-0 z-[var(--z-dialog)] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm cursor-zoom-out"
       @click="zoomImage = null"
     >
       <img

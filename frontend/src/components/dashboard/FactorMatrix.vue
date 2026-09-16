@@ -172,8 +172,8 @@ const processedRows = computed(() => {
             v-model="searchQuery"
             type="text"
             :placeholder="t('dash.matrix.searchPlaceholder')"
-            class="h-6 w-36 rounded border pl-6 pr-2 text-3xs outline-none transition-colors focus:border-[var(--line-3)]"
-            style="background-color: var(--surface-2); border-color: var(--line-1); color: var(--ink-1)"
+            class="h-6 w-36 rounded border border-[var(--line-1)] pl-6 pr-2 text-3xs transition-colors focus:outline-none focus:border-[var(--ds-color-border-input-focus)] focus:ring-1 focus:ring-[var(--ds-color-border-input-focus)]"
+            style="background-color: var(--surface-2); color: var(--ink-1)"
           />
         </div>
 
