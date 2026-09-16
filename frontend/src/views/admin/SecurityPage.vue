@@ -1203,6 +1203,18 @@ onMounted(() => { loadAll(); loadMx() })
   font-size: var(--text-3xs);
   color: var(--ds-color-text-description);
   cursor: pointer;
+  /* 批 101：勾选行此前悬停毫无反馈。与同页 `.sc-radio:hover` / `.sc-row:hover`
+     用同一语汇 `--ds-color-bg-hover`（底色而非文字色）—— 这样**危险变体也有反馈**：
+     `.sc-check.is-danger span` 权重更高、始终是红的，若只改文字色，
+     危险行会静默地「没有变化」（第一版就踩了这个坑）。 */
+  border-radius: var(--r-xs);
+  transition: background-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+.sc-check:hover {
+  background-color: var(--ds-color-bg-hover);
+}
+.sc-check:hover:not(.is-danger) {
+  color: var(--ds-color-text-primary);
 }
 .sc-check.is-danger span {
   color: var(--down);

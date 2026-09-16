@@ -49,9 +49,11 @@ const { setRef, onKeydown, roving } = useRovingTabs(
       type="button"
       role="tab"
       class="relative shrink-0 px-3 py-2 text-sm font-medium transition-colors cursor-pointer"
-      :style="{
-        color: modelValue === it.key ? 'var(--ink-strong)' : 'var(--ink-2)',
-      }"
+      :class="
+        modelValue === it.key
+          ? 'text-[var(--ink-strong)]'
+          : 'text-[var(--ink-2)] hover:text-[var(--ink-1)]'
+      "
       :id="baseId ? `${baseId}-tab-${it.key}` : undefined"
       :aria-selected="modelValue === it.key"
       :tabindex="roving(modelValue === it.key)"

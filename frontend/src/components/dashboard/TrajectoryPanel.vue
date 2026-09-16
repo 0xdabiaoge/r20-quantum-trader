@@ -171,10 +171,10 @@ function actionBadgeClass(action: string) {
               :tabindex="tabRoving(activeTab === 'decisions')"
               :aria-selected="activeTab === 'decisions'"
               class="flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-medium cursor-pointer transition-colors"
-              :style="
+              :class="
                 activeTab === 'decisions'
-                  ? { backgroundColor: 'var(--surface-3)', color: 'var(--ink-strong)' }
-                  : { color: 'var(--ink-2)' }
+                  ? 'bg-[var(--surface-3)] text-[var(--ink-strong)]'
+                  : 'text-[var(--ink-2)] hover:bg-[var(--ds-color-bg-hover)] hover:text-[var(--ink-1)]'
               "
               @click="activeTab = 'decisions'"
               @keydown="onTabKey($event, 0)"
@@ -193,10 +193,10 @@ function actionBadgeClass(action: string) {
               :tabindex="tabRoving(activeTab === 'logs')"
               :aria-selected="activeTab === 'logs'"
               class="flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-medium cursor-pointer transition-colors"
-              :style="
+              :class="
                 activeTab === 'logs'
-                  ? { backgroundColor: 'var(--surface-3)', color: 'var(--ink-strong)' }
-                  : { color: 'var(--ink-2)' }
+                  ? 'bg-[var(--surface-3)] text-[var(--ink-strong)]'
+                  : 'text-[var(--ink-2)] hover:bg-[var(--ds-color-bg-hover)] hover:text-[var(--ink-1)]'
               "
               @click="activeTab = 'logs'"
               @keydown="onTabKey($event, 1)"

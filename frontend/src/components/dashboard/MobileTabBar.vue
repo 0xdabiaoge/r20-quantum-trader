@@ -22,7 +22,10 @@ const activeKey = computed(() => (route.meta?.tab as string) || 'trading');
         v-for="tab in publicTabs"
         :key="tab.key"
         class="flex flex-1 cursor-pointer flex-col items-center gap-0.5 py-1.5 text-2xs font-medium transition-colors"
-        :style="{ color: activeKey === tab.key ? 'var(--accent)' : 'var(--ink-2)' }"
+        :class="
+          activeKey === tab.key ? 'text-[var(--accent)]' : 'text-[var(--ink-2)] hover:text-[var(--ink-1)]'
+        "
+        :aria-current="activeKey === tab.key ? 'page' : undefined"
         @click="router.push(tab.path)"
       >
         <component :is="tab.icon" class="h-[18px] w-[18px]" />

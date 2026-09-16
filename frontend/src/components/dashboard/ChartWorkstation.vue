@@ -708,8 +708,7 @@ onUnmounted(() => {
       <!-- 选币下拉 -->
       <div class="indicator-dropdown-container relative">
         <button
-          class="flex h-7 cursor-pointer items-center gap-1.5 rounded border px-2.5 transition-colors"
-          style="border-color: var(--line-1); background-color: var(--surface-2)"
+          class="flex h-7 cursor-pointer items-center gap-1.5 rounded border border-[var(--line-1)] bg-[var(--surface-2)] px-2.5 transition-colors hover:bg-[var(--surface-3)]"
           :aria-expanded="symbolMenu"
           aria-haspopup="listbox"
           :aria-controls="symbolMenu ? symbolMenuId : undefined"
@@ -790,9 +789,11 @@ onUnmounted(() => {
                   v-for="ind in mainIndicators"
                   :key="ind.key"
                   class="flex cursor-pointer items-center justify-between rounded-md border px-2 py-1.5 text-xs font-semibold transition-colors"
-                  :style="activeIndicators[ind.key]
-                    ? { backgroundColor: 'var(--accent-bg)', borderColor: 'var(--accent-line)', color: 'var(--ink-1)' }
-                    : { backgroundColor: 'var(--surface-1)', borderColor: 'var(--line-1)', color: 'var(--ink-2)' }"
+                  :class="
+                    activeIndicators[ind.key]
+                      ? 'bg-[var(--accent-bg)] border-[var(--accent-line)] text-[var(--ink-1)]'
+                      : 'bg-[var(--surface-1)] border-[var(--line-1)] text-[var(--ink-2)] hover:bg-[var(--surface-3)] hover:text-[var(--ink-1)]'
+                  "
                   @click="toggleIndicatorKey(ind.key)"
                 >
                   <span class="flex min-w-0 items-center gap-1.5">
@@ -808,9 +809,11 @@ onUnmounted(() => {
                   v-for="ind in subIndicators"
                   :key="ind.key"
                   class="flex cursor-pointer items-center justify-between rounded-md border px-2 py-1.5 text-xs font-semibold transition-colors"
-                  :style="activeIndicators[ind.key]
-                    ? { backgroundColor: 'var(--accent-bg)', borderColor: 'var(--accent-line)', color: 'var(--ink-1)' }
-                    : { backgroundColor: 'var(--surface-1)', borderColor: 'var(--line-1)', color: 'var(--ink-2)' }"
+                  :class="
+                    activeIndicators[ind.key]
+                      ? 'bg-[var(--accent-bg)] border-[var(--accent-line)] text-[var(--ink-1)]'
+                      : 'bg-[var(--surface-1)] border-[var(--line-1)] text-[var(--ink-2)] hover:bg-[var(--surface-3)] hover:text-[var(--ink-1)]'
+                  "
                   @click="toggleIndicatorKey(ind.key)"
                 >
                   <span class="flex min-w-0 items-center gap-1.5">

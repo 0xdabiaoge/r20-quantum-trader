@@ -182,8 +182,7 @@ function refreshAll(): void {
         <div class="flex items-center justify-between text-2xs mb-1.5">
           <span class="font-bold text-[var(--ink-1)]">{{ t('dash.venueAccounts.mobileSummary') }}</span>
           <button
-            class="text-3xs font-medium px-2 py-1 rounded cursor-pointer transition-colors"
-            style="background-color: var(--surface-3); color: var(--ink-2)"
+            class="text-3xs font-medium px-2 py-1 rounded cursor-pointer transition-colors bg-[var(--surface-3)] text-[var(--ink-2)] hover:bg-[var(--ds-color-bg-hover)] hover:text-[var(--ink-1)]"
             :aria-expanded="isMobileExpanded"
             :aria-controls="'venue-accounts-grid'"
             @click="isMobileExpanded = !isMobileExpanded"

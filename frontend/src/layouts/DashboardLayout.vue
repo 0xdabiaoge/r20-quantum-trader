@@ -140,7 +140,7 @@ const venueHealth = computed(() => {
              用 `brand.name` 而不是新造键 —— 它已是品牌名的单一事实源。 -->
         <RouterLink
           to="/"
-          class="flex items-center gap-2.5 min-w-0 cursor-pointer no-underline"
+          class="flex items-center gap-2.5 min-w-0 cursor-pointer no-underline transition-opacity hover:opacity-85"
           style="color: inherit"
           :aria-label="t('brand.name')"
         >
