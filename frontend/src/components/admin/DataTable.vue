@@ -105,6 +105,12 @@ const has = (name: string) => !!slots[name]
 const sortKey = ref<string | null>(null)
 const sortDir = ref<'asc' | 'desc' | null>(null)
 
+/** `aria-sort` 取值：只有当前排序列才报方向，其余为 none（屏幕阅读器据此播报）。 */
+function ariaSortOf(col: DataTableColumn): 'ascending' | 'descending' | 'none' {
+  if (sortKey.value !== col.key || !sortDir.value) return 'none'
+  return sortDir.value === 'asc' ? 'ascending' : 'descending'
+}
+
 function toggleSort(col: DataTableColumn) {
   if (!props.sortable || !col.sortable) return
   if (sortKey.value !== col.key) {
@@ -157,22 +163,32 @@ const colCount = computed(() => props.columns.length + (has('actions') ? 1 : 0))
       <thead>
         <slot name="head">
           <tr class="sticky top-0 z-10" style="background-color: var(--surface-2);">
+            <!-- 批 43：可排序表头改成**真按钮**。
+                 此前 `@click` 挂在 `<th>` 上 —— 鼠标能排序，键盘用户完全够不着
+                 （`<th>` 不可聚焦、不响应 Enter），屏幕阅读器也不知道它能点。
+                 现在：`<th>` 带 `aria-sort`（语义），里面是裸按钮（可聚焦 + Enter/Space）。
+                 外观由 `.sort-btn` 保证与原来的纯文本一致。 -->
             <th
               v-for="col in columns"
               :key="col.key"
               class="px-3 py-2 text-4xs font-bold uppercase tracking-wider border-b whitespace-nowrap"
-              :class="sortable && col.sortable ? 'cursor-pointer select-none' : ''"
+              :aria-sort="sortable && col.sortable ? ariaSortOf(col) : undefined"
               :style="{ color: 'var(--ink-3)', borderColor: 'var(--line-1)', textAlign: col.align || 'left', width: col.width || 'auto' }"
-              @click="toggleSort(col)"
             >
-              <span class="inline-flex items-center gap-1">
+              <button
+                v-if="sortable && col.sortable"
+                type="button"
+                class="sort-btn"
+                :style="{ width: '100%', justifyContent: col.align === 'right' ? 'flex-end' : 'flex-start' }"
+                :title="col.label"
+                @click="toggleSort(col)"
+              >
                 {{ col.label }}
-                <template v-if="sortable && col.sortable">
-                  <ChevronUp v-if="sortKey === col.key && sortDir === 'asc'" class="w-3 h-3" />
-                  <ChevronDown v-else-if="sortKey === col.key && sortDir === 'desc'" class="w-3 h-3" />
-                  <ChevronsUpDown v-else class="w-3 h-3 opacity-40" />
-                </template>
-              </span>
+                <ChevronUp v-if="sortKey === col.key && sortDir === 'asc'" class="w-3 h-3" />
+                <ChevronDown v-else-if="sortKey === col.key && sortDir === 'desc'" class="w-3 h-3" />
+                <ChevronsUpDown v-else class="w-3 h-3 opacity-40" />
+              </button>
+              <span v-else class="inline-flex items-center gap-1">{{ col.label }}</span>
             </th>
             <th v-if="has('actions')" class="px-3 py-2 text-4xs font-bold uppercase tracking-wider border-b text-right" style="color: var(--ink-3); border-color: var(--line-1);">
               ·
@@ -190,13 +206,17 @@ const colCount = computed(() => props.columns.length + (has('actions') ? 1 : 0))
           </td>
         </tr>
         <template v-else>
+          <!-- 批 43：`clickable` 的行补键盘可达（此前只有鼠标能点行）。 -->
           <tr
             v-for="(row, i) in displayRows"
             :key="rowKey ? rowKey(row, i) : i"
             class="border-b last:border-b-0 transition-colors hover:bg-[var(--surface-3)]"
-            :class="[clickable ? 'cursor-pointer' : '', rowClass]"
+            :class="[clickable ? 'clickable' : '', rowClass]"
+            :tabindex="clickable ? 0 : undefined"
             style="border-color: var(--line-1);"
             @click="emit('row-click', row)"
+            @keydown.enter="clickable && emit('row-click', row)"
+            @keydown.space.prevent="clickable && emit('row-click', row)"
           >
             <slot name="row" :row="row" :index="i">
               <td

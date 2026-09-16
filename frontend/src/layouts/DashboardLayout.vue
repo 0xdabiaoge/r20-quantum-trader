@@ -124,9 +124,12 @@ const venueHealth = computed(() => {
         class="flex h-12 items-center justify-between border-b px-3.5"
         style="border-color: var(--line-1)"
       >
-        <div
-          class="flex items-center gap-2.5 min-w-0 cursor-pointer"
-          @click="go('/')"
+        <!-- 批 43：品牌区此前是 `<div @click>` —— 键盘用户回不到首页，
+             屏幕阅读器也不知道它是链接。改成真 `<RouterLink>`（外观靠 a 的类保留）。 -->
+        <RouterLink
+          to="/"
+          class="flex items-center gap-2.5 min-w-0 cursor-pointer no-underline"
+          style="color: inherit"
         >
           <img src="/favicon.svg" alt="" class="h-6 w-6 shrink-0 rounded" />
           <div v-if="!navCompact" class="min-w-0 truncate">
@@ -137,7 +140,7 @@ const venueHealth = computed(() => {
               <span class="dsh-status-dot active" :title="t('dash.shell.nav.liveDot')" />
             </div>
           </div>
-        </div>
+        </RouterLink>
 
         <span
           v-if="!navCompact"

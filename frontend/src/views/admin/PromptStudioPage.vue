@@ -634,9 +634,14 @@ onMounted(loadLib)
               <div
                 v-for="(m, idx) in workingModules"
                 :key="m.id"
-                class="ps-mod"
+                class="ps-mod clickable"
                 :class="{ 'is-on': activeEditingIdx === idx, 'is-off': !m.enabled }"
+                role="button"
+                tabindex="0"
+                :aria-current="activeEditingIdx === idx ? 'true' : undefined"
                 @click="activeEditingIdx = idx"
+                @keydown.enter="activeEditingIdx = idx"
+                @keydown.space.prevent="activeEditingIdx = idx"
               >
                 <span class="ps-mod-n mono">#{{ idx + 1 }}</span>
                 <BaseSwitch

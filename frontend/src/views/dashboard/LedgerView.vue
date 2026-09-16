@@ -370,7 +370,10 @@ const truncation = computed<{ kept: number; total: number } | null>(() => {
                   v-for="x in rows"
                   :key="x.id"
                   class="clickable transition-colors hover:bg-[var(--surface-2)]"
+                  tabindex="0"
                   @click="detail = x"
+                  @keydown.enter="detail = x"
+                  @keydown.space.prevent="detail = x"
                 >
                   <td>
                     <div class="flex items-center gap-1.5 flex-wrap">

@@ -190,6 +190,7 @@ function toggleCoinFilter(sym: string) {
             :key="c.sym"
             class="dsh-card-sub p-2.5 text-left transition-all cursor-pointer relative"
             :class="selectedCoin === c.sym ? 'border-[var(--accent)] bg-[var(--surface-3)]' : 'hover:border-[var(--line-2)]'"
+            :aria-pressed="selectedCoin === c.sym"
             @click="toggleCoinFilter(c.sym)"
           >
             <div class="flex items-center justify-between gap-1 mb-1.5">
@@ -279,14 +280,15 @@ function toggleCoinFilter(sym: string) {
                 </span>
 
                 <!-- 关联币种 -->
-                <span
+                <button
                   v-for="coin in (item.coins || [])"
                   :key="coin"
+                  type="button"
                   class="rounded px-1.5 py-0.5 text-4xs font-mono font-bold text-[var(--accent)] border border-[var(--line-2)] cursor-pointer hover:bg-[var(--surface-3)]"
                   @click="toggleCoinFilter(coin)"
                 >
                   ${{ coin }}
-                </span>
+                </button>
               </div>
 
               <!-- 外链 -->

@@ -49,7 +49,11 @@ test('模板里不存在 <tr> 直接嵌 <tr>', () => {
   for (const f of files) {
     const text = readFileSync(f, 'utf8');
     // <tr ...> 后面（允许属性/空白/注释）紧跟另一个 <tr
-    const re = /<tr\b[^>]*>\s*(?:<!--[\s\S]*?-->\s*)*<tr\b/g;
+    // 批 43：注释匹配收紧成 `<!--(?:(?!-->)[\s\S])*-->`。原来的 `[\s\S]*?--` 允许
+    // 注释体里出现 `-->`，于是**跨注释回溯**：源码里插一条新注释后，正则会从上一个
+    // `<tr ...>` 一路吞到后面某条注释的 `-->`，把中间的表头、按钮全当注释，
+    // 命中本文件里相隔四十行的两个 `<tr>`（批 43 实测误报 DataTable:165）。
+    const re = /<tr\b[^>]*>\s*(?:<!--(?:(?!-->)[\s\S])*-->\s*)*<tr\b/g;
     let m;
     while ((m = re.exec(text))) {
       const line = text.slice(0, m.index).split('\n').length;

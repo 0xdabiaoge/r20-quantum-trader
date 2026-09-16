@@ -39,6 +39,14 @@ type SortKey = 'name' | 'price' | 'chg24h' | 'velocity' | 'accel' | 'adx' | 'ls'
 const sortKey = ref<SortKey | null>(null);
 const sortOrder = ref<'asc' | 'desc'>('desc');
 
+/** `aria-sort`：只有当前排序列报方向（批 43，键盘/读屏可感知排序状态）。 */
+function ariaSortOf(key: string): 'ascending' | 'descending' | 'none' {
+  if (sortKey.value !== key) return 'none'
+  if (sortOrder.value === 'asc') return 'ascending'
+  if (sortOrder.value === 'desc') return 'descending'
+  return 'none'
+}
+
 function toggleSort(key: SortKey) {
   if (sortKey.value === key) {
     if (sortOrder.value === 'desc') {
@@ -200,78 +208,78 @@ const processedRows = computed(() => {
         <table class="table w-full">
           <thead>
             <tr>
-              <th class="cursor-pointer select-none" @click="toggleSort('name')">
-                <div class="flex items-center gap-1">
-                  <span>{{ t('dash.matrix.matrix.col.symbol') }}</span>
-                  <ArrowUp v-if="sortKey === 'name' && sortOrder === 'asc'" class="h-3 w-3" />
-                  <ArrowDown v-else-if="sortKey === 'name' && sortOrder === 'desc'" class="h-3 w-3" />
-                  <ArrowUpDown v-else class="h-3 w-3 opacity-40" />
-                </div>
+              <th :aria-sort="ariaSortOf('name')">
+                <button type="button" class="sort-btn w-full" @click="toggleSort('name')">
+                  <span class="inline-flex w-full items-center gap-1">
+                    <span>{{ t('dash.matrix.matrix.col.symbol') }}</span>
+                    <ArrowUp v-if="sortKey === 'name' && sortOrder === 'asc'" class="h-3 w-3" />
+                    <ArrowDown v-else-if="sortKey === 'name' && sortOrder === 'desc'" class="h-3 w-3" />
+                    <ArrowUpDown v-else class="h-3 w-3 opacity-40" />
+                  </span>
+                </button>
               </th>
-              <th class="col-num cursor-pointer select-none" @click="toggleSort('price')">
-                <div class="flex items-center justify-end gap-1">
-                  <span>{{ t('dash.matrix.matrix.col.price') }}</span>
-                  <ArrowUp v-if="sortKey === 'price' && sortOrder === 'asc'" class="h-3 w-3" />
-                  <ArrowDown v-else-if="sortKey === 'price' && sortOrder === 'desc'" class="h-3 w-3" />
-                </div>
+              <th class="col-num" :aria-sort="ariaSortOf('price')">
+                <button type="button" class="sort-btn w-full" @click="toggleSort('price')">
+                  <span class="inline-flex w-full items-center justify-end gap-1">
+                    <span>{{ t('dash.matrix.matrix.col.price') }}</span>
+                    <ArrowUp v-if="sortKey === 'price' && sortOrder === 'asc'" class="h-3 w-3" />
+                    <ArrowDown v-else-if="sortKey === 'price' && sortOrder === 'desc'" class="h-3 w-3" />
+                  </span>
+                </button>
               </th>
-              <th class="col-num cursor-pointer select-none" @click="toggleSort('chg24h')">
-                <div class="flex items-center justify-end gap-1">
-                  <span>{{ t('dash.matrix.matrix.col.chg') }}</span>
-                  <ArrowUp v-if="sortKey === 'chg24h' && sortOrder === 'asc'" class="h-3 w-3" />
-                  <ArrowDown v-else-if="sortKey === 'chg24h' && sortOrder === 'desc'" class="h-3 w-3" />
-                </div>
+              <th class="col-num" :aria-sort="ariaSortOf('chg24h')">
+                <button type="button" class="sort-btn w-full" @click="toggleSort('chg24h')">
+                  <span class="inline-flex w-full items-center justify-end gap-1">
+                    <span>{{ t('dash.matrix.matrix.col.chg') }}</span>
+                    <ArrowUp v-if="sortKey === 'chg24h' && sortOrder === 'asc'" class="h-3 w-3" />
+                    <ArrowDown v-else-if="sortKey === 'chg24h' && sortOrder === 'desc'" class="h-3 w-3" />
+                  </span>
+                </button>
               </th>
-              <th
-                class="col-num cursor-pointer select-none"
-                :title="t('dash.matrix.matrix.col.vel') + ' · ' + t('dash.matrix.matrix.velTip')"
-                @click="toggleSort('velocity')"
-              >
-                <div class="flex items-center justify-end gap-1">
-                  <span>v (1H)</span>
-                  <ArrowUp v-if="sortKey === 'velocity' && sortOrder === 'asc'" class="h-3 w-3" />
-                  <ArrowDown v-else-if="sortKey === 'velocity' && sortOrder === 'desc'" class="h-3 w-3" />
-                </div>
+              <th class="col-num" :title="t('dash.matrix.matrix.col.vel') + ' · ' + t('dash.matrix.matrix.velTip')" :aria-sort="ariaSortOf('velocity')">
+                <button type="button" class="sort-btn w-full" @click="toggleSort('velocity')">
+                  <span class="inline-flex w-full items-center justify-end gap-1">
+                    <span>v (1H)</span>
+                    <ArrowUp v-if="sortKey === 'velocity' && sortOrder === 'asc'" class="h-3 w-3" />
+                    <ArrowDown v-else-if="sortKey === 'velocity' && sortOrder === 'desc'" class="h-3 w-3" />
+                  </span>
+                </button>
               </th>
-              <th
-                class="col-num cursor-pointer select-none"
-                :title="t('dash.matrix.matrix.col.acc') + ' · ' + t('dash.matrix.matrix.accTip')"
-                @click="toggleSort('accel')"
-              >
-                <div class="flex items-center justify-end gap-1">
-                  <span>a (1H)</span>
-                  <ArrowUp v-if="sortKey === 'accel' && sortOrder === 'asc'" class="h-3 w-3" />
-                  <ArrowDown v-else-if="sortKey === 'accel' && sortOrder === 'desc'" class="h-3 w-3" />
-                </div>
+              <th class="col-num" :title="t('dash.matrix.matrix.col.acc') + ' · ' + t('dash.matrix.matrix.accTip')" :aria-sort="ariaSortOf('accel')">
+                <button type="button" class="sort-btn w-full" @click="toggleSort('accel')">
+                  <span class="inline-flex w-full items-center justify-end gap-1">
+                    <span>a (1H)</span>
+                    <ArrowUp v-if="sortKey === 'accel' && sortOrder === 'asc'" class="h-3 w-3" />
+                    <ArrowDown v-else-if="sortKey === 'accel' && sortOrder === 'desc'" class="h-3 w-3" />
+                  </span>
+                </button>
               </th>
-              <th
-                class="col-num cursor-pointer select-none"
-                :title="t('dash.matrix.matrix.adxTip')"
-                @click="toggleSort('adx')"
-              >
-                <div class="flex items-center justify-end gap-1">
-                  <span>ADX</span>
-                  <ArrowUp v-if="sortKey === 'adx' && sortOrder === 'asc'" class="h-3 w-3" />
-                  <ArrowDown v-else-if="sortKey === 'adx' && sortOrder === 'desc'" class="h-3 w-3" />
-                </div>
+              <th class="col-num" :title="t('dash.matrix.matrix.adxTip')" :aria-sort="ariaSortOf('adx')">
+                <button type="button" class="sort-btn w-full" @click="toggleSort('adx')">
+                  <span class="inline-flex w-full items-center justify-end gap-1">
+                    <span>ADX</span>
+                    <ArrowUp v-if="sortKey === 'adx' && sortOrder === 'asc'" class="h-3 w-3" />
+                    <ArrowDown v-else-if="sortKey === 'adx' && sortOrder === 'desc'" class="h-3 w-3" />
+                  </span>
+                </button>
               </th>
-              <th
-                class="col-num cursor-pointer select-none"
-                :title="t('dash.matrix.matrix.lsTip')"
-                @click="toggleSort('ls')"
-              >
-                <div class="flex items-center justify-end gap-1">
-                  <span>{{ t('dash.matrix.matrix.col.ls') }}</span>
-                  <ArrowUp v-if="sortKey === 'ls' && sortOrder === 'asc'" class="h-3 w-3" />
-                  <ArrowDown v-else-if="sortKey === 'ls' && sortOrder === 'desc'" class="h-3 w-3" />
-                </div>
+              <th class="col-num" :title="t('dash.matrix.matrix.lsTip')" :aria-sort="ariaSortOf('ls')">
+                <button type="button" class="sort-btn w-full" @click="toggleSort('ls')">
+                  <span class="inline-flex w-full items-center justify-end gap-1">
+                    <span>{{ t('dash.matrix.matrix.col.ls') }}</span>
+                    <ArrowUp v-if="sortKey === 'ls' && sortOrder === 'asc'" class="h-3 w-3" />
+                    <ArrowDown v-else-if="sortKey === 'ls' && sortOrder === 'desc'" class="h-3 w-3" />
+                  </span>
+                </button>
               </th>
-              <th class="cursor-pointer select-none" @click="toggleSort('conf')">
-                <div class="flex items-center gap-1">
-                  <span>{{ t('dash.matrix.matrix.col.decision') }}</span>
-                  <ArrowUp v-if="sortKey === 'conf' && sortOrder === 'asc'" class="h-3 w-3" />
-                  <ArrowDown v-else-if="sortKey === 'conf' && sortOrder === 'desc'" class="h-3 w-3" />
-                </div>
+              <th :aria-sort="ariaSortOf('conf')">
+                <button type="button" class="sort-btn w-full" @click="toggleSort('conf')">
+                  <span class="inline-flex w-full items-center gap-1">
+                    <span>{{ t('dash.matrix.matrix.col.decision') }}</span>
+                    <ArrowUp v-if="sortKey === 'conf' && sortOrder === 'asc'" class="h-3 w-3" />
+                    <ArrowDown v-else-if="sortKey === 'conf' && sortOrder === 'desc'" class="h-3 w-3" />
+                  </span>
+                </button>
               </th>
               <th class="text-right">{{ t('dash.matrix.colActions') }}</th>
             </tr>
@@ -281,7 +289,10 @@ const processedRows = computed(() => {
               v-for="f in processedRows"
               :key="f.instId"
               class="clickable transition-colors hover:bg-[var(--surface-2)]"
+              tabindex="0"
               @click="openDetail(f)"
+              @keydown.enter="openDetail(f)"
+              @keydown.space.prevent="openDetail(f)"
             >
               <td>
                 <div class="flex items-center gap-2">
@@ -337,8 +348,12 @@ const processedRows = computed(() => {
         <div
           v-for="f in processedRows"
           :key="f.instId"
-          class="dsh-card-sub flex flex-col gap-1.5 p-3 text-left transition-colors hover:border-[var(--line-2)] cursor-pointer"
+          class="clickable dsh-card-sub flex flex-col gap-1.5 p-3 text-left transition-colors hover:border-[var(--line-2)]"
+          role="button"
+          tabindex="0"
           @click="openDetail(f)"
+          @keydown.enter="openDetail(f)"
+          @keydown.space.prevent="openDetail(f)"
         >
           <div class="flex items-center justify-between gap-2">
             <span class="flex items-center gap-2 text-xs font-bold text-[var(--ink-strong)]">

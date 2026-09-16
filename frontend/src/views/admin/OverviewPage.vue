@@ -436,9 +436,14 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
         <div
           v-for="(a, idx) in audits"
           :key="idx"
-          class="ov-audit-row"
+          class="ov-audit-row clickable"
           :class="{ 'is-selected': inspectingAuditIndex === idx }"
+          role="button"
+          tabindex="0"
+          :aria-expanded="inspectingAuditIndex === idx"
           @click="inspectingAuditIndex = inspectingAuditIndex === idx ? null : idx"
+          @keydown.enter="inspectingAuditIndex = inspectingAuditIndex === idx ? null : idx"
+          @keydown.space.prevent="inspectingAuditIndex = inspectingAuditIndex === idx ? null : idx"
         >
           <!-- 状态点与时间 -->
           <div class="ov-ar-time">

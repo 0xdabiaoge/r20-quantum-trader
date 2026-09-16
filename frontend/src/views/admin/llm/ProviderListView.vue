@@ -368,9 +368,13 @@ const bandFacts = () => [
         <article
           v-for="prov in filteredProviders"
           :key="prov.id"
-          class="pv-row"
+          class="pv-row clickable"
           :class="{ 'is-off': !prov.enabled }"
+          role="button"
+          tabindex="0"
           @click="selectProvider(prov)"
+          @keydown.enter="selectProvider(prov)"
+          @keydown.space.prevent="selectProvider(prov)"
         >
           <span class="pv-avatar mono">{{ monogram(prov.name) }}</span>
 

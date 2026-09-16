@@ -124,7 +124,10 @@ function symOf(x: { instId?: string; name?: string }): string {
             :key="p.instId + p.side"
             class="clickable transition-colors hover:bg-[var(--surface-2)]"
             :title="t('dash.matrix.chart.pickHint')"
+            tabindex="0"
             @click="emit('pick-symbol', p.instId)"
+            @keydown.enter="emit('pick-symbol', p.instId)"
+            @keydown.space.prevent="emit('pick-symbol', p.instId)"
           >
             <td>
               <div class="flex items-center gap-1.5 flex-wrap">
@@ -207,7 +210,10 @@ function symOf(x: { instId?: string; name?: string }): string {
             :key="o.ordId"
             class="clickable transition-colors hover:bg-[var(--surface-2)]"
             :title="t('dash.matrix.chart.pickHint')"
+            tabindex="0"
             @click="emit('pick-symbol', o.instId)"
+            @keydown.enter="emit('pick-symbol', o.instId)"
+            @keydown.space.prevent="emit('pick-symbol', o.instId)"
           >
             <td>
               <div class="flex items-center gap-1.5 flex-wrap">
