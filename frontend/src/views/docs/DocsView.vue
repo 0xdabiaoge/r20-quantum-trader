@@ -132,6 +132,7 @@ onUnmounted(() => {
         <a
           href="https://github.com/555cute/r20-quantum-trader"
           target="_blank"
+          rel="noopener noreferrer"
           class="btn btn-primary h-7 px-2.5 text-xs font-medium inline-flex items-center gap-1"
         >
           <ExternalLink class="w-3.5 h-3.5" />

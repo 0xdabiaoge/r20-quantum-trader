@@ -464,7 +464,7 @@ onBeforeUnmount(() => {
                   </span>
                   <BaseSwitch
                     :model-value="channelOn(c.key)"
-                    :title="channelOn(c.key) ? c.offTitle : c.onTitle"
+                    :label="channelOn(c.key) ? c.offTitle : c.onTitle"
                     @update:model-value="() => toggleChannel(c.key, !channelOn(c.key))"
                   />
                 </div>

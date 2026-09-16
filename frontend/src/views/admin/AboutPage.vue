@@ -217,7 +217,7 @@ const bandFacts = computed(() => {
               <a
                 href="https://github.com/555cute/r20-quantum-trader"
                 target="_blank"
-                rel="noopener"
+                rel="noopener noreferrer"
                 class="btn btn-primary btn-sm"
               >
                 <GitBranch :size="13" />

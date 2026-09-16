@@ -75,7 +75,7 @@ onBeforeUnmount(() => {
               <span class="block text-sm font-medium" style="color: var(--ink-1)">{{ t('dash.shell.settings.cvd') }}</span>
               <span class="block text-xs leading-snug" style="color: var(--ink-3)">{{ t('dash.shell.settings.cvdDesc') }}</span>
             </span>
-            <BaseSwitch :model-value="cvd" @update:model-value="toggleCvd()" />
+            <BaseSwitch :model-value="cvd" :label="t('dash.shell.settings.cvd')" @update:model-value="toggleCvd()" />
           </label>
           <div class="border-t pt-2" style="border-color: var(--line-1)">
             <p class="form-label mb-1">{{ t('dash.shell.settings.goto') }}</p>

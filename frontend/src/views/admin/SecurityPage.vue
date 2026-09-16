@@ -681,7 +681,7 @@ onMounted(() => { loadAll(); loadMx() })
                 <div class="sc-field">
                   <span class="form-label">{{ t('admin.security.endpointTier') }}</span>
                   <label class="sc-check">
-                    <BaseSwitch v-model="mxTestnet.binance" />
+                    <BaseSwitch v-model="mxTestnet.binance" :label="t('admin.security.binanceDemoDomain')" />
                     <span>{{ t('admin.security.binanceDemoDomain') }}</span>
                   </label>
                 </div>
@@ -721,7 +721,7 @@ onMounted(() => { loadAll(); loadMx() })
                 <div class="sc-field">
                   <span class="form-label">{{ t('admin.security.endpointTier') }}</span>
                   <label class="sc-check">
-                    <BaseSwitch v-model="mxTestnet.gate" />
+                    <BaseSwitch v-model="mxTestnet.gate" :label="t('admin.security.gateSandboxDomain')" />
                     <span>{{ t('admin.security.gateSandboxDomain') }}</span>
                   </label>
                 </div>
@@ -736,7 +736,7 @@ onMounted(() => { loadAll(); loadMx() })
               <template #extra>
                 <div class="sc-gate">
                   <label class="sc-check" :class="{ 'is-danger': gateExec }">
-                    <BaseSwitch v-model="gateExec" />
+                    <BaseSwitch v-model="gateExec" :label="t('admin.security.gateMaster')" />
                     <span>
                       {{ t('admin.security.gateMaster') }}
                       <b>{{ mx?.venues?.gate?.execution_open ? t('admin.security.gateMasterOpen') : t('admin.security.gateMasterClosed') }}</b>
@@ -901,7 +901,7 @@ onMounted(() => { loadAll(); loadMx() })
           </template>
 
           <div class="sc-switch-row" :class="{ 'is-danger': manualClose }">
-            <BaseSwitch v-model="manualClose" />
+            <BaseSwitch v-model="manualClose" :label="t('admin.security.manualTitle')" />
             <span class="sc-switch-text">
               {{ manualClose ? t('admin.security.manualOn') : t('admin.security.manualOff') }}
             </span>

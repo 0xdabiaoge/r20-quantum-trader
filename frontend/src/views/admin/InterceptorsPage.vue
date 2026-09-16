@@ -390,7 +390,7 @@ onMounted(loadPlugins)
 
               <BaseSwitch
                 :model-value="p.enabled === true"
-                :title="p.enabled ? t('admin.interceptors.enabledTitle') : t('admin.interceptors.disabledTitle')"
+                :label="p.enabled ? t('admin.interceptors.enabledTitle') : t('admin.interceptors.disabledTitle')"
                 @update:model-value="() => togglePlugin(p)"
               />
             </div>
