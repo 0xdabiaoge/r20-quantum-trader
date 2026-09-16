@@ -22,6 +22,12 @@ const props = withDefaults(
     showClose?: boolean;
     /** 顶部强调条语义（danger 时用于编辑危险表单） */
     tone?: 'default' | 'danger';
+    /**
+     * 打开时的初始焦点选择器（在面板内部查找，批 69）。
+     * 仅用于"打开即需输入"的弹窗 —— 危险操作的确认短语、管理员密码等；
+     * 找不到匹配元素时自动回落到面板容器。
+     */
+    initialFocus?: string;
   }>(),
   { closeOnScrim: true, showClose: true, tone: 'default' },
 );
@@ -36,7 +42,14 @@ const panel = ref<HTMLElement | null>(null);
 
 /* 批 42：焦点陷阱 / Escape 栈 / 滚动锁 / 焦点交接 提取到 useModalFocus，
    与 BaseDrawer、TrajectoryPanel 共用同一份实现（此前三处各写或干脆没有）。 */
-const { sync: syncModalFocus, release: releaseModalFocus } = useModalFocus(panel, () => emit('close'));
+const { sync: syncModalFocus, release: releaseModalFocus } = useModalFocus(
+  panel,
+  () => emit('close'),
+  {
+    initialFocus: () =>
+      props.initialFocus ? panel.value?.querySelector<HTMLElement>(props.initialFocus) ?? null : null,
+  },
+);
 
 watch(() => props.open, syncModalFocus);
 

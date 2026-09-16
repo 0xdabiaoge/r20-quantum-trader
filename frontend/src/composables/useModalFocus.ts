@@ -37,9 +37,22 @@ const stack: symbol[] = [];
 export function useModalFocus(
   panel: Ref<HTMLElement | null>,
   onClose: () => void,
-  options: { lockScroll?: boolean } = {},
+  options: {
+    lockScroll?: boolean;
+    /**
+     * 打开时的初始焦点（批 69）。返回 null 则回落到面板容器。
+     *
+     * 默认落点是**面板容器**而非第一个可聚焦项：否则鼠标用户打开弹窗就会看到
+     * 确认/关闭按钮上多出一圈蓝环，视觉上像"已经按下了什么"。
+     * 但有一类弹窗的**唯一目的就是让用户输入**（危险操作的确认短语、管理员密码），
+     * 此时把焦点直接放到该输入框既省一次 Tab，也让移动端键盘立刻弹出 ——
+     * 由调用方通过本选项显式声明。
+     */
+    initialFocus?: () => HTMLElement | null | undefined;
+  } = {},
 ) {
   const lockScroll = options.lockScroll !== false;
+  const initialFocus = options.initialFocus;
   let lastFocused: Element | null = null;
   let token: symbol | null = null;
 
@@ -102,8 +115,8 @@ export function useModalFocus(
   }
 
   /**
-   * 跟随 `open` 状态调用：打开时记住原焦点、锁滚动、挂监听并把焦点落到**面板容器**
-   * （`tabindex="-1"` + `outline-none`；不给第一个按钮，否则鼠标用户会看到一圈蓝环）；
+   * 跟随 `open` 状态调用：打开时记住原焦点、锁滚动、挂监听并把焦点落到 **`initialFocus()`
+   * 指定的元素，未指定则落到面板容器**（`tabindex="-1"` + `outline-none`）；
    * 关闭时解锁、摘监听、把焦点还给触发元素。
    */
   async function sync(open: boolean) {
@@ -112,7 +125,7 @@ export function useModalFocus(
       if (lockScroll) document.body.style.overflow = 'hidden';
       await nextTick();
       attach();
-      panel.value?.focus?.();
+      (initialFocus?.() || panel.value)?.focus?.();
       return;
     }
     if (lockScroll) document.body.style.overflow = '';

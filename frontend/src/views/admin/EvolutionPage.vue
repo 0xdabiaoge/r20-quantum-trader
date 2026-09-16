@@ -631,6 +631,7 @@ onMounted(loadData);
       :title="t('admin.evolution.runConfirmTitle')"
       :desc="t('admin.evolution.runConfirmDesc')"
       size="sm"
+      initial-focus="input"
       @close="closeRunDialog"
     >
       <label class="evo-field">

@@ -31,6 +31,7 @@ function onConfirm() {
     :size="'sm'"
     :tone="state.danger ? 'danger' : 'default'"
     :show-close="false"
+    initial-focus="input"
     @close="settle(false)"
   >
     <div class="flex items-start gap-3">

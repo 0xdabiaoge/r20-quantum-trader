@@ -992,6 +992,7 @@ onMounted(() => { loadAll(); loadMx() })
       :title="t('admin.security.closeModalTitle')"
       tone="danger"
       size="md"
+      initial-focus="input"
       @close="closeModal = null"
     >
       <template v-if="closeModal?.pos">

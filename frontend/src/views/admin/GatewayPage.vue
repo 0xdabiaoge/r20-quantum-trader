@@ -308,6 +308,7 @@ function statusLabel(s: string): string {
       :title="t('admin.gateway.deliveries.replayTitle', undefined, { id: replayId ?? '' })"
       :desc="t('admin.gateway.deliveries.replayDesc')"
       size="sm"
+      initial-focus="input"
       @close="closeReplay"
     >
       <label class="gw-field">

@@ -339,6 +339,7 @@ const bandFacts = computed(() => {
       :title="t('admin.about.confirmTitle')"
       :desc="t('admin.about.confirmSubtitle')"
       size="sm"
+      initial-focus=".ab-confirm-input"
       @close="showConfirmModal = false"
     >
       <div class="ab-confirm">

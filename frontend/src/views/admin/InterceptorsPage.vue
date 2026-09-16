@@ -400,7 +400,7 @@ onMounted(loadPlugins)
     </template>
 
     <!-- ══ 源码编辑器 ══ -->
-    <BaseDialog :open="editorVisible" size="xl" @close="closeEditor">
+    <BaseDialog :open="editorVisible" size="xl" initial-focus="textarea" @close="closeEditor">
       <template #title>
         <span class="ip-dlg-title">
           <FileCode :size="15" />
@@ -448,6 +448,7 @@ onMounted(loadPlugins)
       :title="t('admin.interceptors.createTitle')"
       :desc="t('admin.interceptors.createHint')"
       size="lg"
+      initial-focus="input"
       @close="closeCreate"
     >
       <div v-if="createError" role="alert" class="ip-dlg-error">
