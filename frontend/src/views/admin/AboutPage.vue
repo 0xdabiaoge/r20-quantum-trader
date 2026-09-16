@@ -155,7 +155,7 @@ const bandFacts = computed(() => {
     </PageHeader>
 
     <!-- 取数失败（旧版仅 console.error，页面完全不可见） -->
-    <div v-if="error && !about" class="state-block is-error ab-error">
+    <div v-if="error && !about" role="alert" class="state-block is-error ab-error">
       <span class="state-icon"><AlertTriangle :size="17" /></span>
       <p class="state-title">{{ t('common.loadFailed') }}</p>
       <p class="state-desc">{{ error }}</p>

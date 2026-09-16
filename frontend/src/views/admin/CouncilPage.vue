@@ -431,7 +431,7 @@ onMounted(loadData);
     </PageHeader>
 
     <!-- 载入失败 -->
-    <div v-if="loadError" class="state-block is-error cn-error">
+    <div v-if="loadError" role="alert" class="state-block is-error cn-error">
       <span class="state-icon"><AlertTriangle :size="17" /></span>
       <p class="state-title">{{ t('common.loadFailed') }}</p>
       <p class="state-desc">{{ t('common.networkError') }}</p>
@@ -659,6 +659,7 @@ onMounted(loadData);
                     v-model="selectedRole.model_id"
                     class="field"
                     :class="{ 'is-warn': modelMissing(selectedRole) }"
+                    :aria-invalid="modelMissing(selectedRole) ? 'true' : undefined"
                     :disabled="!auth.isSuperadmin"
                   >
                     <option value="">{{ t('admin.council.inheritGlobalBrain') }}</option>

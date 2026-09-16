@@ -61,7 +61,7 @@ const {
       </div>
 
       <!-- 状态 -->
-      <div v-if="remoteFetchResult" class="rf-status" :class="remoteFetchResult.ok ? 'is-ok' : 'is-error'">
+      <div v-if="remoteFetchResult" class="rf-status" :role="remoteFetchResult.ok ? 'status' : 'alert'" :class="remoteFetchResult.ok ? 'is-ok' : 'is-error'">
         <CheckCircle2 v-if="remoteFetchResult.ok" :size="14" />
         <AlertCircle v-else :size="14" />
         <span class="rf-status-text">

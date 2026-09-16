@@ -212,7 +212,7 @@ function tone(level: string): string {
         </div>
 
         <!-- 拉取失败 -->
-        <div v-else-if="logError" class="state-block is-error">
+        <div v-else-if="logError" role="alert" class="state-block is-error">
           <span class="state-icon"><AlertCircle :size="17" /></span>
           <p class="state-title">{{ t('common.loadFailed') }}</p>
           <p class="state-desc">{{ logError }}</p>

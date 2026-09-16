@@ -285,7 +285,7 @@ onMounted(() => {
     </PageHeader>
 
     <!-- 拉取失败 -->
-    <div v-if="errorMsg" class="state-block is-error pol-error">
+    <div v-if="errorMsg" role="alert" class="state-block is-error pol-error">
       <span class="state-icon"><AlertTriangle :size="17" /></span>
       <p class="state-title">{{ t('admin.policySnapshot.err.fetchFailed') }}</p>
       <p class="state-desc">{{ errorMsg }}</p>

@@ -264,7 +264,7 @@ onMounted(load)
       <!-- 批 24：取账号列表失败时，此前只弹一个转瞬即逝的 toast，
            users 保持 []，于是页面显示「暂无管理员账号」——把**接口故障**说成**没有账号**，
            超管回到这个页面会以为账号被清空了，且没有重试入口。 -->
-      <div v-else-if="loadError" class="state-block is-error">
+      <div v-else-if="loadError" role="alert" class="state-block is-error">
         <span class="state-icon"><AlertTriangle :size="17" /></span>
         <p class="state-title">{{ t('common.loadFailed') }}</p>
         <p class="state-desc">{{ loadError }}</p>
@@ -338,7 +338,7 @@ onMounted(load)
       size="md"
       @close="createVisible = false"
     >
-      <div v-if="createError" class="as-dlg-error">
+      <div v-if="createError" class="as-dlg-error" role="alert">
         <ShieldAlert :size="13" />
         <span>{{ createError }}</span>
       </div>

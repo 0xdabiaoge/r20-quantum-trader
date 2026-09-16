@@ -72,7 +72,7 @@ async function retry() {
   </div>
 
   <!-- ② 从未加载成功：报错 + 重试 -->
-  <div v-else-if="failed" class="state-block is-error dg-error">
+  <div v-else-if="failed" role="alert" class="state-block is-error dg-error">
     <span class="state-icon"><AlertTriangle :size="17" /></span>
     <p class="state-title">{{ t('dash.shell.gateFailedTitle') }}</p>
     <p class="state-desc">{{ t('dash.shell.gateFailedDesc') }}</p>

@@ -206,7 +206,7 @@ const bandFacts = () => [
         </div>
       </div>
 
-      <div v-if="settingsResult" class="pv-result" :class="settingsResult.ok ? 'is-ok' : 'is-error'">
+      <div v-if="settingsResult" class="pv-result" :role="settingsResult.ok ? 'status' : 'alert'" :class="settingsResult.ok ? 'is-ok' : 'is-error'">
         <CheckCircle2 v-if="settingsResult.ok" :size="14" />
         <AlertCircle v-else :size="14" />
         <span>{{ settingsResult.message || settingsResult.error }}</span>
@@ -354,7 +354,7 @@ const bandFacts = () => [
       </div>
 
       <!-- ② 加载结束但无配置：报错 + 重试（失败不再伪装成"没有供应商"） -->
-      <div v-else-if="cfgFailed" class="state-block is-error pv-gate-err">
+      <div v-else-if="cfgFailed" role="alert" class="state-block is-error pv-gate-err">
         <span class="state-icon"><ShieldAlert :size="17" /></span>
         <p class="state-title">{{ t('common.loadFailed') }}</p>
         <p class="state-desc">{{ t('common.networkError') }}</p>

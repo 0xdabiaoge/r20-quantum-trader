@@ -282,7 +282,7 @@ function monogram(name: string): string {
       </section>
 
       <!-- 连通性诊断结果 -->
-      <section v-if="testResult" class="card pd-test" :class="testResult.ok ? 'is-ok' : 'is-error'">
+      <section v-if="testResult" class="card pd-test" :role="testResult.ok ? 'status' : 'alert'" :class="testResult.ok ? 'is-ok' : 'is-error'">
         <header class="pd-test-head">
           <span class="pd-test-icon">
             <CheckCircle2 v-if="testResult.ok" :size="15" />

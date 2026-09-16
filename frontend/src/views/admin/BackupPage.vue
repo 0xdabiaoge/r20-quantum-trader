@@ -368,7 +368,7 @@ onMounted(load)
       </template>
     </PageHeader>
 
-    <div v-if="loadError && !simple" class="state-block is-error bk-error">
+    <div v-if="loadError && !simple" role="alert" class="state-block is-error bk-error">
       <span class="state-icon"><AlertTriangle :size="17" /></span>
       <p class="state-title">{{ t('common.loadFailed') }}</p>
       <p class="state-desc">{{ loadError }}</p>

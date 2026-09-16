@@ -478,7 +478,7 @@ onMounted(loadLib)
     </PageHeader>
 
     <!-- 载入失败 -->
-    <div v-if="loadError" class="state-block is-error ps-error">
+    <div v-if="loadError" role="alert" class="state-block is-error ps-error">
       <span class="state-icon"><AlertTriangle :size="17" /></span>
       <p class="state-title">{{ t('common.loadFailed') }}</p>
       <p class="state-desc">{{ t('common.networkError') }}</p>

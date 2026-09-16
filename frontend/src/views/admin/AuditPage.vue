@@ -148,7 +148,7 @@ onMounted(load)
     </PageHeader>
 
     <!-- 拉取失败（旧版无错误位：请求抛错时页面停在空白） -->
-    <div v-if="loadError && !records.length" class="state-block is-error au-error">
+    <div v-if="loadError && !records.length" role="alert" class="state-block is-error au-error">
       <span class="state-icon"><AlertTriangle :size="17" /></span>
       <p class="state-title">{{ t('common.loadFailed') }}</p>
       <p class="state-desc">{{ loadError }}</p>

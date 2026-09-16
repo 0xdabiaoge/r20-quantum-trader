@@ -326,7 +326,7 @@ onMounted(loadData);
     </PageHeader>
 
     <!-- 拉取失败 -->
-    <div v-if="loadError" class="state-block is-error evo-error">
+    <div v-if="loadError" role="alert" class="state-block is-error evo-error">
       <span class="state-icon"><AlertTriangle :size="17" /></span>
       <p class="state-title">{{ t('common.loadFailed') }}</p>
       <p class="state-desc">{{ loadError }}</p>

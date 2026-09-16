@@ -122,7 +122,7 @@ function statusLabel(s: string): string {
     </PageHeader>
 
     <!-- 拉取失败（无任何数据） -->
-    <div v-if="error && !gw" class="state-block is-error gw-error">
+    <div v-if="error && !gw" role="alert" class="state-block is-error gw-error">
       <span class="state-icon"><AlertTriangle :size="17" /></span>
       <p class="state-title">{{ t('common.loadFailed') }}</p>
       <!-- 批 24：原来这里复用 `msgs.loadFailed`（值 = 「加载失败：{msg}」），

@@ -96,7 +96,7 @@ function ageText(a: any): string {
     </PageHeader>
 
     <!-- 拉取失败 -->
-    <div v-if="error && !data" class="state-block is-error ag-error">
+    <div v-if="error && !data" role="alert" class="state-block is-error ag-error">
       <span class="state-icon"><AlertTriangle :size="17" /></span>
       <p class="state-title">{{ t('common.loadFailed') }}</p>
       <p class="state-desc">{{ error }}</p>

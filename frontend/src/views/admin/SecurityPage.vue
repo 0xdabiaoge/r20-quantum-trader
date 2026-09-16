@@ -525,7 +525,7 @@ onMounted(() => { loadAll(); loadMx() })
 
     <!-- 加载失败：批 24 —— 此前失败只弹一个 3 秒就消失的 toast，
          config 保持 null，模板两个分支都不命中 → 页面只剩页头，一片空白且无重试入口。 -->
-    <div v-else-if="loadError && !config" class="state-block is-error">
+    <div v-else-if="loadError && !config" role="alert" class="state-block is-error">
       <span class="state-icon"><AlertTriangle :size="17" /></span>
       <p class="state-title">{{ t('common.loadFailed') }}</p>
       <p class="state-desc">{{ loadError }}</p>

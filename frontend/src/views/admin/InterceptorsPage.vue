@@ -289,7 +289,7 @@ onMounted(loadPlugins)
     </PageHeader>
 
     <!-- 拉取失败 -->
-    <div v-if="loadError" class="state-block is-error ip-error">
+    <div v-if="loadError" role="alert" class="state-block is-error ip-error">
       <span class="state-icon"><AlertTriangle :size="17" /></span>
       <p class="state-title">{{ t('common.loadFailed') }}</p>
       <p class="state-desc">{{ loadError }}</p>
@@ -411,7 +411,7 @@ onMounted(loadPlugins)
 
       <p class="ip-dlg-hint">{{ t('admin.interceptors.editorHint') }}</p>
 
-      <div v-if="codeError" class="ip-dlg-error">
+      <div v-if="codeError" class="ip-dlg-error" role="alert">
         <AlertTriangle :size="13" />
         <span>{{ codeError }}</span>
       </div>
@@ -422,6 +422,7 @@ onMounted(loadPlugins)
         spellcheck="false"
         class="field ip-code"
         :aria-label="t('admin.interceptors.codeLabel')"
+        :aria-invalid="!!codeError ? 'true' : undefined"
       />
 
       <template #footer>
