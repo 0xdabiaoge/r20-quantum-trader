@@ -485,12 +485,11 @@ watch(() => route.path, () => (drawerOpen.value = false));
   min-height: 0;
   display: flex;
   flex-direction: column;
+  /* 批 33：此前移动端 16px、≥768px 24px，而前台壳层（DashboardLayout）
+     在 ≥640px 就是 16px + 底部 24px —— 同一套外壳两个内缩值，前后台来回切
+     页面整体会横移 8px。统一到前台的 16/16/24/16。 */
   padding: var(--ds-space-4);
-}
-@media (min-width: 768px) {
-  .wb-main {
-    padding: var(--ds-space-5);
-  }
+  padding-bottom: var(--ds-space-5);
 }
 .wb-content {
   flex: 1;

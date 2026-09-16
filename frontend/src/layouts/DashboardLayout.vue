@@ -61,7 +61,7 @@ function toggleNav() {
 /** 传给顶栏的「导航是否可见」，两套形态共用一个图标语义。 */
 const navExpanded = computed(() =>
   isNarrow.value ? mobileNavOpen.value : !sidebarCollapsed.value);
-/** 桌面端折叠态（窄屏抽屉永远是完整宽度 w-60，标签/分组必须照常显示）。 */
+/** 桌面端折叠态（窄屏抽屉永远是完整宽度，标签/分组必须照常显示）。 */
 const navCompact = computed(() => !isNarrow.value && sidebarCollapsed.value);
 
 /* 全局 ⌘J 快捷键呼出轨迹面板 */
@@ -108,13 +108,13 @@ const venueHealth = computed(() => {
     style="color: var(--ink-1)"
   >
     <!-- 左侧：DeepSeek Harness 开发者侧边导航栏
-         桌面（md+）= 常驻侧栏（可折叠 w-60/w-16）；窄屏 = off-canvas 抽屉（同一元素）
+         桌面（md+）= 常驻侧栏（可折叠 236/56）；窄屏 = off-canvas 抽屉（同一元素）
          层级：遮罩 z-30 < 抽屉 z-50 < 顶栏 z-[60] —— 顶栏必须压在抽屉之上，
          否则抽屉展开后会把顶栏那颗「展开/收起导航」按钮自己盖住，点不回去。 -->
     <aside
-      class="flex flex-col shrink-0 border-e transition-all duration-200 z-50 select-none backdrop-blur-xl fixed inset-y-0 left-0 w-60 md:static"
+      class="flex flex-col shrink-0 border-e transition-all duration-200 z-50 select-none backdrop-blur-xl fixed inset-y-0 left-0 w-[var(--w-sidebar)] md:static"
       :class="[
-        sidebarCollapsed ? 'md:w-16' : 'md:w-60',
+        sidebarCollapsed ? 'md:w-[var(--w-sidebar-collapsed)]' : 'md:w-[var(--w-sidebar)]',
         mobileNavOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
       ]"
       style="background-color: var(--surface-sidebar); border-color: var(--line-1)"

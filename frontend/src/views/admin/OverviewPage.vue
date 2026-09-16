@@ -736,10 +736,13 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: var(--text-sm);
+  /* 批 33：全站 18 个页面用 .card-title（--text-xs 12px），只有本页自定义成
+     --text-sm（12.5px）→ 同一「卡片标题」角色出现两种字号。改回同一档，
+     并改用同一套令牌（颜色用 token 而非写死 #fff，字距用 --track-title）。 */
+  font-size: var(--text-xs);
   font-weight: 600;
-  color: #fff;
-  letter-spacing: -0.01em;
+  color: var(--ds-color-text-primary);
+  letter-spacing: var(--track-title);
 }
 .ov-ch-icon {
   color: var(--ds-color-brand);
