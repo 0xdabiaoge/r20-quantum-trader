@@ -444,9 +444,11 @@ const bandFacts = computed(() => {
   display: flex;
   flex-direction: column;
 }
-.ab-comp:last-child {
-  border-bottom: 0;
-}
+/* 批 96：此处原有 `.ab-comp:last-child { border-bottom: 0 }`（末行不封口）——
+   批 90 把行本体并入 `.kv-row` 后，该类名已不在模板里，此条成了**死规则**；
+   「末行不封口」的行为现由原件 `.kv-row:last-child` 统一提供。
+   批 90 的判据只拉黑了 `ab-comp"`（带引号）这种**模板用法**，漏掉了
+   **伪类形态的 CSS 规则**；本批把死 CSS 探针扩展到 scoped 样式后由它抓出。 */
 .ab-comp-name {
   font-size: var(--text-xs);
   color: var(--ds-color-text-secondary);
