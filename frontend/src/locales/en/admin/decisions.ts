@@ -1,5 +1,5 @@
 export const enAdminDecisions = {
-  desc: 'Review the AI macro stance and per-symbol actions, and audit the trader, backend and scheduler live log streams',
+  desc: 'Check the macro stance, per-symbol actions and three live logs',
   normalRun: 'Normal operation',
   latestFirst: 'Newest first',
   tabTrader: 'Trader patrol (Trader)',
@@ -8,4 +8,10 @@ export const enAdminDecisions = {
   pullingLogs: 'Fetching the latest log stream...',
   noLiveLogs: 'No live logs',
   fetchLogFailed: 'Failed to fetch logs: {message}',
+  searchPlaceholder: 'Filter log content',
+  filterAll: 'All levels',
+  filterWarn: 'Warning and above',
+  filterError: 'Errors only',
+  filterNoMatch: 'No entries match the current filter',
+  entriesCount: '{n} entries',
 };

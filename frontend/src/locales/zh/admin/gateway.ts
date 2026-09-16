@@ -1,6 +1,6 @@
 /** 网关调度页文案 */
 export const zhAdminGateway = {
-  desc: '调度任务、事件投递队列与死信重放；Gateway 仅记录无内容遥测。',
+  desc: '查看调度任务、投递队列与死信重放',
   opsBadge: '日常运行 · 4/4',
   loading: '正在加载网关状态...',
   cards: {
@@ -24,6 +24,7 @@ export const zhAdminGateway = {
     notScheduled: '尚未调度',
     overdue: '逾期',
     normal: '正常',
+    jobsEmpty: '暂无调度作业',
   },
   deliveries: {
     title: '事件投递队列 (最近 50 条)',
@@ -37,6 +38,11 @@ export const zhAdminGateway = {
     colActions: '操作',
     replay: '重放',
     empty: '暂无投递记录',
+    colId: 'ID',
+    replayTitle: '重放投递 #{id}',
+    replayDesc: '重放会把该事件重新入队并再次外发，可能产生重复消息。',
+    replayExpected: '确认短语',
+    replaySubmit: '确认重放',
   },
   msgs: {
     loadFailed: '加载失败：{msg}',

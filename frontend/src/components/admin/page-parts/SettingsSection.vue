@@ -1,36 +1,63 @@
 <script setup lang="ts">
-/** P2 shared: settings section card. Header = title + muted description +
- *  right-aligned actions slot (usually the section's own save button). */
+/**
+ * SettingsSection · 设置区块外壳（**仅供 SecurityPage 使用**）
+ * ---------------------------------------------------------------------------
+ * 批 10 重构：改用全局 `.card` / `.card-head` 语汇（与其余管理页的分层卡片一致），
+ * 不再自带一套 `rounded-xl + shadow-xs + 内联 surface 三元`。
+ * 对外接口（props / slots）保持兼容：title · description · tone · actions / default。
+ */
+import type { Component } from 'vue'
+
 defineProps<{
   title: string
   description?: string
-  /** tone: 'default' surface card | 'subtle' recessed */
+  /** tone: 'default' 分层卡 | 'subtle' 内嵌底 */
   tone?: 'default' | 'subtle'
+  /** 可选图标（重构新增；不传则不渲染，向后兼容） */
+  icon?: Component
 }>()
 </script>
 
 <template>
-  <section
-    class="rounded-xl border shadow-xs transition-colors"
-    :style="tone === 'subtle'
-      ? { backgroundColor: 'var(--surface-1)', borderColor: 'var(--line-1)' }
-      : { backgroundColor: 'var(--surface-2)', borderColor: 'var(--line-1)' }"
-  >
-    <header class="flex items-start justify-between gap-3 px-4 py-3 border-b" style="border-color: var(--line-1);">
-      <div class="min-w-0">
-        <h3 class="text-sm font-semibold" style="color: var(--ink-1);">
+  <section class="card ss" :class="{ 'is-subtle': tone === 'subtle' }">
+    <header class="card-head">
+      <div class="ss-head-text">
+        <h3 class="card-title">
+          <component :is="icon" v-if="icon" :size="14" />
           {{ title }}
         </h3>
-        <p v-if="description" class="text-[11px] mt-0.5 leading-relaxed" style="color: var(--ink-2);">
-          {{ description }}
-        </p>
+        <p v-if="description" class="card-sub">{{ description }}</p>
       </div>
-      <div class="flex items-center gap-2 shrink-0">
+      <div class="ss-actions">
         <slot name="actions" />
       </div>
     </header>
-    <div class="p-4">
+
+    <div class="ss-body">
       <slot />
     </div>
   </section>
 </template>
+
+<style scoped>
+.ss {
+  overflow: hidden;
+}
+.ss.is-subtle {
+  background-color: var(--ds-color-bg-surface-inset);
+}
+.ss-head-text {
+  min-width: 0;
+}
+.ss-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.ss-body {
+  padding: var(--ds-space-4);
+}
+</style>

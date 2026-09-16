@@ -1,6 +1,6 @@
 export const enRadar = {
   title: 'AI Radar',
-  desc: 'Macro reads, advisor quotes and final verdicts of every decision cycle — fully auditable',
+  desc: 'Per-cycle macro read, advisor quotes and verdict',
   cycles: 'Last {n} cycles',
   cycleCount: '{n} entries',
   empty: 'No decisions yet — waiting for the next cycle',

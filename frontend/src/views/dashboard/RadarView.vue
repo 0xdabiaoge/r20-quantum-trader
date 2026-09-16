@@ -1,12 +1,18 @@
 <script setup lang="ts">
-/** AI 推演视图：决策周期时间线（最新在前），行点击 → 审计抽屉 */
+/**
+ * RadarView.vue · DeepSeek Harness 风格 AI 委员会决策推演与审计大盘
+ * 呈现：决策周期时序流、AI 决策健康中枢、宏观研判流、多模型多空博弈与白盒穿透抽屉
+ */
 import { computed, ref } from 'vue';
-import { ChevronDown } from 'lucide-vue-next';
+import {
+  Brain,
+  ChevronRight,
+} from 'lucide-vue-next';
 import { useDashboardStore } from '../../stores/dashboard';
+import DataGate from '../../components/dashboard/DataGate.vue';
 import { symOf } from '../../utils/instId';
 import { useI18n } from '../../composables/useI18n';
 import { fmtHM, fmtDate, parseTime } from '../../utils/format';
-import PageHead from '../../components/dashboard/PageHead.vue';
 import BaseEmpty from '../../components/base/BaseEmpty.vue';
 import DirTag from '../../components/base/DirTag.vue';
 import ConfBadge from '../../components/base/ConfBadge.vue';
@@ -17,11 +23,10 @@ const { t } = useI18n();
 
 const history = computed<any[]>(() => {
   const h = (store.data as any)?.ai_brain_history;
-  // 后端原始序即最新在前（倒叙展示，用户指令 2026-09-09）
   return Array.isArray(h) ? [...h] : [];
 });
 
-/** AI 决策健康度：委员会开关 / 决策缓存年龄 / 最近周期结果（2026-09-10 报障适配） */
+/** AI 决策健康度 */
 const aiHealth = computed<any>(() => (store.data as any)?.ai_health || null);
 const decisionAgeText = computed(() => {
   const s = aiHealth.value?.decision_age_seconds;
@@ -45,7 +50,8 @@ function dayOf(c: any): string {
   const sameDay = fmtDate(d) === fmtDate(today);
   return sameDay ? t('dash.news.feed.grouped.today') : fmtDate(d);
 }
-/** 按日期分组，保持组内最新在前 */
+
+/** 按日期分组 */
 const grouped = computed(() => {
   const out: { day: string; items: any[] }[] = [];
   for (const c of history.value) {
@@ -60,11 +66,23 @@ function actionsOf(c: any): { inst: string; dir: string; conf: number }[] {
   const list: { inst: string; dir: string; conf: number }[] = [];
   for (const m of c.position_management || []) {
     const a = String(m.action || '').toUpperCase();
-    if (a && a !== 'WAIT' && a !== 'HOLD') list.push({ inst: symOf(String(m.instId || '')), dir: a.includes('LONG') ? 'long' : a.includes('SHORT') ? 'short' : 'flat', conf: Number(m.confidence || 0) });
+    if (a && a !== 'WAIT' && a !== 'HOLD') {
+      list.push({
+        inst: symOf(String(m.instId || '')),
+        dir: a.includes('LONG') ? 'long' : a.includes('SHORT') ? 'short' : 'flat',
+        conf: Number(m.confidence || 0),
+      });
+    }
   }
   for (const o of c.top_opportunities || []) {
     const a = String(o.action || '').toUpperCase();
-    if (a === 'BUY_LONG' || a === 'SELL_SHORT') list.push({ inst: String(o.inst || '').split('-')[0], dir: a === 'BUY_LONG' ? 'long' : 'short', conf: Number(o.confidence || 0) });
+    if (a === 'BUY_LONG' || a === 'SELL_SHORT') {
+      list.push({
+        inst: String(o.inst || '').split('-')[0],
+        dir: a === 'BUY_LONG' ? 'long' : 'short',
+        conf: Number(o.confidence || 0),
+      });
+    }
   }
   return list.slice(0, 4);
 }
@@ -72,65 +90,110 @@ function actionsOf(c: any): { inst: string; dir: string; conf: number }[] {
 
 <template>
   <div class="space-y-3">
-    <PageHead :title="t('dash.radar.title')" :desc="t('dash.radar.desc')">
-      <template #actions>
-        <span class="badge num">{{ t('dash.radar.cycles', undefined, { n: history.length }) }}</span>
-      </template>
-    </PageHead>
-
-    <!-- 决策健康条：委员会为何"没反应"一眼可见（2026-09-10） -->
-    <div v-if="aiHealth" class="card-flat flex flex-wrap items-center gap-x-3 gap-y-1 px-3.5 py-2 text-xs" style="color: var(--ink-2)">
-      <span>{{ t('dash.radar.health.decisionAge') }}：<b class="num" :style="decisionAgeWarn ? 'color: var(--down)' : 'color: var(--up)'" :title="aiHealth.last_cycle_time ? String(aiHealth.last_cycle_time) : ''">{{ decisionAgeText }}</b></span>
-      <span class="opacity-40">·</span>
-      <span>{{ t('dash.radar.council.title') }}：<b :style="aiHealth.council_enabled ? 'color: var(--up)' : 'color: var(--warn)'">{{ aiHealth.council_enabled ? t('dash.radar.council.on') : t('dash.radar.council.off') }}</b></span>
-      <template v-if="aiHealth.council_enabled && aiHealth.last_council_status && aiHealth.last_council_status.ran === false">
-        <span class="opacity-40">·</span>
-        <span style="color: var(--warn)" :title="String(aiHealth.last_council_status.reason || '')">{{ t('dash.radar.council.degraded') }}</span>
-      </template>
-      <template v-if="aiHealth.council_enabled && aiHealth.last_council_status && aiHealth.last_council_status.ran === true">
-        <span class="opacity-40">·</span>
-        <span style="color: var(--up)">{{ t('dash.radar.council.done') }} {{ (((aiHealth.last_council_status.duration_ms || 0) / 1000)).toFixed(0) }}s</span>
-      </template>
-    </div>
-
-    <!-- 批D(2026-09-13)：卡片原为 overflow-hidden —— 它会**创建滚动容器**，其滚动口永不
-         滚动，于是内部 sticky 的日期头终生粘不住（写了个假的吸顶效果）。overflow-clip
-         同样裁切圆角/溢出，但按规范不建立滚动口，sticky 因此对页面滚动生效。 -->
-    <div class="card overflow-clip">
-      <BaseEmpty v-if="!history.length" :text="t('dash.radar.empty')" />
-      <div v-else>
-        <template v-for="grp in grouped" :key="grp.day">
-          <p class="t-label sticky top-12 z-[1] border-b bg-[var(--surface-2)] px-4 py-1.5" style="border-color: var(--line-1)">{{ grp.day }}</p>
-          <button
-            v-for="c in grp.items"
-            :key="c.time"
-            class="flex w-full cursor-pointer items-start gap-3 border-b px-4 py-2.5 text-left transition-colors last:border-b-0 hover:bg-[var(--surface-3)]"
-            style="border-color: var(--line-1)"
-            @click="selected = c"
+    <!-- 页头 -->
+    <div
+      class="flex flex-wrap items-center justify-between gap-2 border-b pb-2.5"
+      style="border-color: var(--line-1)"
+    >
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 class="text-sm font-bold tracking-tight text-[var(--ink-strong)] flex items-center gap-1.5">
+            <Brain class="h-4 w-4 text-[var(--accent)]" />
+            {{ t('dash.radar.title') }}
+          </h1>
+          <span
+            class="rounded px-1.5 py-0.2 border text-3xs font-mono font-medium"
+            style="background-color: var(--surface-2); border-color: var(--line-1); color: var(--ink-2)"
           >
-            <span class="num mt-0.5 w-[74px] shrink-0 text-xs font-semibold" style="color: var(--ink-strong)">{{ hm(c) }}</span>
-            <span class="min-w-0 flex-1">
-              <span class="block truncate text-sm" style="color: var(--ink-1)">{{ c.macro_assessment || t('dash.radar.empty') }}</span>
-              <span class="mt-1 flex flex-wrap items-center gap-1.5">
-                <span v-for="a in actionsOf(c)" :key="a.inst + a.dir" class="inline-flex items-center gap-1">
-                  <span class="num text-2xs font-bold" style="color: var(--ink-2)">{{ a.inst }}</span>
-                  <DirTag :dir="a.dir" />
-                  <ConfBadge :value="a.conf" />
-                </span>
-                <span v-if="!actionsOf(c).length" class="t-faint text-2xs">{{ t('dash.radar.detail.waitNote') }}</span>
-              </span>
-            </span>
-            <span v-if="c.council_transcript" class="badge badge-up hidden shrink-0 sm:inline-flex" :title="t('dash.radar.council.done')">🏛️</span>
-            <span v-else-if="c.council_status && !c.council_status.ran" class="badge badge-warn hidden shrink-0 sm:inline-flex" :title="`${t('dash.radar.council.degraded')}：${c.council_status.reason || ''}`">⚡</span>
-            <span v-if="c.policy_hash" class="badge badge-mono hidden shrink-0 sm:inline-flex" :title="c.policy_version">
-              {{ c.policy_hash.slice(0, 8) }}
-            </span>
-            <ChevronDown class="mt-1 h-4 w-4 shrink-0 -rotate-90" style="color: var(--ink-3)" />
-          </button>
-        </template>
+            {{ t('dash.radar.cycles', undefined, { n: history.length }) }}
+          </span>
+        </div>
+        <p class="text-3xs text-[var(--ink-3)] mt-0.5">
+          {{ t('dash.radar.desc') }}
+        </p>
+      </div>
+
+      <!-- AI 决策健康指示状态 -->
+      <div v-if="aiHealth" class="flex flex-wrap items-center gap-1.5">
+        <span class="dsh-pill">
+          <span class="text-[var(--ink-3)]">{{ t('dash.radar.health.decisionAge') }}:</span>
+          <b class="num font-mono" :class="decisionAgeWarn ? 'text-[var(--down)]' : 'text-[var(--up)]'">{{ decisionAgeText }}</b>
+        </span>
+        <span class="dsh-pill">
+          <span class="text-[var(--ink-3)]">{{ t('dash.radar.council.title') }}:</span>
+          <b :class="aiHealth.council_enabled ? 'text-[var(--up)]' : 'text-[var(--warn)]'">
+            {{ aiHealth.council_enabled ? t('dash.radar.council.on') : t('dash.radar.council.off') }}
+          </b>
+        </span>
+        <span
+          v-if="aiHealth.council_enabled && aiHealth.last_council_status?.ran"
+          class="dsh-pill text-[var(--up)]"
+        >
+          {{ t('dash.radar.council.done') }} {{ (((aiHealth.last_council_status.duration_ms || 0) / 1000)).toFixed(0) }}s
+        </span>
       </div>
     </div>
 
-    <RadarDrawer :cycle="selected" @close="selected = null" />
+    <DataGate>
+      <!-- 决策周期时序卡片流 -->
+      <div class="dsh-card overflow-clip">
+        <BaseEmpty v-if="!history.length" :text="t('dash.radar.empty')" />
+        <div v-else>
+          <template v-for="grp in grouped" :key="grp.day">
+            <div
+              class="sticky top-12 z-[1] border-b px-4 py-1.5 text-3xs font-bold uppercase tracking-wider text-[var(--ink-3)]"
+              style="background-color: var(--surface-header); border-color: var(--line-1)"
+            >
+              {{ grp.day }}
+            </div>
+            <button
+              v-for="c in grp.items"
+              :key="c.time"
+              class="flex w-full cursor-pointer items-start gap-3 border-b px-4 py-3 text-left transition-colors last:border-b-0 hover:bg-[var(--surface-2)]"
+              style="border-color: var(--line-1)"
+              @click="selected = c"
+            >
+              <!-- 决策时钟 -->
+              <div class="shrink-0 w-16">
+                <span class="num font-mono text-xs font-bold text-[var(--ink-strong)] block">{{ hm(c) }}</span>
+                <span class="text-4xs text-[var(--ink-3)] block font-mono">BJT</span>
+              </div>
+
+              <!-- 研判正文与指令 -->
+              <div class="min-w-0 flex-1">
+                <p class="text-xs text-[var(--ink-1)] leading-relaxed font-medium line-clamp-2">
+                  {{ c.macro_assessment || t('dash.radar.empty') }}
+                </p>
+
+                <!-- 指令与机会 -->
+                <div class="mt-2 flex flex-wrap items-center gap-2">
+                  <span
+                    v-for="a in actionsOf(c)"
+                    :key="a.inst + a.dir"
+                    class="dsh-pill !py-0.5"
+                  >
+                    <span class="num font-mono text-3xs font-bold text-[var(--ink-strong)]">{{ a.inst }}</span>
+                    <DirTag :dir="a.dir" />
+                    <ConfBadge :value="a.conf" />
+                  </span>
+
+                  <span v-if="!actionsOf(c).length" class="text-3xs text-[var(--ink-3)] font-mono">
+                    {{ t('dash.radar.detail.waitNote') }}
+                  </span>
+                </div>
+              </div>
+
+              <!-- 右侧箭头 -->
+              <div class="shrink-0 self-center text-[var(--ink-3)]">
+                <ChevronRight class="h-4 w-4" />
+              </div>
+            </button>
+          </template>
+        </div>
+      </div>
+
+      <!-- 决策审计抽屉 -->
+      <RadarDrawer :cycle="selected" @close="selected = null" />
+    </DataGate>
   </div>
 </template>

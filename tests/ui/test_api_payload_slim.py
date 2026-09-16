@@ -24,6 +24,10 @@ from r20_backend.dashboard_cache import (
     SLIM_TRADES,
     slim_payload,
 )
+from r20_backend.dashboard_payload.ledger_view import LEDGER_TRADES_MAX
+
+#: 台账夹具必须**多于**瘦身上限，否则「截断并留痕」这条契约根本不会触发。
+_TRADES_TOTAL = SLIM_TRADES + 11
 
 
 def _entry(index: int, prompt: str = "") -> dict:
@@ -50,7 +54,7 @@ def _payload() -> dict:
         "ai_last_prompt": prompt,
         "review": {"timestamp": "2026-09-14 03:00:00", "ai_last_prompt": prompt, "insights": ["a"]},
         "ai_brain_history": [_entry(0, prompt)] + [_entry(i, "短" * 210) for i in range(1, 25)],
-        "trades": [{"id": i} for i in range(31)],
+        "trades": [{"id": i} for i in range(_TRADES_TOTAL)],
         "logs": [f"line {i}" for i in range(60)],
         "factors": [{"name": "f"}],
         "account": {"avail_eq": 1.0},
@@ -71,7 +75,7 @@ class SlimShapeTests(unittest.TestCase):
         """瘦身必须是纯函数：缓存对象本身保持完整（否则 ?full=1 也拿不到全量）。"""
         self.assertEqual(len(self.full["ai_brain_history"]), 25)
         self.assertIn("ai_last_prompt", self.full["review"])
-        self.assertEqual(len(self.full["trades"]), 31)
+        self.assertEqual(len(self.full["trades"]), _TRADES_TOTAL)
 
     def test_meta_documents_every_omission(self):
         omitted = self.slim["_meta"]["omitted"]
@@ -111,11 +115,22 @@ class SlimShapeTests(unittest.TestCase):
     def test_lists_are_capped_and_marked(self):
         self.assertEqual(len(self.slim["trades"]), SLIM_TRADES)
         self.assertEqual(len(self.slim["logs"]), SLIM_LOGS)
-        self.assertEqual(self.slim["_meta"]["omitted"]["trades"]["total"], 31)
+        self.assertEqual(self.slim["_meta"]["omitted"]["trades"]["total"], _TRADES_TOTAL)
         self.assertEqual(self.slim["_meta"]["omitted"]["logs"]["total"], 60)
         # 保留的是**最新**的尾巴，不是最早的
-        self.assertEqual(self.slim["trades"][-1], {"id": 30})
+        self.assertEqual(self.slim["trades"][-1], {"id": _TRADES_TOTAL - 1})
         self.assertEqual(self.slim["logs"][-1], "line 59")
+
+    def test_slim_cap_never_undercuts_the_ledger_view_cap(self):
+        """2026-09-16 台账少行事故的不变量：瘦身不得比台账视图本身更紧。
+
+        `SLIM_TRADES` 曾写死 20，而台账视图上限是 60 ⇒ `/api/all` 默认把 34 笔
+        已平仓台账砍到最近 20 笔，台账页少 14 行、且「累计平仓/胜率/净盈亏」
+        全在被砍切片上聚合。两处上限必须同源。
+        """
+        self.assertGreaterEqual(
+            SLIM_TRADES, LEDGER_TRADES_MAX,
+            "瘦身上限比台账视图上限更紧：台账页必然少行（UI 说谎）")
 
     def test_unrelated_sections_untouched(self):
         for key in ("factors", "account", "timestamp"):

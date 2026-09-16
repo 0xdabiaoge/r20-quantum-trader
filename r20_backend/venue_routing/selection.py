@@ -39,6 +39,7 @@
 from __future__ import annotations
 
 import hashlib
+import warnings
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -49,6 +50,39 @@ __all__ = ["_hard_filters", "_balanced_pick", "_score"]
 
 #: listing 对账 fail-open 时的标记串（命中则不淘汰，仅注明）
 _LISTING_FAILOPEN_MARK = "跳过对账"
+
+
+def _venue_pool_assets(venue: str) -> Optional[List[str]]:
+    """该所配置的**准入币种清单**；未配置/为空/不可读 → `None`（=不淘汰）。
+
+    与执行层 `execution_router.open_protected_position` 的池门禁**同源同规则**
+    （同一份 `data/venue_routing.json`）：清单非空且标的不在其中 → 该所注定被
+    执行层拒单，路由阶段就必须淘汰它。
+
+    ⚠️ 2026-09-16 P0 事故**第二层**：listing gate 修好之后，ARB 这类**不在
+    binance/gate 准入清单**（两份清单都只有 8 个币）的标的仍会被 `_balanced_pick`
+    按 sha256 分到 binance/gate，然后在执行层被「不在 BINANCE 准入币种清单」拒掉；
+    而 `route_signal` 一旦选中**不会回退**到其它所 ⇒ 主脑发单继续全灭
+    （实盘日志 11:45「[ARB] … 不在 BINANCE 准入币种清单（…）」）。
+
+    ⚠️ 刻意**不**把「清单为空」当淘汰：空清单在执行层是「该所停发」的开关，而
+    OKX 直下路径（`okx_rest.place_order`，不经 execution_router）根本没有池概念，
+    两者共用「空」这一表示。故空清单返回 `None`（不设限），与「未配置」同路 ——
+    不替管理员发明新的拒绝理由。
+    """
+    try:
+        from ..exchanges.routing_policy import load_venue_pool
+        pool = load_venue_pool(venue)
+    except Exception as exc:
+        warnings.warn(
+            f"[venue-router] {venue} 准入币种池不可读，跳过池门禁（不淘汰）: {exc!r}",
+            RuntimeWarning,
+        )
+        return None
+    assets = pool.get("assets") if isinstance(pool, dict) else None
+    if not assets:
+        return None
+    return [str(a).strip().upper() for a in assets if str(a).strip()]
 
 
 def _parse_iso_utc(ts: str) -> Optional[float]:
@@ -82,15 +116,29 @@ def _hard_filters(signal: Dict[str, Any], cand: Dict[str, Any],
     # 原生合约代码对齐（防跨所 inst_id 格式错位导致误杀）
     # 纯元数据翻译（native_symbol_pure）：绝不实例化适配器——实例化会触发
     # 沙盒档域名探测出网，破坏本模块「零真实网络」的封闭铁律
+    #
+    # ⚠️ 2026-09-16 P0（下单全拒事故）：本模块从 `venue_router.py` 抽到
+    # `venue_routing/` 子包后，此处的相对导入写成了**单点** `.exchanges`——
+    # 它解析到不存在的 `r20_backend.venue_routing.exchanges`，ImportError 被下面
+    # 的裸 `except Exception` 吞掉，`native_contract` 静默退化成 canonical base
+    # （`BTC`）。listing gate 拿 `BTC` 去对 OKX 目录键 `BTC-USDT-SWAP` 必然查不到
+    # → 每个候选所都被判「沙盒未上市：okx demo 目录中无 BTC」→ route_signal
+    # 返回 ALL_REJECTED → **一单都开不出去**（ai_factor_trader 日志连续十数小时
+    # 全是「路由拒绝: listing gate 拒」）。
+    # 修复=两点：导入补一层点（`..exchanges`），且失败必须吼出来，禁止再静默降级。
     raw_sym = str(signal.get("symbol_canonical") or signal.get("inst_id") or "")
     native_contract = raw_sym
     try:
-        from .exchanges.registry import native_symbol_pure
+        from ..exchanges.registry import native_symbol_pure
         base_sym = _canonical_base(raw_sym)
         if base_sym:
             native_contract = native_symbol_pure(base_sym, venue)
-    except Exception:
-        pass
+    except Exception as _native_err:
+        warnings.warn(
+            f"[venue-router] {venue} 原生合约码对齐失败，已退化为 {native_contract!r}，"
+            f"listing gate 将按此名对账（极可能误判未上市）：{_native_err!r}",
+            RuntimeWarning,
+        )
 
     check = listing.ensure_contract_listed(
         venue, str(cand.get("environment", "live")),
@@ -100,6 +148,16 @@ def _hard_filters(signal: Dict[str, Any], cand: Dict[str, Any],
     elif check.reason and _LISTING_FAILOPEN_MARK in check.reason:
         # fail-open：不淘汰，但 reasons 注明（由调用方拼入 reasons）
         fails.append(f"__FAILOPEN__{check.reason}")
+
+    # 每所准入币种池（与执行层同一份 data/venue_routing.json、同一条规则）：
+    # 清单非空且标的不在其中的所，路由阶段就淘汰 —— 否则会选出一个**注定被
+    # 执行层拒单**的所，而 route_signal 选中即不回退 ⇒ 主脑发单全灭。
+    pool_assets = _venue_pool_assets(venue)
+    if pool_assets:
+        pool_asset = _canonical_base(raw_sym)
+        if pool_asset and pool_asset not in pool_assets:
+            fails.append(
+                f"不在 {venue.upper()} 准入币种清单（{', '.join(pool_assets)}）")
 
     size_usdt = float(signal.get("size_usdt") or 0.0)
     min_notional = float(cand.get("min_notional") or 0.0)

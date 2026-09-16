@@ -127,7 +127,7 @@ export const zhMatrix = {
 
   matrix: {
     title: '因子动能矩阵',
-    desc: '1H 微积分动力学 × 聪明钱筹码 × AI 终审结论，点击行看完整证据链',
+    desc: '点击任意行查看完整证据链',
     empty: '等待首个因子快照',
     col: {
       symbol: '标的',

@@ -1,20 +1,53 @@
 <script setup lang="ts">
-import { useToast } from '../../composables/useToast'
-const toast = useToast()
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
-import PageHeader from '../../components/admin/PageHeader.vue'
-import { useI18n } from '../../composables/useI18n'
-const { t } = useI18n()
-import { useApi } from '../../composables/useApi'
-import {Zap} from 'lucide-vue-next'
+/**
+ * NotifyPage.vue · 通知通道与事件流工位
+ * ---------------------------------------------------------------------------
+ * 骨架（推倒重来）：
+ *   旧 = 4 张通道卡（**开关块逐字复制了 4 遍，每遍 10 行**）
+ *        + 6 张类别卡（Tailwind 色相类 emerald/blue/indigo/purple/red/amber）
+ *        + 2 个手写 fixed 遮罩弹窗（含 📱💬🤖 emoji）
+ *   新 = 共享 PageHeader
+ *        → **通道状态带**（已开启 / QQ / Telegram / 简报时间）
+ *        → **通道清单：4 张卡由一份 `channelCards` computed 驱动**，模板只剩一份
+ *        → **通知类别：单一面板内的行式清单**（中性图标 + 等宽事件键）
+ *        → **每日简报** 独立面板
+ *        → 2 个弹窗改用 BaseDialog
+ *
+ * 后端契约（逐字未改）：
+ *   GET  /api/v1/admin/notifications
+ *   GET  /api/v1/admin/notifications/schedule
+ *   PUT  /api/v1/admin/notifications            ← saveAll 请求体字段逐字保留
+ *   PUT  /api/v1/admin/notifications/schedule   { briefing_times }
+ *   PUT  /api/v1/admin/channels/{channel}/toggle{ enabled, ...per-channel }
+ *   POST /api/v1/admin/notifications/diagnose   { channel }
+ *   POST /api/v1/admin/notifications/test       { channel, confirmation }
+ *   POST /api/v1/admin/notifications/qq/capture-openid/start  { timeout: 60 }
+ *   GET  /api/v1/admin/notifications/qq/capture-openid/{id}
+ *   POST /api/v1/admin/notifications/qq/bind/start            {}
+ *   GET  /api/v1/admin/notifications/qq/bind/{taskId}
+ *
+ * ⚠️ 轮询纪律逐字保留：捕获 1.5s / 绑定 2s，终态即停，`onBeforeUnmount` 停全部定时器。
+ */
+import { useToast } from '../../composables/useToast';
+const toast = useToast();
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
+import PageHeader from '../../components/admin/PageHeader.vue';
+import BaseDialog from '../../components/base/BaseDialog.vue';
+import BaseSwitch from '../../components/base/BaseSwitch.vue';
+import { useI18n } from '../../composables/useI18n';
+const { t } = useI18n();
+import { useApi } from '../../composables/useApi';
+import { Zap, RefreshCw, Loader2, ScanLine, QrCode, AlertTriangle, Send, Save,
+  ArrowUpRight, CheckCircle2, ShieldCheck, Brain, OctagonAlert, Clock, Radio, CalendarClock } from 'lucide-vue-next';
 
-const { api } = useApi()
-const config = ref<any>(null)
-const loading = ref(true)
-const testResults = ref<Record<string, any>>({})
-const captureModal = ref(false)
-const captureStatus = ref<any>(null)
-let captureTimer: any = null
+const { api } = useApi();
+const config = ref<any>(null);
+const loading = ref(true);
+const loadError = ref('');
+const testResults = ref<Record<string, any>>({});
+const captureModal = ref(false);
+const captureStatus = ref<any>(null);
+let captureTimer: any = null;
 
 const enabledChannelsCount = computed(() => {
   if (!config.value) return 0
@@ -23,6 +56,7 @@ const enabledChannelsCount = computed(() => {
 
 async function loadConfig(silent = false) {
   if (!silent) loading.value = true
+  loadError.value = ''
   try {
     const res = await api('/api/v1/admin/notifications')
     // Preserve local un-submitted secret inputs if any
@@ -35,7 +69,8 @@ async function loadConfig(silent = false) {
     config.value = res
   } catch (e: any) {
     console.error(e)
-    toast.err('加载通知配置失败: ' + (e.message || String(e)))
+    loadError.value = e.message || String(e)
+    if (!silent) toast.err('加载通知配置失败: ' + (e.message || String(e)))
   } finally {
     if (!silent) loading.value = false
   }
@@ -216,6 +251,92 @@ async function saveSchedule() {
   }
 }
 
+// ── 展示层：把 4 段复制粘贴的通道卡收成一份数据 ──
+interface FieldSpec {
+  key: string
+  label: string
+  type?: string
+  placeholder?: string
+  span?: boolean
+}
+interface ChannelCard {
+  key: string
+  title: string
+  offTitle: string
+  onTitle: string
+  qqActions: boolean
+  fields: FieldSpec[]
+}
+
+const channelCards = computed<ChannelCard[]>(() => [
+  {
+    key: 'qq',
+    title: t('admin.notify.qqTitle'),
+    offTitle: t('admin.notify.qqOff'),
+    onTitle: t('admin.notify.qqOn'),
+    qqActions: true,
+    fields: [
+      { key: 'app_id', label: 'App ID' },
+      { key: '_secret', label: 'Client Secret', type: 'password', placeholder: t('admin.notify.keepExisting') },
+      { key: 'openid', label: t('admin.notify.targetOpenId'), span: true },
+    ],
+  },
+  {
+    key: 'telegram',
+    title: 'Telegram Bot',
+    offTitle: t('admin.notify.telegramOff'),
+    onTitle: t('admin.notify.telegramOn'),
+    qqActions: false,
+    fields: [
+      { key: '_token', label: 'Bot Token', type: 'password', placeholder: t('admin.notify.keepExisting') },
+      { key: 'chat_id', label: 'Chat ID' },
+      { key: 'api_base', label: t('admin.notify.apiBaseLabel'), placeholder: 'https://api.telegram.org', span: true },
+    ],
+  },
+  {
+    key: 'wechat',
+    title: t('admin.notify.wechatTitle'),
+    offTitle: t('admin.notify.wechatOff'),
+    onTitle: t('admin.notify.wechatOn'),
+    qqActions: false,
+    fields: [{ key: 'webhook', label: 'Webhook URL', span: true }],
+  },
+  {
+    key: 'webhook',
+    title: t('admin.notify.webhookTitle'),
+    offTitle: t('admin.notify.webhookOff'),
+    onTitle: t('admin.notify.webhookOn'),
+    qqActions: false,
+    fields: [{ key: 'url', label: t('admin.notify.webhookUrlLabel'), span: true }],
+  },
+])
+
+const categories = computed(() => [
+  { key: 'trade.opened', label: t('admin.notify.catOpen'), desc: t('admin.notify.catOpenDesc'), icon: ArrowUpRight },
+  { key: 'trade.closed', label: t('admin.notify.catClosed'), desc: t('admin.notify.catClosedDesc'), icon: CheckCircle2 },
+  { key: 'trade.sl_updated', label: t('admin.notify.catBreakEven'), desc: t('admin.notify.catBreakEvenDesc'), icon: ShieldCheck },
+  { key: 'evolution.completed', label: t('admin.notify.catEvolution'), desc: t('admin.notify.catEvolutionDesc'), icon: Brain },
+  { key: 'risk.triggered', label: t('admin.notify.catRisk'), desc: t('admin.notify.catRiskDesc'), icon: OctagonAlert },
+  { key: 'briefing.ready', label: t('admin.notify.catBriefing'), desc: t('admin.notify.catBriefingDesc'), icon: Clock },
+])
+
+/** 后端返回的 status 是自由字符串 → 徽章色调（ready/sent 绿 · failed/error 红 · 其余琥珀） */
+function testTone(status: string): string {
+  if (['ready', 'sent', 'ok', 'success'].includes(status)) return 'badge-up'
+  if (['failed', 'error'].includes(status)) return 'badge-down'
+  return 'badge-warn'
+}
+function channelOn(k: string): boolean {
+  return config.value?.[k]?.enabled === true
+}
+const bindTone = computed(() => {
+  const tone = bindStatus.value?.tone
+  if (tone === 'green') return 'badge-up'
+  if (tone === 'red') return 'badge-down'
+  if (tone === 'amber') return 'badge-warn'
+  return 'badge-accent'
+})
+
 onMounted(() => {
   loadConfig()
 })
@@ -230,293 +351,640 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="space-y-4 max-w-[2048px] mx-auto">
+  <div class="nf">
     <PageHeader :title="t('nav.admin.notify')" :description="t('admin.notify.desc')">
       <template #actions>
-        <span class="chip">{{ t('admin.notify.channelsChip') }} <b class="num">{{ enabledChannelsCount }}/4</b></span>
+        <span class="badge badge-accent mono">
+          {{ t('admin.notify.channelsChip') }} {{ enabledChannelsCount }}/4
+        </span>
+        <button class="btn btn-ghost btn-sm" :disabled="loading" @click="loadConfig()">
+          <Loader2 v-if="loading && config" :size="14" class="nf-spin" />
+          <RefreshCw v-else :size="14" />
+          <span>{{ t('common.refresh') }}</span>
+        </button>
       </template>
     </PageHeader>
 
-    <!-- Alert / Banner Message -->
-    <div v-if="loading" class="py-12 text-center text-xs" style="color: var(--ink-2);">{{ t('admin.notify.loading') }}</div>
+    <!-- 拉取失败 -->
+    <div v-if="loadError && !config" class="state-block is-error nf-error">
+      <span class="state-icon"><AlertTriangle :size="17" /></span>
+      <p class="state-title">{{ t('common.loadFailed') }}</p>
+      <p class="state-desc">{{ loadError }}</p>
+      <button class="btn btn-ghost btn-sm" style="margin-top: 4px" :disabled="loading" @click="loadConfig()">
+        <RefreshCw :size="14" />
+        <span>{{ t('common.retry') }}</span>
+      </button>
+    </div>
 
-    <template v-else-if="config">
-      <!-- QQ Channel -->
-      <div class="rounded-xl border p-4 sm:p-5 shadow-xs transition-colors" style="background-color: var(--surface-2); border-color: var(--line-1);">
-        <div class="flex items-center justify-between mb-4">
-          <div class="flex items-center space-x-2">
-            <span class="inline-block w-2 h-2 rounded-full" :class="config.qq.enabled ? 'bg-emerald-500' : 'bg-zinc-500'"></span>
-            <h2 class="text-sm font-bold" style="color: var(--ink-1);">{{ t('nav.admin.notify') }}</h2>
+    <template v-else>
+      <!-- ══ 通道状态带 ══ -->
+      <section class="card nf-band">
+        <template v-if="loading && !config">
+          <div v-for="i in 4" :key="i" class="nf-fact">
+            <div class="skeleton skeleton-text" style="width: 48%" />
+            <div class="skeleton skeleton-text" style="width: 62%; height: 16px" />
+            <div class="skeleton skeleton-text" style="width: 36%" />
           </div>
-          <div class="flex items-center space-x-3">
-            <button @click="startQqBind" class="px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer transition-all shadow-xs" style="background-color: var(--accent); color: var(--accent-ink);">{{ t('admin.notify.scanBind') }}</button>
-            <button @click="startCapture" class="flex items-center space-x-1 px-2.5 py-1 rounded-lg border text-xs cursor-pointer transition-all shadow-xs" style="background-color: var(--accent-bg); border-color: var(--accent-line); color: var(--accent);">
-              <Zap class="w-3 h-3" />
-              <span>{{ t('admin.notify.autoOpenId') }}</span>
-            </button>
-            <div class="flex items-center space-x-2">
-              <button
-                type="button"
-                @click="toggleChannel('qq', !config.qq.enabled)"
-                class="relative inline-flex items-center cursor-pointer focus:outline-none"
-                :title="config.qq.enabled ? t('admin.notify.qqOff') : t('admin.notify.qqOn')"
-              >
-                <div
-                  class="w-10 h-5 rounded-full transition-colors relative"
-                  :style="{ backgroundColor: config.qq.enabled ? 'var(--up)' : 'var(--line-2)' }"
-                >
-                  <div
-                    class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform shadow-xs"
-                    :class="config.qq.enabled ? 'translate-x-5' : 'translate-x-0'"
-                  ></div>
-                </div>
-              </button>
-              <span
-                class="text-xs font-bold select-none cursor-pointer"
-                @click="toggleChannel('qq', !config.qq.enabled)"
-                :style="{ color: config.qq.enabled ? 'var(--up)' : 'var(--ink-2)' }"
-              >
-                {{ config.qq.enabled ? t('admin.notify.enabled') : t('admin.notify.disabled') }}
-              </span>
-            </div>
-          </div>
-        </div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div><label class="block text-[11px] mb-1" style="color: var(--ink-2);">App ID</label><input v-model="config.qq.app_id" class="w-full rounded-lg px-3 py-2 text-xs outline-none border" style="background-color: var(--surface-input); border-color: var(--line-1); color: var(--ink-1);" /></div>
-          <div><label class="block text-[11px] mb-1" style="color: var(--ink-2);">Client Secret</label><input v-model="config.qq._secret" type="password" :placeholder="t('admin.notify.keepExisting')" class="w-full rounded-lg px-3 py-2 text-xs outline-none border" style="background-color: var(--surface-input); border-color: var(--line-1); color: var(--ink-1);" /></div>
-          <div class="sm:col-span-2"><label class="block text-[11px] mb-1" style="color: var(--ink-2);">{{ t('admin.notify.targetOpenId') }}</label><input v-model="config.qq.openid" class="w-full rounded-lg px-3 py-2 text-xs outline-none border" style="background-color: var(--surface-input); border-color: var(--line-1); color: var(--ink-1);" /></div>
-        </div>
-        <div class="flex space-x-2 mt-3">
-          <button @click="diagnose('qq')" class="px-3 py-1.5 rounded-lg border text-xs cursor-pointer transition-all shadow-xs" style="background-color: var(--surface-1); border-color: var(--line-2); color: var(--ink-1);">{{ t('admin.notify.diagnose') }}</button>
-          <button @click="sendTest('qq')" class="px-3 py-1.5 rounded-lg border text-xs font-bold cursor-pointer transition-all shadow-xs" style="background-color: var(--up-bg); border-color: var(--up-line); color: var(--up);">{{ t('admin.notify.sendTest') }}</button>
-        </div>
-        <div v-if="testResults.qq" class="mt-2 text-xs" :class="testResults.qq.status === 'ready' ? 'text-emerald-500' : 'text-amber-500'">{{ testResults.qq.status }} · {{ testResults.qq.detail }}</div>
-      </div>
+        </template>
 
-      <!-- Telegram -->
-      <div class="rounded-xl border p-4 sm:p-5 shadow-xs transition-colors" style="background-color: var(--surface-2); border-color: var(--line-1);">
-        <div class="flex items-center justify-between mb-4">
-          <div class="flex items-center space-x-2">
-            <span class="inline-block w-2 h-2 rounded-full" :class="config.telegram.enabled ? 'bg-emerald-500' : 'bg-zinc-500'"></span>
-            <h2 class="text-sm font-bold" style="color: var(--ink-1);">Telegram Bot</h2>
-          </div>
-          <div class="flex items-center space-x-2">
-            <button
-              type="button"
-              @click="toggleChannel('telegram', !config.telegram.enabled)"
-              class="relative inline-flex items-center cursor-pointer focus:outline-none"
-              :title="config.telegram.enabled ? t('admin.notify.telegramOff') : t('admin.notify.telegramOn')"
-            >
-              <div
-                class="w-10 h-5 rounded-full transition-colors relative"
-                :style="{ backgroundColor: config.telegram.enabled ? 'var(--up)' : 'var(--line-2)' }"
-              >
-                <div
-                  class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform shadow-xs"
-                  :class="config.telegram.enabled ? 'translate-x-5' : 'translate-x-0'"
-                ></div>
-              </div>
-            </button>
-            <span
-              class="text-xs font-bold select-none cursor-pointer"
-              @click="toggleChannel('telegram', !config.telegram.enabled)"
-              :style="{ color: config.telegram.enabled ? 'var(--up)' : 'var(--ink-2)' }"
-            >
-              {{ config.telegram.enabled ? t('admin.notify.enabled') : t('admin.notify.disabled') }}
+        <template v-else-if="config">
+          <div class="nf-fact">
+            <span class="nf-fact-label"><Radio :size="12" />{{ t('admin.notify.bandEnabled') }}</span>
+            <span class="nf-fact-value num" :class="enabledChannelsCount ? 'is-up' : ''">
+              {{ enabledChannelsCount }} / 4
             </span>
+            <span class="nf-fact-foot">{{ t('admin.notify.channelsTitle') }}</span>
           </div>
-        </div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div><label class="block text-[11px] mb-1" style="color: var(--ink-2);">Bot Token</label><input v-model="config.telegram._token" type="password" :placeholder="t('admin.notify.keepExisting')" class="w-full rounded-lg px-3 py-2 text-xs outline-none border" style="background-color: var(--surface-input); border-color: var(--line-1); color: var(--ink-1);" /></div>
-          <div><label class="block text-[11px] mb-1" style="color: var(--ink-2);">Chat ID</label><input v-model="config.telegram.chat_id" class="w-full rounded-lg px-3 py-2 text-xs outline-none border" style="background-color: var(--surface-input); border-color: var(--line-1); color: var(--ink-1);" /></div>
-          <div class="sm:col-span-2"><label class="block text-[11px] mb-1" style="color: var(--ink-2);">{{ t('admin.notify.apiBaseLabel') }}</label><input v-model="config.telegram.api_base" placeholder="https://api.telegram.org" class="w-full rounded-lg px-3 py-2 text-xs outline-none border" style="background-color: var(--surface-input); border-color: var(--line-1); color: var(--ink-1);" /></div>
-        </div>
-        <div class="flex space-x-2 mt-3">
-          <button @click="diagnose('telegram')" class="px-3 py-1.5 rounded-lg border text-xs cursor-pointer transition-all shadow-xs" style="background-color: var(--surface-1); border-color: var(--line-2); color: var(--ink-1);">{{ t('admin.notify.diagnose') }}</button>
-          <button @click="sendTest('telegram')" class="px-3 py-1.5 rounded-lg border text-xs font-bold cursor-pointer transition-all shadow-xs" style="background-color: var(--up-bg); border-color: var(--up-line); color: var(--up);">{{ t('admin.notify.sendTest') }}</button>
-        </div>
-        <div v-if="testResults.telegram" class="mt-2 text-xs" :class="testResults.telegram.status === 'ready' ? 'text-emerald-500' : 'text-amber-500'">{{ testResults.telegram.status }} · {{ testResults.telegram.detail }}</div>
-      </div>
 
-      <!-- WeChat + Webhook -->
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div class="rounded-xl border p-4 sm:p-5 shadow-xs transition-colors" style="background-color: var(--surface-2); border-color: var(--line-1);">
-          <div class="flex items-center justify-between mb-4">
-            <div class="flex items-center space-x-2"><span class="inline-block w-2 h-2 rounded-full" :class="config.wechat.enabled ? 'bg-emerald-500' : 'bg-zinc-500'"></span><h2 class="text-sm font-bold" style="color: var(--ink-1);">{{ t('admin.notify.wechatTitle') }}</h2></div>
-            <div class="flex items-center space-x-2">
-              <button
-                type="button"
-                @click="toggleChannel('wechat', !config.wechat.enabled)"
-                class="relative inline-flex items-center cursor-pointer focus:outline-none"
-                :title="config.wechat.enabled ? t('admin.notify.wechatOff') : t('admin.notify.wechatOn')"
-              >
-                <div
-                  class="w-10 h-5 rounded-full transition-colors relative"
-                  :style="{ backgroundColor: config.wechat.enabled ? 'var(--up)' : 'var(--line-2)' }"
-                >
-                  <div
-                    class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform shadow-xs"
-                    :class="config.wechat.enabled ? 'translate-x-5' : 'translate-x-0'"
-                  ></div>
+          <div class="nf-fact">
+            <span class="nf-fact-label"><Zap :size="12" />{{ t('admin.notify.bandQQ') }}</span>
+            <span class="nf-fact-value" :class="channelOn('qq') ? 'is-up' : 'is-off'">
+              {{ channelOn('qq') ? t('admin.notify.enabled') : t('admin.notify.disabled') }}
+            </span>
+            <span class="nf-fact-foot mono truncate">{{ config.qq?.openid || t('admin.notify.notSet') }}</span>
+          </div>
+
+          <div class="nf-fact">
+            <span class="nf-fact-label"><Send :size="12" />{{ t('admin.notify.bandTelegram') }}</span>
+            <span class="nf-fact-value" :class="channelOn('telegram') ? 'is-up' : 'is-off'">
+              {{ channelOn('telegram') ? t('admin.notify.enabled') : t('admin.notify.disabled') }}
+            </span>
+            <span class="nf-fact-foot mono truncate">{{ config.telegram?.chat_id || t('admin.notify.notSet') }}</span>
+          </div>
+
+          <div class="nf-fact">
+            <span class="nf-fact-label"><CalendarClock :size="12" />{{ t('admin.notify.bandBriefing') }}</span>
+            <span class="nf-fact-value num truncate">{{ config._briefingTimes || t('admin.notify.notSet') }}</span>
+            <span class="nf-fact-foot">{{ t('admin.notify.scheduleTitle') }}</span>
+          </div>
+        </template>
+      </section>
+
+      <template v-if="config">
+        <!-- ══ 通知通道 ══ -->
+        <section class="nf-block">
+          <header class="nf-block-head">
+            <div>
+              <h2 class="card-title">{{ t('admin.notify.channelsTitle') }}</h2>
+              <p class="card-sub">{{ t('admin.notify.channelsDesc') }}</p>
+            </div>
+          </header>
+
+          <div class="nf-channels">
+            <article
+              v-for="c in channelCards"
+              :key="c.key"
+              class="card nf-card"
+              :class="{ 'is-on': channelOn(c.key) }"
+            >
+              <header class="nf-card-head">
+                <span class="nf-card-dot" :class="{ 'is-on': channelOn(c.key) }" />
+                <h3 class="nf-card-title">{{ c.title }}</h3>
+
+                <div class="nf-card-actions">
+                  <template v-if="c.qqActions">
+                    <button class="btn btn-primary btn-sm" @click="startQqBind">
+                      <QrCode :size="13" />
+                      <span>{{ t('admin.notify.scanBind') }}</span>
+                    </button>
+                    <button class="btn btn-ghost btn-sm" @click="startCapture">
+                      <Zap :size="13" />
+                      <span>{{ t('admin.notify.autoOpenId') }}</span>
+                    </button>
+                  </template>
+
+                  <span class="nf-state" :class="channelOn(c.key) ? 'is-on' : ''">
+                    {{ channelOn(c.key) ? t('admin.notify.enabled') : t('admin.notify.disabled') }}
+                  </span>
+                  <BaseSwitch
+                    :model-value="channelOn(c.key)"
+                    :title="channelOn(c.key) ? c.offTitle : c.onTitle"
+                    @update:model-value="() => toggleChannel(c.key, !channelOn(c.key))"
+                  />
                 </div>
-              </button>
-              <span
-                class="text-xs font-bold select-none cursor-pointer"
-                @click="toggleChannel('wechat', !config.wechat.enabled)"
-                :style="{ color: config.wechat.enabled ? 'var(--up)' : 'var(--ink-2)' }"
-              >
-                {{ config.wechat.enabled ? t('admin.notify.enabled') : t('admin.notify.disabled') }}
-              </span>
-            </div>
-          </div>
-          <label class="block text-[11px] mb-1" style="color: var(--ink-2);">Webhook URL</label>
-          <input v-model="config.wechat.webhook" class="w-full rounded-lg px-3 py-2 text-xs outline-none border mb-3" style="background-color: var(--surface-input); border-color: var(--line-1); color: var(--ink-1);" />
-          <button @click="diagnose('wechat')" class="px-3 py-1.5 rounded-lg border text-xs cursor-pointer transition-all shadow-xs" style="background-color: var(--surface-1); border-color: var(--line-2); color: var(--ink-1);">{{ t('admin.notify.diagnose') }}</button>
-          <button @click="sendTest('wechat')" class="ml-2 px-3 py-1.5 rounded-lg border text-xs font-bold cursor-pointer transition-all shadow-xs" style="background-color: var(--up-bg); border-color: var(--up-line); color: var(--up);">{{ t('admin.notify.sendTest') }}</button>
-          <div v-if="testResults.wechat" class="mt-2 text-xs" :class="testResults.wechat.status === 'ready' ? 'text-emerald-500' : 'text-amber-500'">{{ testResults.wechat.status }} · {{ testResults.wechat.detail }}</div>
-        </div>
-        <div class="rounded-xl border p-4 sm:p-5 shadow-xs transition-colors" style="background-color: var(--surface-2); border-color: var(--line-1);">
-          <div class="flex items-center justify-between mb-4">
-            <div class="flex items-center space-x-2"><span class="inline-block w-2 h-2 rounded-full" :class="config.webhook.enabled ? 'bg-emerald-500' : 'bg-zinc-500'"></span><h2 class="text-sm font-bold" style="color: var(--ink-1);">{{ t('admin.notify.webhookTitle') }}</h2></div>
-            <div class="flex items-center space-x-2">
-              <button
-                type="button"
-                @click="toggleChannel('webhook', !config.webhook.enabled)"
-                class="relative inline-flex items-center cursor-pointer focus:outline-none"
-                :title="config.webhook.enabled ? t('admin.notify.webhookOff') : t('admin.notify.webhookOn')"
-              >
-                <div
-                  class="w-10 h-5 rounded-full transition-colors relative"
-                  :style="{ backgroundColor: config.webhook.enabled ? 'var(--up)' : 'var(--line-2)' }"
+              </header>
+
+              <div class="nf-fields">
+                <label
+                  v-for="f in c.fields"
+                  :key="f.key"
+                  class="nf-field"
+                  :class="{ 'is-span': f.span }"
                 >
-                  <div
-                    class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform shadow-xs"
-                    :class="config.webhook.enabled ? 'translate-x-5' : 'translate-x-0'"
-                  ></div>
+                  <span class="form-label">{{ f.label }}</span>
+                  <input
+                    v-model="config[c.key][f.key]"
+                    :type="f.type || 'text'"
+                    :placeholder="f.placeholder"
+                    class="field"
+                  />
+                </label>
+              </div>
+
+              <footer class="nf-card-foot">
+                <button class="btn btn-ghost btn-sm" @click="diagnose(c.key)">
+                  <ScanLine :size="13" />
+                  <span>{{ t('admin.notify.diagnose') }}</span>
+                </button>
+                <button class="btn btn-ghost btn-sm" @click="sendTest(c.key)">
+                  <Send :size="13" />
+                  <span>{{ t('admin.notify.sendTest') }}</span>
+                </button>
+
+                <span
+                  v-if="testResults[c.key]"
+                  class="nf-result"
+                  :class="testTone(testResults[c.key].status)"
+                >
+                  <b>{{ testResults[c.key].status }}</b>
+                  <span class="nf-result-detail">{{ testResults[c.key].detail }}</span>
+                </span>
+                <span v-else class="nf-result is-idle">{{ t('admin.notify.testIdle') }}</span>
+              </footer>
+            </article>
+          </div>
+        </section>
+
+        <!-- ══ 通知类别 ══ -->
+        <section class="card">
+          <header class="card-head">
+            <div>
+              <h2 class="card-title">{{ t('admin.notify.categoriesTitle') }}</h2>
+              <p class="card-sub">{{ t('admin.notify.categoriesDesc') }}</p>
+            </div>
+            <span class="badge mono">{{ categories.length }}</span>
+          </header>
+
+          <div class="nf-cats">
+            <article v-for="cat in categories" :key="cat.key" class="nf-cat">
+              <span class="nf-cat-icon"><component :is="cat.icon" :size="14" /></span>
+              <div class="nf-cat-main">
+                <div class="nf-cat-title">
+                  <span class="nf-cat-name">{{ cat.label }}</span>
+                  <code class="nf-cat-key">{{ cat.key }}</code>
                 </div>
-              </button>
-              <span
-                class="text-xs font-bold select-none cursor-pointer"
-                @click="toggleChannel('webhook', !config.webhook.enabled)"
-                :style="{ color: config.webhook.enabled ? 'var(--up)' : 'var(--ink-2)' }"
-              >
-                {{ config.webhook.enabled ? t('admin.notify.enabled') : t('admin.notify.disabled') }}
-              </span>
-            </div>
+                <p class="nf-cat-desc">{{ cat.desc }}</p>
+              </div>
+            </article>
           </div>
-          <label class="block text-[11px] mb-1" style="color: var(--ink-2);">{{ t('admin.notify.webhookUrlLabel') }}</label>
-          <input v-model="config.webhook.url" class="w-full rounded-lg px-3 py-2 text-xs outline-none border mb-3" style="background-color: var(--surface-input); border-color: var(--line-1); color: var(--ink-1);" />
-          <button @click="diagnose('webhook')" class="px-3 py-1.5 rounded-lg border text-xs cursor-pointer transition-all shadow-xs" style="background-color: var(--surface-1); border-color: var(--line-2); color: var(--ink-1);">{{ t('admin.notify.diagnose') }}</button>
-          <button @click="sendTest('webhook')" class="ml-2 px-3 py-1.5 rounded-lg border text-xs font-bold cursor-pointer transition-all shadow-xs" style="background-color: var(--up-bg); border-color: var(--up-line); color: var(--up);">{{ t('admin.notify.sendTest') }}</button>
-          <div v-if="testResults.webhook" class="mt-2 text-xs" :class="testResults.webhook.status === 'ready' ? 'text-emerald-500' : 'text-amber-500'">{{ testResults.webhook.status }} · {{ testResults.webhook.detail }}</div>
-        </div>
-      </div>
+        </section>
 
-      <!-- Schedule + Notification Categories + Save -->
-      <div class="rounded-xl border p-4 sm:p-5 shadow-xs transition-colors space-y-4" style="background-color: var(--surface-2); border-color: var(--line-1);">
-        <div>
-          <h2 class="text-sm font-bold mb-1" style="color: var(--ink-1);">{{ t('admin.notify.categoriesTitle') }}</h2>
-          <p class="text-xs" style="color: var(--ink-2);">{{ t('admin.notify.categoriesDesc') }}</p>
-        </div>
+        <!-- ══ 每日简报 ══ -->
+        <section class="card">
+          <header class="card-head">
+            <h2 class="card-title"><CalendarClock :size="14" />{{ t('admin.notify.scheduleTitle') }}</h2>
+          </header>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 text-xs">
-          <div class="p-3 rounded-lg border space-y-1" style="background-color: var(--surface-1); border-color: var(--line-1);">
-            <div class="flex items-center space-x-1.5 font-bold text-emerald-400">
-              <span>{{ t('admin.notify.catOpen') }} <code class="mono text-[10px] opacity-60">trade.opened</code></span>
-            </div>
-            <p class="text-[11px] leading-relaxed" style="color: var(--ink-2);">
-              {{ t('admin.notify.catOpenDesc') }}
-            </p>
+          <div class="nf-schedule">
+            <label class="nf-field is-span">
+              <span class="form-label">{{ t('admin.notify.scheduleLabel') }}</span>
+              <input
+                v-model="config._briefingTimes"
+                placeholder="08:00, 20:00"
+                class="field num"
+              />
+            </label>
           </div>
 
-          <div class="p-3 rounded-lg border space-y-1" style="background-color: var(--surface-1); border-color: var(--line-1);">
-            <div class="flex items-center space-x-1.5 font-bold text-blue-400">
-              <span>{{ t('admin.notify.catClosed') }} <code class="mono text-[10px] opacity-60">trade.closed</code></span>
-            </div>
-            <p class="text-[11px] leading-relaxed" style="color: var(--ink-2);">
-              {{ t('admin.notify.catClosedDesc') }}
-            </p>
-          </div>
-
-          <div class="p-3 rounded-lg border space-y-1" style="background-color: var(--surface-1); border-color: var(--line-1);">
-            <div class="flex items-center space-x-1.5 font-bold text-indigo-400">
-              <span>{{ t('admin.notify.catBreakEven') }} <code class="mono text-[10px] opacity-60">trade.sl_updated</code></span>
-            </div>
-            <p class="text-[11px] leading-relaxed" style="color: var(--ink-2);">
-              {{ t('admin.notify.catBreakEvenDesc') }}
-            </p>
-          </div>
-
-          <div class="p-3 rounded-lg border space-y-1" style="background-color: var(--surface-1); border-color: var(--line-1);">
-            <div class="flex items-center space-x-1.5 font-bold text-purple-400">
-              <span>{{ t('admin.notify.catEvolution') }} <code class="mono text-[10px] opacity-60">evolution.completed</code></span>
-            </div>
-            <p class="text-[11px] leading-relaxed" style="color: var(--ink-2);">
-              {{ t('admin.notify.catEvolutionDesc') }}
-            </p>
-          </div>
-
-          <div class="p-3 rounded-lg border space-y-1" style="background-color: var(--surface-1); border-color: var(--line-1);">
-            <div class="flex items-center space-x-1.5 font-bold text-red-400">
-              <span>{{ t('admin.notify.catRisk') }} <code class="mono text-[10px] opacity-60">risk.triggered</code></span>
-            </div>
-            <p class="text-[11px] leading-relaxed" style="color: var(--ink-2);">
-              {{ t('admin.notify.catRiskDesc') }}
-            </p>
-          </div>
-
-          <div class="p-3 rounded-lg border space-y-1" style="background-color: var(--surface-1); border-color: var(--line-1);">
-            <div class="flex items-center space-x-1.5 font-bold text-amber-400">
-              <span>{{ t('admin.notify.catBriefing') }} <code class="mono text-[10px] opacity-60">briefing.ready</code></span>
-            </div>
-            <p class="text-[11px] leading-relaxed" style="color: var(--ink-2);">
-              {{ t('admin.notify.catBriefingDesc') }}
-            </p>
-          </div>
-        </div>
-
-        <div class="pt-2 border-t" style="border-color: var(--line-1);">
-          <label class="block text-[11px] mb-1 font-bold" style="color: var(--ink-2);">{{ t('admin.notify.scheduleLabel') }}</label>
-          <input v-model="config._briefingTimes" placeholder="08:00, 20:00" class="w-full rounded-lg px-3 py-2 text-xs outline-none border mb-4" style="background-color: var(--surface-input); border-color: var(--line-1); color: var(--ink-1);" />
-          <div class="flex items-center space-x-3">
-            <button @click="saveAll" class="px-4 py-2 rounded-lg text-xs font-bold cursor-pointer transition-all shadow-xs" style="background-color: var(--accent); color: var(--accent-ink);">{{ t('admin.notify.saveAll') }}</button>
-            <button @click="saveSchedule" class="px-4 py-2 rounded-lg border text-xs cursor-pointer transition-all shadow-xs" style="background-color: var(--surface-1); border-color: var(--line-2); color: var(--ink-1);">{{ t('admin.notify.saveSchedule') }}</button>
-          </div>
-        </div>
-      </div>
+          <footer class="nf-save">
+            <button class="btn btn-primary btn-sm" @click="saveAll">
+              <Save :size="14" />
+              <span>{{ t('admin.notify.saveAll') }}</span>
+            </button>
+            <button class="btn btn-ghost btn-sm" @click="saveSchedule">
+              <CalendarClock :size="14" />
+              <span>{{ t('admin.notify.saveSchedule') }}</span>
+            </button>
+          </footer>
+        </section>
+      </template>
     </template>
 
-    <!-- Capture Modal -->
-    <div v-if="captureModal" class="fixed inset-0 z-[var(--z-dialog)] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4" @click.self="captureModal = false">
-      <div class="rounded-xl border p-6 w-full max-w-[520px] max-h-[88dvh] overflow-y-auto text-center shadow-2xl transition-colors" style="background-color: var(--surface-2); border-color: var(--line-1);">
-        <h3 class="text-sm font-bold mb-3" style="color: var(--ink-1);">{{ t('admin.notify.captureTitle') }}</h3>
-        <div class="text-4xl mb-3">📱 💬 🤖</div>
-        <p class="text-sm font-bold mb-2" style="color: var(--ink-1);">{{ captureStatus?.bot_name || t('admin.notify.connecting') }}</p>
-        <p class="text-xs mb-4 leading-relaxed" style="color: var(--ink-2);">{{ t('admin.notify.captureGuide') }}</p>
-        <div class="border rounded-lg p-3 mb-4" style="background-color: var(--surface-1); border-color: var(--line-1);">
-          <div class="font-bold text-sm" :class="captureStatus?.status === 'captured' ? 'text-emerald-500' : 'text-blue-500'">
-            {{ captureStatus?.status === 'captured' ? t('admin.notify.captured') : t('admin.notify.listening') }}
-          </div>
-          <div v-if="captureStatus?.expires_in" class="text-[11px] mt-1" style="color: var(--ink-3);">{{ t('admin.notify.remainingSeconds', undefined, { n: captureStatus.expires_in }) }}</div>
-          <div v-if="captureStatus?.openid" class="text-xs mt-2" style="color: var(--accent);">OpenID: {{ captureStatus.openid }}</div>
-        </div>
-        <button @click="captureModal = false" class="px-4 py-2 rounded-lg border text-xs cursor-pointer transition-all shadow-xs" style="background-color: var(--surface-1); border-color: var(--line-2); color: var(--ink-1);">{{ t('admin.notify.close') }}</button>
-      </div>
-    </div>
+    <!-- ══ OpenID 捕获 ══ -->
+    <BaseDialog
+      :open="captureModal"
+      :title="t('admin.notify.captureTitle')"
+      size="md"
+      @close="captureModal = false"
+    >
+      <div class="nf-capture">
+        <span
+          class="badge"
+          :class="captureStatus?.status === 'captured' ? 'badge-up' : 'badge-accent'"
+        >
+          {{ captureStatus?.status === 'captured' ? t('admin.notify.captured') : t('admin.notify.listening') }}
+        </span>
 
-    <!-- QQ Bind QR Modal -->
-    <div v-if="bindModal" class="fixed inset-0 z-[var(--z-dialog)] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4" @click.self="closeBindModal">
-      <div class="rounded-xl border p-5 sm:p-6 w-full max-w-[380px] max-h-[88dvh] overflow-y-auto text-center shadow-2xl transition-colors" style="background-color: var(--surface-2); border-color: var(--line-1);">
-        <h3 class="text-sm font-bold mb-2" style="color: var(--ink-1);">{{ t('admin.notify.bindTitle') }}</h3>
-        <p class="text-[11px] mb-3" style="color: var(--ink-2);">{{ t('admin.notify.bindGuide') }}</p>
-        <img v-if="bindStatus?.qr" :src="bindStatus.qr" :alt="t('admin.notify.qrAlt')" class="w-[220px] h-[220px] rounded-lg bg-white p-2.5 mx-auto mb-3 shadow-xs border" style="border-color: var(--line-1);" />
-        <p v-if="bindStatus?.link" class="text-[11px] break-all mb-3" style="color: var(--accent);">{{ bindStatus.link }}</p>
-        <p class="text-xs mb-4" :class="{ 'text-blue-500': bindStatus?.tone === 'blue', 'text-emerald-500': bindStatus?.tone === 'green', 'text-amber-500': bindStatus?.tone === 'amber', 'text-rose-500': bindStatus?.tone === 'red' }">{{ bindStatus?.text }}</p>
-        <div class="flex justify-center space-x-2">
-          <button @click="startQqBind" class="px-3 py-1.5 rounded-lg border text-xs cursor-pointer transition-all shadow-xs" style="background-color: var(--surface-1); border-color: var(--line-2); color: var(--ink-1);">{{ t('admin.notify.refreshQr') }}</button>
-          <button @click="closeBindModal" class="px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all shadow-xs" style="background-color: var(--accent); color: var(--accent-ink);">{{ t('admin.notify.close') }}</button>
+        <p class="nf-capture-bot">{{ captureStatus?.bot_name || t('admin.notify.connecting') }}</p>
+        <p class="nf-capture-guide">{{ t('admin.notify.captureGuide') }}</p>
+
+        <div class="nf-capture-box">
+          <p v-if="captureStatus?.expires_in" class="nf-capture-meta mono">
+            {{ t('admin.notify.remainingSeconds', undefined, { n: captureStatus.expires_in }) }}
+          </p>
+          <p v-if="captureStatus?.openid" class="nf-capture-openid mono">
+            OpenID: {{ captureStatus.openid }}
+          </p>
         </div>
       </div>
-    </div>
+
+      <template #footer>
+        <button class="btn btn-ghost btn-sm" @click="captureModal = false">
+          {{ t('admin.notify.close') }}
+        </button>
+      </template>
+    </BaseDialog>
+
+    <!-- ══ QQ 扫码绑定 ══ -->
+    <BaseDialog
+      :open="bindModal"
+      :title="t('admin.notify.bindTitle')"
+      :desc="t('admin.notify.bindGuide')"
+      size="sm"
+      @close="closeBindModal"
+    >
+      <div class="nf-bind">
+        <img
+          v-if="bindStatus?.qr"
+          :src="bindStatus.qr"
+          :alt="t('admin.notify.qrAlt')"
+          class="nf-qr"
+        />
+        <p v-if="bindStatus?.link" class="nf-bind-link mono">{{ bindStatus.link }}</p>
+        <span class="badge" :class="bindTone">{{ bindStatus?.text }}</span>
+      </div>
+
+      <template #footer>
+        <button class="btn btn-ghost btn-sm" @click="startQqBind">
+          <RefreshCw :size="13" />
+          <span>{{ t('admin.notify.refreshQr') }}</span>
+        </button>
+        <button class="btn btn-primary btn-sm" @click="closeBindModal">
+          {{ t('admin.notify.close') }}
+        </button>
+      </template>
+    </BaseDialog>
   </div>
 </template>
+
+<style scoped>
+.nf {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-4);
+}
+.nf-spin {
+  animation: nf-rotate 0.9s linear infinite;
+}
+@keyframes nf-rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.nf-error {
+  border: 1px solid var(--down-line);
+  border-radius: var(--r-card);
+  background-color: var(--ds-color-bg-surface-card);
+}
+
+/* ══ 状态带 ══ */
+.nf-band {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+@media (min-width: 640px) {
+  .nf-band {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (min-width: 1280px) {
+  .nf-band {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+.nf-fact {
+  display: flex;
+  flex-direction: column;
+  gap:4px;
+  min-width: 0;
+  padding: var(--ds-space-4);
+  border-top: 1px solid var(--ds-color-border-default);
+}
+.nf-fact:first-child {
+  border-top: 0;
+}
+@media (min-width: 640px) {
+  .nf-fact:nth-child(2) {
+    border-top: 0;
+  }
+  .nf-fact:nth-child(even) {
+    border-left: 1px solid var(--ds-color-border-default);
+  }
+}
+@media (min-width: 1280px) {
+  .nf-fact {
+    border-top: 0;
+  }
+  .nf-fact + .nf-fact {
+    border-left: 1px solid var(--ds-color-border-default);
+  }
+}
+.nf-fact-label {
+  display: flex;
+  align-items: center;
+  gap:6px;
+  font-size: var(--text-3xs);
+  font-weight: 500;
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--ds-color-text-placeholder);
+}
+.nf-fact-value {
+  font-size: var(--text-md);
+  font-weight: 500;
+  letter-spacing: var(--track-display);
+  line-height: 1.25;
+  color: var(--ds-color-text-primary);
+  min-width: 0;
+}
+.nf-fact-value.is-up {
+  color: var(--up);
+}
+.nf-fact-value.is-off {
+  color: var(--ds-color-text-placeholder);
+}
+.nf-fact-foot {
+  font-size: var(--text-4xs);
+  color: var(--ds-color-text-placeholder);
+}
+
+/* ══ 通道 ══ */
+.nf-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-3);
+}
+.nf-block-head {
+  padding: 0 2px;
+}
+.nf-channels {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--ds-space-4);
+}
+@media (min-width: 1100px) {
+  .nf-channels {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.nf-card {
+  display: flex;
+  flex-direction: column;
+  border-left: 2px solid transparent;
+}
+.nf-card.is-on {
+  border-left-color: var(--up);
+}
+.nf-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: var(--ds-space-3) var(--ds-space-4);
+  border-bottom: 1px solid var(--ds-color-border-default);
+}
+.nf-card-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: var(--ds-color-text-placeholder);
+  flex-shrink: 0;
+}
+.nf-card-dot.is-on {
+  background-color: var(--up);
+}
+.nf-card-title {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--ds-color-text-primary);
+}
+.nf-card-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+.nf-state {
+  font-size: var(--text-3xs);
+  font-weight: 600;
+  color: var(--ds-color-text-placeholder);
+}
+.nf-state.is-on {
+  color: var(--up);
+}
+
+.nf-fields {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--ds-space-3);
+  padding: var(--ds-space-4);
+}
+@media (min-width: 520px) {
+  .nf-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.nf-field {
+  display: flex;
+  flex-direction: column;
+  gap:6px;
+  min-width: 0;
+}
+.nf-field.is-span {
+  grid-column: 1 / -1;
+}
+
+.nf-card-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  flex-wrap: wrap;
+  margin-top: auto;
+  padding: var(--ds-space-3) var(--ds-space-4);
+  border-top: 1px solid var(--ds-color-border-default);
+  background-color: var(--ds-color-bg-surface-inset);
+}
+.nf-result {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-left: auto;
+  min-width: 0;
+  font-size: var(--text-3xs);
+}
+.nf-result.is-idle {
+  color: var(--ds-color-text-placeholder);
+}
+.nf-result b {
+  font-weight: 600;
+}
+.nf-result-detail {
+  color: var(--ds-color-text-description);
+  overflow-wrap: anywhere;
+}
+
+/* ══ 类别 ══ */
+.nf-cats {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+@media (min-width: 900px) {
+  .nf-cats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (min-width: 1500px) {
+  .nf-cats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+.nf-cat {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ds-space-3);
+  padding: var(--ds-space-3) var(--ds-space-4);
+  border-top: 1px solid var(--ds-color-border-default);
+}
+@media (min-width: 900px) {
+  .nf-cat:nth-child(-n + 2) {
+    border-top: 0;
+  }
+  .nf-cat:nth-child(even) {
+    border-left: 1px solid var(--ds-color-border-default);
+  }
+}
+@media (min-width: 1500px) {
+  .nf-cat:nth-child(3) {
+    border-top: 0;
+  }
+  .nf-cat:nth-child(3n) {
+    border-left: 0;
+  }
+  .nf-cat:not(:nth-child(3n + 1)) {
+    border-left: 1px solid var(--ds-color-border-default);
+  }
+}
+.nf-cat-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--r-ctl);
+  background-color: var(--ds-color-bg-surface-1);
+  color: var(--ds-color-text-description);
+  flex-shrink: 0;
+}
+.nf-cat-main {
+  min-width: 0;
+}
+.nf-cat-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.nf-cat-name {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--ds-color-text-primary);
+}
+.nf-cat-key {
+  padding:1px 6px;
+  border-radius: var(--r-xs);
+  border: 1px solid var(--ds-color-border-default);
+  background-color: var(--ds-color-bg-surface-1);
+  font-family: var(--ds-font-mono);
+  font-size: var(--text-4xs);
+  color: var(--ds-color-text-placeholder);
+}
+.nf-cat-desc {
+  margin-top:4px;
+  font-size: var(--text-3xs);
+  line-height: var(--leading-body);
+  color: var(--ds-color-text-description);
+}
+
+/* ══ 简报 ══ */
+.nf-schedule {
+  padding: var(--ds-space-4);
+}
+.nf-save {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  flex-wrap: wrap;
+  padding: var(--ds-space-3) var(--ds-space-4);
+  border-top: 1px solid var(--ds-color-border-default);
+  background-color: var(--ds-color-bg-surface-inset);
+}
+
+/* ══ 弹窗内 ══ */
+.nf-capture {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--ds-space-2);
+  text-align: center;
+}
+.nf-capture-bot {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--ds-color-text-primary);
+}
+.nf-capture-guide {
+  font-size: var(--text-3xs);
+  line-height: var(--leading-body);
+  color: var(--ds-color-text-description);
+}
+.nf-capture-box {
+  width: 100%;
+  margin-top: var(--ds-space-2);
+  padding: var(--ds-space-3);
+  border-radius: var(--r-ctl);
+  background-color: var(--ds-color-bg-surface-inset);
+}
+.nf-capture-meta {
+  font-size: var(--text-3xs);
+  color: var(--ds-color-text-placeholder);
+}
+.nf-capture-openid {
+  margin-top: 6px;
+  font-size: var(--text-3xs);
+  color: var(--ds-color-brand);
+  overflow-wrap: anywhere;
+}
+.nf-bind {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--ds-space-3);
+  text-align: center;
+}
+.nf-qr {
+  width: 220px;
+  height: 220px;
+  padding: 10px;
+  border-radius: var(--r-ctl);
+  border: 1px solid var(--ds-color-border-default);
+  /* 唯一一处刻意的固定色：二维码必须落在纯白底上才能被手机相机/QQ 稳定识别，
+     深色主题下的半透明表面色会让多数扫码器解读失败。这是功能性对比要求，非装饰用色。 */
+  background-color: #fff;
+}
+.nf-bind-link {
+  font-size: var(--text-3xs);
+  color: var(--ds-color-brand);
+  overflow-wrap: anywhere;
+}
+</style>

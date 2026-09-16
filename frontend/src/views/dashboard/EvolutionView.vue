@@ -1,38 +1,42 @@
 <script setup lang="ts">
-import { fmtDateTime } from '../../utils/format';
 /**
- * 自进化视图：复盘 HUD → 左·裁决与归因与行动 / 右·黄金心法库。
- * 数据源：/api/all 的 review + ai_trading_memory_md（AI 每 6 小时覆写）。
+ * EvolutionView.vue · DeepSeek Harness 风格自进化与认知中枢
+ * 包含：自进化复盘 HUD 状态带、诊断归因与行动决策树、确定性数理快照可观测性审计、核心黄金心法库与长期认知记忆流
  */
 import { computed } from 'vue';
-import { Dna, ShieldCheck, Sparkles, BrainCircuit, ListChecks } from 'lucide-vue-next';
+import {
+  Dna,
+  Sparkles,
+  ShieldCheck,
+  Brain,
+  ListChecks,
+  FileText,
+} from 'lucide-vue-next';
 import { useDashboardStore } from '../../stores/dashboard';
+import DataGate from '../../components/dashboard/DataGate.vue';
 import { useI18n } from '../../composables/useI18n';
-import { fmtNum } from '../../utils/format';
-import PageHead from '../../components/dashboard/PageHead.vue';
+import { fmtNum, fmtDateTime } from '../../utils/format';
 import BaseStat from '../../components/base/BaseStat.vue';
 import BaseEmpty from '../../components/base/BaseEmpty.vue';
 import BaseCollapse from '../../components/base/BaseCollapse.vue';
-import BaseCodeBlock from '../../components/base/BaseCodeBlock.vue';
 
 const store = useDashboardStore();
 const { t } = useI18n();
 
 const review = computed<any>(() => (store.data as any)?.review || {});
-const hasReview = computed(() => !!review.value?.timestamp);
 
 const statusKey = computed(() => String(review.value.change_status || ''));
 const statusMeta = computed(() => {
   const s = statusKey.value;
-  if (s === 'CHANGED') return { cls: 'badge-up', label: t('dash.evolution.hud.statuses.CHANGED') };
-  if (s === 'NO_CHANGE') return { cls: 'badge-info', label: t('dash.evolution.hud.statuses.NO_CHANGE') };
-  if (s === 'RUNNING') return { cls: 'badge-warn', label: t('dash.evolution.hud.statuses.RUNNING') };
-  if (s) return { cls: 'badge-down', label: t('dash.evolution.hud.statuses.FAILED') };
+  if (s === 'CHANGED') return { cls: 'text-[var(--up)] border-[var(--up-line)] bg-[var(--up-bg)]', label: t('dash.evolution.hud.statuses.CHANGED') };
+  if (s === 'NO_CHANGE') return { cls: 'text-[var(--ink-2)] border-[var(--line-1)] bg-[var(--surface-2)]', label: t('dash.evolution.hud.statuses.NO_CHANGE') };
+  if (s === 'RUNNING') return { cls: 'text-[var(--warn)] border-[var(--warn-line)] bg-[var(--warn-bg)]', label: t('dash.evolution.hud.statuses.RUNNING') };
+  if (s) return { cls: 'text-[var(--down)] border-[var(--down-line)] bg-[var(--down-bg)]', label: t('dash.evolution.hud.statuses.FAILED') };
   return { cls: '', label: '--' };
 });
 
 const insights = computed<any[]>(() => review.value.diagnosis_insights || review.value.insights || []);
-/** 归因切片兼容两种形态：字符串（"标题：正文"，当前后端格式）与对象 {dimension, observation} */
+
 function insTitle(it: any): string {
   if (typeof it === 'string') {
     const i = it.indexOf('：');
@@ -41,6 +45,7 @@ function insTitle(it: any): string {
   }
   return it?.dimension || it?.title || '';
 }
+
 function insBody(it: any): string {
   if (typeof it === 'string') {
     const i = it.indexOf('：');
@@ -50,7 +55,6 @@ function insBody(it: any): string {
     || it?.content || it?.finding || it?.summary || it?.description || it?.reason;
   if (direct) return String(direct);
   if (it && typeof it === 'object') {
-    // 未知对象形态：按 key:value 拼接，绝不渲染 [object Object]
     return Object.entries(it)
       .filter(([, v]) => v !== null && v !== undefined && typeof v !== 'object')
       .map(([k, v]) => `${k}: ${v}`)
@@ -58,11 +62,10 @@ function insBody(it: any): string {
   }
   return String(it ?? '');
 }
+
 const actions = computed<any[]>(() => review.value.actions_taken || []);
-/** 宿主确定性数理快照可观测性审计（2026-09-10 起进报告；旧报告无此字段则隐藏行） */
 const snapAudit = computed<any>(() => review.value.snapshot_audit || null);
 
-/** 行动项兼容：字符串直出；对象优先 action/text，未知键拼接 */
 function actText(a: any): string {
   if (typeof a === 'string') return a;
   if (a && typeof a === 'object') {
@@ -76,7 +79,6 @@ function actText(a: any): string {
   return String(a ?? '');
 }
 
-/** 心法解析：【标题】正文 */
 const rules = computed(() => {
   const list: string[] = review.value.core_lessons || [];
   return list.map((raw) => {
@@ -84,156 +86,191 @@ const rules = computed(() => {
     return m ? { title: m[1], body: m[2].trim() } : { title: '', body: String(raw).trim() };
   });
 });
+
 const md = computed(() => (store.data as any)?.ai_trading_memory_md || '');
 </script>
 
 <template>
   <div class="space-y-3">
-    <PageHead :title="t('dash.evolution.title')" :desc="t('dash.evolution.desc')" />
+    <!-- 页头 -->
+    <div
+      class="flex flex-wrap items-center justify-between gap-2 border-b pb-2.5"
+      style="border-color: var(--line-1)"
+    >
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 class="text-sm font-bold tracking-tight text-[var(--ink-strong)] flex items-center gap-1.5">
+            <Dna class="h-4 w-4 text-[var(--accent)]" />
+            {{ t('dash.evolution.title') }}
+          </h1>
+          <span
+            class="rounded px-1.5 py-0.2 border text-3xs font-mono font-medium"
+            style="background-color: var(--surface-2); border-color: var(--line-1); color: var(--ink-2)"
+          >
+            每 6 小时自主覆写迭代
+          </span>
+        </div>
+        <p class="text-3xs text-[var(--ink-3)] mt-0.5">
+          {{ t('dash.evolution.desc') }}
+        </p>
+      </div>
 
-    <!-- 复盘 HUD -->
-    <div class="card grid grid-cols-2 gap-2 p-2 md:grid-cols-5 xl:gap-0 xl:p-0">
-      <BaseStat
-        :label="t('dash.evolution.hud.at')"
-        :value="review.timestamp ? fmtDateTime(review.timestamp).slice(5, 16) : '--'"
-       
-      />
-      <BaseStat
-        :label="t('dash.evolution.hud.sample')"
-        :value="review.total_trades != null ? `${fmtNum(review.total_trades, 0)} ${t('common.unitCount')}` : '--'"
-       
-      />
-      <BaseStat
-        :label="t('dash.evolution.hud.winRate')"
-        :value="review.win_rate != null ? fmtNum(review.win_rate, 1) + '%' : '--'"
-        :delta-tone="(review.win_rate ?? 0) >= 50 ? 'up' : 'down'"
-       
-      />
-      <BaseStat
-        :label="t('dash.evolution.hud.pf')"
-        :value="review.profit_factor != null ? fmtNum(review.profit_factor, 2) : '--'"
-        :delta="(review.profit_factor ?? 0) >= 1 ? t('common.ge') + ' 1' : undefined"
-        :delta-tone="(review.profit_factor ?? 0) >= 1 ? 'up' : 'down'"
-        :hint="t('dash.ledger.summary.tipPf')"
-       
-      />
-      <BaseStat :label="t('dash.evolution.hud.status')" value="">
-        <template #extra>
-          <span class="badge" :class="statusMeta.cls">{{ statusMeta.label }}</span>
-        </template>
-      </BaseStat>
+      <div class="flex items-center gap-2">
+        <span
+          v-if="statusKey"
+          class="rounded px-2 py-0.5 border text-3xs font-mono font-bold uppercase"
+          :class="statusMeta.cls"
+        >
+          {{ statusMeta.label }}
+        </span>
+      </div>
     </div>
 
-    <BaseEmpty v-if="!hasReview" :text="t('dash.evolution.hud.empty')" />
-
-    <div v-else class="grid grid-cols-1 gap-3 xl:grid-cols-12">
-      <!-- 左：裁决 / 归因 / 行动 -->
-      <div class="space-y-3 xl:col-span-7">
-        <div class="section">
-          <div class="section-head">
-            <div>
-              <h2 class="section-title"><BrainCircuit class="h-4 w-4" style="color: var(--accent)" />{{ t('dash.evolution.rationale.title') }}</h2>
-              <p class="section-desc">{{ t('dash.evolution.rationale.desc') }}</p>
-            </div>
-            <span v-if="review.mode" class="badge badge-mono hidden sm:inline-flex">{{ review.mode }}</span>
+    <DataGate>
+      <!-- 复盘 HUD 5 指标卡片 -->
+      <div class="dsh-card">
+        <div class="grid grid-cols-2 gap-px bg-[var(--line-1)] sm:grid-cols-3 xl:grid-cols-5">
+          <div class="bg-[var(--surface-1)] p-3">
+            <BaseStat
+              :label="t('dash.evolution.hud.at')"
+              :value="review.timestamp ? fmtDateTime(review.timestamp).slice(5, 16) : '--'"
+            />
           </div>
-          <div class="section-body">
-            <p class="text-sm leading-relaxed" style="color: var(--ink-1)">
-              {{ review.memory_overwrites_reason || '--' }}
-            </p>
-            <div
-              v-if="review.llm_error"
-              class="mt-3 rounded-lg border p-2.5 text-xs"
-              style="border-color: var(--down-line); background-color: var(--down-bg); color: var(--down)"
-            >
-              {{ review.llm_error }}
-            </div>
+          <div class="bg-[var(--surface-1)] p-3">
+            <BaseStat
+              :label="t('dash.evolution.hud.sample')"
+              :value="review.total_trades != null ? `${fmtNum(review.total_trades, 0)} ${t('common.unitCount')}` : '--'"
+            />
+          </div>
+          <div class="bg-[var(--surface-1)] p-3">
+            <BaseStat
+              :label="t('dash.evolution.hud.winRate')"
+              :value="review.win_rate != null ? fmtNum(review.win_rate, 1) + '%' : '--'"
+              :delta-tone="(review.win_rate ?? 0) >= 50 ? 'up' : 'down'"
+            />
+          </div>
+          <div class="bg-[var(--surface-1)] p-3">
+            <BaseStat
+              :label="t('dash.evolution.hud.pf')"
+              :value="review.profit_factor != null ? fmtNum(review.profit_factor, 2) : '--'"
+              :delta="(review.profit_factor ?? 0) >= 1 ? t('common.ge') + ' 1' : undefined"
+              :delta-tone="(review.profit_factor ?? 0) >= 1 ? 'up' : 'down'"
+              :hint="t('dash.ledger.summary.tipPf')"
+            />
+          </div>
+          <div class="bg-[var(--surface-1)] p-3 flex flex-col justify-center">
+            <span class="text-3xs text-[var(--ink-3)] font-semibold">{{ t('dash.evolution.hud.status') }}</span>
+            <span class="text-xs font-bold mt-1" :class="statusKey === 'CHANGED' ? 'text-[var(--up)]' : 'text-[var(--ink-1)]'">
+              {{ statusMeta.label }}
+            </span>
           </div>
         </div>
+      </div>
 
-        <div class="section">
-          <div class="section-head">
-            <div>
-              <h2 class="section-title"><Sparkles class="h-4 w-4" style="color: var(--accent)" />{{ t('dash.evolution.insights.title') }}</h2>
-              <p class="section-desc">{{ t('dash.evolution.insights.desc') }}</p>
-            </div>
-            <span class="badge num">{{ insights.length }}</span>
-          </div>
-          <div class="section-body space-y-2">
+      <!-- 双列工位排布：左侧诊断与行动决策 / 右侧黄金心法与长期记忆 -->
+      <div class="grid grid-cols-1 gap-3 xl:grid-cols-12 items-start">
+        <!-- 左列：诊断归因、行动项与物理快照 (7) -->
+        <div class="xl:col-span-7 space-y-3">
+          <!-- 诊断归因切片 -->
+          <div class="dsh-card p-4 space-y-3">
+            <h2 class="text-xs font-bold uppercase tracking-wider text-[var(--ink-strong)] flex items-center gap-1.5">
+              <Brain class="h-4 w-4 text-[var(--accent)]" />
+              {{ t('dash.evolution.insights.title') }}
+            </h2>
+
             <BaseEmpty v-if="!insights.length" :text="t('dash.evolution.insights.empty')" />
-            <div v-for="(it, i) in insights" :key="i" class="card-flat p-3">
-              <p class="text-sm font-semibold" style="color: var(--ink-strong)">
-                <span class="num me-1.5 t-faint">{{ String(i + 1).padStart(2, '0') }}</span>{{ insTitle(it) }}
-              </p>
-              <p class="mt-1 text-xs leading-relaxed" style="color: var(--ink-2)">{{ insBody(it) }}</p>
+
+            <div v-else class="space-y-2.5">
+              <div
+                v-for="(it, idx) in insights"
+                :key="idx"
+                class="dsh-card-sub p-3 space-y-1"
+              >
+                <span v-if="insTitle(it)" class="text-3xs font-bold font-mono text-[var(--accent)] block uppercase">
+                  {{ insTitle(it) }}
+                </span>
+                <p class="text-xs text-[var(--ink-1)] leading-relaxed font-sans">{{ insBody(it) }}</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- 自进化行动项 -->
+          <div v-if="actions.length" class="dsh-card p-4 space-y-3">
+            <h2 class="text-xs font-bold uppercase tracking-wider text-[var(--ink-strong)] flex items-center gap-1.5">
+              <ListChecks class="h-4 w-4 text-[var(--accent)]" />
+              {{ t('dash.evolution.actions.title') }}
+            </h2>
+
+            <div class="space-y-2">
+              <div
+                v-for="(a, idx) in actions"
+                :key="idx"
+                class="dsh-card-sub p-3 flex items-start gap-2.5"
+              >
+                <span class="num font-mono font-bold text-3xs text-[var(--accent)] shrink-0 mt-0.5">0{{ idx + 1 }}</span>
+                <p class="text-xs text-[var(--ink-1)] leading-relaxed flex-1">{{ actText(a) }}</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- 确定性数理快照审计 -->
+          <div v-if="snapAudit" class="dsh-card p-4 space-y-2">
+            <h2 class="text-xs font-bold uppercase tracking-wider text-[var(--ink-strong)] flex items-center gap-1.5">
+              <ShieldCheck class="h-4 w-4 text-[var(--accent)]" />
+              确定性物理快照审计
+            </h2>
+            <div class="dsh-card-sub p-3 text-3xs font-mono text-[var(--ink-2)] space-y-1">
+              <div v-for="(v, k) in snapAudit" :key="k" class="flex justify-between">
+                <span class="text-[var(--ink-3)]">{{ k }}:</span>
+                <span class="font-bold text-[var(--ink-1)]">{{ v }}</span>
+              </div>
             </div>
           </div>
         </div>
 
-        <div class="section">
-          <div class="section-head">
-            <h2 class="section-title"><ListChecks class="h-4 w-4" style="color: var(--accent)" />{{ t('dash.evolution.actions.title') }}</h2>
-            <span class="badge num">{{ actions.length }}</span>
-          </div>
-          <div class="section-body">
-            <p v-if="!actions.length" class="t-faint text-sm">{{ t('dash.evolution.actions.empty') }}</p>
-            <ol v-else class="space-y-2">
-              <li v-for="(a, i) in actions" :key="i" class="flex gap-2.5 text-sm leading-relaxed" style="color: var(--ink-1)">
-                <span class="num t-faint shrink-0">{{ i + 1 }}.</span>
-                <span>{{ actText(a) }}</span>
-              </li>
-            </ol>
-          </div>
-        </div>
-      </div>
+        <!-- 右列：核心黄金心法库 & 长期记忆 Markdown (5) -->
+        <div class="xl:col-span-5 space-y-3">
+          <!-- 黄金心法库 -->
+          <div class="dsh-card p-4 space-y-3">
+            <h2 class="text-xs font-bold uppercase tracking-wider text-[var(--ink-strong)] flex items-center gap-1.5">
+              <Sparkles class="h-4 w-4 text-[var(--accent)]" />
+              {{ t('dash.evolution.memory.title') }}
+            </h2>
 
-      <!-- 右：心法库 + 护栏 -->
-      <div class="space-y-3 xl:col-span-5">
-        <div class="section">
-          <div class="section-head">
-            <div>
-              <h2 class="section-title"><Dna class="h-4 w-4" style="color: var(--accent)" />{{ t('dash.evolution.memory.title') }}</h2>
-              <p class="section-desc">{{ t('dash.evolution.memory.desc') }}</p>
-            </div>
-            <span class="badge badge-accent num">{{ t('dash.evolution.memory.rules', undefined, { n: rules.length }) }}</span>
-          </div>
-          <div class="section-body space-y-2">
             <BaseEmpty v-if="!rules.length" :text="t('dash.evolution.memory.empty')" />
-            <div v-for="(r, i) in rules" :key="i" class="card-flat p-3" style="border-left: 2px solid var(--accent-line)">
-              <p class="text-sm font-semibold" style="color: var(--ink-strong)">{{ r.title || t('dash.evolution.memory.dimension') }}</p>
-              <p class="mt-1 text-xs leading-relaxed" style="color: var(--ink-2)">{{ r.body }}</p>
-            </div>
-            <BaseCollapse>
-              <template #head><span class="text-xs" style="color: var(--ink-2)">{{ t('dash.evolution.memory.dev') }} · {{ t('dash.evolution.memory.devDesc') }}</span></template>
-              <div class="p-2"><BaseCodeBlock :code="md" max-height="320px" /></div>
-            </BaseCollapse>
-          </div>
-        </div>
 
-        <div class="section">
-          <div class="section-body flex items-center gap-3">
-            <ShieldCheck class="h-5 w-5 shrink-0" :style="{ color: review.memory_preserved !== false ? 'var(--up)' : 'var(--warn)' }" />
-            <div class="min-w-0">
-              <p class="text-sm font-semibold" style="color: var(--ink-strong)">
-                {{ t('dash.evolution.guard.title') }}
-                <!-- 批B(2026-09-13)：徽章与左侧盾牌同源派生——旧写法无条件 badge-up+
-                     「生效中」，心法未被保留（memory_preserved=false，盾牌已转黄警示）时
-                     徽章仍报绿「一切正常」，两个信号自相矛盾。 -->
-                <span
-                  class="badge ms-1"
-                  :class="review.memory_preserved !== false ? 'badge-up' : 'badge-warn'"
-                >{{ review.memory_preserved !== false ? t('dash.evolution.guard.on') : t('dash.evolution.guard.off') }}</span>
-              </p>
-              <p class="t-faint text-xs">{{ t('dash.evolution.guard.desc') }}</p>
-              <p v-if="snapAudit" class="mt-1 text-xs" style="color: var(--ink-2)">
-                {{ t('dash.evolution.guard.snapshot') }}：
-                {{ t('dash.evolution.guard.snapshotCounts', undefined, { observed: snapAudit.math_observable ?? 0, total: snapAudit.total ?? 0, priceOnly: snapAudit.PRICE_ONLY ?? 0, none: snapAudit.NONE ?? 0 }) }}
-                <span v-if="(review.baseline_memory_protected ?? 0) > 0" class="badge badge-warn ms-1">{{ t('dash.evolution.guard.baselineProtected', undefined, { n: review.baseline_memory_protected }) }}</span>
-              </p>
+            <div v-else class="space-y-2.5">
+              <div
+                v-for="(r, idx) in rules"
+                :key="idx"
+                class="dsh-card-sub p-3 space-y-1"
+              >
+                <h3 v-if="r.title" class="text-xs font-bold text-[var(--ink-strong)] flex items-center gap-1.5">
+                  <span class="h-1.5 w-1.5 rounded-full bg-[var(--accent)]" />
+                  {{ r.title }}
+                </h3>
+                <p class="text-xs text-[var(--ink-2)] leading-relaxed font-sans">{{ r.body }}</p>
+              </div>
             </div>
           </div>
+
+          <!-- 全量自进化认知记忆 Markdown -->
+          <BaseCollapse v-if="md">
+            <template #head>
+              <span class="flex items-center gap-2 text-xs font-bold text-[var(--ink-strong)]">
+                <FileText class="h-3.5 w-3.5 text-[var(--accent)]" />
+                {{ t('dash.evolution.memory.dev') }}
+              </span>
+            </template>
+            <div class="p-3">
+              <pre
+                class="rounded p-3 font-mono text-3xs leading-relaxed whitespace-pre-wrap select-text max-h-96 overflow-y-auto"
+                style="background-color: var(--surface-input); border: 1px solid var(--line-1); color: var(--ink-2)"
+              >{{ md }}</pre>
+            </div>
+          </BaseCollapse>
         </div>
       </div>
-    </div>
+    </DataGate>
   </div>
 </template>

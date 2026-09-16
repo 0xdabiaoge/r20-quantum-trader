@@ -10,22 +10,27 @@
  * 与 `onMounted`/`onUnmounted`/`watch` 时序强耦合，而前端没有测试、渲染结果
  * 无法自动验证。研究文档 F4 自己也标注了"需人工过一遍 K 线工位" ——
  * 在有人目视验证之前，不动渲染路径。
+ *
+ * ⚠️ 批 13：自由变量由 3 个降为 **2 个**（`legendRule` / `tok`）。
+ * 原先散落在此的 `dark ? A : B` 三元与十六进制字面量已收口到 `tokens.css`
+ * 的 `--chart-*` 主题化色板，颜色一律经 `tok()` 在渲染时取解析值。
+ * 主题切换的正确性不变：组件侧的 `watch([isDark, cvd])` 仍会在换肤时重跑本函数，
+ * 而 `tok()` 读到的是刚更新过的 `data-theme`。canvas 无法解析 `var()`，
+ * 故这里**必须**继续用 `tok()`，不能直接写 CSS 变量引用。
  */
 
 /** 图表网格/蜡烛/指标线的配色与形态，随明暗主题切换 */
 export function chartStyles(
-  isDark: boolean,
   legendRule: () => 'always',
   tok: (name: string) => string,
 ): any {
-  const dark = isDark
   return {
     grid: {
       show: true,
       horizontal: {
         show: true,
         size: 1,
-        color: dark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)',
+        color: tok('--chart-grid'),
         style: 'solid',
       },
       vertical: {
@@ -102,9 +107,9 @@ export function chartStyles(
         noChangeColor: tok('--ink-3'),
       },
       lines: [
-        { style: 'solid', smooth: false, size: 1.5, color: '#F59E0B' }, // MA5 / 黄
-        { style: 'solid', smooth: false, size: 1.5, color: '#38BDF8' }, // MA10 / 蓝
-        { style: 'solid', smooth: false, size: 1.5, color: '#A855F7' }, // MA20 / 紫
+        { style: 'solid', smooth: false, size: 1.5, color: tok('--chart-ma') }, // MA5 / 黄
+        { style: 'solid', smooth: false, size: 1.5, color: tok('--chart-ema') }, // MA10 / 蓝
+        { style: 'solid', smooth: false, size: 1.5, color: tok('--chart-kdj') }, // MA20 / 紫
         { style: 'solid', smooth: false, size: 1.5, color: tok('--down') },
         { style: 'solid', smooth: false, size: 1.5, color: tok('--up') },
       ],
@@ -167,7 +172,7 @@ export function chartStyles(
       size: 1,
       color: tok('--surface-3'),
       fill: true,
-      activeBackgroundColor: dark ? '#334155' : '#CBD5E1',
+      activeBackgroundColor: tok('--chart-grid-active'),
     },
     crosshair: {
       show: true,
@@ -184,7 +189,7 @@ export function chartStyles(
           color: tok('--ink-1'),
           size: 11,
           family: 'JetBrains Mono, monospace',
-          backgroundColor: '#3B82F6',
+          backgroundColor: tok('--chart-crosshair-h'),
         },
       },
       vertical: {
@@ -200,7 +205,7 @@ export function chartStyles(
           color: tok('--ink-1'),
           size: 10,
           family: 'JetBrains Mono, monospace',
-          backgroundColor: '#475569',
+          backgroundColor: tok('--chart-crosshair-v'),
         },
       },
     },

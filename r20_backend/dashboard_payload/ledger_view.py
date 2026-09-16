@@ -10,8 +10,49 @@ import os
 import time
 
 from r20_backend.time_utils import beijing_text
+from scripts.evolution.observability import classify_snapshot_observability
 
-__all__ = ["load_ledger_lifecycle_trades"]
+__all__ = ["load_ledger_lifecycle_trades", "LEDGER_TRADES_MAX"]
+
+#: 台账视图一次下发的**最大逐笔行数**（唯一事实源）。
+#:
+#: ⚠️ 2026-09-16：这个常量此前是 `[:60]` 的字面量，而 `slim.py` 的
+#: `SLIM_TRADES` 另写了 20 —— 于是 `/api/all` 默认瘦身把台账**静默**砍到最近
+#: 20 笔（34 笔里丢 14 笔），而台账页的「累计平仓/胜率/净盈亏/手续费」全部
+#: 在这个被砍的切片上聚合，页面却没有任何截断提示（前端从不读
+#: `_meta.omitted`）—— 既是少数据，也是 UI 说谎。两处上限现已同源：
+#: slim 侧不能再比本上限更紧，否则台账页必然少行。
+LEDGER_TRADES_MAX = 60
+
+#: 逐单可观测性标签的合法取值（与 `scripts/evolution/observability.py` 同源）。
+_OBSERVABILITY_TAGS = ("DYNAMICS_OBSERVED", "PARTIAL", "PRICE_ONLY", "NONE")
+
+#: 台账成交行可能携带开仓快照的字段名（历史上不同写入路径用过不同键）。
+_SNAPSHOT_KEYS = ("signal_snapshot", "entry_snapshot", "snapshot")
+
+
+def classify_trade_observability(trade: dict) -> str:
+    """逐单判定「开仓时刻数理快照」可观测性（前台台账展示用）。
+
+    ⚠️ 证据纪律（2026-09-16 用户要求，与宿主宪章第 2 条一致）：
+
+    - **只认该笔成交自身携带的证据**（显式标签，或 `signal_snapshot` /
+      `entry_snapshot` / `snapshot` 字段）；
+    - **绝不向 `signal_journal.json` 之类的外部日志回填匹配**，也绝不由
+      price/atr/adx 之类普通观测**推算** v/a/j/I、能量积分、偏离面积积分、
+      延续/击穿概率、VaR/CVaR —— 台账当时没记，就是「不可观测」；
+    - 缺失本身不得被解读为「动力学异常」等任何证据。
+
+    故台账行没有快照 → `NONE`（前台据此明确标注「数理快照不可观测」）。
+    """
+    tag = str(trade.get("snapshot_observability") or "").upper()
+    if tag in _OBSERVABILITY_TAGS:
+        return tag
+    for key in _SNAPSHOT_KEYS:
+        snap = trade.get(key)
+        if isinstance(snap, dict) and snap:
+            return classify_snapshot_observability(snap)
+    return "NONE"
 
 
 def load_ledger_lifecycle_trades(ledger_file, workspace_dir, autosync_enabled, reset_time_str):
@@ -73,7 +114,13 @@ def load_ledger_lifecycle_trades(ledger_file, workspace_dir, autosync_enabled, r
         if (c_time and c_time >= beijing_text(reset_time_str)) or (o_time and o_time >= beijing_text(reset_time_str)) or (t_time and t_time >= beijing_text(reset_time_str)) or t.get("status") == "holding":
             valid_ledger_trades.append(t)
 
-    trades_table = valid_ledger_trades[:60]
+    trades_table = valid_ledger_trades[:LEDGER_TRADES_MAX]
+
+    # 逐单挂「数理快照可观测性」标签（前台台账/抽屉据此明确标注「不可观测」）。
+    # 纯分类、零回填：见 classify_trade_observability 的证据纪律说明。
+    for _t in trades_table:
+        if isinstance(_t, dict):
+            _t["snapshot_observability"] = classify_trade_observability(_t)
 
     # 8-10. 本地读取（结构优化阶段 2·B2 第六刀：迁至 dashboard_payload/local_reads.py）
     return valid_ledger_trades, trades_table

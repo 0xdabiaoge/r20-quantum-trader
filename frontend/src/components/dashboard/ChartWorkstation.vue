@@ -43,6 +43,12 @@ registerIndicator({
   precision: 2,
   figures: [{ key: 'vwap', title: 'VWAP: ', type: 'line' }],
   styles: {
+    // ⚠️ 批 13 说明：此处是本仓**唯一**刻意保留的颜色字面量。
+    // `registerIndicator` 在模块求值时执行，而 `tok()` 依赖 document 与已生效的
+    // `data-theme`；此刻取值不可靠。且该色最终落在 canvas（不解析 var()）。
+    // 改这条线色需要目视验证 K 线工位；本仓不装浏览器，目视验证经 harness 的
+    // Playwright MCP 进行。未验证前按 chartStyles.ts 模块头「不动渲染路径」的纪律保留原值。
+    // 事件驱动的重绘会经 getChartStyles() 覆盖大部分指标样式，本值是注册期兜底。
     lines: [{ style: 'solid', smooth: false, size: 1.5, color: '#06B6D4' }], // 青蓝色
   },
   calc: (dataList: KLineData[]) => {
@@ -74,6 +80,8 @@ registerIndicator({
 const props = defineProps<{
   symbol?: string
   initialSymbol?: string
+  fill?: boolean
+  chartHeight?: string
 }>()
 
 const emit = defineEmits<{
@@ -308,7 +316,8 @@ let slOverlayId: string | null = null
 let tpOverlayId: string | null = null
 
 function getChartStyles(): any {
-  return chartStyles(isDark.value, legendRule, tok)
+  // 批 13：主题已完全由 tok() 经 --chart-* 主题化色板承载，不再需要传 isDark
+  return chartStyles(legendRule, tok)
 }
 
 // 统一根据 activeIndicators 渲染与挂载指标
@@ -674,39 +683,41 @@ onUnmounted(() => {
 
 <template>
   <div
-    class="card overflow-hidden select-none"
-    :class="isFullscreen ? 'fixed inset-0 z-[var(--z-float)] rounded-none' : ''"
+    class="dsh-card select-none"
+    :class="[
+      isFullscreen ? 'fixed inset-0 z-[var(--z-float)] rounded-none' : '',
+      fill ? 'h-full flex flex-col' : '',
+    ]"
   >
     <!-- 工具条：行情信息 + 工作站工具 -->
     <div
-      class="flex flex-wrap items-center gap-x-3 gap-y-2 border-b px-3 py-2 sm:px-4"
-      style="border-color: var(--line-1); background-color: var(--surface-1)"
+      class="dsh-card-header flex flex-wrap items-center gap-x-3 gap-y-2"
     >
       <!-- 选币下拉 -->
       <div class="indicator-dropdown-container relative">
         <button
-          class="flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border px-2.5 transition-colors"
-          style="border-color: var(--line-2); background-color: var(--surface-2)"
+          class="flex h-7 cursor-pointer items-center gap-1.5 rounded border px-2.5 transition-colors"
+          style="border-color: var(--line-1); background-color: var(--surface-2)"
           :aria-expanded="symbolMenu"
           @click="symbolMenu = !symbolMenu"
         >
-          <span class="text-sm font-bold" style="color: var(--ink-strong)">{{ currentSymbol }}</span>
-          <span class="text-xs" style="color: var(--ink-3)">/USDT · {{ t('dash.matrix.chart.perp') }}</span>
-          <ChevronDown class="h-3.5 w-3.5 transition-transform" :class="symbolMenu && 'rotate-180'" style="color: var(--ink-2)" />
+          <span class="text-xs font-bold" style="color: var(--ink-strong)">{{ currentSymbol }}</span>
+          <span class="text-3xs" style="color: var(--ink-3)">/USDT · {{ t('dash.matrix.chart.perp') }}</span>
+          <ChevronDown class="h-3 w-3 transition-transform" :class="symbolMenu && 'rotate-180'" style="color: var(--ink-2)" />
         </button>
         <Transition name="pop">
           <div
             v-if="symbolMenu"
-            class="float-panel absolute left-0 top-9 z-50 max-h-80 w-56 overflow-y-auto p-1.5"
+            class="float-panel absolute left-0 top-8 z-50 max-h-80 w-56 overflow-y-auto p-1.5"
           >
             <button
               v-for="sym in availableSymbols"
               :key="sym"
-              class="flex w-full cursor-pointer items-center justify-between rounded-md px-2.5 py-1.5 text-left text-sm transition-colors hover:bg-[var(--surface-1)]"
+              class="flex w-full cursor-pointer items-center justify-between rounded px-2 py-1.5 text-left text-xs transition-colors hover:bg-[var(--surface-1)]"
               :style="sym === currentSymbol ? { color: 'var(--accent)', fontWeight: 600 } : { color: 'var(--ink-1)' }"
               @click="selectSymbol(sym); symbolMenu = false"
             >
-              <span class="num">{{ sym }}</span>
+              <span class="num font-mono">{{ sym }}</span>
               <span v-if="holdingSet.has(sym)" class="badge badge-accent !h-4 !px-1 !text-[10px]">{{ t('dash.matrix.chart.holding') }}</span>
             </button>
           </div>
@@ -714,22 +725,22 @@ onUnmounted(() => {
       </div>
 
       <!-- 现价 / 涨跌 / ATR -->
-      <span class="num text-md font-bold" style="color: var(--ink-strong)">
+      <span class="num font-mono text-sm font-bold" style="color: var(--ink-strong)">
         {{ currentPrice >= 100 ? currentPrice.toFixed(1) : currentPrice.toFixed(4) }}
       </span>
-      <span class="num text-xs font-semibold" :class="liveChangePct >= 0 ? 'up' : 'down'">
+      <span class="num font-mono text-xs font-semibold" :class="liveChangePct >= 0 ? 'up' : 'down'">
         {{ liveChangePct >= 0 ? '+' : '' }}{{ liveChangePct.toFixed(2) }}%
       </span>
-      <span class="chip hidden !h-6 md:inline-flex">
-        <span class="dot dot-live" />{{ t('dash.matrix.chart.live') }}
+      <span class="dsh-pill hidden md:inline-flex">
+        <span class="dsh-status-dot active" />{{ t('dash.matrix.chart.live') }}
       </span>
-      <span class="t-faint num hidden text-xs lg:inline">1H ATR {{ currentAtr >= 100 ? '$' + currentAtr.toFixed(1) : (currentAtr * 100).toFixed(2) + '%' }}</span>
+      <span class="t-faint num font-mono hidden text-3xs lg:inline">1H ATR {{ currentAtr >= 100 ? '$' + currentAtr.toFixed(1) : (currentAtr * 100).toFixed(2) + '%' }}</span>
 
       <!-- 右侧工具组 -->
       <div class="ms-auto flex flex-wrap items-center gap-1.5">
-        <span class="chip mr-1 hidden !h-7 sm:inline-flex">
-          <span class="t-faint">{{ t('dash.matrix.chart.barCloseIn') }}</span>
-          <b class="num" style="color: var(--warn)">{{ candleCountdown }}</b>
+        <span class="dsh-pill mr-1 hidden sm:inline-flex">
+          <span class="text-[var(--ink-3)]">{{ t('dash.matrix.chart.barCloseIn') }}</span>
+          <b class="num font-mono" style="color: var(--warn)">{{ candleCountdown }}</b>
         </span>
 
         <BaseSegmented
@@ -742,7 +753,7 @@ onUnmounted(() => {
         <div class="indicator-dropdown-container relative">
           <button
             class="btn btn-sm"
-            :class="showIndicatorMenu || activeIndicatorCount > 0 ? 'btn-primary' : 'btn-ghost'"
+            :class="showIndicatorMenu || activeIndicatorCount > 0 ? 'bg-[var(--accent-bg)] text-[var(--accent)] border border-[var(--accent-line)]' : 'btn-ghost'"
             :aria-expanded="showIndicatorMenu"
             @click="showIndicatorMenu = !showIndicatorMenu"
           >
@@ -824,7 +835,8 @@ onUnmounted(() => {
     <div
       ref="chartContainer"
       class="relative w-full"
-      :style="{ height: isFullscreen ? 'calc(100vh - 108px)' : 'clamp(320px, 60vw, 560px)' }"
+      :class="fill ? 'flex-1 min-h-[340px]' : ''"
+      :style="{ height: isFullscreen ? 'calc(100vh - 108px)' : (props.chartHeight || 'clamp(340px, 60vw, 560px)') }"
     ></div>
 
     <!-- 试算控制台 -->

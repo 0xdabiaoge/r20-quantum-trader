@@ -28,6 +28,7 @@
 import json
 import os
 import urllib
+import warnings
 
 from r20_backend.execution import (
     calc_atr,
@@ -181,8 +182,12 @@ def fetch_single_instrument_data(item, all_positions, usdt_available, *,
                     t_item = d_t["data"][0]
                     f["bidPx"] = float(t_item.get("bidPx", f["price"]) or f["price"])
                     f["askPx"] = float(t_item.get("askPx", f["price"]) or f["price"])
-        except Exception:
-            pass
+        except Exception as _bbo_err:
+            # 2026-09-16：原先静默 pass —— BBO 取不到时 bid/ask 会悄悄退回最新价，
+            # 限价精度随之降级而无人知道。保留降级（不阻断取数），但必须留痕。
+            warnings.warn(
+                f"[factors] {inst_id} BBO 盘口取价失败，bid/ask 退回最新价（限价精度降级）: {_bbo_err!r}",
+                RuntimeWarning)
 
         f["is_bull_candle_15m"] = (c_close > c_open)
         f["is_bear_candle_15m"] = (c_close < c_open)
@@ -260,8 +265,16 @@ def fetch_single_instrument_data(item, all_positions, usdt_available, *,
                 coins_s = n_data.get("coins_sentiment", {})
                 if name in coins_s:
                     f["sentiment_score"] = float(coins_s[name].get("sentiment_factor_score", 0.0) or 0.0)
-        except Exception:
-            pass
+                # 2026-09-16：区分「情绪=0（真中性）」与「情绪面没读到」。
+                # 原先读失败静默 pass，`sentiment_score` 停在默认 0.0 —— 正是
+                # 本仓红线「缺失≠0」的反例：主脑会把"没数据"当"中性"。
+                f["sentiment_available"] = bool(name in coins_s)
+        except Exception as _sent_err:
+            f["sentiment_available"] = False
+            warnings.warn(
+                f"[factors] {name} 舆情文件读取失败，sentiment_score 保持默认"
+                f"（标记 sentiment_available=False，不得当成中性）: {_sent_err!r}",
+                RuntimeWarning)
 
     # 5. Causal Multi-Timeframe Calculus Dynamics
     f["calculus"] = {"valid": False, "regime": "RANGE_LOW_VELOCITY", "velocity": 0.0, "acceleration": 0.0, "impulse": 0.0, "max_abs_jerk": 0.0, "quality": 0.0}
@@ -272,8 +285,15 @@ def fetch_single_instrument_data(item, all_positions, usdt_available, *,
             "1H": raw_1h,
             "4H": raw_4h
         })
-    except Exception:
-        pass
+    except Exception as _calc_err:
+        # 2026-09-16：原先静默 pass —— 此处失败会退化成「全 0 动力学」
+        # （v=a=j=I=0、regime=RANGE_LOW_VELOCITY），主脑会照着 0 推理。
+        # 保留 valid=False 的诚实形状，但把原因一并写进去并告警。
+        f["calculus"]["error"] = f"{type(_calc_err).__name__}: {_calc_err}"[:200]
+        warnings.warn(
+            f"[factors] {name} 多周期动力学计算失败，已退化为零动力学"
+            f"（calculus.valid=False，原因见 calculus.error）: {_calc_err!r}",
+            RuntimeWarning)
 
     # 6. Dynamic Equal-Risk Position Sizing with AI Self-Evolution Kelly Multipliers
     adaptive_cfg = load_adaptive_config()

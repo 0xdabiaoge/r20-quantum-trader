@@ -1,6 +1,6 @@
 /** Policy snapshot page copy */
 export const enAdminPolicySnapshot = {
-  desc: 'Package fingerprint across the four strategy units (prompt, evolution, interceptors, council) plus risk/routing; named archives and rollback with per-unit verification (auto-revert on mismatch)',
+  desc: 'Archive the strategy pack; roll back with per-unit verification (auto-revert on mismatch)',
   loading: 'Computing and aggregating live fingerprints of the four policy units...',
   notRecorded: 'Not recorded',
   btn: {
@@ -75,7 +75,7 @@ export const enAdminPolicySnapshot = {
   },
   modal: {
     title: 'Archive Current Policy Version',
-    desc: 'Package the active prompt modules, self-evolving doctrine, physical interceptors and model council config into an immutable snapshot that can be fully rolled back with one click at any time.',
+    desc: 'Freeze the active strategy as an immutable version',
     nameLabel: 'Policy name (required):',
     namePlaceholder: 'e.g. 2026-09 pullback-in-bull-market high win-rate edition',
     descLabel: 'Description & live-trading notes (optional):',
@@ -101,4 +101,13 @@ export const enAdminPolicySnapshot = {
     restoreFailed: 'Rollback failed: {msg}',
     deleteFailed: 'Delete failed: {msg}',
   },
+
+  // ── added by the rebuild (batch 5) ──
+  bandPackageHash: 'Package hash',
+  bandPackageHashFoot: 'Full policy identity including risk and routing',
+  unitsTitle: 'The four strategy units',
+  unitsDesc: 'The active policy is composed of four units; verify each unit’s identity and guard state',
+  colUnit: 'Unit',
+  colDetail: 'Key detail',
+  colEnter: 'Open',
 };

@@ -271,7 +271,7 @@ const vdBudgetText = computed(() => {
         <div class="mb-2 flex flex-wrap gap-1.5">
           <span v-for="h in cvHealth" :key="h.key"
                 class="badge num text-[10px]"
-                :style="h.testnet ? 'color:#56B4E9;border-color:currentColor' : (h.fail > 0 ? 'color:var(--warn, #F0B90B);border-color:currentColor' : (h.fresh ? 'color:var(--up);border-color:currentColor' : 'color:var(--ink-3);border-color:currentColor'))">
+                :style="h.testnet ? 'color:var(--info);border-color:currentColor' : (h.fail > 0 ? 'color:var(--warn);border-color:currentColor' : (h.fresh ? 'color:var(--up);border-color:currentColor' : 'color:var(--ink-3);border-color:currentColor'))">
             {{ h.key.toUpperCase() }} {{ h.fresh ? `${h.ok}/${h.ok + h.fail}` : '--' }}<template v-if="h.avg"> · {{ h.avg }}ms</template><template v-if="h.testnet"> · TN</template>
           </span>
         </div>

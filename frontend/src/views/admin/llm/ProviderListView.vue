@@ -1,16 +1,31 @@
 <script setup lang="ts">
 /**
- * ProviderListView：从 1762 行的 LlmPage.vue 拆出的视图块（结构优化阶段 3·F3）。
+ * ProviderListView · 供应商矩阵（列表屏）
+ * ---------------------------------------------------------------------------
+ * 骨架（推倒重来）：
+ *   旧 = 两张巨型配置卡（**同一段预设按钮复制 5 遍**）+ 搜索框
+ *        + 供应商列表（**10 个分支的 emoji/符号头像** + 硬编码 rgba 胶囊）
+ *   新 = 共享 PageHeader
+ *        → **状态带**（在册供应商 / 主脑模型 / 思考上限 / 回退链）
+ *        → **全局思考上限面板**（预设按钮由数组驱动）
+ *        → **请求韧性与回退面板**（回退链行 + 可选模型 + 回退审计日志面板）
+ *        → **供应商矩阵清单**（中性单字头像 + 语义徽章 + BaseSwitch）
  *
- * 状态由父页 `provide(LLM_KEY, useLlmConfig())` 注入，本组件 `useLlmCtx()` 取用：
- * 这样拆**不会**新建一份状态（composable 每次调用都会建新状态，直接调用即出错），
- * 也不必为几十个绑定铺 prop/emit 管道。标记一处未改，DOM 结构未变。
+ * ⚠️ 状态仍由父页 `provide(LLM_KEY, useLlmConfig())` 注入，本组件只做展示；
+ *    `useLlmConfig.ts` / `llmLogic.ts` 两个逻辑模块**未触碰**。
+ *
+ * 批 14 补：`loadConfig()` 内部把失败吞进 `console.error`，不发任何错误状态
+ * ——于是拉取失败时页面会渲染成「没有供应商」（**失败被显示成空**）。
+ * 逻辑层不动的前提下，展示层用「加载已结束但仍无 cfg」判定失败并给出重试。
  */
+import { computed } from 'vue'
 import PageHeader from '../../../components/admin/PageHeader.vue'
+import BaseSwitch from '../../../components/base/BaseSwitch.vue'
 import { fmtDateTime } from '../../../utils/format'
 import { useI18n } from '../../../composables/useI18n'
 import { useLlmCtx } from './injection'
-import {AlertCircle, ArrowDown, ArrowUp, CheckCircle2, Clock, History, Plus, RefreshCw, Save, Search, ShieldAlert, X} from 'lucide-vue-next'
+import { AlertCircle, ArrowDown, ArrowUp, CheckCircle2, Clock, History, Plus,
+  RefreshCw, Save, Search, ShieldAlert, X, Server, Brain, Timer, Route } from 'lucide-vue-next'
 
 const { t } = useI18n()
 const {
@@ -36,95 +51,133 @@ const {
   toggleFallback,
   toggleProviderQuick,
 } = useLlmCtx()
+
+/** 首次加载中（尚无配置可渲染）→ 骨架 */
+const cfgFirstLoad = computed(() => loading.value && !cfg.value)
+
+/** 加载已结束但仍无配置 → 判定为拉取失败（`loadConfig` 把异常吞在 console）
+ *  纯展示层判定：成功时 `cfg` 必为对象（endpoint 返回配置对象），故 `!cfg` 即失败。 */
+const cfgFailed = computed(() => !loading.value && !cfg.value)
+
+/** 思考超时预设（旧版把这一段按钮块逐字复制了 5 遍）
+ *  注：这里存**完整键路径**并直接 `t(p.labelKey)`，不使用拼接式键名——
+ *  拼接出来的键无法被 i18n 静态校验识别，且缺键时会在界面渲染出裸键名。 */
+const TIMEOUT_PRESETS = [
+  { sec: 30, labelKey: 'admin.llm.presetFast' },
+  { sec: 60, labelKey: 'admin.llm.presetStd' },
+  { sec: 120, labelKey: 'admin.llm.presetRec' },
+  { sec: 180, labelKey: 'admin.llm.presetDeep' },
+  { sec: 300, labelKey: 'admin.llm.presetLong' },
+]
+const ATTEMPT_PRESETS = [1, 2, 3, 5]
+
+/** 供应商头像改为中性单字（旧版是 10 个分支的 emoji/符号 + 色相类） */
+function monogram(name: string): string {
+  return String(name || '?').trim().slice(0, 2).toUpperCase()
+}
+
+/**
+ * BaseSwitch 只抛出布尔值，而 `toggleProviderQuick(prov, e)` 需要一个能 `stopPropagation()`
+ * 的事件对象（旧版传的是原生点击事件，用于阻止冒泡到整行的 `selectProvider`）。
+ * 这里补一个最小事件替身，语义与旧版一致；行内已用 `@click.stop` 兜住冒泡。
+ */
+function onToggleProvider(prov: any) {
+  const evt = { stopPropagation() {} } as unknown as Event
+  void toggleProviderQuick(prov, evt)
+}
+
+/** 状态带 4 项事实 */
+const bandFacts = () => [
+  {
+    icon: Server,
+    label: t('admin.llm.bandProviders'),
+    value: String(cfg.value?.providers?.length ?? '--'),
+    foot: `${(cfg.value?.providers || []).filter((p: any) => p.enabled).length} ${t('admin.llm.enabledOnList')}`,
+    tone: '',
+  },
+  {
+    icon: Brain,
+    label: t('admin.llm.bandActiveModel'),
+    value: cfg.value?.active_model_id || t('admin.llm.notSelected'),
+    foot: cfg.value?.active_reasoning_effort ? String(cfg.value.active_reasoning_effort).toUpperCase() : 'HIGH',
+    tone: cfg.value?.active_model_id ? 'is-accent' : 'is-off',
+  },
+  {
+    icon: Timer,
+    label: t('admin.llm.bandTimeout'),
+    value: `${cfg.value?.thinking_timeout || 120}s`,
+    foot: t('admin.llm.validRange'),
+    tone: '',
+  },
+  {
+    icon: Route,
+    label: t('admin.llm.bandFallback'),
+    value: String(fallbackIds.value.length),
+    foot: fallbackIds.value.length ? modelNameOf(fallbackIds.value[0]) : t('admin.llm.noFallback'),
+    tone: fallbackIds.value.length ? '' : 'is-off',
+  },
+]
 </script>
 
 <template>
-    <!-- Top Title & Navigation Bar -->
+  <div class="pv">
     <PageHeader :title="t('nav.admin.llm')" :description="t('admin.llm.desc')">
       <template #actions>
-      <div class="flex items-center space-x-2">
-        <button
-          @click="openAddProviderModal"
-          class="btn-admin-primary"
-          :title="t('admin.llm.addProviderTitle')"
-        >
-          <Plus class="w-3.5 h-3.5" />
+        <button class="btn btn-ghost btn-sm" :disabled="loading" @click="loadConfig">
+          <RefreshCw :size="14" :class="loading && 'pv-spin'" />
+          <span>{{ t('admin.llm.refreshStatus') }}</span>
+        </button>
+        <button class="btn btn-primary btn-sm" :title="t('admin.llm.addProviderTitle')" @click="openAddProviderModal">
+          <Plus :size="14" />
           <span>{{ t('admin.llm.addProvider') }}</span>
         </button>
-
-        <button
-          @click="loadConfig"
-          class="btn-admin-secondary px-2"
-          :title="t('admin.llm.refreshStatus')"
-        >
-          <RefreshCw class="w-3.5 h-3.5" :class="loading ? 'animate-spin' : ''" />
-        </button>
-      </div>
       </template>
     </PageHeader>
 
-    <!-- Global Reasoning & Thinking Timeout Configuration Card -->
-    <div
-      class="rounded-2xl border p-4 sm:p-5 shadow-xs transition-colors space-y-3"
-      style="background-color: var(--surface-2); border-color: var(--line-1);"
-    >
-      <div class="flex flex-wrap items-center justify-between gap-2 pb-3 border-b" style="border-color: var(--line-1);">
-        <div class="flex items-center space-x-2.5">
-          <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-blue-500/10 text-blue-400 border border-blue-500/20">
-            <Clock class="w-4 h-4" />
-          </div>
-          <div>
-            <div class="flex items-center space-x-2">
-              <h2 class="text-xs sm:text-[13px] font-bold" style="color: var(--ink-1);">
-                {{ t('admin.llm.globalTimeoutTitle') }}
-              </h2>
-              <span
-                class="px-2 py-0.5 rounded text-[11px] font-bold border"
-                style="background-color: var(--accent-bg); border-color: var(--accent-line); color: var(--accent);"
-              >
-                {{ t('admin.llm.currentLimit', undefined, { n: cfg?.thinking_timeout || 120 }) }}
-              </span>
-            </div>
-            <p class="text-[11px] mt-0.5" style="color: var(--ink-2);">
-              {{ t('admin.llm.globalTimeoutDesc') }}
-            </p>
-          </div>
-        </div>
+    <!-- ══ 状态带 ══ -->
+    <section class="card pv-band">
+      <div v-for="f in bandFacts()" :key="f.label" class="pv-fact">
+        <span class="pv-fact-label"><component :is="f.icon" :size="12" />{{ f.label }}</span>
+        <span class="pv-fact-value" :class="f.tone">{{ f.value }}</span>
+        <span class="pv-fact-foot truncate">{{ f.foot }}</span>
+      </div>
+    </section>
 
-        <button
-          @click="saveGlobalSettings"
-          :disabled="savingSettings"
-          class="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold text-white transition-all cursor-pointer shadow-xs disabled:opacity-40"
-          style="background-color: var(--accent); border-color: var(--accent); color: var(--accent-ink);"
-        >
-          <RefreshCw v-if="savingSettings" class="w-3.5 h-3.5 animate-spin" />
-          <Save v-else class="w-3.5 h-3.5" />
+    <!-- ══ 全局思考上限 ══ -->
+    <section class="card">
+      <header class="card-head">
+        <div>
+          <h2 class="card-title"><Clock :size="14" />{{ t('admin.llm.globalTimeoutTitle') }}</h2>
+          <p class="card-sub">{{ t('admin.llm.globalTimeoutDesc') }}</p>
+        </div>
+        <span class="badge mono">{{ t('admin.llm.currentLimit', undefined, { n: cfg?.thinking_timeout || 120 }) }}</span>
+        <button class="btn btn-primary btn-sm" :disabled="savingSettings" @click="saveGlobalSettings">
+          <RefreshCw v-if="savingSettings" :size="14" class="pv-spin" />
+          <Save v-else :size="14" />
           <span>{{ savingSettings ? t('admin.llm.saving') : t('admin.llm.saveReasoning') }}</span>
         </button>
+      </header>
+
+      <div class="pv-body">
+        <div class="pv-kv">
+          <span class="label-caps">{{ t('admin.llm.activeModel') }}</span>
+          <span class="pv-kv-v mono" :class="cfg?.active_model_id ? 'is-accent' : 'is-off'">
+            {{ cfg?.active_model_id || t('admin.llm.notSelected') }}
+          </span>
+        </div>
+        <div class="pv-kv">
+          <span class="label-caps">{{ t('admin.llm.effort') }}</span>
+          <span class="pv-kv-v mono">{{ (cfg?.active_reasoning_effort || 'HIGH').toUpperCase() }}</span>
+        </div>
       </div>
 
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
-        <!-- Active Model & Reasoning Effort Status -->
-        <div class="p-3 rounded-xl border space-y-1.5" style="background-color: var(--surface-1); border-color: var(--line-1);">
-          <div class="text-[11px]" style="color: var(--ink-3);">{{ t('admin.llm.activeModel') }}</div>
-          <div class="text-xs font-bold truncate text-blue-400">
-            {{ cfg?.active_model_id || t('admin.llm.notSelected') }}
-          </div>
-          <div class="text-[11px] flex items-center space-x-1" style="color: var(--ink-2);">
-            <span>{{ t('admin.llm.effort') }}</span>
-            <span class="font-bold uppercase text-emerald-400">{{ cfg?.active_reasoning_effort || 'HIGH' }}</span>
-          </div>
+      <div class="pv-field">
+        <div class="pv-field-head">
+          <span class="form-label">{{ t('admin.llm.timeoutLabel') }}</span>
+          <span class="pv-hint">{{ t('admin.llm.validRange') }}</span>
         </div>
-
-        <!-- Thinking Timeout Input Field -->
-        <div class="p-3 rounded-xl border space-y-1.5 sm:col-span-1 lg:col-span-2" style="background-color: var(--surface-1); border-color: var(--line-1);">
-          <div class="flex items-center justify-between">
-            <label class="text-[11px] font-bold" style="color: var(--ink-2);">
-              {{ t('admin.llm.timeoutLabel') }}
-            </label>
-            <span class="text-[11px]" style="color: var(--ink-3);">{{ t('admin.llm.validRange') }}</span>
-          </div>
-          <div class="flex flex-wrap items-center gap-2">
+        <div class="pv-field-row">
+          <div class="pv-num">
             <input
               v-model.number="thinkingTimeoutInput"
               type="number"
@@ -132,318 +185,700 @@ const {
               max="1800"
               step="5"
               placeholder="120"
-              class="w-28 rounded-lg px-3 py-1.5 text-xs outline-none border font-bold"
-              style="background-color: var(--surface-2); border-color: var(--line-2); color: var(--ink-1);"
+              class="pv-num-input"
             />
-            <span class="text-xs font-bold" style="color: var(--ink-2);">{{ t('admin.llm.secondsUnit') }}</span>
-
-            <!-- Quick Presets -->
-            <div class="flex flex-wrap items-center gap-1.5 pl-2">
-              <button
-                type="button"
-                @click="setPresetTimeout(30)"
-                class="px-2 py-1 rounded text-[11px] border cursor-pointer transition-all"
-                :class="thinkingTimeoutInput === 30 ? 'bg-blue-500/20 text-blue-400 border-blue-500 font-bold' : 'text-gray-400 hover:text-white border-transparent'"
-              >
-                {{ t('admin.llm.presetFast') }}
-              </button>
-              <button
-                type="button"
-                @click="setPresetTimeout(60)"
-                class="px-2 py-1 rounded text-[11px] border cursor-pointer transition-all"
-                :class="thinkingTimeoutInput === 60 ? 'bg-blue-500/20 text-blue-400 border-blue-500 font-bold' : 'text-gray-400 hover:text-white border-transparent'"
-              >
-                {{ t('admin.llm.presetStd') }}
-              </button>
-              <button
-                type="button"
-                @click="setPresetTimeout(120)"
-                class="px-2 py-1 rounded text-[11px] border cursor-pointer transition-all"
-                :class="thinkingTimeoutInput === 120 ? 'bg-blue-500/20 text-blue-400 border-blue-500 font-bold' : 'text-gray-400 hover:text-white border-transparent'"
-              >
-                {{ t('admin.llm.presetRec') }}
-              </button>
-              <button
-                type="button"
-                @click="setPresetTimeout(180)"
-                class="px-2 py-1 rounded text-[11px] border cursor-pointer transition-all"
-                :class="thinkingTimeoutInput === 180 ? 'bg-blue-500/20 text-blue-400 border-blue-500 font-bold' : 'text-gray-400 hover:text-white border-transparent'"
-              >
-                {{ t('admin.llm.presetDeep') }}
-              </button>
-              <button
-                type="button"
-                @click="setPresetTimeout(300)"
-                class="px-2 py-1 rounded text-[11px] border cursor-pointer transition-all"
-                :class="thinkingTimeoutInput === 300 ? 'bg-blue-500/20 text-blue-400 border-blue-500 font-bold' : 'text-gray-400 hover:text-white border-transparent'"
-              >
-                {{ t('admin.llm.presetLong') }}
-              </button>
-            </div>
+            <span class="pv-num-unit">{{ t('admin.llm.secondsUnit') }}</span>
+          </div>
+          <div class="pv-presets">
+            <span class="label-caps">{{ t('admin.llm.presetLabel') }}</span>
+            <button
+              v-for="p in TIMEOUT_PRESETS"
+              :key="p.sec"
+              type="button"
+              class="pv-preset"
+              :class="{ 'is-on': thinkingTimeoutInput === p.sec }"
+              @click="setPresetTimeout(p.sec)"
+            >
+              {{ t(p.labelKey) }}
+            </button>
           </div>
         </div>
       </div>
 
-      <!-- Feedback Alert -->
-      <div
-        v-if="settingsResult"
-        class="p-2.5 rounded-lg border text-xs flex items-center space-x-2"
-        :style="settingsResult.ok
-          ? { backgroundColor: 'var(--up-bg)', borderColor: 'var(--up-line)', color: 'var(--up)' }
-          : { backgroundColor: 'var(--down-bg)', borderColor: 'var(--down-line)', color: 'var(--down)' }"
-      >
-        <CheckCircle2 v-if="settingsResult.ok" class="w-3.5 h-3.5 shrink-0" />
-        <AlertCircle v-else class="w-3.5 h-3.5 shrink-0" />
+      <div v-if="settingsResult" class="pv-result" :class="settingsResult.ok ? 'is-ok' : 'is-error'">
+        <CheckCircle2 v-if="settingsResult.ok" :size="14" />
+        <AlertCircle v-else :size="14" />
         <span>{{ settingsResult.message || settingsResult.error }}</span>
       </div>
-    </div>
+    </section>
 
-    <!-- Resilience: Request Attempts & Fallback Model Chain -->
-    <div
-      class="rounded-2xl border p-4 sm:p-5 shadow-xs transition-colors space-y-3"
-      style="background-color: var(--surface-2); border-color: var(--line-1);"
-    >
-      <div class="flex flex-wrap items-center justify-between gap-2 pb-3 border-b" style="border-color: var(--line-1);">
-        <div class="flex items-center space-x-2.5">
-          <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-amber-500/10 text-amber-400 border border-amber-500/20">
-            <ShieldAlert class="w-4 h-4" />
-          </div>
-          <div>
-            <div class="flex items-center space-x-2">
-              <h2 class="text-xs sm:text-[13px] font-bold" style="color: var(--ink-1);">
-                {{ t('admin.llm.resilienceTitle') }}
-              </h2>
-              <span
-                class="px-2 py-0.5 rounded text-[11px] font-bold border"
-                style="background-color: var(--accent-bg); border-color: var(--accent-line); color: var(--accent);"
-              >
-                {{ t('admin.llm.attemptsChip', undefined, { n: cfg?.request_attempts || 3, m: (cfg?.fallback_model_ids || []).length }) }}
-              </span>
-            </div>
-            <p class="text-[11px] mt-0.5" style="color: var(--ink-2);">
-              {{ t('admin.llm.resilienceDesc') }}
-            </p>
-          </div>
+    <!-- ══ 请求韧性与回退 ══ -->
+    <section class="card">
+      <header class="card-head">
+        <div>
+          <h2 class="card-title"><ShieldAlert :size="14" />{{ t('admin.llm.resilienceTitle') }}</h2>
+          <p class="card-sub">{{ t('admin.llm.resilienceDesc') }}</p>
         </div>
-
-        <button
-          @click="saveGlobalSettings"
-          :disabled="savingSettings"
-          class="flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs disabled:opacity-40"
-          style="background-color: var(--accent); border-color: var(--accent); color: var(--accent-ink);"
-        >
-          <RefreshCw v-if="savingSettings" class="w-3.5 h-3.5 animate-spin" />
-          <Save v-else class="w-3.5 h-3.5" />
+        <span class="badge mono">
+          {{ t('admin.llm.attemptsChip', undefined, { n: cfg?.request_attempts || 3, m: (cfg?.fallback_model_ids || []).length }) }}
+        </span>
+        <button class="btn btn-primary btn-sm" :disabled="savingSettings" @click="saveGlobalSettings">
+          <RefreshCw v-if="savingSettings" :size="14" class="pv-spin" />
+          <Save v-else :size="14" />
           <span>{{ savingSettings ? t('admin.llm.saving') : t('admin.llm.saveResilience') }}</span>
         </button>
-      </div>
+      </header>
 
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-        <!-- Request attempts -->
-        <div class="p-3 rounded-xl border space-y-2" style="background-color: var(--surface-1); border-color: var(--line-1);">
-          <div class="flex items-center justify-between">
-            <label class="text-[11px] font-bold" style="color: var(--ink-2);">{{ t('admin.llm.attemptsLabel') }}</label>
-            <span class="text-[11px]" style="color: var(--ink-3);">{{ t('admin.llm.attemptsRange') }}</span>
+      <div class="pv-resilience">
+        <!-- 请求次数 -->
+        <div class="pv-sub">
+          <div class="pv-field-head">
+            <span class="form-label">{{ t('admin.llm.attemptsLabel') }}</span>
+            <span class="pv-hint">{{ t('admin.llm.attemptsRange') }}</span>
           </div>
-          <div class="flex flex-wrap items-center gap-2">
-            <input
-              v-model.number="requestAttemptsInput"
-              type="number"
-              min="1"
-              max="10"
-              step="1"
-              class="w-20 rounded-lg px-3 py-1.5 text-xs outline-none border font-bold"
-              style="background-color: var(--surface-2); border-color: var(--line-2); color: var(--ink-1);"
-            />
-            <span class="text-xs font-bold" style="color: var(--ink-2);">{{ t('admin.llm.timesUnit') }}</span>
-            <div class="flex flex-wrap items-center gap-1.5 pl-1">
+          <div class="pv-field-row">
+            <div class="pv-num">
+              <input
+                v-model.number="requestAttemptsInput"
+                type="number"
+                min="1"
+                max="10"
+                step="1"
+                class="pv-num-input"
+              />
+              <span class="pv-num-unit">{{ t('admin.llm.timesUnit') }}</span>
+            </div>
+            <div class="pv-presets">
               <button
-                v-for="n in [1, 2, 3, 5]"
+                v-for="n in ATTEMPT_PRESETS"
                 :key="n"
                 type="button"
+                class="pv-preset"
+                :class="{ 'is-on': requestAttemptsInput === n }"
                 @click="requestAttemptsInput = n"
-                class="px-2 py-1 rounded text-[11px] border cursor-pointer transition-all"
-                :class="requestAttemptsInput === n ? 'bg-amber-500/20 text-amber-400 border-amber-500 font-bold' : 'text-gray-400 hover:text-white border-transparent'"
               >
                 {{ t('admin.llm.timesN', undefined, { n }) }}
               </button>
             </div>
           </div>
-          <p class="text-[10px] leading-relaxed" style="color: var(--ink-3);">
-            {{ t('admin.llm.attemptsDesc') }}
-          </p>
+          <p class="pv-hint block">{{ t('admin.llm.attemptsDesc') }}</p>
         </div>
 
-        <!-- Fallback chain -->
-        <div class="p-3 rounded-xl border space-y-2" style="background-color: var(--surface-1); border-color: var(--line-1);">
-          <div class="flex items-center justify-between">
-            <label class="text-[11px] font-bold" style="color: var(--ink-2);">{{ t('admin.llm.fallbackLabel') }}</label>
-            <span class="text-[11px]" style="color: var(--ink-3);">{{ t('admin.llm.currentBrain') }} {{ cfg?.active_model_id || '--' }}</span>
+        <!-- 回退链 -->
+        <div class="pv-sub">
+          <div class="pv-field-head">
+            <span class="form-label">{{ t('admin.llm.fallbackLabel') }}</span>
+            <span class="pv-hint">{{ t('admin.llm.currentBrain') }} {{ cfg?.active_model_id || '--' }}</span>
           </div>
 
-          <div v-if="fallbackIds.length === 0" class="text-[11px] italic px-1 py-0.5" style="color: var(--ink-3);">
-            {{ t('admin.llm.noFallback') }}
-          </div>
-          <div v-else class="space-y-1">
-            <div
-              v-for="(fid, idx) in fallbackIds"
-              :key="fid"
-              class="flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg border text-[11px]"
-              style="background-color: var(--surface-2); border-color: var(--line-1);"
-            >
-              <div class="flex items-center space-x-2 min-w-0">
-                <span class="w-4 h-4 shrink-0 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/25 flex items-center justify-center font-bold text-[10px]">{{ idx + 1 }}</span>
-                <span class="font-bold truncate" style="color: var(--ink-1);">{{ modelNameOf(fid) }}</span>
-              </div>
-              <div class="flex items-center space-x-1 shrink-0">
-                <button type="button" :title="t('admin.llm.moveUp')" @click="moveFallback(idx, -1)" class="p-1 rounded hover:bg-[var(--surface-1)] cursor-pointer text-gray-400"><ArrowUp class="w-3 h-3" /></button>
-                <button type="button" :title="t('admin.llm.moveDown')" @click="moveFallback(idx, 1)" class="p-1 rounded hover:bg-[var(--surface-1)] cursor-pointer text-gray-400"><ArrowDown class="w-3 h-3" /></button>
-                <button type="button" :title="t('admin.llm.remove')" @click="toggleFallback(fid)" class="p-1 rounded hover:bg-[var(--surface-1)] cursor-pointer text-red-400"><X class="w-3 h-3" /></button>
-              </div>
-            </div>
-          </div>
+          <p v-if="!fallbackIds.length" class="pv-empty">{{ t('admin.llm.noFallback') }}</p>
+          <ol v-else class="pv-chain">
+            <li v-for="(fid, idx) in fallbackIds" :key="fid" class="pv-chain-row">
+              <span class="pv-chain-n mono">{{ idx + 1 }}</span>
+              <span class="pv-chain-name truncate">{{ modelNameOf(fid) }}</span>
+              <button type="button" class="btn btn-quiet btn-icon btn-sm" :title="t('admin.llm.moveUp')" :disabled="idx === 0" @click="moveFallback(idx, -1)">
+                <ArrowUp :size="12" />
+              </button>
+              <button type="button" class="btn btn-quiet btn-icon btn-sm" :title="t('admin.llm.moveDown')" :disabled="idx === fallbackIds.length - 1" @click="moveFallback(idx, 1)">
+                <ArrowDown :size="12" />
+              </button>
+              <button type="button" class="btn btn-quiet btn-icon btn-sm is-danger" :title="t('admin.llm.remove')" @click="toggleFallback(fid)">
+                <X :size="12" />
+              </button>
+            </li>
+          </ol>
 
-          <div class="pt-1 border-t" style="border-color: var(--line-1);">
-            <div class="text-[10px] mb-1.5" style="color: var(--ink-3);">{{ t('admin.llm.toggleFallbackHint') }}</div>
-            <div class="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+          <div class="pv-pool">
+            <span class="label-caps">{{ t('admin.llm.toggleFallbackHint') }}</span>
+            <div class="pv-pool-items">
               <button
                 v-for="m in fallbackOptions"
                 :key="m.id"
                 type="button"
-                @click="toggleFallback(m.id)"
-                class="px-2 py-1 rounded-lg text-[11px] border cursor-pointer transition-all"
-                :class="fallbackIds.includes(m.id)
-                  ? 'bg-amber-500/20 text-amber-400 border-amber-500 font-bold'
-                  : 'text-gray-400 border-transparent hover:text-white hover:bg-[var(--surface-2)]'"
+                class="pv-preset"
+                :class="{ 'is-on': fallbackIds.includes(m.id) }"
                 :title="m.description || m.id"
+                @click="toggleFallback(m.id)"
               >
                 {{ m.name || m.id }}
               </button>
-              <span v-if="fallbackOptions.length === 0" class="text-[11px] italic" style="color: var(--ink-3);">
-                {{ t('admin.llm.noSpareModels') }}
-              </span>
+              <span v-if="!fallbackOptions.length" class="pv-empty">{{ t('admin.llm.noSpareModels') }}</span>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Failover audit -->
-      <div class="pt-1">
-        <div class="flex items-center justify-between pb-1.5">
-          <div class="flex items-center space-x-1.5 text-[11px] font-bold" style="color: var(--ink-2);">
-            <History class="w-3.5 h-3.5 text-amber-400" />
-            <span>{{ t('admin.llm.recentFailover') }}</span>
-          </div>
-          <button @click="loadFailoverEvents" class="text-[11px] px-2 py-0.5 rounded border cursor-pointer" style="color: var(--ink-2); border-color: var(--line-1);">{{ t('admin.llm.refresh') }}</button>
-        </div>
-        <div v-if="failoverEvents.length === 0" class="text-[11px] italic px-1" style="color: var(--ink-3);">
-          {{ t('admin.llm.noFailover') }}
-        </div>
-        <div v-else class="rounded-xl border divide-y overflow-hidden" style="background-color: var(--surface-1); border-color: var(--line-1);">
-          <div
-            v-for="(ev, i) in failoverEvents.slice(0, 8)"
-            :key="i"
-            class="px-3 py-2 text-[11px] space-y-0.5"
-            style="border-color: var(--line-1);"
-          >
-            <div class="flex items-center justify-between gap-2">
-              <span class="font-bold" :class="ev.succeeded ? 'text-emerald-400' : 'text-red-400'">
-                {{ ev.type === 'fallback_hit' ? t('admin.llm.fallbackHit') : t('admin.llm.chainDead') }}
-                {{ ev.from_model }}<template v-if="ev.to_model"> → {{ ev.to_model }}</template>
-              </span>
-              <span class="shrink-0" style="color: var(--ink-3);">{{ fmtDateTime(ev.ts || ev.time_str) }} · {{ ev.elapsed_seconds }}s</span>
-            </div>
-            <div class="truncate" style="color: var(--ink-2);" :title="(ev.errors || []).join(' | ')">
-              {{ (ev.errors || [])[0] || ev.chain || '' }}
-            </div>
-          </div>
+      <!-- 回退审计 -->
+      <div class="pv-audit-head">
+        <span class="label-caps"><History :size="11" />{{ t('admin.llm.recentFailover') }}</span>
+        <button class="btn btn-ghost btn-sm" @click="loadFailoverEvents">
+          <RefreshCw :size="12" />
+          <span>{{ t('admin.llm.refresh') }}</span>
+        </button>
+      </div>
+
+      <p v-if="!failoverEvents.length" class="pv-empty pad">{{ t('admin.llm.noFailover') }}</p>
+
+      <div v-else class="log-panel pv-audit">
+        <div v-for="(ev, i) in failoverEvents.slice(0, 8)" :key="i" class="pv-audit-row">
+          <span class="badge" :class="ev.succeeded ? 'badge-up' : 'badge-down'">
+            {{ ev.type === 'fallback_hit' ? t('admin.llm.fallbackHit') : t('admin.llm.chainDead') }}
+          </span>
+          <span class="pv-audit-chain mono truncate">
+            {{ ev.from_model }}<template v-if="ev.to_model"> → {{ ev.to_model }}</template>
+          </span>
+          <span class="pv-audit-time mono">{{ fmtDateTime(ev.ts || ev.time_str) }} · {{ ev.elapsed_seconds }}s</span>
+          <span class="pv-audit-err truncate" :title="(ev.errors || []).join(' | ')">
+            {{ (ev.errors || [])[0] || ev.chain || '' }}
+          </span>
         </div>
       </div>
-    </div>
+    </section>
 
-    <!-- Search Box (对应截图 1 顶部的搜索栏) -->
-    <div class="relative">
-      <input
-        v-model="searchQuery"
-        :placeholder="t('admin.llm.searchPlaceholder')"
-        class="w-full rounded-2xl px-4 py-3 pl-11 text-xs outline-none border transition-colors shadow-xs"
-        style="background-color: var(--surface-2); border-color: var(--line-1); color: var(--ink-1);"
-      />
-      <Search class="w-4 h-4 absolute left-4 top-3.5 text-gray-400 pointer-events-none" />
-    </div>
+    <!-- ══ 供应商矩阵 ══ -->
+    <section class="card">
+      <header class="card-head">
+        <h2 class="card-title"><Server :size="14" />{{ t('admin.llm.providersTitle') }}</h2>
+        <div class="pv-search">
+          <Search :size="13" />
+          <input v-model="searchQuery" :placeholder="t('admin.llm.searchPlaceholder')" class="pv-search-input" />
+        </div>
+        <span class="badge mono">{{ filteredProviders.length }}</span>
+      </header>
 
-    <!-- Providers List Container -->
-    <div
-      class="rounded-2xl border overflow-hidden shadow-xs divide-y transition-colors"
-      style="background-color: var(--surface-2); border-color: var(--line-1);"
-    >
-      <div
-        v-for="prov in filteredProviders"
-        :key="prov.id"
-        @click="selectProvider(prov)"
-        class="p-4 flex items-center justify-between hover:bg-[var(--surface-1)] transition-colors cursor-pointer group"
-        style="border-color: var(--line-1);"
-      >
-        <!-- Left: Provider Logo / Icon & Name -->
-        <div class="flex items-center space-x-3.5">
-          <!-- Icon Avatar -->
-          <div
-            class="w-10 h-10 rounded-xl flex items-center justify-center border font-bold text-sm shrink-0 transition-transform group-hover:scale-105"
-            style="background-color: var(--surface-1); border-color: var(--line-1);"
-          >
-            <span v-if="prov.id === 'openai'" class="text-emerald-500">❖</span>
-            <span v-else-if="prov.id === 'siliconflow'" class="text-purple-500">⚡</span>
-            <span v-else-if="prov.id === 'gemini'" class="text-blue-500">✦</span>
-            <span v-else-if="prov.id === 'openrouter'" class="text-indigo-500">◈</span>
-            <span v-else-if="prov.id === 'deepseek'" class="text-sky-500">🐳</span>
-            <span v-else-if="prov.id === 'claude'" class="text-amber-500">✳</span>
-            <span v-else-if="prov.id === 'grok'" class="text-neutral-300">Ø</span>
-            <span v-else-if="prov.id === 'volcengine'" class="text-cyan-500">📶</span>
-            <span v-else-if="prov.id === 'dashscope'" class="text-orange-500">[-]</span>
-            <span v-else-if="prov.id === 'zhipu'" class="text-violet-500">◆</span>
-            <span v-else class="text-blue-400">❖</span>
-          </div>
+      <!-- ① 首次加载：骨架 -->
+      <div v-if="cfgFirstLoad" class="pv-skel">
+        <div v-for="i in 4" :key="i" class="skeleton skeleton-row" />
+      </div>
 
-          <!-- Provider Name & Subtitle -->
-          <div>
-            <div class="flex items-center space-x-2">
-              <span class="font-bold text-sm" style="color: var(--ink-1);">{{ prov.name }}</span>
+      <!-- ② 加载结束但无配置：报错 + 重试（失败不再伪装成"没有供应商"） -->
+      <div v-else-if="cfgFailed" class="state-block is-error pv-gate-err">
+        <span class="state-icon"><ShieldAlert :size="17" /></span>
+        <p class="state-title">{{ t('common.loadFailed') }}</p>
+        <p class="state-desc">{{ t('common.networkError') }}</p>
+        <button class="btn btn-ghost btn-sm" :disabled="loading" @click="loadConfig">
+          <RefreshCw :size="13" />
+          <span>{{ t('common.retry') }}</span>
+        </button>
+      </div>
+
+      <p v-else-if="!filteredProviders.length" class="pv-empty pad">{{ t('common.noRecords') }}</p>
+
+      <div v-else class="pv-rows">
+        <article
+          v-for="prov in filteredProviders"
+          :key="prov.id"
+          class="pv-row"
+          :class="{ 'is-off': !prov.enabled }"
+          @click="selectProvider(prov)"
+        >
+          <span class="pv-avatar mono">{{ monogram(prov.name) }}</span>
+
+          <div class="pv-main">
+            <div class="pv-title">
+              <span class="pv-name">{{ prov.name }}</span>
               <span
                 v-if="prov.models?.some((m: any) => m.id === cfg?.active_model_id)"
-                class="px-1.5 py-0.2 rounded text-[11px] font-bold border"
-                style="background-color: var(--up-bg); border-color: var(--up-line); color: var(--up);"
+                class="badge badge-up"
               >
                 {{ t('admin.llm.brainActive') }}
               </span>
             </div>
-            <div class="text-[11px] mt-0.5" style="color: var(--ink-3);">
-              {{ prov.models_count || 0 }} {{ t('admin.llm.modelsSuffix') }} · {{ prov.group || t('admin.llm.groupOther') }}
-            </div>
+            <span class="pv-meta mono">
+              {{ prov.id }} · {{ prov.models_count || 0 }} {{ t('admin.llm.modelsSuffix') }} · {{ prov.group || t('admin.llm.groupOther') }}
+            </span>
           </div>
-        </div>
 
-        <!-- Right: Enable / Disable Badge & Chevron Arrow (对齐截图 1) -->
-        <div class="flex items-center space-x-2.5">
-          <!-- Capsule Status Button -->
-          <button
-            @click="toggleProviderQuick(prov, $event)"
-            class="px-3 py-1 rounded-full text-xs font-semibold border transition-all cursor-pointer shadow-2xs"
-            :style="prov.enabled ? {
-              backgroundColor: 'rgba(16, 185, 129, 0.12)',
-              borderColor: 'rgba(16, 185, 129, 0.25)',
-              color: 'var(--up)',
-            } : {
-              backgroundColor: 'rgba(239, 68, 68, 0.08)',
-              borderColor: 'rgba(239, 68, 68, 0.2)',
-              color: '#F87171',
-            }"
-          >
-            {{ prov.enabled ? t('admin.llm.enabledOnList') : t('admin.llm.disabledOnList') }}
-          </button>
-
-          <!-- Arrow Right -->
-          <span class="text-gray-400 font-bold text-base select-none">›</span>
-        </div>
+          <div class="pv-actions" @click.stop>
+            <span class="pv-state" :class="prov.enabled ? 'is-on' : ''">
+              {{ prov.enabled ? t('admin.llm.enabledOnList') : t('admin.llm.disabledOnList') }}
+            </span>
+            <BaseSwitch
+              :model-value="prov.enabled === true"
+              :disabled="false"
+              @update:model-value="() => onToggleProvider(prov)"
+            />
+          </div>
+        </article>
       </div>
-    </div>
+    </section>
+  </div>
 </template>
+
+<style scoped>
+.pv {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-4);
+}
+.pv-spin {
+  animation: pv-rotate 0.9s linear infinite;
+}
+@keyframes pv-rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ══ 状态带 ══ */
+.pv-band {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+@media (min-width: 640px) {
+  .pv-band {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (min-width: 1280px) {
+  .pv-band {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+.pv-fact {
+  display: flex;
+  flex-direction: column;
+  gap:4px;
+  min-width: 0;
+  padding: var(--ds-space-4);
+  border-top: 1px solid var(--ds-color-border-default);
+}
+.pv-fact:first-child {
+  border-top: 0;
+}
+@media (min-width: 640px) {
+  .pv-fact:nth-child(2) {
+    border-top: 0;
+  }
+  .pv-fact:nth-child(even) {
+    border-left: 1px solid var(--ds-color-border-default);
+  }
+}
+@media (min-width: 1280px) {
+  .pv-fact {
+    border-top: 0;
+  }
+  .pv-fact + .pv-fact {
+    border-left: 1px solid var(--ds-color-border-default);
+  }
+}
+.pv-fact-label {
+  display: flex;
+  align-items: center;
+  gap:6px;
+  font-size: var(--text-3xs);
+  font-weight: 500;
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--ds-color-text-placeholder);
+}
+.pv-fact-value {
+  font-size: var(--text-md);
+  font-weight: 500;
+  letter-spacing: var(--track-display);
+  line-height: 1.25;
+  color: var(--ds-color-text-primary);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.pv-fact-value.is-accent {
+  color: var(--ds-color-brand);
+}
+.pv-fact-value.is-off {
+  color: var(--ds-color-text-placeholder);
+}
+.pv-fact-foot {
+  font-size: var(--text-4xs);
+  color: var(--ds-color-text-placeholder);
+}
+
+/* ══ 通用块 ══ */
+.pv-body {
+  display: grid;
+  grid-template-columns: 1fr;
+  border-bottom: 1px solid var(--ds-color-border-default);
+}
+@media (min-width: 700px) {
+  .pv-body {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.pv-kv {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--ds-space-3);
+  padding: 10px var(--ds-space-4);
+}
+@media (min-width: 700px) {
+  .pv-kv + .pv-kv {
+    border-left: 1px solid var(--ds-color-border-default);
+  }
+}
+.pv-kv-v {
+  font-size: var(--text-xs);
+  color: var(--ds-color-text-primary);
+  overflow-wrap: anywhere;
+}
+.pv-kv-v.is-accent {
+  color: var(--ds-color-brand);
+}
+.pv-kv-v.is-off {
+  color: var(--ds-color-text-placeholder);
+}
+
+.pv-field {
+  padding: var(--ds-space-4);
+}
+.pv-field-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--ds-space-3);
+  flex-wrap: wrap;
+  margin-bottom:8px;
+}
+.pv-field-row {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-4);
+  flex-wrap: wrap;
+}
+.pv-hint {
+  font-size: var(--text-4xs);
+  color: var(--ds-color-text-placeholder);
+}
+.pv-hint.block {
+  display: block;
+  margin-top:8px;
+  line-height: var(--leading-body);
+}
+
+.pv-num {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--ds-color-border-default);
+  border-radius: var(--r-ctl);
+  background-color: var(--ds-color-bg-input);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.pv-num-input {
+  width: 76px;
+  padding:8px 10px;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--ds-color-text-primary);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.pv-num-unit {
+  padding:0 10px 0 2px;
+  font-size: var(--text-4xs);
+  color: var(--ds-color-text-placeholder);
+  white-space: nowrap;
+}
+
+.pv-presets {
+  display: flex;
+  align-items: center;
+  gap:6px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.pv-preset {
+  padding:4px 10px;
+  border: 1px solid var(--ds-color-border-default);
+  border-radius: var(--r-ctl);
+  background-color: transparent;
+  font-size: var(--text-4xs);
+  color: var(--ds-color-text-description);
+  cursor: pointer;
+  transition: all var(--dur-fast);
+}
+.pv-preset:hover {
+  background-color: var(--ds-color-bg-hover);
+  color: var(--ds-color-text-primary);
+}
+.pv-preset.is-on {
+  background-color: var(--r20-brand-bg);
+  border-color: var(--r20-brand-line);
+  color: var(--ds-color-brand);
+  font-weight: 600;
+}
+
+.pv-result {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 var(--ds-space-4) var(--ds-space-4);
+  padding: 8px 10px;
+  border-radius: var(--r-ctl);
+  font-size: var(--text-3xs);
+}
+.pv-result.is-ok {
+  background-color: var(--up-bg);
+  color: var(--up);
+}
+.pv-result.is-error {
+  background-color: var(--down-bg);
+  color: var(--down);
+}
+
+/* ══ 韧性 ══ */
+.pv-resilience {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+@media (min-width: 1000px) {
+  .pv-resilience {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+.pv-sub {
+  padding: var(--ds-space-4);
+  border-top: 1px solid var(--ds-color-border-default);
+}
+@media (min-width: 1000px) {
+  .pv-sub {
+    border-top: 0;
+  }
+  .pv-sub + .pv-sub {
+    border-left: 1px solid var(--ds-color-border-default);
+  }
+}
+
+.pv-empty {
+  font-size: var(--text-3xs);
+  color: var(--ds-color-text-placeholder);
+  line-height: var(--leading-body);
+}
+.pv-empty.pad {
+  padding: var(--ds-space-4);
+}
+
+/* 批 14：首次加载骨架 / 拉取失败态 */
+.pv-skel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: var(--ds-space-4);
+}
+.pv-gate-err {
+  border-top: 1px solid var(--ds-color-border-default);
+}
+
+.pv-chain {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.pv-chain-row {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  padding:6px 8px;
+  border-radius: var(--r-ctl);
+  background-color: var(--ds-color-bg-surface-inset);
+}
+.pv-chain-n {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background-color: var(--ds-color-bg-surface-1);
+  font-size: var(--text-4xs);
+  color: var(--ds-color-text-placeholder);
+  flex-shrink: 0;
+}
+.pv-chain-name {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--text-3xs);
+  font-weight: 600;
+  color: var(--ds-color-text-primary);
+}
+
+.pv-pool {
+  margin-top: var(--ds-space-3);
+  padding-top: var(--ds-space-3);
+  border-top: 1px solid var(--ds-color-border-default);
+}
+.pv-pool-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap:6px;
+  margin-top: 6px;
+  max-height: 108px;
+  overflow-y: auto;
+}
+
+.pv-audit-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ds-space-3);
+  padding: var(--ds-space-3) var(--ds-space-4) 6px;
+  border-top: 1px solid var(--ds-color-border-default);
+}
+.pv-audit-head .label-caps {
+  display: flex;
+  align-items: center;
+  gap:6px;
+}
+.pv-audit {
+  border: 0;
+  border-radius: 0;
+  background-color: transparent;
+  max-height: 240px;
+}
+.pv-audit-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1.1fr) auto minmax(0, 1.4fr);
+  align-items: center;
+  gap: var(--ds-space-3);
+  padding:6px var(--ds-space-4);
+  font-size: var(--text-4xs);
+}
+.pv-audit-row:hover {
+  background-color: var(--ds-color-bg-hover);
+}
+.pv-audit-chain {
+  color: var(--ds-color-text-secondary);
+  min-width: 0;
+}
+.pv-audit-time {
+  color: var(--ds-color-text-placeholder);
+  white-space: nowrap;
+}
+.pv-audit-err {
+  color: var(--ds-color-text-placeholder);
+  min-width: 0;
+}
+@media (max-width: 900px) {
+  .pv-audit-row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .pv-audit-err {
+    grid-column: 2;
+  }
+}
+
+/* ══ 供应商清单 ══ */
+.pv-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  padding: 0 10px;
+  border: 1px solid var(--ds-color-border-default);
+  border-radius: var(--r-ctl);
+  background-color: var(--ds-color-bg-input);
+  color: var(--ds-color-text-placeholder);
+}
+.pv-search-input {
+  width: 190px;
+  padding: 6px 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--ds-color-text-primary);
+  font-size: var(--text-3xs);
+}
+@media (max-width: 760px) {
+  .pv-search-input {
+    width: 110px;
+  }
+}
+
+.pv-rows {
+  display: flex;
+  flex-direction: column;
+}
+.pv-row {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--ds-space-3);
+  padding: var(--ds-space-3) var(--ds-space-4);
+  border-bottom: 1px solid var(--ds-color-border-default);
+  cursor: pointer;
+  transition: background-color var(--dur-fast);
+}
+.pv-row:last-child {
+  border-bottom: 0;
+}
+.pv-row:hover {
+  background-color: var(--ds-color-bg-hover);
+}
+.pv-row.is-off {
+  opacity: 0.6;
+}
+.pv-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--r-ctl);
+  border: 1px solid var(--ds-color-border-default);
+  background-color: var(--ds-color-bg-surface-1);
+  font-size: var(--text-4xs);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--ds-color-text-description);
+  flex-shrink: 0;
+}
+.pv-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.pv-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.pv-name {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--ds-color-text-primary);
+}
+.pv-meta {
+  font-size: var(--text-4xs);
+  color: var(--ds-color-text-placeholder);
+}
+.pv-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  flex-shrink: 0;
+}
+.pv-state {
+  font-size: var(--text-4xs);
+  font-weight: 600;
+  color: var(--ds-color-text-placeholder);
+}
+.pv-state.is-on {
+  color: var(--up);
+}
+
+@media (max-width: 720px) {
+  .pv-row {
+    grid-template-columns: 34px minmax(0, 1fr);
+  }
+  .pv-actions {
+    grid-column: 2;
+    justify-content: flex-end;
+  }
+}
+</style>

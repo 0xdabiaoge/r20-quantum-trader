@@ -20,6 +20,7 @@ import hashlib
 import hmac
 import json
 import time
+import warnings
 from decimal import Decimal, ROUND_DOWN
 from typing import Any, Dict, List, Optional
 from urllib.error import HTTPError
@@ -219,50 +220,112 @@ class BinanceAdapter(BinanceAlgoRequestsMixin, BaseExchangeAdapter):
                 f"Binance ({self.environment}档) 凭证未配置——请在后台「多交易所凭证」录入 API Key/Secret")
         return key, secret
 
+    #: 服务器校时缓存：base_url -> (测量时刻, 偏差毫秒)。偏差 = 交易所服务器时间 − 本机时间。
+    #: 按**域**分键：demo-fapi 与 fapi 是两台主机，各测各的。
+    _SERVER_TIME_CACHE: Dict[str, tuple] = {}
+    #: 校时缓存有效期（秒）与"偏差过大"告警阈值（毫秒）。
+    SERVER_TIME_TTL_S = 300.0
+    SERVER_TIME_WARN_MS = 3000.0
+
+    def server_time_offset_ms(self, *, force: bool = False) -> float:
+        """本机时钟相对该域交易所服务器时间的偏差（毫秒，正=本机慢）。
+
+        ⚠️ 为什么需要它（2026-09-16 P1）：宿主机无 NTP、容器内无 CAP_SYS_TIME
+        （`date -s` 被拒），实测本机比交易所**慢 ~2.1s**；而 Binance 私有请求的
+        `recvWindow=5000ms` ⇒ 只剩 ~2.9s 的传输/排队余量，实测已撞到
+        `[-1021] Timestamp for this request is outside of the recvWindow`。
+        取 `GET /fapi/v1/time`（公共、免签）按 RTT/2 折算，缓存 `SERVER_TIME_TTL_S`；
+        任何失败 → 0.0（fail-open，只告警，绝不因校时不可用而阻断交易）。
+        """
+        import time as _time
+        cache = self._SERVER_TIME_CACHE.get(self.base_url)
+        now = _time.time()
+        if not force and cache and (now - cache[0]) < self.SERVER_TIME_TTL_S:
+            return float(cache[1])
+        start = _time.time()
+        try:
+            with urlopen(Request(f"{self.base_url}/fapi/v1/time",
+                                 headers={"User-Agent": "R20-Binance/1.0"}), timeout=8.0) as resp:
+                server_ms = float(json.loads(resp.read().decode("utf-8"))["serverTime"])
+            rtt_ms = (_time.time() - start) * 1000.0
+            offset = server_ms - (start * 1000.0 + rtt_ms / 2.0)   # 扣掉半程 RTT
+        except Exception as exc:
+            warnings.warn(
+                f"[binance] {self.base_url} 服务器校时失败，按本机时钟签名（-1021 风险仍在）: {exc!r}",
+                RuntimeWarning)
+            return 0.0
+        self._SERVER_TIME_CACHE[self.base_url] = (now, offset)
+        if abs(offset) >= self.SERVER_TIME_WARN_MS:
+            warnings.warn(
+                f"[binance] 本机时钟与 {self.base_url} 偏差 {offset:+.0f}ms（recvWindow="
+                f"{5000}ms）：余量已被吃掉 {abs(offset) / 5000 * 100:.0f}%，建议宿主机启用 NTP",
+                RuntimeWarning)
+        return float(offset)
+
+    def _server_aligned_ms(self) -> int:
+        """服务器校时后的毫秒时间戳（= 本机 + 实测偏差）。"""
+        return int(time.time() * 1000 + self.server_time_offset_ms())
+
     def signed_request(self, method: str, path: str,
                        params: Optional[Dict[str, Any]] = None,
                        body: Optional[Dict[str, Any]] = None,
                        timeout: float = 15.0) -> Any:
-        """Binance USDⓈ-M 私有请求（HMAC-SHA256 签名）。"""
+        """Binance USDⓈ-M 私有请求（HMAC-SHA256 签名）。
+
+        `timestamp` 一律用**服务器校时**值（见 `server_time_offset_ms`）；若仍被
+        交易所判 `-1021`（时间戳超出 recvWindow —— 通常是某次慢请求把仅剩的余量
+        吃光），强制重测偏差并**重试一次**：重试会重新取时间戳与签名，不复述旧时间。
+        签名与 HTTP 传送仍在**本方法内**（`tests/extraction/test_binance_signing_extraction.py`
+        的接缝门据此钉住"传送仍在门面"）。
+        """
         key, secret = self._keys()
-        full_query = build_signed_query(
-            params=params,
-            secret=secret        )
-
-        body_bytes = None
-        headers = {
-            "X-MBX-APIKEY": key,
-            "Accept": "application/json",
-            "User-Agent": "R20-Binance/1.0",
-        }
-
         m = method.upper()
-        if m in ("GET", "DELETE"):
+        for attempt in (1, 2):
+            if attempt == 2:
+                self.server_time_offset_ms(force=True)   # 重测偏差后再签一次
+            timestamp_ms = self._server_aligned_ms()
+            full_query = build_signed_query(
+                params=params,
+                secret=secret,
+                timestamp_ms=timestamp_ms)
+
+            body_bytes = None
+            headers = {
+                "X-MBX-APIKEY": key,
+                "Accept": "application/json",
+                "User-Agent": "R20-Binance/1.0",
+            }
+
             url = f"{self.base_url}{path}?{full_query}"
-        else:
-            url = f"{self.base_url}{path}?{full_query}"
-            if body is not None:
+            if m not in ("GET", "DELETE") and body is not None:
                 body_bytes = json.dumps(body).encode("utf-8")
                 headers["Content-Type"] = "application/json"
 
-        req = Request(url, data=body_bytes, headers=headers, method=m)
-        try:
-            with urlopen(req, timeout=timeout) as resp:
-                raw = resp.read().decode("utf-8", errors="replace")
-                data = json.loads(raw) if raw else None
-                return data
-        except HTTPError as exc:
-            raw = ""
+            req = Request(url, data=body_bytes, headers=headers, method=m)
             try:
-                raw = exc.read().decode("utf-8", errors="replace")
-                payload = json.loads(raw or "{}")
-            except Exception:
-                payload = {}
-            code = payload.get("code") if isinstance(payload, dict) else exc.code
-            msg = payload.get("msg") if isinstance(payload, dict) else (raw[:200] or exc.reason)
-            raise BinanceAPIError(code or exc.code, msg or "request failed", status=exc.code) from exc
-        except Exception as exc:
-            raise BinanceAPIError("network", f"{type(exc).__name__}: {exc}") from exc
+                with urlopen(req, timeout=timeout) as resp:
+                    raw = resp.read().decode("utf-8", errors="replace")
+                    return json.loads(raw) if raw else None
+            except HTTPError as exc:
+                raw = ""
+                try:
+                    raw = exc.read().decode("utf-8", errors="replace")
+                    payload = json.loads(raw or "{}")
+                except Exception:
+                    payload = {}
+                code = payload.get("code") if isinstance(payload, dict) else exc.code
+                msg = payload.get("msg") if isinstance(payload, dict) else (raw[:200] or exc.reason)
+                err = BinanceAPIError(code or exc.code, msg or "request failed", status=exc.code)
+            except Exception as exc:
+                raise BinanceAPIError("network", f"{type(exc).__name__}: {exc}") from exc
+
+            if str(err.code) == "-1021" and attempt == 1:
+                warnings.warn(
+                    f"[binance] {path} 返回 -1021（时间戳超出 recvWindow），"
+                    f"重测校时后重试一次", RuntimeWarning)
+                continue
+            raise err
+        raise AssertionError("unreachable")
 
     def account_snapshot(self) -> Dict[str, Any]:
         """获取账户权益与可用保证金快照（USDT-M）。"""
@@ -427,20 +490,69 @@ class BinanceAdapter(BinanceAlgoRequestsMixin, BaseExchangeAdapter):
         data = self.signed_request("DELETE", "/fapi/v1/allOpenOrders", params={"symbol": inst})
         return {"venue": "binance", "symbol": inst, "result": data}
 
+    #: `/fapi/v1/marginType` 在 **Binance Demo 域**（demo-fapi.binance.com）不可用
+    #: 时的两种表现（2026-09-16 逐格实测，tests/venues/test_binance_adapter_private.py）：
+    #: 参数放 query → -1102「margintype 缺失」；放 JSON body → -1022「签名无效」。
+    MARGIN_TYPE_ENDPOINT_UNAVAILABLE = (-1102, -1022)
+
+    def position_margin_type(self, inst: str) -> Optional[str]:
+        """读回该合约当前保证金档（`'cross'` / `'isolated'`）；读不到 → `None`（不猜）。"""
+        try:
+            rows = self.signed_request("GET", "/fapi/v2/positionRisk", params={"symbol": inst})
+        except Exception:
+            return None
+        row: Any = rows[0] if isinstance(rows, list) and rows else rows
+        if not isinstance(row, dict):
+            return None
+        raw = str(row.get("marginType") or "").strip().lower()
+        return raw or None
+
     def set_leverage(self, symbol: str, leverage: float, margin_mode: str = "cross") -> Any:
-        """设置标的杠杆倍数与保证金模式（US-005）。"""
+        """设置标的杠杆倍数与保证金模式（US-005）。
+
+        ⚠️ 2026-09-16 修 P1（"Binance 一单都下不出去"）：旧实现**无条件**先调
+        `/fapi/v1/marginType`，而该端点在 Binance **Demo 域不可用**（见上常量），
+        于是每一笔 Binance 下单都死在这一步——实盘日志 2026-09-13/14 十次
+        「设置杠杆失败: Binance [-1102]: Mandatory parameter 'margintype'…」，
+        而账户当时的档位**本来就是 cross**（positionRisk 读回一致）。
+        改为「**先读、后写、以读回为准**」：
+          1. 读回已是目标档 → 跳过写入（压根不碰这个坏端点）；
+          2. 不一致才写；写入失败后**必须再读回核对**——读回已是目标档 →
+             端点坏但现状正确，告警放行；读回仍不一致 → 上抛 fail-closed；
+             读不回档位且错误码属"端点不可用" → 告警放行（不假装核对通过）。
+        审计 C1 的意图不变：**确定处于错误档位**时绝不继续强设杠杆。
+        """
         inst = self.native_symbol(symbol)
+        want = str(margin_mode or "cross").strip().lower()
+        have = self.position_margin_type(inst)
+        if have is None:
+            warnings.warn(
+                f"[binance] {inst} 保证金档读回失败，将直接尝试设置 {want}（无法核对现状）",
+                RuntimeWarning)
+        elif have == want:
+            return self.signed_request("POST", "/fapi/v1/leverage", params={
+                "symbol": inst, "leverage": int(leverage)})
         try:
             self.signed_request("POST", "/fapi/v1/marginType", params={
-                "symbol": inst, "marginType": margin_mode.upper()
-            })
+                "symbol": inst, "marginType": want.upper()})
         except BinanceAPIError as exc:
-            if exc.code != -4046:  # -4046: No need to change margin type.
-                raise  # 审计 C1：其余 marginType 错误（如 -4059 对冲模式冲突）不得
-                # 静默吞掉后在错误保证金模式下强设杠杆——fail-closed 上抛
+            if exc.code == -4046:      # 无需变更：现状即目标（旧语义保留）
+                pass
+            else:
+                after = self.position_margin_type(inst)
+                if after == want:
+                    warnings.warn(
+                        f"[binance] /fapi/v1/marginType 失败({exc.code}: {exc})，"
+                        f"但读回档位已={after}（目标），继续——该端点在 Demo 域不可用",
+                        RuntimeWarning)
+                elif after is None and exc.code in self.MARGIN_TYPE_ENDPOINT_UNAVAILABLE:
+                    warnings.warn(
+                        f"[binance] /fapi/v1/marginType 端点不可用({exc.code}) 且档位读不回，"
+                        f"按现状继续（未核对通过，仅告警）", RuntimeWarning)
+                else:
+                    raise   # 确定处于错误档位（或 -4059 对冲冲突等）→ fail-closed 上抛
         return self.signed_request("POST", "/fapi/v1/leverage", params={
-            "symbol": inst, "leverage": int(leverage)
-        })
+            "symbol": inst, "leverage": int(leverage)})
 
     def attach_protective_orders(self, symbol: str, side: str,
                                  tp_px: Optional[float] = None,

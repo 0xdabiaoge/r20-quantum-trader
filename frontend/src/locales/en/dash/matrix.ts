@@ -121,7 +121,7 @@ export const enMatrix = {
   },
   matrix: {
     title: 'Factor momentum matrix',
-    desc: '1H calculus dynamics × smart-money flow × final AI verdict. Click a row for the evidence chain.',
+    desc: 'Click any row for the full evidence chain',
     empty: 'Waiting for the first factor snapshot',
     col: {
       symbol: 'Symbol',

@@ -40,6 +40,7 @@ from r20_backend import risk_reservation
 from r20_backend.exchanges import listing as listing_mod
 import shutil
 from r20_backend.exchanges import routing_policy
+from r20_backend.venue_routing import selection as venue_selection
 
 FP = "fp-test-1234"
 
@@ -127,6 +128,11 @@ class _WiringSandbox(unittest.TestCase):
             patch.object(trader, "selected_environment", lambda values=None: live_env),
             patch.object(trader, "reservation_manager", lambda: mgr),
             patch.object(listing_mod, "ensure_contract_listed", listing_check or _ok_listing),
+            # 每所准入币种池（2026-09-16）默认读真实 data/venue_routing.json——本文件的
+            # 封闭三律③要求「不触碰真实 data/**」，且本组钉的是**接线**（轮动/拆单/
+            # 预留/落盘），不是池策略。故把清单解析面钉死为「不设限」，
+            # 池门禁本身由 tests/venues/test_venue_router.py::TestVenuePoolGate 专测。
+            patch.object(venue_selection, "_venue_pool_assets", lambda v: None),
             patch.object(trader.okx_rest, "place_order", self._on_place),
             # 审计④后 submit 路径会读现价做幻觉锚校验；本文件用符号价（100/60U 等）
             # 测试路由与预算，锚必须打平到被测价本身——同时恢复法① hermetic（旧版

@@ -28,8 +28,8 @@ export const enAdminBackup = {
   uploading: "Uploading...",
   uploadPackage: "Upload backup",
   readonly: "Read-only view · superadmin login required to modify",
-  targetConfigured: "● Target configured",
-  targetNotConfigured: "● Target not configured",
+  targetConfigured: "Target configured",
+  targetNotConfigured: "Target not configured",
   latestRun: "Latest run",
   time: "Time",
   status: "Status",
@@ -43,4 +43,15 @@ export const enAdminBackup = {
   downloadTitle: "Download archive to local machine",
   restoreTitle: "Restore this backup to the system",
   emptyArchives: "No local archives yet. Click \"Back up now\" to create a full image package, or \"Upload backup\"",
+
+  // ── added by the rebuild (batch 11) ──
+  bandEnabled: 'Auto backup',
+  bandLocation: 'Destination',
+  bandSchedule: 'Schedule',
+  bandLatest: 'Last run',
+  configTitle: 'Backup configuration',
+  notConfigured: 'Not configured',
+  statusSuccess: 'Success',
+  statusFailed: 'Failed',
+  legacyTag: "Legacy bypy config",
 };

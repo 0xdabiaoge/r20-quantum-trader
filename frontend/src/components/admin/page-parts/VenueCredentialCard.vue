@@ -1,5 +1,11 @@
 <script setup lang="ts">
-/** 三所凭证卡外壳：所名 + 接口档 + 状态徽章 → 资金档位 → 凭证区 → 附加区 → 页脚动作。 */
+/**
+ * VenueCredentialCard · 三所凭证卡外壳（**仅供 SecurityPage 使用**）
+ * ---------------------------------------------------------------------------
+ * 批 10 重构：内联 `TONES` 样式三元 → 语义徽章类；内嵌 `surface-1` 方块 →
+ * 面板内分区（发丝分隔）；页脚动作位改用共享按钮语汇。
+ * 对外接口（props / slots）保持兼容。
+ */
 import { computed } from 'vue'
 
 const props = withDefaults(defineProps<{
@@ -11,48 +17,121 @@ const props = withDefaults(defineProps<{
   envLabel?: string
 }>(), { tone: 'warn', envLabel: '当前资金档位' })
 
-const TONES: Record<string, Record<string, string>> = {
-  up: { color: 'var(--up)', borderColor: 'var(--up-line)', backgroundColor: 'var(--up-bg)' },
-  warn: { color: 'var(--warn)', borderColor: 'var(--warn-line)', backgroundColor: 'var(--warn-bg)' },
-  down: { color: 'var(--down)', borderColor: 'var(--down-line)', backgroundColor: 'var(--down-bg)' },
-}
-
-const toneStyle = computed(() => TONES[props.tone] ?? TONES.warn)
+const toneClass = computed(
+  () => ({ up: 'badge-up', warn: 'badge-warn', down: 'badge-down' })[props.tone] ?? 'badge-warn',
+)
 </script>
 
 <template>
-  <div class="flex flex-col justify-between rounded-lg border p-3" style="background-color: var(--surface-1); border-color: var(--line-1);">
-    <div class="space-y-2.5">
-      <!-- 头部：所名 + 接口档 + 文字状态徽章 -->
-      <div class="flex items-center justify-between border-b pb-2" style="border-color: var(--line-1);">
-        <div class="min-w-0">
-          <h4 class="text-xs font-bold truncate" style="color: var(--ink-1);">{{ name }}</h4>
-          <span class="text-[10px]" style="color: var(--ink-3);">{{ apiLabel }}</span>
-        </div>
-        <span class="text-[10px] px-1.5 py-0.5 rounded border font-bold shrink-0" :style="toneStyle">{{ statusText }}</span>
+  <div class="vc">
+    <!-- 卡头：所名 + 接口档 + 状态徽章 -->
+    <header class="vc-head">
+      <div class="vc-id">
+        <h4 class="vc-name">{{ name }}</h4>
+        <span class="vc-api">{{ apiLabel }}</span>
       </div>
+      <span class="badge" :class="toneClass">{{ statusText }}</span>
+    </header>
 
-      <!-- 资金环境档位：三所同位，一眼看清当前凭证属于实盘还是模拟盘 -->
-      <div class="flex items-center justify-between text-[10px]" style="color: var(--ink-3);">
-        <span>{{ envLabel }}</span>
-        <b class="num" style="color: var(--ink-1);">{{ envText }}</b>
-      </div>
+    <!-- 资金档位 -->
+    <div class="vc-env">
+      <span class="vc-env-label">{{ envLabel }}</span>
+      <span class="vc-env-value mono">{{ envText }}</span>
+    </div>
+
+    <div class="vc-body">
       <slot name="env" />
-
-      <!-- 凭证区 -->
       <slot />
-
-      <!-- 附加区（执行闸门 / 能力说明） -->
       <slot name="extra" />
     </div>
 
-    <!-- 页脚：统一「检测 + 保存」动作位 -->
-    <div class="pt-3 mt-2 border-t flex items-center justify-end gap-2" style="border-color: var(--line-1);">
+    <!-- 页脚动作 -->
+    <footer class="vc-foot">
       <slot name="footer-left" />
-      <div class="ms-auto flex items-center gap-2">
+      <div class="vc-foot-actions">
         <slot name="probe" />
         <slot name="save" />
       </div>
-    </div>
+    </footer>
   </div>
 </template>
+
+<style scoped>
+.vc {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--ds-color-border-default);
+  border-radius: var(--r-ctl);
+  background-color: var(--ds-color-bg-surface-inset);
+  overflow: hidden;
+}
+.vc-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--ds-space-3);
+  padding: 10px var(--ds-space-3);
+  border-bottom: 1px solid var(--ds-color-border-default);
+}
+.vc-id {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.vc-name {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--ds-color-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vc-api {
+  font-size: var(--text-4xs);
+  color: var(--ds-color-text-placeholder);
+}
+.vc-head .badge {
+  flex-shrink: 0;
+}
+.vc-env {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ds-space-3);
+  padding:8px var(--ds-space-3);
+  border-bottom: 1px solid var(--ds-color-border-default);
+}
+.vc-env-label {
+  font-size: var(--text-4xs);
+  color: var(--ds-color-text-placeholder);
+}
+.vc-env-value {
+  font-size: var(--text-3xs);
+  font-weight: 600;
+  color: var(--ds-color-text-primary);
+}
+.vc-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+  padding: var(--ds-space-3);
+}
+.vc-foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--ds-space-2);
+  flex-wrap: wrap;
+  padding: 10px var(--ds-space-3);
+  border-top: 1px solid var(--ds-color-border-default);
+  background-color: var(--ds-color-bg-surface-1);
+}
+.vc-foot-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  margin-left: auto;
+}
+</style>

@@ -14,6 +14,7 @@ import hmac
 import io
 import json
 import unittest
+import warnings
 from unittest.mock import MagicMock, Mock, patch
 from urllib.error import HTTPError
 from urllib.parse import parse_qs, urlparse
@@ -86,10 +87,13 @@ class BinancePrivateAdapterTests(unittest.TestCase):
             return _FakeResp(json.dumps({"test": "ok"}).encode("utf-8"))
 
         with patch("r20_backend.exchanges.registry.venue_credentials", return_value=(api_key, secret_key)), \
+             patch.object(self.adapter, "server_time_offset_ms", lambda **k: 0.0), \
              patch("r20_backend.exchanges.binance.urlopen", mock_urlopen):
             res = self.adapter.signed_request("GET", "/fapi/v1/test", params={"symbol": "BTCUSDT"})
             self.assertEqual(res, {"test": "ok"})
 
+        # 本用例只钉 Header/签名/参数，故把 2026-09-16 新增的**服务器校时**网络面钉掉
+        # （校时行为由 ServerClockAlignmentTest 专测）；否则计数会多出一次 time 请求。
         self.assertEqual(len(captured_req), 1)
         req = captured_req[0]
 
@@ -297,6 +301,7 @@ class BinanceExecutionAndProtectionTests(unittest.TestCase):
 
         with patch("r20_backend.exchanges.registry.venue_credentials", return_value=(api_key, secret_key)), \
              patch("r20_backend.exchanges.binance.urlopen", mock_urlopen), \
+             patch.object(self.adapter, "server_time_offset_ms", lambda **k: 0.0), \
              patch.object(type(self.adapter), "_public_get", lambda *a, **k: None):
              # 第七十九刀：spec 路径走 requests.Session 不是 urlopen，
              # 探针实测非离线时**真打 fapi.binance.com**；离线时它被拦后
@@ -362,6 +367,7 @@ class BinanceExecutionAndProtectionTests(unittest.TestCase):
 
         with patch("r20_backend.exchanges.registry.venue_credentials", return_value=(api_key, secret_key)), \
              patch("r20_backend.exchanges.binance.urlopen", mock_urlopen), \
+             patch.object(self.adapter, "server_time_offset_ms", lambda **k: 0.0), \
              patch.object(type(self.adapter), "_public_get", lambda *a, **k: None):
              # 第七十九刀：spec 路径走 requests.Session 不是 urlopen，
              # 探针实测非离线时**真打 fapi.binance.com**；离线时它被拦后
@@ -506,6 +512,235 @@ class BinanceExecutionAndProtectionTests(unittest.TestCase):
         legs = [c.args[1] for c in ad.cancel_order.call_args_list]
         self.assertIn("801", legs, "已挂成功的 TP 腿必须回滚")
         self.assertIn("9999", legs, "入场单必须回滚")
+
+
+class SetLeverageMarginTypeTest(unittest.TestCase):
+    """2026-09-16 P1：Binance Demo 域 `/fapi/v1/marginType` 不可用，不得再阻塞下单。
+
+    事故：旧实现无条件先调该端点，Demo 域下 参数放 query → -1102「margintype 缺失」、
+    放 JSON body → -1022「签名无效」（下方 test_demo_domain_* 记录实测形状），
+    于是**每一笔 Binance 下单**都死在「设置杠杆失败」，而账户档位本来就是 cross。
+    修法：先读 positionRisk 的 marginType，已是目标档就不写；非写不可时失败后
+    **必须再读回核对**，读回仍不一致才 fail-closed。
+    """
+
+    def setUp(self):
+        self.adapter = BinanceAdapter(environment="demo")
+        self.calls: list = []
+
+    def _wire(self, *, margin_reads, write_error=None, path_prefix="demo-fapi"):
+        """伪 signed_request：按 (method,path) 记录调用并按脚本回放。"""
+        reads = list(margin_reads)
+
+        def fake(method, path, params=None, body=None, timeout=15.0):
+            self.calls.append((method, path))
+            if path == "/fapi/v2/positionRisk":
+                mt = reads.pop(0) if reads else None
+                if mt == "RAISE":
+                    raise BinanceAPIError("-1130", "positionRisk 挂了")
+                return [{"symbol": "ADAUSDT", "marginType": mt, "leverage": "2"}]
+            if path == "/fapi/v1/marginType":
+                if write_error is not None:
+                    raise BinanceAPIError(write_error, "probe")
+                return {}
+            if path == "/fapi/v1/leverage":
+                return {"symbol": "ADAUSDT", "leverage": 3}
+            raise AssertionError(f"未预期的路径 {path}")
+
+        self.adapter.signed_request = fake
+
+    def test_already_target_skips_the_broken_endpoint(self):
+        """读回已是 cross ⇒ 压根不调 marginType（这就是线上 -1102 的根治点）。"""
+        self._wire(margin_reads=["cross"])
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            self.adapter.set_leverage("ADA", 3, margin_mode="cross")
+        self.assertNotIn(("POST", "/fapi/v1/marginType"), self.calls,
+                         "档位已一致还去写坏端点 = 老 bug 复发")
+        self.assertIn(("POST", "/fapi/v1/leverage"), self.calls)
+        self.assertEqual([w for w in caught if issubclass(w.category, RuntimeWarning)], [])
+
+    def test_case_and_whitespace_tolerated_on_target(self):
+        self._wire(margin_reads=["cross"])
+        self.adapter.set_leverage("ADA", 3, margin_mode=" CROSS ")
+        self.assertNotIn(("POST", "/fapi/v1/marginType"), self.calls)
+
+    def test_mismatch_then_write_fails_but_readback_confirms(self):
+        """不一致才写；写入失败但读回已是目标 ⇒ 告警放行（端点坏 ≠ 现状坏）。"""
+        self._wire(margin_reads=["isolated", "cross"], write_error=-1102)
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            self.adapter.set_leverage("ADA", 3, margin_mode="cross")
+        self.assertIn(("POST", "/fapi/v1/marginType"), self.calls)
+        self.assertIn(("POST", "/fapi/v1/leverage"), self.calls)
+        self.assertTrue(any(issubclass(w.category, RuntimeWarning) for w in caught),
+                        "端点不可用但现状正确必须留告警，不得静默")
+
+    def test_write_fails_and_readback_still_wrong_fails_closed(self):
+        """读回仍不是目标档 ⇒ 上抛（审计 C1：绝不在错误保证金模式下建仓）。"""
+        self._wire(margin_reads=["isolated", "isolated"], write_error=-4059)
+        with self.assertRaises(BinanceAPIError):
+            self.adapter.set_leverage("ADA", 3, margin_mode="cross")
+        self.assertNotIn(("POST", "/fapi/v1/leverage"), self.calls,
+                         "保证金档未落地就不得强设杠杆")
+
+    def test_4046_needs_no_change(self):
+        self._wire(margin_reads=["isolated"], write_error=-4046)
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            self.adapter.set_leverage("ADA", 3, margin_mode="cross")
+        self.assertIn(("POST", "/fapi/v1/leverage"), self.calls)
+        self.assertEqual([w for w in caught if issubclass(w.category, RuntimeWarning)], [])
+
+    def test_readback_unavailable_warns_but_does_not_block(self):
+        """连档位都读不回且端点不可用 ⇒ 告警放行（不假装核对通过，也不制造假阻塞）。"""
+        self._wire(margin_reads=["RAISE", "RAISE"], write_error=-1102)
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            self.adapter.set_leverage("ADA", 3, margin_mode="cross")
+        self.assertIn(("POST", "/fapi/v1/leverage"), self.calls)
+        self.assertGreaterEqual(len([w for w in caught if issubclass(w.category, RuntimeWarning)]), 2)
+
+    def test_readback_unavailable_with_other_error_still_fails_closed(self):
+        """读不回 + 非"端点不可用"错误码 ⇒ 仍 fail-closed（不放过未知错误）。"""
+        self._wire(margin_reads=["RAISE", "RAISE"], write_error=-2015)
+        with self.assertRaises(BinanceAPIError):
+            self.adapter.set_leverage("ADA", 3, margin_mode="cross")
+
+
+class ServerClockAlignmentTest(unittest.TestCase):
+    """2026-09-16 P1：宿主机时钟比交易所慢 ~2.1s，recvWindow=5000ms 只剩 ~2.9s 余量。
+
+    实测已撞到 `[-1021] Timestamp for this request is outside of the recvWindow`。
+    修法=按域测 `GET /fapi/v1/time`（公共免签）算偏差，签名时用校时时间戳；
+    仍被判 -1021 时重测偏差重试一次。本组全 mock、零出网。
+    """
+
+    def setUp(self):
+        self.adapter = BinanceAdapter(environment="demo")
+        BinanceAdapter._SERVER_TIME_CACHE.clear()
+
+    def _fake_time_resp(self, server_ms, delay_s=0.0):
+        import time as _time
+        def fake(req, timeout=None):
+            if delay_s:
+                _time.sleep(delay_s)
+            return _FakeResp(json.dumps({"serverTime": server_ms}).encode())
+        return fake
+
+    def test_offset_applied_and_cached(self):
+        import time as _time
+        calls = {"n": 0}
+
+        def fake(req, timeout=None):
+            calls["n"] += 1
+            return _FakeResp(json.dumps({"serverTime": int(_time.time() * 1000) + 2000}).encode())
+
+        with patch("r20_backend.exchanges.binance.urlopen", fake):
+            first = self.adapter.server_time_offset_ms()
+            second = self.adapter.server_time_offset_ms()
+            forced = self.adapter.server_time_offset_ms(force=True)
+        self.assertAlmostEqual(first, 2000, delta=60, msg="偏差≈服务器-本机（含半程 RTT 修正）")
+        self.assertEqual(first, second, "TTL 内必须命中缓存")
+        self.assertEqual(calls["n"], 2, "仅 force=True 才重新出网")
+        self.assertAlmostEqual(forced, 2000, delta=60)
+
+    def test_aligned_ms_carries_the_offset(self):
+        import time as _time
+        with patch.object(self.adapter, "server_time_offset_ms", lambda **k: 1500.0):
+            got = self.adapter._server_aligned_ms()
+        self.assertAlmostEqual(got - int(_time.time() * 1000), 1500, delta=50)
+
+    def test_signed_request_timestamp_is_aligned(self):
+        import time as _time
+        seen: dict = {}
+
+        def fake(req, timeout=None):
+            url = req.full_url if hasattr(req, "full_url") else str(req)
+            if "/fapi/v1/time" in url:
+                return _FakeResp(json.dumps({"serverTime": int(_time.time() * 1000) + 2000}).encode())
+            seen["url"] = url
+            return _FakeResp(b'{"ok": true}')
+
+        with patch("r20_backend.exchanges.registry.venue_credentials", return_value=("ak", "sk")), \
+             patch("r20_backend.exchanges.binance.urlopen", fake):
+            self.adapter.signed_request("GET", "/fapi/v2/account")
+        ts = int(parse_qs(urlparse(seen["url"]).query)["timestamp"][0])
+        self.assertAlmostEqual(ts - int(_time.time() * 1000), 2000, delta=120,
+                               msg="签名时间戳必须带上校时偏差（否则 -1021 复现）")
+
+    def test_1021_retries_once_after_resync(self):
+        sends = {"n": 0}
+
+        def fake(req, timeout=None):
+            url = req.full_url if hasattr(req, "full_url") else str(req)
+            if "/fapi/v1/time" in url:
+                import time as _t
+                return _FakeResp(json.dumps({"serverTime": int(_t.time() * 1000)}).encode())
+            sends["n"] += 1
+            if sends["n"] == 1:
+                raise HTTPError(url, 400, "bad", {}, io.BytesIO(
+                    b'{"code":-1021,"msg":"Timestamp for this request is outside of the recvWindow."}'))
+            return _FakeResp(b'{"ok": true}')
+
+        with patch("r20_backend.exchanges.registry.venue_credentials", return_value=("ak", "sk")), \
+             patch("r20_backend.exchanges.binance.urlopen", fake), \
+             patch.object(self.adapter, "server_time_offset_ms",
+                          side_effect=lambda **k: 0.0) as resync:
+            with warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter("always")
+                out = self.adapter.signed_request("GET", "/fapi/v2/account")
+        self.assertEqual(out, {"ok": True})
+        self.assertEqual(sends["n"], 2, "必须重试且只重试一次")
+        self.assertTrue(any(c.kwargs.get("force") for c in resync.call_args_list),
+                        "重试前必须 force 重测偏差")
+        self.assertTrue(any("-1021" in str(w.message) for w in caught), "重试必须留告警")
+
+    def test_1021_persisting_raises_after_one_retry(self):
+        sends = {"n": 0}
+
+        def fake(req, timeout=None):
+            url = req.full_url if hasattr(req, "full_url") else str(req)
+            if "/fapi/v1/time" in url:
+                import time as _t
+                return _FakeResp(json.dumps({"serverTime": int(_t.time() * 1000)}).encode())
+            sends["n"] += 1
+            raise HTTPError(url, 400, "bad", {}, io.BytesIO(
+                b'{"code":-1021,"msg":"Timestamp for this request is outside of the recvWindow."}'))
+
+        with patch("r20_backend.exchanges.registry.venue_credentials", return_value=("ak", "sk")), \
+             patch("r20_backend.exchanges.binance.urlopen", fake), \
+             patch.object(self.adapter, "server_time_offset_ms", side_effect=lambda **k: 0.0):
+            with warnings.catch_warnings(record=True):
+                warnings.simplefilter("always")
+                with self.assertRaises(BinanceAPIError):
+                    self.adapter.signed_request("GET", "/fapi/v2/account")
+        self.assertEqual(sends["n"], 2, "不得无限重试（恰好 2 次后上抛）")
+
+    def test_offset_measure_failure_is_fail_open_with_warning(self):
+        def fake(req, timeout=None):
+            raise OSError("no route")
+
+        with patch("r20_backend.exchanges.binance.urlopen", fake):
+            with warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter("always")
+                off = self.adapter.server_time_offset_ms()
+        self.assertEqual(off, 0.0, "校时不可用必须 fail-open（绝不因校时阻断交易）")
+        self.assertTrue(any(issubclass(w.category, RuntimeWarning) for w in caught))
+
+    def test_large_offset_warns_with_remediation(self):
+        import time as _time
+
+        def fake(req, timeout=None):
+            return _FakeResp(json.dumps({"serverTime": int(_time.time() * 1000) + 3600}).encode())
+
+        with patch("r20_backend.exchanges.binance.urlopen", fake):
+            with warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter("always")
+                self.adapter.server_time_offset_ms()
+        msgs = [str(w.message) for w in caught if issubclass(w.category, RuntimeWarning)]
+        self.assertTrue(any("NTP" in m and "recvWindow" in m for m in msgs),
+                        f"偏差过大必须点名 NTP 与 recvWindow：{msgs}")
 
 
 if __name__ == "__main__":

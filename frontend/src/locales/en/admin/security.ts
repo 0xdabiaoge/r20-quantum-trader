@@ -120,7 +120,7 @@ export const enAdminSecurity = {
   colMode: 'Mode',
   colUpl: 'Unrealised P&L',
   quickClose: 'Close now',
-  noPositions: '✓ 0 active positions in the current environment',
+  noPositions: '0 active positions in the current environment',
   clickRefreshHint: 'Click “Refresh positions and orders” to read the live state.',
   closeModalTitle: 'Fast safe close',
   closePrefix: 'Will re-verify and close from the',
@@ -144,4 +144,9 @@ export const enAdminSecurity = {
   tabEmergency: 'Emergency risk and positions',
   loadingPositions: 'Reading positions and orders…',
   period: '.',
-};
+
+  // ── added by the rebuild (batch 10) ──
+  bandVenues: 'Venues connected',
+  healthOk: 'All available',
+  healthDegraded: 'Partially degraded',
+  routingEffectiveTitle: 'Currently effective',};

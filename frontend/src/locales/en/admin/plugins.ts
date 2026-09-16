@@ -15,4 +15,12 @@ export const enAdminPlugins = {
   healthDisabled: "Disabled",
   installPolicy: "Installation policy: ",
   policyBuiltinOnly: "Built-in plugins only",
-};
+
+  // ── added by the rebuild (batch 7) ──
+  bandPlugins: 'Plugins registered',
+  bandHealthy: 'Healthy',
+  bandDisabled: 'Disabled',
+  bandIssues: 'Issues',
+  registryTitle: 'Plugin inventory',
+  registryDesc: 'Built-in plugins and their health; the live control plane only allows repository-audited built-ins',
+  policyTitle: 'Installation policy',};

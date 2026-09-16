@@ -1,7 +1,7 @@
 /** 自进化：复盘 HUD + 心法库 + 归因切片 */
 export const zhEvolution = {
   title: '自进化',
-  desc: '每 6 小时穿透全量平仓台账自省归因，提炼心法注入下一轮决策提示词',
+  desc: '每 6 小时复盘全量台账，提炼经验法则',
   hud: {
     at: '最近复盘',
     sample: '复盘样本',
@@ -32,7 +32,7 @@ export const zhEvolution = {
   },
   memory: {
     title: '黄金心法库',
-    desc: 'AI 自己维护的实战纪律，随每次复盘覆写；旧经验按半衰期自动淘汰',
+    desc: 'AI 自维护的实战纪律，旧经验按半衰期淘汰',
     empty: '心法库为空，等待首次复盘',
     halfLife: '半衰期 {n} 天',
     remaining: '余量 {n}%',

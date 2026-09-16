@@ -2,7 +2,9 @@
 
 import json
 import os
+import shutil
 import tempfile
+import time
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -110,6 +112,9 @@ class TestNewsSentimentHarvester(unittest.TestCase):
             self.assertEqual(res["long_short_ratio"], "1.50")
             self.assertEqual(res["bullish_ratio"], "60.0%")
             self.assertEqual(res["bearish_ratio"], "40.0%")
+            # 2026-09-16：Rubik 是「账户多空比」端点，与「新闻提及篇数」无关，
+            # 此处**不得**再产出 mentions（旧版硬编码 100 → 前台每个币都显示「100 篇」）。
+            self.assertNotIn("mentions", res)
 
     def test_full_harvester_pipeline(self):
         fake_ann = [{
@@ -124,7 +129,7 @@ class TestNewsSentimentHarvester(unittest.TestCase):
         }]
         fake_j10 = [{
             "id": "jin10-1",
-            "title": "美联储主席就通胀发表讲话",
+            "title": "美联储主席就通胀发表讲话，比特币应声回落",
             "summary": "金十数据要闻",
             "time": "2026-09-11 20:05:00",
             "cTime": "1789138300000",
@@ -143,7 +148,6 @@ class TestNewsSentimentHarvester(unittest.TestCase):
             "bull_cnt": 58,
             "bear_cnt": 41,
             "neutral_cnt": 0,
-            "mentions": 100,
             "sentiment_factor_score": 0.30,
         }
 
@@ -155,12 +159,43 @@ class TestNewsSentimentHarvester(unittest.TestCase):
             payload = harvester.fetch_and_analyze_news_sentiment()
 
             self.assertTrue(payload["source_available"])
-            self.assertIn("OKX官方公告", payload["source_reason"])
+            # 2026-09-16：OKX 官方运营公告不再进展示流（仍参与黑天鹅正则体检）。
+            self.assertNotIn("OKX官方公告", payload["source_reason"])
             self.assertIn("金十数据", payload["source_reason"])
-            self.assertEqual(len(payload["latest_news"]), 2)
+            self.assertEqual(len(payload["latest_news"]), 1)
+            self.assertNotIn("OKX官方", payload["latest_news"][0]["platforms"])
             self.assertIn("BTC", payload["coins_sentiment"])
             self.assertEqual(payload["coins_sentiment"]["BTC"]["label"], "bullish")
+            # mentions 是**本轮实际入流快讯**的真实提及数（标题含「比特币」→ BTC 命中 1 条），
+            # 不再是硬编码的 100。
+            self.assertEqual(payload["coins_sentiment"]["BTC"]["mentions"], 1)
             self.assertTrue(os.path.exists(self.cache_file))
+
+    def test_okx_announcements_still_scan_for_black_swan(self):
+        """公告虽不进展示流，但**必须**继续参与黑天鹅体检（安全网不动）。"""
+        cbs = tempfile.mkdtemp(prefix="test_news_cb_")
+        cb_file = os.path.join(cbs, "circuit_breaker.json")
+        ann = [{
+            "id": "okx-cb",
+            "title": "OKX 紧急公告：暂停全部提现以进行安全审计",
+            "summary": "OKX官方通告",
+            "time": "2026-09-11 20:00:00",
+            "cTime": str(int(time.time() * 1000)),
+            "url": "https://okx.com",
+            "platforms": ["OKX官方"],
+            "importance": "high",
+        }]
+        with patch.object(harvester, "CIRCUIT_BREAKER_FILE", cb_file), \
+             patch.object(harvester, "fetch_okx_announcements", return_value=ann), \
+             patch.object(harvester, "fetch_jin10_macro_news", return_value=[]), \
+             patch.object(harvester, "fetch_okx_rubik_sentiment", return_value=None), \
+             patch.object(harvester, "load_instruments", return_value=[{"name": "BTC", "instId": "BTC-USDT-SWAP"}]):
+            payload = harvester.fetch_and_analyze_news_sentiment()
+            # 公告不进展示流……
+            self.assertEqual(payload["latest_news"], [])
+            # ……但熔断被触发（安全网保留）
+            self.assertTrue(payload["circuit_breaker"].get("active"))
+        shutil.rmtree(cbs, ignore_errors=True)
 
 
 if __name__ == "__main__":

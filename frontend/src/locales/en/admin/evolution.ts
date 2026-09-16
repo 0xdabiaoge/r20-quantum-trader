@@ -1,5 +1,5 @@
 export const enAdminEvolution = {
-  desc: 'Attribute every closed trade from the ledger, distil doctrines into the next decision round; outlier removal and half-life decay',
+  desc: 'Closed-trade attribution and doctrines added or dropped',
   guardChip: 'White-box cognition · anti-bias guardrails',
   tabOverview: 'White-box doctrines and anti-pollution overview',
   tabSystem: 'Reviewer System template',
@@ -63,4 +63,14 @@ export const enAdminEvolution = {
   saveTemplate: 'Save template',
   moduleOn: 'Module enabled',
   moduleOff: 'Disabled',
+
+  // ── added by the rebuild (batch 5) ──
+  reportStatsHint: 'Sample and verdict basis for this review',
+  insightLine: 'Distilled insight',
+  runConfirmTitle: 'Run the self-evolution review now',
+  runConfirmDesc: 'Distils the full day of results into the latest doctrines; this writes to the knowledge base for real.',
+  runConfirmPhrase: 'Confirmation phrase',
+  runConfirmSubmit: 'Run review',
+  modulesTitle: 'Template module sequence',
+  lockedBadge: 'Read-only',
 };

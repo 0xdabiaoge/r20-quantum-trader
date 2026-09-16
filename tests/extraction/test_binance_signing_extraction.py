@@ -53,17 +53,41 @@ def _impl() -> ast.FunctionDef:
                 if isinstance(n, ast.FunctionDef) and n.name == "build_signed_query")
 
 
+#: 2026-09-16：本题的基线**从"git 历史逐字"改成"钉当前形态"**。
+#:
+#: 原因（有意的功能性变更，不是搬运事故）：宿主机无 NTP、容器内无 CAP_SYS_TIME
+#: （`date -s` 被拒），实测本机时钟比交易所**慢 ~2.1s**；而 `recvWindow=5000ms`
+#: ⇒ 只剩 ~2.9s 传输/排队余量，实测已撞到 `[-1021] Timestamp … outside of the
+#: recvWindow`。修法=给 `build_signed_query` 增加"服务器校时时间戳"入口
+#: （`timestamp_ms`），故其段体必须变。
+#:
+#: 本门仍**完整保留发现漂移的能力**（`test_judgment_actually_notices_a_change`
+#: 用下面这段做对照）；其余四题（调用点参数一一对应、传送缝仍在门面、标准库自
+#: import、无未声明自由名）不受影响、仍钉原始意图。
+_PINNED_SEGMENT_SRC = '''
+query_dict = dict(params or {})
+query_dict["timestamp"] = int(timestamp_ms if timestamp_ms is not None
+                              else time.time() * 1000)
+query_dict["recvWindow"] = 5000
+clean_query = {k: v for k, v in query_dict.items() if v not in (None, "")}
+query_string = urlencode(clean_query)
+signature = hmac.new(secret.encode("utf-8"), query_string.encode("utf-8"), hashlib.sha256).hexdigest()
+full_query = f"{query_string}&signature={signature}"
+'''
+
+
 class BinanceSigningExtractionTest(unittest.TestCase):
-    def test_segment_is_ast_identical_to_baseline(self):
-        seg = _baseline_method().body[2:9]
+    def test_segment_matches_pinned_form(self):
+        """段体 = 钉住的当前形态（含服务器校时入口）；任何再次改动都红灯。"""
         body = list(_impl().body)[:-1]          # 去掉尾部 return
         body = body[1:] if (body and isinstance(body[0], ast.Expr)
                             and isinstance(body[0].value, ast.Constant)
                             and isinstance(body[0].value.value, str)) else body
         self.assertEqual(
             ast.dump(ast.Module(body=body, type_ignores=[]), include_attributes=False),
-            ast.dump(ast.Module(body=list(seg), type_ignores=[]), include_attributes=False),
-            "build_signed_query 段体与抽取前**不再同一棵 AST**")
+            ast.dump(ast.Module(body=ast.parse(_PINNED_SEGMENT_SRC).body,
+                                type_ignores=[]), include_attributes=False),
+            "build_signed_query 段体已偏离钉住形态（若为有意变更，请同步更新 _PINNED_SEGMENT_SRC 并写明理由）")
 
     def test_call_site_passes_every_parameter_once_same_name(self):
         params = [a.arg for a in _impl().args.kwonlyargs]

@@ -13,4 +13,16 @@ export const zhAdminAudit = {
   empty: "暂无符合条件的审计记录",
   detailTitle: "审计详情",
   close: "关闭",
-};
+
+  // ── 推倒重来新增（批 11）──
+  bandTotal: '审计记录',
+  bandSuccess: '成功',
+  bandFailed: '异常',
+  bandLatest: '最近留痕',
+  filterAll: '全部',
+  filterSuccess: '成功',
+  filterFailed: '异常',
+  recordsTitle: '审计流水',
+  actorLabel: '操作者',
+  rawJson: '原始记录 JSON',
+  noMatch: '没有匹配的记录',};

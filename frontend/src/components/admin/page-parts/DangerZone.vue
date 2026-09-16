@@ -1,17 +1,30 @@
 <script setup lang="ts">
-/** P2 shared: DangerZone — Vercel/GitHub pattern.
- *  Red-striped band stating WHAT is unrecoverable + type-to-confirm that must
- *  EXACTLY match `confirmPhrase` (the resource name) before the action unlocks.
- *  Reversible operations should NOT use this component (use an undo toast instead). */
-import { ref, watch } from 'vue'
+/**
+ * DangerZone.vue · 不可逆操作的危险区（共享 page-part）
+ * ---------------------------------------------------------------------------
+ * 契约：逐字保留 `title` / `description` / `confirmPhrase` / `actionLabel` /
+ *      `placeholder` 五个 prop 与 `confirm` 事件；**逐字短语校验逻辑不变**
+ *      （`typed === confirmPhrase` 才解锁按钮，确认后清空输入并重新上锁）。
+ *      仅可在不可逆操作上使用；可逆操作请改用撤销 toast。
+ *
+ * 骨架（批 14 重写）：
+ *   旧 = `repeating-linear-gradient` 斜纹警示条（**装饰性渐变，明令禁止**）
+ *        + 6 处内联 `:style` 三元 + 自成一套的 `rounded-xl / font-black` 写法
+ *   新 = 左侧危险色竖线（与 `.dg-stale` / `.sc-switch-row.is-danger` / `.is-error`
+ *        同一套"左侧竖线表语义"的语汇）+ 共享 `.field` / `.btn` / `.form-label`
+ *
+ * 为什么去掉斜纹：本项目的危险语义一律靠**左侧 2px 竖线 + 语义色**表达，
+ * 斜纹是另一套无关的视觉方言；且渐变属明令禁止的装饰手法。
+ */
+import { computed, ref, watch } from 'vue'
 import { useI18n } from '../../../composables/useI18n'
-import { ShieldAlert } from 'lucide-vue-next'
+import { ShieldAlert, Lock, Unlock } from 'lucide-vue-next'
 
 const props = withDefaults(defineProps<{
   title: string
-  /** what exactly is lost, unrecoverable — one blunt sentence */
+  /** 究竟什么会被永久失去——一句直白的话 */
   description: string
-  /** resource name the user must type (e.g. account login, "ALL", filename) */
+  /** 用户必须逐字键入的资源名（如账号名、"ALL"、文件名） */
   confirmPhrase: string
   actionLabel: string
   placeholder?: string
@@ -33,48 +46,141 @@ function act() {
   typed.value = ''
   unlocked.value = false
 }
+
+/** 提示语仍走既有键，保持与旧版逐字一致 */
+const hint = computed(() => t('admin.shell.danger.confirmHint', undefined, { phrase: props.confirmPhrase }))
 </script>
 
 <template>
-  <div
-    class="rounded-xl border overflow-hidden"
-    style="border-color: var(--down-line);"
-  >
-    <!-- hazard stripe -->
-    <div class="h-1" style="background: repeating-linear-gradient(45deg, var(--down) 0 10px, transparent 10px 20px); opacity: .55;"></div>
-    <div class="p-4" style="background-color: var(--surface-2);">
-      <div class="flex items-start gap-2.5">
-        <ShieldAlert class="w-4 h-4 shrink-0 mt-0.5" style="color: var(--down);" />
-        <div class="min-w-0 flex-1">
-          <h4 class="text-xs font-black uppercase tracking-wide" style="color: var(--down);">{{ title }}</h4>
-          <p class="text-[11px] mt-1 leading-relaxed" style="color: var(--ink-2);">{{ description }}</p>
-          <div class="mt-3 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-            <input
-              v-model="typed"
-              @input="onInput"
-              type="text"
-              autocomplete="off"
-              :placeholder="placeholder || confirmPhrase"
-              class="h-8 px-2.5 rounded-lg border text-xs outline-none transition-shadow min-w-0 flex-1"
-              style="background-color: var(--surface-input); border-color: var(--line-2); color: var(--ink-1);"
-              :style="unlocked ? { borderColor: 'var(--down)' } : {}"
-            />
-            <button
-              @click="act"
-              :disabled="!unlocked"
-              class="h-8 px-3.5 rounded-lg border text-xs font-bold transition-all shrink-0 cursor-pointer disabled:cursor-not-allowed"
-              :style="unlocked
-                ? { backgroundColor: 'var(--down-bg)', borderColor: 'var(--down-line)', color: 'var(--down)' }
-                : { backgroundColor: 'var(--surface-3)', borderColor: 'var(--line-1)', color: 'var(--ink-3)' }"
-            >
-              {{ actionLabel }}
-            </button>
-          </div>
-          <p class="text-[11px] mt-1.5" style="color: var(--ink-3);">
-            {{ t('admin.shell.danger.confirmHint').replace('{phrase}', confirmPhrase) }}
-          </p>
-        </div>
+  <section class="dz" :class="{ 'is-armed': unlocked }">
+    <header class="dz-head">
+      <span class="dz-icon"><ShieldAlert :size="15" /></span>
+      <div class="dz-head-text">
+        <h3 class="dz-title">{{ title }}</h3>
+        <p class="dz-desc">{{ description }}</p>
       </div>
+    </header>
+
+    <div class="dz-body">
+      <label class="dz-field">
+        <span class="form-label">{{ hint }}</span>
+        <span class="dz-input-wrap">
+          <Lock v-if="!unlocked" :size="12" class="dz-input-icon" />
+          <Unlock v-else :size="12" class="dz-input-icon is-armed" />
+          <input
+            v-model="typed"
+            type="text"
+            autocomplete="off"
+            spellcheck="false"
+            :placeholder="placeholder || confirmPhrase"
+            class="field dz-input mono"
+            @input="onInput"
+          />
+        </span>
+      </label>
+
+      <button
+        class="btn btn-danger btn-sm dz-action"
+        :disabled="!unlocked"
+        @click="act"
+      >
+        {{ actionLabel }}
+      </button>
     </div>
-  </div>
+  </section>
 </template>
+
+<style scoped>
+.dz {
+  border: 1px solid var(--down-line);
+  border-left: 2px solid var(--down);
+  border-radius: var(--r-card);
+  background-color: var(--ds-color-bg-surface-card);
+  overflow: hidden;
+}
+
+/* 头部：危险色标题 + 直白的损失说明 */
+.dz-head {
+  display: flex;
+  align-items: flex-start;
+  gap:10px;
+  padding: var(--ds-space-4);
+  background-color: var(--down-bg);
+  border-bottom: 1px solid var(--down-line);
+}
+.dz-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--r-ctl);
+  background-color: var(--down-bg);
+  color: var(--down);
+  flex-shrink: 0;
+}
+.dz-head-text {
+  display: flex;
+  flex-direction: column;
+  gap:4px;
+  min-width: 0;
+}
+.dz-title {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: var(--track-label);
+  color: var(--down);
+}
+.dz-desc {
+  font-size: var(--text-3xs);
+  line-height: var(--leading-body);
+  color: var(--ds-color-text-description);
+}
+
+/* 主体：短语输入 + 危险动作 */
+.dz-body {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--ds-space-3);
+  padding: var(--ds-space-4);
+}
+@media (max-width: 640px) {
+  .dz-body {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+.dz-field {
+  display: flex;
+  flex-direction: column;
+  gap:6px;
+  flex: 1;
+  min-width: 0;
+}
+.dz-input-wrap {
+  position: relative;
+  display: block;
+}
+.dz-input-icon {
+  position: absolute;
+  left: 9px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--ds-color-text-placeholder);
+  pointer-events: none;
+}
+.dz-input-icon.is-armed {
+  color: var(--down);
+}
+.dz-input {
+  width: 100%;
+  padding-left: 27px;
+}
+/* 解锁后输入框转危险色描边，明确告知"现在可以按了" */
+.dz.is-armed .dz-input {
+  border-color: var(--down);
+}
+.dz-action {
+  flex-shrink: 0;
+}
+</style>

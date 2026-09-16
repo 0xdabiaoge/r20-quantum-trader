@@ -11,6 +11,34 @@ from r20_backend.dashboard_payload.market import _global_env_axis
 __all__ = ["collect_cross_venue_positions"]
 
 
+def _protection_triggers(algos, base_sym, opposite_side):
+    """从**已取回**的云端保护腿里取出该挂单的 `(SL, TP)` 触发价（2026-09-16）。
+
+    Binance/Gate 的 TP/SL 不在挂单对象里（只有 OKX 有 `attachAlgoOrds`），旧实现给
+    跨所挂单一律写死 `"--"` ⇒ 用户看到"裸单"，而云端双腿其实早已挂出
+    （实盘复核：ETH 空单 STOP 2456.5 / TAKE_PROFIT 2298.5，reduceOnly）。
+
+    只认**反向**（reduceOnly）腿：同向腿属于别的方向持仓，串味比 `"--"` 更危险。
+    任一腿匹配不到 → `None`，展示层落回 `"--"`（缺失≠编造）。
+    """
+    def _pick(want: str):
+        for a in (algos or []):
+            if base_sym and base_sym not in str(a.get("symbol", "")).upper():
+                continue
+            if opposite_side and opposite_side not in str(a.get("side", "")).lower():
+                continue
+            kind = str((a.get("raw") or {}).get("orderType") or a.get("type", "")).upper()
+            if want not in kind:
+                continue
+            try:
+                return float(a.get("trigger_price") or a.get("triggerPrice"))
+            except (TypeError, ValueError):
+                return None
+        return None
+
+    return _pick("STOP"), _pick("TAKE_PROFIT")
+
+
 def collect_cross_venue_positions(positions, pending_orders_list,
                                   long_count, short_count, total_pos_upl):
     """把 Binance/Gate 的持仓与挂单并入 OKX 主视野（就地追加，返回累计计数）。
@@ -98,6 +126,12 @@ def collect_cross_venue_positions(positions, pending_orders_list,
                     vo_px_float = float(vo.get("price", 0) or 0)
                     vo_sz = str(vo.get("size", "--"))
                     vo_ord_id = str(vo.get("order_id", vo.get("orderId", "")))
+                    # 2026-09-16：Binance/Gate 的 TP/SL **不在挂单对象里**（只有 OKX 有
+                    # `attachAlgoOrds`），旧实现一律写死 `"--"` ⇒ 用户在挂单行看到"无保护"，
+                    # 而云端双腿其实早已挂出（实盘复核：ETH 空单 STOP 2456.5 / TP 2298.5）。
+                    # 复用本段**上方已经取回**的 `v_algos` 匹配——零新增交易所调用。
+                    _opp_side = "sell" if vo_is_long else "buy"
+                    _vo_sl, _vo_tp = _protection_triggers(v_algos, base_sym, _opp_side)
                     pending_orders_list.append({
                         "venue": v_name,
                         "exchange": v_name,
@@ -118,8 +152,8 @@ def collect_cross_venue_positions(positions, pending_orders_list,
                         "cTime": str(vo.get("time", "")),
                         "time": "刚刚",
                         "state": "live",
-                        "tp_px": "--",
-                        "sl_px": "--"
+                        "tp_px": f"{_vo_tp:g}" if _vo_tp else "--",
+                        "sl_px": f"{_vo_sl:g}" if _vo_sl else "--"
                     })
             except Exception:
                 pass

@@ -1,7 +1,7 @@
 /** AI 推演：决策时间线 + 委员会 */
 export const zhRadar = {
   title: 'AI 推演',
-  desc: '每个决策周期的宏观研判、参谋报价与终审结论全程留痕，可逐单审计',
+  desc: '按周期查看宏观研判、参谋报价与终审',
   cycles: '近 {n} 个周期',
   cycleCount: '{n} 条',
   empty: '暂无决策记录，等待下一个周期',

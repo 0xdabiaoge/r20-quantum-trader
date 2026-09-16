@@ -5,7 +5,6 @@ import { enNews } from './news';
 import { enEvolution } from './evolution';
 import { enLedger } from './ledger';
 import { enAbout } from './about';
-import { enCmdk } from './cmdk';
 import { enVenueAccounts } from './venueAccounts';
 
 export const enDash = {
@@ -16,6 +15,5 @@ export const enDash = {
   evolution: enEvolution,
   ledger: enLedger,
   about: enAbout,
-  cmdk: enCmdk,
   venueAccounts: enVenueAccounts,
 };

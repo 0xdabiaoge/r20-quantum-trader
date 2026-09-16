@@ -36,4 +36,10 @@ export const zhAdminAbout = {
   checkUpToDate: "当前代码已是最新，与远端主分支保持同步。",
   updateSuccess: "系统更新成功！",
   updateNoop: "当前分支已是最新。",
-};
+
+  // ── 推倒重来新增（批 8）──
+  productTitle: '产品信息',
+  bandVersion: '系统版本',
+  bandControlPlane: '网关控制面',
+  bandRuntime: '运行环境',
+  bandSyncGap: '待同步差额',};

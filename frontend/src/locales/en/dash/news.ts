@@ -1,9 +1,9 @@
 export const enNews = {
   title: 'Sentiment',
-  desc: 'News flow and smart-money positioning — the "tape" the AI reads, made transparent',
+  desc: 'Macro news feed and whale positioning (OKX Rubik account long/short ratio)',
   band: {
     title: 'Market temperature',
-    desc: 'Composite reading of news sentiment and smart-money flow',
+    desc: 'Positioning comes from the OKX Rubik account long/short ratio (smart money), not a news-sentiment blend',
     bull: 'Bullish',
     bear: 'Bearish',
     neutral: 'Balanced',
@@ -56,8 +56,9 @@ export const enNews = {
   longPct: 'Long share: {n}%',
   shortPct: 'Short share: {n}%',
   mentions: '{n} posts',
+  ratioHint: 'OKX Rubik account long/short ratio (long accounts / short accounts)',
   filters: { all: 'All', macro: 'Macro' },
-  source: { okx: 'OKX Official', jin10: 'Jin10 Data' },
+  source: { jin10: 'Jin10 Data', macro: 'Global macro' },
   filterTag: '{sym} filter',
   count: '{n} items',
   resetFilters: 'Reset filters',

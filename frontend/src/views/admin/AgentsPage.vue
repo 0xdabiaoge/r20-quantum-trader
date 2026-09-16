@@ -1,129 +1,582 @@
 <script setup lang="ts">
+/**
+ * AgentsPage.vue · 运行单元与遥测工位
+ * ---------------------------------------------------------------------------
+ * 骨架（推倒重来）：
+ *   旧 = 一行说明 + 3 张卡（名册表 / 遥测表 / 密钥库），字色靠蓝紫琥珀色相区分
+ *   新 = 共享 PageHeader（策略徽章 + 刷新）
+ *        → **名册状态带**（在册 / 健康 / 异常 / 平均时延）
+ *        → **Worker 名册行式清单**（图标 + 名称·职责 / 健康徽章 / 最近执行 / 产物时效）
+ *        → 双栏：**模型遥测**（策略说明 + 3 项统计 + 调用流水日志面板）
+ *               / **本机密文库**（kv 行）
+ *
+ * ⚠️ 修复：`useResource` 的文档声明 `immediate` 默认 true，但实现只在传入真值时取数，
+ *    本页此前**从不自动加载**。现显式传 `immediate: true`。
+ *
+ * 后端契约（逐字未改）：GET /api/v1/admin/agents
+ *   → { agents:[{id,name,role,health,last_run_at,last_run_status,output_age_seconds,output}],
+ *       prompt_policy, model_stats:{total_calls,successful_calls,avg_duration_ms},
+ *       model_calls:[{id,caller,model,status,total_tokens,duration_ms}],
+ *       secret_store:{initialized,count,store_mode,source_priority,keys[]} }
+ */
+import { computed } from 'vue';
 import { fmtDateTime } from '../../utils/format';
-import { useI18n } from '../../composables/useI18n'
-const { t } = useI18n()
-import DataTable from '../../components/admin/DataTable.vue'
-import { useResource } from '../../composables/useResource'
-import { Package, Cpu, KeyRound, RefreshCw } from 'lucide-vue-next'
+import { useI18n } from '../../composables/useI18n';
+const { t } = useI18n();
+import PageHeader from '../../components/admin/PageHeader.vue';
+import BaseEmpty from '../../components/base/BaseEmpty.vue';
+import { useResource } from '../../composables/useResource';
+import { Package, Cpu, KeyRound, RefreshCw, Loader2, AlertTriangle,
+  Activity, ShieldCheck, Radio } from 'lucide-vue-next';
 
-// F2：取数样板收成一行
-const { data, loading, error, reload: load } = useResource<any>('/api/v1/admin/agents')
+const { data, loading, error, loaded, reload: load } = useResource<any>('/api/v1/admin/agents', {
+  immediate: true,
+});
 
-function statusColor(s: string) {
-  if (['success', 'running', 'online', 'idle'].includes(s)) return 'text-emerald-400'
-  if (['failed', 'error', 'offline'].includes(s)) return 'text-rose-400'
-  return 'text-amber-400'
+const agents = computed<any[]>(() => data.value?.agents || []);
+const calls = computed<any[]>(() => (data.value?.model_calls || []).slice(0, 30));
+const showSkeleton = computed(() => loading.value && !loaded.value);
+
+/** 状态语义 → 徽章色调（判定集合与旧版 statusColor 完全一致） */
+function statusTone(s: string): string {
+  if (['success', 'running', 'online', 'idle'].includes(s)) return 'badge-up';
+  if (['failed', 'error', 'offline'].includes(s)) return 'badge-down';
+  return 'badge-warn';
 }
 
+const healthyCount = computed(
+  () => agents.value.filter((a) => ['success', 'running', 'online', 'idle'].includes(a.health)).length,
+);
+const issueCount = computed(() => agents.value.length - healthyCount.value);
+
+const avgLatency = computed(() =>
+  data.value?.model_stats?.avg_duration_ms
+    ? `${Math.round(data.value.model_stats.avg_duration_ms)}ms`
+    : '--',
+);
+const successRate = computed(() => {
+  const s = data.value?.model_stats;
+  if (!s || !(s.total_calls > 0)) return '--';
+  return `${Math.round((100 * (s.successful_calls ?? 0)) / s.total_calls)}%`;
+});
+const successRateTone = computed(() => {
+  const s = data.value?.model_stats;
+  if (!s || !(s.total_calls > 0)) return '';
+  return (s.successful_calls ?? 0) < s.total_calls ? 'is-warn' : 'is-up';
+});
+const callsDegraded = computed(() => {
+  const s = data.value?.model_stats;
+  return !!s && s.total_calls > 0 && (s.successful_calls ?? 0) < s.total_calls;
+});
+
+function ageText(a: any): string {
+  if (a.output_age_seconds != null) {
+    return t('admin.agents.minutesAgo', undefined, { n: Math.round(a.output_age_seconds / 60) });
+  }
+  return a.output ? t('admin.agents.coldStart') : t('admin.agents.noOutput');
+}
 </script>
 
 <template>
-  <div class="space-y-4">
-    <div class="flex items-center justify-between">
-      <p class="text-xs text-[var(--ink-3)]">{{ t('admin.agents.desc') }}</p>
-      <span class="text-[11px] text-blue-400 bg-blue-500/10 px-2 py-1 rounded border border-blue-500/20">{{ t('admin.agents.policyChip') }}</span>
+  <div class="ag">
+    <PageHeader :title="t('nav.admin.agents')" :description="t('admin.agents.desc')">
+      <template #actions>
+        <span class="badge badge-accent mono">{{ t('admin.agents.policyChip') }}</span>
+        <button class="btn btn-ghost btn-sm" :disabled="loading" @click="load">
+          <Loader2 v-if="loading && loaded" :size="14" class="ag-spin" />
+          <RefreshCw v-else :size="14" />
+          <span>{{ t('admin.agents.refresh') }}</span>
+        </button>
+      </template>
+    </PageHeader>
+
+    <!-- 拉取失败 -->
+    <div v-if="error && !data" class="state-block is-error ag-error">
+      <span class="state-icon"><AlertTriangle :size="17" /></span>
+      <p class="state-title">{{ t('common.loadFailed') }}</p>
+      <p class="state-desc">{{ error }}</p>
+      <button class="btn btn-ghost btn-sm" style="margin-top: 4px" :disabled="loading" @click="load">
+        <RefreshCw :size="14" />
+        <span>{{ t('common.retry') }}</span>
+      </button>
     </div>
 
-    <div v-if="error" class="p-3 rounded-lg text-xs bg-rose-500/10 border border-rose-500/20 text-rose-400">{{ error }}</div>
-    <div v-if="loading" class="py-12 text-center text-xs text-[var(--ink-3)]"><RefreshCw class="w-5 h-5 animate-spin inline mr-1.5 text-blue-400" />{{ t('admin.agents.loading') }}</div>
-
-    <template v-else-if="data">
-      <!-- Agents -->
-      <div class="rounded-xl border overflow-hidden shadow-xs" style="background-color: var(--surface-2); border-color: var(--line-1);">
-        <div class="px-4 py-3 border-b flex items-center justify-between" style="border-color: var(--line-1); background-color: var(--surface-1);">
-          <div class="flex items-center space-x-2">
-            <Package class="w-4 h-4 text-blue-400" />
-            <h2 class="text-xs font-semibold" style="color: var(--ink-1);">{{ t('nav.admin.agents') }}</h2>
-        <p class="text-[11px] mt-0.5" style="color: var(--ink-2);">{{ t('admin.agents.roster') }}</p>
+    <template v-else>
+      <!-- ══ 名册状态带 ══ -->
+      <section class="card ag-band">
+        <template v-if="showSkeleton">
+          <div v-for="i in 4" :key="i" class="ag-fact">
+            <div class="skeleton skeleton-text" style="width: 48%" />
+            <div class="skeleton skeleton-text" style="width: 64%; height: 16px" />
+            <div class="skeleton skeleton-text" style="width: 36%" />
           </div>
-          <button @click="load" class="flex items-center space-x-1 px-2.5 py-1 rounded-lg border text-[11px] cursor-pointer transition-all shadow-xs" style="background-color: var(--surface-2); border-color: var(--line-2); color: var(--ink-1);">
-            <RefreshCw class="w-3 h-3" />
-            <span>{{ t('admin.agents.refresh') }}</span>
-          </button>
-        </div>
-        <DataTable
-          flat
-          class="table-scroll-container"
-          :rows="data.agents || []"
-          :row-key="(a: any) => a.id"
-          :empty-text="t('common.noRecords')"
-        >
-          <template #head>
-            <tr class="border-b text-[11px] uppercase tracking-wider font-bold" style="border-color: var(--line-1); background-color: var(--surface-1); color: var(--ink-2);">
-                            <th class="py-2.5 px-4">{{ t('admin.agents.colUnit') }}</th>
-                            <th class="py-2.5 px-3">{{ t('admin.agents.colRole') }}</th>
-                            <th class="py-2.5 px-3">{{ t('admin.agents.colHealth') }}</th>
-                            <th class="py-2.5 px-3">{{ t('admin.agents.colLastRun') }}</th>
-                            <th class="py-2.5 px-3">{{ t('admin.agents.colResult') }}</th>
-                            <th class="py-2.5 px-4 text-right">{{ t('admin.agents.colOutputAge') }}</th>
-                          </tr>
-          </template>
-          <template #row="{ row: a }">
-            <td class="py-2.5 px-4 font-bold" style="color: var(--ink-1);">{{ a.name }}</td>
-            <td class="py-2.5 px-3" style="color: var(--ink-2);">{{ a.role }}</td>
-            <td class="py-2.5 px-3 font-bold" :class="statusColor(a.health)">{{ a.health }}</td>
-            <td class="py-2.5 px-3 num" style="color: var(--ink-3);">{{ fmtDateTime(a.last_run_at || t('admin.agents.notScheduled')) }}</td>
-            <td class="py-2.5 px-3 font-bold" :class="statusColor(a.last_run_status)">{{ a.last_run_status }}</td>
-            <td class="py-2.5 px-4 text-right" style="color: var(--ink-2);">{{ a.output_age_seconds != null ? t('admin.agents.minutesAgo', undefined, { n: Math.round(a.output_age_seconds / 60) }) : (a.output ? t('admin.agents.coldStart') : t('admin.agents.noOutput')) }}</td>
-          </template>
-        </DataTable>
-      </div>
+        </template>
 
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <!-- Model Telemetry -->
-        <div class="rounded-xl border overflow-hidden shadow-xs p-4" style="background-color: var(--surface-2); border-color: var(--line-1);">
-          <div class="flex items-center space-x-2 mb-3"><Cpu class="w-4 h-4 text-purple-400" /><h2 class="text-xs font-semibold" style="color: var(--ink-1);">{{ t('admin.agents.modelTelemetry') }}</h2></div>
-          <div class="text-[11px] mb-3 p-2.5 rounded-lg border leading-relaxed" style="background-color: var(--surface-1); border-color: var(--line-1); color: var(--ink-2);">{{ data.prompt_policy }}</div>
-          <div class="grid grid-cols-3 gap-2.5 mb-3 text-center">
-            <div class="rounded-lg border p-2" style="background-color: var(--surface-1); border-color: var(--line-1);"><div class="text-[11px]" style="color: var(--ink-3);">{{ t('admin.agents.totalCalls') }}</div><div class="text-sm font-bold num mt-0.5" style="color: var(--ink-1);">{{ data.model_stats?.total_calls ?? '--' }}</div></div>
-            <div class="rounded-lg border p-2" style="background-color: var(--surface-1); border-color: var(--line-1);"><div class="text-[11px]" style="color: var(--ink-3);">{{ t('admin.agents.successRate') }}</div><div class="text-sm font-bold num mt-0.5" :class="(data.model_stats?.total_calls ?? 0) > 0 && (data.model_stats?.successful_calls ?? 0) < (data.model_stats?.total_calls ?? 0) ? 'text-amber-500' : 'text-emerald-500'">{{ (data.model_stats?.total_calls ?? 0) > 0 ? Math.round(100 * (data.model_stats?.successful_calls ?? 0) / data.model_stats.total_calls) + '%' : '--' }}</div></div>
-            <div class="rounded-lg border p-2" style="background-color: var(--surface-1); border-color: var(--line-1);"><div class="text-[11px]" style="color: var(--ink-3);">{{ t('admin.agents.avgLatency') }}</div><div class="text-sm font-bold num mt-0.5" style="color: var(--ink-1);">{{ data.model_stats?.avg_duration_ms ? Math.round(data.model_stats.avg_duration_ms) + 'ms' : '--' }}</div></div>
+        <template v-else>
+          <div class="ag-fact">
+            <span class="ag-fact-label"><Radio :size="12" />{{ t('admin.agents.bandUnits') }}</span>
+            <span class="ag-fact-value num">{{ agents.length }}</span>
+            <span class="ag-fact-foot">{{ t('admin.agents.roster') }}</span>
           </div>
-          <DataTable
-            flat
-            class="table-scroll-container max-h-60 overflow-y-auto rounded-lg border"
-            style="border-color: var(--line-1);"
-            :rows="(data.model_calls || []).slice(0, 30) || []"
-            :row-key="(c: any) => c.id"
-            :empty-text="t('common.noRecords')"
-          >
-            <template #head>
-              <tr class="border-b text-[11px] uppercase tracking-wider font-bold" style="border-color: var(--line-1); background-color: var(--surface-1); color: var(--ink-2);">
-                                <th class="py-2 px-3">{{ t('admin.agents.colCaller') }}</th>
-                                <th class="py-2 px-2">{{ t('admin.agents.colModel') }}</th>
-                                <th class="py-2 px-2">{{ t('admin.agents.colStatus') }}</th>
-                                <th class="py-2 px-2">Tokens</th>
-                                <th class="py-2 px-3 text-right">{{ t('admin.agents.colDuration') }}</th>
-                              </tr>
-            </template>
-            <template #row="{ row: c }">
-              <td class="py-1.5 px-3" style="color: var(--ink-2);">{{ c.caller || '--' }}</td>
-              <td class="py-1.5 px-2 num" style="color: var(--ink-3);">{{ c.model || '--' }}</td>
-              <td class="py-1.5 px-2 font-bold" :class="statusColor(c.status)">{{ c.status }}</td>
-              <td class="py-1.5 px-2 num" style="color: var(--ink-2);">{{ c.total_tokens ?? '--' }}</td>
-              <td class="py-1.5 px-3 text-right num" style="color: var(--ink-2);">{{ c.duration_ms ? Math.round(c.duration_ms) + 'ms' : '--' }}</td>
-            </template>
-          </DataTable>
+
+          <div class="ag-fact">
+            <span class="ag-fact-label"><ShieldCheck :size="12" />{{ t('admin.agents.bandHealthy') }}</span>
+            <span class="ag-fact-value num" :class="healthyCount === agents.length && agents.length ? 'is-up' : ''">
+              {{ healthyCount }}
+            </span>
+            <span class="ag-fact-foot">{{ t('admin.agents.colHealth') }}</span>
+          </div>
+
+          <div class="ag-fact">
+            <span class="ag-fact-label"><AlertTriangle :size="12" />{{ t('admin.agents.bandIssues') }}</span>
+            <span class="ag-fact-value num" :class="issueCount ? 'is-warn' : 'is-up'">{{ issueCount }}</span>
+            <span class="ag-fact-foot">{{ t('admin.agents.colResult') }}</span>
+          </div>
+
+          <div class="ag-fact">
+            <span class="ag-fact-label"><Activity :size="12" />{{ t('admin.agents.bandLatency') }}</span>
+            <span class="ag-fact-value num">{{ avgLatency }}</span>
+            <span class="ag-fact-foot mono">
+              {{ t('admin.agents.successRate') }} {{ successRate }}
+            </span>
+          </div>
+        </template>
+      </section>
+
+      <!-- ══ Worker 名册 ══ -->
+      <section class="card">
+        <header class="card-head">
+          <div>
+            <h2 class="card-title"><Package :size="14" />{{ t('nav.admin.agents') }}</h2>
+            <p class="card-sub">{{ t('admin.agents.roster') }}</p>
+          </div>
+          <span v-if="!showSkeleton" class="badge mono">{{ agents.length }}</span>
+        </header>
+
+        <div v-if="showSkeleton" class="ag-skel">
+          <div v-for="i in 4" :key="i" class="skeleton skeleton-row" />
         </div>
 
-        <!-- Secret Store -->
-        <div class="rounded-xl border p-4 shadow-xs transition-colors" style="background-color: var(--surface-2); border-color: var(--line-1);">
-          <div class="flex items-center space-x-2 mb-3"><KeyRound class="w-4 h-4 text-amber-500" /><h2 class="text-xs font-semibold" style="color: var(--ink-1);">{{ t('admin.agents.secretStore') }}</h2></div>
-          <div class="space-y-1.5 text-xs">
-            <div class="flex items-center justify-between border rounded-lg px-3 py-2" style="background-color: var(--surface-1); border-color: var(--line-1);">
-              <span style="color: var(--ink-2);">{{ t('admin.agents.storeStatus') }}</span>
-              <span :class="data.secret_store?.initialized ? 'text-emerald-500 font-bold' : 'text-rose-500 font-bold'">{{ data.secret_store?.initialized ? t('admin.agents.initialized') : t('admin.agents.notInitialized') }} · {{ t('admin.agents.cipherCount', undefined, { count: data.secret_store?.count ?? 0 }) }} · {{ t('admin.agents.filePerm') }} {{ data.secret_store?.store_mode || '--' }}</span>
+        <BaseEmpty v-else-if="!agents.length" :text="t('common.noRecords')" />
+
+        <div v-else class="ag-rows">
+          <div class="ag-row ag-row-head">
+            <span />
+            <span>{{ t('admin.agents.colUnit') }}</span>
+            <span>{{ t('admin.agents.colHealth') }}</span>
+            <span>{{ t('admin.agents.colLastRun') }}</span>
+            <span>{{ t('admin.agents.colOutputAge') }}</span>
+          </div>
+
+          <article v-for="a in agents" :key="a.id" class="ag-row">
+            <span class="ag-icon"><Cpu :size="14" /></span>
+
+            <div class="ag-main">
+              <span class="ag-name">{{ a.name }}</span>
+              <span class="ag-role">{{ a.role }}</span>
             </div>
-            <div class="flex items-center justify-between border rounded-lg px-3 py-2" style="background-color: var(--surface-1); border-color: var(--line-1);">
-              <span style="color: var(--ink-2);">{{ t('admin.agents.readPriority') }}</span><span style="color: var(--ink-1);">{{ data.secret_store?.source_priority || 'encrypted-store-over-env' }}</span>
+
+            <span class="badge" :class="statusTone(a.health)">{{ a.health }}</span>
+
+            <div class="ag-run">
+              <span class="ag-run-time mono">
+                {{ a.last_run_at ? fmtDateTime(a.last_run_at) : t('admin.agents.notScheduled') }}
+              </span>
+              <span class="badge" :class="statusTone(a.last_run_status)">{{ a.last_run_status }}</span>
             </div>
-            <div v-for="k in (data.secret_store?.keys || [])" :key="k" class="flex items-center justify-between border rounded-lg px-3 py-2" style="background-color: var(--surface-1); border-color: var(--line-1);">
-              <span style="color: var(--ink-2);">{{ k }}</span>
-              <span class="text-emerald-500 font-bold">{{ t('admin.agents.configured') }}</span>
+
+            <span class="ag-age num">{{ ageText(a) }}</span>
+          </article>
+        </div>
+      </section>
+
+      <!-- ══ 遥测 / 密文库 ══ -->
+      <div class="ag-grid">
+        <!-- 模型调用遥测 -->
+        <section class="card">
+          <header class="card-head">
+            <h2 class="card-title"><Cpu :size="14" />{{ t('admin.agents.modelTelemetry') }}</h2>
+            <span v-if="callsDegraded" class="badge badge-warn">{{ t('admin.agents.colStatus') }}</span>
+          </header>
+
+          <p class="ag-policy">
+            <span class="label-caps">{{ t('admin.agents.promptPolicy') }}</span>
+            <span>{{ data?.prompt_policy }}</span>
+          </p>
+
+          <div class="ag-stats">
+            <div class="ag-stat">
+              <span class="label-caps">{{ t('admin.agents.totalCalls') }}</span>
+              <span class="ag-stat-v num">{{ data?.model_stats?.total_calls ?? '--' }}</span>
+            </div>
+            <div class="ag-stat">
+              <span class="label-caps">{{ t('admin.agents.successRate') }}</span>
+              <span class="ag-stat-v num" :class="successRateTone">{{ successRate }}</span>
+            </div>
+            <div class="ag-stat">
+              <span class="label-caps">{{ t('admin.agents.avgLatency') }}</span>
+              <span class="ag-stat-v num">{{ avgLatency }}</span>
             </div>
           </div>
-        </div>
+
+          <div class="ag-calls-head">
+            <span class="label-caps">{{ t('admin.agents.callsTitle') }}</span>
+            <span class="badge mono">{{ calls.length }}</span>
+          </div>
+
+          <BaseEmpty v-if="!calls.length" :text="t('admin.agents.emptyCalls')" />
+
+          <div v-else class="log-panel ag-calls">
+            <div v-for="c in calls" :key="c.id" class="ag-call">
+              <span class="ag-call-caller truncate" :title="c.caller">{{ c.caller || '--' }}</span>
+              <span class="ag-call-model mono truncate" :title="c.model">{{ c.model || '--' }}</span>
+              <span class="badge" :class="statusTone(c.status)">{{ c.status }}</span>
+              <span class="ag-call-n num">{{ c.total_tokens ?? '--' }}</span>
+              <span class="ag-call-n num">{{ c.duration_ms ? Math.round(c.duration_ms) + 'ms' : '--' }}</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- 本机加密密文库 -->
+        <section class="card">
+          <header class="card-head">
+            <h2 class="card-title"><KeyRound :size="14" />{{ t('admin.agents.secretStore') }}</h2>
+            <span
+              class="badge"
+              :class="data?.secret_store?.initialized ? 'badge-up' : 'badge-down'"
+            >
+              {{ data?.secret_store?.initialized ? t('admin.agents.initialized') : t('admin.agents.notInitialized') }}
+            </span>
+          </header>
+
+          <div class="ag-kv">
+            <div class="ag-kv-row">
+              <span class="ag-kv-k">{{ t('admin.agents.storeStatus') }}</span>
+              <span class="ag-kv-v mono">
+                {{ t('admin.agents.cipherCount', undefined, { count: data?.secret_store?.count ?? 0 }) }}
+                · {{ t('admin.agents.filePerm') }} {{ data?.secret_store?.store_mode || '--' }}
+              </span>
+            </div>
+
+            <div class="ag-kv-row">
+              <span class="ag-kv-k">{{ t('admin.agents.readPriority') }}</span>
+              <span class="ag-kv-v mono">{{ data?.secret_store?.source_priority || 'encrypted-store-over-env' }}</span>
+            </div>
+
+            <div
+              v-for="k in (data?.secret_store?.keys || [])"
+              :key="k"
+              class="ag-kv-row"
+            >
+              <span class="ag-kv-k mono truncate" :title="k">{{ k }}</span>
+              <span class="badge badge-up">{{ t('admin.agents.configured') }}</span>
+            </div>
+          </div>
+        </section>
       </div>
     </template>
   </div>
 </template>
+
+<style scoped>
+.ag {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-4);
+}
+.ag-spin {
+  animation: ag-rotate 0.9s linear infinite;
+}
+@keyframes ag-rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.ag-error {
+  border: 1px solid var(--down-line);
+  border-radius: var(--r-card);
+  background-color: var(--ds-color-bg-surface-card);
+}
+
+/* ══ 状态带 ══ */
+.ag-band {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+@media (min-width: 640px) {
+  .ag-band {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (min-width: 1280px) {
+  .ag-band {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+.ag-fact {
+  display: flex;
+  flex-direction: column;
+  gap:4px;
+  min-width: 0;
+  padding: var(--ds-space-4);
+  border-top: 1px solid var(--ds-color-border-default);
+}
+.ag-fact:first-child {
+  border-top: 0;
+}
+@media (min-width: 640px) {
+  .ag-fact:nth-child(2) {
+    border-top: 0;
+  }
+  .ag-fact:nth-child(even) {
+    border-left: 1px solid var(--ds-color-border-default);
+  }
+}
+@media (min-width: 1280px) {
+  .ag-fact {
+    border-top: 0;
+  }
+  .ag-fact + .ag-fact {
+    border-left: 1px solid var(--ds-color-border-default);
+  }
+}
+.ag-fact-label {
+  display: flex;
+  align-items: center;
+  gap:6px;
+  font-size: var(--text-3xs);
+  font-weight: 500;
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--ds-color-text-placeholder);
+}
+.ag-fact-value {
+  font-size: var(--text-lg);
+  font-weight: 500;
+  letter-spacing: var(--track-display);
+  line-height: 1.2;
+  color: var(--ds-color-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+.ag-fact-value.is-up {
+  color: var(--up);
+}
+.ag-fact-value.is-warn {
+  color: var(--warn);
+}
+.ag-fact-foot {
+  font-size: var(--text-3xs);
+  color: var(--ds-color-text-placeholder);
+}
+
+/* ══ 名册 ══ */
+.ag-skel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: var(--ds-space-4);
+}
+.ag-rows {
+  display: flex;
+  flex-direction: column;
+}
+.ag-row {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr) 84px minmax(0, 1fr) 92px;
+  align-items: center;
+  gap: var(--ds-space-3);
+  padding: var(--ds-space-3) var(--ds-space-4);
+  border-bottom: 1px solid var(--ds-color-border-default);
+  transition: background-color var(--dur-fast);
+}
+.ag-row:last-child {
+  border-bottom: 0;
+}
+.ag-row:not(.ag-row-head):hover {
+  background-color: var(--ds-color-bg-hover);
+}
+.ag-row-head {
+  min-height: 30px;
+  padding-top: 0;
+  padding-bottom: 0;
+  background-color: var(--ds-color-bg-surface-inset);
+  font-size: var(--text-3xs);
+  font-weight: 500;
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--ds-color-text-placeholder);
+}
+.ag-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--r-ctl);
+  background-color: var(--ds-color-bg-surface-1);
+  color: var(--ds-color-text-description);
+  flex-shrink: 0;
+}
+.ag-main {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.ag-name {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--ds-color-text-primary);
+}
+.ag-role {
+  font-size: var(--text-4xs);
+  color: var(--ds-color-text-placeholder);
+}
+.ag-run {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  min-width: 0;
+  flex-wrap: wrap;
+}
+.ag-run-time {
+  font-size: var(--text-4xs);
+  color: var(--ds-color-text-placeholder);
+  white-space: nowrap;
+}
+.ag-age {
+  font-size: var(--text-3xs);
+  color: var(--ds-color-text-secondary);
+  text-align: right;
+}
+
+@media (max-width: 1000px) {
+  .ag-row {
+    grid-template-columns: 26px minmax(0, 1fr) auto;
+  }
+  .ag-run,
+  .ag-age {
+    grid-column: 2 / -1;
+  }
+  .ag-age {
+    text-align: left;
+  }
+  .ag-row-head {
+    display: none;
+  }
+}
+
+/* ══ 遥测 / 密文库 ══ */
+.ag-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--ds-space-4);
+  align-items: start;
+}
+@media (min-width: 1100px) {
+  .ag-grid {
+    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  }
+}
+.ag-policy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--ds-space-3) var(--ds-space-4);
+  border-bottom: 1px solid var(--ds-color-border-default);
+  font-size: var(--text-3xs);
+  line-height: var(--leading-body);
+  color: var(--ds-color-text-description);
+}
+.ag-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-bottom: 1px solid var(--ds-color-border-default);
+}
+.ag-stat {
+  display: flex;
+  flex-direction: column;
+  gap:4px;
+  padding: var(--ds-space-3) var(--ds-space-4);
+  border-left: 1px solid var(--ds-color-border-default);
+}
+.ag-stat:first-child {
+  border-left: 0;
+}
+.ag-stat-v {
+  font-size: var(--text-md);
+  font-weight: 500;
+  color: var(--ds-color-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+.ag-stat-v.is-up {
+  color: var(--up);
+}
+.ag-stat-v.is-warn {
+  color: var(--warn);
+}
+.ag-calls-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ds-space-2);
+  padding: var(--ds-space-3) var(--ds-space-4) 6px;
+}
+.ag-calls {
+  border: 0;
+  border-radius: 0;
+  background-color: transparent;
+  padding: 0 0 var(--ds-space-3);
+  max-height: 300px;
+}
+.ag-call {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto 60px 56px;
+  align-items: center;
+  gap: var(--ds-space-3);
+  padding: 4px var(--ds-space-4);
+  font-size: var(--text-4xs);
+}
+.ag-call:hover {
+  background-color: var(--ds-color-bg-hover);
+}
+.ag-call-caller {
+  color: var(--ds-color-text-secondary);
+  min-width: 0;
+}
+.ag-call-model {
+  color: var(--ds-color-text-placeholder);
+  min-width: 0;
+}
+.ag-call-n {
+  color: var(--ds-color-text-placeholder);
+  text-align: right;
+}
+
+/* 密文库 */
+.ag-kv {
+  display: flex;
+  flex-direction: column;
+}
+.ag-kv-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ds-space-3);
+  padding: 10px var(--ds-space-4);
+  border-bottom: 1px solid var(--ds-color-border-default);
+}
+.ag-kv-row:last-child {
+  border-bottom: 0;
+}
+.ag-kv-k {
+  font-size: var(--text-xs);
+  color: var(--ds-color-text-description);
+  min-width: 0;
+}
+.ag-kv-v {
+  font-size: var(--text-3xs);
+  color: var(--ds-color-text-primary);
+  text-align: right;
+}
+</style>

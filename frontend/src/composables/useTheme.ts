@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 
-export type ThemeMode = 'dark' | 'light'
+export type ThemeMode = 'dark'
 
 const currentTheme = ref<ThemeMode>('dark')
 const cvdMode = ref(false)
@@ -21,42 +21,41 @@ function applyCvd(on: boolean) {
 }
 
 export function useTheme() {
-  function applyTheme(theme: ThemeMode) {
-    currentTheme.value = theme
+  function applyTheme(_theme: string = 'dark') {
+    currentTheme.value = 'dark'
     if (typeof document !== 'undefined') {
       const el = document.documentElement
-      el.setAttribute('data-theme', theme)
-      if (theme === 'dark') {
-        el.classList.add('dark')
-      } else {
-        el.classList.remove('dark')
-      }
+      el.setAttribute('data-theme', 'dark')
+      el.classList.add('dark')
+      el.classList.remove('light')
       try {
-        localStorage.setItem('r20_theme', theme)
+        localStorage.setItem('r20_theme', 'dark')
       } catch {
-        // ignore localStorage error in private mode
+        // ignore
       }
     }
   }
 
   function toggleTheme() {
-    applyTheme(currentTheme.value === 'dark' ? 'light' : 'dark')
+    applyTheme('dark')
   }
 
   function initTheme() {
     if (initialized) return
     initialized = true
-    let saved: ThemeMode = 'dark'
-    try {
-      const stored = localStorage.getItem('r20_theme')
-      if (stored === 'light' || stored === 'dark') {
-        saved = stored
+    if (typeof document !== 'undefined') {
+      const el = document.documentElement
+      el.setAttribute('data-theme', 'dark')
+      el.classList.add('dark')
+      el.classList.remove('light')
+      try {
+        if (localStorage.getItem('r20_cvd') === '1') applyCvd(true)
+        localStorage.setItem('r20_theme', 'dark')
+      } catch {
+        // fallback
       }
-      if (localStorage.getItem('r20_cvd') === '1') applyCvd(true)
-    } catch {
-      // fallback
     }
-    applyTheme(saved)
+    applyTheme('dark')
   }
 
   return {

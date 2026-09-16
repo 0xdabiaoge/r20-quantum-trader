@@ -15,4 +15,12 @@ export const zhAdminPlugins = {
   healthDisabled: "已禁用",
   installPolicy: "安装策略：",
   policyBuiltinOnly: "仅内置插件",
-};
+
+  // ── 推倒重来新增（批 7）──
+  bandPlugins: '在册插件',
+  bandHealthy: '健康',
+  bandDisabled: '已停用',
+  bandIssues: '异常',
+  registryTitle: '插件清单',
+  registryDesc: '内置插件及其健康状态；实盘控制面仅允许随仓库审计过的内置插件',
+  policyTitle: '安装策略',};

@@ -163,6 +163,7 @@ import json
 import math
 import tempfile
 import time
+import warnings
 import datetime
 import subprocess
 import urllib.request
@@ -205,7 +206,9 @@ LEDGER_JSON_FILE = os.path.join(DATA_DIR, "trading_ledger.json")
 LEDGER_AUTOSYNC_ENABLED = str(os.environ.get("R20_LEDGER_SYNC_DISABLED", "")).strip().lower() not in ("1", "true", "yes")
 LOG_FILE = os.path.join(LOGS_DIR, "ai_factor_trader.log")
 POSITION_TRACKER_FILE = os.path.join(DATA_DIR, "position_trackers.json")
-SIGNAL_JOURNAL_FILE = os.path.join(DATA_DIR, "signal_journal.json")
+# 2026-09-16：`SIGNAL_JOURNAL_FILE` 常量已删——它把路径**钉死在导入期**，
+# `patch.object(aft, "DATA_DIR", tmp)` 对它无效，是"测试真写生产"的通道。
+# 信号日记路径现由 `_signal_journal_file()` 调用期解析（见其 docstring）。
 STOP_COOLDOWN_FILE = os.path.join(DATA_DIR, "stop_cooldown.json")
 CIRCUIT_BREAKER_FILE = os.path.join(DATA_DIR, "circuit_breaker.json")
 NEWS_SENTIMENT_FILE = os.path.join(DATA_DIR, "news_sentiment.json")
@@ -324,16 +327,30 @@ def load_trackers():
         try:
             with open(POSITION_TRACKER_FILE, "r", encoding="utf-8") as f:
                 return json.load(f)
-        except Exception:
-            pass
+        except Exception as _load_err:
+            # 2026-09-16：原先静默 pass —— 读失败会返回 {}，等于**忘掉全部在管持仓**
+            # （移动止损/高点水位全丢），却看不出任何异常。仍然返回 {}（保持调用方
+            # 语义），但必须吼出来：这是"数据缺失被当成没有持仓"的高危静默面。
+            warnings.warn(
+                f"[trader] 持仓追踪文件读取失败，本轮按「无在管持仓」继续"
+                f"（高风险：移动止损/水位丢失）: {_load_err!r}",
+                RuntimeWarning)
     return {}
 
 def save_trackers(trackers):
+    """落盘持仓追踪（走本文件的原子写：mkstemp+fsync+os.replace）。
+
+    2026-09-16：① 原先 `open("w")` 直覆写 —— 并发读者（面板/对账/下一轮巡检）
+    可能读到半截 JSON，与本文件 `_atomic_write_json` 的既有审计结论相悖；
+    ② 写失败原先静默 pass —— 追踪状态悄悄丢失。现改为原子写 + 失败告警。
+    """
     try:
-        with open(POSITION_TRACKER_FILE, "w", encoding="utf-8") as f:
-            json.dump(trackers, f, ensure_ascii=False, indent=2)
-    except Exception:
-        pass
+        _atomic_write_json(POSITION_TRACKER_FILE, trackers)
+    except Exception as _save_err:
+        warnings.warn(
+            f"[trader] 持仓追踪文件写入失败，本轮追踪状态未落盘"
+            f"（下轮将按旧状态继续）: {_save_err!r}",
+            RuntimeWarning)
 
 def _atomic_write_json(path, payload):
     """审计③(2026-09-13)：常驻写者统一原子路数（mkstemp+fsync+os.replace，对齐
@@ -797,16 +814,34 @@ def build_signal_snapshot(f: dict) -> dict:
     """
     return _signal_snapshot_build(f, data_dir=DATA_DIR)
 
+def _signal_journal_file() -> str:
+    """**调用期**解析信号日记路径（与 `build_signal_snapshot(data_dir=DATA_DIR)` 同款）。
+
+    2026-09-16 守卫：模块级 `SIGNAL_JOURNAL_FILE` 是**导入期**绑定，
+    `patch.object(aft, "DATA_DIR", tmp)` 这类本仓既有的隔离手法对它无效。
+    历史事故：`test_trader_position_exit_extraction` 未替身 `record_signal_snapshot`
+    时**真写生产**，累计把 249 条夹具（ETH/2500.0/2026-09-07 10:00:00）写进
+    `data/signal_journal.json`（2026-09-16 已清理，备份在 `data/backups/`）。
+    该测试后来补了替身（第八十九刀），但**"能真写生产"这个口子必须一起堵**。
+    """
+    return os.path.join(DATA_DIR, "signal_journal.json")
+
+
 def record_signal_snapshot(snap: dict) -> None:
-    """把开仓时刻的数理快照写入 signal_journal.json，保留最近 500 条供复盘 join。"""
+    """把开仓时刻的数理快照写入 signal_journal.json，保留最近 500 条供复盘 join。
+
+    2026-09-16：① 路径改为**调用期解析**（见 `_signal_journal_file`），
+    令 `patch.object(aft, "DATA_DIR", tmp)` 真正生效；② 落盘改走本文件的
+    `_atomic_write_json`（并发读者——面板/复盘/日报——不再可能读到半截 JSON）。
+    """
     try:
+        journal_file = _signal_journal_file()
         journal = []
-        if os.path.exists(SIGNAL_JOURNAL_FILE):
-            with open(SIGNAL_JOURNAL_FILE, "r", encoding="utf-8") as handle:
+        if os.path.exists(journal_file):
+            with open(journal_file, "r", encoding="utf-8") as handle:
                 journal = json.load(handle)
         journal.append(snap)
-        with open(SIGNAL_JOURNAL_FILE, "w", encoding="utf-8") as handle:
-            json.dump(journal[-500:], handle, ensure_ascii=False, indent=2)
+        _atomic_write_json(journal_file, journal[-500:])
     except Exception as e:
         print(f"Failed to record signal snapshot: {e}")
 

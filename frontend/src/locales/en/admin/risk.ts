@@ -34,4 +34,9 @@ export const enAdminRisk = {
   unsavedCount: '{n} unsaved change(s)',
   saving: 'Saving…',
   saveApply: 'Save & apply',
-};
+
+  // ── added by the rebuild (batch 6) ──
+  effectTitle: 'Effect',
+  suitesTitle: 'Presets',
+  suitesDesc: 'Apply a validated combination of risk parameters in one click',
+  paramsTitle: 'Risk parameters',};

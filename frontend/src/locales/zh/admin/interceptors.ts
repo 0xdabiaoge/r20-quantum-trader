@@ -1,6 +1,6 @@
 /** 物理拦截插件页文案 */
 export const zhAdminInterceptors = {
-  desc: '交易决策发出前必须逐层通过 Python 物理拦截管线，任何异常默认拒单',
+  desc: '配置下单前的逐层拦截规则与失败动作',
   testing: '正在回归测试...',
   runSandbox: '现场沙箱回归测试',
   newPlugin: '新建插件',
@@ -30,11 +30,16 @@ export const zhAdminInterceptors = {
   createAndAdd: '创建并加入管线',
   reportTitle: '沙箱拦截回归测试报告',
   reportSummary: '已激活 {enabled}/{total} 个拦截插件 · 总执行耗时 {ms}ms',
-  intercepted: '🛑 已成功物理拦截 (WAIT)',
-  passed: '🟢 顺势放行通过',
+  intercepted: '已成功物理拦截 (WAIT)',
+  passed: '顺势放行通过',
   rawAction: '原始意向:',
   finalAction: '最终指令:',
   riskReward: '盈亏比:',
   interceptAudit: '拦截审计：',
   closeReport: '关闭测试报告',
-};
+
+  // ── 推倒重来新增（批 6）──
+  pipelineTitle: '拦截管线',
+  pipelineDesc: '按执行优先级从高到低排列；越靠上的插件越早介入风控判定',
+  empty: '暂无拦截插件，可点击右上角「新建插件」添加',
+  editorTitle: '插件源码',};

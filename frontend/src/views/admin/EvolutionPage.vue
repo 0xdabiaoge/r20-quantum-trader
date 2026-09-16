@@ -1,127 +1,157 @@
 <script setup lang="ts">
+/**
+ * EvolutionPage.vue · 自进化与心法工位
+ * ---------------------------------------------------------------------------
+ * 骨架（推倒重来）：
+ *   旧 = 页头 + 自绘标签栏 + 三张互不相干的面板堆叠
+ *        （复盘报告卡 / 4 张总览卡 / 心法卡列表 / 模版卡列表）
+ *        + 原生 prompt() 做"RUN EVOLUTION"确认
+ *   新 = 共享 PageHeader（动作集中）→ `.seg` 标签栏
+ *        → 复盘报告（统计行 + 裁定理由 + **洞见日志面板**）
+ *        → 运行状态带（护栏 / 节律 / 心法规模 / 半衰期，发丝分隔单卡）
+ *        → 心法库（单一面板内的行式清单，开关改 BaseSwitch）
+ *        → 模版模块序列（单一面板内的可编辑行）
+ *        → 立即复盘确认改 BaseDialog
+ *
+ * 后端契约（逐字未改）：
+ *   GET  /api/v1/prompt-library        （失败回落 /api/v1/admin/prompt-library）
+ *   GET  /api/v1/admin/memory
+ *   GET  /api/v1/cache/self-improvement （失败忽略）
+ *   POST /api/v1/admin/memory/toggle/{lessonId}?expected_version=…
+ *   POST /api/v1/admin/memory/rollback?expected_version=…
+ *   POST /api/v1/admin/memory   { text, expected_version }
+ *   DELETE /api/v1/admin/memory/{idx}?lesson_id=…&expected_version=…
+ *   PUT  /api/v1/admin/prompt-profiles/{id}  { name, description, pipelines }
+ *   POST /api/v1/admin/gateway/jobs/self_improvement/run  { confirmation: 'RUN JOB' }
+ *
+ * ⚠️ 乐观并发纪律未动：任一次写失败都会把 `memoryVersion` 置空，
+ *    后续写操作必须先显式「重新加载心法」（expectedMemoryVersion 会抛错）。
+ */
 import { fmtDateTime } from '../../utils/format';
-import { useToast } from '../../composables/useToast'
-import { useConfirm } from '../../composables/useConfirm'
-const toast = useToast()
-const { ask } = useConfirm()
-import { ref, computed, onMounted } from 'vue'
-import PageHeader from '../../components/admin/PageHeader.vue'
-import { useI18n } from '../../composables/useI18n'
-import { useApi } from '../../composables/useApi'
-import { useAuthStore } from '../../stores/auth'
-import {Brain,
-  Sparkles,
-  RefreshCw,
-  Clock,
-  Plus,
-  Trash2,
-  Save,
-  PlayCircle,
-  BookOpen,
-  Sliders,
-  Terminal,
-  ShieldCheck,
-  RotateCcw,
-  ToggleLeft,
-  ToggleRight} from 'lucide-vue-next'
+import { useToast } from '../../composables/useToast';
+import { useConfirm } from '../../composables/useConfirm';
+const toast = useToast();
+const { ask } = useConfirm();
+import { ref, computed, onMounted } from 'vue';
+import PageHeader from '../../components/admin/PageHeader.vue';
+import BaseDialog from '../../components/base/BaseDialog.vue';
+import BaseSwitch from '../../components/base/BaseSwitch.vue';
+import BaseEmpty from '../../components/base/BaseEmpty.vue';
+import { useI18n } from '../../composables/useI18n';
+import { useApi } from '../../composables/useApi';
+import { useAuthStore } from '../../stores/auth';
+import { Brain, Sparkles, RefreshCw, Clock, Plus, Trash2, Save,
+  PlayCircle, BookOpen, Sliders, Terminal, ShieldCheck, RotateCcw,
+  Loader2, AlertTriangle } from 'lucide-vue-next';
 
-const { api } = useApi()
-const auth = useAuthStore()
-const { t } = useI18n()
+const { api } = useApi();
+const auth = useAuthStore();
+const { t } = useI18n();
 
-const loading = ref(true)
-const busy = ref<'save' | 'run' | 'add' | 'delete' | 'toggle' | 'rollback' | ''>('')
+const loading = ref(true);
+const loadError = ref('');
+const busy = ref<'save' | 'run' | 'add' | 'delete' | 'toggle' | 'rollback' | ''>('');
 
 // Pipelines state (evolution_system & evolution_user)
-const activeTab = ref<'settings' | 'evolution_system' | 'evolution_user'>('settings')
-const lib = ref<any>(null)
-const selectedProfileId = ref('stable')
-const workingModules = ref<any[]>([])
+const activeTab = ref<'settings' | 'evolution_system' | 'evolution_user'>('settings');
+const lib = ref<any>(null);
+const selectedProfileId = ref('stable');
+const workingModules = ref<any[]>([]);
 
 // Structured White-Box Memory state
-const structuredLessons = ref<any[]>([])
-const memoryVersion = ref<string | null>(null)
+const structuredLessons = ref<any[]>([]);
+const memoryVersion = ref<string | null>(null);
 /** 结构化记忆是否启用（后端 legacy_read_only=False 表示走结构化 v1 护栏；缺失不猜） */
-const memoryStructured = ref<boolean | null>(null)
-const newMemoryText = ref('')
-const evolutionReport = ref<any>(null)
+const memoryStructured = ref<boolean | null>(null);
+const newMemoryText = ref('');
+const evolutionReport = ref<any>(null);
 
-// Scheduler settings
+const selectedProfile = computed(() => (lib.value?.profiles || []).find((p: any) => p.id === selectedProfileId.value) || null);
+const enabledLessonCount = computed(() => structuredLessons.value.filter((l: any) => l.enabled).length);
+/** 正在删除的心法下标（仅用于按钮 loading 态） */
+const deletingIdx = ref<number | null>(null);
 
-const selectedProfile = computed(() => (lib.value?.profiles || []).find((p: any) => p.id === selectedProfileId.value) || null)
+type TabId = 'settings' | 'evolution_system' | 'evolution_user';
+const tabs = computed<{ id: TabId; label: string; icon: any }[]>(() => [
+  { id: 'settings', label: t('admin.evolution.tabOverview'), icon: Brain },
+  { id: 'evolution_system', label: t('admin.evolution.tabSystem'), icon: BookOpen },
+  { id: 'evolution_user', label: t('admin.evolution.tabUser'), icon: Terminal },
+]);
 
 async function loadData() {
-  loading.value = true
-  memoryVersion.value = null
+  loading.value = true;
+  loadError.value = '';
+  memoryVersion.value = null;
   try {
     const [libRes, memRes, reportRes] = await Promise.all([
       api('/api/v1/prompt-library').catch(() => api('/api/v1/admin/prompt-library')),
       api('/api/v1/admin/memory'),
       api('/api/v1/cache/self-improvement').catch(() => null),
-    ])
-    lib.value = libRes
-    selectedProfileId.value = libRes?.active_profile_id || 'stable'
-    structuredLessons.value = memRes?.structured_lessons || []
-    memoryVersion.value = memRes?.version || null
-    memoryStructured.value = memRes && 'legacy_read_only' in memRes ? !memRes.legacy_read_only : null
-    evolutionReport.value = reportRes || null
-    syncWorkingModules()
+    ]);
+    lib.value = libRes;
+    selectedProfileId.value = libRes?.active_profile_id || 'stable';
+    structuredLessons.value = memRes?.structured_lessons || [];
+    memoryVersion.value = memRes?.version || null;
+    memoryStructured.value = memRes && 'legacy_read_only' in memRes ? !memRes.legacy_read_only : null;
+    evolutionReport.value = reportRes || null;
+    syncWorkingModules();
   } catch (e: any) {
-    toast.err(`加载失败: ${e.message}`)
+    loadError.value = e.message;
+    toast.err(`加载失败: ${e.message}`);
   } finally {
-    loading.value = false
+    loading.value = false;
   }
 }
 
 function syncWorkingModules() {
-  if (activeTab.value === 'settings') return
-  const views = selectedProfile.value?.pipeline_views?.[activeTab.value] || []
-  workingModules.value = JSON.parse(JSON.stringify(views))
+  if (activeTab.value === 'settings') return;
+  const views = selectedProfile.value?.pipeline_views?.[activeTab.value] || [];
+  workingModules.value = JSON.parse(JSON.stringify(views));
 }
 
 function switchTab(tab: 'settings' | 'evolution_system' | 'evolution_user') {
-  activeTab.value = tab
-  syncWorkingModules()
+  activeTab.value = tab;
+  syncWorkingModules();
 }
 
 // Never retry writes: on failure require an explicit reload before another attempt.
 function expectedMemoryVersion() {
-  if (!memoryVersion.value) throw new Error('请重新加载心法后再操作')
-  return memoryVersion.value
+  if (!memoryVersion.value) throw new Error('请重新加载心法后再操作');
+  return memoryVersion.value;
 }
 
 async function refreshMemory() {
-  memoryVersion.value = null
-  const res = await api('/api/v1/admin/memory')
-  structuredLessons.value = res.structured_lessons || []
-  memoryVersion.value = res.version || null
-  memoryStructured.value = 'legacy_read_only' in res ? !res.legacy_read_only : null
+  memoryVersion.value = null;
+  const res = await api('/api/v1/admin/memory');
+  structuredLessons.value = res.structured_lessons || [];
+  memoryVersion.value = res.version || null;
+  memoryStructured.value = 'legacy_read_only' in res ? !res.legacy_read_only : null;
 }
 
 async function reloadMemory() {
-  if (busy.value || loading.value) return
-  loading.value = true
+  if (busy.value || loading.value) return;
+  loading.value = true;
   try {
-    await refreshMemory()
+    await refreshMemory();
   } catch (e: any) {
-    toast.err(`重新加载心法失败: ${e.message}`)
+    toast.err(`重新加载心法失败: ${e.message}`);
   } finally {
-    loading.value = false
+    loading.value = false;
   }
 }
 
 async function toggleLessonStatus(lessonId: string) {
-  if (busy.value || loading.value) return
-  busy.value = 'toggle'
+  if (busy.value || loading.value) return;
+  busy.value = 'toggle';
   try {
-    await api(`/api/v1/admin/memory/toggle/${encodeURIComponent(lessonId)}?expected_version=${encodeURIComponent(expectedMemoryVersion())}`, { method: 'POST' })
-    await refreshMemory()
-    toast.ok(`心法状态已切换（大模型下次决策立即感知）`)
+    await api(`/api/v1/admin/memory/toggle/${encodeURIComponent(lessonId)}?expected_version=${encodeURIComponent(expectedMemoryVersion())}`, { method: 'POST' });
+    await refreshMemory();
+    toast.ok(`心法状态已切换（大模型下次决策立即感知）`);
   } catch (e: any) {
-    memoryVersion.value = null
-    toast.err(`状态切换失败: ${e.message}`)
+    memoryVersion.value = null;
+    toast.err(`状态切换失败: ${e.message}`);
   } finally {
-    busy.value = ''
+    busy.value = '';
   }
 }
 
@@ -134,64 +164,66 @@ async function rollbackToBaseline() {
     danger: true,
     confirmPhrase: 'ROLLBACK',
     okText: '执行回滚',
-  })
-  if (!_ok) return
-  if (busy.value || loading.value) return
-  busy.value = 'rollback'
+  });
+  if (!_ok) return;
+  if (busy.value || loading.value) return;
+  busy.value = 'rollback';
   try {
-    await api(`/api/v1/admin/memory/rollback?expected_version=${encodeURIComponent(expectedMemoryVersion())}`, { method: 'POST' })
-    await refreshMemory()
-    toast.ok('🛡️ 已成功执行宪法级防污染回滚，系统已重置为黄金基准认知！')
+    await api(`/api/v1/admin/memory/rollback?expected_version=${encodeURIComponent(expectedMemoryVersion())}`, { method: 'POST' });
+    await refreshMemory();
+    toast.ok('已成功执行宪法级防污染回滚，系统已重置为黄金基准认知');
   } catch (e: any) {
-    memoryVersion.value = null
-    toast.err(`回滚失败: ${e.message}`)
+    memoryVersion.value = null;
+    toast.err(`回滚失败: ${e.message}`);
   } finally {
-    busy.value = ''
+    busy.value = '';
   }
 }
 
 async function addMemoryItem() {
-  const text = newMemoryText.value.trim()
-  if (!text) return
-  if (busy.value || loading.value) return
-  busy.value = 'add'
+  const text = newMemoryText.value.trim();
+  if (!text) return;
+  if (busy.value || loading.value) return;
+  busy.value = 'add';
   try {
     await api('/api/v1/admin/memory', {
       method: 'POST',
       body: JSON.stringify({ text, expected_version: expectedMemoryVersion() }),
-    })
+    });
     // Reload full structured list
-    await refreshMemory()
-    newMemoryText.value = ''
-    toast.ok('新心法已通过防偏见审查，并成功同步写入决策注入层')
+    await refreshMemory();
+    newMemoryText.value = '';
+    toast.ok('新心法已通过防偏见审查，并成功同步写入决策注入层');
   } catch (e: any) {
-    memoryVersion.value = null
-    toast.err(`添加心法失败: ${e.message}`)
+    memoryVersion.value = null;
+    toast.err(`添加心法失败: ${e.message}`);
   } finally {
-    busy.value = ''
+    busy.value = '';
   }
 }
 
 async function deleteMemoryItem(idx: number, lessonId: string) {
-  const _ok = await ask({ title: '删除自进化心法', desc: '该条心法将从认知库移除', danger: true, okText: '删除' })
-  if (!_ok) return
-  if (busy.value || loading.value) return
-  busy.value = 'delete'
+  const _ok = await ask({ title: '删除自进化心法', desc: '该条心法将从认知库移除', danger: true, okText: '删除' });
+  if (!_ok) return;
+  if (busy.value || loading.value) return;
+  busy.value = 'delete';
+  deletingIdx.value = idx;
   try {
-    await api(`/api/v1/admin/memory/${idx}?lesson_id=${encodeURIComponent(lessonId)}&expected_version=${encodeURIComponent(expectedMemoryVersion())}`, { method: 'DELETE' })
-    await refreshMemory()
-    toast.ok('该条自进化心法已成功移除')
+    await api(`/api/v1/admin/memory/${idx}?lesson_id=${encodeURIComponent(lessonId)}&expected_version=${encodeURIComponent(expectedMemoryVersion())}`, { method: 'DELETE' });
+    await refreshMemory();
+    toast.ok('该条自进化心法已成功移除');
   } catch (e: any) {
-    memoryVersion.value = null
-    toast.err(`删除失败: ${e.message}`)
+    memoryVersion.value = null;
+    toast.err(`删除失败: ${e.message}`);
   } finally {
-    busy.value = ''
+    busy.value = '';
+    deletingIdx.value = null;
   }
 }
 
 async function savePipelineModules() {
-  if (!selectedProfile.value) return
-  busy.value = 'save'
+  if (!selectedProfile.value) return;
+  busy.value = 'save';
   try {
     const pipelinesMap: Record<string, any[]> = {}
     pipelinesMap[activeTab.value] = workingModules.value.map((m) => ({
@@ -201,7 +233,7 @@ async function savePipelineModules() {
       enabled: m.enabled,
       locked: m.locked,
       source: m.source,
-    }))
+    }));
 
     await api(`/api/v1/admin/prompt-profiles/${selectedProfile.value.id}`, {
       method: 'PUT',
@@ -220,405 +252,724 @@ async function savePipelineModules() {
   }
 }
 
-async function triggerEvolutionNow() {
-  const phrase = prompt('立即强制执行自进化复盘任务（对全天战绩穿透提炼并生成最新复盘心法），请输入确认短语：RUN EVOLUTION')
-  if (!phrase) return
-  if (phrase.trim().toUpperCase() !== 'RUN EVOLUTION') {
-    toast.err('确认短语错误，已取消执行')
-    return
+/* ── 立即复盘：原生 prompt() → 对话框（确认短语校验与请求体逐字保留） ── */
+const RUN_PHRASE = 'RUN EVOLUTION';
+const runDialog = ref<{ open: boolean; phrase: string }>({ open: false, phrase: '' });
+
+function openRunDialog() {
+  runDialog.value = { open: true, phrase: '' };
+}
+function closeRunDialog() {
+  runDialog.value = { open: false, phrase: '' };
+}
+
+async function confirmRun() {
+  const phrase = runDialog.value.phrase;
+  // 与旧版等价：空输入视为取消
+  if (!phrase) return;
+  if (phrase.trim().toUpperCase() !== RUN_PHRASE) {
+    toast.err('确认短语错误，已取消执行');
+    closeRunDialog();
+    return;
   }
-  busy.value = 'run'
+  busy.value = 'run';
   try {
     const res = await api('/api/v1/admin/gateway/jobs/self_improvement/run', {
       method: 'POST',
       body: JSON.stringify({ confirmation: 'RUN JOB' }),
-    })
-    toast.ok(`自进化复盘已完成（已自动执行离群噪点过滤与宪法安全审查）！${res.detail || ''}`)
-    await loadData()
+    });
+    toast.ok(`自进化复盘已完成（已自动执行离群噪点过滤与宪法安全审查）！${res.detail || ''}`);
+    closeRunDialog();
+    await loadData();
   } catch (e: any) {
-    toast.err(`执行复盘失败: ${e.message}`)
+    toast.err(`执行复盘失败: ${e.message}`);
   } finally {
-    busy.value = ''
+    busy.value = '';
   }
 }
 
-onMounted(loadData)
+onMounted(loadData);
 </script>
 
 <template>
-  <div class="space-y-4 max-w-[2048px] mx-auto">
-    <!-- Header -->
+  <div class="evo">
     <PageHeader :title="t('nav.admin.evolution')" :description="t('admin.evolution.desc')">
       <template #actions>
-        <span class="chip"><span class="dot dot-up" />{{ t('admin.evolution.guardChip') }}</span>
-      </template>
-    </PageHeader>
-
-    <!-- Banner -->
-    <!-- Navigation Tabs -->
-    <div class="flex flex-wrap items-center justify-between gap-3 p-1.5 rounded-xl border" style="background-color: var(--surface-2); border-color: var(--line-1);">
-      <div class="flex flex-wrap gap-1">
-        <button
-          @click="switchTab('settings')"
-          class="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-colors"
-          :style="activeTab === 'settings' ? { backgroundColor: 'var(--ink-1)', color: 'var(--surface-2)' } : { color: 'var(--ink-2)' }"
-        >
-          <Brain class="w-3.5 h-3.5" />
-          <span>{{ t('admin.evolution.tabOverview') }}</span>
-        </button>
-        <button
-          @click="switchTab('evolution_system')"
-          class="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-colors"
-          :style="activeTab === 'evolution_system' ? { backgroundColor: 'var(--ink-1)', color: 'var(--surface-2)' } : { color: 'var(--ink-2)' }"
-        >
-          <BookOpen class="w-3.5 h-3.5" />
-          <span>{{ t('admin.evolution.tabSystem') }}</span>
-        </button>
-        <button
-          @click="switchTab('evolution_user')"
-          class="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-colors"
-          :style="activeTab === 'evolution_user' ? { backgroundColor: 'var(--ink-1)', color: 'var(--surface-2)' } : { color: 'var(--ink-2)' }"
-        >
-          <Terminal class="w-3.5 h-3.5" />
-          <span>{{ t('admin.evolution.tabUser') }}</span>
-        </button>
-      </div>
-
-      <div class="flex items-center space-x-2">
-        <button
-          @click="reloadMemory"
-          :disabled="busy !== '' || loading"
-          class="flex items-center space-x-1 px-3 py-1.5 rounded-lg text-xs cursor-pointer disabled:opacity-40 border"
-        >
-          <RefreshCw class="w-3.5 h-3.5" />
+        <span class="dsh-pill">
+          <span class="dsh-status-dot active" />
+          {{ t('admin.evolution.guardChip') }}
+        </span>
+        <button class="btn btn-ghost btn-sm" :disabled="busy !== '' || loading" @click="reloadMemory">
+          <RefreshCw :size="14" :class="loading && 'evo-spin'" />
           <span>{{ t('admin.evolution.reloadMemory') }}</span>
         </button>
         <button
           v-if="auth.isSuperadmin"
-          @click="rollbackToBaseline"
+          class="btn btn-ghost btn-sm"
           :disabled="busy !== ''"
-          class="flex items-center space-x-1 px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer disabled:opacity-40 transition-all border shadow-xs"
-          style="background-color: var(--surface-1); border-color: var(--line-1); color: var(--ink-1);"
           :title="t('admin.evolution.rollbackTitle')"
+          @click="rollbackToBaseline"
         >
-          <RotateCcw class="w-3.5 h-3.5 text-amber-400" />
+          <RotateCcw :size="14" />
           <span>{{ t('admin.evolution.rollback') }}</span>
         </button>
-
-        <button
-          v-if="auth.isSuperadmin"
-          @click="triggerEvolutionNow"
-          :disabled="busy !== ''"
-          class="flex items-center space-x-1 px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer disabled:opacity-40 transition-all shadow-xs"
-          style="background-color: var(--accent-bg); border-color: var(--accent-line); color: var(--accent);"
-        >
-          <PlayCircle class="w-3.5 h-3.5" />
+        <button v-if="auth.isSuperadmin" class="btn btn-primary btn-sm" :disabled="busy !== ''" @click="openRunDialog">
+          <PlayCircle :size="14" />
           <span>{{ busy === 'run' ? t('admin.evolution.runningReview') : t('admin.evolution.reviewNow') }}</span>
         </button>
-      </div>
+      </template>
+    </PageHeader>
+
+    <!-- 拉取失败 -->
+    <div v-if="loadError" class="state-block is-error evo-error">
+      <span class="state-icon"><AlertTriangle :size="17" /></span>
+      <p class="state-title">{{ t('common.loadFailed') }}</p>
+      <p class="state-desc">{{ loadError }}</p>
+      <button class="btn btn-ghost btn-sm" style="margin-top: 4px" :disabled="loading" @click="loadData">
+        <RefreshCw :size="14" :class="loading && 'evo-spin'" />
+        <span>{{ t('common.retry') }}</span>
+      </button>
     </div>
 
-    <!-- TAB 1: Settings & Structured White-Box Memory -->
-    <div v-if="activeTab === 'settings'" class="space-y-4">
-      <!-- 核心新增：最新自进化执行实况与诊断成果看板 -->
-      <div v-if="evolutionReport" class="rounded-xl border p-4 shadow-xs space-y-3" style="background-color: var(--surface-2); border-color: var(--line-1);">
-        <div class="flex items-center justify-between pb-2 border-b" style="border-color: var(--line-1);">
-          <div class="flex items-center space-x-2">
-            <Sparkles class="w-4 h-4 text-amber-400" />
-            <h3 class="text-xs sm:text-sm font-semibold uppercase tracking-wide" style="color: var(--ink-1);">
-              {{ t('admin.evolution.reportTitle') }}
-            </h3>
-            <span
-              class="text-[11px] px-2 py-0.5 rounded border font-bold"
-              :class="evolutionReport.change_status === 'EVOLVED' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' : 'text-amber-400 bg-amber-500/10 border-amber-500/30'"
-            >
-              {{ evolutionReport.change_status || 'NO_CHANGE' }}
+    <template v-else>
+      <!-- 标签栏 -->
+      <div class="seg evo-tabs">
+        <button
+          v-for="tb in tabs"
+          :key="tb.id"
+          :class="{ 'seg-on': activeTab === tb.id }"
+          @click="switchTab(tb.id)"
+        >
+          <component :is="tb.icon" :size="13" />
+          <span>{{ tb.label }}</span>
+        </button>
+      </div>
+
+      <!-- ═══════ TAB 1 ═══════ -->
+      <div v-if="activeTab === 'settings'" class="evo-tab">
+        <!-- 复盘报告 -->
+        <section v-if="evolutionReport" class="card">
+          <header class="card-head">
+            <div class="evo-rep-head">
+              <h2 class="card-title"><Sparkles :size="14" />{{ t('admin.evolution.reportTitle') }}</h2>
+              <span
+                class="badge"
+                :class="evolutionReport.change_status === 'EVOLVED' ? 'badge-up' : 'badge-warn'"
+              >
+                {{ evolutionReport.change_status || 'NO_CHANGE' }}
+              </span>
+            </div>
+            <span class="evo-rep-time mono">
+              {{ t('admin.evolution.reviewTime') }} {{ fmtDateTime(evolutionReport.timestamp) }}
             </span>
-          </div>
-          <div class="text-[11px]" style="color: var(--ink-2);">
-            {{ t('admin.evolution.reviewTime') }} <strong class="text-emerald-400 font-bold">{{ fmtDateTime(evolutionReport.timestamp) }}</strong>
-          </div>
-        </div>
+          </header>
 
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-          <div class="p-2 rounded-lg border" style="background-color: var(--surface-1); border-color: var(--line-1);">
-            <div class="text-[11px]" style="color: var(--ink-3);">{{ t('admin.evolution.sampleCount') }}</div>
-            <div class="font-bold text-sm mt-0.5" style="color: var(--ink-1);">{{ t('admin.evolution.closedTrades', undefined, { n: evolutionReport.total_trades }) }}</div>
-          </div>
-          <div class="p-2 rounded-lg border" style="background-color: var(--surface-1); border-color: var(--line-1);">
-            <div class="text-[11px]" style="color: var(--ink-3);">{{ t('admin.evolution.winRate') }}</div>
-            <div class="font-bold text-sm mt-0.5 text-emerald-400">{{ evolutionReport.win_rate }}%</div>
-          </div>
-          <div class="p-2 rounded-lg border" style="background-color: var(--surface-1); border-color: var(--line-1);">
-            <div class="text-[11px]" style="color: var(--ink-3);">{{ t('admin.evolution.profitFactor') }}</div>
-            <div class="font-bold text-sm mt-0.5 text-blue-400">{{ evolutionReport.profit_factor }}</div>
-          </div>
-          <div class="p-2 rounded-lg border" style="background-color: var(--surface-1); border-color: var(--line-1);">
-            <div class="text-[11px]" style="color: var(--ink-3);">{{ t('admin.evolution.memoryGuard') }}</div>
-            <div class="font-bold text-sm mt-0.5 text-purple-400">{{ evolutionReport.memory_preserved ? t('admin.evolution.guardOn') : t('admin.evolution.guardRebuild') }}</div>
-          </div>
-        </div>
-
-        <div v-if="evolutionReport.memory_overwrites_reason" class="p-2.5 rounded-lg border text-xs" style="background-color: var(--surface-1); border-color: var(--line-1);">
-          <div class="text-[11px] uppercase font-bold text-amber-400 mb-0.5">{{ t('admin.evolution.verdictReason') }}</div>
-          <p class="text-[11px] leading-relaxed" style="color: var(--ink-2);">{{ evolutionReport.memory_overwrites_reason }}</p>
-        </div>
-
-        <div v-if="evolutionReport.insights && evolutionReport.insights.length" class="space-y-1">
-          <div class="text-[11px] font-bold uppercase" style="color: var(--ink-3);">{{ t('admin.evolution.insightsTitle', undefined, { n: evolutionReport.insights.length }) }}</div>
-          <div class="space-y-1 max-h-[160px] overflow-y-auto pr-1">
-            <div v-for="(ins, idx) in evolutionReport.insights" :key="idx" class="p-2 rounded border text-[11px] leading-relaxed" style="background-color: var(--surface-1); border-color: var(--line-1); color: var(--ink-2);">
-              <span class="text-indigo-400 font-bold mr-1">#{{ Number(idx) + 1 }}</span>
-              <span>{{ ins }}</span>
+          <div class="evo-rep-stats">
+            <div class="evo-rep-stat">
+              <span class="label-caps">{{ t('admin.evolution.sampleCount') }}</span>
+              <span class="evo-stat-v">{{ t('admin.evolution.closedTrades', undefined, { n: evolutionReport.total_trades }) }}</span>
+            </div>
+            <div class="evo-rep-stat">
+              <span class="label-caps">{{ t('admin.evolution.winRate') }}</span>
+              <span class="evo-stat-v num is-up">{{ evolutionReport.win_rate }}%</span>
+            </div>
+            <div class="evo-rep-stat">
+              <span class="label-caps">{{ t('admin.evolution.profitFactor') }}</span>
+              <span class="evo-stat-v num">{{ evolutionReport.profit_factor }}</span>
+            </div>
+            <div class="evo-rep-stat">
+              <span class="label-caps">{{ t('admin.evolution.memoryGuard') }}</span>
+              <span class="evo-stat-v" :class="evolutionReport.memory_preserved ? 'is-up' : 'is-warn'">
+                {{ evolutionReport.memory_preserved ? t('admin.evolution.guardOn') : t('admin.evolution.guardRebuild') }}
+              </span>
             </div>
           </div>
-        </div>
-      </div>
 
-      <!-- Strategy & Schedule Overview -->
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
-        <div class="rounded-xl border p-3.5 shadow-xs" style="background-color: var(--surface-2); border-color: var(--line-1);">
-          <div class="flex items-center space-x-1.5 mb-1 text-[11px] font-bold" style="color: var(--ink-2);">
-            <ShieldCheck class="w-3.5 h-3.5 text-emerald-400" />
-            <span>{{ t('admin.evolution.guardrailStatus') }}</span>
+          <div v-if="evolutionReport.memory_overwrites_reason" class="evo-verdict">
+            <span class="label-caps">{{ t('admin.evolution.verdictReason') }}</span>
+            <p>{{ evolutionReport.memory_overwrites_reason }}</p>
           </div>
-          <div
-            class="text-sm font-bold"
-            :style="{ color: memoryStructured === false ? 'var(--warn)' : memoryStructured === true ? 'var(--up, #34d399)' : 'var(--ink-3)' }"
-          >
-            {{ memoryStructured === true ? t('admin.evolution.guardrailActive')
-              : memoryStructured === false ? t('admin.evolution.guardrailLegacy')
-              : t('admin.evolution.unknown') }}
-          </div>
-          <div class="text-[11px] mt-1" style="color: var(--ink-3);">
-            {{ memoryStructured === true ? t('admin.evolution.guardrailSub') : t('admin.evolution.guardrailSubLegacy') }}
-          </div>
-        </div>
 
-        <div class="rounded-xl border p-3.5 shadow-xs" style="background-color: var(--surface-2); border-color: var(--line-1);">
-          <div class="flex items-center space-x-1.5 mb-1 text-[11px] font-bold" style="color: var(--ink-2);">
-            <Clock class="w-3.5 h-3.5 text-cyan-400" />
-            <span>{{ t('admin.evolution.cadence') }}</span>
+          <!-- 洞见日志面板 -->
+          <div v-if="evolutionReport.insights && evolutionReport.insights.length" class="evo-insights">
+            <span class="label-caps">
+              {{ t('admin.evolution.insightsTitle', undefined, { n: evolutionReport.insights.length }) }}
+            </span>
+            <div class="log-panel evo-insight-panel">
+              <div v-for="(ins, idx) in evolutionReport.insights" :key="idx" class="evo-insight">
+                <span class="evo-insight-n mono">#{{ Number(idx) + 1 }}</span>
+                <span class="evo-insight-text">{{ ins }}</span>
+              </div>
+            </div>
           </div>
-          <div class="text-sm font-bold text-cyan-400">{{ t('admin.evolution.cadenceValue') }}</div>
-          <div class="text-[11px] mt-1" style="color: var(--ink-3);">
-            02:00, 08:00, 14:00, 20:00 (UTC+8)
-          </div>
-        </div>
+        </section>
 
-        <div class="rounded-xl border p-3.5 shadow-xs" style="background-color: var(--surface-2); border-color: var(--line-1);">
-          <div class="flex items-center space-x-1.5 mb-1 text-[11px] font-bold" style="color: var(--ink-2);">
-            <Sliders class="w-3.5 h-3.5 text-purple-400" />
-            <span>{{ t('admin.evolution.currentLessons') }}</span>
-          </div>
-          <div class="text-sm font-bold" style="color: var(--ink-1);">
-            {{ t('admin.evolution.lessonsCount', undefined, { enabled: structuredLessons.filter((l: any) => l.enabled).length, total: structuredLessons.length }) }}
-          </div>
-          <div class="text-[11px] mt-1" style="color: var(--ink-3);">
-            {{ t('admin.evolution.lessonsSub') }}
-          </div>
-        </div>
+        <!-- 运行状态带 -->
+        <section class="card evo-band">
+          <template v-if="loading">
+            <div v-for="i in 4" :key="i" class="evo-fact">
+              <div class="skeleton skeleton-text" style="width: 48%" />
+              <div class="skeleton skeleton-text" style="width: 66%; height: 16px" />
+              <div class="skeleton skeleton-text" style="width: 34%" />
+            </div>
+          </template>
 
-        <div class="rounded-xl border p-3.5 shadow-xs" style="background-color: var(--surface-2); border-color: var(--line-1);">
-          <div class="flex items-center space-x-1.5 mb-1 text-[11px] font-bold" style="color: var(--ink-2);">
-            <Sparkles class="w-3.5 h-3.5 text-amber-400" />
-            <span>{{ t('admin.evolution.halfLife') }}</span>
-          </div>
-          <div class="text-sm font-bold text-amber-400">{{ t('admin.evolution.halfLifeValue') }}</div>
-          <div class="text-[11px] mt-1" style="color: var(--ink-3);">
-            {{ t('admin.evolution.halfLifeSub') }}
-          </div>
-        </div>
-      </div>
+          <template v-else>
+            <div class="evo-fact">
+              <span class="evo-fact-label"><ShieldCheck :size="12" />{{ t('admin.evolution.guardrailStatus') }}</span>
+              <span
+                class="evo-fact-value"
+                :class="memoryStructured === false ? 'is-warn' : memoryStructured === true ? 'is-up' : ''"
+              >
+                {{ memoryStructured === true ? t('admin.evolution.guardrailActive')
+                  : memoryStructured === false ? t('admin.evolution.guardrailLegacy')
+                  : t('admin.evolution.unknown') }}
+              </span>
+              <span class="evo-fact-foot">
+                {{ memoryStructured === true ? t('admin.evolution.guardrailSub') : t('admin.evolution.guardrailSubLegacy') }}
+              </span>
+            </div>
 
-      <!-- Structured White-Box Memory Management -->
-      <div class="rounded-xl border p-4 sm:p-5 shadow-xs transition-colors" style="background-color: var(--surface-2); border-color: var(--line-1);">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 mb-3 border-b" style="border-color: var(--line-1);">
-          <div class="flex items-center space-x-2">
-            <Brain class="w-4 h-4 text-emerald-400" />
-            <h2 class="text-xs font-semibold" style="color: var(--ink-1);">
-              {{ t('admin.evolution.lifecycle') }}
-            </h2>
-          </div>
-          <span class="text-[11px]" style="color: var(--ink-3);">
-            {{ t('admin.evolution.lifecycleHint') }}
-          </span>
-        </div>
+            <div class="evo-fact">
+              <span class="evo-fact-label"><Clock :size="12" />{{ t('admin.evolution.cadence') }}</span>
+              <span class="evo-fact-value">{{ t('admin.evolution.cadenceValue') }}</span>
+              <span class="evo-fact-foot mono">02:00, 08:00, 14:00, 20:00 (UTC+8)</span>
+            </div>
 
-        <!-- Add Rule -->
-        <div class="flex flex-col sm:flex-row gap-2 mb-4">
-          <input
-            v-model="newMemoryText"
-            @keydown.enter="addMemoryItem"
-            :placeholder="t('admin.evolution.addPlaceholder')"
-            class="flex-1 rounded-lg px-3 py-2 text-xs outline-none border transition-colors"
-            style="background-color: var(--surface-input); border-color: var(--line-1); color: var(--ink-1);"
-          />
-          <button
-            @click="addMemoryItem"
-            :disabled="busy !== '' || !newMemoryText.trim()"
-            class="flex items-center justify-center space-x-1 px-4 py-2 rounded-lg text-xs font-bold cursor-pointer disabled:opacity-40 transition-all shadow-xs shrink-0"
-            style="background-color: var(--accent); color: var(--accent-ink);"
-          >
-            <Plus class="w-3.5 h-3.5" />
-            <span>{{ busy === 'add' ? t('admin.evolution.auditing') : t('admin.evolution.submitReview') }}</span>
-          </button>
-        </div>
+            <div class="evo-fact">
+              <span class="evo-fact-label"><Sliders :size="12" />{{ t('admin.evolution.currentLessons') }}</span>
+              <span class="evo-fact-value num">
+                {{ enabledLessonCount }}<span class="evo-fact-sub"> / {{ structuredLessons.length }}</span>
+              </span>
+              <span class="evo-fact-foot">{{ t('admin.evolution.lessonsSub') }}</span>
+            </div>
 
-        <!-- Structured Lessons Cards Grid -->
-        <div class="space-y-2.5">
-          <div v-if="loading" class="py-8 text-center text-xs" style="color: var(--ink-2);">
-            <RefreshCw class="w-4 h-4 animate-spin inline mr-1.5" style="color: var(--accent);" />
-            {{ t('admin.evolution.loadingLibrary') }}
+            <div class="evo-fact">
+              <span class="evo-fact-label"><Sparkles :size="12" />{{ t('admin.evolution.halfLife') }}</span>
+              <span class="evo-fact-value">{{ t('admin.evolution.halfLifeValue') }}</span>
+              <span class="evo-fact-foot">{{ t('admin.evolution.halfLifeSub') }}</span>
+            </div>
+          </template>
+        </section>
+
+        <!-- 心法库 -->
+        <section class="card">
+          <header class="card-head">
+            <div>
+              <h2 class="card-title"><Brain :size="14" />{{ t('admin.evolution.lifecycle') }}</h2>
+              <p class="card-sub">{{ t('admin.evolution.lifecycleHint') }}</p>
+            </div>
+          </header>
+
+          <!-- 新增心法 -->
+          <div class="evo-add">
+            <input
+              v-model="newMemoryText"
+              class="field"
+              :placeholder="t('admin.evolution.addPlaceholder')"
+              @keydown.enter="addMemoryItem"
+            />
+            <button
+              class="btn btn-primary btn-sm"
+              :disabled="busy !== '' || !newMemoryText.trim()"
+              @click="addMemoryItem"
+            >
+              <Plus :size="14" />
+              <span>{{ busy === 'add' ? t('admin.evolution.auditing') : t('admin.evolution.submitReview') }}</span>
+            </button>
           </div>
-          <template v-else-if="structuredLessons.length">
-            <div
+
+          <!-- 骨架 -->
+          <div v-if="loading" class="evo-skel">
+            <div v-for="i in 4" :key="i" class="skeleton skeleton-row" />
+          </div>
+
+          <!-- 空态 -->
+          <BaseEmpty v-else-if="!structuredLessons.length" :text="t('admin.evolution.emptyLessons')" />
+
+          <!-- 心法清单 -->
+          <div v-else class="evo-lessons">
+            <article
               v-for="(item, idx) in structuredLessons"
               :key="item.id || idx"
-              class="p-3.5 rounded-xl border transition-all flex flex-col justify-between gap-2.5"
-              :style="{
-                backgroundColor: item.enabled ? 'var(--surface-1)' : 'rgba(255, 255, 255, 0.01)',
-                borderColor: item.enabled ? 'var(--line-1)' : 'rgba(255, 255, 255, 0.05)',
-                opacity: item.enabled ? 1 : 0.6
-              }"
+              class="evo-lesson"
+              :class="{ 'is-off': !item.enabled }"
             >
-              <!-- Card Header Row -->
-              <div class="flex items-center justify-between gap-2 text-xs">
-                <div class="flex items-center space-x-1.5">
-                  <span
-                    class="px-1.5 py-0.5 rounded-[3px] text-[11px] font-bold border"
-                    :style="{
-                      backgroundColor: item.is_baseline ? 'rgba(56, 117, 246, 0.12)' : 'rgba(16, 185, 129, 0.12)',
-                      borderColor: item.is_baseline ? 'rgba(56, 117, 246, 0.3)' : 'rgba(16, 185, 129, 0.3)',
-                      color: item.is_baseline ? 'var(--info)' : 'var(--up)'
-                    }"
-                  >
-                    {{ item.is_baseline ? t('admin.evolution.baselineBadge') : t('admin.evolution.aiBadge') }}
-                  </span>
+              <div class="evo-lesson-head">
+                <span class="badge" :class="item.is_baseline ? 'badge-accent' : 'badge-up'">
+                  {{ item.is_baseline ? t('admin.evolution.baselineBadge') : t('admin.evolution.aiBadge') }}
+                </span>
+                <span class="badge">{{ item.category }}</span>
+                <span class="badge badge-up mono">{{ t('admin.evolution.score') }} {{ item.health_score }}</span>
 
-                  <span class="text-[11px] px-1.5 py-0.5 rounded-[3px] border" style="background-color: var(--surface-3); border-color: var(--line-1); color: var(--ink-2);">
-                    {{ item.category }}
-                  </span>
+                <span class="evo-lesson-spacer" />
 
-                  <span class="text-[11px] px-1.5 py-0.5 rounded-[3px] border bg-emerald-500/10 border-emerald-500/25 text-emerald-400 font-bold">
-                    {{ t('admin.evolution.score') }} {{ item.health_score }}
-                  </span>
-                </div>
-
-                <!-- Action Controls -->
-                <div class="flex items-center space-x-2">
-                  <!-- Toggle Switch -->
-                  <button
-                    @click="toggleLessonStatus(item.id)"
-                    class="flex items-center space-x-1 px-2.5 py-1 rounded-md border text-[11px] font-bold cursor-pointer transition-colors"
-                    :style="item.enabled ? {
-                      backgroundColor: 'rgba(16, 185, 129, 0.15)',
-                      borderColor: 'rgba(16, 185, 129, 0.3)',
-                      color: 'var(--up)',
-                    } : {
-                      backgroundColor: 'var(--surface-2)',
-                      borderColor: 'var(--line-1)',
-                      color: 'var(--ink-3)',
-                    }"
-                    :title="item.enabled ? t('admin.evolution.disableTitle') : t('admin.evolution.enableTitle')"
-                  >
-                    <ToggleRight v-if="item.enabled" class="w-3.5 h-3.5" />
-                    <ToggleLeft v-else class="w-3.5 h-3.5" />
-                    <span>{{ item.enabled ? t('admin.evolution.statusOn') : t('admin.evolution.statusOff') }}</span>
-                  </button>
-
-                  <!-- Delete -->
-                  <button
-                    @click="deleteMemoryItem(idx, item.id)"
-                    class="p-1 rounded hover:bg-rose-500/20 text-rose-400 opacity-60 hover:opacity-100 transition-opacity cursor-pointer"
-                    :title="t('admin.evolution.removeTitle')"
-                  >
-                    <Trash2 class="w-3.5 h-3.5" />
-                  </button>
-                </div>
+                <BaseSwitch
+                  :model-value="item.enabled === true"
+                  :disabled="busy !== '' || loading || !auth.isSuperadmin"
+                  @update:model-value="() => toggleLessonStatus(item.id)"
+                />
+                <button
+                  class="btn btn-quiet btn-icon btn-sm evo-del"
+                  :title="t('admin.evolution.removeTitle')"
+                  :disabled="busy !== '' || loading || !auth.isSuperadmin"
+                  @click="deleteMemoryItem(idx, item.id)"
+                >
+                  <Loader2 v-if="busy === 'delete' && deletingIdx === idx" :size="13" class="evo-spin" />
+                  <Trash2 v-else :size="13" />
+                </button>
               </div>
 
-              <!-- Rule Text -->
-              <p
-                class="text-xs leading-relaxed select-text"
-                :style="item.enabled ? { color: 'var(--ink-1)' } : { color: 'var(--ink-3)', textDecoration: 'line-through' }"
-              >
-                {{ item.rule_text }}
-              </p>
+              <p class="evo-lesson-text" :class="{ 'is-struck': !item.enabled }">{{ item.rule_text }}</p>
 
-              <!-- Footer Audit Line -->
-              <div class="flex items-center justify-between text-[11px] pt-1 border-t" style="border-color: var(--line-1); color: var(--ink-3);">
+              <div class="evo-lesson-foot mono">
                 <span>
                   {{ t('admin.evolution.createdAt') }} {{ fmtDateTime(item.created_at) }}
                   · {{ t('admin.evolution.sampleSupport') }}
                   {{ typeof item.sample_size === 'number' ? `${item.sample_size} ${t('admin.evolution.sampleUnit')}` : t('admin.evolution.unknown') }}
                 </span>
                 <span
-                  class="flex items-center space-x-1"
-                  :style="{ color: typeof item.shield_status === 'string' && item.shield_status ? 'var(--up, #34d399)' : 'var(--ink-3)' }"
+                  class="evo-shield"
+                  :class="{ 'is-up': typeof item.shield_status === 'string' && item.shield_status }"
                 >
-                  <ShieldCheck class="w-3 h-3" />
-                  <span>{{ t('admin.evolution.shieldAudit') }} {{ typeof item.shield_status === 'string' && item.shield_status ? item.shield_status : t('admin.evolution.unknown') }}</span>
+                  <ShieldCheck :size="12" />
+                  {{ t('admin.evolution.shieldAudit') }}
+                  {{ typeof item.shield_status === 'string' && item.shield_status ? item.shield_status : t('admin.evolution.unknown') }}
                 </span>
               </div>
-            </div>
-          </template>
-          <div v-else class="py-8 text-center text-xs border rounded-lg border-dashed" style="border-color: var(--line-1); color: var(--ink-3);">
-            {{ t('admin.evolution.emptyLessons') }}
+            </article>
           </div>
-        </div>
+        </section>
       </div>
-    </div>
 
-    <!-- TAB 2 & 3: Template Pipelines (Evolution System / User) -->
-    <div v-else class="space-y-4">
-      <div class="rounded-xl border p-4 sm:p-5 shadow-xs transition-colors space-y-4" style="background-color: var(--surface-2); border-color: var(--line-1);">
-        <div class="flex items-center justify-between pb-3 border-b" style="border-color: var(--line-1);">
-          <div>
-            <h2 class="text-sm font-bold" style="color: var(--ink-1);">
-              {{ activeTab === 'evolution_system' ? t('admin.evolution.systemTitle') : t('admin.evolution.userTitle') }}
-            </h2>
-            <p class="text-xs mt-0.5" style="color: var(--ink-2);">
-              {{ activeTab === 'evolution_system' ? t('admin.evolution.systemDesc') : t('admin.evolution.userDesc') }}
-            </p>
-          </div>
-          <button
-            v-if="auth.isSuperadmin"
-            @click="savePipelineModules"
-            :disabled="busy !== ''"
-            class="flex items-center space-x-1 px-4 py-2 rounded-lg text-xs font-bold cursor-pointer disabled:opacity-40 transition-all shadow-xs"
-            style="background-color: var(--accent); color: var(--accent-ink);"
-          >
-            <Save class="w-3.5 h-3.5" />
-            <span>{{ busy === 'save' ? t('admin.evolution.saving') : t('admin.evolution.saveTemplate') }}</span>
-          </button>
-        </div>
-
-        <!-- Modules List -->
-        <div class="space-y-3">
-          <div
-            v-for="(mod, mIdx) in workingModules"
-            :key="mod.id || mIdx"
-            class="border rounded-xl p-4 transition-all"
-            style="background-color: var(--surface-1); border-color: var(--line-1);"
-          >
-            <div class="flex items-center justify-between mb-2">
-              <span class="text-xs font-bold" style="color: var(--ink-1);">{{ mod.title }}</span>
-              <label class="flex items-center space-x-1.5 text-xs cursor-pointer">
-                <input v-model="mod.enabled" type="checkbox" class="accent-blue-500 w-3.5 h-3.5" :disabled="!auth.isSuperadmin" />
-                <span :class="mod.enabled ? 'text-emerald-500 font-bold' : 'text-zinc-500'">{{ mod.enabled ? t('admin.evolution.moduleOn') : t('admin.evolution.moduleOff') }}</span>
-              </label>
+      <!-- ═══════ TAB 2 / 3 ═══════ -->
+      <div v-else class="evo-tab">
+        <section class="card">
+          <header class="card-head">
+            <div>
+              <h2 class="card-title">
+                {{ activeTab === 'evolution_system' ? t('admin.evolution.systemTitle') : t('admin.evolution.userTitle') }}
+              </h2>
+              <p class="card-sub">
+                {{ activeTab === 'evolution_system' ? t('admin.evolution.systemDesc') : t('admin.evolution.userDesc') }}
+              </p>
             </div>
-            <textarea
-              v-model="mod.content"
-              :disabled="!auth.isSuperadmin || mod.locked"
-              rows="6"
-              class="w-full rounded-lg p-3 text-xs leading-relaxed outline-none border transition-colors resize-y"
-              style="background-color: var(--surface-input); border-color: var(--line-1); color: var(--ink-1);"
-            ></textarea>
+            <button
+              v-if="auth.isSuperadmin"
+              class="btn btn-primary btn-sm"
+              :disabled="busy !== ''"
+              @click="savePipelineModules"
+            >
+              <Save :size="14" />
+              <span>{{ busy === 'save' ? t('admin.evolution.saving') : t('admin.evolution.saveTemplate') }}</span>
+            </button>
+          </header>
+
+          <div v-if="loading" class="evo-skel">
+            <div v-for="i in 3" :key="i" class="skeleton skeleton-row" />
           </div>
-        </div>
+
+          <BaseEmpty v-else-if="!workingModules.length" :text="t('common.noData')" />
+
+          <div v-else class="evo-mods">
+            <article v-for="(mod, mIdx) in workingModules" :key="mod.id || mIdx" class="evo-mod">
+              <header class="evo-mod-head">
+                <span class="evo-mod-n mono">#{{ mIdx + 1 }}</span>
+                <span class="evo-mod-title truncate" :title="mod.title">{{ mod.title }}</span>
+                <span v-if="mod.locked" class="badge" :title="t('admin.evolution.lockedBadge')">
+                  {{ t('admin.evolution.lockedBadge') }}
+                </span>
+                <span class="evo-mod-spacer" />
+                <BaseSwitch
+                  :model-value="mod.enabled === true"
+                  :disabled="!auth.isSuperadmin"
+                  @update:model-value="(v: boolean) => (mod.enabled = v)"
+                />
+                <span class="evo-mod-state">
+                  {{ mod.enabled ? t('admin.evolution.moduleOn') : t('admin.evolution.moduleOff') }}
+                </span>
+              </header>
+
+              <textarea
+                v-model="mod.content"
+                :disabled="!auth.isSuperadmin || mod.locked"
+                rows="6"
+                class="field evo-textarea"
+                :placeholder="t('common.notConfigured')"
+              />
+            </article>
+          </div>
+        </section>
       </div>
-    </div>
+    </template>
+
+    <!-- ══ 立即复盘确认 ══ -->
+    <BaseDialog
+      :open="runDialog.open"
+      :title="t('admin.evolution.runConfirmTitle')"
+      :desc="t('admin.evolution.runConfirmDesc')"
+      size="sm"
+      @close="closeRunDialog"
+    >
+      <label class="evo-field">
+        <span class="form-label">{{ t('admin.evolution.runConfirmPhrase') }}</span>
+        <code class="evo-phrase">{{ RUN_PHRASE }}</code>
+        <input
+          v-model="runDialog.phrase"
+          type="text"
+          class="field mono"
+          autocomplete="off"
+          :placeholder="RUN_PHRASE"
+          @keyup.enter="confirmRun"
+        />
+      </label>
+
+      <template #footer>
+        <button class="btn btn-ghost btn-sm" @click="closeRunDialog">{{ t('common.cancel') }}</button>
+        <button
+          class="btn btn-primary btn-sm"
+          :disabled="!runDialog.phrase.trim() || busy === 'run'"
+          @click="confirmRun"
+        >
+          <Loader2 v-if="busy === 'run'" :size="14" class="evo-spin" />
+          <PlayCircle v-else :size="14" />
+          <span>{{ t('admin.evolution.runConfirmSubmit') }}</span>
+        </button>
+      </template>
+    </BaseDialog>
   </div>
 </template>
+
+<style scoped>
+.evo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-4);
+}
+.evo-spin {
+  animation: evo-rotate 0.9s linear infinite;
+}
+@keyframes evo-rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.evo-error {
+  border: 1px solid var(--down-line);
+  border-radius: var(--r-card);
+  background-color: var(--ds-color-bg-surface-card);
+}
+.evo-tabs {
+  align-self: flex-start;
+}
+.evo-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.evo-tab {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-4);
+}
+
+/* ══ 复盘报告 ══ */
+.evo-rep-head {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  flex-wrap: wrap;
+}
+.evo-rep-time {
+  font-size: var(--text-3xs);
+  color: var(--ds-color-text-placeholder);
+  white-space: nowrap;
+}
+.evo-rep-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-bottom: 1px solid var(--ds-color-border-default);
+}
+@media (min-width: 900px) {
+  .evo-rep-stats {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+.evo-rep-stat {
+  display: flex;
+  flex-direction: column;
+  gap:4px;
+  padding: var(--ds-space-3) var(--ds-space-4);
+  border-right: 1px solid var(--ds-color-border-default);
+}
+.evo-rep-stat:last-child {
+  border-right: 0;
+}
+.evo-stat-v {
+  font-size: var(--text-md);
+  font-weight: 500;
+  color: var(--ds-color-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+.evo-stat-v.is-up {
+  color: var(--up);
+}
+.evo-stat-v.is-warn {
+  color: var(--warn);
+}
+.evo-verdict {
+  padding: var(--ds-space-3) var(--ds-space-4);
+  border-bottom: 1px solid var(--ds-color-border-default);
+}
+.evo-verdict p {
+  margin-top: 4px;
+  font-size: var(--text-xs);
+  line-height: var(--leading-body);
+  color: var(--ds-color-text-secondary);
+}
+.evo-insights {
+  padding: var(--ds-space-3) var(--ds-space-4) var(--ds-space-4);
+}
+.evo-insight-panel {
+  border: 0;
+  background-color: transparent;
+  padding: 6px 0 0;
+  max-height: 200px;
+}
+.evo-insight {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: var(--ds-space-2);
+  padding: 2px 0;
+  font-family: var(--ds-font-mono);
+  font-size: var(--text-2xs);
+  line-height: var(--leading-dense);
+}
+.evo-insight-n {
+  color: var(--ds-color-brand);
+}
+.evo-insight-text {
+  color: var(--ds-color-text-secondary);
+  overflow-wrap: anywhere;
+}
+
+/* ══ 运行状态带 ══ */
+.evo-band {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+@media (min-width: 640px) {
+  .evo-band {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (min-width: 1280px) {
+  .evo-band {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+.evo-fact {
+  display: flex;
+  flex-direction: column;
+  gap:4px;
+  min-width: 0;
+  padding: var(--ds-space-4);
+  border-top: 1px solid var(--ds-color-border-default);
+}
+.evo-fact:first-child {
+  border-top: 0;
+}
+@media (min-width: 640px) {
+  .evo-fact:nth-child(2) {
+    border-top: 0;
+  }
+  .evo-fact:nth-child(even) {
+    border-left: 1px solid var(--ds-color-border-default);
+  }
+}
+@media (min-width: 1280px) {
+  .evo-fact {
+    border-top: 0;
+  }
+  .evo-fact + .evo-fact {
+    border-left: 1px solid var(--ds-color-border-default);
+  }
+}
+.evo-fact-label {
+  display: flex;
+  align-items: center;
+  gap:6px;
+  font-size: var(--text-3xs);
+  font-weight: 500;
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--ds-color-text-placeholder);
+}
+.evo-fact-value {
+  font-size: var(--text-md);
+  font-weight: 500;
+  letter-spacing: var(--track-display);
+  line-height: 1.25;
+  color: var(--ds-color-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+.evo-fact-value.is-up {
+  color: var(--up);
+}
+.evo-fact-value.is-warn {
+  color: var(--warn);
+}
+.evo-fact-sub {
+  font-size: var(--text-xs);
+  color: var(--ds-color-text-placeholder);
+}
+.evo-fact-foot {
+  font-size: var(--text-3xs);
+  line-height: var(--leading-body);
+  color: var(--ds-color-text-placeholder);
+}
+
+/* ══ 心法库 ══ */
+.evo-add {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  padding: var(--ds-space-3) var(--ds-space-4);
+  border-bottom: 1px solid var(--ds-color-border-default);
+  background-color: var(--ds-color-bg-surface-inset);
+}
+.evo-add .field {
+  flex: 1;
+}
+.evo-skel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: var(--ds-space-4);
+}
+.evo-lessons {
+  display: flex;
+  flex-direction: column;
+}
+.evo-lesson {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-2);
+  padding: var(--ds-space-3) var(--ds-space-4);
+  border-bottom: 1px solid var(--ds-color-border-default);
+  transition: background-color var(--dur-fast);
+}
+.evo-lesson:last-child {
+  border-bottom: 0;
+}
+.evo-lesson:hover {
+  background-color: var(--ds-color-bg-hover);
+}
+.evo-lesson.is-off {
+  opacity: 0.6;
+}
+.evo-lesson-head {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  flex-wrap: wrap;
+}
+.evo-lesson-spacer {
+  flex: 1;
+}
+.evo-del {
+  color: var(--down);
+}
+.evo-lesson-text {
+  font-size: var(--text-xs);
+  line-height: var(--leading-body);
+  color: var(--ds-color-text-primary);
+  overflow-wrap: anywhere;
+}
+.evo-lesson-text.is-struck {
+  color: var(--ds-color-text-placeholder);
+  text-decoration: line-through;
+}
+.evo-lesson-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ds-space-3);
+  flex-wrap: wrap;
+  padding-top: 6px;
+  border-top: 1px solid var(--ds-color-border-default);
+  font-size: var(--text-4xs);
+  color: var(--ds-color-text-placeholder);
+}
+.evo-shield {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.evo-shield.is-up {
+  color: var(--up);
+}
+
+/* ══ 模版模块序列 ══ */
+.evo-mods {
+  display: flex;
+  flex-direction: column;
+}
+.evo-mod {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-2);
+  padding: var(--ds-space-3) var(--ds-space-4);
+  border-bottom: 1px solid var(--ds-color-border-default);
+}
+.evo-mod:last-child {
+  border-bottom: 0;
+}
+.evo-mod-head {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  min-width: 0;
+}
+.evo-mod-n {
+  font-size: var(--text-4xs);
+  color: var(--ds-color-text-placeholder);
+}
+.evo-mod-title {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--ds-color-text-primary);
+  min-width: 0;
+}
+.evo-mod-spacer {
+  flex: 1;
+}
+.evo-mod-state {
+  font-size: var(--text-4xs);
+  color: var(--ds-color-text-placeholder);
+  white-space: nowrap;
+}
+.evo-textarea {
+  width: 100%;
+  resize: vertical;
+  line-height: var(--leading-body);
+  font-family: var(--ds-font-mono);
+  font-size: var(--text-2xs);
+}
+
+/* 复盘确认对话框 */
+.evo-field {
+  display: flex;
+  flex-direction: column;
+  gap:8px;
+}
+.evo-phrase {
+  align-self: flex-start;
+  padding:2px 8px;
+  border-radius: var(--r-xs);
+  background-color: var(--ds-color-bg-surface-1);
+  font-family: var(--ds-font-mono);
+  font-size: var(--text-3xs);
+  color: var(--ds-color-text-primary);
+}
+</style>

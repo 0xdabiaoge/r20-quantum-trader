@@ -22,9 +22,20 @@ from typing import Any, Dict, Optional
 
 def build_signed_query(*,
         params,
-        secret):
+        secret,
+        timestamp_ms=None):
+    """构建签名串。
+
+    ⚠️ 2026-09-16 P1（时钟余量）：`timestamp_ms` 是**服务器校时后**的毫秒时间戳
+    （`None` = 用本机时钟），由 `BinanceAdapter._server_aligned_ms()` 传入
+    （实测本机比交易所慢 ~2.1s、而 recvWindow=5000ms，只剩 ~2.9s 传输/排队余量，
+    已实测撞到 `[-1021] Timestamp for this request is outside of the recvWindow`）。
+    把校时做成**显式入参**而非改本机时钟：容器内无 CAP_SYS_TIME（`date -s` 被拒），
+    且宿主机无 NTP；显式入参也让该行为可被测。
+    """
     query_dict = dict(params or {})
-    query_dict["timestamp"] = int(time.time() * 1000)
+    query_dict["timestamp"] = int(timestamp_ms if timestamp_ms is not None
+                                  else time.time() * 1000)
     query_dict["recvWindow"] = 5000
     clean_query = {k: v for k, v in query_dict.items() if v not in (None, "")}
     query_string = urlencode(clean_query)

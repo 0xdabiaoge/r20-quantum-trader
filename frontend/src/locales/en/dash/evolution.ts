@@ -1,6 +1,6 @@
 export const enEvolution = {
   title: 'Evolution',
-  desc: 'Every 6 hours the AI audits its full closed-trade ledger, distills lessons and re-injects them into prompts',
+  desc: 'Audits the full closed-trade ledger every 6 hours',
   hud: {
     at: 'Last review',
     sample: 'Sample',
@@ -16,7 +16,7 @@ export const enEvolution = {
   actions: { title: 'Action list', empty: 'No new actions this round' },
   memory: {
     title: 'Golden rules',
-    desc: 'Battle-tested discipline maintained by the AI itself; stale rules decay out',
+    desc: 'Rules the AI maintains; old ones decay by half-life',
     empty: 'Rule library is empty until the first review',
     halfLife: 'Half-life {n}d',
     remaining: '{n}% left',

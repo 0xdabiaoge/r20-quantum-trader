@@ -1,11 +1,14 @@
 <script setup lang="ts">
-/** US-005 · 三所同构账户卡：同一组件三实例；未知值渲染「—」+文字徽章，颜色不作唯一识别。 */
+/**
+ * VenueAccountCard.vue · DeepSeek Harness 开发者工作台交易所账户微卡
+ * 低饱和黑白/深灰主题、分层卡片、清晰状态指示与等宽数值
+ */
 import { computed } from 'vue';
 import { AlertTriangle, CheckCircle2, Info, PlugZap } from 'lucide-vue-next';
 import { useI18n } from '../../composables/useI18n';
 import { fmtNum } from '../../utils/format';
+import { venueColor } from '../../utils/venueMeta';
 import { listingMeta, type ListingVenueStatus } from '../../utils/listingMeta';
-import TimeAgo from '../base/TimeAgo.vue';
 import type { VenueAccount, VenueKey } from '../../stores/venueAccounts';
 
 const props = defineProps<{
@@ -21,12 +24,12 @@ const venueName = computed(() => t(`dash.venueAccounts.venueNames.${props.venue}
 
 const statusMeta = computed(() => {
   const s = props.account?.status;
-  if (!s) return { icon: Info, cls: 'dot-warn', label: t('dash.venueAccounts.status.unknown') };
+  if (!s) return { icon: Info, statusDot: 'warn', label: t('dash.venueAccounts.status.unknown') };
   switch (s) {
-    case 'ready': return { icon: CheckCircle2, cls: 'dot-live', label: t('dash.venueAccounts.status.ready') };
-    case 'unavailable': return { icon: PlugZap, cls: 'dot-down', label: t('dash.venueAccounts.status.unavailable') };
-    case 'degraded': return { icon: AlertTriangle, cls: 'dot-warn', label: t('dash.venueAccounts.status.degraded') };
-    default: return { icon: Info, cls: 'dot-warn', label: t('dash.venueAccounts.status.not_implemented') };
+    case 'ready': return { icon: CheckCircle2, statusDot: 'active', label: t('dash.venueAccounts.status.ready') };
+    case 'unavailable': return { icon: PlugZap, statusDot: 'error', label: t('dash.venueAccounts.status.unavailable') };
+    case 'degraded': return { icon: AlertTriangle, statusDot: 'warn', label: t('dash.venueAccounts.status.degraded') };
+    default: return { icon: Info, statusDot: 'warn', label: t('dash.venueAccounts.status.not_implemented') };
   }
 });
 
@@ -38,7 +41,6 @@ function count(v: number | null | undefined, unit = true): string {
   return unit ? t('dash.venueAccounts.fields.unitN', undefined, { n: v }) : String(v);
 }
 
-/** US-007 · 合约目录对账徽章：fail-open（目录不可用）只提示不吓人，未知显「—」。 */
 const listingMeta_ = computed(() => listingMeta(props.listing));
 const listingLabel = computed(() => {
   const m = listingMeta_.value;
@@ -57,50 +59,74 @@ const listingTitle = computed(() => {
 </script>
 
 <template>
-  <div class="card card-pad flex min-w-0 flex-col gap-2" data-test="venue-card" :data-venue="venue">
-    <div class="flex flex-wrap items-center justify-between gap-2">
-      <span class="t-label truncate">{{ venueName }}</span>
-      <span class="chip" :title="account?.reason || ''">
-        <span class="dot" :class="statusMeta.cls" />
-        <component :is="statusMeta.icon" class="h-3 w-3 shrink-0 opacity-80" />
-        {{ loading && !account ? t('dash.venueAccounts.loading') : statusMeta.label }}
-      </span>
+  <div
+    class="dsh-card-sub flex min-w-0 flex-col gap-2.5 p-3 transition-colors hover:border-[var(--line-2)]"
+    data-test="venue-card"
+    :data-venue="venue"
+  >
+    <!-- 卡片头部：场所标识与连接状态 -->
+    <div class="flex items-center justify-between gap-2 border-b pb-2" style="border-color: var(--line-1)">
+      <div class="flex items-center gap-1.5 min-w-0">
+        <span class="h-2 w-2 rounded-full" :style="{ backgroundColor: venueColor(venue) }" />
+        <span class="truncate font-semibold text-xs text-[var(--ink-strong)]">{{ venueName }}</span>
+      </div>
+
+      <div
+        class="dsh-pill"
+        :title="account?.reason || ''"
+      >
+        <span class="dsh-status-dot" :class="statusMeta.statusDot" />
+        <span>{{ loading && !account ? t('dash.venueAccounts.loading') : statusMeta.label }}</span>
+      </div>
     </div>
-    <dl class="grid grid-cols-2 gap-x-3 gap-y-1.5">
-      <div class="min-w-0">
-        <dt class="t-faint truncate">{{ t('dash.venueAccounts.fields.equity') }}</dt>
-        <dd class="num truncate text-sm font-bold" style="color: var(--ink-strong)" data-test="cell-equity">{{ money(account?.equity) }}</dd>
+
+    <!-- 资产与仓位数据格 -->
+    <dl class="grid grid-cols-2 gap-2 text-2xs">
+      <div class="min-w-0 rounded p-1.5" style="background-color: var(--surface-1); border: 1px solid var(--line-1)">
+        <dt class="truncate text-3xs text-[var(--ink-3)]">{{ t('dash.venueAccounts.fields.equity') }}</dt>
+        <dd class="num truncate font-mono text-xs font-bold text-[var(--ink-strong)]" data-test="cell-equity">
+          {{ money(account?.equity) }}
+        </dd>
       </div>
-      <div class="min-w-0">
-        <dt class="t-faint truncate">{{ t('dash.venueAccounts.fields.available') }}</dt>
-        <dd class="num truncate text-sm font-semibold" style="color: var(--ink-1)" data-test="cell-available">{{ money(account?.available) }}</dd>
+
+      <div class="min-w-0 rounded p-1.5" style="background-color: var(--surface-1); border: 1px solid var(--line-1)">
+        <dt class="truncate text-3xs text-[var(--ink-3)]">{{ t('dash.venueAccounts.fields.available') }}</dt>
+        <dd class="num truncate font-mono text-xs font-semibold text-[var(--ink-1)]" data-test="cell-available">
+          {{ money(account?.available) }}
+        </dd>
       </div>
-      <div class="min-w-0">
-        <dt class="t-faint truncate">{{ t('dash.venueAccounts.fields.positions') }}</dt>
-        <dd class="num truncate text-sm font-semibold" style="color: var(--ink-1)" data-test="cell-positions">{{ count(account?.positions_count) }}</dd>
+
+      <div class="min-w-0 rounded p-1.5" style="background-color: var(--surface-1); border: 1px solid var(--line-1)">
+        <dt class="truncate text-3xs text-[var(--ink-3)]">{{ t('dash.venueAccounts.fields.positions') }}</dt>
+        <dd class="num truncate font-mono text-xs font-semibold text-[var(--ink-1)]" data-test="cell-positions">
+          {{ count(account?.positions_count) }}
+        </dd>
       </div>
-      <div class="min-w-0">
-        <dt class="t-faint truncate">{{ t('dash.venueAccounts.fields.openOrders') }}</dt>
-        <dd class="num truncate text-sm font-semibold" style="color: var(--ink-1)" data-test="cell-orders">{{ count(account?.open_orders_count) }}</dd>
+
+      <div class="min-w-0 rounded p-1.5" style="background-color: var(--surface-1); border: 1px solid var(--line-1)">
+        <dt class="truncate text-3xs text-[var(--ink-3)]">{{ t('dash.venueAccounts.fields.openOrders') }}</dt>
+        <dd class="num truncate font-mono text-xs font-semibold text-[var(--ink-1)]" data-test="cell-orders">
+          {{ count(account?.open_orders_count) }}
+        </dd>
       </div>
     </dl>
-    <div class="flex min-w-0 items-center justify-between gap-2" data-test="cell-listing">
-      <dt class="t-faint shrink-0">{{ t('dash.venueAccounts.listing.label') }}</dt>
-      <dd class="min-w-0 truncate text-right" :title="listingTitle">
-        <span v-if="listingMeta_.tone === 'ok'" class="badge" style="color: var(--up)">
-          <span class="dot dot-live" />{{ listingLabel }}
+
+    <!-- 合约对账徽标与底栏说明 -->
+    <div
+      class="mt-auto flex min-w-0 items-center justify-between gap-2 border-t pt-1.5 text-3xs"
+      style="border-color: var(--line-1)"
+      data-test="cell-listing"
+    >
+      <dt class="text-[var(--ink-3)] shrink-0">{{ t('dash.venueAccounts.listing.label') }}</dt>
+      <dd class="min-w-0 truncate text-right font-mono" :title="listingTitle">
+        <span v-if="listingMeta_.tone === 'ok'" class="text-[var(--up)]">
+          ● {{ listingLabel }}
         </span>
-        <span v-else-if="listingMeta_.tone === 'warn'" class="badge" style="color: var(--warn)">
-          <span class="dot dot-warn" />{{ listingLabel }}
+        <span v-else-if="listingMeta_.tone === 'warn'" class="text-[var(--warn)]">
+          ▲ {{ listingLabel }}
         </span>
-        <span v-else class="t-faint">{{ listingLabel }}</span>
+        <span v-else class="text-[var(--ink-3)]">{{ listingLabel }}</span>
       </dd>
-    </div>
-    <div class="mt-auto flex min-w-0 items-center justify-between gap-2 border-t pt-1.5" style="border-color: var(--line-1)">
-      <span class="t-faint min-w-0 truncate" :title="account?.reason || ''">{{ account?.reason || '' }}</span>
-      <span v-if="account?.last_sync_ts" class="t-faint shrink-0">
-        <TimeAgo :time="account.last_sync_ts" />
-      </span>
     </div>
   </div>
 </template>

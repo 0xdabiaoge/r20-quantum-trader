@@ -1,104 +1,455 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { LogIn, AlertCircle, Loader2, Eye, EyeOff, ArrowLeft } from 'lucide-vue-next'
-import { useAuthStore } from '../../stores/auth'
-import { useTheme } from '../../composables/useTheme'
-import { useI18n } from '../../composables/useI18n'
-import { APP_VERSION } from '../../config/version'
+/**
+ * LoginPage.vue · 系统管理员鉴权入口
+ * ---------------------------------------------------------------------------
+ * 极简高端、通透精致的开发者控制台质感（参考 Linear / Vercel / DeepSeek）：
+ *   - 居中微发光悬浮毛玻璃工位卡片
+ *   - 严谨、专业、克制的排版与信息层级
+ *   - 真实高精度控件与平滑交互反馈
+ *
+ * 行为契约：
+ *   auth.login(username, password) → 成功后 router.push('/admin/overview')
+ *   失败时呈现 auth.error 提示；提交中禁用并显示「正在验证…」
+ */
+import { ref } from 'vue';
+import { useRouter } from 'vue-router';
+import {
+  LogIn,
+  AlertCircle,
+  Loader2,
+  Eye,
+  EyeOff,
+  ArrowLeft,
+  ShieldCheck
+} from 'lucide-vue-next';
+import { useAuthStore } from '../../stores/auth';
+import { useI18n } from '../../composables/useI18n';
+import { APP_VERSION, APP_NAME } from '../../config/version';
 
-const auth = useAuthStore()
-const router = useRouter()
-const { theme, toggleTheme } = useTheme()
-const { t } = useI18n()
+const auth = useAuthStore();
+const router = useRouter();
+const { t, currentLocale, setLocale } = useI18n();
 
-const username = ref('')
-const password = ref('')
-const showPwd = ref(false)
-const loading = ref(false)
+const username = ref('');
+const password = ref('');
+const showPwd = ref(false);
+const loading = ref(false);
 
 async function handleLogin() {
-  if (!username.value || !password.value || loading.value) return
-  loading.value = true
-  const ok = await auth.login(username.value, password.value)
-  loading.value = false
-  if (ok) router.push('/admin/overview')
+  if (!username.value || !password.value || loading.value) return;
+  loading.value = true;
+  const ok = await auth.login(username.value, password.value);
+  loading.value = false;
+  if (ok) router.push('/admin/overview');
 }
 </script>
 
 <template>
-  <div class="relative flex min-h-screen flex-col items-center justify-center p-4" style="background-color: var(--surface-0); color: var(--ink-1)">
-    <!-- 角落工具 -->
-    <div class="absolute inset-x-4 top-4 flex items-center justify-between">
-      <a href="/" class="btn btn-ghost btn-sm">
-        <ArrowLeft />{{ t('admin.login.backToScreen') }}
-      </a>
-      <button class="btn btn-quiet btn-icon" :title="t('dash.shell.settings.theme')" @click="toggleTheme">
-        <svg v-if="theme === 'dark'" viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M2 12h2m16 0h2M4.9 19.1l1.4-1.4m11.4-11.4 1.4-1.4"/></svg>
-        <svg v-else viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+  <div class="auth-page">
+    <!-- 顶部极简操作条 -->
+    <header class="auth-topbar">
+      <button class="auth-back-btn" @click="router.push('/')">
+        <ArrowLeft :size="14" />
+        <span>{{ t('admin.login.backToScreen') }}</span>
       </button>
-    </div>
 
-    <!-- 登录卡 -->
-    <div class="w-full max-w-[380px]">
-      <div class="mb-5 flex flex-col items-center text-center">
-        <img src="/favicon.svg" class="mb-3 h-12 w-12 rounded-xl" alt="" />
-        <h1 class="text-xl font-bold tracking-tight" style="color: var(--ink-strong)">{{ t('admin.login.title') }}</h1>
-        <p class="mt-1 text-xs" style="color: var(--ink-2)">{{ t('admin.login.desc') }}</p>
-      </div>
-
-      <div class="card p-5 sm:p-6">
-        <div
-          v-if="auth.error"
-          class="mb-4 flex items-start gap-2 rounded-lg border p-3 text-xs leading-relaxed"
-          style="background-color: var(--down-bg); border-color: var(--down-line); color: var(--down)"
-          role="alert"
+      <div class="auth-lang-pill">
+        <button
+          class="auth-lang-opt"
+          :class="{ 'is-active': currentLocale === 'zh-CN' }"
+          @click="setLocale('zh-CN')"
         >
-          <AlertCircle class="mt-0.5 h-4 w-4 shrink-0" />
+          中文
+        </button>
+        <span class="auth-lang-sep" />
+        <button
+          class="auth-lang-opt"
+          :class="{ 'is-active': currentLocale === 'en-US' }"
+          @click="setLocale('en-US')"
+        >
+          EN
+        </button>
+      </div>
+    </header>
+
+    <!-- 登录工位核心卡片 -->
+    <main class="auth-card-wrap">
+      <div class="auth-card">
+        <!-- 品牌标识与标题区 -->
+        <div class="auth-header">
+          <div class="auth-logo-box">
+            <img src="/favicon.svg" class="auth-logo" alt="" />
+          </div>
+          <h1 class="auth-title">{{ APP_NAME }}</h1>
+          <p class="auth-subtitle">
+            <span>{{ t('admin.login.panelTitle') }}</span>
+            <span class="auth-version-tag mono">{{ APP_VERSION }}</span>
+          </p>
+        </div>
+
+        <!-- 错误提示横幅 -->
+        <div v-if="auth.error" class="auth-alert" role="alert">
+          <AlertCircle :size="15" class="auth-alert-icon" />
           <span>{{ auth.error }}</span>
         </div>
 
-        <form class="space-y-4" @submit.prevent="handleLogin">
-          <div>
-            <label class="form-label" for="login-user">{{ t('admin.login.username') }}</label>
-            <input id="login-user" v-model="username" type="text" autocomplete="username" class="field" :placeholder="t('admin.shell.common.inputPlaceholder')" />
+        <!-- 登录表单 -->
+        <form class="auth-form" @submit.prevent="handleLogin">
+          <div class="auth-field">
+            <label class="auth-label" for="login-user">
+              {{ t('admin.login.username') }}
+            </label>
+            <input
+              id="login-user"
+              v-model="username"
+              type="text"
+              autocomplete="username"
+              class="auth-input"
+              :placeholder="t('admin.shell.common.inputPlaceholder')"
+              required
+            />
           </div>
-          <div>
-            <label class="form-label" for="login-pwd">{{ t('admin.login.password') }}</label>
-            <div class="relative">
+
+          <div class="auth-field">
+            <div class="auth-label-row">
+              <label class="auth-label" for="login-pwd">
+                {{ t('admin.login.password') }}
+              </label>
+            </div>
+            <div class="auth-input-pwd-wrap">
               <input
                 id="login-pwd"
                 v-model="password"
                 :type="showPwd ? 'text' : 'password'"
                 autocomplete="current-password"
-                class="field pe-10"
+                class="auth-input"
+                placeholder="••••••••••••"
+                required
               />
               <button
                 type="button"
-                class="btn btn-quiet btn-icon absolute end-1 top-1/2 h-7 w-7 -translate-y-1/2"
-                :aria-label="showPwd ? 'hide password' : 'show password'"
+                class="auth-eye-btn"
+                :title="showPwd ? '隐藏密码' : '显示密码'"
                 @click="showPwd = !showPwd"
               >
-                <EyeOff v-if="showPwd" class="h-3.5 w-3.5" />
-                <Eye v-else class="h-3.5 w-3.5" />
+                <EyeOff v-if="showPwd" :size="14" />
+                <Eye v-else :size="14" />
               </button>
             </div>
           </div>
-          <button type="submit" class="btn btn-primary w-full" :disabled="loading || !username || !password">
-            <LogIn v-if="!loading" />
-            <Loader2 v-else class="animate-spin" />
-            {{ loading ? t('admin.login.submitting') : t('admin.login.submit') }}
+
+          <!-- 登录主按钮 -->
+          <button
+            type="submit"
+            class="auth-submit-btn"
+            :disabled="loading || !username || !password"
+          >
+            <LogIn v-if="!loading" :size="15" />
+            <Loader2 v-else :size="15" class="auth-spin" />
+            <span>{{ loading ? t('admin.login.submitting') : t('admin.login.submit') }}</span>
           </button>
         </form>
 
-        <p class="mt-4 text-xs leading-relaxed" style="color: var(--ink-3)">
-          {{ t('admin.login.rateHint') }}
-        </p>
+        <!-- 安全警示说明 -->
+        <div class="auth-footer">
+          <ShieldCheck :size="13" class="auth-shield" />
+          <span>{{ t('admin.login.rateHint') }}</span>
+        </div>
       </div>
 
-      <p class="num mt-5 text-center text-2xs" style="color: var(--ink-3)">
-        R20 Quantum Trader · {{ APP_VERSION }} · {{ t('admin.login.secured') }}
-      </p>
-    </div>
+      <!-- 底部安全状态与版本 -->
+      <div class="auth-meta-bar mono">
+        <span class="auth-meta-dot" />
+        <span>FAIL-CLOSED HARD GATEWAYS READY</span>
+        <span class="auth-meta-sep">·</span>
+        <span>SESSION ENCRYPTED</span>
+      </div>
+    </main>
   </div>
 </template>
+
+<style scoped>
+.auth-page {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 24px;
+  background-color: #0b0c10;
+  overflow: hidden;
+}
+
+/* 顶部操作条 */
+.auth-topbar {
+  position: absolute;
+  top: 20px;
+  left: 24px;
+  right: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  z-index: 20;
+}
+
+.auth-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: var(--r-ctl);
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--ds-color-text-description);
+  font-size: var(--text-xs);
+  cursor: pointer;
+  transition: all var(--dur-fast) var(--ease-out);
+}
+.auth-back-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.auth-lang-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.auth-lang-opt {
+  border: 0;
+  background: transparent;
+  font-size: var(--text-3xs);
+  color: var(--ds-color-text-placeholder);
+  cursor: pointer;
+  padding: 2px 4px;
+  transition: color var(--dur-fast);
+}
+.auth-lang-opt.is-active {
+  color: #fff;
+  font-weight: 600;
+}
+.auth-lang-sep {
+  width: 1px;
+  height: 10px;
+  margin: 0 4px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* 卡片本体 */
+.auth-card {
+  padding: 32px 28px;
+  border-radius: 14px;
+  background-color: #12141a;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 4px 24px -2px rgba(0, 0, 0, 0.5);
+}
+
+/* 头部品牌 */
+.auth-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  margin-bottom: 24px;
+}
+.auth-logo-box {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  margin-bottom: 12px;
+  box-shadow: 0 0 16px -2px rgba(103, 153, 254, 0.2);
+}
+.auth-logo {
+  width: 22px;
+  height: 22px;
+}
+.auth-title {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: #fff;
+  margin: 0;
+}
+.auth-subtitle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-xs);
+  color: var(--ds-color-text-description);
+  margin-top: 5px;
+}
+.auth-version-tag {
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--ds-color-text-placeholder);
+}
+
+/* 错误横幅 */
+.auth-alert {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--r-ctl);
+  background: rgba(240, 113, 120, 0.1);
+  border: 1px solid rgba(240, 113, 120, 0.25);
+  color: var(--down);
+  font-size: var(--text-xs);
+  margin-bottom: 18px;
+}
+.auth-alert-icon {
+  flex-shrink: 0;
+}
+
+/* 表单主体 */
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.auth-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.auth-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.auth-label {
+  font-size: var(--text-2xs);
+  font-weight: 500;
+  color: var(--ds-color-text-secondary);
+}
+
+.auth-input {
+  width: 100%;
+  height: 38px;
+  padding: 0 12px;
+  border-radius: var(--r-ctl);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  color: #fff;
+  font-size: var(--text-xs);
+  outline: none;
+  transition: all var(--dur-fast) var(--ease-out);
+}
+.auth-input:focus {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(103, 153, 254, 0.5);
+  box-shadow: 0 0 0 3px rgba(103, 153, 254, 0.15);
+}
+.auth-input::placeholder {
+  color: var(--ds-color-text-placeholder);
+}
+
+.auth-input-pwd-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.auth-input-pwd-wrap .auth-input {
+  padding-right: 36px;
+}
+.auth-eye-btn {
+  position: absolute;
+  right: 10px;
+  border: 0;
+  background: transparent;
+  color: var(--ds-color-text-placeholder);
+  cursor: pointer;
+  transition: color var(--dur-fast);
+}
+.auth-eye-btn:hover {
+  color: #fff;
+}
+
+/* 提交主按钮 */
+.auth-submit-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  height: 38px;
+  margin-top: 8px;
+  border-radius: var(--r-ctl);
+  background: #ffffff;
+  border: 1px solid #ffffff;
+  color: #07090e;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  transition: all var(--dur-fast) var(--ease-out);
+}
+.auth-submit-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 0 16px -2px rgba(255, 255, 255, 0.35);
+  transform: translateY(-1px);
+}
+.auth-submit-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* 底部防线说明 */
+.auth-footer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 20px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  font-size: 11px;
+  color: var(--ds-color-text-placeholder);
+  line-height: 1.4;
+}
+.auth-shield {
+  color: var(--ds-color-brand);
+  flex-shrink: 0;
+}
+
+/* 下方微型状态条 */
+.auth-meta-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.3);
+}
+.auth-meta-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--up);
+  box-shadow: 0 0 6px var(--up);
+}
+.auth-meta-sep {
+  opacity: 0.5;
+}
+
+.auth-spin {
+  animation: auth-rotate 0.9s linear infinite;
+}
+@keyframes auth-rotate {
+  to { transform: rotate(360deg); }
+}
+</style>

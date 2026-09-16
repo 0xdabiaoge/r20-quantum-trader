@@ -50,4 +50,7 @@ export const enAdminAdminSys = {
     unlockPrompt: 'To unlock {name}, enter the confirmation phrase exactly: UNLOCK ADMIN {id}',
     unlocked: '{name} has been unlocked',
   },
+  // ── added by the rebuild (batch 12) ──
+  bandTotal: 'Admin accounts',
+  noUsers: 'No admin accounts',
 };

@@ -1,14 +1,45 @@
 <script setup lang="ts">
+/**
+ * CouncilPage.vue · 投委会工位
+ * ---------------------------------------------------------------------------
+ * 骨架（推倒重来）：
+ *   旧 = 一张巨型控制卡（页头 + 3 张共识模式卡 + 超时行）
+ *        + 每席位一张大卡（展开式手风琴）
+ *        + 辩论实录（3 列顾问卡 + 3 列质询卡 + 6 张标的卡）
+ *   新 = 共享 PageHeader → 议事状态带（4 项事实，含总开关）
+ *        → 议事规则卡（共识模式 + 超时 + 阵容动作）
+ *        → **席位列 / 席位编辑器 主从双栏**（替代逐席大卡手风琴）
+ *        → 辩论实录：轮次分区 + CIO 裁定 + **六标的点位矩阵表**（替代 6 张卡）
+ *
+ * 对话框化：导入从「页内展开面板」改为 BaseDialog；总开关改用 BaseSwitch。
+ * 三态：首屏骨架 · 无席位空态 · 载入失败（可重试）
+ *
+ * 后端契约（逐字未改）：
+ *   GET  /api/v1/admin/council/config        GET  /api/v1/admin/llm/models
+ *   PUT  /api/v1/admin/council/config        { buildCouncilSavePayload(cfg) }
+ *   POST /api/v1/admin/council/apply-suite   { suite_id }
+ *   POST /api/v1/admin/council/reset-role    { role_id }
+ *   POST /api/v1/admin/council/test          {}
+ *   GET  /api/v1/admin/council/export
+ *   POST /api/v1/admin/council/import        { buildCouncilImportPayload(parsed) }
+ *
+ * ⚠️ 配色：本页**不再使用** councilLogic.roleColorOf / ROLE_COLORS 的五色轮盘
+ *    （绿/琥珀/青/紫/蓝 —— 与「单一强调色 + 语义色」的工作台语言冲突）。
+ *    新设计改为中性席位牌 + CIO 走品牌强调色。该模块与其 mjs 契约测试
+ *    （frontend/tests/councilLogic.test.mjs 钉住了配色字符串）**未被改动**。
+ */
 import { fmtDate } from '../../utils/format';
-import { useToast } from '../../composables/useToast'
-import { useConfirm } from '../../composables/useConfirm'
-const toast = useToast()
-const { ask } = useConfirm()
-import { ref, onMounted } from 'vue'
-import PageHeader from '../../components/admin/PageHeader.vue'
-import { useI18n } from '../../composables/useI18n'
-import { useApi } from '../../composables/useApi'
-import { useAuthStore } from '../../stores/auth'
+import { useToast } from '../../composables/useToast';
+import { useConfirm } from '../../composables/useConfirm';
+const toast = useToast();
+const { ask } = useConfirm();
+import { computed, ref, onMounted } from 'vue';
+import PageHeader from '../../components/admin/PageHeader.vue';
+import BaseSwitch from '../../components/base/BaseSwitch.vue';
+import BaseDialog from '../../components/base/BaseDialog.vue';
+import { useI18n } from '../../composables/useI18n';
+import { useApi } from '../../composables/useApi';
+import { useAuthStore } from '../../stores/auth';
 import {
   CONSENSUS_MODES,
   DATA_SLOTS,
@@ -19,13 +50,12 @@ import {
   isCioSeat,
   isModelMissing,
   nextExpandedRole,
-  roleColorOf,
   roleDisplayName,
   roleIconKeyOf,
   roleIdOf,
   roleTitleOf,
-} from './council/councilLogic'
-import {Users,
+} from './council/councilLogic';
+import { Users,
   Shield,
   Zap,
   Cpu,
@@ -35,38 +65,41 @@ import {Users,
   Plus,
   Trash2,
   CheckCircle2,
-  ChevronDown,
-  ChevronUp,
-  ToggleLeft,
-  ToggleRight,
+  ChevronRight,
+  AlertTriangle,
   Sliders,
   Download,
-  Upload} from 'lucide-vue-next'
+  Upload,
+  Loader2,
+  Scale,
+  Clock } from 'lucide-vue-next';
 
-const { api } = useApi()
-const auth = useAuthStore()
-const { t } = useI18n()
+const { api } = useApi();
+const auth = useAuthStore();
+const { t } = useI18n();
 
-const loading = ref(true)
-const saving = ref(false)
-const testing = ref(false)
+const loading = ref(true);
+const saving = ref(false);
+const testing = ref(false);
+const loadError = ref('');
 
 const councilConfig = ref<any>({
   enabled: false,
   consensus_mode: 'standard',
   timeout_seconds: 240.0,
   roles: {},
-})
+});
 
-const availableSuites = ref<any[]>([])
-const availableModels = ref<any[]>([])
+const availableSuites = ref<any[]>([]);
+const availableModels = ref<any[]>([]);
 /** 审计 P1-4b：席位绑定的 model_id 不在模型库 → 后端会静默回落主脑，UI 必须说出来 */
 function modelMissing(role: any): boolean {
-  return isModelMissing(role, availableModels.value)
+  return isModelMissing(role, availableModels.value);
 }
-const expandedRole = ref<string>('trader_trend')
-const testResult = ref<any>(null)
-const expandedReasoning = ref<Record<string, boolean>>({})
+/** 当前选中的席位（原 `expandedRole`；加载时经 nextExpandedRole 回落） */
+const expandedRole = ref<string>('trader_trend');
+const testResult = ref<any>(null);
+const expandedReasoning = ref<Record<string, boolean>>({});
 
 /** 图标表：键由 councilLogic.roleIconKeyOf() 决定（未知席位 → 'custom'）。 */
 const roleIcons: Record<string, any> = {
@@ -75,127 +108,153 @@ const roleIcons: Record<string, any> = {
   trader_quant: Cpu,
   cio: Users,
   custom: Sliders,
+};
+
+/* ── 派生视图状态 ── */
+const seatEntries = computed<[string, any][]>(
+  () => Object.entries(councilConfig.value.roles || {}) as [string, any][],
+);
+const traderCount = computed(
+  () => seatEntries.value.filter(([id, r]) => !isCioSeat(r, id)).length,
+);
+const selectedRole = computed<any>(() => councilConfig.value.roles?.[expandedRole.value] || null);
+const consensusName = computed(() =>
+  consensusModeName(councilConfig.value.consensus_mode, t('admin.council.modeStandardName')),
+);
+
+/** 席位牌着色：CIO 走强调色，静音席位降一档，其余中性 */
+function seatTone(roleId: string, role: any): string {
+  if (isCioSeat(role, roleId)) return 'is-cio';
+  if (role?.enabled === false) return 'is-muted';
+  return '';
 }
 
 async function loadData() {
-  loading.value = true
+  loading.value = true;
+  loadError.value = '';
   try {
     const [cRes, mRes] = await Promise.all([
       api('/api/v1/admin/council/config'),
       api('/api/v1/admin/llm/models'),
-    ])
-    councilConfig.value = cRes
-    availableSuites.value = cRes.available_suites || []
-    availableModels.value = mRes.models || []
-    expandedRole.value = nextExpandedRole(Object.keys(cRes.roles || {}), expandedRole.value)
+    ]);
+    councilConfig.value = cRes;
+    availableSuites.value = cRes.available_suites || [];
+    availableModels.value = mRes.models || [];
+    expandedRole.value = nextExpandedRole(Object.keys(cRes.roles || {}), expandedRole.value);
   } catch (e: any) {
-    toast.err(`加载配置失败: ${e.message}`)
+    loadError.value = e.message;
+    toast.err(`加载配置失败: ${e.message}`);
   } finally {
-    loading.value = false
+    loading.value = false;
   }
 }
 
 async function saveConfig() {
   if (!auth.isSuperadmin) {
-    toast.err('仅超级管理员可修改投委会配置')
-    return
+    toast.err('仅超级管理员可修改投委会配置');
+    return;
   }
-  saving.value = true
+  saving.value = true;
   try {
     const res = await api('/api/v1/admin/council/config', {
       method: 'PUT',
       body: JSON.stringify(buildCouncilSavePayload(councilConfig.value)),
-    })
-    councilConfig.value = res.config
+    });
+    councilConfig.value = res.config;
     toast.ok(councilConfig.value.enabled
         ? `对冲基金投委会配置已保存并生效（${consensusModeName(councilConfig.value.consensus_mode, '标准提案模式')}）`
-        : '投委会配置已保存（当前为单模型直连决策）')
+        : '投委会配置已保存（当前为单模型直连决策）');
   } catch (e: any) {
-    toast.err(`保存失败: ${e.message}`)
+    toast.err(`保存失败: ${e.message}`);
   } finally {
-    saving.value = false
+    saving.value = false;
   }
 }
 
 // ===== 投委会配置导入 / 导出（对齐提示词工坊策略包体验） =====
-const importVisible = ref(false)
-const importRawJson = ref('')
-const importFileError = ref('')
-const importing = ref(false)
+const importVisible = ref(false);
+const importRawJson = ref('');
+const importFileError = ref('');
+const importing = ref(false);
 
 async function exportConfig() {
   try {
-    const res = await api('/api/v1/admin/council/export')
-    const blob = new Blob([JSON.stringify(res, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `r20-council-config-${fmtDate(new Date())}.json`
-    a.click()
-    URL.revokeObjectURL(url)
-    toast.ok('投委会配置已导出为 JSON 包（含全部席位提示词与议事规则）')
+    const res = await api('/api/v1/admin/council/export');
+    const blob = new Blob([JSON.stringify(res, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `r20-council-config-${fmtDate(new Date())}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.ok('投委会配置已导出为 JSON 包（含全部席位提示词与议事规则）');
   } catch (e: any) {
-    toast.err(`导出失败：${e.message}`)
+    toast.err(`导出失败：${e.message}`);
   }
 }
 
 function pickImportFile(ev: Event) {
-  const file = (ev.target as HTMLInputElement).files?.[0]
-  if (!file) return
-  const reader = new FileReader()
+  const file = (ev.target as HTMLInputElement).files?.[0];
+  if (!file) return;
+  const reader = new FileReader();
   reader.onload = () => {
-    importRawJson.value = String(reader.result || '')
-    importFileError.value = ''
-  }
-  reader.onerror = () => { importFileError.value = t('admin.council.importReadFileFailed') }
-  reader.readAsText(file)
+    importRawJson.value = String(reader.result || '');
+    importFileError.value = '';
+  };
+  reader.onerror = () => { importFileError.value = t('admin.council.importReadFileFailed'); };
+  reader.readAsText(file);
+}
+
+function closeImport() {
+  importVisible.value = false;
+  importRawJson.value = '';
+  importFileError.value = '';
 }
 
 async function doImportConfig() {
-  importFileError.value = ''
-  let payload: any
+  importFileError.value = '';
+  let payload: any;
   try {
-    payload = JSON.parse(importRawJson.value)
+    payload = JSON.parse(importRawJson.value);
   } catch {
-    importFileError.value = t('admin.council.importJsonInvalid')
-    return
+    importFileError.value = t('admin.council.importJsonInvalid');
+    return;
   }
-  importing.value = true
+  importing.value = true;
   try {
     const res = await api('/api/v1/admin/council/import', {
       method: 'POST',
       body: JSON.stringify(buildCouncilImportPayload(payload)),
-    })
-    await loadData()
-    importVisible.value = false
-    importRawJson.value = ''
-    toast.ok(`投委会配置导入成功：席位 ${(res.roles || []).join(' / ')}${res.backup_file ? `；原配置已自动备份为 ${res.backup_file}` : ''}`)
+    });
+    await loadData();
+    closeImport();
+    toast.ok(`投委会配置导入成功：席位 ${(res.roles || []).join(' / ')}${res.backup_file ? `；原配置已自动备份为 ${res.backup_file}` : ''}`);
   } catch (e: any) {
-    importFileError.value = t('admin.council.importFailed', undefined, { msg: e.message })
+    importFileError.value = t('admin.council.importFailed', undefined, { msg: e.message });
   } finally {
-    importing.value = false
+    importing.value = false;
   }
 }
 
 async function applySuite(suiteId: string) {
-  if (!auth.isSuperadmin) return
-  const _ok = await ask({ title: '载入标准投委会套件', desc: '将恢复标准交易员阵容，当前席位配置被覆盖', danger: true, okText: '载入' })
-  if (!_ok) return
+  if (!auth.isSuperadmin) return;
+  const _ok = await ask({ title: '载入标准投委会套件', desc: '将恢复标准交易员阵容，当前席位配置被覆盖', danger: true, okText: '载入' });
+  if (!_ok) return;
   try {
     const res = await api('/api/v1/admin/council/apply-suite', {
       method: 'POST',
       body: JSON.stringify({ suite_id: suiteId }),
-    })
-    councilConfig.value = res.config
-    toast.ok('已载入标准投委会阵容！')
+    });
+    councilConfig.value = res.config;
+    toast.ok('已载入标准投委会阵容！');
   } catch (e: any) {
-    toast.err(`载入失败: ${e.message}`)
+    toast.err(`载入失败: ${e.message}`);
   }
 }
 
 function addNewCustomTrader() {
-  if (!auth.isSuperadmin) return
-  const roleId = roleIdOf()
+  if (!auth.isSuperadmin) return;
+  const roleId = roleIdOf();
   councilConfig.value.roles[roleId] = {
     id: roleId,
     name: '自定义交易员',
@@ -213,631 +272,1205 @@ function addNewCustomTrader() {
     temperature: 0.2,
     is_arbitrator: false,
     model_id: '',
-  }
-  expandedRole.value = roleId
-  toast.ok('已添加自定义交易员席位，可直接编辑提示词与参数')
+  };
+  expandedRole.value = roleId;
+  toast.ok('已添加自定义交易员席位，可直接编辑提示词与参数');
 }
 
 async function removeRole(roleId: string) {
-  if (!auth.isSuperadmin) return
-  const role = councilConfig.value.roles[roleId]
+  if (!auth.isSuperadmin) return;
+  const role = councilConfig.value.roles[roleId];
   if (isCioSeat(role, roleId)) {
-    toast.warn('首席投资官 (CIO) 负责终审收口与发单，不可删除！')
-    return
+    toast.warn('首席投资官 (CIO) 负责终审收口与发单，不可删除！');
+    return;
   }
-  const _ok = await ask({ title: '移除交易员席位', desc: `【${roleDisplayName(role, roleId)}】席位将被移除`, danger: true, okText: '移除' })
-  if (!_ok) return
-  delete councilConfig.value.roles[roleId]
-  toast.warn('已移除席位，点击右上角「保存配置」后生效')
+  const _ok = await ask({ title: '移除交易员席位', desc: `【${roleDisplayName(role, roleId)}】席位将被移除`, danger: true, okText: '移除' });
+  if (!_ok) return;
+  delete councilConfig.value.roles[roleId];
+  expandedRole.value = nextExpandedRole(Object.keys(councilConfig.value.roles || {}), '');
+  toast.warn('已移除席位，点击右上角「保存配置」后生效');
 }
 
 async function resetRole(roleId: string) {
-  const _ok = await ask({ title: '恢复出厂提示词', desc: `【${roleDisplayName(councilConfig.value.roles[roleId], roleId)}】的自定义提示词将被覆盖`, danger: true, okText: '恢复' })
-  if (!_ok) return
+  const _ok = await ask({ title: '恢复出厂提示词', desc: `【${roleDisplayName(councilConfig.value.roles[roleId], roleId)}】的自定义提示词将被覆盖`, danger: true, okText: '恢复' });
+  if (!_ok) return;
   try {
     const res = await api('/api/v1/admin/council/reset-role', {
       method: 'POST',
       body: JSON.stringify({ role_id: roleId }),
-    })
-    councilConfig.value = res.config
-    toast.ok('已重置为出厂标准模板')
+    });
+    councilConfig.value = res.config;
+    toast.ok('已重置为出厂标准模板');
   } catch (e: any) {
-    toast.err(`重置失败: ${e.message}`)
+    toast.err(`重置失败: ${e.message}`);
   }
 }
 
 async function runDebateTest() {
-  testing.value = true
-  testResult.value = null
-  expandedReasoning.value = {}
-  toast.warn('投委会正在全息审阅资金与行情并组织交易员辩论（预计 10~25 秒）...')
+  testing.value = true;
+  testResult.value = null;
+  expandedReasoning.value = {};
+  toast.warn('投委会正在全息审阅资金与行情并组织交易员辩论（预计 10~25 秒）...');
   try {
     const res = await api('/api/v1/admin/council/test', {
       method: 'POST',
       body: JSON.stringify({}),
-    })
+    });
     if (res.status === 'ok') {
-      testResult.value = res
-      toast.ok(`投委会辩论与 CIO 终审完成！耗时 ${res.transcript?.total_duration_ms || 0}ms`)
+      testResult.value = res;
+      toast.ok(`投委会辩论与 CIO 终审完成！耗时 ${res.transcript?.total_duration_ms || 0}ms`);
     } else {
-      toast.err(`测试失败: ${res.error || '未知错误'}`)
+      toast.err(`测试失败: ${res.error || '未知错误'}`);
     }
   } catch (e: any) {
-    toast.err(`测试出错: ${e.message}`)
+    toast.err(`测试出错: ${e.message}`);
   } finally {
-    testing.value = false
+    testing.value = false;
   }
 }
 
-onMounted(loadData)
+/* ── 六标的落盘点位矩阵（把旧版 6 张卡摊成一张表） ── */
+const matrixRows = computed<[string, any][]>(() => {
+  const dec = testResult.value?.brain_output?.decisions;
+  return dec ? (Object.entries(dec) as [string, any][]) : [];
+});
+
+function adoptedLabel(dec: any): string {
+  if (!dec?.adopted_role) return '--';
+  if (dec.adopted_role === 'REJECT_ALL') return t('admin.council.rejectAll');
+  return t('admin.council.adoptFrom', undefined, {
+    name: councilConfig.value.roles?.[dec.adopted_role]?.name || dec.adopted_role,
+  });
+}
+function actionTone(action: string): string {
+  if (action?.includes('BUY')) return 'badge-up';
+  if (action?.includes('SELL')) return 'badge-down';
+  return '';
+}
+function priceOf(dec: any): string {
+  return dec?.limit_price || dec?.entry_price || '--';
+}
+
+onMounted(loadData);
 </script>
 
 <template>
-  <div class="space-y-4">
-    <!-- Notice Banner -->
-    <!-- 1. Top Control Station: Switch, Consensus Mode & Actions -->
-    <div class="rounded-2xl border p-4 sm:p-5 shadow-xs space-y-4" style="background-color: var(--surface-2); border-color: var(--line-1);">
-      <!-- Header row -->
-      <PageHeader :title="t('nav.admin.council')" :description="t('admin.council.desc')" stacked>
-        <template #actions>
-        <div class="flex shrink-0 items-center justify-end gap-2">
-          <span class="chip"><span class="dot" :class="councilConfig.enabled ? 'dot-up' : ''" />{{ councilConfig.enabled ? t('admin.council.chipInSession') : t('admin.council.chipDirect') }}</span>
-          <!-- Toggle Button -->
-          <button
-            type="button"
-            @click="auth.isSuperadmin && (councilConfig.enabled = !councilConfig.enabled)"
-            class="btn-admin-secondary"
-            :style="councilConfig.enabled ? { color: 'var(--up)', borderColor: 'var(--up-line)', backgroundColor: 'var(--up-bg)' } : {}"
-            :disabled="!auth.isSuperadmin"
-          >
-            <ToggleRight v-if="councilConfig.enabled" class="w-3.5 h-3.5 text-emerald-400" />
-            <ToggleLeft v-else class="w-3.5 h-3.5 opacity-50" />
-            <span>{{ councilConfig.enabled ? t('admin.council.enabledOn') : t('admin.council.enabledOff') }}</span>
-          </button>
+  <div class="cn">
+    <PageHeader :title="t('nav.admin.council')" :description="t('admin.council.desc')">
+      <template #actions>
+        <button class="btn btn-ghost btn-sm" :disabled="!auth.isSuperadmin" @click="exportConfig">
+          <Download :size="14" />
+          <span>{{ t('admin.council.export') }}</span>
+        </button>
+        <button class="btn btn-ghost btn-sm" :disabled="!auth.isSuperadmin" @click="importVisible = true">
+          <Upload :size="14" />
+          <span>{{ t('admin.council.import') }}</span>
+        </button>
+        <button class="btn btn-ghost btn-sm" :disabled="testing || !auth.isSuperadmin" @click="runDebateTest">
+          <Play :size="14" />
+          <span>{{ testing ? t('admin.council.testing') : t('admin.council.runTest') }}</span>
+        </button>
+        <button class="btn btn-primary btn-sm" :disabled="saving || !auth.isSuperadmin" @click="saveConfig">
+          <Save :size="14" />
+          <span>{{ saving ? t('admin.council.saving') : t('admin.council.save') }}</span>
+        </button>
+      </template>
+    </PageHeader>
 
-          <!-- Save Button -->
-          <button
-            @click="saveConfig"
-            :disabled="saving || !auth.isSuperadmin"
-            class="btn-admin-primary disabled:opacity-40"
-          >
-            <Save class="w-3.5 h-3.5" />
-            <span>{{ saving ? t('admin.council.saving') : t('admin.council.save') }}</span>
-          </button>
+    <!-- 载入失败 -->
+    <div v-if="loadError" class="state-block is-error cn-error">
+      <span class="state-icon"><AlertTriangle :size="17" /></span>
+      <p class="state-title">{{ t('common.loadFailed') }}</p>
+      <p class="state-desc">{{ t('common.networkError') }}</p>
+      <button class="btn btn-ghost btn-sm" style="margin-top: 4px" :disabled="loading" @click="loadData">
+        <Loader2 v-if="loading" :size="14" class="cn-spin" />
+        <RotateCcw v-else :size="14" />
+        <span>{{ t('common.retry') }}</span>
+      </button>
+    </div>
 
-          <!-- Test Button -->
-          <button
-            @click="runDebateTest"
-            :disabled="testing"
-            class="btn-admin-secondary disabled:opacity-40"
-          >
-            <Play class="w-3.5 h-3.5" :class="{ 'animate-spin': testing }" />
-            <span>{{ testing ? t('admin.council.testing') : t('admin.council.runTest') }}</span>
-          </button>
+    <template v-else>
+      <!-- ══ 议事状态带 ══ -->
+      <section class="card cn-band">
+        <template v-if="loading">
+          <div v-for="i in 4" :key="i" class="cn-fact">
+            <div class="skeleton skeleton-text" style="width: 48%" />
+            <div class="skeleton skeleton-text" style="width: 68%; height: 16px" />
+            <div class="skeleton skeleton-text" style="width: 36%" />
+          </div>
+        </template>
 
-          <!-- Export / Import Buttons -->
+        <template v-else>
+          <!-- 总开关 -->
+          <div class="cn-fact">
+            <span class="cn-fact-label"><Scale :size="12" />{{ t('admin.council.bandStatus') }}</span>
+            <span class="cn-fact-value" :class="councilConfig.enabled ? 'is-up' : ''">
+              {{ councilConfig.enabled ? t('admin.council.chipInSession') : t('admin.council.chipDirect') }}
+            </span>
+            <span class="cn-fact-foot">
+              <BaseSwitch v-model="councilConfig.enabled" :disabled="!auth.isSuperadmin" />
+              <span>{{ councilConfig.enabled ? t('admin.council.enabledOn') : t('admin.council.enabledOff') }}</span>
+            </span>
+          </div>
+
+          <div class="cn-fact">
+            <span class="cn-fact-label"><Users :size="12" />{{ t('admin.council.consensusLabel') }}</span>
+            <span class="cn-fact-value truncate">{{ consensusName }}</span>
+            <span class="cn-fact-foot mono">
+              {{ CONSENSUS_MODES.find((m) => m.id === councilConfig.consensus_mode)?.tag || '--' }}
+            </span>
+          </div>
+
+          <div class="cn-fact">
+            <span class="cn-fact-label"><Clock :size="12" />{{ t('admin.council.fieldTimeout') }}</span>
+            <span class="cn-fact-value num">{{ councilConfig.timeout_seconds }}<span class="cn-fact-sub">s</span></span>
+            <span class="cn-fact-foot">{{ t('admin.council.timeoutHint') }}</span>
+          </div>
+
+          <div class="cn-fact">
+            <span class="cn-fact-label"><Shield :size="12" />{{ t('admin.council.bandSeats') }}</span>
+            <span class="cn-fact-value num">{{ seatEntries.length }}</span>
+            <span class="cn-fact-foot">{{ t('admin.council.bandSeatsFoot', undefined, { n: traderCount }) }}</span>
+          </div>
+        </template>
+      </section>
+
+      <!-- ══ 议事规则 ══ -->
+      <section class="card">
+        <header class="card-head">
+          <div>
+            <h2 class="card-title">{{ t('admin.council.consensusLabel') }}</h2>
+            <p class="card-sub">{{ t('admin.council.timeoutHint') }}</p>
+          </div>
+          <div class="cn-head-actions">
+            <button class="btn btn-ghost btn-sm" :disabled="!auth.isSuperadmin" @click="applySuite('hedge_fund_desk')">
+              <RotateCcw :size="14" />
+              <span>{{ t('admin.council.restoreSuite') }}</span>
+            </button>
+            <button class="btn btn-ghost btn-sm" :disabled="!auth.isSuperadmin" @click="addNewCustomTrader">
+              <Plus :size="14" />
+              <span>{{ t('admin.council.addTrader') }}</span>
+            </button>
+          </div>
+        </header>
+
+        <div class="cn-modes">
           <button
-            @click="exportConfig"
+            v-for="mode in CONSENSUS_MODES"
+            :key="mode.id"
+            class="cn-mode"
+            :class="{ 'is-on': councilConfig.consensus_mode === mode.id }"
             :disabled="!auth.isSuperadmin"
-            class="btn-admin-secondary disabled:opacity-40"
-            :title="t('admin.council.exportTitle')"
+            @click="councilConfig.consensus_mode = mode.id"
           >
-            <Download class="w-3.5 h-3.5" />
-            <span>{{ t('admin.council.export') }}</span>
-          </button>
-          <button
-            @click="auth.isSuperadmin && (importVisible = !importVisible)"
-            :disabled="!auth.isSuperadmin"
-            class="btn-admin-secondary disabled:opacity-40"
-            :title="t('admin.council.importTitle')"
-          >
-            <Upload class="w-3.5 h-3.5" />
-            <span>{{ t('admin.council.import') }}</span>
+            <span class="cn-mode-top">
+              <span class="cn-mode-name">{{ mode.name }}</span>
+              <span class="badge">{{ mode.tag }}</span>
+            </span>
+            <span class="cn-mode-desc">{{ mode.desc }}</span>
           </button>
         </div>
-        </template>
-      </PageHeader>
 
-      <!-- Import Panel -->
-      <div
-        v-if="importVisible"
-        class="rounded-lg border p-3 space-y-2"
-        style="border-color: var(--line-1); background: rgba(255, 255, 255, 0.02);"
-      >
-        <p class="text-[11px]" style="color: var(--ink-2);">
-          {{ t('admin.council.importHint') }}
-        </p>
+        <div class="cn-rules-foot">
+          <label class="cn-inline">
+            <span class="label-caps">{{ t('admin.council.fieldTimeout') }}</span>
+            <input
+              v-model="councilConfig.timeout_seconds"
+              type="number"
+              :min="30"
+              :max="420"
+              step="10"
+              class="field cn-num-input"
+              :disabled="!auth.isSuperadmin"
+            />
+            <span class="cn-unit">s</span>
+          </label>
+          <span class="cn-foot-hint">{{ t('admin.council.unsavedHint') }}</span>
+        </div>
+      </section>
+
+      <!-- ══ 席位列 / 编辑器 ══ -->
+      <div class="cn-split">
+        <!-- 席位列 -->
+        <aside class="card cn-seatlist">
+          <header class="card-head">
+            <h2 class="card-title">{{ t('admin.council.seatsTitle') }}</h2>
+            <span class="badge">{{ t('admin.council.seatsCount', undefined, { n: seatEntries.length }) }}</span>
+          </header>
+
+          <div v-if="loading" class="cn-seats">
+            <div v-for="i in 4" :key="i" class="cn-seat">
+              <span class="skeleton" style="width: 24px; height: 24px; border-radius: var(--r-xs)" />
+              <span class="skeleton skeleton-text" style="flex: 1" />
+            </div>
+          </div>
+
+          <BaseEmpty v-else-if="!seatEntries.length" :text="t('admin.council.noSeats')" />
+
+          <div v-else class="cn-seats">
+            <button
+              v-for="[roleId, role] in seatEntries"
+              :key="roleId"
+              class="cn-seat"
+              :class="{ 'is-on': expandedRole === roleId }"
+              @click="expandedRole = String(roleId)"
+            >
+              <span class="cn-avatar" :class="seatTone(String(roleId), role)">
+                <component :is="roleIcons[roleIconKeyOf(String(roleId))]" :size="14" />
+              </span>
+              <span class="cn-seat-text">
+                <span class="cn-seat-name truncate">{{ role.name || roleId }}</span>
+                <span class="cn-seat-sub truncate">
+                  {{ roleTitleOf(role, isCioSeat(role, String(roleId)) ? t('admin.council.cioTitle') : 'Senior Trader') }}
+                </span>
+              </span>
+              <span v-if="isCioSeat(role, String(roleId))" class="badge badge-accent">
+                {{ t('admin.council.cioTitle') }}
+              </span>
+              <span v-else class="cn-seat-w num">{{ role.weight }}</span>
+              <ChevronRight :size="13" class="cn-seat-arrow" />
+            </button>
+          </div>
+        </aside>
+
+        <!-- 席位编辑器 -->
+        <section class="card cn-editor">
+          <BaseEmpty v-if="!selectedRole" :text="t('admin.council.editorEmpty')" />
+
+          <template v-else>
+            <header class="card-head">
+              <div class="cn-editor-id">
+                <span class="cn-avatar is-lg" :class="seatTone(expandedRole, selectedRole)">
+                  <component :is="roleIcons[roleIconKeyOf(expandedRole)]" :size="16" />
+                </span>
+                <div class="cn-editor-text">
+                  <input
+                    v-model="selectedRole.name"
+                    class="cn-name-input"
+                    :readonly="!auth.isSuperadmin"
+                    :placeholder="t('admin.council.seatNamePlaceholder')"
+                  />
+                  <span class="cn-editor-sub">
+                    {{ roleTitleOf(selectedRole, isCioSeat(selectedRole, expandedRole) ? t('admin.council.cioTitle') : 'Senior Trader') }}
+                    <template v-if="isCioSeat(selectedRole, expandedRole)"> · {{ t('admin.council.arbitratorBadge') }}</template>
+                  </span>
+                </div>
+              </div>
+
+              <div class="cn-editor-head-right">
+                <span
+                  class="badge"
+                  :class="isCioSeat(selectedRole, expandedRole)
+                    ? 'badge-accent'
+                    : (selectedRole.enabled !== false ? 'badge-up' : '')"
+                >
+                  {{ isCioSeat(selectedRole, expandedRole)
+                    ? t('admin.council.arbitratorBadge')
+                    : (selectedRole.enabled !== false ? t('admin.council.seatActive') : t('admin.council.seatMuted')) }}
+                </span>
+                <button
+                  v-if="!isCioSeat(selectedRole, expandedRole) && !isBuiltinTrader(expandedRole)"
+                  class="btn btn-danger btn-sm"
+                  :disabled="!auth.isSuperadmin"
+                  :title="t('admin.council.removeSeatTitle')"
+                  @click="removeRole(expandedRole)"
+                >
+                  <Trash2 :size="13" />
+                  <span>{{ t('common.del') }}</span>
+                </button>
+              </div>
+            </header>
+
+            <p class="cn-desc">
+              {{ selectedRole.description || t('admin.council.seatDescFallback') }}
+            </p>
+            <p v-if="modelMissing(selectedRole)" class="cn-warn">
+              <AlertTriangle :size="13" />
+              <span>{{ t('admin.council.modelMissingHint') }}</span>
+            </p>
+
+            <!-- 运行参数 -->
+            <div class="cn-params">
+              <h3 class="cn-section-title">{{ t('admin.council.paramsTitle') }}</h3>
+              <div class="cn-param-grid">
+                <label class="cn-param">
+                  <span class="label-caps">{{ t('admin.council.fieldModel') }}</span>
+                  <select
+                    v-model="selectedRole.model_id"
+                    class="field"
+                    :class="{ 'is-warn': modelMissing(selectedRole) }"
+                    :disabled="!auth.isSuperadmin"
+                  >
+                    <option value="">{{ t('admin.council.inheritGlobalBrain') }}</option>
+                    <!-- 审计 P1-4b：席位绑了模型库里没有的 id 时，旧下拉会显示成空白（等于骗人）；
+                         这里保留原值并显式标注"未登记 · 实际由主脑代答"。 -->
+                    <option v-if="modelMissing(selectedRole)" :value="selectedRole.model_id" disabled>
+                      {{ selectedRole.model_id }} · {{ t('admin.council.modelMissing') }}
+                    </option>
+                    <option v-for="m in availableModels" :key="m.id" :value="m.id">
+                      {{ m.name || m.id }}
+                    </option>
+                  </select>
+                </label>
+
+                <label v-if="!isCioSeat(selectedRole, expandedRole)" class="cn-param">
+                  <span class="label-caps" :title="t('admin.council.weightHint')">{{ t('admin.council.fieldWeight') }}</span>
+                  <input
+                    v-model="selectedRole.weight"
+                    type="number"
+                    step="0.05"
+                    min="0.1"
+                    max="1.0"
+                    class="field"
+                    :disabled="!auth.isSuperadmin"
+                  />
+                </label>
+
+                <label class="cn-param">
+                  <span class="label-caps">{{ t('admin.council.fieldTemperature') }}</span>
+                  <input
+                    v-model="selectedRole.temperature"
+                    type="number"
+                    step="0.05"
+                    min="0.0"
+                    max="1.0"
+                    class="field"
+                    :disabled="!auth.isSuperadmin"
+                  />
+                  <span class="cn-param-hint">{{ t('admin.council.temperatureHint') }}</span>
+                </label>
+
+                <div v-if="!isCioSeat(selectedRole, expandedRole)" class="cn-param">
+                  <span class="label-caps">{{ t('admin.council.seatActive') }}</span>
+                  <div class="cn-param-switch">
+                    <BaseSwitch
+                      :model-value="selectedRole.enabled !== false"
+                      :disabled="!auth.isSuperadmin"
+                      @update:model-value="(v: boolean) => (selectedRole.enabled = v)"
+                    />
+                    <span>{{ selectedRole.enabled !== false ? t('admin.council.seatActive') : t('admin.council.seatMuted') }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 提示词 -->
+            <div class="cn-prompt">
+              <div class="cn-prompt-head">
+                <h3 class="cn-section-title">{{ t('admin.council.promptTitle') }}</h3>
+                <div class="cn-slots">
+                  <span class="label-caps" :title="t('admin.council.insertSlotHint')">
+                    {{ t('admin.council.insertSlotLabel') }}
+                  </span>
+                  <button
+                    v-for="slot in DATA_SLOTS"
+                    :key="slot.k"
+                    type="button"
+                    class="cn-slot"
+                    :disabled="!auth.isSuperadmin"
+                    @click="selectedRole.prompt = selectedRole.prompt ? `${String(selectedRole.prompt).trim()}\n${t('admin.council.slotVerifyLine')}{{${slot.k}}}` : `{{${slot.k}}}`"
+                  >
+                    +&#123;&#123;{{ slot.k }}&#125;&#125;
+                  </button>
+                  <button
+                    class="btn btn-quiet btn-sm"
+                    :disabled="!auth.isSuperadmin"
+                    @click="resetRole(expandedRole)"
+                  >
+                    <RotateCcw :size="13" />
+                    <span>{{ t('admin.council.restorePrompt') }}</span>
+                  </button>
+                </div>
+              </div>
+
+              <textarea
+                v-model="selectedRole.prompt"
+                rows="10"
+                class="field cn-textarea"
+                :disabled="!auth.isSuperadmin"
+                :placeholder="t('admin.council.promptPlaceholder')"
+              />
+            </div>
+          </template>
+        </section>
+      </div>
+
+      <!-- ══ 辩论实录 ══ -->
+      <section v-if="testResult" class="card cn-transcript">
+        <header class="card-head">
+          <div class="cn-tr-head">
+            <h2 class="card-title"><CheckCircle2 :size="14" />{{ t('admin.council.transcriptTitle') }}</h2>
+            <span class="badge badge-accent">
+              {{ t('admin.council.consensusLabel') }} {{ testResult.transcript?.consensus_mode }}
+            </span>
+            <span class="badge badge-up">
+              {{ t('admin.council.totalDuration') }} {{ testResult.transcript?.total_duration_ms }}ms
+            </span>
+            <!-- 审计 P1-4c：本轮辩论的行情/资金到底来自哪里、缺了什么 -->
+            <span
+              v-if="testResult.market_context"
+              class="badge"
+              :class="(testResult.market_context.missing || []).length ? 'badge-warn' : ''"
+              :title="(testResult.market_context.missing || []).join('；')"
+            >
+              {{ testResult.market_context.source === 'manual_mock'
+                ? t('admin.council.ctxManualMock')
+                : t('admin.council.ctxLive', undefined, { n: testResult.market_context.instruments ?? 0 }) }}
+              <template v-if="(testResult.market_context.missing || []).length">
+                · {{ t('admin.council.ctxMissing', undefined, { n: testResult.market_context.missing.length }) }}
+              </template>
+            </span>
+          </div>
+          <button class="btn btn-ghost btn-sm" @click="testResult = null">
+            {{ t('admin.council.collapse') }}
+          </button>
+        </header>
+
+        <div class="cn-body">
+          <!-- 第一轮 -->
+          <div class="cn-round">
+            <h3 class="cn-round-title">{{ t('admin.council.round1Title') }}</h3>
+            <div class="cn-adv-grid">
+              <article
+                v-for="(adv, key) in testResult.transcript?.advisors || {}"
+                :key="key"
+                class="cn-adv"
+              >
+                <header class="cn-adv-head">
+                  <span class="cn-adv-name">{{ adv.role_name }}</span>
+                  <span
+                    class="cn-adv-model mono truncate"
+                    :class="{ 'is-warn': adv.model_fallback }"
+                    :title="adv.model_note || ''"
+                  >
+                    {{ adv.model_fallback ? t('admin.council.modelFallbackTag', undefined, { model: adv.model_requested }) : adv.model_used }}
+                  </span>
+                </header>
+                <div class="cn-adv-meta mono">
+                  <span>{{ t('admin.council.responseLabel') }} {{ adv.latency_ms }}ms</span>
+                  <span v-if="adv.proposal_id">ID: {{ adv.proposal_id }}</span>
+                </div>
+                <p class="cn-adv-body">{{ adv.content }}</p>
+                <div v-if="adv.reasoning" class="cn-adv-reason">
+                  <button
+                    class="btn btn-quiet btn-sm"
+                    @click="expandedReasoning[String(key)] = !expandedReasoning[String(key)]"
+                  >
+                    {{ expandedReasoning[String(key)] ? t('admin.council.collapseReasoning') : t('admin.council.expandReasoning') }}
+                  </button>
+                  <pre v-if="expandedReasoning[String(key)]" class="code-block">{{ adv.reasoning }}</pre>
+                </div>
+              </article>
+            </div>
+          </div>
+
+          <!-- 第二轮 -->
+          <div
+            v-if="testResult.transcript?.cross_examinations && Object.keys(testResult.transcript.cross_examinations).length > 0"
+            class="cn-round"
+          >
+            <h3 class="cn-round-title is-warn">{{ t('admin.council.round2Title') }}</h3>
+            <div class="cn-adv-grid">
+              <article
+                v-for="(crit, cKey) in testResult.transcript.cross_examinations"
+                :key="cKey"
+                class="cn-adv"
+              >
+                <header class="cn-adv-head">
+                  <span class="cn-adv-name">
+                    {{ t('admin.council.critiqueBy', undefined, { name: crit.role_name || cKey }) }}
+                  </span>
+                  <span class="cn-adv-model mono" :class="{ 'is-warn': crit.status === 'ok' }">
+                    {{ crit.status === 'ok'
+                      ? `${crit.latency_ms}ms`
+                      : (crit.status === 'skipped' ? t('admin.council.critiqueSkipped') : t('admin.council.critiqueError')) }}
+                  </span>
+                </header>
+                <p class="cn-adv-body">{{ crit.content }}</p>
+              </article>
+            </div>
+          </div>
+
+          <!-- CIO 终审判定 -->
+          <div class="cn-verdict">
+            <header class="cn-verdict-head">
+              <h3 class="cn-round-title">{{ t('admin.council.verdictTitle') }}</h3>
+              <span
+                class="cn-adv-model mono"
+                :class="{ 'is-warn': testResult.transcript?.arbitrator?.model_fallback }"
+                :title="testResult.transcript?.arbitrator?.model_note || ''"
+              >
+                {{ testResult.transcript?.arbitrator?.model_fallback
+                  ? t('admin.council.modelFallbackTag', undefined, { model: testResult.transcript?.arbitrator?.model_requested })
+                  : testResult.transcript?.arbitrator?.model_used }}
+                · {{ t('admin.council.reviewDuration') }} {{ testResult.transcript?.arbitrator?.latency_ms }}ms
+              </span>
+            </header>
+
+            <div class="cn-macro">
+              <span class="label-caps">{{ t('admin.council.capitalSummary') }}</span>
+              <p>{{ testResult.brain_output?.macro_assessment }}</p>
+            </div>
+
+            <!-- 六标的点位矩阵 -->
+            <div v-if="matrixRows.length" class="cn-matrix">
+              <h4 class="cn-section-title">{{ t('admin.council.matrixTitle') }}</h4>
+              <div class="cn-table-wrap">
+                <table class="table">
+                  <thead>
+                    <tr>
+                      <th>{{ t('admin.council.matrixColSymbol') }}</th>
+                      <th>{{ t('admin.council.matrixColAdopted') }}</th>
+                      <th>{{ t('admin.council.matrixColAction') }}</th>
+                      <th class="col-num">{{ t('admin.council.matrixColConf') }}</th>
+                      <th class="col-num">{{ t('admin.council.matrixColEntry') }}</th>
+                      <th class="col-num">{{ t('admin.council.matrixColStop') }}</th>
+                      <th class="col-num">{{ t('admin.council.matrixColTp') }}</th>
+                      <th>{{ t('admin.council.matrixColReason') }}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="[sym, dec] in matrixRows" :key="sym">
+                      <td class="cn-sym">{{ sym }}</td>
+                      <td>
+                        <span class="badge" :class="dec.adopted_role === 'REJECT_ALL' ? '' : 'badge-accent'">
+                          {{ adoptedLabel(dec) }}
+                        </span>
+                      </td>
+                      <td>
+                        <span class="badge" :class="actionTone(dec.action)">
+                          {{ dec.action || 'WAIT' }}
+                        </span>
+                      </td>
+                      <td class="col-num">{{ dec.confidence || 0 }}%</td>
+                      <td class="col-num mono">{{ dec.action === 'WAIT' ? '--' : '$' + priceOf(dec) }}</td>
+                      <td class="col-num mono cn-down">{{ dec.action === 'WAIT' ? '--' : '$' + (dec.stop_loss || '--') }}</td>
+                      <td class="col-num mono cn-up">{{ dec.action === 'WAIT' ? '--' : '$' + (dec.take_profit || '--') }}</td>
+                      <td class="cn-reason" :title="dec.reasoning || dec.reason || ''">
+                        {{ dec.action === 'WAIT'
+                          ? t('admin.council.waitNote')
+                          : (dec.reasoning || dec.reason || t('admin.council.defaultReason')) }}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </template>
+
+    <!-- ══ 导入配置对话框 ══ -->
+    <BaseDialog
+      :open="importVisible"
+      :title="t('admin.council.import')"
+      :desc="t('admin.council.importHint')"
+      size="lg"
+      @close="closeImport"
+    >
+      <div class="cn-import">
         <input
           type="file"
           accept="application/json,.json"
+          class="cn-file"
           @change="pickImportFile"
-          class="text-[11px]"
-          style="color: var(--ink-2);"
         />
         <textarea
           v-model="importRawJson"
-          rows="8"
+          rows="10"
+          class="field cn-textarea mono"
           :placeholder="t('admin.council.importPlaceholder')"
-          class="w-full text-[11px] rounded p-2 bg-transparent border"
-          style="border-color: var(--line-1); color: var(--ink-1);"
-        ></textarea>
-        <p v-if="importFileError" class="text-[11px]" style="color: var(--down);">{{ importFileError }}</p>
-        <div class="flex gap-2">
-          <button
-            @click="doImportConfig"
-            :disabled="importing || !importRawJson.trim()"
-            class="btn-admin-primary disabled:opacity-40"
-          >
-            <Upload class="w-3.5 h-3.5" />
-            <span>{{ importing ? t('admin.council.importing') : t('admin.council.confirmImport') }}</span>
-          </button>
-          <button
-            @click="importVisible = false; importRawJson = ''; importFileError = ''"
-            class="btn-admin-secondary"
-          >
-            <span>{{ t('admin.council.cancel') }}</span>
-          </button>
-        </div>
+        />
+        <p v-if="importFileError" class="cn-warn">
+          <AlertTriangle :size="13" />
+          <span>{{ importFileError }}</span>
+        </p>
       </div>
 
-      <!-- Consensus Mode Selection Grid -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div
-          v-for="mode in CONSENSUS_MODES"
-          :key="mode.id"
-          @click="auth.isSuperadmin && (councilConfig.consensus_mode = mode.id)"
-          class="p-3 rounded-xl border transition-all cursor-pointer shadow-xs"
-          :style="councilConfig.consensus_mode === mode.id
-            ? { borderColor: 'var(--accent-line)', backgroundColor: 'var(--accent-bg)' }
-            : { borderColor: 'var(--line-1)', backgroundColor: 'var(--surface-1)' }"
-        >
-          <div class="flex items-center justify-between mb-1">
-            <span class="text-xs font-bold" style="color: var(--ink-1);">{{ mode.name }}</span>
-            <span
-              class="text-[11px] px-1.5 py-0.5 rounded-[3px] border font-bold"
-              :style="councilConfig.consensus_mode === mode.id
-                ? { backgroundColor: 'var(--surface-2)', color: 'var(--ink-1)', borderColor: 'var(--line-2)' }
-                : { backgroundColor: 'var(--surface-2)', color: 'var(--ink-2)', borderColor: 'var(--line-1)' }"
-            >
-              {{ mode.tag }}
-            </span>
-          </div>
-          <p class="text-[11px] leading-relaxed" style="color: var(--ink-2);">
-            {{ mode.desc }}
-          </p>
-        </div>
-      </div>
-
-      <!-- Quick Timeout & Preset Bar -->
-      <div class="flex flex-wrap items-center justify-between gap-3 pt-2 border-t" style="border-color: var(--line-1);">
-        <div class="flex items-center space-x-2">
-          <span class="text-[11px] font-bold" style="color: var(--ink-2);">{{ t('admin.council.timeoutLabel') }}</span>
-          <input
-            v-model="councilConfig.timeout_seconds"
-            type="number"
-            :min="30"
-            :max="420"
-            step="10"
-            class="w-16 rounded-lg px-2 py-1 text-xs outline-none border text-center"
-            style="background-color: var(--surface-input); border-color: var(--line-1); color: var(--ink-1);"
-            :disabled="!auth.isSuperadmin"
-          />
-          <span class="text-[11px] text-[var(--ink-2)]">{{ t('admin.council.timeoutHint') }}</span>
-        </div>
-
-        <div class="flex items-center space-x-2">
-          <button
-            @click="applySuite('hedge_fund_desk')"
-            :disabled="!auth.isSuperadmin"
-            class="flex items-center space-x-1 px-2.5 py-1 rounded-lg border text-xs cursor-pointer transition-all"
-            style="background-color: var(--surface-1); border-color: var(--line-1); color: var(--ink-1);"
-          >
-            <RotateCcw class="w-3 h-3 text-purple-400" />
-            <span>{{ t('admin.council.restoreSuite') }}</span>
-          </button>
-          <button
-            @click="addNewCustomTrader"
-            :disabled="!auth.isSuperadmin"
-            class="flex items-center space-x-1 px-2.5 py-1 rounded-lg border border-dashed text-xs cursor-pointer transition-all"
-            style="border-color: var(--accent); color: var(--accent);"
-          >
-            <Plus class="w-3 h-3" />
-            <span>{{ t('admin.council.addTrader') }}</span>
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- 2. Trader Seats & CIO Desk (Core Cards) -->
-    <div class="space-y-3">
-      <div
-        v-for="(role, roleId) in councilConfig.roles"
-        :key="roleId"
-        class="rounded-2xl border p-4 sm:p-5 transition-all shadow-xs"
-        :style="{
-          backgroundColor: expandedRole === roleId ? 'var(--surface-1)' : 'var(--surface-2)',
-          borderColor: expandedRole === roleId ? 'var(--accent-line)' : 'var(--line-1)',
-          opacity: role.enabled === false ? '0.6' : '1'
-        }"
-      >
-        <!-- Seat Row -->
-        <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
-          <!-- Left: Identity -->
-          <div class="flex items-center space-x-3 min-w-0 flex-1">
-            <span
-              class="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs border shrink-0"
-              :class="roleColorOf(String(roleId))"
-            >
-              <component :is="roleIcons[roleIconKeyOf(String(roleId))]" class="w-4 h-4" />
-            </span>
-            <div class="min-w-0 flex-1">
-              <div class="flex flex-wrap items-center gap-2">
-                <input
-                  v-model="role.name"
-                  class="bg-transparent border-b border-dashed text-sm font-bold outline-none max-w-[240px]"
-                  style="border-color: var(--line-2); color: var(--ink-1);"
-                  :readonly="!auth.isSuperadmin"
-                  :placeholder="t('admin.council.seatNamePlaceholder')"
-                />
-                <span
-                  class="rounded px-2 py-0.5 text-[11px] border"
-                  style="background-color: var(--surface-1); border-color: var(--line-1); color: var(--ink-2);"
-                >
-                  {{ roleTitleOf(role, isCioSeat(role, String(roleId)) ? t('admin.council.cioTitle') : 'Senior Trader') }}
-                </span>
-                <span
-                  v-if="isCioSeat(role, String(roleId))"
-                  class="text-[11px] font-bold px-1.5 py-0.2 rounded border shrink-0 text-purple-400 border-purple-500/30 bg-purple-500/10"
-                >
-                  {{ t('admin.council.arbitratorBadge') }}
-                </span>
-                <span
-                  v-else
-                  class="text-[11px] px-1.5 py-0.2 rounded border shrink-0"
-                  :style="role.enabled !== false ? { backgroundColor: 'var(--up-bg)', color: 'var(--up)', borderColor: 'var(--up-line)' } : { backgroundColor: 'var(--surface-3)', color: 'var(--ink-3)', borderColor: 'var(--line-1)' }"
-                >
-                  {{ role.enabled !== false ? t('admin.council.seatActive') : t('admin.council.seatMuted') }}
-                </span>
-              </div>
-              <p class="text-[11px] mt-0.5 truncate" style="color: var(--ink-2);">
-                {{ role.description || t('admin.council.seatDescFallback') }}
-              </p>
-              <p v-if="modelMissing(role)" class="text-[10px] mt-0.5" style="color: var(--warn);">
-                {{ t('admin.council.modelMissingHint') }}
-              </p>
-            </div>
-          </div>
-
-          <!-- Right: Model Binding, Weight & Controls -->
-          <div class="flex flex-wrap items-center justify-end gap-2 shrink-0">
-            <!-- Bound Model -->
-            <div class="flex items-center space-x-1">
-              <span class="text-[11px]" :style="{ color: modelMissing(role) ? 'var(--warn)' : 'var(--ink-2)' }">
-                {{ t('admin.council.modelLabel') }}
-              </span>
-              <select
-                v-model="role.model_id"
-                class="rounded-xl px-2 py-1 text-xs outline-none border cursor-pointer max-w-[170px]"
-                :style="{ backgroundColor: 'var(--surface-input)', borderColor: modelMissing(role) ? 'var(--warn-line)' : 'var(--line-1)', color: modelMissing(role) ? 'var(--warn)' : 'var(--ink-1)' }"
-                :disabled="!auth.isSuperadmin"
-              >
-                <option value="">{{ t('admin.council.inheritGlobalBrain') }}</option>
-                <!-- 审计 P1-4b：席位绑了模型库里没有的 id 时，旧下拉会显示成空白（等于骗人）；
-                     这里保留原值并显式标注"未登记 · 实际由主脑代答"。 -->
-                <option v-if="modelMissing(role)" :value="role.model_id" disabled>
-                  ⚠ {{ role.model_id }} · {{ t('admin.council.modelMissing') }}
-                </option>
-                <option v-for="m in availableModels" :key="m.id" :value="m.id">
-                  {{ m.name || m.id }}
-                </option>
-              </select>
-            </div>
-
-            <!-- Weight (For traders only) -->
-            <div v-if="!isCioSeat(role, String(roleId))" class="flex items-center space-x-1">
-              <span class="text-[11px] text-[var(--ink-2)]" :title="t('admin.council.weightHint')">{{ t('admin.council.weightLabel') }}</span>
-              <input
-                v-model="role.weight"
-                type="number"
-                step="0.05"
-                min="0.1"
-                max="1.0"
-                class="w-14 rounded-xl px-1.5 py-1 text-xs outline-none text-center border"
-                style="background-color: var(--surface-input); border-color: var(--line-1); color: var(--ink-1);"
-                :disabled="!auth.isSuperadmin"
-              />
-            </div>
-
-            <!-- Enable / Mute Toggle -->
-            <button
-              v-if="!isCioSeat(role, String(roleId))"
-              @click="role.enabled = role.enabled === false ? true : false"
-              :disabled="!auth.isSuperadmin"
-              class="cursor-pointer p-1"
-              :class="role.enabled !== false ? 'text-emerald-400' : 'text-zinc-500'"
-              :title="role.enabled !== false ? t('admin.council.muteTitle') : t('admin.council.activateTitle')"
-            >
-              <ToggleRight v-if="role.enabled !== false" class="w-5 h-5" />
-              <ToggleLeft v-else class="w-5 h-5" />
-            </button>
-
-            <!-- Delete (Only for custom traders) -->
-            <button
-              v-if="!isCioSeat(role, String(roleId)) && !isBuiltinTrader(String(roleId))"
-              @click="removeRole(String(roleId))"
-              :disabled="!auth.isSuperadmin"
-              class="p-1.5 rounded text-rose-400 hover:opacity-80 cursor-pointer"
-              :title="t('admin.council.removeSeatTitle')"
-            >
-              <Trash2 class="w-3.5 h-3.5" />
-            </button>
-
-            <!-- Expand Accordion Button -->
-            <button
-              @click="expandedRole = expandedRole === roleId ? '' : String(roleId)"
-              class="p-1.5 rounded cursor-pointer transition-colors"
-              style="color: var(--ink-2);"
-              :title="t('admin.council.expandPromptTitle')"
-            >
-              <ChevronUp v-if="expandedRole === roleId" class="w-4 h-4" />
-              <ChevronDown v-else class="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
-        <!-- Expanded Custom Prompt & Parameter Tuning -->
-        <div v-if="expandedRole === roleId" class="mt-3 pt-3 border-t space-y-3" style="border-color: var(--line-1);">
-          <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
-            <div class="flex items-center space-x-2">
-              <span style="color: var(--ink-2);">{{ t('admin.council.temperatureLabel') }}</span>
-              <input
-                v-model="role.temperature"
-                type="number"
-                step="0.05"
-                min="0.0"
-                max="1.0"
-                class="w-16 rounded-lg px-2 py-0.5 text-xs outline-none text-center border"
-                style="background-color: var(--surface-input); border-color: var(--line-1); color: var(--ink-1);"
-                :disabled="!auth.isSuperadmin"
-              />
-              <span class="text-[11px] text-[var(--ink-2)]">{{ t('admin.council.temperatureHint') }}</span>
-            </div>
-
-            <!-- Quick Data Slots Inserter -->
-            <div class="flex flex-wrap items-center gap-1 text-[11px]">
-              <span class="text-[var(--ink-2)]" :title="t('admin.council.insertSlotHint')">{{ t('admin.council.insertSlotLabel') }}</span>
-              <button
-                v-for="slot in DATA_SLOTS"
-                :key="slot.k"
-                type="button"
-                @click="role.prompt = role.prompt ? `${role.prompt.trim()}\n${t('admin.council.slotVerifyLine')}{{${slot.k}}}` : `{{${slot.k}}}`"
-                class="px-2 py-0.5 rounded-md border cursor-pointer hover:border-purple-400 transition-colors"
-                style="background-color: var(--surface-2); border-color: var(--line-1); color: var(--ink-1);"
-              >
-                +&#123;&#123;{{ slot.k }}&#125;&#125;
-              </button>
-
-              <button
-                @click="resetRole(String(roleId))"
-                :disabled="!auth.isSuperadmin"
-                class="ml-2 flex items-center space-x-1 text-[11px] text-purple-400 hover:underline cursor-pointer"
-              >
-                <RotateCcw class="w-3 h-3" />
-                <span>{{ t('admin.council.restorePrompt') }}</span>
-              </button>
-            </div>
-          </div>
-
-          <!-- Prompt Editor Textarea -->
-          <textarea
-            v-model="role.prompt"
-            rows="6"
-            class="w-full rounded-xl p-3 text-xs outline-none border leading-relaxed resize-y select-text transition-colors"
-            style="background-color: var(--surface-input); border-color: var(--line-1); color: var(--ink-1);"
-            :disabled="!auth.isSuperadmin"
-            :placeholder="t('admin.council.promptPlaceholder')"
-          ></textarea>
-        </div>
-      </div>
-    </div>
-
-    <!-- 3. Live Deliberation Docket & CIO Verdict (Only shown after test run) -->
-    <div v-if="testResult" class="rounded-2xl border p-4 sm:p-5 space-y-4 shadow-lg" style="background-color: var(--surface-2); border-color: var(--accent-line);">
-      <div class="flex items-center justify-between pb-3 border-b" style="border-color: var(--line-1);">
-        <div class="flex flex-wrap items-center gap-2">
-          <CheckCircle2 class="w-4 h-4 text-emerald-400" />
-          <h3 class="text-sm font-bold" style="color: var(--ink-1);">{{ t('admin.council.transcriptTitle') }}</h3>
-          <span class="text-[11px] px-2 py-0.5 rounded border border-purple-500/30 bg-purple-500/10 text-purple-400">
-            {{ t('admin.council.consensusLabel') }} {{ testResult.transcript?.consensus_mode }}
-          </span>
-          <span class="text-[11px] px-2 py-0.5 rounded border border-emerald-500/30 bg-emerald-500/10 text-emerald-400">
-            {{ t('admin.council.totalDuration') }} {{ testResult.transcript?.total_duration_ms }}ms
-          </span>
-          <!-- 审计 P1-4c：本轮辩论的行情/资金到底来自哪里、缺了什么 -->
-          <span
-            v-if="testResult.market_context"
-            class="text-[11px] px-2 py-0.5 rounded border"
-            :style="{
-              borderColor: (testResult.market_context.missing || []).length ? 'var(--warn-line)' : 'var(--line-1)',
-              color: (testResult.market_context.missing || []).length ? 'var(--warn)' : 'var(--ink-2)',
-            }"
-            :title="(testResult.market_context.missing || []).join('；')"
-          >
-            {{ testResult.market_context.source === 'manual_mock'
-              ? t('admin.council.ctxManualMock')
-              : t('admin.council.ctxLive', undefined, { n: testResult.market_context.instruments ?? 0 }) }}
-            <template v-if="(testResult.market_context.missing || []).length">
-              · {{ t('admin.council.ctxMissing', undefined, { n: testResult.market_context.missing.length }) }}
-            </template>
-          </span>
-        </div>
+      <template #footer>
+        <button class="btn btn-ghost btn-sm" @click="closeImport">{{ t('admin.council.cancel') }}</button>
         <button
-          @click="testResult = null"
-          class="text-xs cursor-pointer px-3 py-1 rounded-lg border"
-          style="background-color: var(--surface-1); border-color: var(--line-1); color: var(--ink-2);"
+          class="btn btn-primary btn-sm"
+          :disabled="importing || !importRawJson.trim()"
+          @click="doImportConfig"
         >
-          {{ t('admin.council.collapse') }}
+          <Upload :size="14" />
+          <span>{{ importing ? t('admin.council.importing') : t('admin.council.confirmImport') }}</span>
         </button>
-      </div>
-
-      <!-- Traders' Proposals Grid -->
-      <div class="space-y-1">
-        <div class="text-xs font-bold text-zinc-400">{{ t('admin.council.round1Title') }}</div>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <div
-            v-for="(adv, key) in testResult.transcript?.advisors || {}"
-            :key="key"
-            class="rounded-xl border p-3.5 space-y-2 flex flex-col justify-between"
-            style="background-color: var(--surface-1); border-color: var(--line-1);"
-          >
-            <div class="space-y-1">
-              <div class="flex items-center justify-between text-xs font-bold">
-                <span style="color: var(--ink-1);">{{ adv.role_name }}</span>
-                <span
-                  class="text-[11px] truncate max-w-[140px]"
-                  :style="{ color: adv.model_fallback ? 'var(--warn)' : 'var(--accent)' }"
-                  :title="adv.model_note || ''"
-                >
-                  {{ adv.model_fallback ? t('admin.council.modelFallbackTag', undefined, { model: adv.model_requested }) : adv.model_used }}
-                </span>
-              </div>
-              <div class="flex items-center justify-between text-[11px] text-[var(--ink-2)]">
-                <span>{{ t('admin.council.responseLabel') }} {{ adv.latency_ms }}ms</span>
-                <span v-if="adv.proposal_id" class="text-zinc-500 text-[11px]">ID: {{ adv.proposal_id }}</span>
-              </div>
-              <p class="text-xs whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto pr-1 select-text" style="color: var(--ink-2);">
-                {{ adv.content }}
-              </p>
-            </div>
-
-            <div v-if="adv.reasoning" class="pt-2 border-t" style="border-color: var(--line-1);">
-              <button
-                @click="expandedReasoning[String(key)] = !expandedReasoning[String(key)]"
-                class="text-[11px] text-purple-400 cursor-pointer"
-              >
-                <span>{{ expandedReasoning[String(key)] ? t('admin.council.collapseReasoning') : t('admin.council.expandReasoning') }}</span>
-              </button>
-              <div
-                v-if="expandedReasoning[String(key)]"
-                class="mt-1.5 p-2 rounded text-[11px] whitespace-pre-wrap max-h-36 overflow-y-auto select-text border"
-                style="background-color: var(--surface-2); border-color: var(--line-1); color: var(--ink-2);"
-              >
-                {{ adv.reasoning }}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Optional: Round 2 Cross-Examinations Grid (only in cross_examination mode) -->
-      <div v-if="testResult.transcript?.cross_examinations && Object.keys(testResult.transcript.cross_examinations).length > 0" class="space-y-1 pt-2">
-        <div class="flex items-center space-x-2 text-xs font-bold text-amber-400">
-          <span>{{ t('admin.council.round2Title') }}</span>
-        </div>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <div
-            v-for="(crit, cKey) in testResult.transcript.cross_examinations"
-            :key="cKey"
-            class="rounded-xl border p-3.5 space-y-2"
-            style="background-color: var(--surface-1); border-color: var(--line-1);"
-          >
-            <div class="flex items-center justify-between text-xs font-bold">
-              <span style="color: var(--ink-1);">{{ t('admin.council.critiqueBy', undefined, { name: crit.role_name || cKey }) }}</span>
-              <span class="text-[11px]" :class="crit.status === 'ok' ? 'text-amber-400' : 'text-zinc-500'">
-                {{ crit.status === 'ok' ? `${crit.latency_ms}ms` : (crit.status === 'skipped' ? t('admin.council.critiqueSkipped') : t('admin.council.critiqueError')) }}
-              </span>
-            </div>
-            <p class="text-xs whitespace-pre-wrap leading-relaxed max-h-40 overflow-y-auto pr-1 select-text" style="color: var(--ink-2);">
-              {{ crit.content }}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <!-- CIO Arbitrated Verdict & Order Dispatch -->
-      <div class="rounded-xl border p-4 space-y-3" style="background-color: var(--surface-1); border-color: var(--accent-line);">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center space-x-2">
-            <span class="text-xs font-bold text-purple-400">{{ t('admin.council.cioVerdictTitle') }}</span>
-            <span
-              class="text-[11px]"
-              :style="{ color: testResult.transcript?.arbitrator?.model_fallback ? 'var(--warn)' : 'var(--ink-2)' }"
-              :title="testResult.transcript?.arbitrator?.model_note || ''"
-            >
-              {{ testResult.transcript?.arbitrator?.model_fallback
-                ? t('admin.council.modelFallbackTag', undefined, { model: testResult.transcript?.arbitrator?.model_requested })
-                : testResult.transcript?.arbitrator?.model_used }}
-              · {{ t('admin.council.reviewDuration') }} {{ testResult.transcript?.arbitrator?.latency_ms }}ms
-            </span>
-          </div>
-          <span class="text-[11px] font-bold px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
-            {{ t('admin.council.adoptionBadge') }}
-          </span>
-        </div>
-
-        <div class="text-xs font-bold leading-relaxed p-2.5 rounded border text-emerald-400" style="background-color: var(--surface-2); border-color: var(--line-1);">
-          {{ t('admin.council.capitalSummary') }} {{ testResult.brain_output?.macro_assessment }}
-        </div>
-
-        <!-- 6 Instruments Points Matrix -->
-        <div v-if="testResult.brain_output?.decisions" class="space-y-1.5">
-          <div class="text-xs font-bold" style="color: var(--ink-1);">{{ t('admin.council.matrixTitle') }}</div>
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 text-xs">
-            <div
-              v-for="(dec, sym) in testResult.brain_output?.decisions"
-              :key="sym"
-              class="p-3 rounded-xl border flex flex-col justify-between space-y-2"
-              style="background-color: var(--surface-2); border-color: var(--line-1);"
-            >
-              <div class="flex items-center justify-between gap-1.5">
-                <span class="font-semibold text-sm" style="color: var(--ink-1);">{{ sym }}</span>
-                <div class="flex items-center gap-1">
-                  <span
-                    v-if="dec.adopted_role"
-                    class="px-1.5 py-0.5 rounded text-[11px] font-bold border"
-                    :class="dec.adopted_role === 'REJECT_ALL' ? 'text-zinc-400 border-zinc-700 bg-zinc-800/40' : 'text-purple-300 border-purple-500/30 bg-purple-500/10'"
-                  >
-                    {{ dec.adopted_role === 'REJECT_ALL' ? t('admin.council.rejectAll') : t('admin.council.adoptFrom', undefined, { name: councilConfig.roles[dec.adopted_role]?.name || dec.adopted_role }) }}
-                  </span>
-                  <span
-                    class="px-2 py-0.5 rounded text-[11px] font-bold border"
-                    :style="{
-                      backgroundColor: dec.action?.includes('BUY') ? 'var(--up-bg)' : dec.action?.includes('SELL') ? 'var(--down-bg)' : 'var(--surface-3)',
-                      borderColor: dec.action?.includes('BUY') ? 'var(--up-line)' : dec.action?.includes('SELL') ? 'var(--down-line)' : 'var(--line-1)',
-                      color: dec.action?.includes('BUY') ? 'var(--up)' : dec.action?.includes('SELL') ? 'var(--down)' : 'var(--ink-2)'
-                    }"
-                  >
-                    {{ dec.action || 'WAIT' }} ({{ dec.confidence || 0 }}%)
-                  </span>
-                </div>
-              </div>
-
-              <!-- Price & Risk Metrics -->
-              <div v-if="dec.action !== 'WAIT'" class="grid grid-cols-3 gap-1.5 p-2 rounded-lg bg-black/20 text-[11px] text-center">
-                <div>
-                  <div class="text-zinc-400">{{ t('admin.council.entryLimit') }}</div>
-                  <div class="font-bold text-white mt-0.5">${{ dec.limit_price || dec.entry_price || '--' }}</div>
-                </div>
-                <div>
-                  <div class="text-rose-400">{{ t('admin.council.stopLabel') }}</div>
-                  <div class="font-bold text-rose-400 mt-0.5">${{ dec.stop_loss || '--' }}</div>
-                </div>
-                <div>
-                  <div class="text-emerald-400">{{ t('admin.council.takeProfitLabel') }}</div>
-                  <div class="font-bold text-emerald-400 mt-0.5">${{ dec.take_profit || '--' }}</div>
-                </div>
-              </div>
-              <div v-else class="p-2 rounded-lg bg-black/10 text-[11px] text-zinc-500 italic">
-                {{ t('admin.council.waitNote') }}
-              </div>
-
-              <div class="text-[11px] text-zinc-400 line-clamp-3 leading-relaxed">
-                {{ dec.reasoning || dec.reason || t('admin.council.defaultReason') }}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+      </template>
+    </BaseDialog>
   </div>
 </template>
+
+<style scoped>
+.cn {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-4);
+}
+.cn-spin {
+  animation: cn-rotate 0.9s linear infinite;
+}
+@keyframes cn-rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.cn-error {
+  border: 1px solid var(--down-line);
+  border-radius: var(--r-card);
+  background-color: var(--ds-color-bg-surface-card);
+}
+
+/* ══ 议事状态带 ══ */
+.cn-band {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+@media (min-width: 640px) {
+  .cn-band {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (min-width: 1280px) {
+  .cn-band {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+.cn-fact {
+  display: flex;
+  flex-direction: column;
+  gap:4px;
+  min-width: 0;
+  padding: var(--ds-space-4);
+  border-top: 1px solid var(--ds-color-border-default);
+}
+.cn-fact:first-child {
+  border-top: 0;
+}
+@media (min-width: 640px) {
+  .cn-fact:nth-child(2) {
+    border-top: 0;
+  }
+  .cn-fact:nth-child(even) {
+    border-left: 1px solid var(--ds-color-border-default);
+  }
+}
+@media (min-width: 1280px) {
+  .cn-fact {
+    border-top: 0;
+  }
+  .cn-fact + .cn-fact {
+    border-left: 1px solid var(--ds-color-border-default);
+  }
+}
+.cn-fact-label {
+  display: flex;
+  align-items: center;
+  gap:6px;
+  font-size: var(--text-3xs);
+  font-weight: 500;
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--ds-color-text-placeholder);
+}
+.cn-fact-value {
+  font-size: var(--text-lg);
+  font-weight: 500;
+  letter-spacing: var(--track-display);
+  line-height: 1.2;
+  color: var(--ds-color-text-primary);
+}
+.cn-fact-value.is-up {
+  color: var(--up);
+}
+.cn-fact-sub {
+  font-size: var(--text-xs);
+  color: var(--ds-color-text-placeholder);
+}
+.cn-fact-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  font-size: var(--text-3xs);
+  color: var(--ds-color-text-placeholder);
+  min-width: 0;
+}
+
+/* ══ 议事规则 ══ */
+.cn-head-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  flex-wrap: wrap;
+}
+.cn-modes {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1px;
+  background-color: var(--ds-color-border-default);
+}
+@media (min-width: 900px) {
+  .cn-modes {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+.cn-mode {
+  display: flex;
+  flex-direction: column;
+  gap:6px;
+  padding: var(--ds-space-4);
+  text-align: left;
+  background-color: var(--ds-color-bg-surface-card);
+  border-left: 2px solid transparent;
+  cursor: pointer;
+  transition: background-color var(--dur-fast);
+}
+.cn-mode:hover:not(:disabled) {
+  background-color: var(--ds-color-bg-hover);
+}
+.cn-mode.is-on {
+  background-color: var(--ds-color-bg-surface-inset);
+  border-left-color: var(--ds-color-brand);
+}
+.cn-mode:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+.cn-mode-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ds-space-2);
+}
+.cn-mode-name {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--ds-color-text-primary);
+}
+.cn-mode-desc {
+  font-size: var(--text-3xs);
+  line-height: var(--leading-body);
+  color: var(--ds-color-text-description);
+}
+
+.cn-rules-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ds-space-3);
+  flex-wrap: wrap;
+  padding: var(--ds-space-3) var(--ds-space-4);
+  border-top: 1px solid var(--ds-color-border-default);
+  background-color: var(--ds-color-bg-surface-inset);
+}
+.cn-inline {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+}
+.cn-num-input {
+  width: 76px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.cn-unit {
+  font-size: var(--text-3xs);
+  color: var(--ds-color-text-placeholder);
+}
+.cn-foot-hint {
+  font-size: var(--text-3xs);
+  color: var(--ds-color-text-placeholder);
+}
+
+/* ══ 主从双栏 ══ */
+.cn-split {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--ds-space-4);
+  align-items: start;
+}
+@media (min-width: 1024px) {
+  .cn-split {
+    grid-template-columns: 300px minmax(0, 1fr);
+  }
+}
+
+/* 席位列 */
+.cn-seats {
+  display: flex;
+  flex-direction: column;
+  padding: var(--ds-space-1) 0;
+}
+.cn-seat {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-3);
+  min-height: 46px;
+  padding: 6px var(--ds-space-4);
+  text-align: left;
+  border-left: 2px solid transparent;
+  cursor: pointer;
+  transition: background-color var(--dur-fast);
+}
+.cn-seat:hover {
+  background-color: var(--ds-color-bg-hover);
+}
+.cn-seat.is-on {
+  background-color: var(--ds-color-bg-surface-1);
+  border-left-color: var(--ds-color-brand);
+}
+.cn-seat-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+.cn-seat-name {
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--ds-color-text-primary);
+}
+.cn-seat-sub {
+  font-size: var(--text-4xs);
+  color: var(--ds-color-text-placeholder);
+}
+.cn-seat-w {
+  font-size: var(--text-3xs);
+  color: var(--ds-color-text-placeholder);
+}
+.cn-seat-arrow {
+  color: var(--ds-color-text-placeholder);
+  flex-shrink: 0;
+}
+
+/* 席位牌 */
+.cn-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--r-ctl);
+  background-color: var(--ds-color-bg-surface-1);
+  color: var(--ds-color-text-description);
+  flex-shrink: 0;
+}
+.cn-avatar.is-lg {
+  width: 34px;
+  height: 34px;
+}
+.cn-avatar.is-cio {
+  color: var(--brand);
+  background-color: var(--r20-brand-bg);
+}
+.cn-avatar.is-muted {
+  opacity: 0.45;
+}
+
+/* 编辑器 */
+.cn-editor {
+  min-width: 0;
+}
+.cn-editor-id {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-3);
+  min-width: 0;
+}
+.cn-editor-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.cn-name-input {
+  background: transparent;
+  border: 0;
+  border-bottom: 1px dashed var(--ds-color-border-strong);
+  outline: none;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--ds-color-text-primary);
+  padding: 0 0 2px;
+  max-width: 260px;
+  letter-spacing: var(--track-title);
+}
+.cn-name-input:read-only {
+  border-bottom-color: transparent;
+}
+.cn-editor-sub {
+  font-size: var(--text-4xs);
+  color: var(--ds-color-text-placeholder);
+}
+.cn-editor-head-right {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  flex-wrap: wrap;
+}
+
+.cn-desc {
+  padding: var(--ds-space-3) var(--ds-space-4) 0;
+  font-size: var(--text-xs);
+  line-height: var(--leading-body);
+  color: var(--ds-color-text-description);
+}
+.cn-warn {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: var(--ds-space-3) var(--ds-space-4) 0;
+  padding: 8px 10px;
+  border-radius: var(--r-ctl);
+  background-color: var(--warn-bg);
+  color: var(--warn);
+  font-size: var(--text-3xs);
+  line-height: var(--leading-body);
+}
+.cn-warn > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.cn-section-title {
+  font-size: var(--text-3xs);
+  font-weight: 500;
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--ds-color-text-placeholder);
+}
+
+.cn-params {
+  padding: var(--ds-space-4);
+  border-top: 1px solid var(--ds-color-border-default);
+  margin-top: var(--ds-space-3);
+}
+.cn-param-grid {
+  margin-top: var(--ds-space-3);
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--ds-space-4);
+  align-items: start;
+}
+@media (min-width: 640px) {
+  .cn-param-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (min-width: 1280px) {
+  .cn-param-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+.cn-param {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.cn-param-hint {
+  font-size: var(--text-4xs);
+  color: var(--ds-color-text-placeholder);
+}
+.cn-param-switch {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  font-size: var(--text-xs);
+  color: var(--ds-color-text-secondary);
+  min-height: 32px;
+}
+.field.is-warn {
+  border-color: var(--warn-line);
+  color: var(--warn);
+}
+
+/* 提示词 */
+.cn-prompt {
+  padding: var(--ds-space-4);
+  border-top: 1px solid var(--ds-color-border-default);
+}
+.cn-prompt-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ds-space-3);
+  flex-wrap: wrap;
+}
+.cn-slots {
+  display: flex;
+  align-items: center;
+  gap:6px;
+  flex-wrap: wrap;
+}
+.cn-slot {
+  padding:4px 8px;
+  border-radius: var(--r-xs);
+  border: 1px solid var(--ds-color-border-default);
+  background-color: var(--ds-color-bg-surface-1);
+  font-family: var(--ds-font-mono);
+  font-size: var(--text-4xs);
+  color: var(--ds-color-text-secondary);
+  cursor: pointer;
+  transition: border-color var(--dur-fast), color var(--dur-fast);
+}
+.cn-slot:hover:not(:disabled) {
+  border-color: var(--ds-color-brand);
+  color: var(--ds-color-brand);
+}
+.cn-slot:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.cn-textarea {
+  margin-top: var(--ds-space-3);
+  width: 100%;
+  resize: vertical;
+  line-height: var(--leading-body);
+  font-family: inherit;
+}
+
+/* ══ 辩论实录 ══ */
+.cn-tr-head {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  flex-wrap: wrap;
+}
+.cn-body {
+  display: flex;
+  flex-direction: column;
+}
+.cn-round {
+  padding: var(--ds-space-4);
+  border-bottom: 1px solid var(--ds-color-border-default);
+}
+.cn-round-title {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--ds-color-text-primary);
+  margin-bottom: var(--ds-space-3);
+}
+.cn-round-title.is-warn {
+  color: var(--warn);
+}
+
+.cn-adv-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--ds-space-3);
+}
+@media (min-width: 1100px) {
+  .cn-adv-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+.cn-adv {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-2);
+  padding: var(--ds-space-3);
+  border-radius: var(--r-ctl);
+  background-color: var(--ds-color-bg-surface-inset);
+  min-width: 0;
+}
+.cn-adv-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--ds-space-2);
+  min-width: 0;
+}
+.cn-adv-name {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--ds-color-text-primary);
+}
+.cn-adv-model {
+  font-size: var(--text-4xs);
+  color: var(--ds-color-brand);
+  max-width: 150px;
+}
+.cn-adv-model.is-warn {
+  color: var(--warn);
+}
+.cn-adv-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--text-4xs);
+  color: var(--ds-color-text-placeholder);
+}
+.cn-adv-body {
+  font-size: var(--text-xs);
+  line-height: var(--leading-body);
+  color: var(--ds-color-text-secondary);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.cn-adv-reason {
+  padding-top: var(--ds-space-2);
+  border-top: 1px solid var(--ds-color-border-default);
+}
+
+/* CIO 裁定 */
+.cn-verdict {
+  padding: var(--ds-space-4);
+}
+.cn-verdict-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--ds-space-3);
+  flex-wrap: wrap;
+}
+.cn-macro {
+  margin-top: var(--ds-space-3);
+  padding: var(--ds-space-3);
+  border-radius: var(--r-ctl);
+  background-color: var(--ds-color-bg-surface-inset);
+  border-left: 2px solid var(--ds-color-brand);
+}
+.cn-macro p {
+  margin-top: 4px;
+  font-size: var(--text-xs);
+  line-height: var(--leading-body);
+  color: var(--ds-color-text-primary);
+}
+.cn-matrix {
+  margin-top: var(--ds-space-4);
+}
+.cn-table-wrap {
+  margin-top: var(--ds-space-3);
+  overflow-x: auto;
+}
+.cn-sym {
+  font-weight: 600;
+  color: var(--ds-color-text-primary);
+}
+.cn-up {
+  color: var(--up);
+}
+.cn-down {
+  color: var(--down);
+}
+.cn-reason {
+  max-width: 320px;
+  font-size: var(--text-3xs);
+  color: var(--ds-color-text-description);
+}
+
+/* 导入对话框 */
+.cn-import {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-3);
+}
+.cn-file {
+  font-size: var(--text-xs);
+  color: var(--ds-color-text-description);
+}
+</style>

@@ -1,6 +1,6 @@
 /** Scheduler & delivery gateway page copy */
 export const enAdminGateway = {
-  desc: 'Scheduled jobs, event delivery queue and dead-letter replay; the Gateway records content-free telemetry only.',
+  desc: 'Scheduled jobs, delivery queue and dead-letter replay',
   opsBadge: 'Day-to-day operations · 4/4',
   loading: 'Loading gateway status...',
   cards: {
@@ -24,6 +24,7 @@ export const enAdminGateway = {
     notScheduled: 'Not scheduled yet',
     overdue: 'Overdue',
     normal: 'Normal',
+    jobsEmpty: 'No scheduled jobs',
   },
   deliveries: {
     title: 'Event delivery queue (last 50)',
@@ -37,6 +38,11 @@ export const enAdminGateway = {
     colActions: 'Actions',
     replay: 'Replay',
     empty: 'No delivery records',
+    colId: 'ID',
+    replayTitle: 'Replay delivery #{id}',
+    replayDesc: 'Replaying re-queues this event and delivers it again, which may produce a duplicate message.',
+    replayExpected: 'Confirmation phrase',
+    replaySubmit: 'Confirm replay',
   },
   msgs: {
     loadFailed: 'Load failed: {msg}',

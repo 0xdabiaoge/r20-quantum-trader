@@ -1,10 +1,10 @@
 /** 舆情情报：多空温度带 + 快讯流 + 聪明钱 */
 export const zhNews = {
   title: '舆情情报',
-  desc: '全网快讯与大户筹码流向——AI 决策的"消息面"输入，此处白盒透视',
+  desc: '查看宏观快讯流与大户筹码（OKX Rubik 账户多空比）',
   band: {
     title: '市场多空温度',
-    desc: '基于全量快讯情绪与聪明钱流向的合成读数',
+    desc: '多空力量来自 OKX Rubik 账户多空比（聪明钱），非新闻情绪合成',
     bull: '偏多',
     bear: '偏空',
     neutral: '均衡',
@@ -56,9 +56,10 @@ export const zhNews = {
   filterCoin: '点击筛选 {sym} 快讯',
   longPct: '多头占比: {n}%',
   shortPct: '空头占比: {n}%',
-  mentions: '{n} 篇',
+  mentions: '{n} 篇快讯',
+  ratioHint: 'OKX Rubik 账户多空比（多头账户数 / 空头账户数）',
   filters: { all: '全部', macro: '宏观快讯' },
-  source: { okx: 'OKX官方', jin10: '金十数据' },
+  source: { jin10: '金十数据', macro: '全球宏观快讯' },
   filterTag: '{sym} 过滤',
   count: '共 {n} 条快讯',
   resetFilters: '重置筛选',

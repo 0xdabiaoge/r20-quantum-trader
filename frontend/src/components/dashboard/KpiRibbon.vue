@@ -1,13 +1,16 @@
 <script setup lang="ts">
-/** KPI 带：单行六格，每格带副值与走势 */
+/**
+ * KpiRibbon.vue · DeepSeek Harness 风格核心指标仪表盘
+ * 纯净低饱和黑白/深灰主题，分层卡片结构，呈现多所总权益、走势、浮亏与防线
+ */
 import { computed, onMounted, ref } from 'vue';
-import { ShieldCheck } from 'lucide-vue-next';
+import { ShieldCheck, Layers } from 'lucide-vue-next';
 import { useDashboardStore } from '../../stores/dashboard';
 import { useVenueAccountsStore } from '../../stores/venueAccounts';
 import { useI18n } from '../../composables/useI18n';
 import { fmtNum, fmtSigned, fmtPct, arrow } from '../../utils/format';
+import { venueColor } from '../../utils/venueMeta';
 import BaseStat from '../base/BaseStat.vue';
-import DataStatus from './DataStatus.vue';
 import BaseSparkline from '../base/BaseSparkline.vue';
 
 const store = useDashboardStore();
@@ -17,7 +20,6 @@ const { t } = useI18n();
 const account = computed(() => store.data?.account || ({} as any));
 const today = computed(() => (store.data as any)?.today_stats || {});
 
-/** 多所组合总权益与保证金占用 */
 const isLiveEnv = computed(() => venueStore.environment === 'live');
 const envBadgeText = computed(() => (isLiveEnv.value ? t('dash.venueAccounts.envLive') : t('dash.venueAccounts.envDemo')));
 
@@ -60,7 +62,6 @@ const floatRoi = computed(() =>
 const longCount = computed(() => store.positions.filter((p) => p.side === 'long').length);
 const shortCount = computed(() => store.positions.filter((p) => p.side === 'short').length);
 
-/** 实际持仓已占用保证金 */
 const actualMarginUsed = computed(() => {
   if (posMargin.value > 0) return posMargin.value;
   const sum = portfolioSummary.value;
@@ -96,107 +97,116 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="card space-y-2 p-2 sm:p-2.5 xl:p-3">
-    <div class="flex items-center justify-between border-b px-1.5 sm:px-2.5 pb-2" style="border-color: var(--line-1)"><DataStatus /></div>
-
-    <!-- 多所组合总权益与资产分配条 -->
-    <div v-if="hasMultiVenue" class="flex flex-col gap-1.5 px-1.5 sm:px-2.5 pb-1.5 border-b" style="border-color: var(--line-1)">
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-2xs" style="color: var(--ink-3)">
-        <div class="flex items-center justify-between sm:justify-start gap-2">
-          <div class="flex items-center gap-1.5">
-            <span class="font-bold text-xs" style="color: var(--ink-1)">{{ t('dash.matrix.kpi.multiEquity') }}</span>
-            <span class="num font-bold text-xs sm:text-sm" style="color: var(--ink-strong)">$ {{ totalAggregatedEquity }} U</span>
-          </div>
-          <span class="badge text-3xs" style="background: var(--surface-3); color: var(--ink-2)">{{ t('dash.matrix.kpi.venuesConnected', undefined, { n: portfolioSummary?.active_venues_count }) }}</span>
-        </div>
-        <div class="flex items-center justify-between sm:justify-end gap-2.5 num text-3xs pt-0.5 sm:pt-0">
-          <span class="flex items-center gap-1"><span class="inline-block w-1.5 h-1.5 rounded-full" style="background-color: #3880ff"></span> OKX {{ distOkx }}%</span>
-          <span class="flex items-center gap-1"><span class="inline-block w-1.5 h-1.5 rounded-full" style="background-color: #f3ba2f"></span> Binance {{ distBinance }}%</span>
-          <span class="flex items-center gap-1"><span class="inline-block w-1.5 h-1.5 rounded-full" style="background-color: #00be98"></span> Gate {{ distGate }}%</span>
-        </div>
+  <div class="dsh-card">
+    <!-- 头部：多所组合分布与状态 -->
+    <div
+      v-if="hasMultiVenue"
+      class="dsh-card-header text-3xs font-medium"
+    >
+      <div class="flex items-center gap-2">
+        <span class="flex items-center gap-1.5 font-bold" style="color: var(--ink-strong)">
+          <Layers class="h-3.5 w-3.5 text-[var(--accent)]" />
+          {{ t('dash.matrix.kpi.multiEquity') }}
+        </span>
+        <span class="font-mono font-semibold" style="color: var(--ink-1)">$ {{ totalAggregatedEquity }} U</span>
+        <span
+          class="rounded px-1.5 py-0.5 border text-3xs font-mono"
+          style="background-color: var(--surface-2); border-color: var(--line-1); color: var(--ink-2)"
+        >
+          {{ t('dash.matrix.kpi.venuesConnected', undefined, { n: portfolioSummary?.active_venues_count }) }}
+        </span>
       </div>
-      <!-- 彩色资产分配横条 -->
-      <div class="flex h-1.5 w-full overflow-hidden rounded-full" style="background-color: var(--surface-3)">
-        <div
-          v-if="distOkx > 0"
-          :style="{ width: `${distOkx}%`, backgroundColor: '#3880ff' }"
-          class="transition-all duration-300"
-          :title="`OKX: ${portfolioSummary?.asset_distribution?.okx?.equity ?? 0} U (${distOkx}%)`"
-        />
-        <div
-          v-if="distBinance > 0"
-          :style="{ width: `${distBinance}%`, backgroundColor: '#f3ba2f' }"
-          class="transition-all duration-300"
-          :title="`Binance: ${portfolioSummary?.asset_distribution?.binance?.equity ?? 0} U (${distBinance}%)`"
-        />
-        <div
-          v-if="distGate > 0"
-          :style="{ width: `${distGate}%`, backgroundColor: '#00be98' }"
-          class="transition-all duration-300"
-          :title="`Gate: ${portfolioSummary?.asset_distribution?.gate?.equity ?? 0} U (${distGate}%)`"
-        />
+
+      <!-- 资产份额条 -->
+      <div class="hidden sm:flex items-center gap-3 font-mono">
+        <span class="flex items-center gap-1">
+          <span class="h-1.5 w-1.5 rounded-full" :style="{ backgroundColor: venueColor('okx') }" />
+          <span style="color: var(--ink-2)">OKX</span>
+          <span style="color: var(--ink-1)">{{ distOkx }}%</span>
+        </span>
+        <span class="flex items-center gap-1">
+          <span class="h-1.5 w-1.5 rounded-full" :style="{ backgroundColor: venueColor('binance') }" />
+          <span style="color: var(--ink-2)">Binance</span>
+          <span style="color: var(--ink-1)">{{ distBinance }}%</span>
+        </span>
+        <span class="flex items-center gap-1">
+          <span class="h-1.5 w-1.5 rounded-full" :style="{ backgroundColor: venueColor('gate') }" />
+          <span style="color: var(--ink-2)">Gate</span>
+          <span style="color: var(--ink-1)">{{ distGate }}%</span>
+        </span>
       </div>
     </div>
 
-    <div class="grid grid-cols-2 gap-1.5 sm:gap-2 md:grid-cols-3 xl:grid-cols-6 xl:gap-0">
-    <BaseStat
-      :label="hasMultiVenue ? `[${envBadgeText}] ${t('dash.matrix.kpi.comboEquity')}` : `[${envBadgeText}] ${t('dash.matrix.kpi.equity')}`"
-      :value="totalAggregatedEquity"
-      :hint="hasMultiVenue ? `${envBadgeText} ${t('dash.matrix.kpi.comboEquityTip')}` : t('dash.matrix.kpi.equityTip')"
-    >
-      <template #extra>
-        <span class="num text-xs font-semibold" :class="todayNet >= 0 ? 'up' : 'down'">
-          {{ arrow(todayNet) }} {{ fmtSigned(todayNet) }}
-        </span>
-        <BaseSparkline :values="eqSeries" :width="48" :height="20" />
-      </template>
-    </BaseStat>
+    <!-- 6 个核心指标单元格 -->
+    <div class="grid grid-cols-2 gap-px bg-white/[0.04] sm:grid-cols-3 xl:grid-cols-6">
+      <div class="bg-black/20 p-3.5 flex flex-col justify-between">
+        <BaseStat
+          :label="t('dash.matrix.kpi.comboEquity')"
+          :value="totalAggregatedEquity"
+          :hint="hasMultiVenue ? `${envBadgeText} ${t('dash.matrix.kpi.comboEquityTip')}` : t('dash.matrix.kpi.equityTip')"
+        >
+          <template #extra>
+            <div class="flex items-center gap-2 mt-1">
+              <span class="num text-xs font-semibold" :class="todayNet >= 0 ? 'up' : 'down'">
+                {{ arrow(todayNet) }} {{ fmtSigned(todayNet) }}
+              </span>
+              <BaseSparkline :values="eqSeries" :width="48" :height="18" />
+            </div>
+          </template>
+        </BaseStat>
+      </div>
 
-    <BaseStat
-      :label="t('dash.matrix.kpi.todayPnl')"
-      :value="fmtSigned(todayNet)"
-      :delta="todayTrades ? `${todayTrades} ${t('common.unitCount')} · ${todayWinRate}%` : undefined"
-      :delta-tone="todayNet >= 0 ? 'up' : 'down'"
-      :hint="t('dash.matrix.kpi.todayTip')"
-     
-    />
+      <div class="bg-black/20 p-3.5 flex flex-col justify-between">
+        <BaseStat
+          :label="t('dash.matrix.kpi.todayPnl')"
+          :value="fmtSigned(todayNet)"
+          :delta="todayTrades ? `${todayTrades} ${t('common.unitCount')} · ${todayWinRate}%` : undefined"
+          :delta-tone="todayNet >= 0 ? 'up' : 'down'"
+          :hint="t('dash.matrix.kpi.todayTip')"
+        />
+      </div>
 
-    <BaseStat
-      :label="t('dash.matrix.kpi.floatPnl')"
-      :value="fmtSigned(floatPnl)"
-      :delta="store.positions.length ? `(${fmtPct(floatRoi)})` : '--'"
-      :delta-tone="floatPnl >= 0 ? 'up' : 'down'"
-      :hint="t('dash.matrix.kpi.floatTip')"
-     
-    />
+      <div class="bg-black/20 p-3.5 flex flex-col justify-between">
+        <BaseStat
+          :label="t('dash.matrix.kpi.floatPnl')"
+          :value="fmtSigned(floatPnl)"
+          :delta="store.positions.length ? `(${fmtPct(floatRoi)})` : '--'"
+          :delta-tone="floatPnl >= 0 ? 'up' : 'down'"
+          :hint="t('dash.matrix.kpi.floatTip')"
+        />
+      </div>
 
-    <BaseStat
-      :label="t('dash.matrix.kpi.ls')"
-      :value="`${longCount} / ${shortCount}`"
-      hint="L / S"
-     
-    />
+      <div class="bg-black/20 p-3.5 flex flex-col justify-between">
+        <BaseStat
+          :label="t('dash.matrix.kpi.ls')"
+          :value="`${longCount} / ${shortCount}`"
+          hint="L / S"
+        />
+      </div>
 
-    <BaseStat
-      :label="t('dash.matrix.kpi.margin')"
-      :value="`${fmtNum(marginUsage, 1)}%`"
-      :delta="actualMarginUsed > 0 ? `${fmtNum(actualMarginUsed, 2)} U` : '0.00 U'"
-      :delta-tone="marginUsage > 70 ? 'down' : marginUsage > 30 ? 'warn' : 'muted'"
-      :hint="t('dash.matrix.kpi.marginTip')"
-     
-    />
+      <div class="bg-black/20 p-3.5 flex flex-col justify-between">
+        <BaseStat
+          :label="t('dash.matrix.kpi.margin')"
+          :value="`${fmtNum(marginUsage, 1)}%`"
+          :delta="actualMarginUsed > 0 ? `${fmtNum(actualMarginUsed, 2)} U` : '0.00 U'"
+          :delta-tone="marginUsage > 70 ? 'down' : marginUsage > 30 ? 'warn' : 'muted'"
+          :hint="t('dash.matrix.kpi.marginTip')"
+        />
+      </div>
 
-    <BaseStat
-      :label="t('dash.matrix.kpi.oco')"
-      :value="`${ocoCoverage.pct}%`"
-      :delta="ocoCoverage.missing ? t('dash.matrix.kpi.missN', undefined, { n: ocoCoverage.missing }) : t('dash.matrix.kpi.allCovered')"
-      :delta-tone="ocoCoverage.pct === 100 ? 'up' : 'warn'"
-      :hint="t('dash.matrix.kpi.ocoTip')"
-    >
-      <template #extra>
-        <ShieldCheck class="h-4 w-4 shrink-0" :style="{ color: ocoCoverage.pct === 100 ? 'var(--up)' : 'var(--warn)' }" />
-      </template>
-    </BaseStat>
+      <div class="bg-black/20 p-3.5 flex flex-col justify-between">
+        <BaseStat
+          :label="t('dash.matrix.kpi.oco')"
+          :value="`${ocoCoverage.pct}%`"
+          :delta="ocoCoverage.missing ? t('dash.matrix.kpi.missN', undefined, { n: ocoCoverage.missing }) : t('dash.matrix.kpi.allCovered')"
+          :delta-tone="ocoCoverage.pct === 100 ? 'up' : 'warn'"
+          :hint="t('dash.matrix.kpi.ocoTip')"
+        >
+          <template #extra>
+            <ShieldCheck class="h-4 w-4 shrink-0 mt-1" :style="{ color: ocoCoverage.pct === 100 ? 'var(--up)' : 'var(--warn)' }" />
+          </template>
+        </BaseStat>
+      </div>
     </div>
   </div>
 </template>

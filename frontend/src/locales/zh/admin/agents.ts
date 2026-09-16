@@ -25,10 +25,18 @@ export const zhAdminAgents = {
   colDuration: '耗时',
   secretStore: '本机加密密文库',
   storeStatus: '加密库状态',
-  initialized: '已初始化 ✓',
+  initialized: '已初始化',
   notInitialized: '未初始化',
   cipherCount: '{count} 项密文',
   filePerm: '文件权限',
   readPriority: '读取优先级',
-  configured: '已配置 ✓',
-};
+  configured: '已配置',
+
+  // ── 推倒重来新增（批 7）──
+  bandUnits: '在册单元',
+  bandHealthy: '健康',
+  bandIssues: '异常',
+  bandLatency: '平均时延',
+  callsTitle: '调用流水',
+  emptyCalls: '暂无调用记录',
+  promptPolicy: '提示词策略',};

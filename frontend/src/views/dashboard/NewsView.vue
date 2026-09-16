@@ -1,27 +1,20 @@
 <script setup lang="ts">
 /**
- * US-008 · 舆情快讯与重大黑天鹅情报看板：
- * 1. 置顶突发情报/黑天鹅熔断预警高亮卡 (Warning Glow)
- * 2. 币种情绪极性矩阵 (Coin Sentiment Polarity Matrix) 与点击联动筛选 (Click-to-filter)
- * 3. 多源公开快讯抓取 (CoinDesk / Cointelegraph / Binance CMS) 与新鲜度刷新指示
+ * NewsView.vue · DeepSeek Harness 风格舆情快讯与重大黑天鹅情报看板
+ * 包含：重大黑天鹅熔断预警带、币种情绪极性矩阵（支持点击联动筛选）、多源情报流（OKX/金十/全球宏观）与新鲜度监测
  */
 import { computed, ref } from 'vue';
 import {
   ExternalLink,
   ShieldAlert,
-  ShieldCheck,
-  RefreshCw,
   Radio,
-  Filter,
   X,
   Flame,
-  TrendingUp,
-  TrendingDown,
 } from 'lucide-vue-next';
 import { useDashboardStore } from '../../stores/dashboard';
+import DataGate from '../../components/dashboard/DataGate.vue';
 import { useI18n } from '../../composables/useI18n';
-import { fmtNum, fmtHM } from '../../utils/format';
-import PageHead from '../../components/dashboard/PageHead.vue';
+import { fmtHM } from '../../utils/format';
 import BaseEmpty from '../../components/base/BaseEmpty.vue';
 import TimeAgo from '../../components/base/TimeAgo.vue';
 import CryptoLogo from '../../components/dashboard/CryptoLogo.vue';
@@ -29,17 +22,13 @@ import CryptoLogo from '../../components/dashboard/CryptoLogo.vue';
 const store = useDashboardStore();
 const { t } = useI18n();
 
-// 选中的币种过滤状态（null 为不过滤展示全部）
 const selectedCoin = ref<string | null>(null);
-// 选中的来源过滤状态（all 为全部，支持 'OKX官方' | '金十数据' | '全球宏观'）
 const selectedSource = ref<string>('all');
 
-// 来源分类筛选按钮：key 为数据值（匹配平台名，不可翻译），label 走 i18n
 const sourceFilters = computed(() => [
   { key: 'all', label: t('dash.news.filters.all') },
-  { key: 'OKX官方', label: t('dash.news.source.okx') },
   { key: '金十数据', label: t('dash.news.source.jin10') },
-  { key: '全球宏观', label: t('dash.news.filters.macro') },
+  { key: '全球宏观', label: t('dash.news.source.macro') },
 ]);
 
 const ni = computed<any>(() => (store.data as any)?.news_intelligence || {});
@@ -47,9 +36,6 @@ const macro = computed(() => ni.value.macro_sentiment || '偏多震荡');
 const rawNews = computed<any[]>(() => ni.value.latest_news || []);
 const freshAt = computed(() => ni.value.news_fresh_at || ni.value.timestamp || '');
 const sourceReason = computed(() => ni.value.source_reason || 'OKX官方公告 + 金十数据宏观快讯');
-// 批A(2026-09-13)·UI 谎报修复：旧 `!== false` 令「字段整个缺失」（后端整段抓取失败，
-// ni={} 时 undefined）恒判绿点+源名——链路死了前台还在报平安。真值必须显式 === true，
-// 缺字段按未知走灰/警示（与熔断「不可判定=不放松」同纪律）。
 const isSourceActive = computed(() => ni.value.source_available === true);
 
 // 黑天鹅熔断状态
@@ -75,18 +61,12 @@ const coins = computed(() => {
         bear,
         score,
         ls: v.long_short_ratio,
-        mentions: v.mentions || 0,
+        // 真实入流快讯提及数：后端从本轮实际快讯逐条统计（缺失/未计算 → 0，
+        // 绝不回落成「看起来饱满」的假样本量）。
+        mentions: Number(v.mentions) || 0,
       };
     })
     .sort((a, b) => (b.mentions || 0) - (a.mentions || 0));
-});
-
-// 置顶快讯（首条高危或重要快讯）
-const pinnedNews = computed(() => {
-  if (!rawNews.value.length) return null;
-  // 优先取 importance === 'high' 的第一条，否则取最新第一条
-  const high = rawNews.value.find((n) => n.importance === 'high');
-  return high || rawNews.value[0];
 });
 
 // 按选中币种与来源过滤后的快讯流
@@ -113,289 +93,225 @@ function toggleCoinFilter(sym: string) {
     selectedCoin.value = sym;
   }
 }
-
-function labelCls(l: string): string {
-  return l === 'bullish' ? 'up' : l === 'bearish' ? 'down' : '';
-}
-function labelTxt(l: string): string {
-  return l === 'bullish' ? '偏多' : l === 'bearish' ? '偏空' : '震荡';
-}
-function impCls(i: string): string {
-  return i === 'high' ? 'badge-down' : i === 'mid' ? 'badge-warn' : 'badge-mono';
-}
-function impTxt(i: string): string {
-  return i === 'high' ? '重大' : i === 'mid' ? '关注' : '快讯';
-}
-
-async function refreshNews() {
-  await store.fetchDashboard(false);
-}
 </script>
 
 <template>
-  <div class="space-y-3.5">
-    <!-- 头部与数据源新鲜度状态条 -->
-    <div class="flex flex-wrap items-center justify-between gap-2.5">
-      <PageHead :title="t('dash.news.title')" :desc="t('dash.news.desc')" />
-
-      <!-- 数据源与刷新指示器 (Auto-refresh & Freshness Indicators) -->
-      <div class="flex items-center gap-2 text-2xs" style="color: var(--ink-3)">
-        <div class="flex items-center gap-1.5 rounded-full px-2.5 py-1 border" style="background-color: var(--surface-1); border-color: var(--line-1)">
-          <span class="relative flex h-2 w-2">
-            <span v-if="isSourceActive" class="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style="background-color: var(--up)"></span>
-            <span class="relative inline-flex rounded-full h-2 w-2" :style="{ backgroundColor: isSourceActive ? 'var(--up)' : 'var(--warn)' }"></span>
-          </span>
-          <span class="font-medium" style="color: var(--ink-2)">{{ sourceReason }}</span>
-          <span class="mx-1 text-[10px] opacity-30">|</span>
-          <span>{{ t('dash.news.freshness') }} <b class="num font-semibold" style="color: var(--ink-1)">{{ freshAt || '--' }}</b></span>
-        </div>
-
-        <button
-          class="btn btn-quiet btn-icon btn-sm"
-          :disabled="store.isRefreshing"
-          :title="t('dash.news.refreshTitle')"
-          @click="refreshNews"
-        >
-          <RefreshCw class="h-3.5 w-3.5" :class="store.isRefreshing && 'animate-spin'" />
-        </button>
-      </div>
-    </div>
-
-    <!-- 1. 置顶突发重大情报 / 黑天鹅预警卡片 (Warning Glow Highlight Card) -->
+  <div class="space-y-3">
+    <!-- 页头 -->
     <div
-      class="card relative overflow-hidden p-3.5 transition-all duration-300 border"
-      :style="isCbActive
-        ? {
-            borderColor: 'var(--down)',
-            backgroundColor: 'var(--surface-1)',
-            boxShadow: '0 0 20px rgba(239, 68, 68, 0.35)',
-          }
-        : {
-            borderColor: 'var(--line-1)',
-            backgroundColor: 'var(--surface-1)',
-            boxShadow: '0 0 16px rgba(56, 128, 255, 0.08)',
-          }"
+      class="flex flex-wrap items-center justify-between gap-2 border-b pb-2.5"
+      style="border-color: var(--line-1)"
     >
-      <!-- 黑天鹅熔断触发态 -->
-      <div v-if="isCbActive" class="flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
-        <div class="flex items-start gap-3">
-          <div class="p-2 rounded-lg" style="background-color: rgba(239, 68, 68, 0.15)">
-            <ShieldAlert class="h-6 w-6" style="color: var(--down)" />
-          </div>
-          <div>
-            <div class="flex items-center gap-2">
-              <span class="badge badge-down font-bold text-xs">{{ t('dash.news.cb.badge') }}</span>
-              <span class="text-2xs num t-faint">{{ circuitBreaker.triggered_at }}</span>
-            </div>
-            <h3 class="text-sm font-bold mt-1" style="color: var(--ink-strong)">
-              {{ circuitBreaker.headline || t('dash.news.cb.headlineFallback') }}
-            </h3>
-            <p class="text-xs mt-0.5 t-faint">
-              {{ t('dash.news.cb.keywordLabel') }}<b class="down">{{ circuitBreaker.keyword || t('dash.news.cb.keywordFallback') }}</b> ·
-              {{ t('dash.news.cb.actionLabel') }}<span class="font-medium" style="color: var(--ink-2)">{{ circuitBreaker.action || t('dash.news.cb.actionFallback') }}</span>
-            </p>
-          </div>
-        </div>
-        <div class="shrink-0 flex items-center gap-2">
-          <span class="badge font-semibold" style="color: var(--down); border-color: var(--down-line); background-color: var(--down-bg)">
-            {{ t('dash.news.cb.frozen') }}
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 class="text-sm font-bold tracking-tight text-[var(--ink-strong)] flex items-center gap-1.5">
+            <Radio class="h-4 w-4 text-[var(--accent)]" />
+            {{ t('dash.news.title') }}
+          </h1>
+          <span
+            class="rounded px-1.5 py-0.2 border text-3xs font-mono font-medium"
+            style="background-color: var(--surface-2); border-color: var(--line-1); color: var(--ink-2)"
+          >
+            {{ t('dash.news.count', undefined, { n: rawNews.length }) }}
+          </span>
+          <span
+            class="rounded px-1.5 py-0.2 border text-3xs font-medium"
+            :class="macro.includes('多') ? 'text-[var(--up)] border-[var(--up-line)] bg-[var(--up-bg)]' : macro.includes('空') ? 'text-[var(--down)] border-[var(--down-line)] bg-[var(--down-bg)]' : 'text-[var(--ink-2)] border-[var(--line-1)] bg-[var(--surface-2)]'"
+          >
+            {{ macro }}
           </span>
         </div>
+        <p class="text-3xs text-[var(--ink-3)] mt-0.5">
+          {{ t('dash.news.desc') }}
+        </p>
       </div>
 
-      <!-- 常态置顶突发情报态 (Breaking Macro Intelligence) -->
-      <div v-else-if="pinnedNews" class="flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
-        <div class="flex items-start gap-3 min-w-0">
-          <div class="p-2 rounded-lg shrink-0" style="background-color: rgba(56, 128, 255, 0.1)">
-            <Radio class="h-5 w-5" style="color: var(--accent)" />
-          </div>
-          <div class="min-w-0">
-            <div class="flex items-center gap-2 flex-wrap">
-              <span class="badge badge-accent font-bold text-2xs">{{ t('dash.news.breaking.badge') }}</span>
-              <span class="badge badge-mono text-2xs" v-for="p in (pinnedNews.platforms || []).slice(0, 2)" :key="p">{{ p }}</span>
-              <span class="t-faint text-2xs num">{{ fmtHM(pinnedNews.time) }} · <TimeAgo :time="pinnedNews.time" /></span>
-              <span class="badge badge-accent text-2xs">{{ t('dash.news.breaking.macroPrefix') }}{{ macro }}</span>
-            </div>
-            <a
-              :href="pinnedNews.url || '#'"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="group block mt-1 text-xs md:text-sm font-bold truncate leading-snug hover:text-[var(--accent)] transition-colors"
-              style="color: var(--ink-strong)"
-            >
-              {{ pinnedNews.title }}
-              <ExternalLink class="ms-1 inline h-3 w-3 opacity-40 group-hover:opacity-100" />
-            </a>
-            <p v-if="pinnedNews.summary" class="text-2xs t-faint line-clamp-1 mt-0.5">
-              {{ pinnedNews.summary }}
-            </p>
-          </div>
-        </div>
-        <div class="shrink-0 flex items-center gap-2">
-          <div class="flex items-center gap-1.5 text-2xs font-semibold px-2 py-1 rounded border" style="background-color: var(--up-bg); border-color: var(--up-line); color: var(--up)">
-            <ShieldCheck class="h-3.5 w-3.5" />
-            {{ t('dash.news.breaking.sentinel') }}
-          </div>
-        </div>
+      <!-- 信源状态与新鲜度 -->
+      <div class="flex flex-wrap items-center gap-1.5">
+        <span class="dsh-pill" :title="sourceReason">
+          <span class="dsh-status-dot" :class="isSourceActive ? 'active' : 'warn'" />
+          <span class="text-[var(--ink-2)]">{{ isSourceActive ? sourceReason : t('status.attention') }}</span>
+        </span>
+        <span v-if="freshAt" class="dsh-pill text-3xs font-mono text-[var(--ink-3)]">
+          <span>{{ t('dash.news.freshness') }}</span>
+          <TimeAgo :time="freshAt" />
+        </span>
       </div>
     </div>
 
-    <!-- 2. 主体分栏：左·币种情绪极性矩阵，右·快讯流 -->
-    <div class="grid grid-cols-1 gap-3.5 xl:grid-cols-12">
-      <!-- 左：币种情绪极性矩阵 (Coin Sentiment Polarity Matrix) -->
-      <div class="card overflow-hidden xl:col-span-4 flex flex-col">
-        <div class="flex items-center justify-between border-b px-3.5 py-2.5" style="border-color: var(--line-1)">
+    <DataGate>
+      <!-- 黑天鹅重大熔断预警卡 -->
+      <div
+        v-if="isCbActive"
+        class="dsh-card p-3.5 border-[var(--down-line)] bg-[var(--down-bg)]"
+      >
+        <div class="flex items-start gap-3">
+          <ShieldAlert class="h-5 w-5 text-[var(--down)] shrink-0 mt-0.5" />
+          <div class="flex-1 space-y-1">
+            <div class="flex items-center justify-between">
+              <h3 class="text-xs font-bold text-[var(--down)] uppercase tracking-wider">
+                {{ circuitBreaker.headline || t('dash.news.cb.headlineFallback') }}
+              </h3>
+              <span class="dsh-pill border-[var(--down-line)] text-[var(--down)] font-mono text-3xs">
+                {{ t('dash.news.cb.badge') }}
+              </span>
+            </div>
+            <p class="text-xs text-[var(--ink-1)] leading-relaxed">
+              {{ circuitBreaker.reason || circuitBreaker.detail || t('dash.news.cb.actionFallback') }}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 币种情绪极性矩阵 (Coin Sentiment Polarity Matrix) -->
+      <div v-if="coins.length" class="dsh-card overflow-hidden">
+        <header class="dsh-card-header flex items-center justify-between">
           <div>
-            <h2 class="text-sm font-bold flex items-center gap-1.5" style="color: var(--ink-strong)">
-              <Flame class="h-4 w-4" style="color: var(--accent)" />
+            <h2 class="text-xs font-bold uppercase tracking-wider text-[var(--ink-strong)] flex items-center gap-1.5">
+              <Flame class="h-3.5 w-3.5 text-[var(--accent)]" />
               {{ t('dash.news.band.title') }}
             </h2>
-            <p class="t-faint text-2xs">{{ t('dash.news.matrixHint') }}</p>
+            <p class="text-3xs text-[var(--ink-3)] mt-0.5">{{ t('dash.news.band.desc') }}</p>
           </div>
-          <div v-if="selectedCoin" class="flex items-center gap-1 text-2xs">
-            <span class="badge badge-accent font-bold">{{ selectedCoin }}</span>
-            <button class="btn btn-ghost btn-icon btn-sm" :title="t('dash.news.clearFilter')" @click="selectedCoin = null">
-              <X class="h-3 w-3" />
-            </button>
-          </div>
-        </div>
 
-        <BaseEmpty v-if="!coins.length" :text="t('dash.news.feed.empty')" />
-        <div v-else class="divide-y-0 space-y-1 p-2 flex-1 overflow-y-auto max-h-[600px]">
-          <div
+          <button
+            v-if="selectedCoin"
+            class="btn btn-ghost h-6 px-2 text-3xs font-medium cursor-pointer inline-flex items-center gap-1"
+            @click="selectedCoin = null"
+          >
+            <X class="h-3 w-3" />
+            <span>{{ t('dash.news.clearFilter') }} ({{ selectedCoin }})</span>
+          </button>
+        </header>
+
+        <div class="grid grid-cols-2 gap-2 p-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+          <button
             v-for="c in coins"
             :key="c.sym"
-            class="flex items-center gap-3 rounded-lg px-2.5 py-2 cursor-pointer transition-all border"
-            :style="selectedCoin === c.sym
-              ? {
-                  borderColor: 'var(--accent)',
-                  backgroundColor: 'var(--surface-3)',
-                }
-              : {
-                  borderColor: 'transparent',
-                  backgroundColor: 'var(--surface-2)',
-                }"
-            :title="t('dash.news.filterCoin', undefined, { sym: c.sym })"
+            class="dsh-card-sub p-2.5 text-left transition-all cursor-pointer relative"
+            :class="selectedCoin === c.sym ? 'border-[var(--accent)] bg-[var(--surface-3)]' : 'hover:border-[var(--line-2)]'"
             @click="toggleCoinFilter(c.sym)"
           >
-            <!-- 币种标识 -->
-            <span class="flex w-14 shrink-0 items-center gap-1.5">
-              <CryptoLogo :symbol="c.sym" :size="18" />
-              <span class="num text-xs font-bold" style="color: var(--ink-strong)">{{ c.sym }}</span>
-            </span>
-
-            <!-- 双极性多空能量槽 (Polarity Energy Bar) -->
-            <div class="min-w-0 flex-1">
-              <div class="flex h-2 overflow-hidden rounded-full" style="background-color: var(--surface-1)">
-                <div :style="{ width: c.bull + '%', backgroundColor: 'var(--up)' }" :title="t('dash.news.longPct', undefined, { n: c.bull })" />
-                <div :style="{ width: (100 - c.bull - c.bear) + '%', backgroundColor: 'var(--line-2)' }" />
-                <div :style="{ width: c.bear + '%', backgroundColor: 'var(--down)' }" :title="t('dash.news.shortPct', undefined, { n: c.bear })" />
+            <div class="flex items-center justify-between gap-1 mb-1.5">
+              <div class="flex items-center gap-1.5">
+                <CryptoLogo :symbol="c.sym" :size="16" />
+                <span class="font-mono font-bold text-xs text-[var(--ink-strong)]">{{ c.sym }}</span>
               </div>
-              <div class="num mt-1 flex justify-between text-2xs" style="color: var(--ink-3)">
-                <span class="up font-semibold flex items-center gap-0.5">
-                  <TrendingUp class="h-2.5 w-2.5" /> {{ fmtNum(c.bull, 0) }}%
-                </span>
-                <span class="text-3xs t-faint">{{ t('dash.news.mentions', undefined, { n: c.mentions ?? 0 }) }}</span>
-                <span class="down font-semibold flex items-center gap-0.5">
-                  {{ fmtNum(c.bear, 0) }}% <TrendingDown class="h-2.5 w-2.5" />
-                </span>
-              </div>
-            </div>
-
-            <!-- 极性状态与因子得分 -->
-            <div class="w-14 shrink-0 text-right">
-              <span class="block text-xs font-bold" :class="labelCls(c.label)">{{ labelTxt(c.label) }}</span>
-              <span class="block num text-3xs font-medium" :class="c.score >= 0 ? 'up' : 'down'">
-                {{ c.score > 0 ? '+' : '' }}{{ fmtNum(c.score, 2) }}
+              <span
+                class="rounded px-1 py-0.2 text-4xs font-mono font-semibold uppercase border"
+                :class="c.label === 'bullish' ? 'text-[var(--up)] border-[var(--up-line)] bg-[var(--up-bg)]' : c.label === 'bearish' ? 'text-[var(--down)] border-[var(--down-line)] bg-[var(--down-bg)]' : 'text-[var(--ink-3)] border-[var(--line-1)] bg-[var(--surface-2)]'"
+              >
+                {{ c.label === 'bullish' ? t('common.dir.long') : c.label === 'bearish' ? t('common.dir.short') : t('common.dir.flat') }}
               </span>
             </div>
-          </div>
+
+            <!-- 多空力量条 -->
+            <div class="h-1.5 w-full overflow-hidden rounded bg-[var(--down)] flex mb-1.5">
+              <div
+                class="h-full bg-[var(--up)] transition-all"
+                :style="{ width: `${c.bull}%` }"
+              />
+            </div>
+
+            <div class="flex justify-between text-4xs font-mono text-[var(--ink-3)]">
+              <span class="text-[var(--up)]">{{ c.bull.toFixed(0) }}% 多</span>
+              <!-- 中位指标：多空账户比来自 OKX Rubik（真实端点）。绝不显示
+                   虚构的「100 篇」样本量；仅在确有快讯提及该币时才追加篇数。 -->
+              <span :title="t('dash.news.ratioHint')">多空比 {{ c.ls || '--' }}<template v-if="c.mentions > 0"> · {{ t('dash.news.mentions', undefined, { n: c.mentions }) }}</template></span>
+              <span class="text-[var(--down)]">{{ c.bear.toFixed(0) }}% 空</span>
+            </div>
+          </button>
         </div>
       </div>
 
-      <!-- 右：快讯流 (Intelligence Feed) -->
-      <div class="card overflow-hidden xl:col-span-8 flex flex-col">
-        <div class="flex items-center justify-between border-b px-3.5 py-2.5 flex-wrap gap-2" style="border-color: var(--line-1)">
-          <div class="flex items-center gap-2 flex-wrap">
-            <h2 class="text-sm font-bold" style="color: var(--ink-strong)">{{ t('dash.news.feed.title') }}</h2>
-            <!-- 来源分类筛选按钮 -->
-            <div class="flex items-center gap-0.5 p-0.5 rounded-md text-2xs" style="background-color: var(--surface-2); border: 1px solid var(--line-1);">
-              <button
-                v-for="s in sourceFilters"
-                :key="s.key"
-                class="px-2 py-0.5 rounded transition-colors"
-                :style="selectedSource === s.key ? { backgroundColor: 'var(--surface-3)', color: 'var(--ink-strong)', fontWeight: 'bold' } : { color: 'var(--ink-3)' }"
-                @click="selectedSource = s.key"
-              >
-                {{ s.label }}
-              </button>
-            </div>
-            <span v-if="selectedCoin" class="badge badge-accent text-2xs flex items-center gap-1">
-              <Filter class="h-2.5 w-2.5" /> {{ t('dash.news.filterTag', undefined, { sym: selectedCoin }) }}
-            </span>
-          </div>
-          <div class="flex items-center gap-2">
-            <span class="t-faint text-2xs">{{ t('dash.news.count', undefined, { n: filteredNews.length }) }}</span>
+      <!-- 舆情快讯情报流 -->
+      <div class="dsh-card overflow-hidden">
+        <!-- 筛选栏 -->
+        <div class="dsh-card-header flex flex-wrap items-center justify-between gap-2">
+          <div class="seg">
             <button
-              v-if="selectedCoin || selectedSource !== 'all'"
-              class="btn btn-ghost btn-sm text-2xs"
-              @click="selectedCoin = null; selectedSource = 'all'"
+              v-for="f in sourceFilters"
+              :key="f.key"
+              :class="{ 'seg-on': selectedSource === f.key }"
+              @click="selectedSource = f.key"
             >
-              {{ t('dash.news.resetFilters') }}
+              {{ f.label }}
             </button>
           </div>
+
+          <div class="text-3xs text-[var(--ink-3)] font-mono">
+            {{ filteredNews.length }} / {{ rawNews.length }} 条快讯
+          </div>
         </div>
 
-        <BaseEmpty v-if="!filteredNews.length" :text="selectedCoin ? t('dash.news.emptyCoin', undefined, { sym: selectedCoin }) : t('dash.news.feed.empty')" />
-        <div v-else class="flex-1 max-h-[640px] divide-y overflow-y-auto" style="--tw-divide-y-reverse:0">
-          <a
+        <!-- 空态 -->
+        <BaseEmpty v-if="!filteredNews.length" :text="t('dash.news.feed.empty')" />
+
+        <!-- 快讯卡片列表 -->
+        <div v-else class="divide-y" style="border-color: var(--line-1)">
+          <article
             v-for="item in filteredNews"
-            :key="item.id"
-            :href="item.url || '#'"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="group block px-3.5 py-3 transition-colors hover:bg-[var(--surface-3)]"
-            style="border-color: var(--line-1)"
+            :key="item.id || item.title"
+            class="p-4 transition-colors hover:bg-[var(--surface-2)] flex flex-col gap-2"
           >
-            <!-- 顶栏：影响度 + 来源平台 + 币种标签 + 时间 -->
-            <div class="flex items-center gap-2 flex-wrap">
-              <span class="badge font-bold" :class="impCls(item.importance)">{{ impTxt(item.importance) }}</span>
-              <span
-                v-for="plat in (item.platforms || [])"
-                :key="plat"
-                class="badge text-3xs font-bold"
-                :style="plat === 'OKX官方'
-                  ? { backgroundColor: '#3880ff15', borderColor: '#3880ff33', color: '#3880ff' }
-                  : plat === '金十数据'
-                  ? { backgroundColor: '#e0242415', borderColor: '#e0242433', color: '#e02424' }
-                  : { backgroundColor: 'var(--surface-3)', borderColor: 'var(--line-1)', color: 'var(--ink-2)' }"
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div class="flex items-center gap-2 flex-wrap">
+                <!-- 时间 -->
+                <span class="num font-mono text-xs font-semibold text-[var(--ink-strong)]">
+                  {{ fmtHM(item.timestamp || item.time) }}
+                </span>
+
+                <!-- 重要度 -->
+                <span
+                  v-if="item.importance === 'high'"
+                  class="rounded px-1.5 py-0.2 text-4xs font-mono font-bold uppercase text-[var(--down)] border border-[var(--down-line)] bg-[var(--down-bg)]"
+                >
+                  HIGH
+                </span>
+
+                <!-- 来源渠道 -->
+                <span
+                  v-for="p in (item.platforms || [])"
+                  :key="p"
+                  class="rounded px-1.5 py-0.2 text-4xs font-mono text-[var(--ink-2)] border border-[var(--line-1)] bg-[var(--surface-2)]"
+                >
+                  {{ p }}
+                </span>
+
+                <!-- 关联币种 -->
+                <span
+                  v-for="coin in (item.coins || [])"
+                  :key="coin"
+                  class="rounded px-1.5 py-0.2 text-4xs font-mono font-bold text-[var(--accent)] border border-[var(--line-2)] cursor-pointer hover:bg-[var(--surface-3)]"
+                  @click="toggleCoinFilter(coin)"
+                >
+                  ${{ coin }}
+                </span>
+              </div>
+
+              <!-- 外链 -->
+              <a
+                v-if="item.url"
+                :href="item.url"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="text-3xs text-[var(--ink-3)] hover:text-[var(--accent)] inline-flex items-center gap-1 transition-colors"
               >
-                {{ plat }}
-              </span>
-              <span
-                v-for="cc in (item.coins || []).slice(0, 3)"
-                :key="cc"
-                class="badge badge-mono text-3xs"
-                :class="selectedCoin === cc ? 'badge-accent' : ''"
-              >
-                {{ cc }}
-              </span>
-              <span class="t-faint ms-auto text-2xs num">{{ fmtHM(item.time) }} · <TimeAgo :time="item.time" /></span>
+                <span>{{ t('common.more') }}</span>
+                <ExternalLink class="h-3 w-3" />
+              </a>
             </div>
 
-            <!-- 标题 -->
-            <p class="mt-1.5 text-xs md:text-sm font-medium leading-snug group-hover:text-[var(--accent)] transition-colors" style="color: var(--ink-strong)">
+            <!-- 标题与正文 -->
+            <h3 class="text-xs font-bold text-[var(--ink-strong)] leading-snug">
               {{ item.title }}
-              <ExternalLink class="ms-1 inline h-3 w-3 opacity-30 group-hover:opacity-100" />
-            </p>
-
-            <!-- 摘要正文 -->
-            <p v-if="item.summary" class="mt-1 line-clamp-2 text-2xs leading-relaxed" style="color: var(--ink-2)">
+            </h3>
+            <p v-if="item.summary" class="text-xs text-[var(--ink-2)] leading-relaxed font-sans">
               {{ item.summary }}
             </p>
-          </a>
+          </article>
         </div>
       </div>
-    </div>
+    </DataGate>
   </div>
 </template>

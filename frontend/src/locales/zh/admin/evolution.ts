@@ -1,6 +1,6 @@
 /** 自进化页文案 */
 export const zhAdminEvolution = {
-  desc: '穿透平仓台账自省归因，提炼心法注入下一轮决策；离群噪点剔除与半衰期淘汰',
+  desc: '查看平仓归因结论与经验法则的增删记录',
   guardChip: '白盒认知 · 防偏见护栏',
   tabOverview: '白盒心法与防污染总览',
   tabSystem: '复盘官 System 模版',
@@ -64,4 +64,14 @@ export const zhAdminEvolution = {
   saveTemplate: '保存模版',
   moduleOn: '启用模块',
   moduleOff: '已停用',
+
+  // ── 推倒式重构新增（批 5）──
+  reportStatsHint: '本次复盘样本与裁定依据',
+  insightLine: '提炼洞见',
+  runConfirmTitle: '立即强制执行自进化复盘',
+  runConfirmDesc: '将对全天战绩穿透提炼并生成最新复盘心法；该任务会真实写入认知库。',
+  runConfirmPhrase: '确认短语',
+  runConfirmSubmit: '执行复盘',
+  modulesTitle: '模版模块序列',
+  lockedBadge: '只读',
 };

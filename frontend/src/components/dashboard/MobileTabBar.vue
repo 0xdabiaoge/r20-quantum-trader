@@ -13,7 +13,7 @@ const activeKey = computed(() => (route.meta?.tab as string) || 'trading');
 
 <template>
   <nav
-    class="fixed inset-x-0 bottom-0 z-[var(--z-header)] border-t backdrop-blur-xl md:hidden"
+    class="fixed inset-x-0 bottom-0 z-[var(--z-header)] border-t md:hidden"
     style="background-color: var(--surface-header); border-color: var(--line-1); padding-bottom: env(safe-area-inset-bottom)"
     aria-label="mobile primary"
   >

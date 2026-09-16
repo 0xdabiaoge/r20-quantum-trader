@@ -154,6 +154,104 @@ class TestListingGate(unittest.TestCase):
         self.assertFalse(d.rejected)
         self.assertTrue(any("fail-open" in r or "跳过对账" in r for r in d.reasons))
 
+    def test_hard_filters_pass_native_contract_not_canonical_base(self):
+        """P0 回归（2026-09-16·下单全拒事故）：硬筛必须把**该所原生合约码**交给
+        listing gate，而不是 canonical base。
+
+        事故根因：`selection.py` 从 `venue_router.py` 抽进 `venue_routing/` 子包后
+        写成单点相对导入 `.exchanges.registry`（应为 `..exchanges.registry`），
+        ImportError 被裸 except 吞掉 → `native_contract` 退化成 `BTC` → OKX 目录键
+        是 `BTC-USDT-SWAP`，必然「沙盒未上市」→ 全部候选所 ALL_REJECTED →
+        **一单都开不出去**。
+
+        本门钉两件事：① 三所各自拿到原生码；② 对齐过程**不得**再发 RuntimeWarning
+        （静默降级通道关闭）。
+        """
+        seen: list[tuple[str, str]] = []
+
+        def _capture(venue, environment, contract):
+            seen.append((venue, contract))
+            return _ok_listing(venue, environment, contract)
+
+        for venue, native in (("okx", "BTC-USDT-SWAP"),
+                              ("binance", "BTCUSDT"),
+                              ("gate", "BTC_USDT")):
+            with self.subTest(venue=venue):
+                seen.clear()
+                import warnings as _w
+                with patch.object(listing_mod, "ensure_contract_listed", _capture), \
+                     _w.catch_warnings(record=True) as caught:
+                    _w.simplefilter("always")
+                    route_signal(_signal(), [_cand(venue)], config=_cfg())
+                self.assertIn((venue, native), seen,
+                              f"{venue} 未拿到原生合约码 {native}；实际={seen}")
+                self.assertNotIn((venue, "BTC"), seen,
+                                 f"{venue} 拿到了 canonical base（listing gate 会误判未上市）")
+                self.assertFalse([str(w.message) for w in caught if "对齐失败" in str(w.message)],
+                                 f"{venue} 原生合约码对齐发生了静默降级：{[str(w.message) for w in caught]}")
+
+
+class TestVenuePoolGate(unittest.TestCase):
+    """2026-09-16 P0（第二层）：路由必须尊重各所**准入币种清单**。
+
+    事故链：listing gate 修好之后，`_balanced_pick` 仍会把不在 binance/gate
+    准入清单里的标的（如 ARB）按 sha256 分到那两所 → 执行层 pool 门禁必拒
+    （「不在 BINANCE 准入币种清单」）→ 而 `route_signal` 选中即**不回退**
+    ⇒ 主脑发单继续全灭。本组钉：路由阶段就淘汰这类候选，并回退到真正能做的所。
+    """
+
+    def test_pool_mismatch_rejected_as_venue_pool_and_falls_back(self):
+        from r20_backend.venue_routing import selection as sel
+        pool = {"binance": ["BTC"], "gate": ["BTC"], "okx": None}
+        with patch.object(listing_mod, "ensure_contract_listed", _ok_listing), \
+             patch.object(sel, "_venue_pool_assets", lambda v: pool.get(v)):
+            d = route_signal(
+                _signal(symbol_canonical="ARB", inst_id="ARB-USDT-SWAP"),
+                [_cand("okx"), _cand("binance"), _cand("gate")], config=_cfg())
+        self.assertEqual(d.venue, "okx", "必须回退到不受清单限制的所")
+        stages = {(r["venue"], r["stage"]) for r in d.rejected}
+        self.assertIn(("binance", "venue_pool"), stages)
+        self.assertIn(("gate", "venue_pool"), stages)
+        for r in d.rejected:
+            if r["stage"] == "venue_pool":
+                self.assertIn("准入币种清单", r["reason"])
+
+    def test_asset_in_pool_passes(self):
+        from r20_backend.venue_routing import selection as sel
+        with patch.object(listing_mod, "ensure_contract_listed", _ok_listing), \
+             patch.object(sel, "_venue_pool_assets", lambda v: ["BTC"]):
+            d = route_signal(_signal(), [_cand("okx")], config=_cfg())
+        self.assertEqual(d.venue, "okx")
+        self.assertFalse([r for r in d.rejected if r["stage"] == "venue_pool"])
+
+    def test_empty_or_absent_pool_does_not_restrict(self):
+        """空清单/未配置 ≠ 新造一条拒绝理由（执行层才有「空池=停发」语义，
+        OKX 直下路径更是没有池概念）。"""
+        from r20_backend.venue_routing import selection as sel
+        with patch.object(listing_mod, "ensure_contract_listed", _ok_listing), \
+             patch.object(sel, "_venue_pool_assets", lambda v: None):
+            d = route_signal(
+                _signal(symbol_canonical="ARB", inst_id="ARB-USDT-SWAP"),
+                [_cand("okx"), _cand("binance")], config=_cfg())
+        self.assertIsNotNone(d.venue)
+        self.assertFalse([r for r in d.rejected if r["stage"] == "venue_pool"])
+
+    def test_pool_loader_reads_and_normalizes_routing_file(self):
+        """清单来源 = data/venue_routing.json 的 per-venue assets（去重+大写）。"""
+        import json
+        import tempfile
+        from pathlib import Path
+        from r20_backend.exchanges import routing_policy as rp
+        from r20_backend.venue_routing import selection as sel
+        with tempfile.TemporaryDirectory() as td:
+            f = Path(td) / "venue_routing.json"
+            f.write_text(json.dumps({"okx": {"assets": ["BTC", "eth", "btc"]}}),
+                         encoding="utf-8")
+            with patch.object(rp, "ROUTING_FILE", f):
+                self.assertEqual(sel._venue_pool_assets("okx"), ["BTC", "ETH"])
+                # 未配置的所 → None（不淘汰）
+                self.assertIsNone(sel._venue_pool_assets("gate"))
+
 
 class TestScoring(unittest.TestCase):
     """验收 3：评分排序正确、资金费按方向/周期估计。"""

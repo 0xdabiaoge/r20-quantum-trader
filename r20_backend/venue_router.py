@@ -259,6 +259,9 @@ def _stage_of(fail_reason: str) -> str:
         return "executable"
     if "listing" in fail_reason:
         return "listing"
+    # 每所准入币种池（与执行层 execution_router 的 stage 同名，证据可直接对读）
+    if "准入币种清单" in fail_reason:
+        return "venue_pool"
     if "名义额" in fail_reason or "最小量" in fail_reason or "步进" in fail_reason:
         return "precision"
     if "新鲜度" in fail_reason:

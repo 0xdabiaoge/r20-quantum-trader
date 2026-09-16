@@ -1,17 +1,20 @@
 <script setup lang="ts">
-import { fmtDateTime } from '../../utils/format';
-/** 决策审计抽屉：宏观研判 / 机会与持仓指令 / 委员会纪要 / 原始记录 */
+/**
+ * RadarDrawer.vue · DeepSeek Harness 风格决策白盒透视抽屉
+ * 包含：宏观综合研判、机会与持仓调度、投委会多模型博弈流（各交易员提案/辩论/CIO终审）、三所价差与原始 JSON
+ */
 import { computed, ref, watch } from 'vue';
+import { fmtDateTime, fmtNum, fmtPrice } from '../../utils/format';
+import { useI18n } from '../../composables/useI18n';
+import { useDashboardStore } from '../../stores/dashboard';
+import { Scale, Activity, Zap, Landmark } from 'lucide-vue-next';
 import BaseDrawer from '../base/BaseDrawer.vue';
 import BaseTabs from '../base/BaseTabs.vue';
-import BaseCollapse from '../base/BaseCollapse.vue';
 import BaseCodeBlock from '../base/BaseCodeBlock.vue';
 import BaseEmpty from '../base/BaseEmpty.vue';
 import DirTag from '../base/DirTag.vue';
 import ConfBadge from '../base/ConfBadge.vue';
-import { useI18n } from '../../composables/useI18n';
-import { useDashboardStore } from '../../stores/dashboard';
-import { fmtNum, fmtPrice } from '../../utils/format';
+import CryptoLogo from './CryptoLogo.vue';
 
 const dash = useDashboardStore();
 const props = defineProps<{ cycle: any | null }>();
@@ -21,7 +24,7 @@ const { t } = useI18n();
 const tab = ref('macro');
 
 const c = computed(() => props.cycle || {});
-/** 提示词字数：默认载荷里与顶层同文的行内提示词只保留字数（缺失不得当 0 渲染） */
+
 function promptChars(row: any): number | null {
   const text = row?.ai_last_prompt;
   if (typeof text === 'string' && text.length > 0) return text.length;
@@ -35,23 +38,23 @@ const transcript = computed(() => c.value.council_transcript);
 const councilStatus = computed<any>(() => c.value.council_status || null);
 
 const SEAT_LABELS: Record<string, string> = {
-  trader_trend: '交易员A', trader_momentum: '交易员B', trader_quant: '交易员C',
-  cio: 'CIO', REJECT_ALL: '全员驳回',
+  trader_trend: '交易员 A · 顺势',
+  trader_momentum: '交易员 B · 动能',
+  trader_quant: '交易员 C · 数理',
+  cio: 'CIO · 仲裁决策席',
+  REJECT_ALL: '全员驳回',
 };
 function seatLabel(id: any): string {
   const s = String(id || '');
   return SEAT_LABELS[s] || s || '';
 }
+
 const advisorList = computed<any[]>(() => Object.values(transcript.value?.advisors || {}));
 const arbitrator = computed<any>(() => transcript.value?.arbitrator || null);
 const modeLabel = computed(() => transcript.value?.consensus_mode === 'cross_examination'
   ? t('dash.radar.council.cross') : t('dash.radar.council.standard'));
 
 const xvenueRows = computed(() => {
-  // 审计①#11(2026-09-13)：跨所对账数据源在 /api/all 顶层 cross_venue.symbols
-  // （okx 为 float），而 ai_brain_history 条目从不含 cross_venue.by_asset——
-  // 旧实现只读 cycle 内键位，页签永不渲染（纯漏接线，后端数据一直都在）。
-  // 现双兼容：条目自带（旧契约）优先，否则兜底顶层 store。
   const byAsset: any = c.value?.cross_venue?.by_asset
     || (dash.data as any)?.cross_venue?.symbols || {};
   return Object.entries(byAsset).map(([sym, data]: [string, any]) => ({
@@ -79,9 +82,6 @@ const tabs = computed(() => {
   return items;
 });
 
-// 批A(2026-09-13)·防「串页」：council/xvenue 页签按数据条件出现。连看两个周期时，
-// 上一个残留的 tab key 若在下一个周期不存在 → 不匹配任何 v-if 落到 v-else(原始 JSON)，
-// 而下划线仍停在旧页签，看似加载坏。切周期重置到 macro；并在页签集变化后兜底校正。
 watch(() => props.cycle, () => { tab.value = 'macro'; });
 watch(tabs, (items) => {
   const keys = items.map((i) => i.key);
@@ -99,163 +99,198 @@ function dirOf(a: string): 'long' | 'short' | 'flat' {
     :open="!!cycle"
     width="680px"
     :title="t('dash.radar.detail.title', undefined, { t: fmtDateTime(cycle?.time) })"
-    :subtitle="cycle?.policy_version || ''"
+    :subtitle="cycle?.policy_version || 'R20 Multi-Agent System'"
     @close="emit('close')"
   >
-    <BaseTabs v-model="tab" :items="tabs" class="mb-4" />
+    <BaseTabs v-model="tab" :items="tabs" class="mb-3.5" />
 
-    <!-- 宏观研判 -->
+    <!-- 1. 宏观综合研判 -->
     <div v-if="tab === 'macro'" class="space-y-3">
+      <!-- 委员会运行状态 -->
       <div class="flex flex-wrap items-center gap-2">
-        <span v-if="councilStatus?.ran" class="badge badge-up">🏛️ {{ t('dash.radar.council.done') }} · {{ ((councilStatus.duration_ms || 0) / 1000).toFixed(1) }}s</span>
-        <span v-else-if="councilStatus" class="badge badge-warn" :title="String(councilStatus.reason || '')">⚡ {{ t('dash.radar.council.degraded') }}</span>
+        <span
+          v-if="councilStatus?.ran"
+          class="dsh-pill text-[var(--up)] border-[var(--up-line)] bg-[var(--up-bg)]"
+        >
+          <Landmark class="w-3 h-3" /> {{ t('dash.radar.council.done') }} · {{ ((councilStatus.duration_ms || 0) / 1000).toFixed(1) }}s
+        </span>
+        <span
+          v-else-if="councilStatus"
+          class="dsh-pill text-[var(--warn)] border-[var(--warn-line)] bg-[var(--warn-bg)]"
+          :title="String(councilStatus.reason || '')"
+        >
+          <Zap class="w-3 h-3" /> {{ t('dash.radar.council.degraded') }}
+        </span>
       </div>
-      <p v-if="councilStatus && !councilStatus.ran && councilStatus.reason" class="card-flat p-2.5 text-xs leading-relaxed" style="color: var(--warn, #d97706)">
+
+      <p
+        v-if="councilStatus && !councilStatus.ran && councilStatus.reason"
+        class="dsh-card-sub p-3 text-xs leading-relaxed text-[var(--warn)] border-[var(--warn-line)]"
+      >
         {{ t('dash.radar.council.reason') }}：{{ councilStatus.reason }}
       </p>
-      <div class="card-flat p-3.5 text-sm leading-relaxed" style="color: var(--ink-1)">
-        {{ c.macro_assessment || '--' }}
-        <p v-if="promptChars(c)" class="num t-faint mt-3 border-t pt-2 text-xs" style="border-color: var(--line-1)">
+
+      <!-- 宏观综述 -->
+      <div class="dsh-card-sub p-4 text-xs leading-relaxed text-[var(--ink-1)]">
+        <h4 class="text-3xs font-bold uppercase tracking-wider text-[var(--ink-3)] mb-2">宏观全景评述</h4>
+        <p class="whitespace-pre-wrap font-sans text-xs leading-relaxed">{{ c.macro_assessment || '--' }}</p>
+
+        <p v-if="promptChars(c)" class="num font-mono text-3xs text-[var(--ink-3)] mt-3 border-t pt-2" style="border-color: var(--line-1)">
           {{ t('dash.shell.peek.chars', undefined, { n: promptChars(c) ?? 0 }) }} · {{ t('dash.shell.peek.title') }}
           <span v-if="c.ai_last_prompt_elided">（{{ t('dash.radar.detail.promptElided') }}）</span>
         </p>
       </div>
     </div>
 
-    <!-- 机会与指令 -->
-    <div v-else-if="tab === 'quotes'" class="space-y-4">
-      <div v-if="posMgmt.length">
-        <p class="t-label mb-1.5">{{ t('dash.radar.detail.verdict') }} · position_management</p>
-        <div class="card overflow-x-auto">
-          <table class="table">
-            <thead>
-              <tr>
-                <th>{{ t('dash.matrix.positions.col.symbol') }}</th>
-                <th>{{ t('dash.radar.col.action') }}</th>
-                <th class="col-num">{{ t('dash.matrix.positions.col.sl') }}</th>
-                <th>{{ t('dash.matrix.matrix.reason') }}</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(m, i) in posMgmt" :key="'pm' + i">
-                <td class="num font-semibold">{{ String(m.instId || '').split('-')[0] }}</td>
-                <td><DirTag :dir="dirOf(m.action)" /></td>
-                <td class="col-num t-faint">{{ m.suggested_sl_price ? fmtPrice(m.suggested_sl_price) : '--' }}</td>
-                <td class="max-w-[300px] truncate text-xs" style="color: var(--ink-2)" :title="m.reason">{{ m.reason }}</td>
-              </tr>
-            </tbody>
-          </table>
+    <!-- 2. 机会与持仓调度 -->
+    <div v-else-if="tab === 'quotes'" class="space-y-3">
+      <!-- 持仓管理指令 -->
+      <div v-if="posMgmt.length" class="space-y-2">
+        <h4 class="text-3xs font-bold uppercase tracking-wider text-[var(--ink-3)] flex items-center gap-1.5">
+          <Activity class="h-3 w-3 text-[var(--accent)]" />
+          持仓调度与执行
+        </h4>
+        <div
+          v-for="p in posMgmt"
+          :key="p.instId"
+          class="dsh-card-sub p-3 space-y-1.5"
+        >
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="font-mono font-bold text-xs text-[var(--ink-strong)]">{{ p.instId }}</span>
+              <DirTag :dir="dirOf(p.action)" />
+              <ConfBadge :value="p.confidence" />
+            </div>
+            <span class="text-3xs font-mono text-[var(--ink-3)]">{{ p.action }}</span>
+          </div>
+          <p class="text-xs text-[var(--ink-2)] leading-relaxed">{{ p.reasoning }}</p>
         </div>
       </div>
 
-      <div v-if="opps.length">
-        <p class="t-label mb-1.5">{{ t('dash.radar.detail.quotes') }} · top_opportunities</p>
-        <div class="card overflow-x-auto">
-          <table class="table">
-            <thead>
-              <tr>
-                <th>{{ t('dash.matrix.positions.col.symbol') }}</th>
-                <th>{{ t('dash.radar.col.action') }}</th>
-                <th class="col-num">{{ t('dash.radar.detail.plan') }}</th>
-                <th class="col-num">R:R</th>
-                <th>{{ t('dash.matrix.matrix.col.conf') }}</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(o, i) in opps" :key="'op' + i">
-                <td class="num font-semibold">{{ String(o.inst || '').split('-')[0] }}</td>
-                <td>
-                  <DirTag :dir="dirOf(o.action)" />
-                  <span v-if="transcript && (o as any).council_adopted" class="badge badge-mono ms-1 text-2xs" :title="t('dash.radar.council.adopted')">
-                    🏛️ {{ seatLabel((o as any).council_adopted) }}
-                  </span>
-                </td>
-                <td class="col-num t-faint">{{ fmtNum(o.margin_usdt, 0) }} U · {{ o.leverage }}x</td>
-                <td class="col-num">{{ o.risk_reward_ratio || '--' }}</td>
-                <td><ConfBadge :value="o.confidence" /></td>
-              </tr>
-            </tbody>
-          </table>
+      <!-- 潜力机会 Top -->
+      <div v-if="opps.length" class="space-y-2">
+        <h4 class="text-3xs font-bold uppercase tracking-wider text-[var(--ink-3)] flex items-center gap-1.5">
+          <Zap class="h-3 w-3 text-[var(--accent)]" />
+          潜力机会 Top
+        </h4>
+        <div
+          v-for="o in opps"
+          :key="o.inst"
+          class="dsh-card-sub p-3 space-y-2"
+        >
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <CryptoLogo :symbol="o.inst" :size="16" />
+              <span class="font-mono font-bold text-xs text-[var(--ink-strong)]">{{ o.inst }}</span>
+              <DirTag :dir="dirOf(o.action)" />
+              <ConfBadge :value="o.confidence" />
+            </div>
+            <span class="rounded px-1.5 py-0.2 border text-3xs font-mono text-[var(--ink-2)]" style="background-color: var(--surface-2); border-color: var(--line-1)">
+              {{ o.suggested_leverage || '5x' }}
+            </span>
+          </div>
+
+          <p class="text-xs text-[var(--ink-2)] leading-relaxed">{{ o.reasoning }}</p>
+
+          <!-- 挂单点位 -->
+          <div class="grid grid-cols-3 gap-2 pt-2 border-t text-3xs font-mono" style="border-color: var(--line-1)">
+            <div>
+              <span class="text-[var(--ink-3)] block">建议入场:</span>
+              <span class="font-bold text-[var(--ink-1)]">{{ fmtPrice(o.target_entry_price) }}</span>
+            </div>
+            <div>
+              <span class="text-[var(--ink-3)] block">建议止损:</span>
+              <span class="font-bold text-[var(--down)]">{{ fmtPrice(o.stop_loss_price) }}</span>
+            </div>
+            <div>
+              <span class="text-[var(--ink-3)] block">建议止盈:</span>
+              <span class="font-bold text-[var(--up)]">{{ fmtPrice(o.take_profit_price) }}</span>
+            </div>
+          </div>
         </div>
       </div>
-      <BaseEmpty v-if="!posMgmt.length && !opps.length" :text="t('dash.radar.detail.waitNote')" />
+
+      <BaseEmpty v-if="!opps.length && !posMgmt.length" :text="t('dash.radar.empty')" />
     </div>
 
-    <!-- 委员会纪要 -->
-    <!-- 委员会纪要 -->
-    <div v-else-if="tab === 'council'" class="space-y-2">
-      <template v-if="transcript">
-        <div class="card-flat flex flex-wrap items-center gap-2 p-3 text-xs">
-          <span class="badge badge-info">🏛️ {{ modeLabel }}</span>
-          <span class="t-faint">{{ t('dash.radar.council.totalTime', undefined, { n: ((transcript.total_duration_ms || 0) / 1000).toFixed(1) }) }}</span>
-          <span v-if="advisorList.length" class="t-faint">
-            {{ t('dash.radar.council.seatsOk', undefined, { ok: advisorList.filter((a: any) => a.status !== 'error').length, n: advisorList.length }) }}
-          </span>
+    <!-- 3. 投委会博弈纪要 -->
+    <div v-else-if="tab === 'council'" class="space-y-3">
+      <div class="flex items-center justify-between border-b pb-2" style="border-color: var(--line-1)">
+        <span class="text-xs font-bold uppercase tracking-wider text-[var(--ink-strong)]">
+          {{ modeLabel }}
+        </span>
+        <span
+          v-if="councilStatus?.duration_ms"
+          class="text-3xs font-mono text-[var(--ink-3)]"
+        >
+          总耗时 {{ (councilStatus.duration_ms / 1000).toFixed(2) }}s
+        </span>
+      </div>
+
+      <!-- CIO 仲裁决议 -->
+      <div v-if="arbitrator" class="dsh-card-sub p-3.5 border-[var(--accent)]" style="border-width: 1px">
+        <div class="flex items-center justify-between mb-2">
+          <div class="flex items-center gap-2">
+            <Scale class="h-4 w-4 text-[var(--accent)]" />
+            <span class="text-xs font-bold text-[var(--ink-strong)]">CIO 终审裁决</span>
+            <span
+              v-if="transcript?.adopted_role"
+              class="rounded px-1.5 py-0.2 border text-3xs font-mono text-[var(--up)] border-[var(--up-line)] bg-[var(--up-bg)]"
+            >
+              采纳提案: {{ seatLabel(transcript.adopted_role) }}
+            </span>
+          </div>
+          <ConfBadge :value="arbitrator.confidence" />
         </div>
-        <div v-for="(a, i) in advisorList" :key="'adv' + i" class="card-flat p-3"
-             :style="a.status === 'error' ? 'border-left: 2px solid var(--down)' : 'border-left: 2px solid var(--accent-line)'">
-          <p class="text-xs font-bold" :style="{ color: a.status === 'error' ? 'var(--down)' : 'var(--ink-strong)' }">
-            {{ a.role_name }}
-            <span v-if="a.model_used" class="badge badge-mono ms-1 text-2xs">{{ a.model_used }}</span>
-            <span v-if="a.latency_ms" class="t-faint font-normal ms-1">· {{ (a.latency_ms / 1000).toFixed(1) }}s</span>
-          </p>
-          <p class="mt-1 text-xs leading-relaxed whitespace-pre-wrap" style="color: var(--ink-2)">{{ String(a.content || '--').slice(0, 1200) }}<span v-if="String(a.content || '').length > 1200"> …</span></p>
+        <p class="text-xs text-[var(--ink-1)] leading-relaxed whitespace-pre-wrap">{{ arbitrator.reasoning || arbitrator.summary || '--' }}</p>
+      </div>
+
+      <!-- 各交易员提案列表 -->
+      <div class="space-y-2">
+        <h4 class="text-3xs font-bold uppercase tracking-wider text-[var(--ink-3)]">各席位交易员独立提案</h4>
+        <div
+          v-for="adv in advisorList"
+          :key="adv.role_id || adv.name"
+          class="dsh-card-sub p-3 space-y-2"
+        >
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="font-mono font-bold text-xs text-[var(--ink-strong)]">{{ seatLabel(adv.role_id || adv.name) }}</span>
+              <DirTag v-if="adv.action" :dir="dirOf(adv.action)" />
+              <ConfBadge :value="adv.confidence" />
+            </div>
+            <span v-if="adv.inst" class="text-3xs font-mono text-[var(--ink-2)]">{{ adv.inst }}</span>
+          </div>
+          <p class="text-xs text-[var(--ink-2)] leading-relaxed">{{ adv.reasoning || adv.view || '--' }}</p>
         </div>
-        <div v-if="arbitrator" class="card-flat p-3" style="border-left: 2px solid var(--accent)">
-          <p class="text-xs font-bold" style="color: var(--ink-strong)">
-            ⚖️ {{ arbitrator.role_name }}
-            <span v-if="arbitrator.model_used" class="badge badge-mono ms-1 text-2xs">{{ arbitrator.model_used }}</span>
-          </p>
-          <p class="mt-1 text-xs leading-relaxed whitespace-pre-wrap" style="color: var(--ink-1)">{{ arbitrator.reasoning || '--' }}</p>
-        </div>
-        <BaseCollapse>
-          <template #head><span class="text-xs" style="color: var(--ink-2)">{{ t('dash.radar.council.raw') }}</span></template>
-          <div class="p-2"><BaseCodeBlock :code="JSON.stringify(transcript, null, 2)" max-height="36vh" /></div>
-        </BaseCollapse>
-      </template>
-      <div v-else class="card-flat p-3 text-xs leading-relaxed" style="color: var(--warn, #d97706)">
-        {{ t('dash.radar.council.notRan') }}：{{ councilStatus?.reason || '--' }}
       </div>
     </div>
 
-    <!-- 跨所证据与基差 -->
+    <!-- 4. 三所价差与费率 -->
     <div v-else-if="tab === 'xvenue'" class="space-y-3">
-      <p class="t-label mb-1.5">{{ t('dash.radar.xvenue.title') }}</p>
-      <div class="card overflow-x-auto">
-        <table class="table">
+      <div class="overflow-x-auto">
+        <table class="table w-full">
           <thead>
             <tr>
-              <th>{{ t('dash.matrix.positions.col.symbol') }}</th>
-              <th class="col-num">{{ t('dash.radar.xvenue.okxPrice') }}</th>
-              <th class="col-num">{{ t('dash.radar.xvenue.bnPrice') }}</th>
-              <th class="col-num">{{ t('dash.radar.xvenue.gatePrice') }}</th>
-              <th class="col-num">{{ t('dash.radar.xvenue.lsRatio') }}</th>
-              <th class="col-num">{{ t('dash.radar.xvenue.fundingRate') }}</th>
+              <th>标的</th>
+              <th class="col-num">OKX 现价</th>
+              <th class="col-num">BN 基差</th>
+              <th class="col-num">Gate 基差</th>
+              <th class="col-num">多空比 (BN/Gate)</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="row in xvenueRows" :key="row.symbol">
-              <td class="num font-semibold">{{ row.symbol }}</td>
-              <td class="col-num">{{ row.okx_last ? fmtPrice(row.okx_last) : '--' }}</td>
-              <td class="col-num">
-                <span>{{ row.bin_last ? fmtPrice(row.bin_last) : '--' }}</span>
-                <span v-if="row.bin_basis_pct !== undefined && row.bin_basis_pct !== null" :class="['ms-1 text-2xs font-mono', row.bin_basis_pct >= 0 ? 'up' : 'down']">
-                  ({{ row.bin_basis_pct >= 0 ? '+' : '' }}{{ row.bin_basis_pct }}%)
-                </span>
+            <tr v-for="xv in xvenueRows" :key="xv.symbol">
+              <td class="font-mono font-bold text-xs text-[var(--ink-strong)]">{{ xv.symbol }}</td>
+              <td class="col-num font-mono">{{ fmtPrice(xv.okx_last) }}</td>
+              <td class="col-num font-mono" :class="Number(xv.bin_basis_pct || 0) >= 0 ? 'text-[var(--up)]' : 'text-[var(--down)]'">
+                {{ fmtNum(xv.bin_basis_pct, 3) }}%
               </td>
-              <td class="col-num">
-                <span>{{ row.gate_last ? fmtPrice(row.gate_last) : '--' }}</span>
-                <span v-if="row.gate_basis_pct !== undefined && row.gate_basis_pct !== null" :class="['ms-1 text-2xs font-mono', row.gate_basis_pct >= 0 ? 'up' : 'down']">
-                  ({{ row.gate_basis_pct >= 0 ? '+' : '' }}{{ row.gate_basis_pct }}%)
-                </span>
+              <td class="col-num font-mono" :class="Number(xv.gate_basis_pct || 0) >= 0 ? 'text-[var(--up)]' : 'text-[var(--down)]'">
+                {{ fmtNum(xv.gate_basis_pct, 3) }}%
               </td>
-              <td class="col-num text-2xs font-mono">
-                <span :title="'Binance: ' + (row.bin_ls || '--')">{{ row.bin_ls ?? '--' }}</span> / 
-                <span :title="'Gate: ' + (row.gate_ls || '--')">{{ row.gate_ls ?? '--' }}</span>
-              </td>
-              <td class="col-num text-2xs font-mono">
-                <span>{{ row.bin_funding_pct !== undefined && row.bin_funding_pct !== null ? `${row.bin_funding_pct}%` : '--' }}</span> / 
-                <span>{{ row.gate_funding_pct !== undefined && row.gate_funding_pct !== null ? `${row.gate_funding_pct}%` : '--' }}</span>
+              <td class="col-num font-mono text-[var(--ink-2)]">
+                {{ fmtNum(xv.bin_ls, 2) }} / {{ fmtNum(xv.gate_ls, 2) }}
               </td>
             </tr>
           </tbody>
@@ -263,12 +298,9 @@ function dirOf(a: string): 'long' | 'short' | 'flat' {
       </div>
     </div>
 
-    <!-- 原始记录 -->
-    <div v-else>
-      <BaseCollapse :default-open="true">
-        <template #head><span class="text-sm">{{ t('dash.radar.detail.raw') }} JSON</span></template>
-        <div class="p-2"><BaseCodeBlock :code="JSON.stringify(cycle, null, 2)" max-height="52vh" /></div>
-      </BaseCollapse>
+    <!-- 5. 原始记录 -->
+    <div v-else-if="tab === 'raw'">
+      <BaseCodeBlock :code="JSON.stringify(c, null, 2)" />
     </div>
   </BaseDrawer>
 </template>

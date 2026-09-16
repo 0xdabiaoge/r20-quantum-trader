@@ -36,4 +36,10 @@ export const enAdminAbout = {
   checkUpToDate: "Local code is already up to date and in sync with the remote main branch.",
   updateSuccess: "System updated successfully!",
   updateNoop: "The current branch is already up to date.",
-};
+
+  // ── added by the rebuild (batch 8) ──
+  productTitle: 'Product',
+  bandVersion: 'System version',
+  bandControlPlane: 'Gateway control plane',
+  bandRuntime: 'Runtime',
+  bandSyncGap: 'Sync gap',};

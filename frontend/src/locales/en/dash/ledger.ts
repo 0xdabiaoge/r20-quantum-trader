@@ -1,6 +1,6 @@
 export const enLedger = {
   title: 'Trade Ledger',
-  desc: 'Rebuilt from the exchange position history; exit attribution cross-validated, every trade replayable',
+  desc: 'Per-trade fills, attribution and replayable history',
   summary: {
     total: 'Closed trades',
     winRate: 'Win rate',
@@ -12,7 +12,8 @@ export const enLedger = {
     avgHold: 'Avg hold',
     fundingNet: 'Net funding',
     fundingNetHint: 'Cumulative funding fee net, with income/expense breakdown',
-    tipPf: 'Profit factor = gross win / gross loss; >1 = positive expectancy',
+    tipPf: 'Profit factor = gross win / gross loss; >1 = positive expectancy. Source is exchange settlement bills (not this page\'s ledger rows), so the trade count may differ',
+    pfSource: 'bills basis · {n} trades',
   },
   filters: {
     symbol: 'Symbol',
@@ -78,6 +79,20 @@ export const enLedger = {
     adopted: 'Council verdict · adopted {seat}',
     degraded: 'Council skipped · single-model verdict',
   },
+  observability: {
+    title: 'Math snapshot observability',
+    none: 'Math snapshot not observable',
+    priceOnly: 'Price/common observations only · math snapshot not observable',
+    partial: 'Math snapshot partially observable',
+    observed: 'Math snapshot fully observable',
+    tagHint: 'This trade recorded no entry-time dynamics snapshot, so no math-causal attribution is possible',
+    missingFields: 'Not recorded: v/a/j/I · energy integral · deviation-area integral · continuation/breakdown probability · VaR/CVaR',
+    noBackfill: 'Evidence discipline: absent means unobservable. Back-inference or fabricated micro-math causality is forbidden; a missing field is never itself evidence.',
+    auditLine: 'Entry-time math snapshot audit: fully observable {observed} · partial {partial} · price-only {price} · none {none} (of {total})',
+    unobservable: '{n} / {total} trades with an unobservable math snapshot',
+  },
+  truncated: 'Showing the latest {kept} of {total} trades',
+  truncatedHint: 'Payload slimming truncated the ledger: the summary and table below cover only the retained slice, and missing rows are never filled with 0 or blanks.',
   venue: 'Executing venue (hidden when unlabeled legacy rows — never faked)',
   fundingTag: 'Fund:',
   exportCsv: 'Export CSV',

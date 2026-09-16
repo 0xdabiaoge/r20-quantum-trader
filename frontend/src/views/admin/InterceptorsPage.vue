@@ -1,49 +1,78 @@
 <script setup lang="ts">
-import { useToast } from '../../composables/useToast'
-import { useConfirm } from '../../composables/useConfirm'
-const toast = useToast()
-const { ask } = useConfirm()
-import { ref, onMounted } from 'vue'
-import PageHeader from '../../components/admin/PageHeader.vue'
-import { useI18n } from '../../composables/useI18n'
-import { useApi } from '../../composables/useApi'
-import { useAuthStore } from '../../stores/auth'
-import {ArrowUp, ArrowDown, Plus, Code, Trash2,
-  ToggleLeft, ToggleRight, Play, AlertTriangle,
-  X, Save, Download, FileCode, Sparkles} from 'lucide-vue-next'
+/**
+ * InterceptorsPage.vue · 物理拦截管线工位
+ * ---------------------------------------------------------------------------
+ * 骨架（推倒重来）：
+ *   旧 = 页头 + 每插件一张大卡（左侧上下箭头 + 元信息块 + 右侧动作）
+ *        + **3 个手写 fixed 遮罩弹窗**（源码编辑器 / 新建插件 / 沙箱报告）
+ *   新 = 共享 PageHeader（沙箱 / 新建 / fail-closed 徽章）
+ *        → **拦截管线：单一面板内的执行序清单**
+ *          （优先级箭头 · 序号 · 名称/文件/版本/作者 · 描述/标签/错误 · 动作）
+ *        → 3 个弹窗全部改用 BaseDialog（xl / lg / xl）
+ *
+ * 后端契约（逐字未改）：
+ *   GET    /api/v1/admin/interceptors
+ *   GET    /api/v1/admin/interceptors/{filename}
+ *   PUT    /api/v1/admin/interceptors/{filename}/toggle   { enabled }
+ *   PUT    /api/v1/admin/interceptors/{filename}/code     { code }
+ *   POST   /api/v1/admin/interceptors/reorder             { pipeline_order }
+ *   POST   /api/v1/admin/interceptors                     { filename, code }
+ *   POST   /api/v1/admin/interceptors/test                {}
+ *   DELETE /api/v1/admin/interceptors/{filename}
+ *
+ * ⚠️ 删除门禁未动：逐字短语 `DELETE`；且序号以 `0` 开头的内建插件不显示删除入口。
+ */
+import { useToast } from '../../composables/useToast';
+import { useConfirm } from '../../composables/useConfirm';
+const toast = useToast();
+const { ask } = useConfirm();
+import { ref, onMounted } from 'vue';
+import PageHeader from '../../components/admin/PageHeader.vue';
+import BaseDialog from '../../components/base/BaseDialog.vue';
+import BaseSwitch from '../../components/base/BaseSwitch.vue';
+import BaseEmpty from '../../components/base/BaseEmpty.vue';
+import { useI18n } from '../../composables/useI18n';
+import { useApi } from '../../composables/useApi';
+import { useAuthStore } from '../../stores/auth';
+import { ArrowUp, ArrowDown, Plus, Code, Trash2, Play, AlertTriangle,
+  Save, Download, Loader2, ShieldCheck, RefreshCw, FileCode } from 'lucide-vue-next';
 
-const { api } = useApi()
-const auth = useAuthStore()
-const { t } = useI18n()
+const { api } = useApi();
+const auth = useAuthStore();
+const { t } = useI18n();
 
-const plugins = ref<any[]>([])
-const loading = ref(true)
+const plugins = ref<any[]>([]);
+const loading = ref(true);
+const loadError = ref('');
 
 // Code Editor Modal State
-const editorVisible = ref(false)
-const editingFilename = ref('')
-const editingCode = ref('')
-const editingName = ref('')
-const savingCode = ref(false)
-const codeError = ref('')
+const editorVisible = ref(false);
+const editingFilename = ref('');
+const editingCode = ref('');
+const editingName = ref('');
+const savingCode = ref(false);
+const codeError = ref('');
 
 // Sandbox Test State
-const testing = ref(false)
-const testResults = ref<any>(null)
-const testModalVisible = ref(false)
+const testing = ref(false);
+const testResults = ref<any>(null);
+const testModalVisible = ref(false);
 
 // Create New Plugin State
-const createModalVisible = ref(false)
-const newFilename = ref('')
-const newCode = ref('')
-const createError = ref('')
+const createModalVisible = ref(false);
+const newFilename = ref('');
+const newCode = ref('');
+const createError = ref('');
+const creating = ref(false);
 
 async function loadPlugins() {
-  loading.value = true
+  loading.value = true;
+  loadError.value = '';
   try {
     const res = await api('/api/v1/admin/interceptors')
     plugins.value = res.plugins || []
   } catch (e: any) {
+    loadError.value = e.message
     toast.err(`加载插件失败：${e.message}`)
   } finally {
     loading.value = false
@@ -201,6 +230,7 @@ async function submitCreate() {
     createError.value = t('admin.interceptors.filenameRequired')
     return
   }
+  creating.value = true
   try {
     const res = await api('/api/v1/admin/interceptors', {
       method: 'POST',
@@ -214,372 +244,533 @@ async function submitCreate() {
     await loadPlugins()
   } catch (e: any) {
     createError.value = e.message
+  } finally {
+    creating.value = false
   }
+}
+
+function closeEditor() {
+  editorVisible.value = false
+}
+function closeCreate() {
+  createModalVisible.value = false
 }
 
 onMounted(loadPlugins)
 </script>
 
 <template>
-  <div class="space-y-4 text-xs max-w-[2048px] mx-auto">
-    <!-- Header & Action Bar -->
+  <div class="ip">
     <PageHeader :title="t('nav.admin.interceptors')" :description="t('admin.interceptors.desc')">
       <template #actions>
-      <div class="flex items-center space-x-2">
-        <button
-          @click="runSandbox"
-          :disabled="testing"
-          class="btn-admin-secondary text-xs disabled:opacity-50"
-        >
-          <Play class="w-3 h-3 text-emerald-400" />
+        <span class="dsh-pill">
+          <span class="dsh-status-dot active" />
+          {{ t('admin.interceptors.failClosed') }}
+        </span>
+        <button class="btn btn-ghost btn-sm" :disabled="loading" @click="loadPlugins">
+          <RefreshCw :size="14" :class="loading && 'ip-spin'" />
+          <span>{{ t('common.refresh') }}</span>
+        </button>
+        <button class="btn btn-ghost btn-sm" :disabled="testing" @click="runSandbox">
+          <Loader2 v-if="testing" :size="14" class="ip-spin" />
+          <Play v-else :size="14" />
           <span>{{ testing ? t('admin.interceptors.testing') : t('admin.interceptors.runSandbox') }}</span>
         </button>
-        <button
-          v-if="auth.isSuperadmin"
-          @click="openCreateModal"
-          class="btn-admin-primary text-xs"
-        >
-          <Plus class="w-3.5 h-3.5" />
+        <button v-if="auth.isSuperadmin" class="btn btn-primary btn-sm" @click="openCreateModal">
+          <Plus :size="14" />
           <span>{{ t('admin.interceptors.newPlugin') }}</span>
         </button>
-        <span class="chip"><span class="dot dot-up" />{{ t('admin.interceptors.failClosed') }}</span>
-      </div>
       </template>
     </PageHeader>
 
-    <!-- Alert / Banner Message -->
-    <!-- Loading State -->
-    <div v-if="loading" class="py-12 text-center text-xs" style="color: var(--ink-2);">{{ t('admin.interceptors.loading') }}</div>
+    <!-- 拉取失败 -->
+    <div v-if="loadError" class="state-block is-error ip-error">
+      <span class="state-icon"><AlertTriangle :size="17" /></span>
+      <p class="state-title">{{ t('common.loadFailed') }}</p>
+      <p class="state-desc">{{ loadError }}</p>
+      <button class="btn btn-ghost btn-sm" style="margin-top: 4px" :disabled="loading" @click="loadPlugins">
+        <RefreshCw :size="14" :class="loading && 'ip-spin'" />
+        <span>{{ t('common.retry') }}</span>
+      </button>
+    </div>
 
-    <!-- Plugins Pipeline List -->
-    <div v-else class="space-y-3">
-      <div
-        v-for="(p, idx) in plugins"
-        :key="p.filename"
-        class="border rounded-xl p-4 sm:p-5 transition-all shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4"
-        :style="{
-          backgroundColor: 'var(--surface-2)',
-          borderColor: p.enabled ? 'var(--line-2)' : 'var(--line-1)',
-          opacity: p.enabled ? '1' : '0.6'
-        }"
-      >
-        <!-- Left: Order & Meta -->
-        <div class="flex items-start space-x-3.5 min-w-0 flex-1">
-          <!-- Ordering Buttons -->
-          <div class="flex flex-col space-y-1 shrink-0 pt-0.5">
-            <button
-              @click="movePlugin(idx, -1)"
-              :disabled="idx === 0"
-              class="p-1 rounded disabled:opacity-20 cursor-pointer transition-colors"
-              style="color: var(--ink-2);"
-              :title="t('admin.interceptors.raiseTitle')"
-            >
-              <ArrowUp class="w-3.5 h-3.5" />
-            </button>
-            <button
-              @click="movePlugin(idx, 1)"
-              :disabled="idx === plugins.length - 1"
-              class="p-1 rounded disabled:opacity-20 cursor-pointer transition-colors"
-              style="color: var(--ink-2);"
-              :title="t('admin.interceptors.lowerTitle')"
-            >
-              <ArrowDown class="w-3.5 h-3.5" />
-            </button>
+    <template v-else>
+      <section class="card">
+        <header class="card-head">
+          <div>
+            <h2 class="card-title"><ShieldCheck :size="14" />{{ t('admin.interceptors.pipelineTitle') }}</h2>
+            <p class="card-sub">{{ t('admin.interceptors.pipelineDesc') }}</p>
           </div>
+          <span class="badge mono">{{ plugins.length }}</span>
+        </header>
 
-          <!-- Title, Description & Tags -->
-          <div class="space-y-1.5 min-w-0 flex-1">
-            <div class="flex flex-wrap items-center gap-2">
-              <span class="w-6 h-6 rounded-md border font-bold flex items-center justify-center text-[11px]" style="background-color: var(--surface-1); border-color: var(--line-1); color: var(--ink-1);">
-                #{{ idx + 1 }}
-              </span>
-              <h3 class="text-sm font-bold tracking-wide truncate" style="color: var(--ink-1);">
-                {{ p.name || p.filename }}
-              </h3>
-              <span class="px-2 py-0.5 rounded text-[11px] border" style="background-color: var(--surface-3); border-color: var(--line-1); color: var(--ink-2);">
-                {{ p.filename }}
-              </span>
-              <span v-if="p.version" class="px-1.5 py-0.2 rounded text-[11px] font-bold border" style="background-color: var(--accent-bg); color: var(--accent); border-color: var(--accent-line);">
-                v{{ p.version }}
-              </span>
-              <span v-if="p.author" class="text-[11px]" style="color: var(--ink-3);">
-                by {{ p.author }}
-              </span>
-            </div>
+        <!-- 骨架 -->
+        <div v-if="loading" class="ip-skel">
+          <div v-for="i in 5" :key="i" class="skeleton skeleton-row" />
+        </div>
 
-            <p class="text-xs font-sans leading-relaxed" style="color: var(--ink-2);">
-              {{ p.description || t('admin.interceptors.noDescription') }}
-            </p>
+        <!-- 空态 -->
+        <BaseEmpty v-else-if="!plugins.length" :text="t('admin.interceptors.empty')" />
 
-            <!-- Tags -->
-            <div v-if="p.tags && p.tags.length > 0" class="flex flex-wrap gap-1.5 pt-1">
-              <span
-                v-for="t in p.tags"
-                :key="t"
-                class="px-2 py-0.5 rounded text-[11px] border"
-                style="background-color: var(--surface-1); border-color: var(--line-1); color: var(--ink-2);"
+        <!-- 执行序清单 -->
+        <div v-else class="ip-rows">
+          <article
+            v-for="(p, idx) in plugins"
+            :key="p.filename"
+            class="ip-row"
+            :class="{ 'is-off': !p.enabled }"
+          >
+            <!-- 优先级 -->
+            <div class="ip-order">
+              <button
+                class="btn btn-quiet btn-icon btn-sm"
+                :disabled="idx === 0"
+                :title="t('admin.interceptors.raiseTitle')"
+                @click="movePlugin(idx, -1)"
               >
-                {{ t }}
-              </span>
+                <ArrowUp :size="13" />
+              </button>
+              <button
+                class="btn btn-quiet btn-icon btn-sm"
+                :disabled="idx === plugins.length - 1"
+                :title="t('admin.interceptors.lowerTitle')"
+                @click="movePlugin(idx, 1)"
+              >
+                <ArrowDown :size="13" />
+              </button>
             </div>
 
-            <div v-if="p.error" class="text-[11px] text-rose-500 flex items-center space-x-1 pt-1">
-              <AlertTriangle class="w-3.5 h-3.5 shrink-0" />
-              <span>{{ p.error }}</span>
-            </div>
-          </div>
-        </div>
+            <span class="ip-n mono">#{{ idx + 1 }}</span>
 
-        <!-- Right: Controls & Actions -->
-        <div class="flex items-center justify-end space-x-2 shrink-0 border-t md:border-t-0 pt-3 md:pt-0" style="border-color: var(--line-1);">
-          <button
-            @click="openEditor(p)"
-            class="flex items-center space-x-1 px-3 py-1.5 rounded-lg border font-bold cursor-pointer transition-all shadow-xs"
-            style="background-color: var(--surface-1); border-color: var(--line-2); color: var(--ink-1);"
-            :title="t('admin.interceptors.sourceTitle')"
-          >
-            <Code class="w-3.5 h-3.5" style="color: var(--accent);" />
-            <span>{{ t('admin.interceptors.sourceCode') }}</span>
-          </button>
+            <!-- 元信息 -->
+            <div class="ip-main">
+              <div class="ip-title">
+                <span class="ip-name truncate">{{ p.name || p.filename }}</span>
+                <span class="badge mono">{{ p.filename }}</span>
+                <span v-if="p.version" class="badge badge-accent">v{{ p.version }}</span>
+                <span v-if="p.author" class="ip-author">by {{ p.author }}</span>
+              </div>
 
-          <button
-            v-if="auth.isSuperadmin && !p.filename.startsWith('0')"
-            @click="deletePlugin(p)"
-            class="p-2 rounded-lg hover:bg-rose-500/10 text-rose-500 cursor-pointer transition-colors"
-            :title="t('admin.interceptors.deleteTitle')"
-          >
-            <Trash2 class="w-4 h-4" />
-          </button>
+              <p class="ip-desc">{{ p.description || t('admin.interceptors.noDescription') }}</p>
 
-          <button
-            @click="togglePlugin(p)"
-            class="cursor-pointer transition-colors p-1"
-            :class="p.enabled ? 'text-emerald-500' : 'text-zinc-400'"
-            :title="p.enabled ? t('admin.interceptors.enabledTitle') : t('admin.interceptors.disabledTitle')"
-          >
-            <ToggleRight v-if="p.enabled" class="w-6 h-6" />
-            <ToggleLeft v-else class="w-6 h-6" />
-          </button>
-        </div>
-      </div>
-    </div>
+              <div v-if="p.tags && p.tags.length" class="ip-tags">
+                <span v-for="tag in p.tags" :key="tag" class="ip-tag">{{ tag }}</span>
+              </div>
 
-    <!-- Code Editor Modal -->
-    <div
-      v-if="editorVisible"
-      class="fixed inset-0 z-[var(--z-dialog)] bg-black/70 backdrop-blur-xs flex items-center justify-center p-2.5 sm:p-4"
-      @click.self="editorVisible = false"
-    >
-      <div class="border rounded-2xl p-4 sm:p-6 w-full max-w-4xl max-h-[94dvh] flex flex-col shadow-2xl space-y-3 sm:space-y-4 transition-colors" style="background-color: var(--surface-2); border-color: var(--line-1);">
-        <!-- Modal Header -->
-        <div class="flex items-start justify-between gap-2.5 pb-3 border-b" style="border-color: var(--line-1);">
-          <div class="flex items-center space-x-2.5 min-w-0 flex-1">
-            <div class="w-8 h-8 rounded-lg shrink-0 flex items-center justify-center border shadow-xs" style="background-color: var(--accent-bg); border-color: var(--accent-line); color: var(--accent);">
-              <FileCode class="w-4 h-4" />
-            </div>
-            <div class="min-w-0 flex-1">
-              <h3 class="text-xs sm:text-sm font-bold flex flex-wrap items-center gap-1.5" style="color: var(--ink-1);">
-                <span class="truncate max-w-[180px] sm:max-w-[320px]">{{ editingName }}</span>
-                <span class="text-[11px] sm:text-xs font-normal truncate max-w-[140px] sm:max-w-[200px]" style="color: var(--ink-3);">({{ editingFilename }})</span>
-              </h3>
-              <p class="text-[11px] hidden sm:block truncate mt-0.5" style="color: var(--ink-2);">{{ t('admin.interceptors.editorHint') }}</p>
-            </div>
-          </div>
-          <div class="flex items-center space-x-1.5 shrink-0">
-            <button
-              @click="exportPluginCode(editingFilename, editingCode)"
-              class="flex items-center space-x-1 px-2 sm:px-2.5 py-1 rounded-lg border text-[11px] sm:text-xs cursor-pointer shadow-xs transition-colors"
-              style="background-color: var(--surface-1); border-color: var(--line-2); color: var(--ink-1);"
-              :title="t('admin.interceptors.exportTitle')"
-            >
-              <Download class="w-3.5 h-3.5" />
-              <span class="hidden sm:inline">{{ t('admin.interceptors.exportPy') }}</span>
-            </button>
-            <button
-              @click="editorVisible = false"
-              class="p-1 rounded-lg hover:bg-zinc-500/10 cursor-pointer transition-colors"
-              style="color: var(--ink-2);"
-            >
-              <X class="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
-        <div v-if="codeError" class="p-2.5 rounded-lg text-xs border break-all" style="background-color: var(--down-bg); border-color: var(--down-line); color: var(--down);">
-          {{ codeError }}
-        </div>
-
-        <!-- Code Textarea -->
-        <div class="flex-1 min-h-[220px] sm:min-h-[380px] h-[50dvh] flex flex-col">
-          <textarea
-            v-model="editingCode"
-            class="flex-1 w-full border rounded-xl p-3 sm:p-4 text-[11px] sm:text-xs leading-relaxed outline-none resize-none select-text transition-colors"
-            style="background-color: var(--surface-input); border-color: var(--line-1); color: var(--ink-1);"
-            spellcheck="false"
-          ></textarea>
-        </div>
-
-        <!-- Modal Footer -->
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-3 border-t" style="border-color: var(--line-1);">
-          <div class="text-[11px] sm:text-[11px] truncate" style="color: var(--ink-3);" title="def check_risk(package, decision, context) -> tuple[bool, str]">
-            <span class="font-bold">{{ t('admin.interceptors.contractLabel') }}</span> <code class="opacity-80">check_risk(package, decision, ctx)</code>
-          </div>
-          <div class="flex items-center justify-end space-x-2 shrink-0">
-            <button
-              @click="editorVisible = false"
-              class="px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-xl border text-xs cursor-pointer shadow-xs transition-colors"
-              style="background-color: var(--surface-1); border-color: var(--line-2); color: var(--ink-2);"
-            >
-              {{ t('admin.interceptors.cancel') }}
-            </button>
-            <button
-              @click="saveCode"
-              :disabled="savingCode"
-              class="flex items-center space-x-1.5 px-4 sm:px-5 py-1.5 sm:py-2 rounded-xl font-bold text-xs cursor-pointer transition-all shadow-xs disabled:opacity-50"
-              style="background-color: var(--accent); color: var(--accent-ink);"
-            >
-              <Save class="w-4 h-4" />
-              <span>{{ savingCode ? t('admin.interceptors.saving') : t('admin.interceptors.saveAndReload') }}</span>
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Create Modal -->
-    <div
-      v-if="createModalVisible"
-      class="fixed inset-0 z-[var(--z-dialog)] bg-black/70 backdrop-blur-xs flex items-center justify-center p-2.5 sm:p-4"
-      @click.self="createModalVisible = false"
-    >
-      <div class="border rounded-2xl p-4 sm:p-6 w-full max-w-2xl max-h-[94dvh] overflow-y-auto flex flex-col shadow-2xl space-y-3 sm:space-y-4 transition-colors" style="background-color: var(--surface-2); border-color: var(--line-1);">
-        <div class="flex items-center justify-between pb-3 border-b" style="border-color: var(--line-1);">
-          <div class="flex items-center space-x-2.5">
-            <div class="w-7 h-7 rounded-lg flex items-center justify-center border shadow-xs" style="background-color: var(--accent-bg); border-color: var(--accent-line); color: var(--accent);">
-              <Sparkles class="w-4 h-4" />
-            </div>
-            <div>
-              <h3 class="text-xs sm:text-sm font-bold" style="color: var(--ink-1);">{{ t('admin.interceptors.createTitle') }}</h3>
-              <p class="text-[11px] hidden sm:block" style="color: var(--ink-2);">{{ t('admin.interceptors.createHint') }}</p>
-            </div>
-          </div>
-          <button @click="createModalVisible = false" class="cursor-pointer p-1" style="color: var(--ink-2);">
-            <X class="w-4 h-4" />
-          </button>
-        </div>
-
-        <div v-if="createError" class="p-2.5 rounded-lg text-xs border break-all" style="background-color: var(--down-bg); border-color: var(--down-line); color: var(--down);">
-          {{ createError }}
-        </div>
-
-        <div>
-          <label class="block text-xs font-bold mb-1.5" style="color: var(--ink-1);">{{ t('admin.interceptors.filenameLabel') }}</label>
-          <input
-            v-model="newFilename"
-            type="text"
-            class="w-full border rounded-xl px-3 py-2 text-xs outline-none transition-colors"
-            style="background-color: var(--surface-input); border-color: var(--line-1); color: var(--ink-1);"
-            :placeholder="t('admin.interceptors.filenamePlaceholder')"
-          />
-        </div>
-
-        <div class="flex-1 min-h-[200px] sm:min-h-[280px] flex flex-col">
-          <label class="block text-xs font-bold mb-1.5" style="color: var(--ink-1);">{{ t('admin.interceptors.codeLabel') }}</label>
-          <textarea
-            v-model="newCode"
-            class="flex-1 w-full border rounded-xl p-3 sm:p-3.5 text-[11px] sm:text-xs leading-relaxed outline-none resize-y transition-colors min-h-[160px]"
-            style="background-color: var(--surface-input); border-color: var(--line-1); color: var(--ink-1);"
-            spellcheck="false"
-          ></textarea>
-        </div>
-
-        <div class="flex items-center justify-end space-x-2 pt-3 border-t" style="border-color: var(--line-1);">
-          <button
-            @click="createModalVisible = false"
-            class="px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-xl border text-xs cursor-pointer shadow-xs"
-            style="background-color: var(--surface-1); border-color: var(--line-2); color: var(--ink-2);"
-          >
-            {{ t('admin.interceptors.cancel') }}
-          </button>
-          <button
-            @click="submitCreate"
-            class="px-4 sm:px-5 py-1.5 sm:py-2 rounded-xl font-bold text-xs cursor-pointer transition-all shadow-xs"
-            style="background-color: var(--accent); color: var(--accent-ink);"
-          >
-            {{ t('admin.interceptors.createAndAdd') }}
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Sandbox Test Results Modal -->
-    <div
-      v-if="testModalVisible && testResults"
-      class="fixed inset-0 z-[var(--z-dialog)] bg-black/70 backdrop-blur-xs flex items-center justify-center p-2.5 sm:p-4"
-      @click.self="testModalVisible = false"
-    >
-      <div class="border rounded-2xl p-4 sm:p-6 w-full max-w-3xl max-h-[92dvh] overflow-y-auto shadow-2xl space-y-3 sm:space-y-4 transition-colors" style="background-color: var(--surface-2); border-color: var(--line-1);">
-        <div class="flex items-center justify-between pb-3 border-b" style="border-color: var(--line-1);">
-          <div class="flex items-center space-x-2.5">
-            <div class="w-7 h-7 rounded-lg flex items-center justify-center border shadow-xs" style="background-color: var(--up-bg); border-color: var(--up-line); color: var(--up);">
-              <Play class="w-4 h-4" />
-            </div>
-            <div>
-              <h3 class="text-xs sm:text-sm font-bold" style="color: var(--ink-1);">{{ t('admin.interceptors.reportTitle') }}</h3>
-              <p class="text-[11px]" style="color: var(--ink-2);">
-                {{ t('admin.interceptors.reportSummary', undefined, { enabled: testResults.enabled_plugins_count, total: testResults.total_plugins_count, ms: testResults.duration_total_ms }) }}
+              <p v-if="p.error" class="ip-err">
+                <AlertTriangle :size="12" />
+                <span>{{ p.error }}</span>
               </p>
             </div>
-          </div>
-          <button @click="testModalVisible = false" class="cursor-pointer p-1" style="color: var(--ink-2);">
-            <X class="w-4 h-4" />
-          </button>
-        </div>
 
-        <div class="space-y-3">
-          <div
-            v-for="(r, i) in testResults.results"
-            :key="i"
-            class="p-3 sm:p-3.5 rounded-xl border transition-all"
-            :style="r.intercepted
-              ? { backgroundColor: 'var(--warn-bg)', borderColor: 'var(--warn-line)' }
-              : { backgroundColor: 'var(--up-bg)', borderColor: 'var(--up-line)' }"
-          >
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 mb-1.5">
-              <span class="text-xs font-bold" style="color: var(--ink-1);">{{ r.scenario }}</span>
-              <div class="flex items-center space-x-2">
-                <span class="text-[11px]" style="color: var(--ink-3);">{{ r.duration_ms }}ms</span>
-                <span
-                  class="px-2 py-0.5 rounded text-[11px] font-bold border"
-                  :style="r.intercepted
-                    ? { backgroundColor: 'var(--surface-2)', borderColor: 'var(--warn-line)', color: 'var(--warn)' }
-                    : { backgroundColor: 'var(--surface-2)', borderColor: 'var(--up-line)', color: 'var(--up)' }"
-                >
-                  {{ r.intercepted ? t('admin.interceptors.intercepted') : t('admin.interceptors.passed') }}
-                </span>
-              </div>
-            </div>
-            <div class="text-[11px] flex flex-wrap items-center gap-x-3 gap-y-1" style="color: var(--ink-2);">
-              <span>{{ t('admin.interceptors.rawAction') }} <strong style="color: var(--ink-1);">{{ r.raw_action }}</strong></span>
-              <span>{{ t('admin.interceptors.finalAction') }} <strong :style="{ color: r.final_action === 'WAIT' ? 'var(--warn)' : 'var(--up)' }">{{ r.final_action }}</strong></span>
-              <span v-if="r.risk_reward !== '--'">{{ t('admin.interceptors.riskReward') }} {{ r.risk_reward }}</span>
-            </div>
-            <div v-if="r.reason" class="text-[11px] mt-1 font-sans break-words" style="color: var(--warn);">
-              {{ t('admin.interceptors.interceptAudit') }}{{ r.reason }}
-            </div>
-          </div>
-        </div>
+            <!-- 动作 -->
+            <div class="ip-actions">
+              <button
+                class="btn btn-ghost btn-sm"
+                :title="t('admin.interceptors.sourceTitle')"
+                @click="openEditor(p)"
+              >
+                <Code :size="13" />
+                <span>{{ t('admin.interceptors.sourceCode') }}</span>
+              </button>
 
-        <div class="flex justify-end pt-3 border-t" style="border-color: var(--line-1);">
-          <button
-            @click="testModalVisible = false"
-            class="px-4 sm:px-5 py-1.5 sm:py-2 rounded-xl text-xs font-bold cursor-pointer transition-all shadow-xs"
-            style="background-color: var(--accent); color: var(--accent-ink);"
-          >
-            {{ t('admin.interceptors.closeReport') }}
-          </button>
+              <button
+                v-if="auth.isSuperadmin && !p.filename.startsWith('0')"
+                class="btn btn-danger btn-sm"
+                :title="t('admin.interceptors.deleteTitle')"
+                @click="deletePlugin(p)"
+              >
+                <Trash2 :size="13" />
+              </button>
+
+              <BaseSwitch
+                :model-value="p.enabled === true"
+                :title="p.enabled ? t('admin.interceptors.enabledTitle') : t('admin.interceptors.disabledTitle')"
+                @update:model-value="() => togglePlugin(p)"
+              />
+            </div>
+          </article>
         </div>
+      </section>
+    </template>
+
+    <!-- ══ 源码编辑器 ══ -->
+    <BaseDialog :open="editorVisible" size="xl" @close="closeEditor">
+      <template #title>
+        <span class="ip-dlg-title">
+          <FileCode :size="15" />
+          <span>{{ t('admin.interceptors.editorTitle') }}</span>
+          <span class="ip-dlg-sub mono">{{ editingName }} ({{ editingFilename }})</span>
+        </span>
+      </template>
+
+      <p class="ip-dlg-hint">{{ t('admin.interceptors.editorHint') }}</p>
+
+      <div v-if="codeError" class="ip-dlg-error">
+        <AlertTriangle :size="13" />
+        <span>{{ codeError }}</span>
       </div>
-    </div>
+
+      <textarea
+        v-model="editingCode"
+        rows="22"
+        spellcheck="false"
+        class="field ip-code"
+      />
+
+      <template #footer>
+        <span class="ip-contract mono">
+          {{ t('admin.interceptors.contractLabel') }} check_risk(package, decision, ctx)
+        </span>
+        <button class="btn btn-ghost btn-sm" @click="exportPluginCode(editingFilename, editingCode)">
+          <Download :size="14" />
+          <span>{{ t('admin.interceptors.exportPy') }}</span>
+        </button>
+        <button class="btn btn-ghost btn-sm" @click="closeEditor">{{ t('admin.interceptors.cancel') }}</button>
+        <button class="btn btn-primary btn-sm" :disabled="savingCode" @click="saveCode">
+          <Loader2 v-if="savingCode" :size="14" class="ip-spin" />
+          <Save v-else :size="14" />
+          <span>{{ savingCode ? t('admin.interceptors.saving') : t('admin.interceptors.saveAndReload') }}</span>
+        </button>
+      </template>
+    </BaseDialog>
+
+    <!-- ══ 新建插件 ══ -->
+    <BaseDialog
+      :open="createModalVisible"
+      :title="t('admin.interceptors.createTitle')"
+      :desc="t('admin.interceptors.createHint')"
+      size="lg"
+      @close="closeCreate"
+    >
+      <div v-if="createError" class="ip-dlg-error">
+        <AlertTriangle :size="13" />
+        <span>{{ createError }}</span>
+      </div>
+
+      <div class="ip-field">
+        <span class="form-label">{{ t('admin.interceptors.filenameLabel') }}</span>
+        <input
+          v-model="newFilename"
+          type="text"
+          class="field mono"
+          :placeholder="t('admin.interceptors.filenamePlaceholder')"
+        />
+      </div>
+
+      <div class="ip-field">
+        <span class="form-label">{{ t('admin.interceptors.codeLabel') }}</span>
+        <textarea
+          v-model="newCode"
+          rows="16"
+          spellcheck="false"
+          class="field ip-code"
+        />
+      </div>
+
+      <template #footer>
+        <button class="btn btn-ghost btn-sm" @click="closeCreate">{{ t('admin.interceptors.cancel') }}</button>
+        <button class="btn btn-primary btn-sm" :disabled="creating" @click="submitCreate">
+          <Loader2 v-if="creating" :size="14" class="ip-spin" />
+          <Plus v-else :size="14" />
+          <span>{{ t('admin.interceptors.createAndAdd') }}</span>
+        </button>
+      </template>
+    </BaseDialog>
+
+    <!-- ══ 沙箱回归报告 ══ -->
+    <BaseDialog
+      :open="testModalVisible && !!testResults"
+      :title="t('admin.interceptors.reportTitle')"
+      :desc="testResults
+        ? t('admin.interceptors.reportSummary', undefined, {
+            enabled: testResults.enabled_plugins_count,
+            total: testResults.total_plugins_count,
+            ms: testResults.duration_total_ms,
+          })
+        : ''"
+      size="xl"
+      @close="testModalVisible = false"
+    >
+      <div class="ip-report">
+        <article
+          v-for="(r, i) in testResults?.results || []"
+          :key="i"
+          class="ip-case"
+          :class="r.intercepted ? 'is-blocked' : 'is-passed'"
+        >
+          <header class="ip-case-head">
+            <span class="ip-case-name">{{ r.scenario }}</span>
+            <span class="badge mono">{{ r.duration_ms }}ms</span>
+            <span class="badge" :class="r.intercepted ? 'badge-warn' : 'badge-up'">
+              {{ r.intercepted ? t('admin.interceptors.intercepted') : t('admin.interceptors.passed') }}
+            </span>
+          </header>
+
+          <div class="ip-case-meta">
+            <span>{{ t('admin.interceptors.rawAction') }} <b>{{ r.raw_action }}</b></span>
+            <span>
+              {{ t('admin.interceptors.finalAction') }}
+              <b :class="r.final_action === 'WAIT' ? 'is-warn' : 'is-up'">{{ r.final_action }}</b>
+            </span>
+            <span v-if="r.risk_reward !== '--'">{{ t('admin.interceptors.riskReward') }} <b>{{ r.risk_reward }}</b></span>
+          </div>
+
+          <p v-if="r.reason" class="ip-case-reason">
+            {{ t('admin.interceptors.interceptAudit') }}{{ r.reason }}
+          </p>
+        </article>
+
+        <BaseEmpty v-if="!testResults?.results?.length" :text="t('common.noData')" />
+      </div>
+
+      <template #footer>
+        <button class="btn btn-primary btn-sm" @click="testModalVisible = false">
+          {{ t('admin.interceptors.closeReport') }}
+        </button>
+      </template>
+    </BaseDialog>
   </div>
 </template>
+
+<style scoped>
+.ip {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-4);
+}
+.ip-spin {
+  animation: ip-rotate 0.9s linear infinite;
+}
+@keyframes ip-rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.ip-error {
+  border: 1px solid var(--down-line);
+  border-radius: var(--r-card);
+  background-color: var(--ds-color-bg-surface-card);
+}
+.ip-skel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: var(--ds-space-4);
+}
+
+/* ══ 执行序清单 ══ */
+.ip-rows {
+  display: flex;
+  flex-direction: column;
+}
+.ip-row {
+  display: grid;
+  grid-template-columns: auto 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--ds-space-3);
+  padding: var(--ds-space-3) var(--ds-space-4);
+  border-bottom: 1px solid var(--ds-color-border-default);
+  transition: background-color var(--dur-fast);
+}
+.ip-row:last-child {
+  border-bottom: 0;
+}
+.ip-row:hover {
+  background-color: var(--ds-color-bg-hover);
+}
+.ip-row.is-off {
+  opacity: 0.55;
+}
+
+.ip-order {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.ip-n {
+  font-size: var(--text-4xs);
+  color: var(--ds-color-text-placeholder);
+  text-align: center;
+}
+
+.ip-main {
+  display: flex;
+  flex-direction: column;
+  gap:4px;
+  min-width: 0;
+}
+.ip-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.ip-name {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--ds-color-text-primary);
+}
+.ip-author {
+  font-size: var(--text-4xs);
+  color: var(--ds-color-text-placeholder);
+}
+.ip-desc {
+  font-size: var(--text-3xs);
+  line-height: var(--leading-body);
+  color: var(--ds-color-text-description);
+}
+.ip-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.ip-tag {
+  padding: 1px 6px;
+  border-radius: var(--r-xs);
+  border: 1px solid var(--ds-color-border-default);
+  background-color: var(--ds-color-bg-surface-1);
+  font-size: var(--text-4xs);
+  color: var(--ds-color-text-placeholder);
+}
+.ip-err {
+  display: flex;
+  align-items: flex-start;
+  gap:6px;
+  font-size: var(--text-3xs);
+  color: var(--down);
+}
+.ip-err > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.ip-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  flex-shrink: 0;
+}
+
+@media (max-width: 900px) {
+  .ip-row {
+    grid-template-columns: auto 1fr;
+  }
+  .ip-main {
+    grid-column: 2 / -1;
+  }
+  .ip-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-end;
+  }
+}
+
+/* ══ 对话框内 ══ */
+.ip-dlg-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.ip-dlg-sub {
+  font-size: var(--text-4xs);
+  font-weight: 400;
+  color: var(--ds-color-text-placeholder);
+}
+.ip-dlg-hint {
+  margin-bottom: var(--ds-space-3);
+  font-size: var(--text-3xs);
+  color: var(--ds-color-text-description);
+}
+.ip-dlg-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-bottom: var(--ds-space-3);
+  padding: 8px 10px;
+  border-radius: var(--r-ctl);
+  background-color: var(--down-bg);
+  color: var(--down);
+  font-size: var(--text-3xs);
+  overflow-wrap: anywhere;
+}
+.ip-dlg-error > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.ip-code {
+  width: 100%;
+  resize: vertical;
+  font-family: var(--ds-font-mono);
+  font-size: var(--text-2xs);
+  line-height: var(--leading-body);
+}
+.ip-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ip-field + .ip-field {
+  margin-top: var(--ds-space-4);
+}
+.ip-contract {
+  margin-right: auto;
+  font-size: var(--text-4xs);
+  color: var(--ds-color-text-placeholder);
+}
+
+/* ══ 沙箱报告 ══ */
+.ip-report {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-3);
+}
+.ip-case {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: var(--ds-space-3);
+  border-radius: var(--r-ctl);
+  border-left: 2px solid var(--up);
+  background-color: var(--ds-color-bg-surface-inset);
+}
+.ip-case.is-blocked {
+  border-left-color: var(--warn);
+  background-color: var(--warn-bg);
+}
+.ip-case-head {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  flex-wrap: wrap;
+}
+.ip-case-name {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--ds-color-text-primary);
+}
+.ip-case-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ds-space-4);
+  font-size: var(--text-3xs);
+  color: var(--ds-color-text-description);
+}
+.ip-case-meta b {
+  color: var(--ds-color-text-primary);
+  font-weight: 600;
+}
+.ip-case-meta b.is-warn {
+  color: var(--warn);
+}
+.ip-case-meta b.is-up {
+  color: var(--up);
+}
+.ip-case-reason {
+  font-size: var(--text-3xs);
+  line-height: var(--leading-body);
+  color: var(--warn);
+  overflow-wrap: anywhere;
+}
+</style>

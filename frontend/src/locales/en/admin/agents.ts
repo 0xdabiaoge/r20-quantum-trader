@@ -24,10 +24,18 @@ export const enAdminAgents = {
   colDuration: 'Duration',
   secretStore: 'Local encrypted secret store',
   storeStatus: 'Store status',
-  initialized: 'Initialized ✓',
+  initialized: 'Initialized',
   notInitialized: 'Not initialized',
   cipherCount: '{count} secrets',
   filePerm: 'File mode',
   readPriority: 'Read priority',
-  configured: 'Configured ✓',
-};
+  configured: 'Configured',
+
+  // ── added by the rebuild (batch 7) ──
+  bandUnits: 'Units registered',
+  bandHealthy: 'Healthy',
+  bandIssues: 'Issues',
+  bandLatency: 'Avg. latency',
+  callsTitle: 'Call stream',
+  emptyCalls: 'No calls recorded',
+  promptPolicy: 'Prompt policy',};

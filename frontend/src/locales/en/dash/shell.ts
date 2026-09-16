@@ -29,4 +29,14 @@ export const enShell = {
     tokens: '~{n} tokens',
     generatedAt: 'Generated {t}',
   },
+
+  // ── added by the rebuild (batch 14): market-side data gate ──
+  gateLoading: 'Connecting to the market hub…',
+  gateFailedTitle: 'Failed to load market data',
+  gateFailedDesc: 'No data could be fetched from the backend, so this page has nothing to show.',
+  gateRetry: 'Retry',
+  gateRetrying: 'Retrying…',
+  gateStaleTitle: 'Data has stopped updating',
+  gateStaleDesc: 'Showing the last successful snapshot from {t}; values may be out of date.',
+  gateNoSnapshot: 'No market snapshot received yet',
 };

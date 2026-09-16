@@ -1,5 +1,5 @@
 export const enAdminInterceptors = {
-  desc: 'Every trading decision must pass through each layer of the Python physical interceptor pipeline before it is issued; any error defaults to rejection.',
+  desc: 'Per-layer pre-trade interceptor rules and failure actions',
   testing: 'Running regression tests...',
   runSandbox: 'Run live sandbox regression test',
   newPlugin: 'New plugin',
@@ -29,11 +29,16 @@ export const enAdminInterceptors = {
   createAndAdd: 'Create and add to pipeline',
   reportTitle: 'Sandbox interception regression test report',
   reportSummary: '{enabled}/{total} interceptor plugins active · total runtime {ms}ms',
-  intercepted: '🛑 Physically intercepted (WAIT)',
-  passed: '🟢 Passed with the trend',
+  intercepted: 'Physically intercepted (WAIT)',
+  passed: 'Passed with the trend',
   rawAction: 'Original intent:',
   finalAction: 'Final order:',
   riskReward: 'Risk/reward:',
   interceptAudit: 'Interception audit: ',
   closeReport: 'Close test report',
-};
+
+  // ── added by the rebuild (batch 6) ──
+  pipelineTitle: 'Interceptor pipeline',
+  pipelineDesc: 'Ordered by execution priority, highest first; plugins higher up intervene earlier',
+  empty: 'No interceptor plugins yet. Add one with the New plugin button at the top right',
+  editorTitle: 'Plugin source',};

@@ -11,13 +11,23 @@ from __future__ import annotations
 
 from typing import Any
 
+from .ledger_view import LEDGER_TRADES_MAX
+
 __all__ = ["slim_payload", "SLIM_HISTORY_FULL_ENTRIES", "SLIM_HISTORY_DROP_KEYS",
            "SLIM_TRADES", "SLIM_LOGS"]
 
 
 SLIM_HISTORY_FULL_ENTRIES = 5      # 保留最近 N 条的完整明细
 SLIM_HISTORY_DROP_KEYS = ("top_opportunities", "position_management", "policy_snapshot")
-SLIM_TRADES = 20
+#: 台账行上限 —— **与台账视图同一事实源**（`ledger_view.LEDGER_TRADES_MAX`）。
+#:
+#: ⚠️ 2026-09-16 修：此处原为 20，而台账视图本身的上限是 60 —— 默认瘦身把
+#: 34 笔已平仓台账砍到最近 20 笔（`_meta.omitted.trades` 有留痕，但前端从不读），
+#: 台账页于是少 14 行，且「累计平仓/胜率/净盈亏/手续费」全在被砍的切片上聚合。
+#: 瘦身**不得比视图本身更紧**，否则台账页必然少数据；实测代价：34 行 16.4KB vs
+#: 20 行 9.6KB（+6.8KB / 瘦身载荷 233.8KB 的 +2.9%），换来台账页零截断。
+#: 若台账真超过本上限（>60 笔），`_meta.omitted.trades` 仍会留痕，前端据此显式提示。
+SLIM_TRADES = LEDGER_TRADES_MAX
 SLIM_LOGS = 20
 
 

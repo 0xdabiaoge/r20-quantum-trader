@@ -28,8 +28,8 @@ export const zhAdminBackup = {
   uploading: "正在上传...",
   uploadPackage: "上传备份包",
   readonly: "只读视图 · 修改需超级管理员登录",
-  targetConfigured: "● 目标已配置",
-  targetNotConfigured: "● 目标未配置",
+  targetConfigured: "目标已配置",
+  targetNotConfigured: "目标未配置",
   latestRun: "最近一次灾备",
   time: "时间",
   status: "状态",
@@ -43,4 +43,15 @@ export const zhAdminBackup = {
   downloadTitle: "下载归档到本地",
   restoreTitle: "恢复此备份到系统",
   emptyArchives: "暂无本地待清归档，可点击「立即备份」生成完整镜像包或「上传备份包」",
+
+  // ── 推倒重来新增（批 11）──
+  bandEnabled: '自动灾备',
+  bandLocation: '保存位置',
+  bandSchedule: '执行时间',
+  bandLatest: '最近一次',
+  configTitle: '灾备配置',
+  notConfigured: '未配置',
+  statusSuccess: '成功',
+  statusFailed: '失败',
+  legacyTag: "旧版 bypy 配置",
 };

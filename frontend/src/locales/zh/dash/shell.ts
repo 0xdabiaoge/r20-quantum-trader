@@ -30,4 +30,14 @@ export const zhShell = {
     tokens: '约 {n} tokens',
     generatedAt: '生成于 {t}',
   },
+
+  // ── 推倒重来新增（批 14）：行情侧数据门三态 ──
+  gateLoading: '正在连接行情中枢…',
+  gateFailedTitle: '行情数据加载失败',
+  gateFailedDesc: '未能从后端取到数据，本页暂无可展示内容。',
+  gateRetry: '重试',
+  gateRetrying: '重试中…',
+  gateStaleTitle: '数据已停止更新',
+  gateStaleDesc: '当前展示的是 {t} 的最后一次成功快照，数值可能已经过时。',
+  gateNoSnapshot: '尚未收到任何行情快照',
 };

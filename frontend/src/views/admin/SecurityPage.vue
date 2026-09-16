@@ -1,4 +1,31 @@
 <script setup lang="ts">
+/**
+ * SecurityPage.vue · 交易场所与安全配置工位
+ * ---------------------------------------------------------------------------
+ * 骨架（推倒重来）：
+ *   旧 = 页头内联 chip + 4 张总览小卡 + 下划线 Tab 条
+ *        + 页签1：路由卡（**7 个手写 radio 卡，每个 6 行内联 :style 三元**）+ 三所凭证卡 + 健康 chip
+ *        + 页签2：本金卡 + 标的池 DataTable
+ *        + 页签3：手动平仓 checkbox + 持仓 DataTable + **手写 fixed 遮罩平仓弹窗**
+ *   新 = 共享 PageHeader（路由态移入状态带）
+ *        → **接入状态带**（OKX / Binance / Gate / 标的池）
+ *        → **共享 `.seg` 三页签**
+ *        → venues：路由策略（**radio 组全部数据驱动**）+ 三所凭证 + 跨所健康
+ *        → pool：本金基线 + 标的池行式清单
+ *        → emergency：手动平仓总闸（BaseSwitch）+ 持仓行式清单 + **BaseDialog 平仓双确认**
+ *
+ * 后端契约（逐字未改）：
+ *   GET  /api/v1/admin/config · /api/v1/admin/okx/runtime?refresh=1 · /api/v1/admin/instruments
+ *   GET  /api/v1/admin/multi-exchange · /api/v1/admin/okx/account-snapshot
+ *   PUT  /api/v1/admin/config · /api/v1/admin/account-baseline · /api/v1/admin/multi-exchange
+ *   POST /api/v1/admin/instruments · /api/v1/admin/multi-exchange/test-connection
+ *        /api/v1/admin/positions/close
+ *   DELETE /api/v1/admin/instruments/{instId}
+ *
+ * ⚠️ 高风险门禁逐字保留：切 LIVE 需逐字 `LIVE`；改本金需超管 + 逐字 `UPDATE CAPITAL`；
+ *    删标的需逐字 `REMOVE <instId>`；Gate 开闸需短语；平仓需管理员密码 + 令牌短语。
+ * ⚠️ 派生逻辑仍全部来自 `./securityLogic.ts`（未触碰）。
+ */
 import { useToast } from '../../composables/useToast'
 import { useConfirm } from '../../composables/useConfirm'
 const toast = useToast()
@@ -6,7 +33,6 @@ const { ask } = useConfirm()
 import { ref, computed, onMounted } from 'vue'
 import PageHeader from '../../components/admin/PageHeader.vue'
 import SettingsSection from '../../components/admin/page-parts/SettingsSection.vue'
-import DataTable from '../../components/admin/DataTable.vue'
 import { useI18n } from '../../composables/useI18n'
 import { useApi } from '../../composables/useApi'
 import { useAuthStore } from '../../stores/auth'
@@ -14,9 +40,13 @@ import { fmtDateTime } from '../../utils/format'
 import {
   deriveOkxLinked, deriveMxHealthChips, deriveGateExecDirty,
   venueStatus, envTextOf, okxEnvText as okxEnvTextOf, envBadge,
-} from './securityLogic' 
+} from './securityLogic'
 import VenueCredentialCard from '../../components/admin/page-parts/VenueCredentialCard.vue'
-import { Save, RefreshCw, Layers, Trash2, Zap } from 'lucide-vue-next'
+import BaseSwitch from '../../components/base/BaseSwitch.vue'
+import BaseDialog from '../../components/base/BaseDialog.vue'
+import BaseEmpty from '../../components/base/BaseEmpty.vue'
+import { Save, RefreshCw, Layers, Trash2, Zap, ShieldCheck, Route, KeyRound,
+  Wallet, Activity, AlertTriangle, Loader2, Radar } from 'lucide-vue-next'
 
 const { api } = useApi()
 const auth = useAuthStore()
@@ -398,466 +428,1043 @@ const okxEnvText = computed(() => okxEnvTextOf(config.value?.editable?.okx_envir
 const binanceEnvText = computed(() => envTextOf('binance', t('admin.security.envDemoBinance'), mx.value, mxTestnet.value, t))
 const gateEnvText = computed(() => envTextOf('gate', t('admin.security.envDemoGate'), mx.value, mxTestnet.value, t))
 
-const TABS = computed<Array<{ key: TabKey; label: string }>>(() => [
-  { key: 'venues', label: t('admin.security.tabVenues') },
-  { key: 'pool', label: t('admin.security.tabPool') },
-  { key: 'emergency', label: t('admin.security.tabEmergency') },
+const TABS = computed<Array<{ key: TabKey; label: string; icon: any }>>(() => [
+  { key: 'venues', label: t('admin.security.tabVenues'), icon: Route },
+  { key: 'pool', label: t('admin.security.tabPool'), icon: Layers },
+  { key: 'emergency', label: t('admin.security.tabEmergency'), icon: Zap },
 ])
 
+/** 路由模式三档（旧版 3 段手写 radio 卡） */
+const ROUTING_MODES = [
+  { value: 'balanced', labelKey: 'admin.security.modeA', descKey: 'admin.security.modeADesc' },
+  { value: 'auto', labelKey: 'admin.security.modeB', descKey: 'admin.security.modeBDesc' },
+  { value: 'split', labelKey: 'admin.security.modeC', descKey: 'admin.security.modeCDesc' },
+]
+
+/** 手选优先四档（旧版 4 段手写 radio 卡） */
+const PREFERRED_VENUES = [
+  { value: 'auto', labelKey: 'admin.security.noManual', descKey: 'admin.security.noManualDesc' },
+  { value: 'okx', labelKey: 'admin.security.lockOkx', descKey: 'admin.security.lockOkxDesc' },
+  { value: 'binance', labelKey: 'admin.security.lockBinance', descKey: 'admin.security.lockBinanceDesc' },
+  { value: 'gate', labelKey: 'admin.security.lockGate', descKey: 'admin.security.lockGateDesc' },
+]
+
+/** 接入状态带（4 项事实） */
+const bandFacts = computed(() => {
+  const b = mx.value?.venues?.binance
+  const g = mx.value?.venues?.gate
+  return [
+    {
+      icon: ShieldCheck,
+      label: t('admin.security.okxApi'),
+      value: okxLinked.value ? t('admin.security.okxLinked') : t('admin.security.okxUnconfigured'),
+      foot: envBadge(runtime.value?.environment),
+      tone: okxLinked.value ? 'is-up' : 'is-down',
+    },
+    {
+      icon: KeyRound,
+      label: 'Binance · USDT-M',
+      value: b?.has_api_key ? t('admin.security.binanceKeyed') : t('admin.security.publicMarket'),
+      foot: mxTestnet.value.binance ? 'DEMO' : 'LIVE',
+      tone: b?.has_api_key ? 'is-up' : 'is-warn',
+    },
+    {
+      icon: KeyRound,
+      label: t('admin.security.gatePerp'),
+      value: g?.has_api_key
+        ? (g?.execution_open ? t('admin.security.gateOpenLive') : t('admin.security.gateClosed'))
+        : t('admin.security.publicMarket'),
+      foot: mxTestnet.value.gate ? 'TESTNET' : 'LIVE',
+      tone: g?.has_api_key ? 'is-up' : 'is-warn',
+    },
+    {
+      icon: Layers,
+      label: t('admin.security.activePool'),
+      value: t('admin.security.poolCount', undefined, { count: instruments.value.length, max: instLimits.value.maximum }),
+      foot: t('admin.security.usdtPerp'),
+      tone: '',
+    },
+  ]
+})
+
+const healthAllOk = computed(() => {
+  const chips = mxHealthChips.value || []
+  return chips.length > 0 && chips.every((h: any) => h.ok === h.total)
+})
 
 onMounted(() => { loadAll(); loadMx() })
 </script>
 
 <template>
-  <div class="space-y-4 text-xs">
+  <div class="sc">
     <PageHeader :title="t('nav.admin.security')" :description="t('admin.security.desc')">
       <template #actions>
-        <span class="chip flex items-center gap-1.5">
-          <span>{{ t('admin.security.chipRouting') }}</span>
-          <b class="num" style="color: var(--accent);">{{ routingMode.toUpperCase() }}</b>
-          <span class="text-[10px] opacity-70">·</span>
-          <span>{{ t('admin.security.chipPreferred') }}</span>
-          <b class="num" style="color: var(--accent);">{{ preferredVenue.toUpperCase() }}</b>
-          <span class="text-[10px] opacity-70">·</span>
-          <span>{{ t('admin.security.chipEnv') }}</span>
-          <b class="num" :style="{ color: runtime?.environment === 'live' ? 'var(--down)' : 'var(--up)' }">{{ envBadge(runtime?.environment) }}</b>
+        <span class="badge badge-accent mono">
+          {{ t('admin.security.chipRouting') }} {{ routingMode.toUpperCase() }}
         </span>
+        <span class="badge mono">
+          {{ t('admin.security.chipPreferred') }} {{ preferredVenue.toUpperCase() }}
+        </span>
+        <button class="btn btn-ghost btn-sm" :disabled="loading" @click="loadAll">
+          <Loader2 v-if="loading && config" :size="14" class="sc-spin" />
+          <RefreshCw v-else :size="14" />
+          <span>{{ t('common.refresh') }}</span>
+        </button>
       </template>
     </PageHeader>
 
-    <div v-if="loading" class="py-12 text-center" style="color: var(--ink-2);">{{ t('admin.security.syncing') }}</div>
+    <!-- 首屏骨架 -->
+    <div v-if="loading && !config" class="sc-skel">
+      <div v-for="i in 6" :key="i" class="skeleton skeleton-row" />
+    </div>
 
     <template v-else-if="config">
-      <!-- 状态总览条 -->
-      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-        <div class="card card-pad flex flex-col justify-between" style="background-color: var(--surface-1);">
-          <div class="flex items-center justify-between text-[11px]" style="color: var(--ink-3);">
-            <span>{{ t('admin.security.okxApi') }}</span>
-            <span class="dot" :class="okxLinked ? 'dot-up' : 'dot-down'" />
-          </div>
-          <div class="mt-1 flex items-baseline justify-between">
-            <b class="text-xs font-bold" :style="{ color: okxLinked ? 'var(--up)' : 'var(--down)' }">
-              {{ okxLinked ? t('admin.security.okxLinked') : t('admin.security.okxUnconfigured') }}
-            </b>
-            <span class="num text-[10px]" style="color: var(--ink-3);">{{ envBadge(runtime?.environment) }}</span>
-          </div>
+      <!-- ══ 接入状态带 ══ -->
+      <section class="card sc-band">
+        <div v-for="f in bandFacts" :key="f.label" class="sc-fact">
+          <span class="sc-fact-label"><component :is="f.icon" :size="12" />{{ f.label }}</span>
+          <span class="sc-fact-value" :class="f.tone">{{ f.value }}</span>
+          <span class="sc-fact-foot mono">{{ f.foot }}</span>
         </div>
+      </section>
 
-        <div class="card card-pad flex flex-col justify-between" style="background-color: var(--surface-1);">
-          <div class="flex items-center justify-between text-[11px]" style="color: var(--ink-3);">
-            <span>Binance · USDT-M</span>
-            <span class="dot" :class="mx?.venues?.binance?.has_api_key ? 'dot-up' : 'dot-warn'" />
-          </div>
-          <div class="mt-1 flex items-baseline justify-between">
-            <b class="text-xs font-bold" :style="{ color: mx?.venues?.binance?.has_api_key ? 'var(--up)' : 'var(--warn)' }">
-              {{ mx?.venues?.binance?.has_api_key ? t('admin.security.binanceKeyed') : t('admin.security.publicMarket') }}
-            </b>
-            <span class="num text-[10px]" style="color: var(--ink-3);">{{ mxTestnet.binance ? 'DEMO' : 'LIVE' }}</span>
-          </div>
-        </div>
-
-        <div class="card card-pad flex flex-col justify-between" style="background-color: var(--surface-1);">
-          <div class="flex items-center justify-between text-[11px]" style="color: var(--ink-3);">
-            <span>{{ t('admin.security.gatePerp') }}</span>
-            <span class="dot" :class="mx?.venues?.gate?.has_api_key ? 'dot-up' : 'dot-warn'" />
-          </div>
-          <div class="mt-1 flex items-baseline justify-between">
-            <b class="text-xs font-bold" :style="{ color: mx?.venues?.gate?.has_api_key ? 'var(--up)' : 'var(--warn)' }">
-              {{ mx?.venues?.gate?.has_api_key ? (mx?.venues?.gate?.execution_open ? t('admin.security.gateOpenLive') : t('admin.security.gateClosed')) : t('admin.security.publicMarket') }}
-            </b>
-            <span class="num text-[10px]" style="color: var(--ink-3);">{{ mxTestnet.gate ? 'TESTNET' : 'LIVE' }}</span>
-          </div>
-        </div>
-
-        <div class="card card-pad flex flex-col justify-between" style="background-color: var(--surface-1);">
-          <div class="flex items-center justify-between text-[11px]" style="color: var(--ink-3);">
-            <span>{{ t('admin.security.activePool') }}</span>
-            <Layers class="h-3 w-3" style="color: var(--accent);" />
-          </div>
-          <div class="mt-1 flex items-baseline justify-between">
-            <b class="num text-xs font-bold" style="color: var(--ink-1);">{{ t('admin.security.poolCount', undefined, { count: instruments.length, max: instLimits.maximum }) }}</b>
-            <span class="text-[10px] font-medium" style="color: var(--ink-2);">{{ t('admin.security.usdtPerp') }}</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- 选项卡切换 -->
-      <div class="flex items-center gap-2 border-b pb-2 pt-1" style="border-color: var(--line-1);">
+      <!-- ══ 页签 ══ -->
+      <div class="seg seg-lg sc-tabs">
         <button
-          v-for="tab in TABS" :key="tab.key"
-          class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer"
-          :style="activeTab === tab.key ? { backgroundColor: 'var(--ink-1)', color: 'var(--surface-2)' } : { color: 'var(--ink-2)' }"
+          v-for="tab in TABS"
+          :key="tab.key"
+          :class="{ 'seg-on': activeTab === tab.key }"
           @click="switchTab(tab.key)"
-        >{{ tab.label }}</button>
+        >
+          <component :is="tab.icon" :size="13" />
+          <span>{{ tab.label }}</span>
+        </button>
       </div>
 
-      <!-- ============ 页签 1：交易所与路由 ============ -->
-      <div v-if="activeTab === 'venues'" class="space-y-4">
-        <!-- 路由主策略 -->
-        <SettingsSection :title="t('admin.security.routingTitle')" :description="t('admin.security.routingDesc')">
+      <!-- ══════════ 页签 1：交易所与路由 ══════════ -->
+      <template v-if="activeTab === 'venues'">
+        <SettingsSection :title="t('admin.security.routingTitle')" :description="t('admin.security.routingDesc')" :icon="Route">
           <template #actions>
-            <button class="btn btn-primary" :disabled="savingMx" @click="saveRouting"><Save class="h-3.5 w-3.5" /> {{ savingMx ? t('admin.security.saving') : t('admin.security.saveRouting') }}</button>
+            <button class="btn btn-primary btn-sm" :disabled="savingMx" @click="saveRouting">
+              <Loader2 v-if="savingMx" :size="13" class="sc-spin" />
+              <Save v-else :size="13" />
+              <span>{{ savingMx ? t('admin.security.saving') : t('admin.security.saveRouting') }}</span>
+            </button>
           </template>
-          <div class="space-y-3 rounded-lg border p-3.5" style="background-color: var(--surface-1); border-color: var(--line-1);">
-            <div class="text-[10px] font-semibold" style="color: var(--ink-2);">{{ t('admin.security.routingModeLabel') }}</div>
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              <label class="flex items-center gap-2 p-2.5 rounded-md border cursor-pointer transition-colors" :style="routingMode === 'balanced' ? { borderColor: 'var(--accent)', backgroundColor: 'var(--surface-2)' } : { borderColor: 'var(--line-1)' }">
-                <input v-model="routingMode" type="radio" value="balanced" class="accent-[var(--accent)]" />
-                <div>
-                  <div class="text-xs font-bold" style="color: var(--ink-1);">{{ t('admin.security.modeA') }}</div>
-                  <div class="text-[10px]" style="color: var(--ink-3);">{{ t('admin.security.modeADesc') }}</div>
-                </div>
-              </label>
-              <label class="flex items-center gap-2 p-2.5 rounded-md border cursor-pointer transition-colors" :style="routingMode === 'auto' ? { borderColor: 'var(--accent)', backgroundColor: 'var(--surface-2)' } : { borderColor: 'var(--line-1)' }">
-                <input v-model="routingMode" type="radio" value="auto" class="accent-[var(--accent)]" />
-                <div>
-                  <div class="text-xs font-bold" style="color: var(--ink-1);">{{ t('admin.security.modeB') }}</div>
-                  <div class="text-[10px]" style="color: var(--ink-3);">{{ t('admin.security.modeBDesc') }}</div>
-                </div>
-              </label>
-              <label class="flex items-center gap-2 p-2.5 rounded-md border cursor-pointer transition-colors" :style="routingMode === 'split' ? { borderColor: 'var(--accent)', backgroundColor: 'var(--surface-2)' } : { borderColor: 'var(--line-1)' }">
-                <input v-model="routingMode" type="radio" value="split" class="accent-[var(--accent)]" />
-                <div>
-                  <div class="text-xs font-bold" style="color: var(--ink-1);">{{ t('admin.security.modeC') }}</div>
-                  <div class="text-[10px]" style="color: var(--ink-3);">{{ t('admin.security.modeCDesc') }}</div>
-                </div>
+
+          <div class="sc-group">
+            <span class="form-label">{{ t('admin.security.routingModeLabel') }}</span>
+            <div class="sc-radios sc-radios-3">
+              <label
+                v-for="m in ROUTING_MODES"
+                :key="m.value"
+                class="sc-radio"
+                :class="{ 'is-on': routingMode === m.value }"
+              >
+                <input v-model="routingMode" type="radio" :value="m.value" />
+                <span class="sc-radio-text">
+                  <span class="sc-radio-title">{{ t(m.labelKey) }}</span>
+                  <span class="sc-radio-desc">{{ t(m.descKey) }}</span>
+                </span>
               </label>
             </div>
-            <div class="text-[10px] font-semibold pt-1" style="color: var(--ink-2);">{{ t('admin.security.manualLabel') }}</div>
-            <div class="grid grid-cols-1 sm:grid-cols-4 gap-2">
-              <label class="flex items-center gap-2 p-2.5 rounded-md border cursor-pointer transition-colors" :style="preferredVenue === 'auto' ? { borderColor: 'var(--accent)', backgroundColor: 'var(--surface-2)' } : { borderColor: 'var(--line-1)' }">
-                <input v-model="preferredVenue" type="radio" value="auto" class="accent-[var(--accent)]" />
-                <div>
-                  <div class="text-xs font-bold" style="color: var(--ink-1);">{{ t('admin.security.noManual') }}</div>
-                  <div class="text-[10px]" style="color: var(--ink-3);">{{ t('admin.security.noManualDesc') }}</div>
-                </div>
-              </label>
-              <label class="flex items-center gap-2 p-2.5 rounded-md border cursor-pointer transition-colors" :style="preferredVenue === 'okx' ? { borderColor: 'var(--accent)', backgroundColor: 'var(--surface-2)' } : { borderColor: 'var(--line-1)' }">
-                <input v-model="preferredVenue" type="radio" value="okx" class="accent-[var(--accent)]" />
-                <div>
-                  <div class="text-xs font-bold" style="color: var(--ink-1);">{{ t('admin.security.lockOkx') }}</div>
-                  <div class="text-[10px]" style="color: var(--ink-3);">{{ t('admin.security.lockOkxDesc') }}</div>
-                </div>
-              </label>
-              <label class="flex items-center gap-2 p-2.5 rounded-md border cursor-pointer transition-colors" :style="preferredVenue === 'binance' ? { borderColor: 'var(--accent)', backgroundColor: 'var(--surface-2)' } : { borderColor: 'var(--line-1)' }">
-                <input v-model="preferredVenue" type="radio" value="binance" class="accent-[var(--accent)]" />
-                <div>
-                  <div class="text-xs font-bold" style="color: var(--ink-1);">{{ t('admin.security.lockBinance') }}</div>
-                  <div class="text-[10px]" style="color: var(--ink-3);">{{ t('admin.security.lockBinanceDesc') }}</div>
-                </div>
-              </label>
-              <label class="flex items-center gap-2 p-2.5 rounded-md border cursor-pointer transition-colors" :style="preferredVenue === 'gate' ? { borderColor: 'var(--accent)', backgroundColor: 'var(--surface-2)' } : { borderColor: 'var(--line-1)' }">
-                <input v-model="preferredVenue" type="radio" value="gate" class="accent-[var(--accent)]" />
-                <div>
-                  <div class="text-xs font-bold" style="color: var(--ink-1);">{{ t('admin.security.lockGate') }}</div>
-                  <div class="text-[10px]" style="color: var(--ink-3);">{{ t('admin.security.lockGateDesc') }}</div>
-                </div>
-              </label>
-            </div>
-            <p class="text-[11px] leading-relaxed" style="color: var(--ink-3);">
-              {{ t('admin.security.currentEffective') }}<b class="num" style="color: var(--accent);">{{ routingMode.toUpperCase() }}</b>
-              <template v-if="preferredVenue !== 'auto'"> {{ t('admin.security.manualTag') }} <b class="num" style="color: var(--accent);">{{ preferredVenue.toUpperCase() }}</b></template>{{ t('admin.security.period') }}
-              {{ t('admin.security.unconfiguredNote') }}
-            </p>
           </div>
+
+          <div class="sc-group">
+            <span class="form-label">{{ t('admin.security.manualLabel') }}</span>
+            <div class="sc-radios sc-radios-4">
+              <label
+                v-for="v in PREFERRED_VENUES"
+                :key="v.value"
+                class="sc-radio"
+                :class="{ 'is-on': preferredVenue === v.value }"
+              >
+                <input v-model="preferredVenue" type="radio" :value="v.value" />
+                <span class="sc-radio-text">
+                  <span class="sc-radio-title">{{ t(v.labelKey) }}</span>
+                  <span class="sc-radio-desc">{{ t(v.descKey) }}</span>
+                </span>
+              </label>
+            </div>
+          </div>
+
+          <p class="sc-note">
+            <span class="label-caps">{{ t('admin.security.routingEffectiveTitle') }}</span>
+            <span>
+              <b class="mono is-accent">{{ routingMode.toUpperCase() }}</b>
+              <template v-if="preferredVenue !== 'auto'">
+                {{ t('admin.security.manualTag') }} <b class="mono is-accent">{{ preferredVenue.toUpperCase() }}</b>
+              </template>
+              — {{ t('admin.security.unconfiguredNote') }}
+            </span>
+          </p>
         </SettingsSection>
 
-        <!-- 三所凭证卡 -->
-        <SettingsSection :title="t('admin.security.credsTitle')" :description="t('admin.security.credsDesc')">
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <!-- 1. OKX -->
+        <!-- 三所凭证 -->
+        <SettingsSection :title="t('admin.security.credsTitle')" :description="t('admin.security.credsDesc')" :icon="KeyRound">
+          <div class="sc-venues">
+            <!-- OKX -->
             <VenueCredentialCard
               :name="t('admin.security.okxName')" :api-label="t('admin.security.okxApiLabel')"
-              :status-text="okxLinked ? t('admin.security.okxReady') : t('admin.security.okxNotReady')" :tone="okxLinked ? 'up' : 'down'"
+              :status-text="okxLinked ? t('admin.security.okxReady') : t('admin.security.okxNotReady')"
+              :tone="okxLinked ? 'up' : 'down'"
               :env-text="okxEnvText" :env-label="t('admin.security.fundEnv')"
             >
               <template #env>
-                <label class="block text-[10px] mb-1" style="color: var(--ink-2);">{{ t('admin.security.envTier') }}</label>
-                <select v-model="config.editable.okx_environment" class="input w-full text-xs">
-                  <option value="demo">{{ t('admin.security.optDemo') }}</option>
-                  <option value="live">{{ t('admin.security.optLive') }}</option>
-                </select>
+                <label class="sc-field">
+                  <span class="form-label">{{ t('admin.security.envTier') }}</span>
+                  <select v-model="config.editable.okx_environment" class="field">
+                    <option value="demo">{{ t('admin.security.optDemo') }}</option>
+                    <option value="live">{{ t('admin.security.optLive') }}</option>
+                  </select>
+                </label>
               </template>
-              <div class="space-y-1.5 pt-1">
-                <div class="text-[10px] font-semibold" style="color: var(--ink-2);">{{ t('admin.security.liveTrio') }}</div>
-                <input v-model="keys.live_key" type="password" :placeholder="t('admin.security.apiKeyKeep')" class="input w-full text-xs" />
-                <input v-model="keys.live_secret" type="password" placeholder="Secret Key" class="input w-full text-xs" />
-                <input v-model="keys.live_pass" type="password" placeholder="Passphrase" class="input w-full text-xs" />
+
+              <div class="sc-creds">
+                <span class="form-label">{{ t('admin.security.liveTrio') }}</span>
+                <input v-model="keys.live_key" type="password" :placeholder="t('admin.security.apiKeyKeep')" class="field" />
+                <input v-model="keys.live_secret" type="password" placeholder="Secret Key" class="field" />
+                <input v-model="keys.live_pass" type="password" placeholder="Passphrase" class="field" />
               </div>
-              <div class="space-y-1.5 pt-1">
-                <div class="text-[10px] font-semibold" style="color: var(--ink-2);">{{ t('admin.security.demoTrio') }}</div>
-                <input v-model="keys.demo_key" type="password" :placeholder="t('admin.security.apiKeyKeep')" class="input w-full text-xs" />
-                <input v-model="keys.demo_secret" type="password" placeholder="Secret Key" class="input w-full text-xs" />
-                <input v-model="keys.demo_pass" type="password" placeholder="Passphrase" class="input w-full text-xs" />
+
+              <div class="sc-creds">
+                <span class="form-label">{{ t('admin.security.demoTrio') }}</span>
+                <input v-model="keys.demo_key" type="password" :placeholder="t('admin.security.apiKeyKeep')" class="field" />
+                <input v-model="keys.demo_secret" type="password" placeholder="Secret Key" class="field" />
+                <input v-model="keys.demo_pass" type="password" placeholder="Passphrase" class="field" />
               </div>
+
               <template #extra>
-                <p class="text-[10px] leading-relaxed pt-1" style="color: var(--ink-3);">
-                  {{ t('admin.security.liveConfirmNote') }}
-                </p>
+                <p class="sc-hint"><AlertTriangle :size="11" />{{ t('admin.security.liveConfirmNote') }}</p>
               </template>
               <template #probe>
-                <button class="btn btn-quiet btn-sm" :disabled="probingVenue === 'okx'" @click="probeVenue('okx')"><RefreshCw class="h-3 w-3" :class="probingVenue === 'okx' ? 'animate-spin' : ''" /> {{ probingVenue === 'okx' ? t('admin.security.probing') : t('admin.security.detect') }}</button>
+                <button class="btn btn-quiet btn-sm" :disabled="probingVenue === 'okx'" @click="probeVenue('okx')">
+                  <RefreshCw :size="12" :class="probingVenue === 'okx' ? 'sc-spin' : ''" />
+                  <span>{{ probingVenue === 'okx' ? t('admin.security.probing') : t('admin.security.detect') }}</span>
+                </button>
               </template>
               <template #save>
-                <button class="btn btn-primary btn-sm" :disabled="savingOkx" @click="saveEnvironment"><Save class="h-3 w-3" /> {{ savingOkx ? t('admin.security.saving') : t('admin.security.saveOkx') }}</button>
+                <button class="btn btn-primary btn-sm" :disabled="savingOkx" @click="saveEnvironment">
+                  <Loader2 v-if="savingOkx" :size="12" class="sc-spin" />
+                  <Save v-else :size="12" />
+                  <span>{{ savingOkx ? t('admin.security.saving') : t('admin.security.saveOkx') }}</span>
+                </button>
               </template>
             </VenueCredentialCard>
 
-            <!-- 2. Binance -->
+            <!-- Binance -->
             <VenueCredentialCard
               :name="t('admin.security.binanceName')" :api-label="t('admin.security.binanceApiLabel')"
               :status-text="binanceStatus.text" :tone="binanceStatus.tone"
               :env-text="binanceEnvText" :env-label="t('admin.security.fundEnv')"
             >
               <template #env>
-                <label class="block text-[10px] mb-1" style="color: var(--ink-2);">{{ t('admin.security.endpointTier') }}</label>
-                <label class="flex items-center gap-1.5 text-[11px] cursor-pointer" style="color: var(--ink-2);">
-                  <input v-model="mxTestnet.binance" type="checkbox" class="accent-[var(--accent)]" />
-                  {{ t('admin.security.binanceDemoDomain') }}
-                </label>
+                <div class="sc-field">
+                  <span class="form-label">{{ t('admin.security.endpointTier') }}</span>
+                  <label class="sc-check">
+                    <BaseSwitch v-model="mxTestnet.binance" />
+                    <span>{{ t('admin.security.binanceDemoDomain') }}</span>
+                  </label>
+                </div>
               </template>
-              <div class="space-y-1.5 pt-1">
-                <div class="text-[10px] font-semibold" style="color: var(--ink-2);">{{ t('admin.security.binanceCredLabel') }}</div>
-                <input v-model="mxForm.binance_api_key" type="text" :placeholder="t('admin.security.apiKeyKeep')" class="input w-full text-xs" />
-                <input v-model="mxForm.binance_secret_key" type="password" placeholder="API Secret" class="input w-full text-xs" />
+
+              <div class="sc-creds">
+                <span class="form-label">{{ t('admin.security.binanceCredLabel') }}</span>
+                <input v-model="mxForm.binance_api_key" type="text" :placeholder="t('admin.security.apiKeyKeep')" class="field mono" />
+                <input v-model="mxForm.binance_secret_key" type="password" placeholder="API Secret" class="field" />
               </div>
+
               <template #extra>
-                <p class="text-[10px] leading-relaxed pt-1" style="color: var(--ink-3);">
-                  {{ t('admin.security.binanceExtra') }}
-                </p>
+                <p class="sc-hint">{{ t('admin.security.binanceExtra') }}</p>
               </template>
               <template #probe>
-                <button class="btn btn-quiet btn-sm" :disabled="probingVenue !== '' && probingVenue !== 'binance'" @click="probeVenue('binance')"><RefreshCw class="h-3 w-3" /> {{ t('admin.security.detect') }}</button>
+                <button class="btn btn-quiet btn-sm" :disabled="probingVenue !== '' && probingVenue !== 'binance'" @click="probeVenue('binance')">
+                  <RefreshCw :size="12" />
+                  <span>{{ t('admin.security.detect') }}</span>
+                </button>
               </template>
               <template #save>
-                <button class="btn btn-primary btn-sm" :disabled="savingVenue !== ''" @click="saveVenue('binance')"><Save class="h-3 w-3" /> {{ savingVenue === 'binance' ? t('admin.security.saving') : t('admin.security.saveBinance') }}</button>
+                <button class="btn btn-primary btn-sm" :disabled="savingVenue !== ''" @click="saveVenue('binance')">
+                  <Loader2 v-if="savingVenue === 'binance'" :size="12" class="sc-spin" />
+                  <Save v-else :size="12" />
+                  <span>{{ savingVenue === 'binance' ? t('admin.security.saving') : t('admin.security.saveBinance') }}</span>
+                </button>
               </template>
             </VenueCredentialCard>
 
-            <!-- 3. Gate -->
+            <!-- Gate -->
             <VenueCredentialCard
               :name="t('admin.security.gateName')" :api-label="t('admin.security.gateApiLabel')"
               :status-text="gateStatus.text" :tone="gateStatus.tone"
               :env-text="gateEnvText" :env-label="t('admin.security.fundEnv')"
             >
               <template #env>
-                <label class="block text-[10px] mb-1" style="color: var(--ink-2);">{{ t('admin.security.endpointTier') }}</label>
-                <label class="flex items-center gap-1.5 text-[11px] cursor-pointer" style="color: var(--ink-2);">
-                  <input v-model="mxTestnet.gate" type="checkbox" class="accent-[var(--accent)]" />
-                  {{ t('admin.security.gateSandboxDomain') }}
-                </label>
-              </template>
-              <div class="space-y-1.5 pt-1">
-                <div class="text-[10px] font-semibold" style="color: var(--ink-2);">{{ t('admin.security.gateCredLabel') }}</div>
-                <input v-model="mxForm.gate_api_key" type="text" :placeholder="t('admin.security.apiKeyKeep')" class="input w-full text-xs" />
-                <input v-model="mxForm.gate_secret_key" type="password" placeholder="API Secret" class="input w-full text-xs" />
-              </div>
-              <template #extra>
-                <div class="pt-1">
-                  <label class="flex items-center gap-1.5 text-[11px] cursor-pointer font-bold" :style="{ color: gateExec ? 'var(--down)' : 'var(--ink-2)' }">
-                    <input v-model="gateExec" type="checkbox" class="accent-[var(--accent)]" />
-                    {{ t('admin.security.gateMaster') }} {{ mx?.venues?.gate?.execution_open ? t('admin.security.gateMasterOpen') : t('admin.security.gateMasterClosed') }}
+                <div class="sc-field">
+                  <span class="form-label">{{ t('admin.security.endpointTier') }}</span>
+                  <label class="sc-check">
+                    <BaseSwitch v-model="mxTestnet.gate" />
+                    <span>{{ t('admin.security.gateSandboxDomain') }}</span>
                   </label>
-                  <input v-if="gateExecDirty && gateExec" v-model="gateExecPhrase" :placeholder="t('admin.security.gatePhrasePlaceholder')" class="input w-full text-xs mt-1.5" />
                 </div>
-                <p class="text-[10px] leading-relaxed pt-1" style="color: var(--ink-3);">
-                  {{ t('admin.security.gateExtra') }}
-                </p>
+              </template>
+
+              <div class="sc-creds">
+                <span class="form-label">{{ t('admin.security.gateCredLabel') }}</span>
+                <input v-model="mxForm.gate_api_key" type="text" :placeholder="t('admin.security.apiKeyKeep')" class="field mono" />
+                <input v-model="mxForm.gate_secret_key" type="password" placeholder="API Secret" class="field" />
+              </div>
+
+              <template #extra>
+                <div class="sc-gate">
+                  <label class="sc-check" :class="{ 'is-danger': gateExec }">
+                    <BaseSwitch v-model="gateExec" />
+                    <span>
+                      {{ t('admin.security.gateMaster') }}
+                      <b>{{ mx?.venues?.gate?.execution_open ? t('admin.security.gateMasterOpen') : t('admin.security.gateMasterClosed') }}</b>
+                    </span>
+                  </label>
+                  <input
+                    v-if="gateExecDirty && gateExec"
+                    v-model="gateExecPhrase"
+                    :placeholder="t('admin.security.gatePhrasePlaceholder')"
+                    class="field mono"
+                  />
+                </div>
+                <p class="sc-hint">{{ t('admin.security.gateExtra') }}</p>
               </template>
               <template #probe>
-                <button class="btn btn-quiet btn-sm" :disabled="probingVenue !== '' && probingVenue !== 'gate'" @click="probeVenue('gate')"><RefreshCw class="h-3 w-3" /> {{ t('admin.security.detect') }}</button>
+                <button class="btn btn-quiet btn-sm" :disabled="probingVenue !== '' && probingVenue !== 'gate'" @click="probeVenue('gate')">
+                  <RefreshCw :size="12" />
+                  <span>{{ t('admin.security.detect') }}</span>
+                </button>
               </template>
               <template #save>
-                <button class="btn btn-primary btn-sm" :disabled="savingVenue !== ''" @click="saveVenue('gate')"><Save class="h-3 w-3" /> {{ savingVenue === 'gate' ? t('admin.security.saving') : t('admin.security.saveGate') }}</button>
+                <button class="btn btn-primary btn-sm" :disabled="savingVenue !== ''" @click="saveVenue('gate')">
+                  <Loader2 v-if="savingVenue === 'gate'" :size="12" class="sc-spin" />
+                  <Save v-else :size="12" />
+                  <span>{{ savingVenue === 'gate' ? t('admin.security.saving') : t('admin.security.saveGate') }}</span>
+                </button>
               </template>
             </VenueCredentialCard>
           </div>
         </SettingsSection>
 
         <!-- 跨所行情健康 -->
-        <SettingsSection :title="t('admin.security.healthTitle')" :description="t('admin.security.healthDesc')">
+        <SettingsSection :title="t('admin.security.healthTitle')" :description="t('admin.security.healthDesc')" :icon="Activity">
           <template #actions>
-            <button class="btn btn-quiet btn-sm" @click="loadMx"><RefreshCw class="h-3 w-3" /> {{ t('admin.security.recheck') }}</button>
-          </template>
-          <div v-if="mxHealthChips" class="flex flex-wrap gap-2 text-[11px]">
-            <span v-for="h in mxHealthChips" :key="h.name" class="px-2 py-1 rounded border font-bold num" :style="h.ok === h.total ? { color: 'var(--up)', borderColor: 'var(--up-line)', backgroundColor: 'var(--up-bg)' } : { color: 'var(--warn)', borderColor: 'var(--warn-line)', backgroundColor: 'var(--warn-bg)' }">
-              {{ h.name }} {{ h.ok }}/{{ h.total }} {{ t('admin.security.coinsUnit') }}{{ h.avg_ms ? ' · ' + h.avg_ms + 'ms' : '' }}{{ h.testnet ? ' · ' + t('admin.security.sandboxTag') : '' }}
+            <span class="badge" :class="healthAllOk ? 'badge-up' : 'badge-warn'">
+              {{ healthAllOk ? t('admin.security.healthOk') : t('admin.security.healthDegraded') }}
             </span>
-          </div>
-          <div v-else class="text-[11px]" style="color: var(--ink-3);">{{ t('admin.security.noHealthData') }}</div>
-        </SettingsSection>
-      </div>
+            <button class="btn btn-quiet btn-sm" @click="loadMx">
+              <RefreshCw :size="12" />
+              <span>{{ t('admin.security.recheck') }}</span>
+            </button>
+          </template>
 
-      <!-- ============ 页签 2：标的池与初始本金 ============ -->
-      <div v-if="activeTab === 'pool'" class="space-y-4">
-        <SettingsSection :title="t('admin.security.capitalTitle')" :description="t('admin.security.capitalDesc')">
+          <BaseEmpty v-if="!mxHealthChips" :text="t('admin.security.noHealthData')" />
+
+          <div v-else class="sc-health">
+            <div
+              v-for="h in mxHealthChips"
+              :key="h.name"
+              class="sc-health-row"
+              :class="{ 'is-ok': h.ok === h.total }"
+            >
+              <span class="sc-health-name">{{ h.name }}</span>
+              <span class="sc-health-stat mono num">{{ h.ok }}/{{ h.total }} {{ t('admin.security.coinsUnit') }}</span>
+              <span v-if="h.avg_ms" class="sc-health-ms mono num">{{ h.avg_ms }}ms</span>
+              <span v-if="h.testnet" class="badge">{{ t('admin.security.sandboxTag') }}</span>
+            </div>
+          </div>
+        </SettingsSection>
+      </template>
+
+      <!-- ══════════ 页签 2：标的池与初始本金 ══════════ -->
+      <template v-if="activeTab === 'pool'">
+        <SettingsSection :title="t('admin.security.capitalTitle')" :description="t('admin.security.capitalDesc')" :icon="Wallet">
           <template #actions>
             <button
-              class="btn btn-primary"
+              class="btn btn-primary btn-sm"
               :disabled="savingCapital || !auth.isSuperadmin"
               @click="saveCapital"
-            ><Save class="h-3.5 w-3.5" /> {{ savingCapital ? t('admin.security.capitalSaving') : t('admin.security.capitalSave') }}</button>
+            >
+              <Loader2 v-if="savingCapital" :size="13" class="sc-spin" />
+              <Save v-else :size="13" />
+              <span>{{ savingCapital ? t('admin.security.capitalSaving') : t('admin.security.capitalSave') }}</span>
+            </button>
           </template>
-          <div class="grid gap-3 md:grid-cols-2">
-            <label class="text-xs space-y-1">
-              <span style="color: var(--ink-2);">{{ t('admin.security.capitalAmount') }}</span>
-              <input v-model="newCapital" class="input w-full num" inputmode="decimal" />
+
+          <div class="sc-form-2">
+            <label class="sc-field">
+              <span class="form-label">{{ t('admin.security.capitalAmount') }}</span>
+              <input v-model="newCapital" class="field num" inputmode="decimal" />
             </label>
-            <label class="text-xs space-y-1">
-              <span style="color: var(--ink-2);">{{ t('admin.security.capitalConfirmLabel') }}</span>
-              <input v-model="capitalConfirm" class="input w-full num" placeholder="UPDATE CAPITAL" />
+            <label class="sc-field">
+              <span class="form-label">{{ t('admin.security.capitalConfirmLabel') }}</span>
+              <input v-model="capitalConfirm" class="field mono" placeholder="UPDATE CAPITAL" />
             </label>
           </div>
-          <p class="pt-3 text-[11px]" style="color: var(--ink-3);">{{ t('admin.security.capitalFooter') }}</p>
+
+          <p class="sc-hint pad">{{ t('admin.security.capitalFooter') }}</p>
         </SettingsSection>
 
-        <SettingsSection :title="t('admin.security.poolTitle')" :description="t('admin.security.poolDesc')">
+        <SettingsSection :title="t('admin.security.poolTitle')" :description="t('admin.security.poolDesc')" :icon="Layers">
           <template #actions>
-            <input v-model="newInstId" :placeholder="t('admin.security.instPlaceholder')" class="input w-44" @keyup.enter="addInstrument" />
-            <button class="btn btn-primary" @click="addInstrument"><Layers class="h-3.5 w-3.5" /> {{ t('admin.security.addInstrument') }}</button>
+            <input
+              v-model="newInstId"
+              :placeholder="t('admin.security.instPlaceholder')"
+              class="field mono sc-inst-input"
+              @keyup.enter="addInstrument"
+            />
+            <button class="btn btn-primary btn-sm" @click="addInstrument">
+              <Layers :size="13" />
+              <span>{{ t('admin.security.addInstrument') }}</span>
+            </button>
           </template>
-          <DataTable
-            flat
-            v-if="instruments.length"
-            class="overflow-x-auto -mx-4 px-4"
-            :rows="instruments || []"
-            :row-key="(item: any) => item.instId"
-            :empty-text="t('common.noRecords')"
-          >
-            <template #head>
-              <tr class="border-b text-[11px] uppercase tracking-wider font-bold" style="border-color: var(--line-1); color: var(--ink-2);">
-                                <th class="py-2 pl-0 pr-4">{{ t('admin.security.colInstId') }}</th>
-                                <th class="py-2 px-3">{{ t('admin.security.colName') }}</th>
-                                <th class="py-2 px-3">{{ t('admin.security.colType') }}</th>
-                                <th class="py-2 px-3">{{ t('admin.security.colRisk') }}</th>
-                                <th class="py-2 px-4 text-right">{{ t('admin.security.colAction') }}</th>
-                              </tr>
-            </template>
-            <template #row="{ row: item }">
-              <td class="py-2 pl-0 pr-4 font-bold num" style="color: var(--ink-1);">{{ item.instId }}</td>
-              <td class="py-2 px-3" style="color: var(--ink-2);">{{ item.name }}</td>
-              <td class="py-2 px-3 num" style="color: var(--ink-3);">{{ item.ctType || 'SWAP' }}</td>
-              <td class="py-2 px-3">
-                <span v-if="item.protected" class="px-1.5 py-0.5 rounded-[3px] text-[11px] font-bold border" style="background-color: var(--warn-bg); border-color: var(--warn-line); color: var(--warn);">{{ t('admin.security.protectedBadge') }}</span>
-                <span v-else-if="item.held_live" class="px-1.5 py-0.5 rounded-[3px] text-[11px] font-bold border" style="background-color: var(--accent-bg); border-color: var(--accent-line); color: var(--accent);">{{ t('admin.security.holdingLiveBadge', undefined, { venues: (item.held_venues || []).join('/') || '—' }) }}</span>
-                <span v-else-if="item.has_tracker" class="px-1.5 py-0.5 rounded-[3px] text-[11px] font-bold border" style="background-color: var(--accent-bg); border-color: var(--accent-line); color: var(--accent);">{{ t('admin.security.holdingBadge') }}</span>
-                <span v-else-if="item.holdings_unknown" class="px-1.5 py-0.5 rounded-[3px] text-[11px] font-bold border" style="background-color: var(--surface-3); border-color: var(--warn-line); color: var(--warn);" :title="String(item.holdings_unknown)">{{ t('admin.security.holdingUnknownBadge') }}</span>
-                <span v-else class="text-[11px] px-1.5 py-0.5 rounded-[3px] border" style="background-color: var(--surface-3); border-color: var(--line-1); color: var(--ink-3);">{{ t('admin.security.removableBadge') }}</span>
-              </td>
-              <td class="py-2 px-4 text-right">
+
+          <BaseEmpty v-if="!instruments.length" :text="t('admin.security.poolEmpty')" />
+
+          <div v-else class="sc-rows">
+            <div class="sc-row sc-row-head">
+              <span>{{ t('admin.security.colInstId') }}</span>
+              <span>{{ t('admin.security.colName') }}</span>
+              <span>{{ t('admin.security.colType') }}</span>
+              <span>{{ t('admin.security.colRisk') }}</span>
+              <span />
+            </div>
+
+            <article v-for="item in instruments" :key="item.instId" class="sc-row">
+              <span class="sc-inst mono num">{{ item.instId }}</span>
+              <span class="sc-name truncate">{{ item.name }}</span>
+              <span class="sc-type mono">{{ item.ctType || 'SWAP' }}</span>
+              <span class="sc-badges">
+                <span v-if="item.protected" class="badge badge-warn">{{ t('admin.security.protectedBadge') }}</span>
+                <span v-else-if="item.held_live" class="badge badge-accent">
+                  {{ t('admin.security.holdingLiveBadge', undefined, { venues: (item.held_venues || []).join('/') || '—' }) }}
+                </span>
+                <span v-else-if="item.has_tracker" class="badge badge-accent">{{ t('admin.security.holdingBadge') }}</span>
+                <span
+                  v-else-if="item.holdings_unknown"
+                  class="badge badge-warn"
+                  :title="String(item.holdings_unknown)"
+                >{{ t('admin.security.holdingUnknownBadge') }}</span>
+                <span v-else class="badge">{{ t('admin.security.removableBadge') }}</span>
+              </span>
+              <span class="sc-actions">
                 <button
                   :disabled="item.protected || item.has_tracker || item.held_live || item.holdings_unknown"
-                  class="p-1 rounded cursor-pointer transition-opacity hover:opacity-80 disabled:opacity-20"
-                  style="color: var(--down);"
-                  :title="item.held_live ? t('admin.security.removeBlockedHoldings', undefined, { venues: (item.held_venues || []).join('/') || '—' }) : item.holdings_unknown ? t('admin.security.removeBlockedUnknown') : t('admin.security.removeTitle')"
+                  class="btn btn-quiet btn-icon btn-sm is-danger"
+                  :title="item.held_live
+                    ? t('admin.security.removeBlockedHoldings', undefined, { venues: (item.held_venues || []).join('/') || '—' })
+                    : item.holdings_unknown
+                      ? t('admin.security.removeBlockedUnknown')
+                      : t('admin.security.removeTitle')"
                   @click="removeInstrument(item)"
                 >
-                  <Trash2 class="h-3.5 w-3.5" />
+                  <Trash2 :size="13" />
                 </button>
-              </td>
-            </template>
-          </DataTable>
-            <div v-else class="py-8 text-center text-xs" style="color: var(--ink-3);">{{ t('admin.security.poolEmpty') }}</div>
-          <p class="pt-3 text-[11px]" style="color: var(--ink-3);">{{ t('admin.security.poolFooter', undefined, { max: instLimits.maximum }) }}</p>
-        </SettingsSection>
-      </div>
+              </span>
+            </article>
+          </div>
 
-      <!-- ============ 页签 3：应急风控与持仓 ============ -->
-      <div v-if="activeTab === 'emergency'" class="space-y-4">
-        <SettingsSection :title="t('admin.security.manualTitle')" :description="t('admin.security.manualDesc')">
+          <p class="sc-hint pad">{{ t('admin.security.poolFooter', undefined, { max: instLimits.maximum }) }}</p>
+        </SettingsSection>
+      </template>
+
+      <!-- ══════════ 页签 3：应急风控与持仓 ══════════ -->
+      <template v-if="activeTab === 'emergency'">
+        <SettingsSection :title="t('admin.security.manualTitle')" :description="t('admin.security.manualDesc')" :icon="Zap">
           <template #actions>
-            <button class="btn btn-quiet" @click="saveManualClose"><Save class="h-3.5 w-3.5" /> {{ t('admin.security.saveSwitch') }}</button>
+            <button class="btn btn-quiet btn-sm" @click="saveManualClose">
+              <Save :size="13" />
+              <span>{{ t('admin.security.saveSwitch') }}</span>
+            </button>
           </template>
-          <label class="flex items-center gap-2 cursor-pointer w-fit">
-            <input v-model="manualClose" type="checkbox" class="accent-[var(--accent)]" />
-            <span class="text-xs" :style="{ color: manualClose ? 'var(--warn)' : 'var(--ink-2)', fontWeight: manualClose ? 700 : 400 }">
+
+          <div class="sc-switch-row" :class="{ 'is-danger': manualClose }">
+            <BaseSwitch v-model="manualClose" />
+            <span class="sc-switch-text">
               {{ manualClose ? t('admin.security.manualOn') : t('admin.security.manualOff') }}
             </span>
-          </label>
+          </div>
         </SettingsSection>
 
-        <SettingsSection :title="t('admin.security.snapshotTitle')" :description="t('admin.security.snapshotDesc')">
+        <SettingsSection :title="t('admin.security.snapshotTitle')" :description="t('admin.security.snapshotDesc')" :icon="Radar">
           <template #actions>
-            <button class="btn btn-quiet" @click="loadPositions"><Zap class="h-3.5 w-3.5" /> {{ t('admin.security.refreshPositions') }}</button>
+            <button class="btn btn-quiet btn-sm" @click="loadPositions">
+              <Zap :size="13" />
+              <span>{{ t('admin.security.refreshPositions') }}</span>
+            </button>
           </template>
-          <div v-if="snapshotState" class="text-[11px] pb-2" style="color: var(--warn);">{{ snapshotState }}</div>
-          <div v-if="snapshot" class="text-[11px] pb-2" style="color: var(--ink-2);">
-            {{ t('admin.security.envWord') }} <b :style="{ color: snapshot.environment === 'live' ? 'var(--down)' : 'var(--up)' }">{{ envBadge(snapshot.environment) }}</b>
-            · {{ t('admin.security.positionsWord') }} {{ snapshot.positions?.length ?? 0 }} · {{ t('admin.security.ordersWord') }} {{ snapshot.orders?.length ?? 0 }} · {{ fmtDateTime(snapshot.captured_at_ms) }}
-          </div>
-          <DataTable
-            flat
-            v-if="snapshot?.positions?.length"
-            class="overflow-x-auto -mx-4 px-4"
-            :rows="snapshot.positions || []"
-            :row-key="(p: any) => p.instId + p.posSide"
-            :empty-text="t('common.noRecords')"
-          >
-            <template #head>
-              <tr class="border-b text-[11px] uppercase tracking-wider font-bold" style="border-color: var(--line-1); color: var(--ink-2);">
-                                <th class="py-2 pl-0 pr-4">{{ t('admin.security.colPosition') }}</th>
-                                <th class="py-2 px-3">{{ t('admin.security.colContracts') }}</th>
-                                <th class="py-2 px-3">{{ t('admin.security.colMode') }}</th>
-                                <th class="py-2 px-3">{{ t('admin.security.colUpl') }}</th>
-                                <th class="py-2 px-4 text-right">{{ t('admin.security.colAction') }}</th>
-                              </tr>
-            </template>
-            <template #row="{ row: p }">
-              <td class="py-2 pl-0 pr-4">
-                <b class="num" style="color: var(--ink-1);">{{ p.instId }}</b>
-                <span v-if="p.venue" class="ml-1 px-1 py-0.5 rounded text-[10px] font-bold uppercase border" :style="p.venue === 'binance' ? { color: '#f3ba2f', borderColor: '#f3ba2f33' } : p.venue === 'gate' ? { color: '#00be98', borderColor: '#00be9833' } : { color: '#3880ff', borderColor: '#3880ff33' }">
-                  {{ p.venue }}
-                </span>
-                <span class="ml-1.5 px-1.5 py-0.5 rounded text-[11px] font-bold border" :style="p.posSide === 'long' ? { backgroundColor: 'var(--up-bg)', borderColor: 'var(--up-line)', color: 'var(--up)' } : { backgroundColor: 'var(--down-bg)', borderColor: 'var(--down-line)', color: 'var(--down)' }">
+
+          <p v-if="snapshotState" class="sc-loading">
+            <Loader2 :size="12" class="sc-spin" />{{ snapshotState }}
+          </p>
+
+          <p v-else-if="snapshot" class="sc-snap-meta">
+            <span class="label-caps">{{ t('admin.security.envWord') }}</span>
+            <b :class="snapshot.environment === 'live' ? 'is-down' : 'is-up'">{{ envBadge(snapshot.environment) }}</b>
+            <span class="sc-sep">·</span>
+            <span>{{ t('admin.security.positionsWord') }} <b class="num">{{ snapshot.positions?.length ?? 0 }}</b></span>
+            <span class="sc-sep">·</span>
+            <span>{{ t('admin.security.ordersWord') }} <b class="num">{{ snapshot.orders?.length ?? 0 }}</b></span>
+            <span class="sc-sep">·</span>
+            <span class="mono">{{ fmtDateTime(snapshot.captured_at_ms) }}</span>
+          </p>
+
+          <BaseEmpty
+            v-if="!snapshot?.positions?.length"
+            :text="snapshot ? t('admin.security.noPositions') : t('admin.security.clickRefreshHint')"
+          />
+
+          <div v-else class="sc-rows">
+            <div class="sc-row sc-pos-row sc-row-head">
+              <span>{{ t('admin.security.colPosition') }}</span>
+              <span>{{ t('admin.security.colContracts') }}</span>
+              <span>{{ t('admin.security.colMode') }}</span>
+              <span>{{ t('admin.security.colUpl') }}</span>
+              <span />
+            </div>
+
+            <article
+              v-for="p in snapshot.positions"
+              :key="p.instId + p.posSide"
+              class="sc-row sc-pos-row"
+            >
+              <span class="sc-pos-id">
+                <b class="mono">{{ p.instId }}</b>
+                <span v-if="p.venue" class="badge mono">{{ p.venue }}</span>
+                <span class="badge" :class="p.posSide === 'long' ? 'badge-up' : 'badge-down'">
                   {{ (p.posSide || 'net').toUpperCase() }}
                 </span>
-              </td>
-              <td class="py-2 px-3 num" style="color: var(--ink-2);">{{ p.pos || '0' }}</td>
-              <td class="py-2 px-3 text-[11px]" style="color: var(--ink-3);">{{ p.mgnMode || '--' }}</td>
-              <td class="py-2 px-3 font-bold num" :style="{ color: Number(p.upl || 0) >= 0 ? 'var(--up)' : 'var(--down)' }">{{ Number(p.upl || 0).toFixed(4) }}</td>
-              <td class="py-2 px-4 text-right">
-                <button class="px-2.5 py-1 rounded-md text-[11px] font-bold border cursor-pointer transition-all" style="background-color: var(--down-bg); border-color: var(--down-line); color: var(--down);" @click="openClose(p)">{{ t('admin.security.quickClose') }}</button>
-              </td>
-            </template>
-          </DataTable>
-            <div v-else-if="snapshot" class="py-8 text-center text-xs" style="color: var(--up);">{{ t('admin.security.noPositions') }}</div>
-            <div v-else-if="!snapshotState" class="py-8 text-center text-xs" style="color: var(--ink-3);">{{ t('admin.security.clickRefreshHint') }}</div>
+              </span>
+              <span class="sc-contracts num">{{ p.pos || '0' }}</span>
+              <span class="sc-mode mono">{{ p.mgnMode || '--' }}</span>
+              <span class="sc-upl num" :class="Number(p.upl || 0) >= 0 ? 'is-up' : 'is-down'">
+                {{ Number(p.upl || 0).toFixed(4) }}
+              </span>
+              <span class="sc-actions">
+                <button class="btn btn-danger btn-sm" @click="openClose(p)">
+                  {{ t('admin.security.quickClose') }}
+                </button>
+              </span>
+            </article>
+          </div>
         </SettingsSection>
-      </div>
+      </template>
     </template>
 
-    <!-- 平仓双确认弹窗 -->
-    <div v-if="closeModal?.show" class="fixed inset-0 z-[var(--z-dialog)] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4" @click.self="closeModal = null">
-      <div class="rounded-xl border p-5 sm:p-6 w-full max-w-[460px] max-h-[88dvh] overflow-y-auto shadow-2xl" style="background-color: var(--surface-2); border-color: var(--line-1);">
-        <h3 class="text-sm font-bold mb-2" style="color: var(--down);">{{ t('admin.security.closeModalTitle') }}</h3>
-        <p class="text-[11px] leading-relaxed mb-3" style="color: var(--ink-2);">
-          {{ t('admin.security.closePrefix') }} <b :style="{ color: snapshot?.environment === 'live' ? 'var(--down)' : 'var(--up)' }">{{ envBadge(snapshot?.environment) }}</b> {{ t('admin.security.closeMiddle') }}
-          <b style="color: var(--ink-1);">{{ closeModal.pos.instId }} {{ (closeModal.pos.posSide || 'net').toUpperCase() }} {{ Math.abs(Number(closeModal.pos.pos || 0)) }}</b>{{ t('admin.security.period') }}
+    <!-- ══════════ 平仓双确认 ══════════ -->
+    <BaseDialog
+      :open="!!closeModal?.show"
+      :title="t('admin.security.closeModalTitle')"
+      tone="danger"
+      size="md"
+      @close="closeModal = null"
+    >
+      <template v-if="closeModal?.pos">
+        <p class="sc-close-desc">
+          {{ t('admin.security.closePrefix') }}
+          <b :class="snapshot?.environment === 'live' ? 'is-down' : 'is-up'">{{ envBadge(snapshot?.environment) }}</b>
+          {{ t('admin.security.closeMiddle') }}
+          <b class="sc-close-target mono">
+            {{ closeModal.pos.instId }} {{ (closeModal.pos.posSide || 'net').toUpperCase() }}
+            {{ Math.abs(Number(closeModal.pos.pos || 0)) }}
+          </b>{{ t('admin.security.period') }}
           {{ t('admin.security.closeSuffix') }}
         </p>
-        <label class="block text-[11px] mb-1" style="color: var(--ink-2);">{{ t('admin.security.adminPasswordLabel') }}</label>
-        <input v-model="closePassword" type="password" class="input w-full mb-3" />
-        <label class="block text-[11px] mb-1" style="color: var(--ink-2);">{{ t('admin.security.confirmPhraseLabel') }}{{ closeModal.pos.close_confirmation }}</label>
-        <input v-model="closePhraseInput" :placeholder="closeModal.pos.close_confirmation" class="input w-full mb-4" />
-        <div class="flex justify-end gap-2">
-          <button class="btn btn-quiet" @click="closeModal = null">{{ t('admin.security.cancel') }}</button>
-          <button class="px-3 py-2 rounded-lg text-xs font-bold cursor-pointer disabled:opacity-50 transition-all" style="background-color: var(--down-bg); border: 1px solid var(--down-line); color: var(--down);" :disabled="closing" @click="confirmClose">{{ closing ? t('admin.security.closing') : t('admin.security.confirmClose') }}</button>
+
+        <div class="sc-close-fields">
+          <label class="sc-field">
+            <span class="form-label">{{ t('admin.security.adminPasswordLabel') }}</span>
+            <input v-model="closePassword" type="password" class="field" />
+          </label>
+
+          <label class="sc-field">
+            <span class="form-label">
+              {{ t('admin.security.confirmPhraseLabel') }}
+              <code class="sc-close-phrase">{{ closeModal.pos.close_confirmation }}</code>
+            </span>
+            <input
+              v-model="closePhraseInput"
+              :placeholder="closeModal.pos.close_confirmation"
+              class="field mono"
+            />
+          </label>
         </div>
-      </div>
-    </div>
+      </template>
+
+      <template #footer>
+        <button class="btn btn-ghost btn-sm" @click="closeModal = null">
+          {{ t('admin.security.cancel') }}
+        </button>
+        <button class="btn btn-danger btn-sm" :disabled="closing" @click="confirmClose">
+          <Loader2 v-if="closing" :size="13" class="sc-spin" />
+          <span>{{ closing ? t('admin.security.closing') : t('admin.security.confirmClose') }}</span>
+        </button>
+      </template>
+    </BaseDialog>
   </div>
 </template>
 
 <style scoped>
-.input {
-  border-radius: 8px;
-  padding: 8px 10px;
-  font-size: 12px;
-  outline: none;
-  border: 1px solid var(--line-1);
-  background-color: var(--surface-input);
-  color: var(--ink-1);
-  transition: border-color 0.15s ease;
+.sc {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-4);
 }
-.input:focus { border-color: var(--accent); }
+.sc-spin {
+  animation: sc-rotate 0.9s linear infinite;
+}
+@keyframes sc-rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.sc-skel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ══ 状态带 ══ */
+.sc-band {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+@media (min-width: 640px) {
+  .sc-band {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (min-width: 1280px) {
+  .sc-band {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+.sc-fact {
+  display: flex;
+  flex-direction: column;
+  gap:4px;
+  min-width: 0;
+  padding: var(--ds-space-4);
+  border-top: 1px solid var(--ds-color-border-default);
+}
+.sc-fact:first-child {
+  border-top: 0;
+}
+@media (min-width: 640px) {
+  .sc-fact:nth-child(2) {
+    border-top: 0;
+  }
+  .sc-fact:nth-child(even) {
+    border-left: 1px solid var(--ds-color-border-default);
+  }
+}
+@media (min-width: 1280px) {
+  .sc-fact {
+    border-top: 0;
+  }
+  .sc-fact + .sc-fact {
+    border-left: 1px solid var(--ds-color-border-default);
+  }
+}
+.sc-fact-label {
+  display: flex;
+  align-items: center;
+  gap:6px;
+  font-size: var(--text-3xs);
+  font-weight: 500;
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--ds-color-text-placeholder);
+}
+.sc-fact-value {
+  font-size: var(--text-md);
+  font-weight: 500;
+  letter-spacing: var(--track-display);
+  line-height: 1.25;
+  color: var(--ds-color-text-primary);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.sc-fact-value.is-up {
+  color: var(--up);
+}
+.sc-fact-value.is-down {
+  color: var(--down);
+}
+.sc-fact-value.is-warn {
+  color: var(--warn);
+}
+.sc-fact-foot {
+  font-size: var(--text-4xs);
+  color: var(--ds-color-text-placeholder);
+}
+
+.sc-tabs {
+  align-self: flex-start;
+}
+
+/* ══ 通用 ══ */
+.sc-note {
+  display: flex;
+  align-items: baseline;
+  gap: var(--ds-space-2);
+  flex-wrap: wrap;
+  margin-top: var(--ds-space-4);
+  padding-top: var(--ds-space-3);
+  border-top: 1px solid var(--ds-color-border-default);
+  font-size: var(--text-3xs);
+  line-height: var(--leading-body);
+  color: var(--ds-color-text-description);
+}
+.sc-note .mono.is-accent {
+  color: var(--ds-color-brand);
+}
+.sc-hint {
+  display: flex;
+  align-items: flex-start;
+  gap:6px;
+  font-size: var(--text-4xs);
+  line-height: var(--leading-body);
+  color: var(--ds-color-text-placeholder);
+}
+.sc-hint > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.sc-hint.pad {
+  margin-top: var(--ds-space-3);
+  padding-top: var(--ds-space-3);
+  border-top: 1px solid var(--ds-color-border-default);
+}
+
+.sc-group + .sc-group {
+  margin-top: var(--ds-space-4);
+}
+
+/* ══ radio 卡组（旧版 7 段手写卡片 → 数据驱动） ══ */
+.sc-radios {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--ds-space-2);
+  margin-top:8px;
+}
+@media (min-width: 620px) {
+  .sc-radios-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .sc-radios-4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+.sc-radio {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--ds-color-border-default);
+  border-left: 2px solid transparent;
+  border-radius: var(--r-ctl);
+  background-color: var(--ds-color-bg-surface-inset);
+  cursor: pointer;
+  transition: all var(--dur-fast);
+}
+.sc-radio:hover {
+  background-color: var(--ds-color-bg-hover);
+}
+.sc-radio.is-on {
+  border-left-color: var(--ds-color-brand);
+  background-color: var(--r20-brand-bg);
+}
+.sc-radio input {
+  margin-top: 2px;
+  accent-color: var(--ds-color-brand);
+  flex-shrink: 0;
+}
+.sc-radio-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.sc-radio-title {
+  font-size: var(--text-3xs);
+  font-weight: 600;
+  color: var(--ds-color-text-primary);
+}
+.sc-radio-desc {
+  font-size: var(--text-4xs);
+  line-height: var(--leading-body);
+  color: var(--ds-color-text-placeholder);
+}
+
+/* ══ 三所凭证 ══ */
+.sc-venues {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--ds-space-3);
+}
+@media (min-width: 900px) {
+  .sc-venues {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+.sc-field {
+  display: flex;
+  flex-direction: column;
+  gap:6px;
+  min-width: 0;
+}
+.sc-creds {
+  display: flex;
+  flex-direction: column;
+  gap:6px;
+}
+.sc-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--text-3xs);
+  color: var(--ds-color-text-description);
+  cursor: pointer;
+}
+.sc-check.is-danger span {
+  color: var(--down);
+}
+.sc-gate {
+  display: flex;
+  flex-direction: column;
+  gap:8px;
+}
+.sc-gate .field {
+  margin-top: 2px;
+}
+
+/* ══ 健康 ══ */
+.sc-health {
+  display: flex;
+  flex-direction: column;
+}
+.sc-health-row {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-3);
+  padding:10px var(--ds-space-3);
+  border-bottom: 1px solid var(--ds-color-border-default);
+  border-left: 2px solid var(--warn);
+  font-size: var(--text-3xs);
+}
+.sc-health-row:last-child {
+  border-bottom: 0;
+}
+.sc-health-row.is-ok {
+  border-left-color: var(--up);
+}
+.sc-health-name {
+  font-weight: 600;
+  color: var(--ds-color-text-primary);
+  min-width: 0;
+}
+.sc-health-stat {
+  margin-left: auto;
+  color: var(--ds-color-text-secondary);
+}
+.sc-health-ms {
+  color: var(--ds-color-text-placeholder);
+}
+
+/* ══ 表单 ══ */
+.sc-form-2 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--ds-space-3);
+}
+@media (min-width: 700px) {
+  .sc-form-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.sc-inst-input {
+  width: 190px;
+}
+
+/* ══ 行式清单 ══ */
+.sc-rows {
+  display: flex;
+  flex-direction: column;
+}
+.sc-row {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr) 78px minmax(0, 1.3fr) 44px;
+  align-items: center;
+  gap: var(--ds-space-3);
+  padding: 10px var(--ds-space-3);
+  border-bottom: 1px solid var(--ds-color-border-default);
+  font-size: var(--text-3xs);
+}
+.sc-row:last-child {
+  border-bottom: 0;
+}
+.sc-row-head {
+  min-height: 30px;
+  padding-top: 0;
+  padding-bottom: 0;
+  background-color: var(--ds-color-bg-surface-inset);
+  font-size: var(--text-4xs);
+  font-weight: 500;
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--ds-color-text-placeholder);
+}
+.sc-row:not(.sc-row-head):hover {
+  background-color: var(--ds-color-bg-hover);
+}
+.sc-inst {
+  font-weight: 600;
+  color: var(--ds-color-text-primary);
+}
+.sc-name {
+  color: var(--ds-color-text-secondary);
+  min-width: 0;
+}
+.sc-type {
+  color: var(--ds-color-text-placeholder);
+}
+.sc-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+}
+.sc-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.sc-pos-row {
+  grid-template-columns: minmax(0, 1.6fr) 80px 80px 110px 92px;
+}
+.sc-pos-id {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.sc-pos-id .mono {
+  font-weight: 600;
+  color: var(--ds-color-text-primary);
+}
+.sc-contracts,
+.sc-mode {
+  color: var(--ds-color-text-description);
+}
+.sc-upl {
+  font-weight: 600;
+  text-align: right;
+}
+.sc-upl.is-up {
+  color: var(--up);
+}
+.sc-upl.is-down {
+  color: var(--down);
+}
+
+@media (max-width: 900px) {
+  .sc-row,
+  .sc-pos-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .sc-row-head {
+    display: none;
+  }
+  .sc-badges,
+  .sc-actions {
+    grid-column: 2;
+    justify-content: flex-end;
+  }
+}
+
+/* ══ 应急 ══ */
+.sc-switch-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding:12px var(--ds-space-3);
+  border: 1px solid var(--ds-color-border-default);
+  border-left: 2px solid var(--ds-color-border-strong);
+  border-radius: var(--r-ctl);
+  background-color: var(--ds-color-bg-surface-inset);
+}
+.sc-switch-row.is-danger {
+  border-left-color: var(--warn);
+  background-color: var(--warn-bg);
+}
+.sc-switch-text {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--ds-color-text-secondary);
+}
+.sc-switch-row.is-danger .sc-switch-text {
+  color: var(--warn);
+}
+
+.sc-loading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-3xs);
+  color: var(--ds-color-text-placeholder);
+}
+.sc-snap-meta {
+  display: flex;
+  align-items: baseline;
+  gap:8px;
+  flex-wrap: wrap;
+  margin-bottom: var(--ds-space-3);
+  font-size: var(--text-3xs);
+  color: var(--ds-color-text-description);
+}
+.sc-snap-meta b.is-up {
+  color: var(--up);
+}
+.sc-snap-meta b.is-down {
+  color: var(--down);
+}
+.sc-sep {
+  color: var(--ds-color-text-placeholder);
+}
+
+/* ══ 平仓弹窗 ══ */
+.sc-close-desc {
+  font-size: var(--text-3xs);
+  line-height: var(--leading-body);
+  color: var(--ds-color-text-description);
+}
+.sc-close-desc b.is-up {
+  color: var(--up);
+}
+.sc-close-desc b.is-down {
+  color: var(--down);
+}
+.sc-close-target {
+  font-weight: 600;
+  color: var(--ds-color-text-primary);
+}
+.sc-close-fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-3);
+  margin-top: var(--ds-space-4);
+}
+.sc-close-phrase {
+  padding:1px 6px;
+  border-radius: var(--r-xs);
+  background-color: var(--down-bg);
+  color: var(--down);
+  font-family: var(--ds-font-mono);
+  font-weight: 600;
+}
 </style>

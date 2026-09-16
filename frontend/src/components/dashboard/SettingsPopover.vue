@@ -10,7 +10,7 @@ import BaseSegmented from '../base/BaseSegmented.vue';
 import BaseSwitch from '../base/BaseSwitch.vue';
 
 const { t, currentLocale, setLocale } = useI18n();
-const { theme, setTheme, cvd, toggleCvd } = useTheme();
+const { cvd, toggleCvd } = useTheme();
 
 const router = useRouter();
 const { peekOpen } = useUi();
@@ -58,18 +58,6 @@ onBeforeUnmount(() => {
         role="menu"
       >
         <div class="space-y-3">
-          <div>
-            <p class="form-label mb-1.5">{{ t('dash.shell.settings.theme') }}</p>
-            <BaseSegmented
-              class="w-full"
-              :model-value="theme"
-              :options="[
-                { value: 'dark', label: t('dash.shell.settings.themeDark') },
-                { value: 'light', label: t('dash.shell.settings.themeLight') },
-              ]"
-              @update:model-value="(v: any) => setTheme(v)"
-            />
-          </div>
           <div>
             <p class="form-label mb-1.5">{{ t('dash.shell.settings.language') }}</p>
             <BaseSegmented

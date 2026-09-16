@@ -121,7 +121,7 @@ export const zhAdminSecurity = {
   colMode: '模式',
   colUpl: '未实现盈亏',
   quickClose: '快速平仓',
-  noPositions: '✓ 当前环境 0 活跃持仓',
+  noPositions: '当前环境 0 活跃持仓',
   clickRefreshHint: '点击「刷新持仓与挂单」读取实时状态。',
   closeModalTitle: '快速安全平仓',
   closePrefix: '将从',
@@ -145,4 +145,9 @@ export const zhAdminSecurity = {
   tabEmergency: '应急风控与持仓',
   loadingPositions: '正在读取持仓与挂单…',
   period: '。',
-};
+
+  // ── 推倒重来新增（批 10）──
+  bandVenues: '接入场所',
+  healthOk: '全部可用',
+  healthDegraded: '部分降级',
+  routingEffectiveTitle: '当前生效',};

@@ -13,4 +13,16 @@ export const enAdminAudit = {
   empty: "No audit records match the current filter",
   detailTitle: "Audit detail",
   close: "Close",
-};
+
+  // ── added by the rebuild (batch 11) ──
+  bandTotal: 'Audit records',
+  bandSuccess: 'Succeeded',
+  bandFailed: 'Abnormal',
+  bandLatest: 'Latest entry',
+  filterAll: 'All',
+  filterSuccess: 'Succeeded',
+  filterFailed: 'Abnormal',
+  recordsTitle: 'Audit stream',
+  actorLabel: 'Actor',
+  rawJson: 'Raw record JSON',
+  noMatch: 'No matching records',};

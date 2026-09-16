@@ -249,8 +249,26 @@ def fetch_jin10_macro_news(limit=20) -> list:
     return items[:limit]
 
 
+#: OKX 官方公告（上币/下架/维护/风控调整类通告）是否进入前台「舆情情报」快讯流。
+#:
+#: 2026-09-16 用户反馈：「舆情页的 OKX 公告没什么鸟用」——这类通告是交易所运营流水账
+#: （升级维护、活动、指数成分调整…），对 1H~4H 波段研判零信息量，却固定占掉 15/35 条
+#: 版面，还会把金十宏观要闻挤出首屏与 LLM 提示词的前 6 条快讯摘要。
+#: 故**默认不进展示流**（`latest_news` / 前端快讯卡片 / 来源筛选）。
+#:
+#: ⚠️ 公告**仍然**参与下面的黑天鹅正则体检（「交易所暂停全部提现」「破产挤兑」这类
+#: 通告是真实系统性风险信号），安全网不动 —— 本开关只影响「展示」，不影响「风控」。
+DISPLAY_OKX_ANNOUNCEMENTS = False
+
+
 def fetch_okx_rubik_sentiment(ccy: str) -> dict:
-    """从 OKX Rubik 官方数据端点拉取多空账户比与合约持仓情绪。"""
+    """从 OKX Rubik 官方数据端点拉取多空账户比与合约持仓情绪。
+
+    ⚠️ 本函数**不产出** `mentions`：Rubik 端点是「账户多空比」，与「新闻提及篇数」
+    是两件事。旧版在这里硬编码 `"mentions": 100`，导致前台每个币种都显示
+    「100 篇」的凭空数字（2026-09-16 用户反馈）。真实提及数由
+    `fetch_and_analyze_news_sentiment()` 从本轮实际入流的快讯逐条统计后写入。
+    """
     c = ccy.upper()
     url = f"https://www.okx.com/api/v5/rubik/stat/contracts/long-short-account-ratio?ccy={c}"
     for attempt in range(2):
@@ -281,7 +299,6 @@ def fetch_okx_rubik_sentiment(ccy: str) -> dict:
                     "bull_cnt": int(bull_pct),
                     "bear_cnt": int(bear_pct),
                     "neutral_cnt": 0,
-                    "mentions": 100,
                     "sentiment_factor_score": score,
                 }
         except Exception:
@@ -295,6 +312,7 @@ def fetch_and_analyze_news_sentiment():
     now_str = now_bj.strftime("%Y-%m-%d %H:%M:%S")
 
     # 1. News sources：直连 OKX 官方公告流 + 金十数据宏观快讯，淘汰旧第三方 RSS。
+    #    ⚠️ 公告只进「黑天鹅体检」，不进展示流（见 DISPLAY_OKX_ANNOUNCEMENTS 注释）。
     okx_news = fetch_okx_announcements(limit=20)
     jin10_news = fetch_jin10_macro_news(limit=25)
     raw_news = okx_news + jin10_news
@@ -307,27 +325,32 @@ def fetch_and_analyze_news_sentiment():
             seen_ids.add(nid)
             deduped_news.append(item)
 
-    # 保障 OKX 官方公告与金十宏观要闻双向足额露出，避免单方时间差挤占
-    top_okx = [n for n in deduped_news if "OKX官方" in n.get("platforms", [])][:15]
-    top_other = [n for n in deduped_news if "OKX官方" not in n.get("platforms", [])][:20]
-    raw_news = sorted(top_okx + top_other, key=lambda x: int(x.get("cTime", 0) or 0), reverse=True)
+    # 展示流：按 DISPLAY_OKX_ANNOUNCEMENTS 决定是否收录交易所运营通告；时间倒序。
+    display_news = deduped_news if DISPLAY_OKX_ANNOUNCEMENTS else [
+        n for n in deduped_news if "OKX官方" not in n.get("platforms", [])
+    ]
+    display_news = sorted(display_news, key=lambda x: int(x.get("cTime", 0) or 0), reverse=True)
+
+    # 黑天鹅体检：对**全部**原始快讯执行（含不进展示流的官方公告）——只判风控，不做展示。
+    triggered_threat = None
+    for item in deduped_news:
+        c_time = int(item.get("cTime", 0) or 0) / 1000.0
+        if time.time() - c_time >= 900:
+            continue
+        full_text = f"{item.get('title', '')} {item.get('summary', '')}"
+        for pattern, threat_name in BLACK_SWAN_PATTERNS:
+            if re.search(pattern, full_text, re.IGNORECASE):
+                triggered_threat = (item.get("title", ""), threat_name)
+                break
+        if triggered_threat:
+            break
 
     parsed_news = []
-    triggered_threat = None
-
-    for item in raw_news:
+    for item in display_news:
         c_time = int(item.get("cTime", 0) or 0) / 1000.0
         dt_str = datetime.datetime.fromtimestamp(c_time, tz=tz_bj).strftime("%Y-%m-%d %H:%M:%S") if c_time > 0 else "--"
         title = item.get("title", "")
         summary = item.get("summary", "")
-        full_text = f"{title} {summary}"
-
-        # Only evaluate black-swan patterns for news within last 15 minutes
-        if time.time() - c_time < 900:
-            for pattern, threat_name in BLACK_SWAN_PATTERNS:
-                if re.search(pattern, full_text, re.IGNORECASE):
-                    triggered_threat = (title, threat_name)
-                    break
 
         coins = item.get("ccyList") or item.get("coins") or _extract_coins(title, summary, TARGET_COINS)
         importance = item.get("importance") or _classify_importance(title, summary)
@@ -402,7 +425,6 @@ def fetch_and_analyze_news_sentiment():
                 "bull_cnt": 50,
                 "bear_cnt": 50,
                 "neutral_cnt": 0,
-                "mentions": 100,
                 "sentiment_factor_score": 0.0,
             }
         time.sleep(0.3)
@@ -419,9 +441,10 @@ def fetch_and_analyze_news_sentiment():
     payload = {
         "timestamp": now_str,
         "updated_at": now_str,
-        "source_available": bool(raw_news),
-        "source_reason": ("OKX官方公告 + 金十数据宏观要闻 + OKX Rubik多空数据" if raw_news
-                          else "OKX官方公告与金十数据拉取失败，显示缺失而非中性"),
+        # 数据源可用性只认**可展示**的快讯源；只剩官方运营公告不算「有舆情」。
+        "source_available": bool(parsed_news),
+        "source_reason": ("金十数据宏观要闻 + 新浪 7x24 全球宏观快讯 + OKX Rubik 账户多空比" if parsed_news
+                          else "金十数据/宏观快讯拉取失败，显示缺失而非中性"),
         "macro_sentiment": macro_env,
         "circuit_breaker": cb_info if cb_active else {"active": False},
         "coins_sentiment": coin_sentiments,
@@ -451,6 +474,23 @@ def fetch_and_analyze_news_sentiment():
                     payload["stale_sections"] = True
         except Exception:
             pass
+
+    # 4. 币种真实「相关快讯」计数（2026-09-16 用户反馈修复）
+    #
+    #    这些数字必须**从本轮实际入流的快讯逐条统计**得出：某币在标题/摘要里被识别到
+    #    （title/summary 命中或 `coins` 已带），计数 +1；一条都没有就是 0。
+    #    旧版把 `mentions` 硬编码成 100，前台九个币种全部显示「100 篇」，是凭空数字。
+    #    铁律：宁可显示 0（并如实说明），也不编造一个看起来饱满的样本量。
+    #    放在所有 fail-closed 回落**之后**执行，确保缓存回落的旧 `mentions` 也被覆盖。
+    mention_counts = {str(c).upper(): 0 for c in target_coins}
+    for _item in payload.get("latest_news") or []:
+        for _c in (_item.get("coins") or []):
+            _key = str(_c).upper()
+            if _key in mention_counts:
+                mention_counts[_key] += 1
+    for _ccy, _sent in (payload.get("coins_sentiment") or {}).items():
+        if isinstance(_sent, dict):
+            _sent["mentions"] = int(mention_counts.get(str(_ccy).upper(), 0))
 
     try:
         os.makedirs(DATA_DIR, exist_ok=True)

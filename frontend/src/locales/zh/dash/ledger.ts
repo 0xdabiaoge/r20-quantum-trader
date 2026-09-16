@@ -1,7 +1,7 @@
 /** 交易台账：筛选 + 汇总 + 明细 + 生命周期抽屉 + 巡检日志 */
 export const zhLedger = {
   title: '交易台账',
-  desc: '以交易所官方持仓史为事实源，双源交叉验证出场归因，逐笔可回放',
+  desc: '按笔查看成交、归因与可回放的持仓史',
   summary: {
     total: '累计平仓',
     winRate: '胜率',
@@ -13,7 +13,8 @@ export const zhLedger = {
     avgHold: '平均持仓',
     fundingNet: '资金费净收支',
     fundingNetHint: '累计资金费用净额与收支细分',
-    tipPf: '利润因子 = 总盈利 / 总亏损，>1 为正期望',
+    tipPf: '利润因子 = 总盈利 / 总亏损，>1 为正期望；口径为交易所结算账单（非本页台账行），故笔数可能与台账不同',
+    pfSource: '账单口径 · {n} 笔',
   },
   filters: {
     symbol: '标的',
@@ -79,6 +80,20 @@ export const zhLedger = {
     adopted: '投委会裁决 · 采纳席位 {seat}',
     degraded: '委员会未运行 · 单模型裁决',
   },
+  observability: {
+    title: '数理快照可观测性',
+    none: '数理快照不可观测',
+    priceOnly: '仅价格/普通观测 · 数理快照不可观测',
+    partial: '数理快照部分可观测',
+    observed: '数理快照完全可观测',
+    tagHint: '该笔成交未记录开仓时刻的动力学链快照，无法作数理因果归因',
+    missingFields: '本笔未记录：v/a/j/I · 能量积分 · 偏离面积积分 · 延续/击穿概率 · VaR/CVaR',
+    noBackfill: '证据纪律：缺失即不可观测。严禁倒推或编造微观数理因果；字段缺失本身不得被解读为任何证据。',
+    auditLine: '开仓时刻数理快照审计：完全可观测 {observed} · 部分 {partial} · 仅价格 {price} · 无快照 {none}（共 {total} 笔）',
+    unobservable: '{n} / {total} 笔数理快照不可观测',
+  },
+  truncated: '本页仅含最近 {kept} 笔 / 共 {total} 笔',
+  truncatedHint: '载荷瘦身截断了台账：下方汇总与明细只覆盖被保留的切片，缺失的行绝不用 0 或空值代填。',
   venue: '执行场所（旧数据无标注则不显示，绝不冒充）',
   fundingTag: '资:',
   exportCsv: '导出 CSV',

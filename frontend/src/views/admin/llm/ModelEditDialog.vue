@@ -1,13 +1,19 @@
 <script setup lang="ts">
 /**
- * ModelEditDialog：从 1762 行的 LlmPage.vue 拆出的视图块（结构优化阶段 3·F3）。
+ * ModelEditDialog · 模型参数编辑
+ * ---------------------------------------------------------------------------
+ * 骨架（推倒重来）：
+ *   旧 = 手写 `fixed inset-0 bg-black/60 backdrop-blur-md` 遮罩 + 自绘面板
+ *        + 4 个能力开关（**每个 3 行内联 rgba 三元表达式**）
+ *   新 = **BaseDialog**（自带焦点陷阱 / ESC 关闭 / 滚动锁）
+ *        + 能力开关由一份 `CAPABILITIES` 数组驱动，色调只走品牌与中性
  *
- * 状态由父页 `provide(LLM_KEY, useLlmConfig())` 注入，本组件 `useLlmCtx()` 取用：
- * 这样拆**不会**新建一份状态（composable 每次调用都会建新状态，直接调用即出错），
- * 也不必为几十个绑定铺 prop/emit 管道。标记一处未改，DOM 结构未变。
+ * ⚠️ 逻辑模块 `useLlmConfig.ts` / `llmLogic.ts` 未触碰。
  */
+import { computed } from 'vue'
 import { useI18n } from '../../../composables/useI18n'
 import { useLlmCtx } from './injection'
+import BaseDialog from '../../../components/base/BaseDialog.vue'
 
 const { t } = useI18n()
 const {
@@ -19,133 +25,152 @@ const {
   selectedProvider,
   toggleCapability,
 } = useLlmCtx()
+
+/** 能力标签（旧版把同一段三元样式写了 4 遍，只有 key 与文案不同）
+ *  存**完整键路径**并直接 `t(c.labelKey)`，避免拼接键逃过 i18n 静态校验。 */
+const CAPABILITIES = [
+  { key: 'chat', labelKey: 'admin.llm.capChatFull' },
+  { key: 'vision', labelKey: 'admin.llm.capVisionFull' },
+  { key: 'tools', labelKey: 'admin.llm.capToolsFull' },
+  { key: 'reasoning', labelKey: 'admin.llm.capCotFull' },
+]
+
+const title = computed(() =>
+  editingModel.value ? t('admin.llm.editModel') : t('admin.llm.addNewModel'),
+)
 </script>
 
 <template>
-  <div
-    v-if="modelModalVisible"
-    class="fixed inset-0 z-[var(--z-dialog)] bg-black/60 backdrop-blur-md flex items-center justify-center p-4"
-    @click.self="modelModalVisible = false"
-  >
-    <div
-      class="border rounded-2xl w-full max-w-lg shadow-2xl p-5 sm:p-6 space-y-4 text-xs"
-      style="background-color: var(--surface-2); border-color: var(--line-1); color: var(--ink-1);"
-    >
-      <div class="flex items-center justify-between pb-3 border-b" style="border-color: var(--line-1);">
-        <h3 class="text-sm font-bold uppercase" style="color: var(--ink-1);">
-          {{ editingModel ? t('admin.llm.editModel') : t('admin.llm.addNewModel') }}
-        </h3>
-        <span class="text-[11px]" style="color: var(--ink-3);">{{ t('admin.llm.belongsTo') }} {{ selectedProvider?.name }}</span>
-      </div>
+  <BaseDialog :open="modelModalVisible" :title="title" size="lg" @close="modelModalVisible = false">
+    <template #title>
+      <span class="me-title">
+        <span>{{ title }}</span>
+        <span class="me-owner">{{ t('admin.llm.belongsTo') }} {{ selectedProvider?.name }}</span>
+      </span>
+    </template>
 
-      <div class="space-y-3">
-        <div>
-          <label class="block text-[11px] font-bold mb-1" style="color: var(--ink-2);">{{ t('admin.llm.modelIdLabel') }}</label>
-          <input
-            v-model="modelForm.id"
-            :readonly="!!editingModel"
-            :placeholder="t('admin.llm.modelIdPlaceholder')"
-            class="w-full rounded-xl px-3.5 py-2 text-xs outline-none border"
-            style="background-color: var(--surface-1); border-color: var(--line-1); color: var(--ink-1);"
-          />
-        </div>
+    <div class="me-form">
+      <label class="me-field">
+        <span class="form-label">{{ t('admin.llm.modelIdLabel') }}</span>
+        <input
+          v-model="modelForm.id"
+          :readonly="!!editingModel"
+          :placeholder="t('admin.llm.modelIdPlaceholder')"
+          class="field mono"
+          :class="{ 'is-readonly': !!editingModel }"
+        />
+      </label>
 
-        <div>
-          <label class="block text-[11px] font-bold mb-1" style="color: var(--ink-2);">{{ t('admin.llm.displayName') }}</label>
-          <input
-            v-model="modelForm.name"
-            :placeholder="t('admin.llm.displayNamePlaceholder')"
-            class="w-full rounded-xl px-3.5 py-2 text-xs outline-none border"
-            style="background-color: var(--surface-1); border-color: var(--line-1); color: var(--ink-1);"
-          />
-        </div>
+      <label class="me-field">
+        <span class="form-label">{{ t('admin.llm.displayName') }}</span>
+        <input
+          v-model="modelForm.name"
+          :placeholder="t('admin.llm.displayNamePlaceholder')"
+          class="field"
+        />
+      </label>
 
-        <!-- 模型能力标签选择 -->
-        <div>
-          <label class="block text-[11px] font-bold mb-1" style="color: var(--ink-2);">{{ t('admin.llm.capBadges') }}</label>
-          <div class="flex flex-wrap gap-2 pt-1">
-            <button
-              type="button"
-              @click="toggleCapability('chat')"
-              class="px-2.5 py-1 rounded-lg border text-xs font-medium cursor-pointer transition-all"
-              :style="modelForm.capabilities.includes('chat') ? { backgroundColor: 'rgba(99, 102, 241, 0.2)', borderColor: '#818CF8', color: '#818CF8' } : { backgroundColor: 'var(--surface-1)', borderColor: 'var(--line-1)', color: 'var(--ink-2)' }"
-            >
-              {{ t('admin.llm.capChatFull') }}
-            </button>
-            <button
-              type="button"
-              @click="toggleCapability('vision')"
-              class="px-2.5 py-1 rounded-lg border text-xs font-medium cursor-pointer transition-all"
-              :style="modelForm.capabilities.includes('vision') ? { backgroundColor: 'rgba(236, 72, 153, 0.2)', borderColor: '#F472B6', color: '#F472B6' } : { backgroundColor: 'var(--surface-1)', borderColor: 'var(--line-1)', color: 'var(--ink-2)' }"
-            >
-              {{ t('admin.llm.capVisionFull') }}
-            </button>
-            <button
-              type="button"
-              @click="toggleCapability('tools')"
-              class="px-2.5 py-1 rounded-lg border text-xs font-medium cursor-pointer transition-all"
-              :style="modelForm.capabilities.includes('tools') ? { backgroundColor: 'rgba(59, 130, 246, 0.2)', borderColor: 'var(--info)', color: 'var(--info)' } : { backgroundColor: 'var(--surface-1)', borderColor: 'var(--line-1)', color: 'var(--ink-2)' }"
-            >
-              {{ t('admin.llm.capToolsFull') }}
-            </button>
-            <button
-              type="button"
-              @click="toggleCapability('reasoning')"
-              class="px-2.5 py-1 rounded-lg border text-xs font-medium cursor-pointer transition-all"
-              :style="modelForm.capabilities.includes('reasoning') ? { backgroundColor: 'rgba(245, 158, 11, 0.2)', borderColor: 'var(--warn)', color: 'var(--warn)' } : { backgroundColor: 'var(--surface-1)', borderColor: 'var(--line-1)', color: 'var(--ink-2)' }"
-            >
-              {{ t('admin.llm.capCotFull') }}
-            </button>
-          </div>
-        </div>
-
-        <!-- 思考强度配置 (动态精简与自适应展示) -->
-        <div>
-          <label class="block text-[11px] font-bold mb-1" style="color: var(--ink-2);">{{ t('admin.llm.effortLabel') }}</label>
-          <select
-            v-model="modelForm.reasoning_effort"
-            class="w-full rounded-xl px-3.5 py-2 text-xs outline-none border cursor-pointer"
-            style="background-color: var(--surface-1); border-color: var(--line-1); color: var(--ink-1);"
+      <div class="me-field">
+        <span class="form-label">{{ t('admin.llm.capBadges') }}</span>
+        <div class="me-caps">
+          <button
+            v-for="c in CAPABILITIES"
+            :key="c.key"
+            type="button"
+            class="me-cap"
+            :class="{ 'is-on': modelForm.capabilities.includes(c.key) }"
+            @click="toggleCapability(c.key)"
           >
-            <option
-              v-for="opt in availableEffortOptions"
-              :key="opt.value"
-              :value="opt.value"
-            >
-              {{ opt.label }}
-            </option>
-          </select>
+            {{ t(c.labelKey) }}
+          </button>
         </div>
-
-        <div>
-          <label class="block text-[11px] font-bold mb-1" style="color: var(--ink-2);">{{ t('admin.llm.contextLen') }}</label>
-          <input
-            v-model.number="modelForm.context_length"
-            type="number"
-            placeholder="1048576"
-            class="w-full rounded-xl px-3.5 py-2 text-xs outline-none border"
-            style="background-color: var(--surface-1); border-color: var(--line-1); color: var(--ink-1);"
-          />
-        </div>
-
       </div>
 
-      <div class="flex justify-end space-x-2 pt-3 border-t" style="border-color: var(--line-1);">
-        <button
-          @click="modelModalVisible = false"
-          class="px-4 py-1.5 rounded-xl border text-xs cursor-pointer"
-          style="background-color: var(--surface-1); border-color: var(--line-1); color: var(--ink-2);"
-        >
-          {{ t('admin.llm.cancel') }}
-        </button>
-        <button
-          @click="saveModelForm"
-          class="px-5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs btn-primary-text"
-          style="background-color: var(--accent); color: var(--accent-ink);"
-        >
-          {{ t('admin.llm.saveModel') }}
-        </button>
-      </div>
+      <label class="me-field">
+        <span class="form-label">{{ t('admin.llm.effortLabel') }}</span>
+        <select v-model="modelForm.reasoning_effort" class="field me-select">
+          <option v-for="opt in availableEffortOptions" :key="opt.value" :value="opt.value">
+            {{ opt.label }}
+          </option>
+        </select>
+      </label>
+
+      <label class="me-field">
+        <span class="form-label">{{ t('admin.llm.contextLen') }}</span>
+        <input
+          v-model.number="modelForm.context_length"
+          type="number"
+          placeholder="1048576"
+          class="field num"
+        />
+      </label>
     </div>
-  </div>
+
+    <template #footer>
+      <button class="btn btn-ghost btn-sm" @click="modelModalVisible = false">
+        {{ t('admin.llm.cancel') }}
+      </button>
+      <button class="btn btn-primary btn-sm" @click="saveModelForm">
+        {{ t('admin.llm.saveModel') }}
+      </button>
+    </template>
+  </BaseDialog>
 </template>
+
+<style scoped>
+.me-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.me-owner {
+  font-size: var(--text-4xs);
+  font-weight: 400;
+  color: var(--ds-color-text-placeholder);
+}
+.me-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-4);
+}
+.me-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.me-field .field.is-readonly {
+  background-color: var(--ds-color-bg-surface-inset);
+  color: var(--ds-color-text-placeholder);
+  cursor: not-allowed;
+}
+.me-caps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.me-cap {
+  padding:6px 10px;
+  border: 1px solid var(--ds-color-border-default);
+  border-radius: var(--r-ctl);
+  background-color: transparent;
+  font-size: var(--text-3xs);
+  color: var(--ds-color-text-description);
+  cursor: pointer;
+  transition: all var(--dur-fast);
+}
+.me-cap:hover {
+  background-color: var(--ds-color-bg-hover);
+  color: var(--ds-color-text-primary);
+}
+.me-cap.is-on {
+  background-color: var(--r20-brand-bg);
+  border-color: var(--r20-brand-line);
+  color: var(--ds-color-brand);
+  font-weight: 600;
+}
+.me-select {
+  cursor: pointer;
+}
+</style>

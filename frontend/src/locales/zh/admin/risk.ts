@@ -34,4 +34,9 @@ export const zhAdminRisk = {
   unsavedCount: '{n} 项修改未保存',
   saving: '保存中…',
   saveApply: '保存并生效',
-};
+
+  // ── 推倒重来新增（批 6）──
+  effectTitle: '生效说明',
+  suitesTitle: '预设套件',
+  suitesDesc: '一键套用经过验证的风控参数组合',
+  paramsTitle: '风控参数',};

@@ -48,6 +48,30 @@ export function venueColor(v: unknown): string {
   return VENUE_COLORS[String(v ?? '').trim().toLowerCase()] || 'var(--ink-3)';
 }
 
+/**
+ * 场所徽章的三元色调类（文字 / 描边 / 底色）。
+ *
+ * 与 `venueColor()` 同源、同语义，只是把裸色值扩成「文字 + 描边 + 底色」这一组，
+ * 供徽章类元素直接绑到 `:class`。
+ *
+ * ⚠️ 推倒重来期修正（批 13）：行情侧多处曾把场所色**内联硬编码**为具体十六进制值
+ * 或 Tailwind 色相类（`bg-blue-500` / `text-amber-500` / `bg-emerald-500`），
+ * 既绕过色板又与 `venueColor()` 口径不一致 —— 同一个「Binance」在两处会是两种黄。
+ * 现统一收口到本函数，全站场所配色单一事实源。
+ */
+const VENUE_TONE_CLS: Record<string, string> = {
+  okx: 'text-[var(--up)] border-[var(--up-line)] bg-[var(--up-bg)]',
+  binance: 'text-[var(--warn)] border-[var(--warn-line)] bg-[var(--warn-bg)]',
+  gate: 'text-[var(--info)] border-[var(--info-line)] bg-[var(--info-bg)]',
+};
+
+export function venueToneCls(v: unknown): string {
+  return (
+    VENUE_TONE_CLS[String(v ?? '').trim().toLowerCase()] ||
+    'text-[var(--ink-3)] border-[var(--line-1)] bg-[var(--surface-1)]'
+  );
+}
+
 /** 淘汰阶段 → 中文阶段名（对齐 venue_router._stage_of；未知阶段原样透传） */
 export function stageLabel(stage: unknown): string {
   const s = String(stage ?? '').trim();

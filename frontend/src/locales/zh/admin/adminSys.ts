@@ -50,4 +50,7 @@ export const zhAdminAdminSys = {
     unlockPrompt: '解锁 {name} 需输入确认短语：UNLOCK ADMIN {id}',
     unlocked: '{name} 已解锁',
   },
+  // ── 推倒重来新增（批 12）──
+  bandTotal: '管理员账号',
+  noUsers: '暂无管理员账号',
 };

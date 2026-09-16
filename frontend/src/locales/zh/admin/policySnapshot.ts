@@ -1,6 +1,6 @@
 /** 策略版本快照页文案 */
 export const zhAdminPolicySnapshot = {
-  desc: '四大策略单元（提示词、自进化、物理拦截、模型委员会）+ 风控/路由的整包指纹聚合；支持具名归档与回滚（回滚后逐单元校验，任一单元未还原即自动退回原状态）',
+  desc: '归档当前策略整包；回滚时逐单元校验，含风控/路由',
   loading: '正在计算并聚合四大策略单元实时指纹...',
   notRecorded: '未记录',
   btn: {
@@ -75,7 +75,7 @@ export const zhAdminPolicySnapshot = {
   },
   modal: {
     title: '归档当前策略版本',
-    desc: '将当前生效的提示词模块、自进化心法、物理拦截器及模型委员会配置打包固化为不可变版本快照，后续可随时一键全盘回滚。',
+    desc: '把当前生效的策略固化为不可变版本',
     nameLabel: '策略名称 (必填):',
     namePlaceholder: '例如: 2026-09 顺势回踩大牛市高胜率版',
     descLabel: '策略描述与实盘备注 (选填):',
@@ -101,4 +101,13 @@ export const zhAdminPolicySnapshot = {
     restoreFailed: '回滚失败: {msg}',
     deleteFailed: '删除失败: {msg}',
   },
+
+  // ── 推倒式重构新增（批 5）──
+  bandPackageHash: '整包哈希',
+  bandPackageHashFoot: '含风控与路由的完整策略标识',
+  unitsTitle: '四大策略单元',
+  unitsDesc: '当前生效策略由四个单元组成，逐单元核对其关键标识与守卫状态',
+  colUnit: '单元',
+  colDetail: '关键明细',
+  colEnter: '进入',
 };
