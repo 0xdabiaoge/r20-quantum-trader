@@ -250,7 +250,10 @@ async function handleLogin() {
 /* 卡片本体 */
 .auth-card {
   padding: 32px 28px;
-  border-radius: 14px;
+  /* 批 94：原为 `14px` —— **整个半径刻度（4/8/10/12/16/胶囊）里没有这个值**，
+     是全站唯一的 14px 圆角。登录卡也是「卡片」，收敛到 `--r-card`(10px)，
+     与其余 9 处卡片一致。⚠️ 这是本批唯一的**可见变化**（卡片圆角 14px→10px）。 */
+  border-radius: var(--r-card);
   background-color: #12141a;
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 4px 24px -2px rgba(0, 0, 0, 0.5);
@@ -267,7 +270,8 @@ async function handleLogin() {
 .auth-logo-box {
   width: 40px;
   height: 40px;
-  border-radius: 10px;
+  /* 批 94：10px 就是 `--r-card` 的值，改用令牌（渲染完全相同）。 */
+  border-radius: var(--r-card);
   display: flex;
   align-items: center;
   justify-content: center;
