@@ -82,7 +82,7 @@ function typeLabel(v: string): string {
       <!-- ══ 插件状态带 ══ -->
       <section class="card pl-band">
         <template v-if="showSkeleton">
-          <div v-for="i in 4" :key="i" class="pl-fact">
+          <div v-for="i in 4" :key="i" class="fact">
             <div class="skeleton skeleton-text" style="width: 48%" />
             <div class="skeleton skeleton-text" style="width: 62%; height: 16px" />
             <div class="skeleton skeleton-text" style="width: 36%" />
@@ -90,30 +90,30 @@ function typeLabel(v: string): string {
         </template>
 
         <template v-else>
-          <div class="pl-fact">
-            <span class="pl-fact-label"><Blocks :size="12" />{{ t('admin.plugins.bandPlugins') }}</span>
-            <span class="pl-fact-value num">{{ plugins.length }}</span>
-            <span class="pl-fact-foot mono">{{ t('admin.plugins.policyTitle') }}</span>
+          <div class="fact">
+            <span class="fact-label"><Blocks :size="12" />{{ t('admin.plugins.bandPlugins') }}</span>
+            <span class="fact-value num">{{ plugins.length }}</span>
+            <span class="fact-foot mono">{{ t('admin.plugins.policyTitle') }}</span>
           </div>
 
-          <div class="pl-fact">
-            <span class="pl-fact-label"><PackageCheck :size="12" />{{ t('admin.plugins.bandHealthy') }}</span>
-            <span class="pl-fact-value num" :class="healthyCount === plugins.length && plugins.length ? 'is-up' : ''">
+          <div class="fact">
+            <span class="fact-label"><PackageCheck :size="12" />{{ t('admin.plugins.bandHealthy') }}</span>
+            <span class="fact-value num" :class="healthyCount === plugins.length && plugins.length ? 'is-up' : ''">
               {{ healthyCount }}
             </span>
-            <span class="pl-fact-foot">{{ t('admin.plugins.thHealth') }}</span>
+            <span class="fact-foot">{{ t('admin.plugins.thHealth') }}</span>
           </div>
 
-          <div class="pl-fact">
-            <span class="pl-fact-label"><PackageX :size="12" />{{ t('admin.plugins.bandDisabled') }}</span>
-            <span class="pl-fact-value num">{{ disabledCount }}</span>
-            <span class="pl-fact-foot">{{ t('admin.plugins.thEnableSwitch') }}</span>
+          <div class="fact">
+            <span class="fact-label"><PackageX :size="12" />{{ t('admin.plugins.bandDisabled') }}</span>
+            <span class="fact-value num">{{ disabledCount }}</span>
+            <span class="fact-foot">{{ t('admin.plugins.thEnableSwitch') }}</span>
           </div>
 
-          <div class="pl-fact">
-            <span class="pl-fact-label"><ShieldAlert :size="12" />{{ t('admin.plugins.bandIssues') }}</span>
-            <span class="pl-fact-value num" :class="issueCount ? 'is-warn' : 'is-up'">{{ issueCount }}</span>
-            <span class="pl-fact-foot">{{ t('admin.plugins.healthOutside', undefined, { a: t('admin.plugins.healthNormal'), b: t('admin.plugins.healthDisabled') }) }}</span>
+          <div class="fact">
+            <span class="fact-label"><ShieldAlert :size="12" />{{ t('admin.plugins.bandIssues') }}</span>
+            <span class="fact-value num" :class="issueCount ? 'is-warn' : 'is-up'">{{ issueCount }}</span>
+            <span class="fact-foot">{{ t('admin.plugins.healthOutside', undefined, { a: t('admin.plugins.healthNormal'), b: t('admin.plugins.healthDisabled') }) }}</span>
           </div>
         </template>
       </section>
@@ -221,61 +221,13 @@ function typeLabel(v: string): string {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
-.pl-fact {
-  display: flex;
-  flex-direction: column;
-  gap:4px;
-  min-width: 0;
-  padding: var(--ds-space-4);
-  border-top: 1px solid var(--ds-color-border-default);
-}
-.pl-fact:first-child {
-  border-top: 0;
-}
-@media (min-width: 640px) {
-  .pl-fact:nth-child(2) {
-    border-top: 0;
-  }
-  .pl-fact:nth-child(even) {
-    border-left: 1px solid var(--ds-color-border-default);
-  }
-}
-@media (min-width: 1280px) {
-  .pl-fact {
-    border-top: 0;
-  }
-  .pl-fact + .pl-fact {
-    border-left: 1px solid var(--ds-color-border-default);
-  }
-}
-.pl-fact-label {
-  display: flex;
-  align-items: center;
-  gap:6px;
-  font-size: var(--text-3xs);
-  font-weight: 500;
-  letter-spacing: var(--track-label);
-  text-transform: uppercase;
-  color: var(--ds-color-text-placeholder);
-}
-.pl-fact-value {
-  font-size: var(--text-lg);
-  font-weight: 500;
-  letter-spacing: var(--track-display);
-  line-height: 1.2;
-  color: var(--ds-color-text-primary);
-  font-variant-numeric: tabular-nums;
-}
-.pl-fact-value.is-up {
-  color: var(--up);
-}
-.pl-fact-value.is-warn {
-  color: var(--warn);
-}
-.pl-fact-foot {
-  font-size: var(--text-3xs);
-  color: var(--ds-color-text-placeholder);
-}
+
+
+
+
+
+
+
 
 /* ══ 清单 ══ */
 .pl-skel {

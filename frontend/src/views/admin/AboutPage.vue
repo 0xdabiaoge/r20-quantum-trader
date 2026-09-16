@@ -169,7 +169,7 @@ const bandFacts = computed(() => {
       <!-- ══ 版本状态带 ══ -->
       <section class="card ab-band">
         <template v-if="showSkeleton">
-          <div v-for="i in 4" :key="i" class="ab-fact">
+          <div v-for="i in 4" :key="i" class="fact">
             <div class="skeleton skeleton-text" style="width: 48%" />
             <div class="skeleton skeleton-text" style="width: 62%; height: 16px" />
             <div class="skeleton skeleton-text" style="width: 36%" />
@@ -177,10 +177,10 @@ const bandFacts = computed(() => {
         </template>
 
         <template v-else>
-          <div v-for="f in bandFacts" :key="f.label" class="ab-fact">
-            <span class="ab-fact-label"><component :is="f.icon" :size="12" />{{ f.label }}</span>
-            <span class="ab-fact-value" :class="f.tone">{{ f.value }}</span>
-            <span class="ab-fact-foot mono truncate" :title="f.foot">{{ f.foot }}</span>
+          <div v-for="f in bandFacts" :key="f.label" class="fact">
+            <span class="fact-label"><component :is="f.icon" :size="12" />{{ f.label }}</span>
+            <span class="fact-value" :class="f.tone">{{ f.value }}</span>
+            <span class="fact-foot mono truncate" :title="f.foot">{{ f.foot }}</span>
           </div>
         </template>
       </section>
@@ -419,62 +419,13 @@ const bandFacts = computed(() => {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
-.ab-fact {
-  display: flex;
-  flex-direction: column;
-  gap:4px;
-  min-width: 0;
-  padding: var(--ds-space-4);
-  border-top: 1px solid var(--ds-color-border-default);
-}
-.ab-fact:first-child {
-  border-top: 0;
-}
-@media (min-width: 640px) {
-  .ab-fact:nth-child(2) {
-    border-top: 0;
-  }
-  .ab-fact:nth-child(even) {
-    border-left: 1px solid var(--ds-color-border-default);
-  }
-}
-@media (min-width: 1280px) {
-  .ab-fact {
-    border-top: 0;
-  }
-  .ab-fact + .ab-fact {
-    border-left: 1px solid var(--ds-color-border-default);
-  }
-}
-.ab-fact-label {
-  display: flex;
-  align-items: center;
-  gap:6px;
-  font-size: var(--text-3xs);
-  font-weight: 500;
-  letter-spacing: var(--track-label);
-  text-transform: uppercase;
-  color: var(--ds-color-text-placeholder);
-}
-.ab-fact-value {
-  font-size: var(--text-md);
-  font-weight: 500;
-  letter-spacing: var(--track-display);
-  line-height: 1.25;
-  color: var(--ds-color-text-primary);
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-.ab-fact-value.is-up {
-  color: var(--up);
-}
-.ab-fact-value.is-warn {
-  color: var(--warn);
-}
-.ab-fact-foot {
-  font-size: var(--text-4xs);
-  color: var(--ds-color-text-placeholder);
-}
+
+
+
+
+
+
+
 
 /* ══ 双栏 ══ */
 .ab-grid {

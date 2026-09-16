@@ -298,7 +298,7 @@ onMounted(() => {
     <!-- 首屏骨架 -->
     <template v-if="loading">
       <section class="card pol-band">
-        <div v-for="i in 4" :key="i" class="pol-fact">
+        <div v-for="i in 4" :key="i" class="fact">
           <div class="skeleton skeleton-text" style="width: 46%" />
           <div class="skeleton skeleton-text" style="width: 72%; height: 16px" />
           <div class="skeleton skeleton-text" style="width: 34%" />
@@ -312,28 +312,28 @@ onMounted(() => {
     <template v-else-if="snapshotData?.snapshot">
       <!-- ══ 策略身份带 ══ -->
       <section class="card pol-band">
-        <div class="pol-fact">
-          <span class="pol-fact-label"><Layers :size="12" />{{ t('admin.policySnapshot.identity.activeVersion') }}</span>
-          <span class="pol-fact-value truncate" :title="v(snapshotData.snapshot.policy_version)">{{ v(snapshotData.snapshot.policy_version) }}</span>
-          <span class="pol-fact-foot mono">{{ snapshotData.policy_version || '--' }}</span>
+        <div class="fact">
+          <span class="fact-label"><Layers :size="12" />{{ t('admin.policySnapshot.identity.activeVersion') }}</span>
+          <span class="fact-value truncate" :title="v(snapshotData.snapshot.policy_version)">{{ v(snapshotData.snapshot.policy_version) }}</span>
+          <span class="fact-foot mono">{{ snapshotData.policy_version || '--' }}</span>
         </div>
 
-        <div class="pol-fact">
-          <span class="pol-fact-label"><Hash :size="12" />{{ t('admin.policySnapshot.identity.hash') }}</span>
-          <span class="pol-fact-value truncate" :title="'#' + v(snapshotData.snapshot.policy_hash)">#{{ v(snapshotData.snapshot.policy_hash) }}</span>
-          <span class="pol-fact-foot mono">{{ t('admin.policySnapshot.unitsTitle') }}</span>
+        <div class="fact">
+          <span class="fact-label"><Hash :size="12" />{{ t('admin.policySnapshot.identity.hash') }}</span>
+          <span class="fact-value truncate" :title="'#' + v(snapshotData.snapshot.policy_hash)">#{{ v(snapshotData.snapshot.policy_hash) }}</span>
+          <span class="fact-foot mono">{{ t('admin.policySnapshot.unitsTitle') }}</span>
         </div>
 
-        <div class="pol-fact">
-          <span class="pol-fact-label"><Package :size="12" />{{ t('admin.policySnapshot.bandPackageHash') }}</span>
-          <span class="pol-fact-value truncate" :title="'#' + v(snapshotData.package_hash)">#{{ v(snapshotData.package_hash) }}</span>
-          <span class="pol-fact-foot">{{ t('admin.policySnapshot.bandPackageHashFoot') }}</span>
+        <div class="fact">
+          <span class="fact-label"><Package :size="12" />{{ t('admin.policySnapshot.bandPackageHash') }}</span>
+          <span class="fact-value truncate" :title="'#' + v(snapshotData.package_hash)">#{{ v(snapshotData.package_hash) }}</span>
+          <span class="fact-foot">{{ t('admin.policySnapshot.bandPackageHashFoot') }}</span>
         </div>
 
-        <div class="pol-fact">
-          <span class="pol-fact-label"><Clock :size="12" />{{ t('admin.policySnapshot.identity.generatedAt') }}</span>
-          <span class="pol-fact-value num truncate" :title="formatTimestamp(snapshotData.snapshot.timestamp)">{{ formatTimestamp(snapshotData.snapshot.timestamp) }}</span>
-          <span class="pol-fact-foot mono">
+        <div class="fact">
+          <span class="fact-label"><Clock :size="12" />{{ t('admin.policySnapshot.identity.generatedAt') }}</span>
+          <span class="fact-value num truncate" :title="formatTimestamp(snapshotData.snapshot.timestamp)">{{ formatTimestamp(snapshotData.snapshot.timestamp) }}</span>
+          <span class="fact-foot mono">
             <Activity :size="12" /> {{ snapshotData.policy_version ? 'OK' : '--' }}
           </span>
         </div>
@@ -553,59 +553,11 @@ onMounted(() => {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
-.pol-fact {
-  display: flex;
-  flex-direction: column;
-  gap:4px;
-  min-width: 0;
-  padding: var(--ds-space-4);
-  border-top: 1px solid var(--ds-color-border-default);
-}
-.pol-fact:first-child {
-  border-top: 0;
-}
-@media (min-width: 640px) {
-  .pol-fact:nth-child(2) {
-    border-top: 0;
-  }
-  .pol-fact:nth-child(even) {
-    border-left: 1px solid var(--ds-color-border-default);
-  }
-}
-@media (min-width: 1280px) {
-  .pol-fact {
-    border-top: 0;
-  }
-  .pol-fact + .pol-fact {
-    border-left: 1px solid var(--ds-color-border-default);
-  }
-}
-.pol-fact-label {
-  display: flex;
-  align-items: center;
-  gap:6px;
-  font-size: var(--text-3xs);
-  font-weight: 500;
-  letter-spacing: var(--track-label);
-  text-transform: uppercase;
-  color: var(--ds-color-text-placeholder);
-}
-.pol-fact-value {
-  font-size: var(--text-md);
-  font-weight: 500;
-  letter-spacing: var(--track-display);
-  line-height: 1.25;
-  color: var(--ds-color-text-primary);
-  font-variant-numeric: tabular-nums;
-}
-.pol-fact-foot {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: var(--text-3xs);
-  color: var(--ds-color-text-placeholder);
-  min-width: 0;
-}
+
+
+
+
+
 
 /* ══ 四大策略单元矩阵 ══ */
 .pol-units {

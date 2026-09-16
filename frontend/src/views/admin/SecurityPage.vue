@@ -551,10 +551,10 @@ onMounted(() => { loadAll(); loadMx() })
     <template v-else-if="config">
       <!-- ══ 接入状态带 ══ -->
       <section class="card sc-band">
-        <div v-for="f in bandFacts" :key="f.label" class="sc-fact">
-          <span class="sc-fact-label"><component :is="f.icon" :size="12" />{{ f.label }}</span>
-          <span class="sc-fact-value" :class="f.tone">{{ f.value }}</span>
-          <span class="sc-fact-foot mono">{{ f.foot }}</span>
+        <div v-for="f in bandFacts" :key="f.label" class="fact">
+          <span class="fact-label"><component :is="f.icon" :size="12" />{{ f.label }}</span>
+          <span class="fact-value" :class="f.tone">{{ f.value }}</span>
+          <span class="fact-foot mono">{{ f.foot }}</span>
         </div>
       </section>
 
@@ -1093,65 +1093,14 @@ onMounted(() => { loadAll(); loadMx() })
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
-.sc-fact {
-  display: flex;
-  flex-direction: column;
-  gap:4px;
-  min-width: 0;
-  padding: var(--ds-space-4);
-  border-top: 1px solid var(--ds-color-border-default);
-}
-.sc-fact:first-child {
-  border-top: 0;
-}
-@media (min-width: 640px) {
-  .sc-fact:nth-child(2) {
-    border-top: 0;
-  }
-  .sc-fact:nth-child(even) {
-    border-left: 1px solid var(--ds-color-border-default);
-  }
-}
-@media (min-width: 1280px) {
-  .sc-fact {
-    border-top: 0;
-  }
-  .sc-fact + .sc-fact {
-    border-left: 1px solid var(--ds-color-border-default);
-  }
-}
-.sc-fact-label {
-  display: flex;
-  align-items: center;
-  gap:6px;
-  font-size: var(--text-3xs);
-  font-weight: 500;
-  letter-spacing: var(--track-label);
-  text-transform: uppercase;
-  color: var(--ds-color-text-placeholder);
-}
-.sc-fact-value {
-  font-size: var(--text-md);
-  font-weight: 500;
-  letter-spacing: var(--track-display);
-  line-height: 1.25;
-  color: var(--ds-color-text-primary);
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-.sc-fact-value.is-up {
-  color: var(--up);
-}
-.sc-fact-value.is-down {
-  color: var(--down);
-}
-.sc-fact-value.is-warn {
-  color: var(--warn);
-}
-.sc-fact-foot {
-  font-size: var(--text-4xs);
-  color: var(--ds-color-text-placeholder);
-}
+
+
+
+
+
+
+
+
 
 .sc-tabs {
   align-self: flex-start;

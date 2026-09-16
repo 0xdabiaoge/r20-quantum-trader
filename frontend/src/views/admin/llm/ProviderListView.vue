@@ -145,10 +145,10 @@ const bandFacts = () => [
 
     <!-- ══ 状态带 ══ -->
     <section class="card pv-band">
-      <div v-for="f in bandFacts()" :key="f.label" class="pv-fact">
-        <span class="pv-fact-label"><component :is="f.icon" :size="12" />{{ f.label }}</span>
-        <span class="pv-fact-value" :class="f.tone">{{ f.value }}</span>
-        <span class="pv-fact-foot truncate" :title="f.foot">{{ f.foot }}</span>
+      <div v-for="f in bandFacts()" :key="f.label" class="fact">
+        <span class="fact-label"><component :is="f.icon" :size="12" />{{ f.label }}</span>
+        <span class="fact-value" :class="f.tone">{{ f.value }}</span>
+        <span class="fact-foot truncate" :title="f.foot">{{ f.foot }}</span>
       </div>
     </section>
 
@@ -456,62 +456,13 @@ const bandFacts = () => [
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
-.pv-fact {
-  display: flex;
-  flex-direction: column;
-  gap:4px;
-  min-width: 0;
-  padding: var(--ds-space-4);
-  border-top: 1px solid var(--ds-color-border-default);
-}
-.pv-fact:first-child {
-  border-top: 0;
-}
-@media (min-width: 640px) {
-  .pv-fact:nth-child(2) {
-    border-top: 0;
-  }
-  .pv-fact:nth-child(even) {
-    border-left: 1px solid var(--ds-color-border-default);
-  }
-}
-@media (min-width: 1280px) {
-  .pv-fact {
-    border-top: 0;
-  }
-  .pv-fact + .pv-fact {
-    border-left: 1px solid var(--ds-color-border-default);
-  }
-}
-.pv-fact-label {
-  display: flex;
-  align-items: center;
-  gap:6px;
-  font-size: var(--text-3xs);
-  font-weight: 500;
-  letter-spacing: var(--track-label);
-  text-transform: uppercase;
-  color: var(--ds-color-text-placeholder);
-}
-.pv-fact-value {
-  font-size: var(--text-md);
-  font-weight: 500;
-  letter-spacing: var(--track-display);
-  line-height: 1.25;
-  color: var(--ds-color-text-primary);
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-.pv-fact-value.is-accent {
-  color: var(--ds-color-brand);
-}
-.pv-fact-value.is-off {
-  color: var(--ds-color-text-placeholder);
-}
-.pv-fact-foot {
-  font-size: var(--text-4xs);
-  color: var(--ds-color-text-placeholder);
-}
+
+
+
+
+
+
+
 
 /* ══ 通用块 ══ */
 .pv-body {

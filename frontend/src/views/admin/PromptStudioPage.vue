@@ -508,7 +508,7 @@ onMounted(loadLib)
       <!-- ══ 方案总览带 ══ -->
       <section class="card ps-band">
         <template v-if="loading">
-          <div v-for="i in 4" :key="i" class="ps-fact">
+          <div v-for="i in 4" :key="i" class="fact">
             <div class="skeleton skeleton-text" style="width: 46%" />
             <div class="skeleton skeleton-text" style="width: 70%; height: 16px" />
             <div class="skeleton skeleton-text" style="width: 34%" />
@@ -516,37 +516,37 @@ onMounted(loadLib)
         </template>
 
         <template v-else>
-          <div class="ps-fact">
-            <span class="ps-fact-label">{{ t('admin.promptStudio.bandProfile') }}</span>
-            <span class="ps-fact-value truncate" :title="selectedProfile?.name">{{ selectedProfile?.name || '--' }}</span>
-            <span class="ps-fact-foot">
+          <div class="fact">
+            <span class="fact-label">{{ t('admin.promptStudio.bandProfile') }}</span>
+            <span class="fact-value truncate" :title="selectedProfile?.name">{{ selectedProfile?.name || '--' }}</span>
+            <span class="fact-foot">
               <span v-if="isActiveProfile" class="badge badge-up">{{ t('admin.promptStudio.profiles.active') }}</span>
               <span v-else class="badge">{{ t('admin.promptStudio.bandInactiveFoot') }}</span>
             </span>
           </div>
 
-          <div class="ps-fact">
-            <span class="ps-fact-label">{{ t('admin.promptStudio.bandPipeline') }}</span>
-            <span class="ps-fact-value truncate">{{ activePipelineLabel }}</span>
-            <span class="ps-fact-foot">
+          <div class="fact">
+            <span class="fact-label">{{ t('admin.promptStudio.bandPipeline') }}</span>
+            <span class="fact-value truncate">{{ activePipelineLabel }}</span>
+            <span class="fact-foot">
               {{ pipelines.find((p) => p.id === activePipeline)?.desc }}
             </span>
           </div>
 
-          <div class="ps-fact">
-            <span class="ps-fact-label">{{ t('admin.promptStudio.bandModules') }}</span>
-            <span class="ps-fact-value num">{{ workingModules.length }}</span>
-            <span class="ps-fact-foot mono">
+          <div class="fact">
+            <span class="fact-label">{{ t('admin.promptStudio.bandModules') }}</span>
+            <span class="fact-value num">{{ workingModules.length }}</span>
+            <span class="fact-foot mono">
               {{ t('admin.promptStudio.bandModulesFoot', undefined, { on: enabledCount, total: workingModules.length }) }}
             </span>
           </div>
 
-          <div class="ps-fact">
-            <span class="ps-fact-label">{{ t('admin.promptStudio.bandState') }}</span>
-            <span class="ps-fact-value" :class="dirty ? 'is-warn' : 'is-up'">
+          <div class="fact">
+            <span class="fact-label">{{ t('admin.promptStudio.bandState') }}</span>
+            <span class="fact-value" :class="dirty ? 'is-warn' : 'is-up'">
               {{ dirty ? t('admin.promptStudio.bandDirty') : t('admin.promptStudio.bandSynced') }}
             </span>
-            <span class="ps-fact-foot">
+            <span class="fact-foot">
               {{ dirty ? t('admin.promptStudio.bandDirtyFoot') : t('admin.promptStudio.bandActiveFoot') }}
             </span>
           </div>
@@ -988,60 +988,13 @@ onMounted(loadLib)
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
-.ps-fact {
-  display: flex;
-  flex-direction: column;
-  gap:4px;
-  min-width: 0;
-  padding: var(--ds-space-4);
-  border-top: 1px solid var(--ds-color-border-default);
-}
-.ps-fact:first-child {
-  border-top: 0;
-}
-@media (min-width: 640px) {
-  .ps-fact:nth-child(2) {
-    border-top: 0;
-  }
-  .ps-fact:nth-child(even) {
-    border-left: 1px solid var(--ds-color-border-default);
-  }
-}
-@media (min-width: 1280px) {
-  .ps-fact {
-    border-top: 0;
-  }
-  .ps-fact + .ps-fact {
-    border-left: 1px solid var(--ds-color-border-default);
-  }
-}
-.ps-fact-label {
-  font-size: var(--text-3xs);
-  font-weight: 500;
-  letter-spacing: var(--track-label);
-  text-transform: uppercase;
-  color: var(--ds-color-text-placeholder);
-}
-.ps-fact-value {
-  font-size: var(--text-lg);
-  font-weight: 500;
-  letter-spacing: var(--track-display);
-  line-height: 1.2;
-  color: var(--ds-color-text-primary);
-}
-.ps-fact-value.is-warn {
-  color: var(--warn);
-}
-.ps-fact-value.is-up {
-  color: var(--up);
-}
-.ps-fact-foot {
-  display: flex;
-  align-items: center;
-  font-size: var(--text-3xs);
-  color: var(--ds-color-text-placeholder);
-  min-width: 0;
-}
+
+
+
+
+
+
+
 
 /* 说明条 */
 .ps-note {

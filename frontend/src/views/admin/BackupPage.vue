@@ -382,17 +382,17 @@ onMounted(load)
       <!-- ══ 灾备状态带 ══ -->
       <section class="card bk-band">
         <template v-if="loading && !simple">
-          <div v-for="i in 4" :key="i" class="bk-fact">
+          <div v-for="i in 4" :key="i" class="fact">
             <div class="skeleton skeleton-text" style="width: 48%" />
             <div class="skeleton skeleton-text" style="width: 62%; height: 16px" />
             <div class="skeleton skeleton-text" style="width: 36%" />
           </div>
         </template>
         <template v-else>
-          <div v-for="f in bandFacts" :key="f.label" class="bk-fact">
-            <span class="bk-fact-label"><component :is="f.icon" :size="12" />{{ f.label }}</span>
-            <span class="bk-fact-value" :class="f.tone">{{ f.value }}</span>
-            <span class="bk-fact-foot truncate" :title="f.foot">{{ f.foot }}</span>
+          <div v-for="f in bandFacts" :key="f.label" class="fact">
+            <span class="fact-label"><component :is="f.icon" :size="12" />{{ f.label }}</span>
+            <span class="fact-value" :class="f.tone">{{ f.value }}</span>
+            <span class="fact-foot truncate" :title="f.foot">{{ f.foot }}</span>
           </div>
         </template>
       </section>
@@ -625,68 +625,15 @@ onMounted(load)
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
-.bk-fact {
-  display: flex;
-  flex-direction: column;
-  gap:4px;
-  min-width: 0;
-  padding: var(--ds-space-4);
-  border-top: 1px solid var(--ds-color-border-default);
-}
-.bk-fact:first-child {
-  border-top: 0;
-}
-@media (min-width: 640px) {
-  .bk-fact:nth-child(2) {
-    border-top: 0;
-  }
-  .bk-fact:nth-child(even) {
-    border-left: 1px solid var(--ds-color-border-default);
-  }
-}
-@media (min-width: 1280px) {
-  .bk-fact {
-    border-top: 0;
-  }
-  .bk-fact + .bk-fact {
-    border-left: 1px solid var(--ds-color-border-default);
-  }
-}
-.bk-fact-label {
-  display: flex;
-  align-items: center;
-  gap:6px;
-  font-size: var(--text-3xs);
-  font-weight: 500;
-  letter-spacing: var(--track-label);
-  text-transform: uppercase;
-  color: var(--ds-color-text-placeholder);
-}
-.bk-fact-value {
-  font-size: var(--text-md);
-  font-weight: 500;
-  letter-spacing: var(--track-display);
-  line-height: 1.25;
-  color: var(--ds-color-text-primary);
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-.bk-fact-value.is-up {
-  color: var(--up);
-}
-.bk-fact-value.is-down {
-  color: var(--down);
-}
-.bk-fact-value.is-warn {
-  color: var(--warn);
-}
-.bk-fact-value.is-off {
-  color: var(--ds-color-text-placeholder);
-}
-.bk-fact-foot {
-  font-size: var(--text-4xs);
-  color: var(--ds-color-text-placeholder);
-}
+
+
+
+
+
+
+
+
+
 
 /* ══ 配置 ══ */
 .bk-switch {

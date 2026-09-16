@@ -386,7 +386,7 @@ onBeforeUnmount(() => {
       <!-- ══ 通道状态带 ══ -->
       <section class="card nf-band">
         <template v-if="loading && !config">
-          <div v-for="i in 4" :key="i" class="nf-fact">
+          <div v-for="i in 4" :key="i" class="fact">
             <div class="skeleton skeleton-text" style="width: 48%" />
             <div class="skeleton skeleton-text" style="width: 62%; height: 16px" />
             <div class="skeleton skeleton-text" style="width: 36%" />
@@ -394,34 +394,34 @@ onBeforeUnmount(() => {
         </template>
 
         <template v-else-if="config">
-          <div class="nf-fact">
-            <span class="nf-fact-label"><Radio :size="12" />{{ t('admin.notify.bandEnabled') }}</span>
-            <span class="nf-fact-value num" :class="enabledChannelsCount ? 'is-up' : ''">
+          <div class="fact">
+            <span class="fact-label"><Radio :size="12" />{{ t('admin.notify.bandEnabled') }}</span>
+            <span class="fact-value num" :class="enabledChannelsCount ? 'is-up' : ''">
               {{ enabledChannelsCount }} / 4
             </span>
-            <span class="nf-fact-foot">{{ t('admin.notify.channelsTitle') }}</span>
+            <span class="fact-foot">{{ t('admin.notify.channelsTitle') }}</span>
           </div>
 
-          <div class="nf-fact">
-            <span class="nf-fact-label"><Zap :size="12" />{{ t('admin.notify.bandQQ') }}</span>
-            <span class="nf-fact-value" :class="channelOn('qq') ? 'is-up' : 'is-off'">
+          <div class="fact">
+            <span class="fact-label"><Zap :size="12" />{{ t('admin.notify.bandQQ') }}</span>
+            <span class="fact-value" :class="channelOn('qq') ? 'is-up' : 'is-off'">
               {{ channelOn('qq') ? t('admin.notify.enabled') : t('admin.notify.disabled') }}
             </span>
-            <span class="nf-fact-foot mono truncate" :title="config.qq?.openid || t('admin.notify.notSet')">{{ config.qq?.openid || t('admin.notify.notSet') }}</span>
+            <span class="fact-foot mono truncate" :title="config.qq?.openid || t('admin.notify.notSet')">{{ config.qq?.openid || t('admin.notify.notSet') }}</span>
           </div>
 
-          <div class="nf-fact">
-            <span class="nf-fact-label"><Send :size="12" />{{ t('admin.notify.bandTelegram') }}</span>
-            <span class="nf-fact-value" :class="channelOn('telegram') ? 'is-up' : 'is-off'">
+          <div class="fact">
+            <span class="fact-label"><Send :size="12" />{{ t('admin.notify.bandTelegram') }}</span>
+            <span class="fact-value" :class="channelOn('telegram') ? 'is-up' : 'is-off'">
               {{ channelOn('telegram') ? t('admin.notify.enabled') : t('admin.notify.disabled') }}
             </span>
-            <span class="nf-fact-foot mono truncate">{{ config.telegram?.chat_id || t('admin.notify.notSet') }}</span>
+            <span class="fact-foot mono truncate">{{ config.telegram?.chat_id || t('admin.notify.notSet') }}</span>
           </div>
 
-          <div class="nf-fact">
-            <span class="nf-fact-label"><CalendarClock :size="12" />{{ t('admin.notify.bandBriefing') }}</span>
-            <span class="nf-fact-value num truncate" :title="config._briefingTimes || t('admin.notify.notSet')">{{ config._briefingTimes || t('admin.notify.notSet') }}</span>
-            <span class="nf-fact-foot">{{ t('admin.notify.scheduleTitle') }}</span>
+          <div class="fact">
+            <span class="fact-label"><CalendarClock :size="12" />{{ t('admin.notify.bandBriefing') }}</span>
+            <span class="fact-value num truncate" :title="config._briefingTimes || t('admin.notify.notSet')">{{ config._briefingTimes || t('admin.notify.notSet') }}</span>
+            <span class="fact-foot">{{ t('admin.notify.scheduleTitle') }}</span>
           </div>
         </template>
       </section>
@@ -682,61 +682,13 @@ onBeforeUnmount(() => {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
-.nf-fact {
-  display: flex;
-  flex-direction: column;
-  gap:4px;
-  min-width: 0;
-  padding: var(--ds-space-4);
-  border-top: 1px solid var(--ds-color-border-default);
-}
-.nf-fact:first-child {
-  border-top: 0;
-}
-@media (min-width: 640px) {
-  .nf-fact:nth-child(2) {
-    border-top: 0;
-  }
-  .nf-fact:nth-child(even) {
-    border-left: 1px solid var(--ds-color-border-default);
-  }
-}
-@media (min-width: 1280px) {
-  .nf-fact {
-    border-top: 0;
-  }
-  .nf-fact + .nf-fact {
-    border-left: 1px solid var(--ds-color-border-default);
-  }
-}
-.nf-fact-label {
-  display: flex;
-  align-items: center;
-  gap:6px;
-  font-size: var(--text-3xs);
-  font-weight: 500;
-  letter-spacing: var(--track-label);
-  text-transform: uppercase;
-  color: var(--ds-color-text-placeholder);
-}
-.nf-fact-value {
-  font-size: var(--text-md);
-  font-weight: 500;
-  letter-spacing: var(--track-display);
-  line-height: 1.25;
-  color: var(--ds-color-text-primary);
-  min-width: 0;
-}
-.nf-fact-value.is-up {
-  color: var(--up);
-}
-.nf-fact-value.is-off {
-  color: var(--ds-color-text-placeholder);
-}
-.nf-fact-foot {
-  font-size: var(--text-4xs);
-  color: var(--ds-color-text-placeholder);
-}
+
+
+
+
+
+
+
 
 /* ══ 通道 ══ */
 .nf-block {

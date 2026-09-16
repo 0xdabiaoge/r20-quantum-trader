@@ -207,10 +207,10 @@ onMounted(load)
 
     <!-- ══ 账号状态带（仅超管有意义） ══ -->
     <section v-if="auth.isSuperadmin" class="card as-band">
-      <div v-for="f in bandFacts" :key="f.label" class="as-fact">
-        <span class="as-fact-label"><component :is="f.icon" :size="12" />{{ f.label }}</span>
-        <span class="as-fact-value" :class="f.tone">{{ f.value }}</span>
-        <span class="as-fact-foot truncate">{{ f.foot }}</span>
+      <div v-for="f in bandFacts" :key="f.label" class="fact">
+        <span class="fact-label"><component :is="f.icon" :size="12" />{{ f.label }}</span>
+        <span class="fact-value" :class="f.tone">{{ f.value }}</span>
+        <span class="fact-foot truncate">{{ f.foot }}</span>
       </div>
     </section>
 
@@ -409,64 +409,14 @@ onMounted(load)
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
-.as-fact {
-  display: flex;
-  flex-direction: column;
-  gap:4px;
-  min-width: 0;
-  padding: var(--ds-space-4);
-  border-top: 1px solid var(--ds-color-border-default);
-}
-.as-fact:first-child {
-  border-top: 0;
-}
-@media (min-width: 640px) {
-  .as-fact:nth-child(2) {
-    border-top: 0;
-  }
-  .as-fact:nth-child(even) {
-    border-left: 1px solid var(--ds-color-border-default);
-  }
-}
-@media (min-width: 1280px) {
-  .as-fact {
-    border-top: 0;
-  }
-  .as-fact + .as-fact {
-    border-left: 1px solid var(--ds-color-border-default);
-  }
-}
-.as-fact-label {
-  display: flex;
-  align-items: center;
-  gap:6px;
-  font-size: var(--text-3xs);
-  font-weight: 500;
-  letter-spacing: var(--track-label);
-  text-transform: uppercase;
-  color: var(--ds-color-text-placeholder);
-}
-.as-fact-value {
-  font-size: var(--text-lg);
-  font-weight: 500;
-  letter-spacing: var(--track-display);
-  line-height: 1.2;
-  color: var(--ds-color-text-primary);
-  font-variant-numeric: tabular-nums;
-}
-.as-fact-value.is-up {
-  color: var(--up);
-}
-.as-fact-value.is-warn {
-  color: var(--warn);
-}
-.as-fact-value.is-off {
-  color: var(--ds-color-text-placeholder);
-}
-.as-fact-foot {
-  font-size: var(--text-4xs);
-  color: var(--ds-color-text-placeholder);
-}
+
+
+
+
+
+
+
+
 
 /* ══ 改密 ══ */
 .as-pwd {

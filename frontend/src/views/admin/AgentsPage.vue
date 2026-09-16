@@ -110,7 +110,7 @@ function ageText(a: any): string {
       <!-- ══ 名册状态带 ══ -->
       <section class="card ag-band">
         <template v-if="showSkeleton">
-          <div v-for="i in 4" :key="i" class="ag-fact">
+          <div v-for="i in 4" :key="i" class="fact">
             <div class="skeleton skeleton-text" style="width: 48%" />
             <div class="skeleton skeleton-text" style="width: 64%; height: 16px" />
             <div class="skeleton skeleton-text" style="width: 36%" />
@@ -118,30 +118,30 @@ function ageText(a: any): string {
         </template>
 
         <template v-else>
-          <div class="ag-fact">
-            <span class="ag-fact-label"><Radio :size="12" />{{ t('admin.agents.bandUnits') }}</span>
-            <span class="ag-fact-value num">{{ agents.length }}</span>
-            <span class="ag-fact-foot">{{ t('admin.agents.roster') }}</span>
+          <div class="fact">
+            <span class="fact-label"><Radio :size="12" />{{ t('admin.agents.bandUnits') }}</span>
+            <span class="fact-value num">{{ agents.length }}</span>
+            <span class="fact-foot">{{ t('admin.agents.roster') }}</span>
           </div>
 
-          <div class="ag-fact">
-            <span class="ag-fact-label"><ShieldCheck :size="12" />{{ t('admin.agents.bandHealthy') }}</span>
-            <span class="ag-fact-value num" :class="healthyCount === agents.length && agents.length ? 'is-up' : ''">
+          <div class="fact">
+            <span class="fact-label"><ShieldCheck :size="12" />{{ t('admin.agents.bandHealthy') }}</span>
+            <span class="fact-value num" :class="healthyCount === agents.length && agents.length ? 'is-up' : ''">
               {{ healthyCount }}
             </span>
-            <span class="ag-fact-foot">{{ t('admin.agents.colHealth') }}</span>
+            <span class="fact-foot">{{ t('admin.agents.colHealth') }}</span>
           </div>
 
-          <div class="ag-fact">
-            <span class="ag-fact-label"><AlertTriangle :size="12" />{{ t('admin.agents.bandIssues') }}</span>
-            <span class="ag-fact-value num" :class="issueCount ? 'is-warn' : 'is-up'">{{ issueCount }}</span>
-            <span class="ag-fact-foot">{{ t('admin.agents.colResult') }}</span>
+          <div class="fact">
+            <span class="fact-label"><AlertTriangle :size="12" />{{ t('admin.agents.bandIssues') }}</span>
+            <span class="fact-value num" :class="issueCount ? 'is-warn' : 'is-up'">{{ issueCount }}</span>
+            <span class="fact-foot">{{ t('admin.agents.colResult') }}</span>
           </div>
 
-          <div class="ag-fact">
-            <span class="ag-fact-label"><Activity :size="12" />{{ t('admin.agents.bandLatency') }}</span>
-            <span class="ag-fact-value num">{{ avgLatency }}</span>
-            <span class="ag-fact-foot mono">
+          <div class="fact">
+            <span class="fact-label"><Activity :size="12" />{{ t('admin.agents.bandLatency') }}</span>
+            <span class="fact-value num">{{ avgLatency }}</span>
+            <span class="fact-foot mono">
               {{ t('admin.agents.successRate') }} {{ successRate }}
             </span>
           </div>
@@ -318,61 +318,13 @@ function ageText(a: any): string {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
-.ag-fact {
-  display: flex;
-  flex-direction: column;
-  gap:4px;
-  min-width: 0;
-  padding: var(--ds-space-4);
-  border-top: 1px solid var(--ds-color-border-default);
-}
-.ag-fact:first-child {
-  border-top: 0;
-}
-@media (min-width: 640px) {
-  .ag-fact:nth-child(2) {
-    border-top: 0;
-  }
-  .ag-fact:nth-child(even) {
-    border-left: 1px solid var(--ds-color-border-default);
-  }
-}
-@media (min-width: 1280px) {
-  .ag-fact {
-    border-top: 0;
-  }
-  .ag-fact + .ag-fact {
-    border-left: 1px solid var(--ds-color-border-default);
-  }
-}
-.ag-fact-label {
-  display: flex;
-  align-items: center;
-  gap:6px;
-  font-size: var(--text-3xs);
-  font-weight: 500;
-  letter-spacing: var(--track-label);
-  text-transform: uppercase;
-  color: var(--ds-color-text-placeholder);
-}
-.ag-fact-value {
-  font-size: var(--text-lg);
-  font-weight: 500;
-  letter-spacing: var(--track-display);
-  line-height: 1.2;
-  color: var(--ds-color-text-primary);
-  font-variant-numeric: tabular-nums;
-}
-.ag-fact-value.is-up {
-  color: var(--up);
-}
-.ag-fact-value.is-warn {
-  color: var(--warn);
-}
-.ag-fact-foot {
-  font-size: var(--text-3xs);
-  color: var(--ds-color-text-placeholder);
-}
+
+
+
+
+
+
+
 
 /* ══ 名册 ══ */
 .ag-skel {

@@ -425,7 +425,7 @@ onMounted(loadData);
         <!-- 运行状态带 -->
         <section class="card evo-band">
           <template v-if="loading">
-            <div v-for="i in 4" :key="i" class="evo-fact">
+            <div v-for="i in 4" :key="i" class="fact">
               <div class="skeleton skeleton-text" style="width: 48%" />
               <div class="skeleton skeleton-text" style="width: 66%; height: 16px" />
               <div class="skeleton skeleton-text" style="width: 34%" />
@@ -433,39 +433,39 @@ onMounted(loadData);
           </template>
 
           <template v-else>
-            <div class="evo-fact">
-              <span class="evo-fact-label"><ShieldCheck :size="12" />{{ t('admin.evolution.guardrailStatus') }}</span>
+            <div class="fact">
+              <span class="fact-label"><ShieldCheck :size="12" />{{ t('admin.evolution.guardrailStatus') }}</span>
               <span
-                class="evo-fact-value"
+                class="fact-value"
                 :class="memoryStructured === false ? 'is-warn' : memoryStructured === true ? 'is-up' : ''"
               >
                 {{ memoryStructured === true ? t('admin.evolution.guardrailActive')
                   : memoryStructured === false ? t('admin.evolution.guardrailLegacy')
                   : t('admin.evolution.unknown') }}
               </span>
-              <span class="evo-fact-foot">
+              <span class="fact-foot">
                 {{ memoryStructured === true ? t('admin.evolution.guardrailSub') : t('admin.evolution.guardrailSubLegacy') }}
               </span>
             </div>
 
-            <div class="evo-fact">
-              <span class="evo-fact-label"><Clock :size="12" />{{ t('admin.evolution.cadence') }}</span>
-              <span class="evo-fact-value">{{ t('admin.evolution.cadenceValue') }}</span>
-              <span class="evo-fact-foot mono">02:00, 08:00, 14:00, 20:00 (UTC+8)</span>
+            <div class="fact">
+              <span class="fact-label"><Clock :size="12" />{{ t('admin.evolution.cadence') }}</span>
+              <span class="fact-value">{{ t('admin.evolution.cadenceValue') }}</span>
+              <span class="fact-foot mono">02:00, 08:00, 14:00, 20:00 (UTC+8)</span>
             </div>
 
-            <div class="evo-fact">
-              <span class="evo-fact-label"><Sliders :size="12" />{{ t('admin.evolution.currentLessons') }}</span>
-              <span class="evo-fact-value num">
-                {{ enabledLessonCount }}<span class="evo-fact-sub"> / {{ structuredLessons.length }}</span>
+            <div class="fact">
+              <span class="fact-label"><Sliders :size="12" />{{ t('admin.evolution.currentLessons') }}</span>
+              <span class="fact-value num">
+                {{ enabledLessonCount }}<span class="fact-sub"> / {{ structuredLessons.length }}</span>
               </span>
-              <span class="evo-fact-foot">{{ t('admin.evolution.lessonsSub') }}</span>
+              <span class="fact-foot">{{ t('admin.evolution.lessonsSub') }}</span>
             </div>
 
-            <div class="evo-fact">
-              <span class="evo-fact-label"><Sparkles :size="12" />{{ t('admin.evolution.halfLife') }}</span>
-              <span class="evo-fact-value">{{ t('admin.evolution.halfLifeValue') }}</span>
-              <span class="evo-fact-foot">{{ t('admin.evolution.halfLifeSub') }}</span>
+            <div class="fact">
+              <span class="fact-label"><Sparkles :size="12" />{{ t('admin.evolution.halfLife') }}</span>
+              <span class="fact-value">{{ t('admin.evolution.halfLifeValue') }}</span>
+              <span class="fact-foot">{{ t('admin.evolution.halfLifeSub') }}</span>
             </div>
           </template>
         </section>
@@ -802,66 +802,14 @@ onMounted(loadData);
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
-.evo-fact {
-  display: flex;
-  flex-direction: column;
-  gap:4px;
-  min-width: 0;
-  padding: var(--ds-space-4);
-  border-top: 1px solid var(--ds-color-border-default);
-}
-.evo-fact:first-child {
-  border-top: 0;
-}
-@media (min-width: 640px) {
-  .evo-fact:nth-child(2) {
-    border-top: 0;
-  }
-  .evo-fact:nth-child(even) {
-    border-left: 1px solid var(--ds-color-border-default);
-  }
-}
-@media (min-width: 1280px) {
-  .evo-fact {
-    border-top: 0;
-  }
-  .evo-fact + .evo-fact {
-    border-left: 1px solid var(--ds-color-border-default);
-  }
-}
-.evo-fact-label {
-  display: flex;
-  align-items: center;
-  gap:6px;
-  font-size: var(--text-3xs);
-  font-weight: 500;
-  letter-spacing: var(--track-label);
-  text-transform: uppercase;
-  color: var(--ds-color-text-placeholder);
-}
-.evo-fact-value {
-  font-size: var(--text-md);
-  font-weight: 500;
-  letter-spacing: var(--track-display);
-  line-height: 1.25;
-  color: var(--ds-color-text-primary);
-  font-variant-numeric: tabular-nums;
-}
-.evo-fact-value.is-up {
-  color: var(--up);
-}
-.evo-fact-value.is-warn {
-  color: var(--warn);
-}
-.evo-fact-sub {
-  font-size: var(--text-xs);
-  color: var(--ds-color-text-placeholder);
-}
-.evo-fact-foot {
-  font-size: var(--text-3xs);
-  line-height: var(--leading-body);
-  color: var(--ds-color-text-placeholder);
-}
+
+
+
+
+
+
+
+
 
 /* ══ 心法库 ══ */
 .evo-add {

@@ -446,7 +446,7 @@ onMounted(loadData);
       <!-- ══ 议事状态带 ══ -->
       <section class="card cn-band">
         <template v-if="loading">
-          <div v-for="i in 4" :key="i" class="cn-fact">
+          <div v-for="i in 4" :key="i" class="fact">
             <div class="skeleton skeleton-text" style="width: 48%" />
             <div class="skeleton skeleton-text" style="width: 68%; height: 16px" />
             <div class="skeleton skeleton-text" style="width: 36%" />
@@ -455,12 +455,12 @@ onMounted(loadData);
 
         <template v-else>
           <!-- 总开关 -->
-          <div class="cn-fact">
-            <span class="cn-fact-label"><Scale :size="12" />{{ t('admin.council.bandStatus') }}</span>
-            <span class="cn-fact-value" :class="councilConfig.enabled ? 'is-up' : ''">
+          <div class="fact">
+            <span class="fact-label"><Scale :size="12" />{{ t('admin.council.bandStatus') }}</span>
+            <span class="fact-value" :class="councilConfig.enabled ? 'is-up' : ''">
               {{ councilConfig.enabled ? t('admin.council.chipInSession') : t('admin.council.chipDirect') }}
             </span>
-            <span class="cn-fact-foot">
+            <span class="fact-foot">
               <BaseSwitch
                 v-model="councilConfig.enabled"
                 :disabled="!auth.isSuperadmin"
@@ -470,24 +470,24 @@ onMounted(loadData);
             </span>
           </div>
 
-          <div class="cn-fact">
-            <span class="cn-fact-label"><Users :size="12" />{{ t('admin.council.consensusLabel') }}</span>
-            <span class="cn-fact-value truncate">{{ consensusName }}</span>
-            <span class="cn-fact-foot mono">
+          <div class="fact">
+            <span class="fact-label"><Users :size="12" />{{ t('admin.council.consensusLabel') }}</span>
+            <span class="fact-value truncate">{{ consensusName }}</span>
+            <span class="fact-foot mono">
               {{ consensusTag }}
             </span>
           </div>
 
-          <div class="cn-fact">
-            <span class="cn-fact-label"><Clock :size="12" />{{ t('admin.council.fieldTimeout') }}</span>
-            <span class="cn-fact-value num">{{ councilConfig.timeout_seconds }}<span class="cn-fact-sub">s</span></span>
-            <span class="cn-fact-foot">{{ t('admin.council.timeoutFoot') }}</span>
+          <div class="fact">
+            <span class="fact-label"><Clock :size="12" />{{ t('admin.council.fieldTimeout') }}</span>
+            <span class="fact-value num">{{ councilConfig.timeout_seconds }}<span class="fact-sub">s</span></span>
+            <span class="fact-foot">{{ t('admin.council.timeoutFoot') }}</span>
           </div>
 
-          <div class="cn-fact">
-            <span class="cn-fact-label"><Shield :size="12" />{{ t('admin.council.bandSeats') }}</span>
-            <span class="cn-fact-value num">{{ seatEntries.length }}</span>
-            <span class="cn-fact-foot">{{ t('admin.council.bandSeatsFoot', undefined, { n: traderCount }) }}</span>
+          <div class="fact">
+            <span class="fact-label"><Shield :size="12" />{{ t('admin.council.bandSeats') }}</span>
+            <span class="fact-value num">{{ seatEntries.length }}</span>
+            <span class="fact-foot">{{ t('admin.council.bandSeatsFoot', undefined, { n: traderCount }) }}</span>
           </div>
         </template>
       </section>
@@ -622,9 +622,7 @@ onMounted(loadData);
               <div class="cn-editor-head-right">
                 <span
                   class="badge"
-                  :class="isCioSeat(selectedRole, expandedRole)
-                    ? 'badge-accent'
-                    : (selectedRole.enabled !== false ? 'badge-up' : '')"
+                  :class="isCioSeat(selectedRole, expandedRole) ? 'badge-accent' : (selectedRole.enabled !== false ? 'badge-up' : '')"
                 >
                   {{ isCioSeat(selectedRole, expandedRole)
                     ? t('admin.council.arbitratorBadge')
@@ -1014,65 +1012,13 @@ onMounted(loadData);
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
-.cn-fact {
-  display: flex;
-  flex-direction: column;
-  gap:4px;
-  min-width: 0;
-  padding: var(--ds-space-4);
-  border-top: 1px solid var(--ds-color-border-default);
-}
-.cn-fact:first-child {
-  border-top: 0;
-}
-@media (min-width: 640px) {
-  .cn-fact:nth-child(2) {
-    border-top: 0;
-  }
-  .cn-fact:nth-child(even) {
-    border-left: 1px solid var(--ds-color-border-default);
-  }
-}
-@media (min-width: 1280px) {
-  .cn-fact {
-    border-top: 0;
-  }
-  .cn-fact + .cn-fact {
-    border-left: 1px solid var(--ds-color-border-default);
-  }
-}
-.cn-fact-label {
-  display: flex;
-  align-items: center;
-  gap:6px;
-  font-size: var(--text-3xs);
-  font-weight: 500;
-  letter-spacing: var(--track-label);
-  text-transform: uppercase;
-  color: var(--ds-color-text-placeholder);
-}
-.cn-fact-value {
-  font-size: var(--text-lg);
-  font-weight: 500;
-  letter-spacing: var(--track-display);
-  line-height: 1.2;
-  color: var(--ds-color-text-primary);
-}
-.cn-fact-value.is-up {
-  color: var(--up);
-}
-.cn-fact-sub {
-  font-size: var(--text-xs);
-  color: var(--ds-color-text-placeholder);
-}
-.cn-fact-foot {
-  display: flex;
-  align-items: center;
-  gap: var(--ds-space-2);
-  font-size: var(--text-3xs);
-  color: var(--ds-color-text-placeholder);
-  min-width: 0;
-}
+
+
+
+
+
+
+
 
 /* ══ 议事规则 ══ */
 .cn-head-actions {

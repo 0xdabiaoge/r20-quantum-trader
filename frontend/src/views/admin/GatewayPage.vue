@@ -149,7 +149,7 @@ function statusLabel(s: string): string {
       <!-- ══ 运行状态带 ══ -->
       <section class="card gw-band">
         <template v-if="showSkeleton">
-          <div v-for="i in 4" :key="i" class="gw-fact">
+          <div v-for="i in 4" :key="i" class="fact">
             <div class="skeleton skeleton-text" style="width: 50%" />
             <div class="skeleton skeleton-text" style="width: 70%; height: 16px" />
             <div class="skeleton skeleton-text" style="width: 38%" />
@@ -157,38 +157,38 @@ function statusLabel(s: string): string {
         </template>
 
         <template v-else>
-          <div class="gw-fact">
-            <span class="gw-fact-label"><Server :size="12" />{{ t('admin.gateway.cards.process') }}</span>
-            <span class="gw-fact-value" :class="gw?.running ? 'is-up' : 'is-down'">
+          <div class="fact">
+            <span class="fact-label"><Server :size="12" />{{ t('admin.gateway.cards.process') }}</span>
+            <span class="fact-value" :class="gw?.running ? 'is-up' : 'is-down'">
               {{ gw?.running ? 'ONLINE' : 'OFFLINE' }}
             </span>
-            <span class="gw-fact-foot mono">PID {{ gw?.pid || '--' }} · v{{ gw?.version }}</span>
+            <span class="fact-foot mono">PID {{ gw?.pid || '--' }} · v{{ gw?.version }}</span>
           </div>
 
-          <div class="gw-fact">
-            <span class="gw-fact-label"><Zap :size="12" />{{ t('admin.gateway.cards.deliveryQueue') }}</span>
-            <span class="gw-fact-value num">
-              {{ deliveredCount }}<span class="gw-fact-sub"> / {{ deliveryTotal }}</span>
+          <div class="fact">
+            <span class="fact-label"><Zap :size="12" />{{ t('admin.gateway.cards.deliveryQueue') }}</span>
+            <span class="fact-value num">
+              {{ deliveredCount }}<span class="fact-sub"> / {{ deliveryTotal }}</span>
             </span>
-            <span class="gw-fact-foot mono">
+            <span class="fact-foot mono">
               {{ t('admin.gateway.cards.queueStats', undefined, { n: gw?.stats?.pending ?? 0, m: gw?.stats?.retry ?? 0 }) }}
             </span>
           </div>
 
-          <div class="gw-fact">
-            <span class="gw-fact-label"><AlertTriangle :size="12" />{{ t('admin.gateway.cards.deadLetter') }}</span>
-            <span class="gw-fact-value num" :class="(gw?.stats?.dead ?? 0) > 0 ? 'is-down' : 'is-up'">
-              {{ gw?.stats?.dead ?? 0 }}<span class="gw-fact-sub"> / {{ gw?.event_health?.critical_total ?? 0 }}</span>
+          <div class="fact">
+            <span class="fact-label"><AlertTriangle :size="12" />{{ t('admin.gateway.cards.deadLetter') }}</span>
+            <span class="fact-value num" :class="(gw?.stats?.dead ?? 0) > 0 ? 'is-down' : 'is-up'">
+              {{ gw?.stats?.dead ?? 0 }}<span class="fact-sub"> / {{ gw?.event_health?.critical_total ?? 0 }}</span>
             </span>
-            <span class="gw-fact-foot mono">
+            <span class="fact-foot mono">
               {{ t('admin.gateway.cards.criticalStats', undefined, { n: gw?.event_health?.critical_unmet ?? 0, m: gw?.event_health?.critical_failed ?? 0 }) }}
             </span>
           </div>
 
-          <div class="gw-fact">
-            <span class="gw-fact-label"><Clock :size="12" />{{ t('admin.gateway.cards.scheduler') }}</span>
-            <span class="gw-fact-value num">{{ jobs.length }}</span>
-            <span class="gw-fact-foot mono" :class="overdueCount > 0 ? 'is-down' : 'is-up'">
+          <div class="fact">
+            <span class="fact-label"><Clock :size="12" />{{ t('admin.gateway.cards.scheduler') }}</span>
+            <span class="fact-value num">{{ jobs.length }}</span>
+            <span class="fact-foot mono" :class="overdueCount > 0 ? 'is-down' : 'is-up'">
               {{ overdueCount > 0
                 ? t('admin.gateway.cards.overdueJobs', undefined, { n: overdueCount })
                 : t('admin.gateway.cards.noOverdue') }}
@@ -400,71 +400,16 @@ function statusLabel(s: string): string {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
-.gw-fact {
-  display: flex;
-  flex-direction: column;
-  gap:4px;
-  min-width: 0;
-  padding: var(--ds-space-4);
-  border-top: 1px solid var(--ds-color-border-default);
-}
-.gw-fact:first-child {
-  border-top: 0;
-}
-@media (min-width: 640px) {
-  .gw-fact:nth-child(2) {
-    border-top: 0;
-  }
-  .gw-fact:nth-child(even) {
-    border-left: 1px solid var(--ds-color-border-default);
-  }
-}
-@media (min-width: 1280px) {
-  .gw-fact {
-    border-top: 0;
-  }
-  .gw-fact + .gw-fact {
-    border-left: 1px solid var(--ds-color-border-default);
-  }
-}
-.gw-fact-label {
-  display: flex;
-  align-items: center;
-  gap:6px;
-  font-size: var(--text-3xs);
-  font-weight: 500;
-  letter-spacing: var(--track-label);
-  text-transform: uppercase;
-  color: var(--ds-color-text-placeholder);
-}
-.gw-fact-value {
-  font-size: var(--text-lg);
-  font-weight: 500;
-  letter-spacing: var(--track-display);
-  line-height: 1.2;
-  color: var(--ds-color-text-primary);
-  font-variant-numeric: tabular-nums;
-}
-.gw-fact-value.is-up {
-  color: var(--up);
-}
-.gw-fact-value.is-down {
-  color: var(--down);
-}
-.gw-fact-sub {
-  font-size: var(--text-xs);
-  color: var(--ds-color-text-placeholder);
-}
-.gw-fact-foot {
-  font-size: var(--text-3xs);
-  color: var(--ds-color-text-placeholder);
-}
-.gw-fact-foot.is-up {
-  color: var(--up);
-}
-.gw-fact-foot.is-down {
-  color: var(--down);
-}
+
+
+
+
+
+
+
+
+
+
 
 /* ══ 调度作业清单 ══ */
 .gw-jobs {

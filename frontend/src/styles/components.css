@@ -653,6 +653,104 @@ textarea.input {
 }
 
 /* ---------------------------------------------------------------------------
+   统计单元（fact cell）—— 全站单一事实源
+   ---------------------------------------------------------------------------
+   批 79：13 个后台页面各自重写了一份完全同构的「统计单元」——
+   `.X-fact` / `.X-fact-label` / `.X-fact-value` / `.X-fact-foot` / `.X-fact-sub`
+   外加 `:first-child` 与两个媒体的头发丝网格。结构逐字节相同，合计约 150 条
+   规则 / 560 行，散落在 13 个 `<style scoped>` 里。
+
+   更糟的是**字阶已经漂移**：
+     · `.X-fact-value` 8 个页面 `--text-md` / 6 个页面 `--text-lg`；
+     · `.X-fact-foot`  7 个页面 `--text-4xs` / 7 个页面 `--text-3xs`（平局）；
+     · `font-variant-numeric: tabular-nums` 只有 6/14 个页面开着。
+
+   已确认统一到**更紧凑的一档**：数值 `--text-md`(14px) + 脚注 `--text-4xs`(11px)
+   —— 脚注比标签 `--text-3xs`(11.5px) 小一档，层次正确。
+   `tabular-nums` 补全：全站其它数字位（`.stat dd` / `.table .col-num` / `.kv dd`）
+   本来就开着，统计单元没开会让数字随取值横向抖动。
+
+   页面侧只保留真正的 delta（`RiskPage` 的 `.rk-fact` 是另一种组件 ——
+   单行省略 + 常驻左框，**不**并入本原件）。
+--------------------------------------------------------------------------- */
+.fact {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: var(--ds-space-4);
+  border-top: 1px solid var(--ds-color-border-default);
+}
+.fact:first-child {
+  border-top: 0;
+}
+@media (min-width: 640px) {
+  .fact:nth-child(2) {
+    border-top: 0;
+  }
+  .fact:nth-child(even) {
+    border-left: 1px solid var(--ds-color-border-default);
+  }
+}
+@media (min-width: 1280px) {
+  .fact {
+    border-top: 0;
+  }
+  .fact + .fact {
+    border-left: 1px solid var(--ds-color-border-default);
+  }
+}
+.fact-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-3xs);
+  font-weight: 500;
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--ds-color-text-placeholder);
+}
+.fact-value {
+  font-size: var(--text-md);
+  font-weight: 500;
+  letter-spacing: var(--track-display);
+  line-height: 1.25;
+  color: var(--ds-color-text-primary);
+  font-variant-numeric: tabular-nums;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.fact-value.is-up {
+  color: var(--up);
+}
+.fact-value.is-down {
+  color: var(--down);
+}
+.fact-value.is-warn {
+  color: var(--warn);
+}
+.fact-value.is-off {
+  color: var(--ds-color-text-placeholder);
+}
+.fact-value.is-accent {
+  color: var(--ds-color-brand);
+}
+.fact-sub {
+  font-size: var(--text-xs);
+  color: var(--ds-color-text-placeholder);
+}
+.fact-foot {
+  font-size: var(--text-4xs);
+  color: var(--ds-color-text-placeholder);
+}
+.fact-foot.is-up {
+  color: var(--up);
+}
+.fact-foot.is-down {
+  color: var(--down);
+}
+
+/* ---------------------------------------------------------------------------
    26px 方形图标盒 —— 全站单一事实源
    ---------------------------------------------------------------------------
    批 78：此前 6 个页面各自写了一份**逐字节相同**的 9 属性规则
