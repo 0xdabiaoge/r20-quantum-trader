@@ -32,6 +32,14 @@ const width = computed(
 const panel = ref<HTMLElement | null>(null);
 let lastFocused: Element | null = null;
 
+/** 批 23：Escape 的监听从 panel 挪到 document。
+ *  原实现挂在 panel 上，只有「焦点正好在面板内」时才收到按键；而用户只要点一下
+ *  面板里的标题、说明文字这类**不可聚焦**元素，焦点就回到 body，
+ *  此后 Escape 关不掉对话框（实测台账抽屉复现）。
+ *  模块级栈保证嵌套时只有最上层响应 Escape。 */
+const stack: symbol[] = [];
+let token: symbol | null = null;
+
 function focusables(): HTMLElement[] {
   if (!panel.value) return [];
   return Array.from(
@@ -43,6 +51,7 @@ function focusables(): HTMLElement[] {
 
 function onKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape') {
+    if (stack[stack.length - 1] !== token) return;
     e.stopPropagation();
     emit('close');
     return;
@@ -50,6 +59,12 @@ function onKeydown(e: KeyboardEvent) {
   if (e.key === 'Tab') {
     const els = focusables();
     if (!els.length) return;
+    // 焦点已经不在面板里（例如刚点了面板内的纯文本）→ 把焦点拉回来，别漏到背景页
+    if (!panel.value || !panel.value.contains(document.activeElement)) {
+      e.preventDefault();
+      (els[0] || panel.value)?.focus?.();
+      return;
+    }
     const first = els[0];
     const last = els[els.length - 1];
     if (e.shiftKey && document.activeElement === first) {
@@ -62,6 +77,15 @@ function onKeydown(e: KeyboardEvent) {
   }
 }
 
+function detach() {
+  document.removeEventListener('keydown', onKeydown, true);
+  if (token) {
+    const i = stack.indexOf(token);
+    if (i >= 0) stack.splice(i, 1);
+    token = null;
+  }
+}
+
 watch(
   () => props.open,
   async (open) => {
@@ -69,12 +93,14 @@ watch(
       lastFocused = document.activeElement;
       document.body.style.overflow = 'hidden';
       await nextTick();
-      panel.value?.addEventListener('keydown', onKeydown);
+      token = Symbol('dialog');
+      stack.push(token);
+      document.addEventListener('keydown', onKeydown, true);
       const els = focusables();
       (els[0] || panel.value)?.focus?.();
     } else {
       document.body.style.overflow = '';
-      panel.value?.removeEventListener('keydown', onKeydown);
+      detach();
       (lastFocused as HTMLElement | null)?.focus?.();
     }
   },
@@ -82,6 +108,7 @@ watch(
 
 onBeforeUnmount(() => {
   document.body.style.overflow = '';
+  detach();
 });
 </script>
 
