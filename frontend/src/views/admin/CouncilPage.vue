@@ -45,7 +45,6 @@ import {
   DATA_SLOTS,
   buildCouncilImportPayload,
   buildCouncilSavePayload,
-  consensusModeName,
   isBuiltinTrader,
   isCioSeat,
   isModelMissing,
@@ -118,9 +117,55 @@ const traderCount = computed(
   () => seatEntries.value.filter(([id, r]) => !isCioSeat(r, id)).length,
 );
 const selectedRole = computed<any>(() => councilConfig.value.roles?.[expandedRole.value] || null);
-const consensusName = computed(() =>
-  consensusModeName(councilConfig.value.consensus_mode, t('admin.council.modeStandardName')),
-);
+/**
+ * 议事模式的展示文案（批 40）。
+ *
+ * 缺陷：模式卡与 HUD 此前直接渲染 `CONSENSUS_MODES` 里的中文 `name/tag/desc`，
+ * 英文界面因此显示「标准提案模式 / 交叉质询模式」。locale 里 `modeStandard*`、
+ * `modeCross*` 六个键只有 `modeStandardName` 被当作回落文案用到，其余无人用，
+ * 且文案与常量已经分叉 —— 两份真源。
+ *
+ * 修法：查表取**完整键路径**（不使用拼接键名，拼接键无法被 i18n 静态校验识别），
+ * 缺键时回落到常量原值；未登记的 id 原样透出。
+ */
+const MODE_TEXT_KEY: Record<string, { name: string; tag: string; desc: string }> = {
+  standard: {
+    name: 'admin.council.modeStandardName',
+    tag: 'admin.council.modeStandardTag',
+    desc: 'admin.council.modeStandardDesc',
+  },
+  cross_examination: {
+    name: 'admin.council.modeCrossName',
+    tag: 'admin.council.modeCrossTag',
+    desc: 'admin.council.modeCrossDesc',
+  },
+  debate: {
+    name: 'admin.council.modeDebateName',
+    tag: 'admin.council.modeDebateTag',
+    desc: 'admin.council.modeDebateDesc',
+  },
+};
+function modeNameOf(mode: any): string {
+  const k = MODE_TEXT_KEY[String(mode?.id ?? '')];
+  return k ? t(k.name, mode?.name) : String(mode?.name ?? '--');
+}
+function modeTagOf(mode: any): string {
+  const k = MODE_TEXT_KEY[String(mode?.id ?? '')];
+  return k ? t(k.tag, mode?.tag) : String(mode?.tag ?? '--');
+}
+function modeDescOf(mode: any): string {
+  const k = MODE_TEXT_KEY[String(mode?.id ?? '')];
+  return k ? t(k.desc, mode?.desc) : String(mode?.desc ?? '--');
+}
+function consensusModeLabel(modeId: string): string {
+  const found = CONSENSUS_MODES.find((m) => m.id === modeId);
+  return found ? modeNameOf(found) : t('admin.council.modeStandardName');
+}
+const consensusName = computed(() => consensusModeLabel(councilConfig.value.consensus_mode));
+const consensusTag = computed(() => {
+  const found = CONSENSUS_MODES.find((m) => m.id === councilConfig.value.consensus_mode);
+  return found ? modeTagOf(found) : '--';
+});
 
 /** 席位牌着色：CIO 走强调色，静音席位降一档，其余中性 */
 function seatTone(roleId: string, role: any): string {
@@ -143,7 +188,7 @@ async function loadData() {
     expandedRole.value = nextExpandedRole(Object.keys(cRes.roles || {}), expandedRole.value);
   } catch (e: any) {
     loadError.value = e.message;
-    toast.err(`加载配置失败: ${e.message}`);
+    toast.err(t('admin.council.loadFailed', undefined, { msg: e.message }));
   } finally {
     loading.value = false;
   }
@@ -151,7 +196,7 @@ async function loadData() {
 
 async function saveConfig() {
   if (!auth.isSuperadmin) {
-    toast.err('仅超级管理员可修改投委会配置');
+    toast.err(t('admin.council.superadminOnly'));
     return;
   }
   saving.value = true;
@@ -161,11 +206,15 @@ async function saveConfig() {
       body: JSON.stringify(buildCouncilSavePayload(councilConfig.value)),
     });
     councilConfig.value = res.config;
-    toast.ok(councilConfig.value.enabled
-        ? `对冲基金投委会配置已保存并生效（${consensusModeName(councilConfig.value.consensus_mode, '标准提案模式')}）`
-        : '投委会配置已保存（当前为单模型直连决策）');
+    toast.ok(
+      councilConfig.value.enabled
+        ? t('admin.council.saveOkConsensus', undefined, {
+            mode: consensusModeLabel(councilConfig.value.consensus_mode),
+          })
+        : t('admin.council.saveOkDirect'),
+    );
   } catch (e: any) {
-    toast.err(`保存失败: ${e.message}`);
+    toast.err(t('admin.council.saveFailed', undefined, { msg: e.message }));
   } finally {
     saving.value = false;
   }
@@ -187,9 +236,9 @@ async function exportConfig() {
     a.download = `r20-council-config-${fmtDate(new Date())}.json`;
     a.click();
     URL.revokeObjectURL(url);
-    toast.ok('投委会配置已导出为 JSON 包（含全部席位提示词与议事规则）');
+    toast.ok(t('admin.council.exportOk'));
   } catch (e: any) {
-    toast.err(`导出失败：${e.message}`);
+    toast.err(t('admin.council.exportFailed', undefined, { msg: e.message }));
   }
 }
 
@@ -228,7 +277,11 @@ async function doImportConfig() {
     });
     await loadData();
     closeImport();
-    toast.ok(`投委会配置导入成功：席位 ${(res.roles || []).join(' / ')}${res.backup_file ? `；原配置已自动备份为 ${res.backup_file}` : ''}`);
+    const roles = (res.roles || []).join(' / ');
+    const backup = res.backup_file
+      ? t('admin.council.importOkBackup', undefined, { file: res.backup_file })
+      : '';
+    toast.ok(t('admin.council.importOk', undefined, { roles }) + backup);
   } catch (e: any) {
     importFileError.value = t('admin.council.importFailed', undefined, { msg: e.message });
   } finally {
@@ -246,9 +299,9 @@ async function applySuite(suiteId: string) {
       body: JSON.stringify({ suite_id: suiteId }),
     });
     councilConfig.value = res.config;
-    toast.ok('已载入标准投委会阵容！');
+    toast.ok(t('admin.council.suiteLoaded'));
   } catch (e: any) {
-    toast.err(`载入失败: ${e.message}`);
+    toast.err(t('admin.council.suiteFailed', undefined, { msg: e.message }));
   }
 }
 
@@ -274,21 +327,21 @@ function addNewCustomTrader() {
     model_id: '',
   };
   expandedRole.value = roleId;
-  toast.ok('已添加自定义交易员席位，可直接编辑提示词与参数');
+  toast.ok(t('admin.council.addedCustom'));
 }
 
 async function removeRole(roleId: string) {
   if (!auth.isSuperadmin) return;
   const role = councilConfig.value.roles[roleId];
   if (isCioSeat(role, roleId)) {
-    toast.warn('首席投资官 (CIO) 负责终审收口与发单，不可删除！');
+    toast.warn(t('admin.council.cioUndeletable'));
     return;
   }
   const _ok = await ask({ title: t('admin.council.confirmRemoveTitle'), desc: t('admin.council.confirmRemoveDesc', undefined, { name: roleDisplayName(role, roleId) }), danger: true, okText: t('common.remove') });
   if (!_ok) return;
   delete councilConfig.value.roles[roleId];
   expandedRole.value = nextExpandedRole(Object.keys(councilConfig.value.roles || {}), '');
-  toast.warn('已移除席位，点击右上角「保存配置」后生效');
+  toast.warn(t('admin.council.removedSeat'));
 }
 
 async function resetRole(roleId: string) {
@@ -300,9 +353,9 @@ async function resetRole(roleId: string) {
       body: JSON.stringify({ role_id: roleId }),
     });
     councilConfig.value = res.config;
-    toast.ok('已重置为出厂标准模板');
+    toast.ok(t('admin.council.resetOk'));
   } catch (e: any) {
-    toast.err(`重置失败: ${e.message}`);
+    toast.err(t('admin.council.resetFailed', undefined, { msg: e.message }));
   }
 }
 
@@ -310,7 +363,7 @@ async function runDebateTest() {
   testing.value = true;
   testResult.value = null;
   expandedReasoning.value = {};
-  toast.warn('投委会正在全息审阅资金与行情并组织交易员辩论（预计 10~25 秒）...');
+  toast.warn(t('admin.council.testRunning'));
   try {
     const res = await api('/api/v1/admin/council/test', {
       method: 'POST',
@@ -318,12 +371,12 @@ async function runDebateTest() {
     });
     if (res.status === 'ok') {
       testResult.value = res;
-      toast.ok(`投委会辩论与 CIO 终审完成！耗时 ${res.transcript?.total_duration_ms || 0}ms`);
+      toast.ok(t('admin.council.testOk', undefined, { ms: res.transcript?.total_duration_ms || 0 }));
     } else {
-      toast.err(`测试失败: ${res.error || '未知错误'}`);
+      toast.err(t('admin.council.testFailed', undefined, { msg: res.error || t('admin.council.unknownError') }));
     }
   } catch (e: any) {
-    toast.err(`测试出错: ${e.message}`);
+    toast.err(t('admin.council.testError', undefined, { msg: e.message }));
   } finally {
     testing.value = false;
   }
@@ -421,7 +474,7 @@ onMounted(loadData);
             <span class="cn-fact-label"><Users :size="12" />{{ t('admin.council.consensusLabel') }}</span>
             <span class="cn-fact-value truncate">{{ consensusName }}</span>
             <span class="cn-fact-foot mono">
-              {{ CONSENSUS_MODES.find((m) => m.id === councilConfig.consensus_mode)?.tag || '--' }}
+              {{ consensusTag }}
             </span>
           </div>
 
@@ -468,10 +521,10 @@ onMounted(loadData);
             @click="councilConfig.consensus_mode = mode.id"
           >
             <span class="cn-mode-top">
-              <span class="cn-mode-name">{{ mode.name }}</span>
-              <span class="badge">{{ mode.tag }}</span>
+              <span class="cn-mode-name">{{ modeNameOf(mode) }}</span>
+              <span class="badge">{{ modeTagOf(mode) }}</span>
             </span>
-            <span class="cn-mode-desc">{{ mode.desc }}</span>
+            <span class="cn-mode-desc">{{ modeDescOf(mode) }}</span>
           </button>
         </div>
 

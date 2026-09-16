@@ -185,13 +185,28 @@ class DuplicationRemovedTest(unittest.TestCase):
         # 议事模式的**定义形态**不得出现在页面里
         self.assertNotIn("{ id: '", page, "议事模式定义应只在 councilLogic.ts")
         # ⚠️ 我原本还想断言 `assertNotIn("标准提案模式", page)` —— 又误报：
-        #    页面把 `'标准提案模式'` 当作 `consensusModeName(mode, fallback)`
+        #    当时页面把 `'标准提案模式'` 当作 `consensusModeName(mode, fallback)`
         #    的**回落实参**传进去，那是正当用法。
-        #    改成断言"该文案与逻辑模块里的模式名一致"，这比"不存在"更有价值。
+        #
+        # 🔁 2026-09-16（批 40）重钉：模式卡此前直接渲染 `CONSENSUS_MODES` 里的
+        #    中文 name/tag/desc，英文界面显示中文；locale 里 `modeStandard*` /
+        #    `modeCross*` 六个键只有 `modeStandardName` 被当回落用到，且文案与常量
+        #    已分叉（如 tag：常量 `Standard` vs locale `高效终审`）——两份真源。
+        #    修法是把展示文案改走 locale 查表（`MODE_TEXT_KEY` 存**完整键路径**），
+        #    常量退回"id 登记 + 回落"。**原意照旧但来源变了**，故断言改为：
+        #    页面出现的是键路径，而 zh locale 的该键必须与逻辑模块里的模式名一致。
+        page = _code(PAGE)
         logic_src = _code(LOGIC)
-        self.assertIn("'标准提案模式'", page, "保存成功的回落文案应在页面里")
+        self.assertIn("admin.council.modeStandardName", page,
+                      "模式展示文案必须走 locale 键路径")
+        self.assertNotIn("mode.name }}", page,
+                         "模式卡不得再直接渲染常量里的 name")
         self.assertIn("name: '标准提案模式'", logic_src,
-                      "页面引用的回落文案必须与逻辑模块里的模式名一致")
+                      "逻辑模块里的模式名应保持不变（作为回落实参）")
+        zh_council = (ROOT / "frontend" / "src" / "locales" / "zh" / "admin"
+                      / "council.ts").read_text(encoding="utf-8")
+        self.assertIn("modeStandardName: '标准提案模式'", zh_council,
+                      "zh locale 的模式名必须与逻辑模块里的模式名一致")
         logic = _code(LOGIC)
         self.assertIn("{ k: 'market_matrix'", logic)
         # ⚠️ 用 `id: 'x'` 而不是 `{ id: 'x'` —— 我第一版写成后者，

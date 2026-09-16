@@ -132,7 +132,7 @@ async function loadLib() {
     loadWorkingModules();
   } catch (e: any) {
     loadError.value = e.message;
-    toast.err(`加载失败：${e.message}`);
+    toast.err(t('admin.promptStudio.loadFailed', undefined, { msg: e.message }));
   } finally {
     loading.value = false;
   }
@@ -193,13 +193,13 @@ function insertVarIntoActiveModule(key: string) {
   const m = workingModules.value[idx];
   const { content, duplicate, tag } = appendVariableSlot(m.content, key);
   if (duplicate) {
-    toast.warn(`模块「${m.title}」已包含变量 ${tag}`);
+    toast.warn(t('admin.promptStudio.varExists', undefined, { title: m.title, tag }));
     return;
   }
   m.content = content;
   activeEditingIdx.value = idx;
   dirty.value = true;
-  toast.ok(`已插入变量插槽 ${tag} 到模块「${m.title}」`);
+  toast.ok(t('admin.promptStudio.varInserted', undefined, { tag, title: m.title }));
 }
 
 async function saveProfile() {
@@ -220,21 +220,24 @@ async function saveProfile() {
         pipelines: pipelinesMap,
       }),
     })
-    toast.ok(`方案「${selectedProfile.value.name}」· ${pipelines.value.find(p => p.id === activePipeline.value)?.label} 模块布局已保存，下一轮推演自动生效`)
+    const pipe = pipelines.value.find((p) => p.id === activePipeline.value)?.label
+    toast.ok(
+      t('admin.promptStudio.layoutSaved', undefined, { name: selectedProfile.value.name, pipe: pipe || '' }),
+    )
     dirty.value = false
     await loadLib()
   } catch (e: any) {
-    toast.err(`保存失败：${e.message}`)
+    toast.err(t('admin.promptStudio.saveFailed', undefined, { msg: e.message }))
   }
 }
 
 async function activateProfile() {
   try {
     await api(`/api/v1/admin/prompt-profiles/${encodeURIComponent(selectedProfileId.value)}/activate`, { method: 'POST', body: '{}' })
-    toast.ok(`已激活方案「${selectedProfile.value?.name}」`)
+    toast.ok(t('admin.promptStudio.activated', undefined, { name: selectedProfile.value?.name || '' }))
     await loadLib()
   } catch (e: any) {
-    toast.err(`激活失败：${e.message}`)
+    toast.err(t('admin.promptStudio.activateFailed', undefined, { msg: e.message }))
   }
 }
 
@@ -247,14 +250,14 @@ const nameDialog = ref<{ open: boolean; mode: 'create' | 'duplicate'; value: str
 });
 
 function openCreateProfile() {
-  nameDialog.value = { open: true, mode: 'create', value: '我的策略', busy: false };
+  nameDialog.value = { open: true, mode: 'create', value: t('admin.promptStudio.defaultProfileName'), busy: false };
 }
 
 function openDuplicateProfile() {
   nameDialog.value = {
     open: true,
     mode: 'duplicate',
-    value: `${selectedProfile.value?.name || ''} 副本`,
+    value: t('admin.promptStudio.profileCopyName', undefined, { name: selectedProfile.value?.name || '' }),
     busy: false,
   };
 }
@@ -279,13 +282,17 @@ async function submitNameDialog() {
       }),
     });
     toast.ok(mode === 'duplicate'
-      ? `已复制为可编辑方案「${res.profile.name}」`
-      : `已创建可编辑方案「${res.profile.name}」，现在可以自由增删改模块`);
+      ? t('admin.promptStudio.duplicated', undefined, { name: res.profile.name })
+      : t('admin.promptStudio.created', undefined, { name: res.profile.name }));
     selectedProfileId.value = res.profile.id;
     closeNameDialog();
     await loadLib();
   } catch (e: any) {
-    toast.err(mode === 'duplicate' ? `复制失败：${e.message}` : `创建失败：${e.message}`);
+    toast.err(
+      mode === 'duplicate'
+        ? t('admin.promptStudio.duplicateFailed', undefined, { msg: e.message })
+        : t('admin.promptStudio.createFailed', undefined, { msg: e.message }),
+    );
   } finally {
     nameDialog.value.busy = false;
   }
@@ -294,7 +301,7 @@ async function submitNameDialog() {
 function addModule() {
   workingModules.value.push({
     id: `module-${Date.now().toString(36)}`,
-    title: `自定义规则模块 ${workingModules.value.length + 1}`,
+    title: t('admin.promptStudio.newModuleName', undefined, { n: workingModules.value.length + 1 }),
     content: '',
     enabled: true,
     locked: false,
@@ -322,7 +329,7 @@ function duplicateModule(idx: number) {
   workingModules.value.splice(idx + 1, 0, {
     ...JSON.parse(JSON.stringify(m)),
     id: `module-${Date.now().toString(36)}`,
-    title: `${m.title} 副本`,
+    title: t('admin.promptStudio.moduleCopyName', undefined, { title: m.title }),
     locked: false,
     source: 'custom'
   })
@@ -338,7 +345,7 @@ async function deleteProfile() {
     selectedProfileId.value = ''
     await loadLib()
   } catch (e: any) {
-    toast.err(`删除失败：${e.message}`)
+    toast.err(t('admin.promptStudio.deleteFailed', undefined, { msg: e.message }))
   }
 }
 
@@ -348,7 +355,7 @@ async function showHistory() {
     const res = await api(`/api/v1/admin/prompt-profiles/${encodeURIComponent(selectedProfileId.value)}/history`)
     historyList.value = res.history || []
   } catch (e: any) {
-    toast.err(`历史加载失败：${e.message}`)
+    toast.err(t('admin.promptStudio.historyFailed', undefined, { msg: e.message }))
   }
 }
 
@@ -360,11 +367,11 @@ async function rollback(revId: string) {
       method: 'POST',
       body: JSON.stringify({ revision_id: revId }),
     })
-    toast.ok('已回滚到所选历史版本')
+    toast.ok(t('admin.promptStudio.rolledBack'))
     historyVisible.value = false
     await loadLib()
   } catch (e: any) {
-    toast.err(`回滚失败：${e.message}`)
+    toast.err(t('admin.promptStudio.rollbackFailed', undefined, { msg: e.message }))
   }
 }
 
@@ -380,9 +387,9 @@ async function exportProfile() {
     a.download = `r20-strategy-${selectedProfile.value?.name || 'profile'}-${fmtDate(new Date())}.json`
     a.click()
     URL.revokeObjectURL(url)
-    toast.ok(`方案「${selectedProfile.value?.name}」已成功导出为 JSON 策略包`)
+    toast.ok(t('admin.promptStudio.exported', undefined, { name: selectedProfile.value?.name || '' }))
   } catch (e: any) {
-    toast.err(`导出失败：${e.message}`)
+    toast.err(t('admin.promptStudio.exportFailed', undefined, { msg: e.message }))
   }
 }
 
@@ -401,7 +408,7 @@ function handleFileSelect(event: Event) {
         importNameOverride.value = deriveImportName(file.name)
       }
     } catch {
-      importFileError.value = '文件内容不是合法的 JSON 格式'
+      importFileError.value = t('admin.promptStudio.jsonInvalid')
     }
   }
   reader.readAsText(file)
@@ -411,7 +418,7 @@ function handleFileSelect(event: Event) {
 async function submitImport() {
   importFileError.value = ''
   if (!importRawJson.value.trim()) {
-    importFileError.value = '请先选择 JSON 策略文件或粘贴 JSON 内容'
+    importFileError.value = t('admin.promptStudio.jsonRequired')
     return
   }
   try {
@@ -423,20 +430,20 @@ async function submitImport() {
         name_override: importNameOverride.value.trim() || undefined,
       }),
     })
-    toast.ok(`成功导入策略方案「${res.profile.name}」！`)
+    toast.ok(t('admin.promptStudio.imported', undefined, { name: res.profile.name }))
     importVisible.value = false
     importRawJson.value = ''
     importNameOverride.value = ''
     selectedProfileId.value = res.profile.id
     await loadLib()
   } catch (e: any) {
-    importFileError.value = `导入失败：${e.message}`
+    importFileError.value = t('admin.promptStudio.importFailed', undefined, { msg: e.message })
   }
 }
 
 function copyPreview() {
   navigator.clipboard.writeText(compiledPreview.value)
-  toast.ok('编译后实发 Prompt 已复制')
+  toast.ok(t('admin.promptStudio.compiledCopied'))
 }
 
 onMounted(loadLib)
