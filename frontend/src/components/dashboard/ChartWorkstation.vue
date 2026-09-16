@@ -850,12 +850,19 @@ onUnmounted(() => {
     </header>
 
     <!-- 图表画布：高度响应式。旧固定 560px 在移动端占满整屏，把持仓面板顶到首屏外
-         且自身吃满手势；改 dvh 自适应，全屏态仍走 calc(视口-顶栏)。 -->
+         且自身吃满手势；改 dvh 自适应。
+         批 84：全屏态原先走 `calc(100vh - 108px)` —— **该魔数既过时又无效**：
+           · 卡片全屏时是 `fixed inset-0` + flex 列，画布带 `flex-1`，
+             `flex-basis: 0%` 会直接覆盖内联 `height`，实测画布高 = 视口 − 真实 chrome；
+           · 而 `108` 与真实 chrome 对不上：顶栏在 1440/1024 宽时是 63px（chrome 65），
+             在 700 宽时换行成 99px（chrome 101）—— 常量在两种方向上都错（偏差 43 / 7）。
+         故删掉该内联高度，全屏一律交给 flex；并让全屏态也拿到 `flex-1 min-h-0`
+         （非 fill 用法在全屏下同样铺满，短视口不会被 `min-h-[340px]` 顶出裁切）。 -->
     <div
       ref="chartContainer"
       class="relative w-full"
-      :class="fill ? 'flex-1 min-h-[340px]' : ''"
-      :style="{ height: isFullscreen ? 'calc(100vh - 108px)' : (props.chartHeight || 'clamp(340px, 60vw, 560px)') }"
+      :class="isFullscreen ? 'flex-1 min-h-0' : fill ? 'flex-1 min-h-[340px]' : ''"
+      :style="{ height: isFullscreen ? undefined : (props.chartHeight || 'clamp(340px, 60vw, 560px)') }"
     ></div>
 
     <!-- 试算控制台 -->

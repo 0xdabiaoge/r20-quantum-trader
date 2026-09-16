@@ -88,8 +88,12 @@ function pick(instId: string) {
       <!-- 常规模式下展示核心指标 HUD -->
       <KpiRibbon v-if="!isFocusMode" />
 
-      <!-- 工位沉浸模式布局：铺满大屏 -->
-      <div v-if="isFocusMode" class="grid grid-cols-1 gap-3 xl:grid-cols-12 h-[calc(100vh-140px)]">
+      <!-- 工位沉浸模式布局：铺满大屏。
+           批 84：固定高度**只在 xl 生效**。原先无条件 `h-[calc(100vh-140px)]`，
+           是按 xl 的 12 栏并排布局算的；在 <1280px（单栏堆叠）下容器高被钉死，
+           两个 `h-full` 子项一个溢出 140px、另一个塌成 **0 高度并被推到 y=900**
+           —— 即「持仓面板整个消失」。改为 xl 限定后，窄屏回归自然文档流。 -->
+      <div v-if="isFocusMode" class="grid grid-cols-1 gap-3 xl:grid-cols-12 xl:h-[calc(100vh-140px)]">
         <div class="xl:col-span-8 h-full">
           <ChartWorkstation
             ref="chart"
