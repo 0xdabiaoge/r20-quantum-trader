@@ -663,11 +663,21 @@ onMounted(loadData);
 }
 .evo-tabs {
   align-self: flex-start;
+  /* 批 21：窄屏（<430px）标签条实测 428px 宽、且**没有任何裁剪或滚动祖先**，
+     于是它把 .wb-main 整个撑出 64px，整页可以横向拖动。
+     改为标签条自己在内部横向滚动，页面不再被撑宽。 */
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.evo-tabs::-webkit-scrollbar {
+  display: none;
 }
 .evo-tabs button {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  flex-shrink: 0;
 }
 .evo-tab {
   display: flex;
