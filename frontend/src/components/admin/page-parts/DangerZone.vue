@@ -62,7 +62,7 @@ const hint = computed(() => t('admin.shell.danger.confirmHint', undefined, { phr
     </header>
 
     <div class="dz-body">
-      <label class="dz-field">
+      <label class="field-stack dz-field">
         <span class="form-label">{{ hint }}</span>
         <span class="dz-input-wrap">
           <Lock v-if="!unlocked" :size="12" class="dz-input-icon" />
@@ -144,12 +144,10 @@ const hint = computed(() => t('admin.shell.danger.confirmHint', undefined, { phr
     align-items: stretch;
   }
 }
+
+/* 字段栈 delta：竖排 + 6px + min-width 来自全站 .field-stack 原件 */
 .dz-field {
-  display: flex;
-  flex-direction: column;
-  gap:6px;
   flex: 1;
-  min-width: 0;
 }
 .dz-input-wrap {
   position: relative;

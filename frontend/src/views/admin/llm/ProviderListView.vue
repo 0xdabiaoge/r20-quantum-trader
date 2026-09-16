@@ -144,7 +144,7 @@ const bandFacts = () => [
     </PageHeader>
 
     <!-- ══ 状态带 ══ -->
-    <section class="card pv-band">
+    <section class="card band">
       <div v-for="f in bandFacts()" :key="f.label" class="fact">
         <span class="fact-label"><component :is="f.icon" :size="12" />{{ f.label }}</span>
         <span class="fact-value" :class="f.tone">{{ f.value }}</span>
@@ -434,20 +434,7 @@ const bandFacts = () => [
 }
 
 /* ══ 状态带 ══ */
-.pv-band {
-  display: grid;
-  grid-template-columns: 1fr;
-}
-@media (min-width: 640px) {
-  .pv-band {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-@media (min-width: 1280px) {
-  .pv-band {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-}
+
 
 
 

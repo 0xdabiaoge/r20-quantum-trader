@@ -50,7 +50,7 @@ const title = computed(() =>
     </template>
 
     <form id="model-edit-form" class="me-form" @submit.prevent="saveModelForm">
-      <label class="me-field">
+      <label class="field-stack me-field">
         <span class="form-label">{{ t('admin.llm.modelIdLabel') }}</span>
         <input
           v-model="modelForm.id"
@@ -61,7 +61,7 @@ const title = computed(() =>
         />
       </label>
 
-      <label class="me-field">
+      <label class="field-stack me-field">
         <span class="form-label">{{ t('admin.llm.displayName') }}</span>
         <input
           v-model="modelForm.name"
@@ -70,7 +70,7 @@ const title = computed(() =>
         />
       </label>
 
-      <div class="me-field">
+      <div class="field-stack me-field">
         <span class="form-label">{{ t('admin.llm.capBadges') }}</span>
         <div class="me-caps">
           <button
@@ -86,7 +86,7 @@ const title = computed(() =>
         </div>
       </div>
 
-      <label class="me-field">
+      <label class="field-stack me-field">
         <span class="form-label">{{ t('admin.llm.effortLabel') }}</span>
         <select v-model="modelForm.reasoning_effort" class="field me-select" :aria-label="t('admin.llm.effortLabel')">
           <option v-for="opt in availableEffortOptions" :key="opt.value" :value="opt.value">
@@ -95,7 +95,7 @@ const title = computed(() =>
         </select>
       </label>
 
-      <label class="me-field">
+      <label class="field-stack me-field">
         <span class="form-label">{{ t('admin.llm.contextLen') }}</span>
         <input
           v-model.number="modelForm.context_length"
@@ -135,12 +135,7 @@ const title = computed(() =>
   flex-direction: column;
   gap: var(--ds-space-4);
 }
-.me-field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 0;
-}
+
 .me-field .field.is-readonly {
   background-color: var(--ds-color-bg-surface-inset);
   color: var(--ds-color-text-placeholder);

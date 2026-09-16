@@ -167,7 +167,7 @@ const bandFacts = computed(() => {
 
     <template v-else>
       <!-- ══ 版本状态带 ══ -->
-      <section class="card ab-band">
+      <section class="card band">
         <template v-if="showSkeleton">
           <div v-for="i in 4" :key="i" class="fact">
             <div class="skeleton skeleton-text" style="width: 48%" />
@@ -392,20 +392,7 @@ const bandFacts = computed(() => {
 }
 
 /* ══ 状态带 ══ */
-.ab-band {
-  display: grid;
-  grid-template-columns: 1fr;
-}
-@media (min-width: 640px) {
-  .ab-band {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-@media (min-width: 1280px) {
-  .ab-band {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-}
+
 
 
 

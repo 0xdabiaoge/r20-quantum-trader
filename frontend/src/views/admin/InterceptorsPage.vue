@@ -457,7 +457,7 @@ onMounted(loadPlugins)
       </div>
 
       <form id="ip-create-form" @submit.prevent="submitCreate">
-      <div class="ip-field">
+      <div class="field-stack ip-field">
         <span class="form-label">{{ t('admin.interceptors.filenameLabel') }}</span>
         <input
           v-model="newFilename"
@@ -468,7 +468,7 @@ onMounted(loadPlugins)
         />
       </div>
 
-      <div class="ip-field">
+      <div class="field-stack ip-field">
         <span class="form-label">{{ t('admin.interceptors.codeLabel') }}</span>
         <textarea
           v-model="newCode"
@@ -710,11 +710,7 @@ onMounted(loadPlugins)
   font-size: var(--text-2xs);
   line-height: var(--leading-body);
 }
-.ip-field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
+
 .ip-field + .ip-field {
   margin-top: var(--ds-space-4);
 }

@@ -444,7 +444,7 @@ onMounted(loadData);
 
     <template v-else>
       <!-- ══ 议事状态带 ══ -->
-      <section class="card cn-band">
+      <section class="card band">
         <template v-if="loading">
           <div v-for="i in 4" :key="i" class="fact">
             <div class="skeleton skeleton-text" style="width: 48%" />
@@ -985,20 +985,7 @@ onMounted(loadData);
 }
 
 /* ══ 议事状态带 ══ */
-.cn-band {
-  display: grid;
-  grid-template-columns: 1fr;
-}
-@media (min-width: 640px) {
-  .cn-band {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-@media (min-width: 1280px) {
-  .cn-band {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-}
+
 
 
 

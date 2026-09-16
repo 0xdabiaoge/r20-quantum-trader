@@ -147,7 +147,7 @@ function statusLabel(s: string): string {
       </div>
 
       <!-- ══ 运行状态带 ══ -->
-      <section class="card gw-band">
+      <section class="card band">
         <template v-if="showSkeleton">
           <div v-for="i in 4" :key="i" class="fact">
             <div class="skeleton skeleton-text" style="width: 50%" />
@@ -314,7 +314,7 @@ function statusLabel(s: string): string {
       initial-focus="input"
       @close="closeReplay"
     >
-      <label class="gw-field">
+      <label class="field-stack">
         <span class="form-label">{{ t('admin.gateway.deliveries.replayExpected') }}</span>
         <code class="gw-phrase">{{ replayExpected }}</code>
         <input
@@ -373,20 +373,7 @@ function statusLabel(s: string): string {
 }
 
 /* ══ 运行状态带 ══ */
-.gw-band {
-  display: grid;
-  grid-template-columns: 1fr;
-}
-@media (min-width: 640px) {
-  .gw-band {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-@media (min-width: 1280px) {
-  .gw-band {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-}
+
 
 
 
@@ -505,11 +492,7 @@ function statusLabel(s: string): string {
 }
 
 /* ══ 重放对话框 ══ */
-.gw-field {
-  display: flex;
-  flex-direction: column;
-  gap:8px;
-}
+
 .gw-phrase {
   align-self: flex-start;
   padding:2px 8px;

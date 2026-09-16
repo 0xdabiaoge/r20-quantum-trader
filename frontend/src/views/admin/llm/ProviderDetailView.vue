@@ -160,17 +160,17 @@ function monogram(name: string): string {
         </header>
 
         <div class="pd-form">
-          <label v-if="selectedProvider.is_new" class="pd-field">
+          <label v-if="selectedProvider.is_new" class="field-stack">
             <span class="form-label">{{ t('admin.llm.providerId') }}</span>
             <input v-model="providerForm.id" :placeholder="t('admin.llm.providerIdPlaceholder')" class="field mono" />
           </label>
 
-          <label class="pd-field">
+          <label class="field-stack">
             <span class="form-label">{{ t('admin.llm.name') }}</span>
             <input v-model="providerForm.name" placeholder="OpenAI" class="field" />
           </label>
 
-          <label class="pd-field">
+          <label class="field-stack">
             <span class="form-label">API Key</span>
             <div class="pd-key">
               <input
@@ -191,13 +191,13 @@ function monogram(name: string): string {
             </div>
           </label>
 
-          <label class="pd-field">
+          <label class="field-stack">
             <span class="form-label">API Base URL</span>
             <input v-model="providerForm.base_url" :placeholder="t('admin.llm.baseUrlPlaceholder')" class="field mono" />
             <span class="pd-field-hint">{{ t('admin.llm.baseUrlDesc') }}</span>
           </label>
 
-          <label class="pd-field">
+          <label class="field-stack">
             <span class="form-label">{{ t('admin.llm.apiPath') }}</span>
             <input v-model="providerForm.api_path" placeholder="/chat/completions" class="field mono" />
           </label>
@@ -433,12 +433,7 @@ function monogram(name: string): string {
   gap: var(--ds-space-4);
   padding: var(--ds-space-4);
 }
-.pd-field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 0;
-}
+
 .pd-field-hint {
   font-size: var(--text-4xs);
   line-height: var(--leading-body);

@@ -423,7 +423,7 @@ onMounted(loadData);
         </section>
 
         <!-- 运行状态带 -->
-        <section class="card evo-band">
+        <section class="card band">
           <template v-if="loading">
             <div v-for="i in 4" :key="i" class="fact">
               <div class="skeleton skeleton-text" style="width: 48%" />
@@ -634,7 +634,7 @@ onMounted(loadData);
       initial-focus="input"
       @close="closeRunDialog"
     >
-      <label class="evo-field">
+      <label class="field-stack">
         <span class="form-label">{{ t('admin.evolution.runConfirmPhrase') }}</span>
         <code class="evo-phrase">{{ RUN_PHRASE }}</code>
         <input
@@ -775,20 +775,7 @@ onMounted(loadData);
 }
 
 /* ══ 运行状态带 ══ */
-.evo-band {
-  display: grid;
-  grid-template-columns: 1fr;
-}
-@media (min-width: 640px) {
-  .evo-band {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-@media (min-width: 1280px) {
-  .evo-band {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-}
+
 
 
 
@@ -927,11 +914,7 @@ onMounted(loadData);
 }
 
 /* 复盘确认对话框 */
-.evo-field {
-  display: flex;
-  flex-direction: column;
-  gap:8px;
-}
+
 .evo-phrase {
   align-self: flex-start;
   padding:2px 8px;

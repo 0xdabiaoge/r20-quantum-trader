@@ -206,7 +206,7 @@ onMounted(load)
     </PageHeader>
 
     <!-- ══ 账号状态带（仅超管有意义） ══ -->
-    <section v-if="auth.isSuperadmin" class="card as-band">
+    <section v-if="auth.isSuperadmin" class="card band">
       <div v-for="f in bandFacts" :key="f.label" class="fact">
         <span class="fact-label"><component :is="f.icon" :size="12" />{{ f.label }}</span>
         <span class="fact-value" :class="f.tone">{{ f.value }}</span>
@@ -226,12 +226,12 @@ onMounted(load)
       </header>
 
       <div class="as-pwd">
-        <label class="as-field">
+        <label class="field-stack">
           <span class="form-label">{{ t('admin.adminsys.password.currentPassword') }}</span>
           <input v-model="currentPassword" type="password" autocomplete="current-password" class="field" />
         </label>
 
-        <label class="as-field">
+        <label class="field-stack">
           <span class="form-label">{{ t('admin.adminsys.password.newPassword') }}</span>
           <input v-model="newPassword" type="password" autocomplete="new-password" class="field" />
         </label>
@@ -346,12 +346,12 @@ onMounted(load)
       </div>
 
       <form id="as-create-form" class="as-create" @submit.prevent="createUser">
-        <label class="as-field">
+        <label class="field-stack">
           <span class="form-label">{{ t('admin.adminsys.create.account') }}</span>
           <input v-model="newUsername" class="field mono" autocomplete="off" />
         </label>
 
-        <label class="as-field">
+        <label class="field-stack">
           <span class="form-label">{{ t('admin.adminsys.create.role') }}</span>
           <select v-model="newRole" class="field" :aria-label="t('admin.adminsys.create.role')">
             <option value="admin">{{ t('admin.adminsys.create.roleAdmin') }}</option>
@@ -359,7 +359,7 @@ onMounted(load)
           </select>
         </label>
 
-        <label class="as-field">
+        <label class="field-stack">
           <span class="form-label">{{ t('admin.adminsys.create.password') }}</span>
           <input v-model="newPasswordForCreate" type="password" autocomplete="new-password" class="field" />
         </label>
@@ -387,20 +387,7 @@ onMounted(load)
 }
 
 /* ══ 状态带 ══ */
-.as-band {
-  display: grid;
-  grid-template-columns: 1fr;
-}
-@media (min-width: 640px) {
-  .as-band {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-@media (min-width: 1280px) {
-  .as-band {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-}
+
 
 
 
@@ -423,12 +410,7 @@ onMounted(load)
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
   }
 }
-.as-field {
-  display: flex;
-  flex-direction: column;
-  gap:6px;
-  min-width: 0;
-}
+
 .as-pwd-submit {
   display: flex;
   padding-bottom: 1px;

@@ -384,7 +384,7 @@ onBeforeUnmount(() => {
 
     <template v-else>
       <!-- ══ 通道状态带 ══ -->
-      <section class="card nf-band">
+      <section class="card band">
         <template v-if="loading && !config">
           <div v-for="i in 4" :key="i" class="fact">
             <div class="skeleton skeleton-text" style="width: 48%" />
@@ -474,7 +474,7 @@ onBeforeUnmount(() => {
                 <label
                   v-for="f in c.fields"
                   :key="f.key"
-                  class="nf-field"
+                  class="field-stack nf-field"
                   :class="{ 'is-span': f.span }"
                 >
                   <span class="form-label">{{ f.label }}</span>
@@ -556,7 +556,7 @@ onBeforeUnmount(() => {
           </header>
 
           <div class="nf-schedule">
-            <label class="nf-field is-span">
+            <label class="field-stack nf-field is-span">
               <span class="form-label">{{ t('admin.notify.scheduleLabel') }}</span>
               <input
                 v-model="config._briefingTimes"
@@ -655,20 +655,7 @@ onBeforeUnmount(() => {
 }
 
 /* ══ 状态带 ══ */
-.nf-band {
-  display: grid;
-  grid-template-columns: 1fr;
-}
-@media (min-width: 640px) {
-  .nf-band {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-@media (min-width: 1280px) {
-  .nf-band {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-}
+
 
 
 
@@ -754,12 +741,7 @@ onBeforeUnmount(() => {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
-.nf-field {
-  display: flex;
-  flex-direction: column;
-  gap:6px;
-  min-width: 0;
-}
+
 .nf-field.is-span {
   grid-column: 1 / -1;
 }

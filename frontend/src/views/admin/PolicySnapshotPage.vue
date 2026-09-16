@@ -297,7 +297,7 @@ onMounted(() => {
 
     <!-- 首屏骨架 -->
     <template v-if="loading">
-      <section class="card pol-band">
+      <section class="card band">
         <div v-for="i in 4" :key="i" class="fact">
           <div class="skeleton skeleton-text" style="width: 46%" />
           <div class="skeleton skeleton-text" style="width: 72%; height: 16px" />
@@ -311,7 +311,7 @@ onMounted(() => {
 
     <template v-else-if="snapshotData?.snapshot">
       <!-- ══ 策略身份带 ══ -->
-      <section class="card pol-band">
+      <section class="card band">
         <div class="fact">
           <span class="fact-label"><Layers :size="12" />{{ t('admin.policySnapshot.identity.activeVersion') }}</span>
           <span class="fact-value truncate" :title="v(snapshotData.snapshot.policy_version)">{{ v(snapshotData.snapshot.policy_version) }}</span>
@@ -478,7 +478,7 @@ onMounted(() => {
       @close="closeArchiveModal"
     >
       <div class="pol-form">
-        <label class="pol-field">
+        <label class="field-stack">
           <span class="form-label">{{ t('admin.policySnapshot.modal.nameLabel') }}</span>
           <input
             v-model="archiveName"
@@ -489,7 +489,7 @@ onMounted(() => {
           />
         </label>
 
-        <label class="pol-field">
+        <label class="field-stack">
           <span class="form-label">{{ t('admin.policySnapshot.modal.descLabel') }}</span>
           <textarea
             v-model="archiveDesc"
@@ -526,20 +526,7 @@ onMounted(() => {
 }
 
 /* ══ 策略身份带 ══ */
-.pol-band {
-  display: grid;
-  grid-template-columns: 1fr;
-}
-@media (min-width: 640px) {
-  .pol-band {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-@media (min-width: 1280px) {
-  .pol-band {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-}
+
 
 
 
@@ -740,11 +727,7 @@ onMounted(() => {
   flex-direction: column;
   gap: var(--ds-space-4);
 }
-.pol-field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
+
 .pol-textarea {
   width: 100%;
   resize: vertical;

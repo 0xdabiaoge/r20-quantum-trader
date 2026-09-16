@@ -550,7 +550,7 @@ onMounted(() => { loadAll(); loadMx() })
 
     <template v-else-if="config">
       <!-- ══ 接入状态带 ══ -->
-      <section class="card sc-band">
+      <section class="card band">
         <div v-for="f in bandFacts" :key="f.label" class="fact">
           <span class="fact-label"><component :is="f.icon" :size="12" />{{ f.label }}</span>
           <span class="fact-value" :class="f.tone">{{ f.value }}</span>
@@ -647,7 +647,7 @@ onMounted(() => { loadAll(); loadMx() })
               :env-text="okxEnvText" :env-label="t('admin.security.fundEnv')"
             >
               <template #env>
-                <label class="sc-field">
+                <label class="field-stack">
                   <span class="form-label">{{ t('admin.security.envTier') }}</span>
                   <select v-model="config.editable.okx_environment" class="field" :aria-label="t('admin.security.envTier')">
                     <option value="demo">{{ t('admin.security.optDemo') }}</option>
@@ -695,7 +695,7 @@ onMounted(() => { loadAll(); loadMx() })
               :env-text="binanceEnvText" :env-label="t('admin.security.fundEnv')"
             >
               <template #env>
-                <div class="sc-field">
+                <div class="field-stack">
                   <span class="form-label">{{ t('admin.security.endpointTier') }}</span>
                   <label class="sc-check">
                     <BaseSwitch v-model="mxTestnet.binance" :label="t('admin.security.binanceDemoDomain')" />
@@ -735,7 +735,7 @@ onMounted(() => { loadAll(); loadMx() })
               :env-text="gateEnvText" :env-label="t('admin.security.fundEnv')"
             >
               <template #env>
-                <div class="sc-field">
+                <div class="field-stack">
                   <span class="form-label">{{ t('admin.security.endpointTier') }}</span>
                   <label class="sc-check">
                     <BaseSwitch v-model="mxTestnet.gate" :label="t('admin.security.gateSandboxDomain')" />
@@ -832,11 +832,11 @@ onMounted(() => { loadAll(); loadMx() })
           </template>
 
           <div class="sc-form-2">
-            <label class="sc-field">
+            <label class="field-stack">
               <span class="form-label">{{ t('admin.security.capitalAmount') }}</span>
               <input v-model="newCapital" class="field num" inputmode="decimal" />
             </label>
-            <label class="sc-field">
+            <label class="field-stack">
               <span class="form-label">{{ t('admin.security.capitalConfirmLabel') }}</span>
               <input v-model="capitalConfirm" type="text" autocomplete="off" spellcheck="false" class="field mono" placeholder="UPDATE CAPITAL" />
             </label>
@@ -1023,12 +1023,12 @@ onMounted(() => { loadAll(); loadMx() })
         </p>
 
         <form id="sc-close-form" class="sc-close-fields" @submit.prevent="confirmClose">
-          <label class="sc-field">
+          <label class="field-stack">
             <span class="form-label">{{ t('admin.security.adminPasswordLabel') }}</span>
             <input v-model="closePassword" type="password" autocomplete="current-password" class="field" />
           </label>
 
-          <label class="sc-field">
+          <label class="field-stack">
             <span class="form-label">
               {{ t('admin.security.confirmPhraseLabel') }}
               <code class="sc-close-phrase">{{ closeModal.pos.close_confirmation }}</code>
@@ -1071,20 +1071,7 @@ onMounted(() => { loadAll(); loadMx() })
 }
 
 /* ══ 状态带 ══ */
-.sc-band {
-  display: grid;
-  grid-template-columns: 1fr;
-}
-@media (min-width: 640px) {
-  .sc-band {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-@media (min-width: 1280px) {
-  .sc-band {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-}
+
 
 
 
@@ -1203,12 +1190,7 @@ onMounted(() => { loadAll(); loadMx() })
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
-.sc-field {
-  display: flex;
-  flex-direction: column;
-  gap:6px;
-  min-width: 0;
-}
+
 .sc-creds {
   display: flex;
   flex-direction: column;

@@ -108,7 +108,7 @@ function ageText(a: any): string {
 
     <template v-else>
       <!-- ══ 名册状态带 ══ -->
-      <section class="card ag-band">
+      <section class="card band">
         <template v-if="showSkeleton">
           <div v-for="i in 4" :key="i" class="fact">
             <div class="skeleton skeleton-text" style="width: 48%" />
@@ -291,20 +291,7 @@ function ageText(a: any): string {
 }
 
 /* ══ 状态带 ══ */
-.ag-band {
-  display: grid;
-  grid-template-columns: 1fr;
-}
-@media (min-width: 640px) {
-  .ag-band {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-@media (min-width: 1280px) {
-  .ag-band {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-}
+
 
 
 

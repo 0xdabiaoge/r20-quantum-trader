@@ -380,7 +380,7 @@ onMounted(load)
 
     <template v-else>
       <!-- ══ 灾备状态带 ══ -->
-      <section class="card bk-band">
+      <section class="card band">
         <template v-if="loading && !simple">
           <div v-for="i in 4" :key="i" class="fact">
             <div class="skeleton skeleton-text" style="width: 48%" />
@@ -419,14 +419,14 @@ onMounted(load)
           </div>
 
           <div class="bk-fields">
-            <label class="bk-field">
+            <label class="field-stack">
               <span class="form-label">{{ t('admin.backup.secContent') }}</span>
               <select disabled class="field bk-readonly" :aria-label="t('admin.backup.secContent')">
                 <option>{{ t('admin.backup.scopeValue') }}</option>
               </select>
             </label>
 
-            <label class="bk-field">
+            <label class="field-stack">
               <span class="form-label">{{ t('admin.backup.secLocation') }}</span>
               <select v-model="destination" :disabled="!auth.isSuperadmin" class="field" :aria-label="t('admin.backup.secLocation')">
                 <option value="local">{{ t('admin.backup.destLocal') }}</option>
@@ -437,12 +437,12 @@ onMounted(load)
               </select>
             </label>
 
-            <label class="bk-field">
+            <label class="field-stack">
               <span class="form-label">{{ t('admin.backup.secSchedule') }}</span>
               <input v-model="scheduleTime" type="time" :disabled="!auth.isSuperadmin" class="field num" />
             </label>
 
-            <label class="bk-field">
+            <label class="field-stack">
               <span class="form-label">
                 {{ t('admin.backup.secRetention') }}{{ destination === 'local' ? t('admin.backup.retentionLocal') : '' }}
               </span>
@@ -456,7 +456,7 @@ onMounted(load)
               <span class="label-caps">{{ t('admin.backup.connInfo') }}</span>
             </div>
             <div class="bk-creds-grid">
-              <label v-if="destination !== 'baidu_oauth'" class="bk-field">
+              <label v-if="destination !== 'baidu_oauth'" class="field-stack">
                 <span class="form-label">Endpoint</span>
                 <input
                   v-model="endpoint"
@@ -465,11 +465,11 @@ onMounted(load)
                   class="field mono"
                 />
               </label>
-              <label v-if="needsBucket" class="bk-field">
+              <label v-if="needsBucket" class="field-stack">
                 <span class="form-label">Bucket</span>
                 <input v-model="bucket" :disabled="!auth.isSuperadmin" class="field mono" />
               </label>
-              <label v-for="f in credentialFields" :key="f" class="bk-field">
+              <label v-for="f in credentialFields" :key="f" class="field-stack">
                 <span class="form-label mono">{{ f }}</span>
                 <input
                   v-model="credentials[f]"
@@ -598,20 +598,7 @@ onMounted(load)
 }
 
 /* ══ 状态带 ══ */
-.bk-band {
-  display: grid;
-  grid-template-columns: 1fr;
-}
-@media (min-width: 640px) {
-  .bk-band {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-@media (min-width: 1280px) {
-  .bk-band {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-}
+
 
 
 
@@ -668,12 +655,7 @@ onMounted(load)
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
-.bk-field {
-  display: flex;
-  flex-direction: column;
-  gap:6px;
-  min-width: 0;
-}
+
 .bk-readonly {
   opacity: 0.7;
   cursor: not-allowed;

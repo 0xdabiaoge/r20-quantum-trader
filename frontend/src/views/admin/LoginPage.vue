@@ -93,7 +93,7 @@ async function handleLogin() {
 
         <!-- 登录表单 -->
         <form class="auth-form" @submit.prevent="handleLogin">
-          <div class="auth-field">
+          <div class="field-stack">
             <label class="auth-label" for="login-user">
               {{ t('admin.login.username') }}
             </label>
@@ -108,7 +108,7 @@ async function handleLogin() {
             />
           </div>
 
-          <div class="auth-field">
+          <div class="field-stack">
             <div class="auth-label-row">
               <label class="auth-label" for="login-pwd">
                 {{ t('admin.login.password') }}
@@ -327,11 +327,7 @@ async function handleLogin() {
   gap: 16px;
 }
 
-.auth-field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
+
 .auth-label-row {
   display: flex;
   align-items: center;

@@ -506,7 +506,7 @@ onMounted(loadLib)
 
     <template v-else>
       <!-- ══ 方案总览带 ══ -->
-      <section class="card ps-band">
+      <section class="card band">
         <template v-if="loading">
           <div v-for="i in 4" :key="i" class="fact">
             <div class="skeleton skeleton-text" style="width: 46%" />
@@ -854,7 +854,7 @@ onMounted(loadLib)
           <span>{{ importFileError }}</span>
         </div>
 
-        <div class="ps-field">
+        <div class="field-stack">
           <span class="form-label">{{ t('admin.promptStudio.import.methodOne') }}</span>
           <label class="ps-file">
             <FileUp :size="14" />
@@ -863,7 +863,7 @@ onMounted(loadLib)
           </label>
         </div>
 
-        <div class="ps-field">
+        <div class="field-stack">
           <span class="form-label">{{ t('admin.promptStudio.import.methodTwo') }}</span>
           <textarea
             v-model="importRawJson"
@@ -874,7 +874,7 @@ onMounted(loadLib)
           />
         </div>
 
-        <div class="ps-field">
+        <div class="field-stack">
           <span class="form-label">{{ t('admin.promptStudio.import.nameLabel') }}</span>
           <input
             v-model="importNameOverride"
@@ -928,7 +928,7 @@ onMounted(loadLib)
       size="sm"
       @close="closeNameDialog"
     >
-      <label class="ps-field">
+      <label class="field-stack">
         <span class="form-label">{{ t('admin.promptStudio.nameLabel') }}</span>
         <input
           v-model="nameDialog.value"
@@ -961,20 +961,7 @@ onMounted(loadLib)
 }
 
 /* ══ 方案总览带 ══ */
-.ps-band {
-  display: grid;
-  grid-template-columns: 1fr;
-}
-@media (min-width: 640px) {
-  .ps-band {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-@media (min-width: 1280px) {
-  .ps-band {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-}
+
 
 
 
@@ -1356,11 +1343,7 @@ onMounted(loadLib)
   color: var(--down);
   font-size: var(--text-3xs);
 }
-.ps-field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
+
 .ps-file {
   display: inline-flex;
   align-items: center;
