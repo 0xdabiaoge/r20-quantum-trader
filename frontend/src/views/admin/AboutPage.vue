@@ -220,8 +220,9 @@ const bandFacts = computed(() => {
                 rel="noopener noreferrer"
                 class="btn btn-primary btn-sm"
               >
-                <GitBranch :size="13" />
+                <GitBranch :size="13" aria-hidden="true" />
                 <span>{{ t('admin.about.repoLink') }}</span>
+                <span class="sr-only">{{ t('common.opensInNewTab') }}</span>
               </a>
             </footer>
           </section>

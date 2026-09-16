@@ -88,6 +88,10 @@ export const enCommon = {
       home: 'Back to the workstation',
       docs: 'Read the docs',
     },
+    // ── batch 68: external links silently open a new tab; screen reader and
+    //    keyboard users could not tell before activating. Adds a visually
+    //    hidden hint (sr-only) without changing the visual layout.
+    opensInNewTab: '(opens in a new tab)',
   },
   status: {
     normal: 'Normal',
@@ -124,5 +128,5 @@ export const enCommon = {
   // batch 39: fullwidth punctuation used to be hardcoded in templates
   // (`}}：{{`, `（{{ ... }}）`), which leaked into the English UI. Values now
   // come per language: CJK uses fullwidth, English uses ASCII with a trailing
-  // space after the colon (the template adds none).
+  // space after the colon (the template adds none).,
 };

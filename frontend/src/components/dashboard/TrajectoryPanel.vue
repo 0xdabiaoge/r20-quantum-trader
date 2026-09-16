@@ -299,8 +299,13 @@ function actionBadgeClass(action: string) {
 
           <!-- TAB 2: 系统日志流 -->
           <div v-else class="h-full flex flex-col">
+            <!-- 批 68：纯文本滚动区，内部没有任何可聚焦元素 —— 不加 tabindex
+                 键盘用户根本无法滚动这段日志（WCAG 2.1.1）。role="log" 声明其语义。 -->
             <div
               class="flex-1 overflow-y-auto rounded p-2.5 font-mono text-3xs space-y-1"
+              role="log"
+              tabindex="0"
+              :aria-label="t('dash.shell.panel.liveLog')"
               style="background-color: var(--surface-input); border: 1px solid var(--line-1); color: var(--ink-2)"
             >
               <div

@@ -61,7 +61,10 @@ function scrollToSection(id: string) {
   mobileMenuOpen.value = false;
   const el = document.getElementById(id);
   if (el) {
-    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // 批 68：base.css 的 prefers-reduced-motion 只能关掉 CSS 滚动，
+    // 关不掉 JS 的 behavior:'smooth' —— 前庭敏感用户仍会被强制平滑滚动。
+    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+    el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
   }
 }
 
@@ -165,8 +168,9 @@ onUnmounted(() => {
           rel="noopener noreferrer"
           class="btn btn-primary h-7 px-2.5 text-xs font-medium inline-flex items-center gap-1"
         >
-          <ExternalLink class="w-3.5 h-3.5" />
+          <ExternalLink class="w-3.5 h-3.5" aria-hidden="true" />
           <span class="hidden sm:inline">GitHub</span>
+          <span class="sr-only">{{ t('common.opensInNewTab') }}</span>
         </a>
       </div>
     </header>
