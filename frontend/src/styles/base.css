@@ -205,9 +205,6 @@ table {
 }
 
 /* 页面入场：路由切换时给内容一个 DSH 式轻入场 */
-.route-enter {
-  animation: r20-enter var(--dur-slow) var(--ease-out) backwards;
-}
 
 .pop-enter-active,
 .pop-leave-active {

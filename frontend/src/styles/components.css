@@ -31,14 +31,10 @@
   border: 1px solid var(--ds-color-border-default);
   border-radius: var(--r-card);
 }
-.card-pad {
-  padding: var(--sp-7) var(--sp-8);
-}
 
 /* 卡片头：统一 44px 基线高度 */
 .card-head,
-.dsh-card-header,
-.section-head {
+.dsh-card-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -59,8 +55,7 @@
   letter-spacing: var(--track-title);
   color: var(--ds-color-text-primary);
 }
-.card-sub,
-.section-desc {
+.card-sub {
   font-size: var(--text-3xs);
   color: var(--ds-color-text-placeholder);
   margin-top: 2px;
@@ -80,14 +75,6 @@
   line-height: var(--leading-body);
   color: var(--ds-color-text-description);
 }
-.card-body,
-.section-body {
-  padding: var(--ds-space-3) var(--ds-space-4);
-}
-.section-body > .dsh-card-sub:first-child {
-  margin-top: 0;
-}
-
 /* 嵌套子面板 */
 .dsh-card-sub {
   background-color: var(--ds-color-bg-surface-2);
@@ -143,14 +130,12 @@
   color: var(--ds-color-text-inverse);
 }
 
-.btn-ghost,
-.btn-secondary {
+.btn-ghost {
   background-color: var(--ds-btn-secondary-bg);
   border-color: var(--ds-btn-secondary-border);
   color: var(--ds-btn-secondary-text);
 }
-.btn-ghost:hover:not(:disabled),
-.btn-secondary:hover:not(:disabled) {
+.btn-ghost:hover:not(:disabled) {
   background-color: var(--ds-btn-secondary-hover-bg);
   border-color: var(--ds-btn-secondary-hover-border);
 }
@@ -164,16 +149,6 @@
   background-color: var(--ds-btn-ghost-hover-bg);
   border-color: var(--ds-btn-ghost-hover-border);
   color: var(--ds-color-text-primary);
-}
-
-.btn-filled {
-  background-color: var(--ds-color-bg-surface-1);
-  border-color: var(--ds-color-border-default);
-  color: var(--ds-color-text-primary);
-}
-.btn-filled:hover:not(:disabled) {
-  background-color: var(--ds-color-bg-surface-5);
-  border-color: var(--ds-color-border-hover);
 }
 
 .btn-danger {
@@ -193,25 +168,21 @@
    ⚠️ 批 13 补：此前多个页面写了 .is-danger / .is-warn 但样式表里并无定义，
    这些修饰当时是**静默无效**的（危险动作退化成中性灰），补上后即生效。 */
 .btn-quiet.is-danger,
-.btn-ghost.is-danger,
-.btn-secondary.is-danger {
+.btn-ghost.is-danger {
   color: var(--down);
 }
 .btn-quiet.is-danger:hover:not(:disabled),
-.btn-ghost.is-danger:hover:not(:disabled),
-.btn-secondary.is-danger:hover:not(:disabled) {
+.btn-ghost.is-danger:hover:not(:disabled) {
   background-color: var(--down-bg);
   border-color: var(--down-line);
   color: var(--down);
 }
 .btn-quiet.is-warn,
-.btn-ghost.is-warn,
-.btn-secondary.is-warn {
+.btn-ghost.is-warn {
   color: var(--warn);
 }
 .btn-quiet.is-warn:hover:not(:disabled),
-.btn-ghost.is-warn:hover:not(:disabled),
-.btn-secondary.is-warn:hover:not(:disabled) {
+.btn-ghost.is-warn:hover:not(:disabled) {
   background-color: var(--warn-bg);
   border-color: var(--warn-line);
   color: var(--warn);
@@ -222,20 +193,12 @@
   padding: 0 10px;
   font-size: var(--text-3xs);
 }
-.btn-lg {
-  height: var(--h-lg);
-  padding: 0 16px;
-  font-size: var(--text-sm);
-}
 .btn-icon {
   width: var(--h-md);
   padding: 0;
 }
 .btn-icon.btn-sm {
   width: var(--h-sm);
-}
-.btn-icon.btn-lg {
-  width: var(--h-lg);
 }
 
 /* =========================================================================
@@ -291,9 +254,6 @@ textarea.input {
   opacity: 0.5;
   cursor: not-allowed;
 }
-.input-prose {
-  font-family: var(--ds-font-body);
-}
 
 /* =========================================================================
    4 · 徽章 / 胶囊 / 状态点
@@ -317,9 +277,6 @@ textarea.input {
   letter-spacing: 0.02em;
   white-space: nowrap;
 }
-.badge-mono {
-  font-family: var(--ds-font-mono);
-}
 .badge-up,
 .dsh-pill.up {
   color: var(--up);
@@ -338,7 +295,6 @@ textarea.input {
   border-color: var(--warn-line);
   background-color: var(--warn-bg);
 }
-.badge-brand,
 .dsh-pill.brand {
   color: var(--brand);
   border-color: var(--r20-brand-line);
@@ -526,39 +482,6 @@ textarea.input {
 /* =========================================================================
    8 · 数据展示
    ========================================================================= */
-.stat {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-}
-.stat dt,
-.stat-label {
-  font-size: var(--text-3xs);
-  font-weight: 500;
-  letter-spacing: var(--track-label);
-  text-transform: uppercase;
-  color: var(--ds-color-text-placeholder);
-}
-.stat dd,
-.stat-value {
-  font-size: var(--text-2xl);
-  font-weight: 500;
-  letter-spacing: var(--track-display);
-  line-height: 1.1;
-  color: var(--ds-color-text-primary);
-  font-variant-numeric: tabular-nums;
-}
-.stat-value.is-up {
-  color: var(--up);
-}
-.stat-value.is-down {
-  color: var(--down);
-}
-.stat .stat-foot {
-  font-size: var(--text-3xs);
-  color: var(--ds-color-text-placeholder);
-}
 
 /* 键值行 */
 .kv {
@@ -610,7 +533,6 @@ textarea.input {
   border-radius: 0;
   background-color: transparent;
 }
-.log-line,
 .dsh-log-entry {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -619,23 +541,8 @@ textarea.input {
   border-radius: var(--r-xs);
   transition: background-color var(--dur-fast);
 }
-.log-line:hover,
 .dsh-log-entry:hover {
   background-color: var(--ds-color-bg-hover);
-}
-.log-line > time {
-  color: var(--ds-color-text-placeholder);
-  white-space: nowrap;
-}
-.log-line > span {
-  color: var(--ds-color-text-secondary);
-  overflow-wrap: anywhere;
-}
-.log-line.is-error > span {
-  color: var(--down);
-}
-.log-line.is-warn > span {
-  color: var(--warn);
 }
 
 /* ---------------------------------------------------------------------------
@@ -694,8 +601,10 @@ textarea.input {
 
    已确认统一到**更紧凑的一档**：数值 `--text-md`(14px) + 脚注 `--text-4xs`(11px)
    —— 脚注比标签 `--text-3xs`(11.5px) 小一档，层次正确。
-   `tabular-nums` 补全：全站其它数字位（`.stat dd` / `.table .col-num` / `.kv dd`）
-   本来就开着，统计单元没开会让数字随取值横向抖动。
+   `tabular-nums` 补全：全站其它数字位（`.table .col-num` / `.kv dd`）本来就开着，
+   统计单元没开会让数字随取值横向抖动。
+   ⚠️ 批 95：原注释还举了 `.stat dd` 为例 —— 该家族（`.stat`/`.stat-label`/
+   `.stat-value`/`.stat-foot`）已被确认零引用并删除，故从举例中去掉。
 
    页面侧只保留真正的 delta（`RiskPage` 的 `.rk-fact` 是另一种组件 ——
    单行省略 + 常驻左框，**不**并入本原件）。
@@ -950,22 +859,6 @@ kbd {
   font-size: var(--text-4xs);
   line-height: 1;
 }
-.divider {
-  height: 1px;
-  background-color: var(--ds-color-border-default);
-  border: 0;
-  margin: var(--ds-space-3) 0;
-}
-.divider-v {
-  width: 1px;
-  align-self: stretch;
-  background-color: var(--ds-color-border-default);
-}
-.truncate-1 {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 .scroll-area {
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -1077,12 +970,6 @@ kbd {
 }
 .dot-up {
   background-color: var(--up);
-}
-.dot-down {
-  background-color: var(--down);
-}
-.dot-warn {
-  background-color: var(--warn);
 }
 
 /* 文字色调工具类 */
