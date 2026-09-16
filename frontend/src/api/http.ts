@@ -3,6 +3,7 @@
  * 迁移自旧 useApi()，行为保持：401 登出、FastAPI 422 detail 数组转中文提示。
  */
 import { useAuthStore } from '../stores/auth';
+import { useI18n } from '../composables/useI18n';
 
 export class HttpError extends Error {
   status: number;
@@ -13,13 +14,21 @@ export class HttpError extends Error {
   }
 }
 
-/** 把 FastAPI 的 detail（字符串或 422 数组）归一为人话 */
-export function normalizeDetail(data: any, status: number): string {
+/**
+ * 把 FastAPI 的 detail（字符串或 422 数组）归一为人话。
+ *
+ * 批 76：拼接串此前硬编码中文（`请求` / `：` / `；`），英文界面下会混进中文标点。
+ * 这里做成**参数可注入**（默认取当前语言），既满足 i18n，也让纯函数可被测试直接调用。
+ */
+export function normalizeDetail(data: any, status: number, t?: (key: string) => string): string {
+  const tr = t || useI18n().t;
   const detail = data?.detail ?? data?.message;
   if (Array.isArray(detail)) {
+    const colon = tr('common.punct.colon');
+    const sep = tr('common.punct.semicolon');
     return detail
-      .map((x: any) => `${(x.loc || []).slice(1).join('.') || '请求'}：${x.msg}`)
-      .join('；');
+      .map((x: any) => `${(x.loc || []).slice(1).join('.') || tr('common.requestFailed')}${colon}${x.msg}`)
+      .join(sep);
   }
   if (typeof detail === 'string' && detail) return detail;
   return `HTTP ${status}`;
@@ -38,7 +47,7 @@ export async function http<T = any>(path: string, options: RequestInit = {}): Pr
       },
     });
   } catch (e: any) {
-    throw new HttpError('网络错误，请稍后重试', 0);
+    throw new HttpError(useI18n().t('common.networkRetry'), 0);
   }
 
   let data: any = null;
@@ -50,7 +59,7 @@ export async function http<T = any>(path: string, options: RequestInit = {}): Pr
 
   if (resp.status === 401 && auth.token) {
     auth.logout();
-    throw new HttpError('会话已过期，请重新登录', 401);
+    throw new HttpError(useI18n().t('common.sessionExpired'), 401);
   }
   if (!resp.ok) {
     throw new HttpError(normalizeDetail(data, resp.status), resp.status);

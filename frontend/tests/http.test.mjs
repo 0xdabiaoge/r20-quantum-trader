@@ -20,12 +20,24 @@ import path from 'node:path';
 import fs from 'node:fs';
 
 // ① 解析钩子：相对、无扩展名 → 补 .ts（并在存在时优先 .ts）
+//
+// 批 76：还必须处理**目录导入**。`src/locales/zh/index.ts` 里写的是 `./dash`，
+// Vite 能解析成 `./dash/index.ts`，Node 的 ESM 解析器直接抛
+// `ERR_UNSUPPORTED_DIR_IMPORT`。此前 `http.ts` 不依赖 i18n 所以碰不到；
+// 一旦某模块（间接）依赖 i18n，任何加载它的 node 测试都会在**解析阶段**就挂掉 ——
+// 补上目录 → `/index.ts` 这一档，比要求整个 locale 树改成显式 `/index` 更稳妥。
 registerHooks({
   resolve(specifier, context, nextResolve) {
     if (specifier.startsWith('.') && !path.extname(specifier) && context.parentURL) {
       const base = path.dirname(fileURLToPath(context.parentURL));
       for (const ext of ['.ts', '.js']) {
         const cand = path.join(base, specifier + ext);
+        if (fs.existsSync(cand)) {
+          return { url: pathToFileURL(cand).href, shortCircuit: true };
+        }
+      }
+      for (const ext of ['.ts', '.js']) {
+        const cand = path.join(base, specifier, 'index' + ext);
         if (fs.existsSync(cand)) {
           return { url: pathToFileURL(cand).href, shortCircuit: true };
         }

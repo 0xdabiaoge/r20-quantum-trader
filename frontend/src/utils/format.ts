@@ -129,13 +129,19 @@ export function fmtHM(input: TimeInput): string {
   return p ? `${p.hour}:${p.minute}` : '--';
 }
 
-/** 置信度 → 档位（未校准概率不展示裸数字，悬停/详情给原值） */
-export function confTier(v: number | null | undefined): { tier: 'high' | 'mid' | 'low'; label: string } | null {
+/**
+ * 置信度 → 档位（未校准概率不展示裸数字，悬停/详情给原值）。
+ *
+ * 批 76：原先还返回一个中文 `label`（高/中/低），**全站无人使用** ——
+ * `ConfBadge` 一直用 `t('common.conf.<tier>')` 自己取词。
+ * 这个死字段是一颗隐雷：将来谁读了它就会在英文界面渲染出中文，故删掉。
+ */
+export function confTier(v: number | null | undefined): { tier: 'high' | 'mid' | 'low' } | null {
   const n = Number(v);
   if (!Number.isFinite(n) || n <= 0) return null;
-  if (n >= 80) return { tier: 'high', label: '高' };
-  if (n >= 65) return { tier: 'mid', label: '中' };
-  return { tier: 'low', label: '低' };
+  if (n >= 80) return { tier: 'high' };
+  if (n >= 65) return { tier: 'mid' };
+  return { tier: 'low' };
 }
 
 /** 去掉文本前导装饰性 emoji（后端台账 exit_reason 等历史数据带 🛑/✨/🛡 前缀，设计语言不再使用装饰 emoji） */

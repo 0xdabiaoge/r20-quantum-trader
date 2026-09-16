@@ -72,19 +72,29 @@ export function venueToneCls(v: unknown): string {
   );
 }
 
-/** 淘汰阶段 → 中文阶段名（对齐 venue_router._stage_of；未知阶段原样透传） */
-export function stageLabel(stage: unknown): string {
+/**
+ * 淘汰阶段 → 阶段名（对齐 `venue_router._stage_of`；未知阶段原样透传）。
+ *
+ * 批 76：此前表里是硬编码中文，英文界面下会直接显示中文。
+ * 沿用本项目纯工具模块的既有约定（见 `llmLogic.effortOptions(labelOf)`）：
+ * **文案由调用方注入**，本模块不 import i18n。
+ * 阶段 → i18n 键的映射固定在这里，避免调用方各写一份。
+ */
+const STAGE_KEY: Record<string, string> = {
+  executable: 'dash.venueAccounts.stage.executable',
+  listing: 'dash.venueAccounts.stage.listing',
+  precision: 'dash.venueAccounts.stage.precision',
+  freshness: 'dash.venueAccounts.stage.freshness',
+  budget: 'dash.venueAccounts.stage.budget',
+  unknown: 'dash.venueAccounts.stage.unknown',
+};
+
+export function stageLabel(stage: unknown, labelOf?: (key: string) => string): string {
   const s = String(stage ?? '').trim();
   if (!s) return '--';
-  const map: Record<string, string> = {
-    executable: '执行开闸',
-    listing: '合约目录',
-    precision: '精度/最小量',
-    freshness: '行情新鲜度',
-    budget: '预算',
-    unknown: '未分类',
-  };
-  return map[s.toLowerCase()] || s;
+  const key = STAGE_KEY[s.toLowerCase()];
+  if (!key || !labelOf) return s;
+  return labelOf(key);
 }
 
 /**

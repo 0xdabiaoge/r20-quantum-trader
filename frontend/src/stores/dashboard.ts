@@ -1,8 +1,11 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { useI18n } from '../composables/useI18n'
 import type { DashboardResponse, InstrumentFactor, PositionItem, PendingOrderItem } from '../types/dashboard'
 
 export const useDashboardStore = defineStore('dashboard', () => {
+  // 批 76：回落文案改走 i18n（useI18n 只读模块级 locale ref，在 store 作用域调用是安全的）
+  const { t } = useI18n()
   const activeTab = ref<'trading' | 'factors' | 'news' | 'lab' | 'history'>('trading')
   const data = ref<DashboardResponse | null>(null)
   const loading = ref<boolean>(false)
@@ -67,7 +70,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
       }
     })
   })
-  const macroAssessment = computed(() => data.value?.macro_assessment || '全市场宏观多周期多因子矩阵扫描中...')
+  const macroAssessment = computed(() => data.value?.macro_assessment || t('common.dashboardScanning'))
   // 不再伪造默认模型名：数据缺失时返回空对象，由视图显式呈现「未配置」，避免界面谎报正在使用的模型。
   const llmRuntime = computed(() => data.value?.llm_runtime || {})
   // 巡检日志倒序展示：最新在前（后端按时间正序 tail，此处仅显示层反转）
@@ -108,7 +111,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
     } catch (err: any) {
       if (mySeq < _lastAppliedSeq) return
       console.error('[DashboardStore] fetch failed:', err)
-      error.value = err.message || '获取数据失败'
+      error.value = err.message || t('common.dashboardLoadFailed')
       isConnected.value = false
     } finally {
       _inflight = false

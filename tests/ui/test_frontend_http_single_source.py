@@ -76,6 +76,9 @@ ROOT = Path(__file__).resolve().parents[2]
 FRONTEND = ROOT / "frontend"
 HTTP_TS = FRONTEND / "src" / "api" / "http.ts"
 USE_API_TS = FRONTEND / "src" / "composables" / "useApi.ts"
+# 批 76：HTTP 层的用户可见文案迁到 i18n 词条（英文界面此前只显示中文）。
+# 契约从"字面量写在 http.ts 里"变为"经 i18n 键取到同一条文案"。
+ZH_COMMON_TS = FRONTEND / "src" / "locales" / "zh" / "common.ts"
 
 
 def _read(p: Path) -> str:
@@ -144,21 +147,38 @@ class ErrorContractTest(unittest.TestCase):
         self.assertIn("class HttpError extends Error", src)
 
     def test_session_expired_message_unchanged(self):
-        """各页 `catch (e) { toast(e.message) }` 直接展示这个文案。"""
-        self.assertIn("'会话已过期，请重新登录'", _read(HTTP_TS))
+        """各页 `catch (e) { toast(e.message) }` 直接展示这个文案。
+
+        批 76：文案本身**逐字不变**，只是从 `http.ts` 的字面量搬到 zh 词条，
+        由 `t('common.sessionExpired')` 取。故这里同时断言
+        「http.ts 经该键取值」+「zh 词条仍是这条文案」。
+        """
+        self.assertIn("'common.sessionExpired'", _read(HTTP_TS))
+        self.assertIn("sessionExpired: '会话已过期，请重新登录'", _read(ZH_COMMON_TS))
 
     def test_network_failure_message_is_the_friendly_one(self):
         """⚠️ 本刀修的漂移：网络层失败必须是中文友好文案，
 
         而不是旧 `useApi` 里原样冒出的 `TypeError: Failed to fetch`。
+        批 76 同上：改断言"键 + zh 词条"，文案逐字不变。
         """
-        src = _read(HTTP_TS)
-        self.assertIn("'网络错误，请稍后重试'", src)
+        self.assertIn("'common.networkRetry'", _read(HTTP_TS))
+        self.assertIn("networkRetry: '网络错误，请稍后重试'", _read(ZH_COMMON_TS))
 
     def test_normalize_detail_handles_fastapi_422_array(self):
+        """422 数组仍要拼成「字段：原因；字段：原因」。
+
+        批 76：连接符改为 `t('common.punct.colon')` / `t('common.punct.semicolon')`
+        （英文界面下不该混进中文标点），故断言键 + zh 词条里的连接符。
+        """
         src = _read(HTTP_TS)
         self.assertIn("Array.isArray(detail)", src)
-        self.assertIn(".join('；')", src)
+        # 断言**键**而非 `t(...)` 调用形状 —— 局部变量名（此处为 `tr`）不该被钉死
+        self.assertIn("'common.punct.colon'", src)
+        self.assertIn("'common.punct.semicolon'", src)
+        zh = _read(ZH_COMMON_TS)
+        self.assertIn("colon: '：'", zh)
+        self.assertIn("semicolon: '；'", zh)
 
 
 class ConsumersKeepWorkingTest(unittest.TestCase):

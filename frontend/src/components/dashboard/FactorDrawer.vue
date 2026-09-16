@@ -224,7 +224,7 @@ const vdBudgetText = computed(() => {
                 <tbody>
                   <tr v-for="(r, i) in vdRejected" :key="'vd-j-' + i">
                     <td class="font-semibold" :style="{ color: venueColor(r.venue) }">{{ venueLabel(r.venue) }}</td>
-                    <td><span class="badge">{{ stageLabel(r.stage) }}</span></td>
+                    <td><span class="badge">{{ stageLabel(r.stage, t) }}</span></td>
                     <td class="max-w-[320px] truncate text-xs" style="color: var(--ink-2)" :title="String(r.reason || '')">{{ r.reason || '--' }}</td>
                   </tr>
                 </tbody>

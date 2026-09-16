@@ -52,4 +52,15 @@ export const enVenueAccounts = {
     envMismatch: 'Data environment differs from current selection',
     tip: 'Portfolio risk budget',
   },
+
+  /* batch 76: stage names used to be hard-coded Chinese in
+     utils/venueMeta.stageLabel, so the English UI showed Chinese. */
+  stage: {
+    executable: 'Executable',
+    listing: 'Contract listing',
+    precision: 'Precision / min size',
+    freshness: 'Quote freshness',
+    budget: 'Budget',
+    unknown: 'Unclassified',
+  },
 };

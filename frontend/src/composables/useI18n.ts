@@ -1,6 +1,9 @@
 import { ref, computed } from 'vue'
-import { zhCN } from '../locales/zh'
-import { enUS } from '../locales/en'
+// 批 76：写成显式 `/index` —— 目录导入只有 Vite 能解析，
+// 而 `frontend/tests/*.test.mjs` 的自定义 loader 只试 `.ts`/`.js` 文件，
+// 于是任何（直接或间接）依赖本模块的 node 测试都会在解析阶段就挂掉。
+import { zhCN } from '../locales/zh/index'
+import { enUS } from '../locales/en/index'
 
 export type LocaleType = 'zh-CN' | 'en-US'
 

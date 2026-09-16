@@ -52,4 +52,15 @@ export const zhVenueAccounts = {
     envMismatch: '数据环境与当前选择不一致',
     tip: '组合风险预算',
   },
+
+  /* 批 76：淘汰阶段名此前硬编码在 utils/venueMeta.stageLabel 里，英文界面显示中文。
+     阶段键对齐 venue_router._stage_of；未知阶段由调用方原样透传。 */
+  stage: {
+    executable: '执行开闸',
+    listing: '合约目录',
+    precision: '精度/最小量',
+    freshness: '行情新鲜度',
+    budget: '预算',
+    unknown: '未分类',
+  },
 };
