@@ -403,7 +403,7 @@ onMounted(loadData)
               </p>
             </div>
 
-            <div class="rk-input-group">
+            <div class="rk-input-group focus-ring">
               <input
                 v-model="disp[levMinP.key]"
                 type="number"
@@ -446,7 +446,7 @@ onMounted(loadData)
             </div>
 
             <div class="rk-row-ctl">
-              <div class="rk-input-group">
+              <div class="rk-input-group focus-ring">
                 <input
                   v-model="disp[p.key]"
                   type="number"

@@ -1207,6 +1207,12 @@ onMounted(loadData);
 .cn-name-input:read-only {
   border-bottom-color: transparent;
 }
+/* 批 22：这些内联输入框都写了 outline:none，此前没有任何焦点提示。
+   席位名是虚线底框，焦点改成实线 + 品牌色，局部可见即可。 */
+.cn-name-input:focus {
+  border-bottom-style: solid;
+  border-bottom-color: var(--ds-color-border-input-focus);
+}
 .cn-editor-sub {
   font-size: var(--text-4xs);
   color: var(--ds-color-text-placeholder);

@@ -76,7 +76,7 @@ const {
 
       <!-- 过滤 + 列表 -->
       <template v-if="remoteFetchResult?.ok">
-        <div class="rf-search">
+        <div class="rf-search focus-ring">
           <Search :size="13" />
           <input v-model="remoteSearch" :placeholder="t('admin.llm.filterPlaceholder')" class="rf-search-input" />
         </div>

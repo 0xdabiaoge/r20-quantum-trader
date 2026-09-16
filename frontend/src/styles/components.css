@@ -264,6 +264,15 @@ textarea.input {
   border-color: var(--ds-color-border-input-focus);
   box-shadow: 0 0 0 1px var(--ds-color-border-input-focus);
 }
+/* —— 复合输入框（无边框 input 嵌在有边框包裹层里）——
+   批 22：全站有 6 个这类输入框（审计/网关/风控/模型连接的搜索与数字输入、
+   席位名内联编辑），它们都写了 `outline: none`（否则框内再套一个环），
+   但包裹层此前**没有任何焦点样式** —— 键盘 Tab 进去完全看不到焦点在哪，
+   鼠标点进去也没有反馈。给包裹层加 .focus-ring，复用 .input:focus 的同一套视觉。 */
+.focus-ring:focus-within {
+  border-color: var(--ds-color-border-input-focus);
+  box-shadow: 0 0 0 1px var(--ds-color-border-input-focus);
+}
 .field:disabled,
 .input:disabled {
   opacity: 0.5;

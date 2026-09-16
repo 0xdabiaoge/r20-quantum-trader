@@ -177,7 +177,7 @@ onMounted(load)
           <h2 class="card-title"><ScrollText :size="14" />{{ t('admin.audit.recordsTitle') }}</h2>
 
           <div class="au-tools">
-            <div class="au-search">
+            <div class="au-search focus-ring">
               <Search :size="13" />
               <input v-model="search" :placeholder="t('admin.audit.searchPlaceholder')" class="au-search-input" />
             </div>

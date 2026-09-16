@@ -177,7 +177,7 @@ const bandFacts = () => [
           <span class="pv-hint">{{ t('admin.llm.validRange') }}</span>
         </div>
         <div class="pv-field-row">
-          <div class="pv-num">
+          <div class="pv-num focus-ring">
             <input
               v-model.number="thinkingTimeoutInput"
               type="number"
@@ -237,7 +237,7 @@ const bandFacts = () => [
             <span class="pv-hint">{{ t('admin.llm.attemptsRange') }}</span>
           </div>
           <div class="pv-field-row">
-            <div class="pv-num">
+            <div class="pv-num focus-ring">
               <input
                 v-model.number="requestAttemptsInput"
                 type="number"
@@ -339,7 +339,7 @@ const bandFacts = () => [
     <section class="card">
       <header class="card-head">
         <h2 class="card-title"><Server :size="14" />{{ t('admin.llm.providersTitle') }}</h2>
-        <div class="pv-search">
+        <div class="pv-search focus-ring">
           <Search :size="13" />
           <input v-model="searchQuery" :placeholder="t('admin.llm.searchPlaceholder')" class="pv-search-input" />
         </div>
