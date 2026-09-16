@@ -413,7 +413,7 @@ onMounted(loadData);
             <span class="label-caps">
               {{ t('admin.evolution.insightsTitle', undefined, { n: evolutionReport.insights.length }) }}
             </span>
-            <div class="log-panel evo-insight-panel">
+            <div class="log-panel is-flush evo-insight-panel">
               <div v-for="(ins, idx) in evolutionReport.insights" :key="idx" class="evo-insight">
                 <span class="evo-insight-n mono">#{{ Number(idx) + 1 }}</span>
                 <span class="evo-insight-text">{{ ins }}</span>
@@ -752,8 +752,6 @@ onMounted(loadData);
   padding: var(--ds-space-3) var(--ds-space-4) var(--ds-space-4);
 }
 .evo-insight-panel {
-  border: 0;
-  background-color: transparent;
   padding: 6px 0 0;
   max-height: 200px;
 }

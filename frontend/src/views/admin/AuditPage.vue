@@ -221,7 +221,7 @@ onMounted(load)
           :text="records.length ? t('admin.audit.noMatch') : t('admin.audit.empty')"
         />
 
-        <div v-else class="log-panel au-rows">
+        <div v-else class="log-panel is-flush au-rows">
           <button
             v-for="(r, i) in filtered"
             :key="i"
@@ -359,9 +359,6 @@ onMounted(load)
 }
 .au-rows {
   max-height: 580px;
-  border: 0;
-  border-radius: 0;
-  background-color: transparent;
 }
 .au-row {
   display: grid;

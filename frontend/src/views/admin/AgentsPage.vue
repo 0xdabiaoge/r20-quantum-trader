@@ -231,7 +231,7 @@ function ageText(a: any): string {
 
           <BaseEmpty v-if="!calls.length" :text="t('admin.agents.emptyCalls')" />
 
-          <div v-else class="log-panel ag-calls">
+          <div v-else class="log-panel is-flush ag-calls">
             <div v-for="c in calls" :key="c.id" class="ag-call">
               <span class="ag-call-caller truncate" :title="c.caller">{{ c.caller || '--' }}</span>
               <span class="ag-call-model mono truncate" :title="c.model">{{ c.model || '--' }}</span>
@@ -443,9 +443,6 @@ function ageText(a: any): string {
   padding: var(--ds-space-3) var(--ds-space-4) 6px;
 }
 .ag-calls {
-  border: 0;
-  border-radius: 0;
-  background-color: transparent;
   padding: 0 0 var(--ds-space-3);
   max-height: 300px;
 }

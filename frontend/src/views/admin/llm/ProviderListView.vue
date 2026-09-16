@@ -332,7 +332,7 @@ const bandFacts = () => [
 
       <p v-if="!failoverEvents.length" class="pv-empty pad">{{ t('admin.llm.noFailover') }}</p>
 
-      <div v-else class="log-panel pv-audit">
+      <div v-else class="log-panel is-flush pv-audit">
         <div v-for="(ev, i) in failoverEvents.slice(0, 8)" :key="i" class="pv-audit-row">
           <span class="badge" :class="ev.succeeded ? 'badge-up' : 'badge-down'">
             {{ ev.type === 'fallback_hit' ? t('admin.llm.fallbackHit') : t('admin.llm.chainDead') }}
@@ -689,9 +689,6 @@ const bandFacts = () => [
   gap:6px;
 }
 .pv-audit {
-  border: 0;
-  border-radius: 0;
-  background-color: transparent;
   max-height: 240px;
 }
 .pv-audit-row {

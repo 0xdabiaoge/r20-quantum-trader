@@ -651,6 +651,20 @@ textarea.input {
   line-height: 1.6;
   overflow: auto;
 }
+
+/* 批 92：`.log-panel` 的**嵌入式（flush）**变体。
+   实测 6 处用法分两派：
+     · 保留原件外观（1px 边框 + 8px 圆角 + inset 底色）：`.ab-git`、`.rf-list`；
+     · 贴在 `.card` 内部时把自己的边框/圆角/底色全部关掉：4 处。
+   而这 4 处是**各自手写**的，其中 3 处逐条相同
+   （`.ag-calls` / `.au-rows` / `.pv-audit` 都写 `border: 0; border-radius: 0;
+   background-color: transparent;`），第 4 处（`.evo-insight-panel`）**漏掉了圆角**
+   —— 手写重复必然漂移，与批 90 键值行同因。收进原件一个具名变体。 */
+.log-panel.is-flush {
+  border: 0;
+  border-radius: 0;
+  background-color: transparent;
+}
 .log-line,
 .dsh-log-entry {
   display: grid;
