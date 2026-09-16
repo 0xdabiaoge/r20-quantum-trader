@@ -536,7 +536,7 @@ onUnmounted(() => {
       <button
         type="button"
         class="absolute top-4 right-4 btn btn-quiet btn-icon text-white hover:bg-white/20"
-        :title="t('common.close')"
+        :title="`${t('common.close')} (Esc)`"
         :aria-label="t('common.close')"
         @click="zoomImage = null"
       >

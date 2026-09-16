@@ -69,7 +69,7 @@ onBeforeUnmount(releaseModalFocus);
               </div>
               <div class="flex items-center gap-1 shrink-0">
                 <slot name="actions" />
-                <button class="btn btn-quiet btn-icon" :title="t('common.close')" :aria-label="t('common.close')" @click="emit('close')"><X /></button>
+                <button class="btn btn-quiet btn-icon" :title="`${t('common.close')} (Esc)`" :aria-label="t('common.close')" @click="emit('close')"><X /></button>
               </div>
             </header>
             <div class="scroll-y flex-1 px-5 py-4">

@@ -80,7 +80,7 @@ onBeforeUnmount(releaseModalFocus);
               <button
                 v-if="showClose"
                 class="btn btn-quiet btn-icon shrink-0 -me-1.5"
-                :title="t('common.close')"
+                :title="`${t('common.close')} (Esc)`"
                 :aria-label="t('common.close')"
                 @click="emit('close')"
               >

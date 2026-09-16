@@ -59,9 +59,9 @@ test('所有 type="number" 输入框必须显式声明 inputmode', () => {
 
 test('BaseDialog、BaseDrawer 与 TrajectoryPanel 关闭按钮必须具备 title 与 aria-label', () => {
   const targets = [
-    { file: 'components/base/BaseDialog.vue', hasTitle: /:title="t\('common\.close'\)"/ },
-    { file: 'components/base/BaseDrawer.vue', hasTitle: /:title="t\('common\.close'\)"/ },
-    { file: 'components/dashboard/TrajectoryPanel.vue', hasTitle: /:title="t\('dash\.shell\.panel\.closeAria'\)"/ },
+    { file: 'components/base/BaseDialog.vue', hasTitle: /:title=".*t\('common\.close'\)/ },
+    { file: 'components/base/BaseDrawer.vue', hasTitle: /:title=".*t\('common\.close'\)/ },
+    { file: 'components/dashboard/TrajectoryPanel.vue', hasTitle: /:title=".*t\('dash\.shell\.panel\.closeAria'\)/ },
   ];
 
   for (const { file, hasTitle } of targets) {

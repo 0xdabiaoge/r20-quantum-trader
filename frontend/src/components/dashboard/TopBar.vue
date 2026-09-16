@@ -81,11 +81,13 @@ const activeTab = computed(() => {
       <button
         class="inline-flex h-[var(--h-md)] items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium cursor-pointer transition-colors hover:border-[var(--line-2)]"
         style="background-color: var(--surface-2); border-color: var(--line-1); color: var(--ink-1)"
+        :title="`${t('dash.shell.trajectoryBtn')} (⌘J)`"
         @click="trajectoryOpen = true"
       >
         <span class="dsh-status-dot active" aria-hidden="true" />
         <Activity class="h-3.5 w-3.5 text-blue-400" />
         <span>{{ t('dash.shell.trajectoryBtn') }}</span>
+        <kbd class="hidden sm:inline-flex ml-0.5">⌘J</kbd>
       </button>
 
       <!-- 偏好设置 -->

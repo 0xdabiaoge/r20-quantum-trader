@@ -137,9 +137,10 @@ function actionBadgeClass(action: string) {
           </div>
 
           <div class="flex items-center gap-1.5">
+            <kbd class="hidden sm:inline-flex">Esc</kbd>
             <button
               class="btn btn-quiet btn-icon cursor-pointer h-7 w-7"
-              :title="t('dash.shell.panel.closeAria')"
+              :title="`${t('dash.shell.panel.closeAria')} (Esc)`"
               :aria-label="t('dash.shell.panel.closeAria')"
               @click="emit('close')"
             >

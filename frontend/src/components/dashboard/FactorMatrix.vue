@@ -7,6 +7,7 @@
 import { computed, ref } from 'vue';
 import { useDashboardStore } from '../../stores/dashboard';
 import { useI18n } from '../../composables/useI18n';
+import { useHotkeys } from '../../composables/useHotkeys';
 import { fmtNum, fmtPct, fmtPrice, arrow, dirClass } from '../../utils/format';
 import {
   Activity,
@@ -32,6 +33,17 @@ const detail = ref<any>(null);
 
 // 搜索与过滤
 const searchQuery = ref('');
+const searchInput = ref<HTMLInputElement | null>(null);
+
+useHotkeys({
+  '/': {
+    handler: () => {
+      searchInput.value?.focus();
+      searchInput.value?.select();
+    },
+    preventDefault: true,
+  },
+});
 const filterMode = ref<'all' | 'long' | 'short' | 'wait'>('all');
 
 // 客户端排序状态
@@ -169,13 +181,20 @@ const processedRows = computed(() => {
         <div class="relative">
           <Search class="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-[var(--ink-3)]" />
           <input
+            ref="searchInput"
             v-model="searchQuery"
             type="search"
             :aria-label="t('dash.matrix.searchPlaceholder')"
             :placeholder="t('dash.matrix.searchPlaceholder')"
-            class="h-6 w-36 rounded border border-[var(--line-1)] pl-6 pr-2 text-3xs transition-colors focus:outline-none focus:border-[var(--ds-color-border-input-focus)] focus:ring-1 focus:ring-[var(--ds-color-border-input-focus)]"
+            class="h-6 w-36 rounded border border-[var(--line-1)] pl-6 pr-6 text-3xs transition-colors focus:outline-none focus:border-[var(--ds-color-border-input-focus)] focus:ring-1 focus:ring-[var(--ds-color-border-input-focus)]"
             style="background-color: var(--surface-2); color: var(--ink-1)"
           />
+          <kbd
+            v-if="!searchQuery"
+            class="hidden sm:inline-flex absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none opacity-60"
+          >
+            /
+          </kbd>
         </div>
 
         <!-- 多空过滤小标签 -->
