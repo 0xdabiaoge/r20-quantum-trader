@@ -219,7 +219,7 @@ onMounted(load)
             <span class="au-time mono num">{{ fmtDateTime(r.timestamp) }}</span>
 
             <span class="badge" :class="statusTone(r.status)" :title="r.status">
-              <component :is="statusIcon(r.status)" :size="10" />
+              <component :is="statusIcon(r.status)" :size="11" />
               {{ statusLabel(r.status) }}
             </span>
 

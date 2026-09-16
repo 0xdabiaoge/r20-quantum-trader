@@ -616,7 +616,7 @@ onBeforeUnmount(() => {
 
       <template #footer>
         <button class="btn btn-ghost btn-sm" @click="startQqBind">
-          <RefreshCw :size="13" />
+          <RefreshCw :size="14" />
           <span>{{ t('admin.notify.refreshQr') }}</span>
         </button>
         <button class="btn btn-primary btn-sm" @click="closeBindModal">

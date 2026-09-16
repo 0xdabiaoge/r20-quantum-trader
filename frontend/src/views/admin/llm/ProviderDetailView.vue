@@ -214,17 +214,17 @@ function monogram(name: string): string {
               <div class="pd-caps">
                 <span v-if="m.capabilities?.includes('chat')" class="badge">{{ t('admin.llm.capChat') }}</span>
                 <span v-if="m.capabilities?.includes('vision')" class="badge">
-                  <ImageIcon :size="10" />{{ t('admin.llm.capVision') }}
+                  <ImageIcon :size="11" />{{ t('admin.llm.capVision') }}
                 </span>
                 <span v-if="m.capabilities?.includes('tools')" class="badge" :title="t('admin.llm.capToolsTitle')">
-                  <Wrench :size="10" />tools
+                  <Wrench :size="11" />tools
                 </span>
                 <span
                   v-if="m.capabilities?.includes('reasoning') || m.reasoning_type !== 'none'"
                   class="badge"
                   :title="t('admin.llm.capReasonTitle')"
                 >
-                  <Brain :size="10" />{{ t('admin.llm.capThink') }}
+                  <Brain :size="11" />{{ t('admin.llm.capThink') }}
                 </span>
                 <span v-if="m.context_length" class="pd-ctx mono">{{ (m.context_length / 1000).toFixed(0) }}k</span>
               </div>
@@ -246,7 +246,7 @@ function monogram(name: string): string {
                 :title="t('admin.llm.testConnTitle')"
                 @click="runTestModel(m)"
               >
-                <RefreshCw :size="13" :class="testLoading && testingModelId === m.id ? 'pd-spin' : ''" />
+                <RefreshCw :size="14" :class="testLoading && testingModelId === m.id ? 'pd-spin' : ''" />
               </button>
 
               <button class="btn btn-ghost btn-icon btn-sm" :title="t('admin.llm.editParamsTitle')" @click="openEditModelModal(m)">

@@ -312,7 +312,7 @@ const bandFacts = () => [
       <div class="pv-audit-head">
         <span class="label-caps"><History :size="11" />{{ t('admin.llm.recentFailover') }}</span>
         <button class="btn btn-ghost btn-sm" @click="loadFailoverEvents">
-          <RefreshCw :size="12" />
+          <RefreshCw :size="14" />
           <span>{{ t('admin.llm.refresh') }}</span>
         </button>
       </div>
@@ -357,7 +357,7 @@ const bandFacts = () => [
         <p class="state-title">{{ t('common.loadFailed') }}</p>
         <p class="state-desc">{{ t('common.networkError') }}</p>
         <button class="btn btn-ghost btn-sm" :disabled="loading" @click="loadConfig">
-          <RefreshCw :size="13" />
+          <RefreshCw :size="14" />
           <span>{{ t('common.retry') }}</span>
         </button>
       </div>

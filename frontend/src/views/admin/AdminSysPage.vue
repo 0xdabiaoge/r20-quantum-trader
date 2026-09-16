@@ -295,7 +295,7 @@ onMounted(load)
 
           <span class="as-role">
             <span class="badge" :class="u.role === 'superadmin' ? 'badge-accent' : ''">
-              <ShieldCheck v-if="u.role === 'superadmin'" :size="10" />
+              <ShieldCheck v-if="u.role === 'superadmin'" :size="11" />
               {{ u.role === 'superadmin' ? t('admin.adminsys.users.roleSuperadmin') : t('admin.adminsys.users.roleAdmin') }}
             </span>
           </span>

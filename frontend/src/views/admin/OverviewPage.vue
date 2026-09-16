@@ -145,7 +145,7 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
           </div>
           <span class="ov-version-badge mono">{{ APP_VERSION }}</span>
           <button class="ov-btn-refresh" :disabled="loading" @click="load" :title="t('common.refresh')">
-            <RefreshCw :size="13" :class="loading && 'ov-spin'" />
+            <RefreshCw :size="14" :class="loading && 'ov-spin'" />
             <span>{{ t('common.refresh') }}</span>
           </button>
         </div>
@@ -162,7 +162,7 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
         </div>
       </div>
       <button class="btn btn-primary btn-sm" :disabled="loading" @click="load">
-        <RefreshCw :size="13" :class="loading && 'ov-spin'" />
+        <RefreshCw :size="14" :class="loading && 'ov-spin'" />
         <span>{{ t('common.retry') }}</span>
       </button>
     </div>

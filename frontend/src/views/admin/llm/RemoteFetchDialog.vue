@@ -55,7 +55,7 @@ const {
         </div>
         <span v-if="selectedProvider?.has_key" class="badge badge-up">{{ t('admin.llm.useStoredKey') }}</span>
         <button class="btn btn-primary btn-sm" :disabled="fetchingRemote" @click="executeRemoteFetch">
-          <RefreshCw :size="13" :class="fetchingRemote ? 'rf-spin' : ''" />
+          <RefreshCw :size="14" :class="fetchingRemote ? 'rf-spin' : ''" />
           <span>{{ fetchingRemote ? t('admin.llm.probing') : t('admin.llm.reprobe') }}</span>
         </button>
       </div>

@@ -325,7 +325,7 @@ onMounted(loadData)
       </div>
 
       <p v-if="driftCount.length" class="rk-drift">
-        <AlertTriangle :size="12" />
+        <AlertTriangle :size="12" class="shrink-0" />
         <span>{{ t('admin.risk.engineDrift') }}：{{ driftLabels.join('、') }}</span>
       </p>
     </section>
@@ -589,6 +589,10 @@ onMounted(loadData)
   display: flex;
   align-items: center;
   gap: 6px;
+  /* 批 36：实测图标被压成 7.02×12（父级 flex + 长文案把它挤扁）。 */
+  > svg {
+    flex-shrink: 0;
+  }
   padding: var(--ds-space-3) var(--ds-space-4);
   border-top: 1px solid var(--ds-color-border-default);
   background-color: var(--warn-bg);

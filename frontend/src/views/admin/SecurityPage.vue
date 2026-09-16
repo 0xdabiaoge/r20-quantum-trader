@@ -656,7 +656,7 @@ onMounted(() => { loadAll(); loadMx() })
               </template>
               <template #probe>
                 <button class="btn btn-quiet btn-sm" :disabled="probingVenue === 'okx'" @click="probeVenue('okx')">
-                  <RefreshCw :size="12" :class="probingVenue === 'okx' ? 'sc-spin' : ''" />
+                  <RefreshCw :size="14" :class="probingVenue === 'okx' ? 'sc-spin' : ''" />
                   <span>{{ probingVenue === 'okx' ? t('admin.security.probing') : t('admin.security.detect') }}</span>
                 </button>
               </template>
@@ -696,7 +696,7 @@ onMounted(() => { loadAll(); loadMx() })
               </template>
               <template #probe>
                 <button class="btn btn-quiet btn-sm" :disabled="probingVenue !== '' && probingVenue !== 'binance'" @click="probeVenue('binance')">
-                  <RefreshCw :size="12" />
+                  <RefreshCw :size="14" />
                   <span>{{ t('admin.security.detect') }}</span>
                 </button>
               </template>
@@ -751,7 +751,7 @@ onMounted(() => { loadAll(); loadMx() })
               </template>
               <template #probe>
                 <button class="btn btn-quiet btn-sm" :disabled="probingVenue !== '' && probingVenue !== 'gate'" @click="probeVenue('gate')">
-                  <RefreshCw :size="12" />
+                  <RefreshCw :size="14" />
                   <span>{{ t('admin.security.detect') }}</span>
                 </button>
               </template>
@@ -773,7 +773,7 @@ onMounted(() => { loadAll(); loadMx() })
               {{ healthAllOk ? t('admin.security.healthOk') : t('admin.security.healthDegraded') }}
             </span>
             <button class="btn btn-quiet btn-sm" @click="loadMx">
-              <RefreshCw :size="12" />
+              <RefreshCw :size="14" />
               <span>{{ t('admin.security.recheck') }}</span>
             </button>
           </template>
