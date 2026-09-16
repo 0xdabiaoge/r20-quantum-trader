@@ -641,16 +641,16 @@ onMounted(() => { loadAll(); loadMx() })
 
               <div class="sc-creds">
                 <span class="form-label">{{ t('admin.security.liveTrio') }}</span>
-                <input v-model="keys.live_key" type="password" :placeholder="t('admin.security.apiKeyKeep')" class="field" />
-                <input v-model="keys.live_secret" type="password" placeholder="Secret Key" class="field" />
-                <input v-model="keys.live_pass" type="password" placeholder="Passphrase" class="field" />
+                <input v-model="keys.live_key" type="password" :placeholder="t('admin.security.apiKeyKeep')" class="field" :aria-label="t('admin.security.liveKeyAria')" />
+                <input v-model="keys.live_secret" type="password" :placeholder="t('admin.security.phSecretKey')" class="field" :aria-label="t('admin.security.liveSecretAria')" />
+                <input v-model="keys.live_pass" type="password" :placeholder="t('admin.security.phPassphrase')" class="field" :aria-label="t('admin.security.livePassAria')" />
               </div>
 
               <div class="sc-creds">
                 <span class="form-label">{{ t('admin.security.demoTrio') }}</span>
-                <input v-model="keys.demo_key" type="password" :placeholder="t('admin.security.apiKeyKeep')" class="field" />
-                <input v-model="keys.demo_secret" type="password" placeholder="Secret Key" class="field" />
-                <input v-model="keys.demo_pass" type="password" placeholder="Passphrase" class="field" />
+                <input v-model="keys.demo_key" type="password" :placeholder="t('admin.security.apiKeyKeep')" class="field" :aria-label="t('admin.security.demoKeyAria')" />
+                <input v-model="keys.demo_secret" type="password" :placeholder="t('admin.security.phSecretKey')" class="field" :aria-label="t('admin.security.demoSecretAria')" />
+                <input v-model="keys.demo_pass" type="password" :placeholder="t('admin.security.phPassphrase')" class="field" :aria-label="t('admin.security.demoPassAria')" />
               </div>
 
               <template #extra>
@@ -690,7 +690,7 @@ onMounted(() => { loadAll(); loadMx() })
               <div class="sc-creds">
                 <span class="form-label">{{ t('admin.security.binanceCredLabel') }}</span>
                 <input v-model="mxForm.binance_api_key" type="text" :placeholder="t('admin.security.apiKeyKeep')" class="field mono" />
-                <input v-model="mxForm.binance_secret_key" type="password" placeholder="API Secret" class="field" />
+                <input v-model="mxForm.binance_secret_key" type="password" :placeholder="t('admin.security.phApiSecret')" class="field" />
               </div>
 
               <template #extra>
@@ -730,7 +730,7 @@ onMounted(() => { loadAll(); loadMx() })
               <div class="sc-creds">
                 <span class="form-label">{{ t('admin.security.gateCredLabel') }}</span>
                 <input v-model="mxForm.gate_api_key" type="text" :placeholder="t('admin.security.apiKeyKeep')" class="field mono" />
-                <input v-model="mxForm.gate_secret_key" type="password" placeholder="API Secret" class="field" />
+                <input v-model="mxForm.gate_secret_key" type="password" :placeholder="t('admin.security.phApiSecret')" class="field" />
               </div>
 
               <template #extra>

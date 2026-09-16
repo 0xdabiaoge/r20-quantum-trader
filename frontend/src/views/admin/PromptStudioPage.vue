@@ -830,6 +830,7 @@ onMounted(loadLib)
             v-model="importRawJson"
             rows="7"
             class="field ps-textarea mono"
+            :aria-label="t('admin.promptStudio.import.methodTwo')"
             placeholder='{"format": "r20-prompt-profile", "version": 3, "profile": { ... }}'
           />
         </div>

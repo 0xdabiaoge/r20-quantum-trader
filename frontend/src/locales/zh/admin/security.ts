@@ -190,4 +190,16 @@ export const zhAdminSecurity = {
   trackedRecord: '追踪记录',
   // ── 批 44：页签栏的组名（role=tablist 的可访问名）──
   tabsLabel: '安全配置视图切换',
+  // ── 批 46：三件套逐项可访问名（原先只有硬编码英文 placeholder，
+  //    中文界面下读屏器念的是 "Secret Key"/"Passphrase"）──
+  liveKeyAria: '实盘 API Key',
+  liveSecretAria: '实盘 Secret Key',
+  livePassAria: '实盘 Passphrase',
+  demoKeyAria: '模拟盘 API Key',
+  demoSecretAria: '模拟盘 Secret Key',
+  demoPassAria: '模拟盘 Passphrase',
+  // ── 批 46：密码框占位符原先写死英文（中文界面里显示 "Secret Key"/"Passphrase"）──
+  phSecretKey: 'Secret Key',
+  phPassphrase: 'Passphrase',
+  phApiSecret: 'API Secret',
 };

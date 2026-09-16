@@ -421,6 +421,7 @@ onMounted(loadPlugins)
         rows="22"
         spellcheck="false"
         class="field ip-code"
+        :aria-label="t('admin.interceptors.codeLabel')"
       />
 
       <template #footer>
@@ -470,6 +471,7 @@ onMounted(loadPlugins)
           rows="16"
           spellcheck="false"
           class="field ip-code"
+          :aria-label="t('admin.interceptors.codeLabel')"
         />
       </div>
 

@@ -188,4 +188,15 @@ export const enAdminSecurity = {
   trackedRecord: 'tracked record',
   // ── batch 44: accessible name for the tablist ──
   tabsLabel: 'Security configuration view switcher',
+  // ── batch 46: per-field accessible names for the credential trios ──
+  liveKeyAria: 'Live API key',
+  liveSecretAria: 'Live secret key',
+  livePassAria: 'Live passphrase',
+  demoKeyAria: 'Demo API key',
+  demoSecretAria: 'Demo secret key',
+  demoPassAria: 'Demo passphrase',
+  // ── batch 46: password placeholders used to be hardcoded English ──
+  phSecretKey: 'Secret Key',
+  phPassphrase: 'Passphrase',
+  phApiSecret: 'API Secret',
 };

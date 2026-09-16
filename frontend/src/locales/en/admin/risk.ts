@@ -56,4 +56,7 @@ export const enAdminRisk = {
   resetAllDesc: 'All risk thresholds return to the code default baseline (single-trade position cap, daily loss cap, leverage cap, etc.)',
   resetOk: 'Restored the code default baseline · {effect}',
   resetFailed: 'Reset failed: {msg}',
+  // ── batch 46: accessible names for the two lever-bound inputs ──
+  levLowerAria: 'Leverage lower bound (x)',
+  levUpperAria: 'Leverage upper bound (x)',
 };

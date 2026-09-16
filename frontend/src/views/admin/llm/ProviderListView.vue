@@ -186,6 +186,7 @@ const bandFacts = () => [
               step="5"
               placeholder="120"
               class="pv-num-input"
+              :aria-label="t('admin.llm.timeoutLabel')"
             />
             <span class="pv-num-unit">{{ t('admin.llm.secondsUnit') }}</span>
           </div>
@@ -245,6 +246,7 @@ const bandFacts = () => [
                 max="10"
                 step="1"
                 class="pv-num-input"
+                :aria-label="t('admin.llm.attemptsLabel')"
               />
               <span class="pv-num-unit">{{ t('admin.llm.timesUnit') }}</span>
             </div>

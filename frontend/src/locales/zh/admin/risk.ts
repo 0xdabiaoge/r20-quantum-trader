@@ -56,4 +56,7 @@ export const zhAdminRisk = {
   resetAllDesc: '所有风控阈值将恢复为代码默认基线（含单笔仓位上限、日亏上限、杠杆上限等）',
   resetOk: '已恢复代码默认基线 · {effect}',
   resetFailed: '重置失败: {msg}',
+  // ── 批 46：杠杆区间两个输入框的可访问名（视觉上有「~」分隔，读屏器听不出来）──
+  levLowerAria: '杠杆下限（倍）',
+  levUpperAria: '杠杆上限（倍）',
 };

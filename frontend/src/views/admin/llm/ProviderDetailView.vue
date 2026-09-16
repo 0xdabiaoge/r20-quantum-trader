@@ -98,7 +98,12 @@ function monogram(name: string): string {
               <span class="pd-kv-k">{{ t('admin.llm.apiProtocol') }}</span>
               <span class="pd-kv-hint">{{ t('admin.llm.apiProtocolDesc') }}</span>
             </div>
-            <select v-model="providerForm.api_format" class="field pd-select" @change="onApiFormatChange">
+            <select
+              v-model="providerForm.api_format"
+              class="field pd-select"
+              :aria-label="t('admin.llm.apiProtocol')"
+              @change="onApiFormatChange"
+            >
               <option value="openai_chat">OpenAI Chat (/chat/completions)</option>
               <option value="claude_messages">Claude Messages (/messages)</option>
               <option value="openai_responses">OpenAI Responses (/responses)</option>
