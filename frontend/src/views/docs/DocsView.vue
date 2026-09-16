@@ -187,7 +187,7 @@ onUnmounted(() => {
             <span>QQ 官方群</span>
             <span class="dsh-pill font-mono font-bold text-3xs">655973677</span>
           </div>
-          <p class="text-3xs text-[var(--ink-3)] leading-relaxed">
+          <p class="text-3xs text-[var(--ink-3)] leading-body">
             欢迎量化极客、提示词工程师、深度求索 R1 用户共同交流探索。
           </p>
         </div>
@@ -202,7 +202,7 @@ onUnmounted(() => {
             <h2 class="text-lg sm:text-xl font-bold tracking-tight text-[var(--ink-strong)]">系统架构与量化哲学</h2>
           </div>
 
-          <p class="text-xs sm:text-sm leading-relaxed font-sans text-[var(--ink-2)]">
+          <p class="text-xs sm:text-sm leading-body font-sans text-[var(--ink-2)]">
             <strong>R20量子交易系统 (R20 Quantum Trading System)</strong> 是一套专为高波动加密货币（Crypto）打造的<strong>机构级全自动波段量化决策与执行系统</strong>。系统通过 OKX / Binance / Gate.io REST API 直签执行私有账户与交易请求。系统运行在严格的北京时间（UTC+8）自然日财务基准之上，聚焦 1H~4H 大级别顺势波段，以<strong>“胜率第一、宁缺毋滥、三位一体 Fail-Closed 物理硬防线”</strong>为最高风控宗旨。
           </p>
 
@@ -213,7 +213,7 @@ onUnmounted(() => {
                 <ShieldCheck class="w-4 h-4" />
                 <span>Fail-Closed 物理硬拦截</span>
               </div>
-              <p class="text-xs text-[var(--ink-2)] leading-relaxed">
+              <p class="text-xs text-[var(--ink-2)] leading-body">
                 绝不将风控寄托于 LLM 提示词本身。在交易执行底层设立不可覆盖的 Python 物理拦截插件管线，4H 顺势门禁、80% 置信度、1H ADX 震荡过滤及真实 2.0R 盈亏比门禁物理硬切断。
               </p>
             </div>
@@ -223,7 +223,7 @@ onUnmounted(() => {
                 <Users class="w-4 h-4" />
                 <span>多模型决策委员会 (Council Pro)</span>
               </div>
-              <p class="text-xs text-[var(--ink-2)] leading-relaxed">
+              <p class="text-xs text-[var(--ink-2)] leading-body">
                 支持并发调度宏观分析师、盘口微结构官、舆情侦察官等多参谋席位展开深度思考辩论，落地一票否决、加权共识与动能突破三种裁决机制，由首席终审仲裁官收口输出严格契约。
               </p>
             </div>
@@ -233,7 +233,7 @@ onUnmounted(() => {
                 <Layers class="w-4 h-4" />
                 <span>语义数据插槽提示词系统</span>
               </div>
-              <p class="text-xs text-[var(--ink-2)] leading-relaxed">
+              <p class="text-xs text-[var(--ink-2)] leading-body">
                 全网快讯、自进化心法、多标的数理矩阵等动态数据抽象为标准语义变量插槽（如 <code>&#123;&#123;news_intelligence&#125;&#125;</code>），支持模块自由解耦与策略方案一键导入导出。
               </p>
             </div>
@@ -243,7 +243,7 @@ onUnmounted(() => {
                 <Brain class="w-4 h-4" />
                 <span>自进化认知复盘闭环</span>
               </div>
-              <p class="text-xs text-[var(--ink-2)] leading-relaxed">
+              <p class="text-xs text-[var(--ink-2)] leading-body">
                 每 6 小时自动读取真实平仓台账流水进行自我反思与痛点归因，自动更新 <code>AI_TRADING_MEMORY.md</code> 长效实战心法，具备时效覆盖与动态经验淘汰机制。
               </p>
             </div>
@@ -257,14 +257,14 @@ onUnmounted(() => {
             <h2 class="text-lg sm:text-xl font-bold tracking-tight text-[var(--ink-strong)]">量化工作台与资产控制舱</h2>
           </div>
 
-          <p class="text-xs sm:text-sm leading-relaxed font-sans text-[var(--ink-2)]">
+          <p class="text-xs sm:text-sm leading-body font-sans text-[var(--ink-2)]">
             前台终端采用 DeepSeek Harness 开发者工作台架构，首屏直接铺满 K 线图表工位与活跃持仓挂单：
           </p>
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1 text-xs">
             <div class="dsh-card-sub p-3.5 space-y-1.5">
               <div class="font-bold text-xs text-[var(--ink-strong)]">主工位操盘中心</div>
-              <p class="text-[var(--ink-2)] leading-relaxed">
+              <p class="text-[var(--ink-2)] leading-body">
                 • <strong>6 单元多所资产 HUD</strong>：多所总权益、走势折线、今日已结、持仓浮盈、多空敞口与云端防线解耦呈现。<br>
                 • <strong>资金费与手续费明细透传</strong>：实时汇总跨周期永续合约资金费与手续费，消除浮盈与已结盈亏认知差。<br>
                 • <strong>TradingView 官方原生 K 线操盘工作站</strong>：本地打包集成，0 外部依赖免 VPN 秒开；支持 150 根 K 线全屏铺满、MA/BOLL/VOL 多指标独立共存。
@@ -272,7 +272,7 @@ onUnmounted(() => {
             </div>
             <div class="dsh-card-sub p-3.5 space-y-1.5">
               <div class="font-bold text-xs text-[var(--ink-strong)]">多因子微积分动力学矩阵</div>
-              <p class="text-[var(--ink-2)] leading-relaxed">
+              <p class="text-[var(--ink-2)] leading-body">
                 • <strong>微积分物理动能指标</strong>：实时计算一阶速度 $v$、二阶加速度 $a$ 与 ADX 趋势动量。<br>
                 • <strong>聪明钱微结构</strong>：追踪大户多空比与净流入流出，点击行即刻呼出白盒透视抽屉。
               </p>
@@ -287,7 +287,7 @@ onUnmounted(() => {
             <h2 class="text-lg sm:text-xl font-bold tracking-tight text-[var(--ink-strong)]">多模型决策委员会 (Council Pro)</h2>
           </div>
 
-          <p class="text-xs sm:text-sm leading-relaxed font-sans text-[var(--ink-2)]">
+          <p class="text-xs sm:text-sm leading-body font-sans text-[var(--ink-2)]">
             为了彻底消除单一模型的幻觉与盲区，系统落地了<strong>多参谋并发辩论与博弈仲裁机制</strong>。在每一轮决策前，行情数理包将分发给各独立席位进行并发思考：
           </p>
 
@@ -317,7 +317,7 @@ onUnmounted(() => {
             <h2 class="text-lg sm:text-xl font-bold tracking-tight text-[var(--ink-strong)]">策略版本快照控制台 (Policy Snapshot)</h2>
           </div>
 
-          <p class="text-xs sm:text-sm leading-relaxed font-sans text-[var(--ink-2)]">
+          <p class="text-xs sm:text-sm leading-body font-sans text-[var(--ink-2)]">
             实时聚合提示词、自进化心法、物理拦截器与投委会四大单元的不可变指纹，解决量化策略碎片化与复盘失真难题：
           </p>
 
@@ -344,7 +344,7 @@ onUnmounted(() => {
             <h2 class="text-lg sm:text-xl font-bold tracking-tight text-[var(--ink-strong)]">提示词策略与语义变量插槽</h2>
           </div>
 
-          <p class="text-xs sm:text-sm leading-relaxed font-sans text-[var(--ink-2)]">
+          <p class="text-xs sm:text-sm leading-body font-sans text-[var(--ink-2)]">
             提示词策略工作室彻底解除了所有预设锁定，支持对四大核心管线（交易 System、交易 User、自进化 System、自进化 User）进行可视化定制。
           </p>
 
@@ -391,7 +391,7 @@ onUnmounted(() => {
             <h2 class="text-lg sm:text-xl font-bold tracking-tight text-[var(--ink-strong)]">Python 物理拦截插件 (Fail-Closed)</h2>
           </div>
 
-          <p class="text-xs sm:text-sm leading-relaxed font-sans text-[var(--ink-2)]">
+          <p class="text-xs sm:text-sm leading-body font-sans text-[var(--ink-2)]">
             物理拦截插件体系是整个系统的安全底座。任何发往交易所的开平仓请求，必须严格穿透全部活跃拦截器的串行校验。
           </p>
 
@@ -413,7 +413,7 @@ onUnmounted(() => {
             <h2 class="text-lg sm:text-xl font-bold tracking-tight text-[var(--ink-strong)]">执行层风控管理中心</h2>
           </div>
 
-          <p class="text-xs sm:text-sm leading-relaxed font-sans text-[var(--ink-2)]">
+          <p class="text-xs sm:text-sm leading-body font-sans text-[var(--ink-2)]">
             可视化配置单日最大亏损熔断、杠杆上限、单笔保证金比例与持仓集中度限制，支持一键切换保守、稳健、进取三套风控预设套件。
           </p>
         </section>
@@ -425,7 +425,7 @@ onUnmounted(() => {
             <h2 class="text-lg sm:text-xl font-bold tracking-tight text-[var(--ink-strong)]">模型连接与 API 协议支持</h2>
           </div>
 
-          <p class="text-xs sm:text-sm leading-relaxed font-sans text-[var(--ink-2)]">
+          <p class="text-xs sm:text-sm leading-body font-sans text-[var(--ink-2)]">
             全协议支持 OpenAI Chat Completions、Responses API 与 Anthropic Claude Messages 协议，支持远端模型一键探活与 Failover 自动容灾故障转移。
           </p>
         </section>
@@ -437,7 +437,7 @@ onUnmounted(() => {
             <h2 class="text-lg sm:text-xl font-bold tracking-tight text-[var(--ink-strong)]">自进化认知与长期记忆闭环</h2>
           </div>
 
-          <p class="text-xs sm:text-sm leading-relaxed font-sans text-[var(--ink-2)]">
+          <p class="text-xs sm:text-sm leading-body font-sans text-[var(--ink-2)]">
             每 6 小时自动读取平仓记录，进行原因剖析与数学验证，动态更新 AI 心法库，具备防过拟合与经验半衰期淘汰机制。
           </p>
         </section>
@@ -449,7 +449,7 @@ onUnmounted(() => {
             <h2 class="text-lg sm:text-xl font-bold tracking-tight text-[var(--ink-strong)]">生产部署与多通道通知</h2>
           </div>
 
-          <p class="text-xs sm:text-sm leading-relaxed font-sans text-[var(--ink-2)]">
+          <p class="text-xs sm:text-sm leading-body font-sans text-[var(--ink-2)]">
             支持 Docker 容器化部署、Systemd 常驻守护，并集成 Telegram、飞书、企业微信、Discord、Webhook 多通道实时通知推送。
           </p>
         </section>
@@ -464,13 +464,13 @@ onUnmounted(() => {
           <div class="space-y-3 text-xs">
             <div class="dsh-card-sub p-3 space-y-1">
               <h4 class="font-bold text-[var(--ink-strong)]">Q: 系统如何保证资金安全？</h4>
-              <p class="text-[var(--ink-2)] leading-relaxed">
+              <p class="text-[var(--ink-2)] leading-body">
                 A: API Key 凭证本地 Fernet 加密存储；绝不开启提现权限；所有订单均有云端 OCO 止损物理保护；全盘具备单日亏损熔断保护。
               </p>
             </div>
             <div class="dsh-card-sub p-3 space-y-1">
               <h4 class="font-bold text-[var(--ink-strong)]">Q: 模型请求失败或超时会怎样？</h4>
-              <p class="text-[var(--ink-2)] leading-relaxed">
+              <p class="text-[var(--ink-2)] leading-body">
                 A: 系统自动触发预设的 Failover 备用模型链；若全链不可用，系统自动保持 Fail-Closed 状态（不执行任何新开仓动作）。
               </p>
             </div>

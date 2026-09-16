@@ -469,7 +469,7 @@ const truncation = computed<{ kept: number; total: number } | null>(() => {
           <BaseEmpty v-if="!store.logs.length" :text="t('dash.ledger.logs.empty')" />
           <pre
             v-else
-            class="rounded p-2.5 font-mono text-3xs leading-relaxed whitespace-pre-wrap select-text"
+            class="rounded p-2.5 font-mono text-3xs leading-body whitespace-pre-wrap select-text"
             style="background-color: var(--surface-input); border: 1px solid var(--line-1); color: var(--ink-2)"
           >{{ store.logs.join('\n') }}</pre>
         </div>

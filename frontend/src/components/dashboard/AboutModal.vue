@@ -35,7 +35,7 @@ const LINUXDO = 'https://linux.do/';
       </p>
       <p class="mono mb-2 text-xs" style="color: var(--ink-3)">{{ t('dash.about.arch.stack') }}</p>
       <ul class="space-y-1.5">
-        <li v-for="(p, i) in tm('dash.about.arch.points')" :key="i" class="flex gap-2 text-xs leading-relaxed" style="color: var(--ink-2)">
+        <li v-for="(p, i) in tm('dash.about.arch.points')" :key="i" class="flex gap-2 text-xs leading-body" style="color: var(--ink-2)">
           <span class="dot dot-up mt-1.5" style="width: 5px; height: 5px" />{{ p }}
         </li>
       </ul>
@@ -81,7 +81,7 @@ const LINUXDO = 'https://linux.do/';
         {{ t('dash.about.version', undefined, { v: APP_VERSION, r: BRAND_REVISION }) }}
       </p>
       <p class="text-xs" style="color: var(--ink-3)">{{ t('dash.about.license') }}</p>
-      <p class="text-xs leading-relaxed" style="color: var(--ink-3)">{{ t('dash.about.risk') }}</p>
+      <p class="text-xs leading-body" style="color: var(--ink-3)">{{ t('dash.about.risk') }}</p>
     </div>
   </BaseDialog>
 </template>

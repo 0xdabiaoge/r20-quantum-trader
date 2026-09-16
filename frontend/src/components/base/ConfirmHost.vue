@@ -43,7 +43,7 @@ function onConfirm() {
       </div>
       <div class="min-w-0">
         <h3 class="text-base font-semibold" style="color: var(--ink-strong)">{{ state.title }}</h3>
-        <p v-if="state.desc" class="mt-1 text-sm leading-relaxed" style="color: var(--ink-2)">{{ state.desc }}</p>
+        <p v-if="state.desc" class="mt-1 text-sm leading-body" style="color: var(--ink-2)">{{ state.desc }}</p>
         <p v-if="state.detail" class="mono mt-2 break-all text-xs" style="color: var(--ink-3)">{{ state.detail }}</p>
       </div>
     </div>

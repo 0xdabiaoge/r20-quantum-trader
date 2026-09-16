@@ -180,7 +180,7 @@ const vdBudgetText = computed(() => {
           </div>
         </div>
         <p v-else class="t-muted mt-2 text-xs">{{ t('dash.matrix.matrix.noDecision') }}</p>
-        <p v-if="d.summary_reason || f.reason" class="mt-2.5 border-t pt-2.5 text-xs leading-relaxed" style="color: var(--ink-2); border-color: var(--line-1)">
+        <p v-if="d.summary_reason || f.reason" class="mt-2.5 border-t pt-2.5 text-xs leading-body" style="color: var(--ink-2); border-color: var(--line-1)">
           {{ d.summary_reason || f.reason }}
         </p>
       </div>
@@ -204,9 +204,9 @@ const vdBudgetText = computed(() => {
             <span v-if="vd.hysteresis_applied" class="badge">{{ t('dash.matrix.venue.hysteresis') }}</span>
             <span v-if="vd.outcome" class="badge">{{ vd.outcome }}</span>
           </div>
-          <p v-if="vd.skip_reason" class="mt-2 text-xs leading-relaxed" style="color: var(--down)">{{ vd.skip_reason }}</p>
+          <p v-if="vd.skip_reason" class="mt-2 text-xs leading-body" style="color: var(--down)">{{ vd.skip_reason }}</p>
           <ul v-if="vdReasons.length" class="mt-2 space-y-1 border-t pt-2" style="border-color: var(--line-1)">
-            <li v-for="(r, i) in vdReasons" :key="'vd-r-' + i" class="text-xs leading-relaxed" style="color: var(--ink-2)">{{ r }}</li>
+            <li v-for="(r, i) in vdReasons" :key="'vd-r-' + i" class="text-xs leading-body" style="color: var(--ink-2)">{{ r }}</li>
           </ul>
           <div v-if="vdAllocation.length" class="mt-2 flex flex-wrap gap-1.5">
             <span v-for="(a, i) in vdAllocation" :key="'vd-a-' + i" class="badge num text-4xs">
@@ -231,7 +231,7 @@ const vdBudgetText = computed(() => {
               </table>
             </div>
           </div>
-          <p v-if="vdBudgetText" class="mt-2 border-t pt-2 text-4xs leading-relaxed" style="border-color: var(--line-1); color: var(--ink-3)">{{ vdBudgetText }}</p>
+          <p v-if="vdBudgetText" class="mt-2 border-t pt-2 text-4xs leading-body" style="border-color: var(--line-1); color: var(--ink-3)">{{ vdBudgetText }}</p>
         </template>
         <p v-else class="t-muted text-xs">{{ t('dash.matrix.venue.noEvidence') }}</p>
       </div>
@@ -290,7 +290,7 @@ const vdBudgetText = computed(() => {
         <div class="space-y-2.5 p-3.5">
           <div v-for="(v, k) in tp" :key="k">
             <p class="t-label">{{ k }}</p>
-            <p class="text-xs leading-relaxed" style="color: var(--ink-2)">{{ v }}</p>
+            <p class="text-xs leading-body" style="color: var(--ink-2)">{{ v }}</p>
           </div>
         </div>
       </BaseCollapse>

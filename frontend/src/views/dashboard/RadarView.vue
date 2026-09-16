@@ -161,7 +161,7 @@ function actionsOf(c: any): { inst: string; dir: string; conf: number }[] {
 
               <!-- 研判正文与指令 -->
               <div class="min-w-0 flex-1">
-                <p class="text-xs text-[var(--ink-1)] leading-relaxed font-medium line-clamp-2">
+                <p class="text-xs text-[var(--ink-1)] leading-body font-medium line-clamp-2">
                   {{ c.macro_assessment || t('dash.radar.empty') }}
                 </p>
 

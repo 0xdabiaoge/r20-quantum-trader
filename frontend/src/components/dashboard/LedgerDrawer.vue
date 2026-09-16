@@ -149,10 +149,10 @@ const cells = computed(() => [
             {{ obsLabel }}
           </span>
         </div>
-        <p class="mt-2 text-3xs leading-relaxed" :class="obsUnobservable ? 'text-[var(--ink-2)]' : 'text-[var(--ink-3)]'">
+        <p class="mt-2 text-3xs leading-body" :class="obsUnobservable ? 'text-[var(--ink-2)]' : 'text-[var(--ink-3)]'">
           {{ t('dash.ledger.observability.missingFields') }}
         </p>
-        <p class="mt-1.5 text-3xs leading-relaxed text-[var(--ink-3)]">
+        <p class="mt-1.5 text-3xs leading-body text-[var(--ink-3)]">
           {{ t('dash.ledger.observability.noBackfill') }}
         </p>
       </div>

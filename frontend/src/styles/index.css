@@ -55,3 +55,29 @@
   --text-md: var(--text-md);
   --text-md--line-height: 1.5;
 }
+
+/* =========================================================================
+   批 37 · 补齐行高工具类（`leading-body` / `leading-dense`）
+   -------------------------------------------------------------------------
+   **与批 28 同源的静默失效**：tokens.css 定义了 `--leading-body: 1.6`（DSH 160%）
+   与 `--leading-dense: 1.45`（表格行专用），但 @theme 从未声明这一档 →
+   `.leading-body` / `.leading-dense` **一条规则都没生成**。
+
+   实测：编译产物里 `.leading-tight`/`.leading-snug`（Tailwind 自带）各有 1 条，
+   而 `.leading-body` 的选择器出现 **0 次**；模板里却有 **92 处**写着这个类名
+   （46 处原有 + 批 37 把 `leading-relaxed` 归并进来的 46 处），
+   它们全部在"继承父级行高"——同一段副标题落在卡片里是 1.6、落在表格里是 1.45，
+   取决于祖先，而不是取决于它自己写的类（典型症状：明明写了 `leading-body`
+   却在密集表格里被压成 1.45）。
+
+   注意区分：`--leading-dense` 此前**只**在 CSS 里以 `var()` 消费
+   （DecisionsPage / EvolutionPage 各 1 处，本来就生效），没有类名用法；
+   一并声明只是让这一档以后能当类名用。
+
+   修法同批 28：在这里声明档位让工具类生成，值仍是 `var(--leading-*)`，
+   运行时取值依旧来自 tokens.css（唯一真源）。
+   ========================================================================= */
+@theme inline {
+  --leading-body: var(--leading-body);
+  --leading-dense: var(--leading-dense);
+}

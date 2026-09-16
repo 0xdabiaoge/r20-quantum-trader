@@ -156,7 +156,7 @@ function toggleCoinFilter(sym: string) {
                 {{ t('dash.news.cb.badge') }}
               </span>
             </div>
-            <p class="text-xs text-[var(--ink-1)] leading-relaxed">
+            <p class="text-xs text-[var(--ink-1)] leading-body">
               {{ circuitBreaker.reason || circuitBreaker.detail || t('dash.news.cb.actionFallback') }}
             </p>
           </div>
@@ -306,7 +306,7 @@ function toggleCoinFilter(sym: string) {
             <h3 class="text-xs font-bold text-[var(--ink-strong)] leading-snug">
               {{ item.title }}
             </h3>
-            <p v-if="item.summary" class="text-xs text-[var(--ink-2)] leading-relaxed font-sans">
+            <p v-if="item.summary" class="text-xs text-[var(--ink-2)] leading-body font-sans">
               {{ item.summary }}
             </p>
           </article>

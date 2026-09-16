@@ -127,15 +127,15 @@ function dirOf(a: string): 'long' | 'short' | 'flat' {
 
       <p
         v-if="councilStatus && !councilStatus.ran && councilStatus.reason"
-        class="dsh-card-sub p-3 text-xs leading-relaxed text-[var(--warn)] border-[var(--warn-line)]"
+        class="dsh-card-sub p-3 text-xs leading-body text-[var(--warn)] border-[var(--warn-line)]"
       >
         {{ t('dash.radar.council.reason') }}：{{ councilStatus.reason }}
       </p>
 
       <!-- 宏观综述 -->
-      <div class="dsh-card-sub p-4 text-xs leading-relaxed text-[var(--ink-1)]">
+      <div class="dsh-card-sub p-4 text-xs leading-body text-[var(--ink-1)]">
         <h4 class="text-3xs font-bold uppercase tracking-wider text-[var(--ink-3)] mb-2">{{ t('dash.radar.macroReview') }}</h4>
-        <p class="whitespace-pre-wrap font-sans text-xs leading-relaxed">{{ c.macro_assessment || '--' }}</p>
+        <p class="whitespace-pre-wrap font-sans text-xs leading-body">{{ c.macro_assessment || '--' }}</p>
 
         <p v-if="promptChars(c)" class="num font-mono text-3xs text-[var(--ink-3)] mt-3 border-t pt-2" style="border-color: var(--line-1)">
           {{ t('dash.shell.peek.chars', undefined, { n: promptChars(c) ?? 0 }) }} · {{ t('dash.shell.peek.title') }}
@@ -165,7 +165,7 @@ function dirOf(a: string): 'long' | 'short' | 'flat' {
             </div>
             <span class="text-3xs font-mono text-[var(--ink-3)]">{{ p.action }}</span>
           </div>
-          <p class="text-xs text-[var(--ink-2)] leading-relaxed">{{ p.reasoning }}</p>
+          <p class="text-xs text-[var(--ink-2)] leading-body">{{ p.reasoning }}</p>
         </div>
       </div>
 
@@ -192,7 +192,7 @@ function dirOf(a: string): 'long' | 'short' | 'flat' {
             </span>
           </div>
 
-          <p class="text-xs text-[var(--ink-2)] leading-relaxed">{{ o.reasoning }}</p>
+          <p class="text-xs text-[var(--ink-2)] leading-body">{{ o.reasoning }}</p>
 
           <!-- 挂单点位 -->
           <div class="grid grid-cols-3 gap-2 pt-2 border-t text-3xs font-mono" style="border-color: var(--line-1)">
@@ -244,7 +244,7 @@ function dirOf(a: string): 'long' | 'short' | 'flat' {
           </div>
           <ConfBadge :value="arbitrator.confidence" />
         </div>
-        <p class="text-xs text-[var(--ink-1)] leading-relaxed whitespace-pre-wrap">{{ arbitrator.reasoning || arbitrator.summary || '--' }}</p>
+        <p class="text-xs text-[var(--ink-1)] leading-body whitespace-pre-wrap">{{ arbitrator.reasoning || arbitrator.summary || '--' }}</p>
       </div>
 
       <!-- 各交易员提案列表 -->
@@ -263,7 +263,7 @@ function dirOf(a: string): 'long' | 'short' | 'flat' {
             </div>
             <span v-if="adv.inst" class="text-3xs font-mono text-[var(--ink-2)]">{{ adv.inst }}</span>
           </div>
-          <p class="text-xs text-[var(--ink-2)] leading-relaxed">{{ adv.reasoning || adv.view || '--' }}</p>
+          <p class="text-xs text-[var(--ink-2)] leading-body">{{ adv.reasoning || adv.view || '--' }}</p>
         </div>
       </div>
     </div>

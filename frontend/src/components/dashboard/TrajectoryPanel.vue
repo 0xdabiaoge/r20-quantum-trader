@@ -229,7 +229,7 @@ function actionBadgeClass(action: string) {
               </div>
 
               <!-- 行2：推演结论 -->
-              <p class="mt-2 text-xs leading-relaxed" style="color: var(--ink-1)">
+              <p class="mt-2 text-xs leading-body" style="color: var(--ink-1)">
                 {{ item.reason }}
               </p>
 

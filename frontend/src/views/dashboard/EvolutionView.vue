@@ -189,7 +189,7 @@ const md = computed(() => (store.data as any)?.ai_trading_memory_md || '');
                 <span v-if="insTitle(it)" class="text-3xs font-bold font-mono text-[var(--accent)] block uppercase">
                   {{ insTitle(it) }}
                 </span>
-                <p class="text-xs text-[var(--ink-1)] leading-relaxed font-sans">{{ insBody(it) }}</p>
+                <p class="text-xs text-[var(--ink-1)] leading-body font-sans">{{ insBody(it) }}</p>
               </div>
             </div>
           </div>
@@ -208,7 +208,7 @@ const md = computed(() => (store.data as any)?.ai_trading_memory_md || '');
                 class="dsh-card-sub p-3 flex items-start gap-2.5"
               >
                 <span class="num font-mono font-bold text-3xs text-[var(--accent)] shrink-0 mt-0.5">0{{ idx + 1 }}</span>
-                <p class="text-xs text-[var(--ink-1)] leading-relaxed flex-1">{{ actText(a) }}</p>
+                <p class="text-xs text-[var(--ink-1)] leading-body flex-1">{{ actText(a) }}</p>
               </div>
             </div>
           </div>
@@ -249,7 +249,7 @@ const md = computed(() => (store.data as any)?.ai_trading_memory_md || '');
                   <span class="h-1.5 w-1.5 rounded-full bg-[var(--accent)]" />
                   {{ r.title }}
                 </h3>
-                <p class="text-xs text-[var(--ink-2)] leading-relaxed font-sans">{{ r.body }}</p>
+                <p class="text-xs text-[var(--ink-2)] leading-body font-sans">{{ r.body }}</p>
               </div>
             </div>
           </div>
@@ -264,7 +264,7 @@ const md = computed(() => (store.data as any)?.ai_trading_memory_md || '');
             </template>
             <div class="p-3">
               <pre
-                class="rounded p-3 font-mono text-3xs leading-relaxed whitespace-pre-wrap select-text max-h-96 overflow-y-auto"
+                class="rounded p-3 font-mono text-3xs leading-body whitespace-pre-wrap select-text max-h-96 overflow-y-auto"
                 style="background-color: var(--surface-input); border: 1px solid var(--line-1); color: var(--ink-2)"
               >{{ md }}</pre>
             </div>
