@@ -26,7 +26,6 @@ export interface IndicatorOption {
   key: string
   name: string
   label: string
-  desc: string
   color: string
   defaultParams?: any[]
   isSub: boolean
@@ -34,21 +33,21 @@ export interface IndicatorOption {
 
 /** 主图叠加指标：全部挂在 candle_pane 上，可多指标叠加共存 */
 export const mainIndicators: IndicatorOption[] = [
-  { key: 'VWAP', name: 'VWAP', label: 'VWAP', desc: '成交量加权均价线', color: 'var(--chart-vwap)', isSub: false },
-  { key: 'MA', name: 'MA', label: 'MA', desc: '均线 (5, 10, 20)', color: 'var(--chart-ma)', defaultParams: [5, 10, 20], isSub: false },
-  { key: 'EMA', name: 'EMA', label: 'EMA', desc: '指数均线 (12, 26, 50)', color: 'var(--chart-ema)', defaultParams: [12, 26, 50], isSub: false },
-  { key: 'BOLL', name: 'BOLL', label: 'BOLL', desc: '布林带轨道 (20, 2)', color: 'var(--chart-boll)', defaultParams: [20, 2], isSub: false },
-  { key: 'SAR', name: 'SAR', label: 'SAR', desc: '抛物线转向', color: 'var(--chart-sar)', isSub: false },
+  { key: 'VWAP', name: 'VWAP', label: 'VWAP', color: 'var(--chart-vwap)', isSub: false },
+  { key: 'MA', name: 'MA', label: 'MA', color: 'var(--chart-ma)', defaultParams: [5, 10, 20], isSub: false },
+  { key: 'EMA', name: 'EMA', label: 'EMA', color: 'var(--chart-ema)', defaultParams: [12, 26, 50], isSub: false },
+  { key: 'BOLL', name: 'BOLL', label: 'BOLL', color: 'var(--chart-boll)', defaultParams: [20, 2], isSub: false },
+  { key: 'SAR', name: 'SAR', label: 'SAR', color: 'var(--chart-sar)', isSub: false },
 ]
 
 /** 副图独立窗格指标 (Sub Panes) */
 export const subIndicators: IndicatorOption[] = [
-  { key: 'VOL', name: 'VOL', label: 'VOL', desc: '成交量与柱形量能', color: 'var(--chart-vol)', isSub: true },
-  { key: 'MACD', name: 'MACD', label: 'MACD', desc: '异同移动平均线', color: 'var(--chart-macd)', defaultParams: [12, 26, 9], isSub: true },
-  { key: 'RSI', name: 'RSI', label: 'RSI', desc: '相对强弱动量 (6, 12, 24)', color: 'var(--chart-rsi)', defaultParams: [6, 12, 24], isSub: true },
-  { key: 'KDJ', name: 'KDJ', label: 'KDJ', desc: '随机摆动指标 (9, 3, 3)', color: 'var(--chart-kdj)', defaultParams: [9, 3, 3], isSub: true },
-  { key: 'OBV', name: 'OBV', label: 'OBV', desc: '能量潮累积线', color: 'var(--chart-obv)', isSub: true },
-  { key: 'WR', name: 'WR', label: 'WR', desc: '威廉超买超卖 (14)', color: 'var(--chart-wr)', defaultParams: [14], isSub: true },
+  { key: 'VOL', name: 'VOL', label: 'VOL', color: 'var(--chart-vol)', isSub: true },
+  { key: 'MACD', name: 'MACD', label: 'MACD', color: 'var(--chart-macd)', defaultParams: [12, 26, 9], isSub: true },
+  { key: 'RSI', name: 'RSI', label: 'RSI', color: 'var(--chart-rsi)', defaultParams: [6, 12, 24], isSub: true },
+  { key: 'KDJ', name: 'KDJ', label: 'KDJ', color: 'var(--chart-kdj)', defaultParams: [9, 3, 3], isSub: true },
+  { key: 'OBV', name: 'OBV', label: 'OBV', color: 'var(--chart-obv)', isSub: true },
+  { key: 'WR', name: 'WR', label: 'WR', color: 'var(--chart-wr)', defaultParams: [14], isSub: true },
 ]
 
 /** 默认激活指标：默认开启 VOL 与 VWAP */

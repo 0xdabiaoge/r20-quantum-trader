@@ -310,9 +310,9 @@ function addNewCustomTrader() {
   const roleId = roleIdOf();
   councilConfig.value.roles[roleId] = {
     id: roleId,
-    name: '自定义交易员',
-    role_title: 'Custom Trader',
-    description: '自主定制策略风格的交易员席位',
+    name: t('admin.council.customTraderName'),
+    role_title: t('admin.council.customTraderRoleTitle'),
+    description: t('admin.council.customTraderDesc'),
     prompt:
       '【角色：自定义资深交易员】\n' +
       '你作为对冲基金交易台的一线交易员，请核验账户可用资金、现有持仓与挂单，并对 6 大标的输出你的实战作战提案：\n' +
@@ -580,9 +580,9 @@ onMounted(loadData);
                 <span class="cn-seat-name truncate" :title="role.name || String(roleId)">{{ role.name || roleId }}</span>
                 <span
                   class="cn-seat-sub truncate"
-                  :title="roleTitleOf(role, isCioSeat(role, String(roleId)) ? t('admin.council.cioTitle') : 'Senior Trader')"
+                  :title="roleTitleOf(role, isCioSeat(role, String(roleId)) ? t('admin.council.cioTitle') : t('admin.council.seniorTrader'))"
                 >
-                  {{ roleTitleOf(role, isCioSeat(role, String(roleId)) ? t('admin.council.cioTitle') : 'Senior Trader') }}
+                  {{ roleTitleOf(role, isCioSeat(role, String(roleId)) ? t('admin.council.cioTitle') : t('admin.council.seniorTrader')) }}
                 </span>
               </span>
               <span v-if="isCioSeat(role, String(roleId))" class="badge badge-accent">
@@ -613,7 +613,7 @@ onMounted(loadData);
                     :placeholder="t('admin.council.seatNamePlaceholder')"
                   />
                   <span class="cn-editor-sub">
-                    {{ roleTitleOf(selectedRole, isCioSeat(selectedRole, expandedRole) ? t('admin.council.cioTitle') : 'Senior Trader') }}
+                    {{ roleTitleOf(selectedRole, isCioSeat(selectedRole, expandedRole) ? t('admin.council.cioTitle') : t('admin.council.seniorTrader')) }}
                     <template v-if="isCioSeat(selectedRole, expandedRole)"> · {{ t('admin.council.arbitratorBadge') }}</template>
                   </span>
                 </div>

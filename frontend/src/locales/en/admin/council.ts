@@ -37,6 +37,12 @@ export const enAdminCouncil = {
   addTrader: 'Add custom trader seat',
   seatNamePlaceholder: 'Role name',
   cioTitle: 'CIO / Final verdict',
+  /* batch 77: 'Senior Trader' was hard-coded in the template (3 places), so the
+     Chinese UI showed English; new custom seats also hard-coded 'Custom Trader'. */
+  seniorTrader: 'Senior Trader',
+  customTraderName: 'Custom Trader',
+  customTraderRoleTitle: 'Custom Trader',
+  customTraderDesc: 'A trader seat whose strategy style you define yourself',
   arbitratorBadge: 'Arbitrator & order dispatch seat',
   seatActive: 'Active',
   seatMuted: 'Muted',

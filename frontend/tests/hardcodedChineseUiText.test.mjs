@@ -215,6 +215,39 @@ test('批 75 修复的文案必须继续走 i18n（回归锚点）', () => {
   assert.match(drawer, /\{\{ t\('dash\.ledger\.lifecycle\.totalFees'\) \}\}/, '费用合计未整体走 t');
 });
 
+test('en 词条的值里不得残留中文（漏译 / 直接拷贝 zh 的值）', () => {
+  // ⚠️ 批 77 的变异 M6 暴露的缺口：把 en 的 copySummary 改成中文，
+  // 而 `copySummary:` 存在、占位符也在 —— 只断言"键存在 + 占位符齐"是拦不住的。
+  // 这条规则覆盖**全部** en 词条（约 700 个键），是漏译的兜底网。
+  const bad = [];
+  let scanned = 0;
+
+  for (const file of (function walk(dir, out = []) {
+    for (const n of readdirSync(dir)) {
+      const p = path.join(dir, n);
+      if (statSync(p).isDirectory()) walk(p, out);
+      else if (n.endsWith('.ts')) out.push(p);
+    }
+    return out;
+  })(path.join(SRC, 'locales/en'))) {
+    const rel = path.relative(SRC, file);
+    rel.split('/').length; // 仅用于可读性
+    const lines = readFileSync(file, 'utf8').split('\n');
+    lines.forEach((line, i) => {
+      const s = line.trim();
+      if (s.startsWith('//') || s.startsWith('*') || s.startsWith('/*')) return;
+      // 只查**值**位置：`key: '值'`
+      for (const m of line.matchAll(/^\s*[\w$]+:\s*(['"`])([\s\S]*?)\1\s*,?\s*$/g)) {
+        scanned += 1;
+        if (CJK.test(m[2])) bad.push(`${rel}:${i + 1}  ${m[2]}`);
+      }
+    });
+  }
+
+  assert.ok(scanned >= 400, `扫描到的 en 词条过少（${scanned}），疑似判据失效`);
+  assert.deepEqual(bad, [], `以下 en 词条未翻译（仍是中文）：\n  ${bad.join('\n  ')}`);
+});
+
 test('中英词条结构必须对称（新增键两侧都要有）', () => {
   const zh = readFileSync(path.join(SRC, 'locales/zh/admin/llm.ts'), 'utf8');
   const en = readFileSync(path.join(SRC, 'locales/en/admin/llm.ts'), 'utf8');

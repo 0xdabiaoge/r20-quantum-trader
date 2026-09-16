@@ -40,6 +40,12 @@ export const zhAdminCouncil = {
   addTrader: '添加自定义交易员席位',
   seatNamePlaceholder: '角色名称',
   cioTitle: 'CIO / 终审',
+  /* 批 77：`'Senior Trader'` 此前硬编码在模板里（3 处），中文界面下显示英文；
+     新建自定义席位也硬编码 `'Custom Trader'`。 */
+  seniorTrader: '资深交易员',
+  customTraderName: '自定义交易员',
+  customTraderRoleTitle: '自定义交易员',
+  customTraderDesc: '自主定制策略风格的交易员席位',
   arbitratorBadge: '终审发单席位',
   seatActive: '活跃参与',
   seatMuted: '已静音',

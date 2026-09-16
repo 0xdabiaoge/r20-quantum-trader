@@ -609,7 +609,14 @@ function selectPeriod(p: any) {
 }
 
 function copySimulationSummary() {
-  const text = `【R20 风控测算】${currentSymbol.value} 入场:${effectiveEntry.value} SL:${effectiveSL.value} TP:${effectiveTP.value} R:R=${riskRewardMetrics.value.rrRatio.toFixed(2)}:1`
+  // 批 77：剪贴板文案此前硬编码中文 —— 英文界面下用户复制出来是中英混排。
+  const text = t('dash.matrix.chart.sim.copySummary', undefined, {
+    sym: currentSymbol.value,
+    entry: effectiveEntry.value,
+    sl: effectiveSL.value,
+    tp: effectiveTP.value,
+    rr: riskRewardMetrics.value.rrRatio.toFixed(2),
+  })
   navigator.clipboard.writeText(text).then(() => {
     copied.value = true
     setTimeout(() => {
