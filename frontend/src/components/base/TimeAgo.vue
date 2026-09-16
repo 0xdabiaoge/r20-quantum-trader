@@ -48,8 +48,12 @@ const text = computed(() => {
   return t('time.daysAgo', undefined, { n: Math.floor(h / 24) });
 });
 const abs = computed(() => `${fmtDateTime(props.time)} ${t('time.beijingTime')}`);
+const iso = computed(() => {
+  const ts = parseTime(props.time);
+  return !Number.isNaN(ts.getTime()) ? ts.toISOString() : undefined;
+});
 </script>
 
 <template>
-  <time class="t-faint whitespace-nowrap" :title="abs">{{ text }}</time>
+  <time class="t-faint whitespace-nowrap" :datetime="iso" :title="abs">{{ text }}</time>
 </template>

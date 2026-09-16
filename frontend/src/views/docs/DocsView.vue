@@ -3,7 +3,8 @@
  * DocsView.vue · DeepSeek Harness 风格系统与技术开发文档中心
  * 包含：双轨工作台骨架、目录大纲索引树 (TOC) 与平滑滚动侦测、全功能架构透视、微积分数学与硬防线技术规范、实机大图预览
  */
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, onMounted, onUnmounted, onBeforeUnmount, watch } from 'vue';
+import { useModalFocus } from '../../composables/useModalFocus';
 import { useRouter } from 'vue-router';
 import {
   ShieldCheck,
@@ -33,6 +34,13 @@ const { t } = useI18n();
 const activeSection = ref('overview');
 const mobileMenuOpen = ref(false);
 const zoomImage = ref<string | null>(null);
+const zoomPanel = ref<HTMLElement | null>(null);
+const { sync: syncZoomFocus, release: releaseZoomFocus } = useModalFocus(
+  zoomPanel,
+  () => { zoomImage.value = null; },
+);
+watch(() => Boolean(zoomImage.value), syncZoomFocus);
+onBeforeUnmount(releaseZoomFocus);
 
 const sections = [
   { id: 'overview', title: '1. 系统架构与量化哲学', icon: TrendingUp },
@@ -68,12 +76,33 @@ function onScroll() {
   }
 }
 
+function onKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape' && mobileMenuOpen.value) {
+    mobileMenuOpen.value = false;
+  }
+}
+
+watch(mobileMenuOpen, (menu) => {
+  if (typeof document !== 'undefined') {
+    if (menu) {
+      document.body.style.overflow = 'hidden';
+    } else if (!zoomImage.value) {
+      document.body.style.overflow = '';
+    }
+  }
+});
+
 onMounted(() => {
+  window.addEventListener('keydown', onKeydown);
   window.addEventListener('scroll', onScroll, { passive: true });
 });
 
 onUnmounted(() => {
   window.removeEventListener('scroll', onScroll);
+  window.removeEventListener('keydown', onKeydown);
+  if (typeof document !== 'undefined') {
+    document.body.style.overflow = '';
+  }
 });
 </script>
 
@@ -490,14 +519,29 @@ onUnmounted(() => {
     <!-- Zoom Image Modal -->
     <div
       v-if="zoomImage"
-      class="fixed inset-0 z-[var(--z-dialog)] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm cursor-zoom-out"
+      ref="zoomPanel"
+      role="dialog"
+      aria-modal="true"
+      :aria-label="t('docs.zoomModalAria')"
+      tabindex="-1"
+      class="fixed inset-0 z-[var(--z-dialog)] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm cursor-zoom-out outline-none"
       @click="zoomImage = null"
     >
       <img
         :src="zoomImage"
         alt="放大的文档插图"
-        class="max-w-full max-h-[90vh] rounded-lg shadow-2xl"
+        class="max-w-full max-h-[90vh] rounded-lg shadow-2xl cursor-default"
+        @click.stop
       />
+      <button
+        type="button"
+        class="absolute top-4 right-4 btn btn-quiet btn-icon text-white hover:bg-white/20"
+        :title="t('common.close')"
+        :aria-label="t('common.close')"
+        @click="zoomImage = null"
+      >
+        <X class="w-5 h-5" />
+      </button>
     </div>
   </div>
 </template>

@@ -12,4 +12,5 @@ export const enDocs = {
   closeToc: 'Close contents',
   backHome: 'Back to home',
   openConsole: 'Open console',
+  zoomModalAria: 'Documentation illustration zoom preview',
 };

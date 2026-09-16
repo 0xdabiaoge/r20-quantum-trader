@@ -13,4 +13,5 @@ export const zhDocs = {
   closeToc: '关闭目录',
   backHome: '返回首页',
   openConsole: '进入控制台',
+  zoomModalAria: '文档插图全屏预览',
 };
