@@ -96,9 +96,11 @@ onUnmounted(() => {
         <div class="h-4 w-px hidden sm:block shrink-0" style="background-color: var(--line-1);" />
         <div class="flex items-center space-x-2 min-w-0">
           <BookOpen class="h-4 w-4 text-[var(--accent)] shrink-0" />
-          <span class="font-bold text-xs sm:text-sm tracking-wide shrink-0 whitespace-nowrap text-[var(--ink-strong)]">
+          <!-- 批 45：本页此前**没有 h1**（首个标题是章节 h2）。顶栏品牌名即文档主标题，
+               换成 h1，类名一字未改，观感不变。 -->
+          <h1 class="font-bold text-xs sm:text-sm tracking-wide shrink-0 whitespace-nowrap text-[var(--ink-strong)]">
             {{ APP_NAME }}
-          </span>
+          </h1>
           <span
             class="dsh-pill font-mono text-3xs"
           >
@@ -396,7 +398,7 @@ onUnmounted(() => {
           </p>
 
           <div class="dsh-card-sub p-3.5 space-y-2">
-            <h4 class="text-xs font-bold text-[var(--ink-strong)]">核心物理硬门禁原则：</h4>
+            <h3 class="text-xs font-bold text-[var(--ink-strong)]">核心物理硬门禁原则：</h3>
             <ul class="list-disc list-inside text-xs text-[var(--ink-2)] space-y-1">
               <li><strong>4H 大级别顺势门禁</strong>：严禁逆 4H 大周期均线开反向单。</li>
               <li><strong>置信度硬阈值门禁</strong>：模型终审置信度未达到设定阈值一律强制压制为 WAIT。</li>
@@ -463,13 +465,13 @@ onUnmounted(() => {
 
           <div class="space-y-3 text-xs">
             <div class="dsh-card-sub p-3 space-y-1">
-              <h4 class="font-bold text-[var(--ink-strong)]">Q: 系统如何保证资金安全？</h4>
+              <h3 class="font-bold text-[var(--ink-strong)]">Q: 系统如何保证资金安全？</h3>
               <p class="text-[var(--ink-2)] leading-body">
                 A: API Key 凭证本地 Fernet 加密存储；绝不开启提现权限；所有订单均有云端 OCO 止损物理保护；全盘具备单日亏损熔断保护。
               </p>
             </div>
             <div class="dsh-card-sub p-3 space-y-1">
-              <h4 class="font-bold text-[var(--ink-strong)]">Q: 模型请求失败或超时会怎样？</h4>
+              <h3 class="font-bold text-[var(--ink-strong)]">Q: 模型请求失败或超时会怎样？</h3>
               <p class="text-[var(--ink-2)] leading-body">
                 A: 系统自动触发预设的 Failover 备用模型链；若全链不可用，系统自动保持 Fail-Closed 状态（不执行任何新开仓动作）。
               </p>

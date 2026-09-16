@@ -78,6 +78,15 @@ export const enCommon = {
     },
     // batch 44: accessible name for the language picker group
     language: 'Interface language',
+    // batch 45: 404 fallback page
+    // batch 45: bypass repeated nav blocks (WCAG 2.4.1)
+    skipToContent: 'Skip to main content',
+    notFound: {
+      title: 'Page not found',
+      desc: 'Nothing lives at {path}. The address may be mistyped, or the page was removed.',
+      home: 'Back to the workstation',
+      docs: 'Read the docs',
+    },
   },
   status: {
     normal: 'Normal',

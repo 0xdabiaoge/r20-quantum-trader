@@ -958,6 +958,31 @@ kbd {
    `.clickable`（4 处，可点击行）与 `.link`（1 处，关于弹窗的社区外链）
    在模板里写了、全站却没有任何规则 —— 前者鼠标不变手型，后者就是普通文字。
    ========================================================================= */
+/* "跳到主内容"（批 45）。默认移出视口（不是 display:none —— 那样不可聚焦），
+   键盘 Tab 到时从左上角滑入，用品牌色描边。 */
+.skip-link {
+  position: fixed;
+  top: var(--ds-space-2);
+  left: var(--ds-space-2);
+  z-index: var(--z-toast);
+  padding: var(--ds-space-2) var(--ds-space-3);
+  border-radius: var(--r-ctl);
+  background-color: var(--ds-color-bg-surface-1);
+  border: 1px solid var(--ds-color-border-strong);
+  color: var(--ds-color-text-primary);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-decoration: none;
+  box-shadow: var(--shadow-dialog);
+  transform: translateY(calc(-100% - var(--ds-space-3)));
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+.skip-link:focus-visible {
+  transform: translateY(0);
+  outline: 2px solid var(--ds-color-brand);
+  outline-offset: 2px;
+}
+
 /* 可点击行/卡片（批 43）。
  *
  * 这些元素（`<tr>`、`<article>`、`<div>`）此前只有鼠标能操作：没有 `tabindex`，

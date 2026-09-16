@@ -252,10 +252,10 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
       <section class="card ov-stream-card">
         <header class="ov-card-header">
           <div class="ov-ch-main">
-            <h3 class="ov-ch-title">
+            <h2 class="ov-ch-title">
               <ScrollText :size="14" class="ov-ch-icon" />
               <span>{{ t('admin.overview.decisions') }}</span>
-            </h3>
+            </h2>
             <p class="ov-ch-desc">{{ t('admin.overview.decisionsDesc') }}</p>
           </div>
           <RouterLink to="/admin/decisions" class="ov-ch-link">
@@ -337,10 +337,10 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
         <section class="card ov-pipe-card">
           <header class="ov-card-header">
             <div class="ov-ch-main">
-              <h3 class="ov-ch-title">
+              <h2 class="ov-ch-title">
                 <Database :size="14" class="ov-ch-icon" />
                 <span>{{ t('admin.overview.dataHealth') }}</span>
-              </h3>
+              </h2>
               <p class="ov-ch-desc">{{ t('admin.overview.dataHealthDesc') }}</p>
             </div>
             <span
@@ -383,10 +383,10 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
         <section class="card ov-nav-card">
           <header class="ov-card-header">
             <div class="ov-ch-main">
-              <h3 class="ov-ch-title">
+              <h2 class="ov-ch-title">
                 <LayoutGrid :size="14" class="ov-ch-icon" />
                 <span>{{ t('admin.overview.quickTitle') }}</span>
-              </h3>
+              </h2>
             </div>
           </header>
 
@@ -415,10 +415,10 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
     <section class="card ov-audit-card">
       <header class="ov-card-header">
         <div class="ov-ch-main">
-          <h3 class="ov-ch-title">
+          <h2 class="ov-ch-title">
             <History :size="14" class="ov-ch-icon" />
             <span>{{ t('admin.overview.recentAudit') }}</span>
-          </h3>
+          </h2>
           <p class="ov-ch-desc">{{ t('admin.overview.auditDesc') }}</p>
         </div>
         <RouterLink to="/admin/audit" class="ov-ch-link">

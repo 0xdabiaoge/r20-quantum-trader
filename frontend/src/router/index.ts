@@ -53,6 +53,15 @@ const routes: RouteRecordRaw[] = [
     path: '/login',
     redirect: '/admin/login',
   },
+  // 批 45：兜底路由。此前**没有** catch-all，拼错的地址渲染出一整页空白
+  // （实测 body 文本长度 0、无标题、无回退入口）；后端对未知路径回的是
+  // `{"detail":"Not Found"}` JSON，前端也曾把 SPA 外壳渲染成空白。
+  {
+    path: '/:pathMatch(.*)*',
+    name: 'not-found',
+    component: () => import('../views/NotFoundView.vue'),
+    meta: { isPublic: true },
+  },
 ]
 
 const router = createRouter({

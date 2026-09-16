@@ -22,10 +22,12 @@ defineProps<{
   <section class="card ss" :class="{ 'is-subtle': tone === 'subtle' }">
     <header class="card-head">
       <div class="ss-head-text">
-        <h3 class="card-title">
+        <!-- 批 45：h3 → h2。本组件承载的是**页面一级分区**，直接挂在布局 h1 之下，
+             跳级（h1→h3）会让读屏器/大纲工具误判层级；其余管理页的卡片标题已是 h2。 -->
+        <h2 class="card-title">
           <component :is="icon" v-if="icon" :size="14" />
           {{ title }}
-        </h3>
+        </h2>
         <p v-if="description" class="card-sub">{{ description }}</p>
       </div>
       <div class="ss-actions">

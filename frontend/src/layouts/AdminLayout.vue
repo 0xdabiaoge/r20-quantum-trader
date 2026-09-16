@@ -27,6 +27,7 @@ import { useLocalStorage } from '../composables/useLocalStorage';
 import { adminGroups } from '../config/nav';
 import { APP_VERSION } from '../config/version';
 import BeijingClock from '../components/base/BeijingClock.vue';
+import SkipLink from '../components/base/SkipLink.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -79,6 +80,9 @@ watch(() => route.path, () => (drawerOpen.value = false));
 
 <template>
   <div class="wb">
+    <!-- 键盘用户的第一个 Tab 落点：跳过 18 项侧边导航直达正文（批 45） -->
+    <SkipLink />
+
     <!-- ═══ 侧边导航 ═══ -->
     <aside class="wb-rail" :class="{ 'is-collapsed': collapsed }">
       <!-- 品牌 -->
@@ -166,7 +170,7 @@ watch(() => route.path, () => (drawerOpen.value = false));
       </header>
 
       <!-- 内容区 -->
-      <main class="wb-main scroll-area">
+      <main id="main-content" tabindex="-1" class="wb-main scroll-area">
         <div class="wb-content">
           <router-view />
         </div>

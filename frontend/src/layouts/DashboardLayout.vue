@@ -28,6 +28,7 @@ import NewsView from '../views/dashboard/NewsView.vue';
 import EvolutionView from '../views/dashboard/EvolutionView.vue';
 import LedgerView from '../views/dashboard/LedgerView.vue';
 import AboutModal from '../components/dashboard/AboutModal.vue';
+import SkipLink from '../components/base/SkipLink.vue';
 import TrajectoryPanel from '../components/dashboard/TrajectoryPanel.vue';
 
 const route = useRoute();
@@ -107,6 +108,8 @@ const venueHealth = computed(() => {
     class="flex h-screen w-screen overflow-hidden text-xs"
     style="color: var(--ink-1)"
   >
+    <!-- 键盘用户的第一个 Tab 落点：跳过侧边导航与顶栏动作组直达正文（批 45） -->
+    <SkipLink />
     <!-- 左侧：DeepSeek Harness 开发者侧边导航栏
          桌面（md+）= 常驻侧栏（可折叠 236/56）；窄屏 = off-canvas 抽屉（同一元素）
          层级：遮罩 z-30 < 抽屉 z-50 < 顶栏 z-[60] —— 顶栏必须压在抽屉之上，
@@ -275,7 +278,11 @@ const venueHealth = computed(() => {
       />
 
       <!-- 主工作区滚动容器 -->
-      <main class="flex-1 overflow-y-auto overflow-x-hidden min-w-0 p-3 sm:p-4 pb-20 md:pb-6">
+      <main
+        id="main-content"
+        tabindex="-1"
+        class="flex-1 overflow-y-auto overflow-x-hidden min-w-0 p-3 sm:p-4 pb-20 md:pb-6 outline-none"
+      >
         <div class="mx-auto w-full max-w-[2048px]">
           <KeepAlive :max="5">
             <MatrixView v-if="activeTab === 'trading'" key="trading" />

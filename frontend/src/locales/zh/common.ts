@@ -78,6 +78,15 @@ export const zhCommon = {
     },
     // 批 44：语言选择组的可访问名（登录页 role=group）
     language: '界面语言',
+    // 批 45：404 兜底页
+    // 批 45：跳过重复导航块（WCAG 2.4.1）
+    skipToContent: '跳到主内容',
+    notFound: {
+      title: '页面不存在',
+      desc: '没有找到 {path}。地址可能拼错了，或该页面已经下线。',
+      home: '回到工作台',
+      docs: '查看使用文档',
+    },
   },
   status: {
     normal: '正常',

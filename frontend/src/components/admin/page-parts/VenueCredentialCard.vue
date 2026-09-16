@@ -38,7 +38,9 @@ const toneClass = computed(
     <!-- 卡头：所名 + 接口档 + 状态徽章 -->
     <header class="vc-head">
       <div class="vc-id">
-        <h4 class="vc-name">{{ name }}</h4>
+        <!-- 批 45：h4 → h3。本卡是「设置分区」内的一张卡（分区标题是 h2），
+             h2→h4 是跳级；`.vc-name` 类控制外观，改层级不影响观感。 -->
+        <h3 class="vc-name">{{ name }}</h3>
         <span class="vc-api">{{ apiLabel }}</span>
       </div>
       <span class="badge" :class="toneClass">{{ statusText }}</span>
