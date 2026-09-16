@@ -69,6 +69,13 @@ export const enLedger = {
     grossPnl: 'Gross PnL',
     rR: 'Realized R:R',
     empty: 'No event detail for this trade',
+
+    // batch 75: Chinese used to be concatenated directly after t() in the template,
+    // so the English UI rendered "Gross PnL & 财务指标"; and
+    // `{{ t('common.total') }} 费用合计` was a duplicated label even in Chinese.
+    metricsTitle: 'Gross PnL & Financial Metrics',
+    totalFees: 'Total Fees',
+
   },
   logs: {
     title: 'Engine patrol log',

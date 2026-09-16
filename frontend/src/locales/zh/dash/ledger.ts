@@ -70,6 +70,13 @@ export const zhLedger = {
     grossPnl: '毛盈亏',
     rR: '实际盈亏比',
     empty: '该笔记录暂无事件明细',
+
+    // 批 75：此前模板里把中文直接贴在 t() 后面 ——
+    // 英文界面渲染成「Gross PnL & 财务指标」；且 `{{ t('common.total') }} 费用合计`
+    // 连中文下都是「合计 费用合计」的重复标签。
+    metricsTitle: '毛盈亏 & 财务指标',
+    totalFees: '费用合计',
+
   },
   logs: {
     title: '引擎巡检日志',

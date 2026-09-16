@@ -59,7 +59,7 @@ const providerForm = ref<any>({
   id: '',
   name: '',
   type: 'OpenAI',
-  group: '其他',
+  group: t('admin.llm.providerGroupOther'),
   enabled: true,
   multi_key_enabled: false,
   response_api_enabled: false,
@@ -219,8 +219,8 @@ function openAddProviderModal() {
   providerForm.value = {
     id: '',
     name: '',
-    type: 'OpenAI 兼容',
-    group: '自定义',
+    type: t('admin.llm.providerTypeCompat'),
+    group: t('admin.llm.providerGroupCustom'),
     enabled: true,
     multi_key_enabled: false,
     response_api_enabled: false,
@@ -243,7 +243,7 @@ function selectProvider(p: any) {
     id: p.id,
     name: p.name,
     type: p.type || p.name,
-    group: p.group || '其他',
+    group: p.group || t('admin.llm.providerGroupOther'),
     enabled: !!p.enabled,
     multi_key_enabled: !!p.multi_key_enabled,
     response_api_enabled: !!p.response_api_enabled,
@@ -296,7 +296,7 @@ async function saveProviderConfig() {
       method: 'POST',
       body: JSON.stringify(payload),
     })
-    toast.ok('供应商配置已成功保存！')
+    toast.ok(t('admin.llm.toastProviderSaved'))
     await loadConfig()
     if (selectedProvider.value?.is_new) {
       const created = cfg.value.providers?.find((p: any) => p.id === payload.id)
@@ -312,13 +312,18 @@ async function saveProviderConfig() {
 async function clearCurrentProviderModels() {
   if (!selectedProvider.value) return
   // 批C(2026-09-13)：破坏性操作统一走项目确认服务（原生 confirm 在移动端易误触）
-  const _ok = await ask({ title: '清空供应商模型', desc: `${selectedProvider.value.name} 旗下全部模型将被删除`, danger: true, okText: '清空' })
+  const _ok = await ask({
+    title: t('admin.llm.confirmClearProviderTitle'),
+    desc: t('admin.llm.confirmClearProviderDesc', undefined, { name: selectedProvider.value.name }),
+    danger: true,
+    okText: t('admin.llm.confirmClearProviderOk'),
+  })
   if (!_ok) return
   try {
     await api(`/api/v1/admin/llm/providers/${encodeURIComponent(selectedProvider.value.id)}/models`, {
       method: 'DELETE',
     })
-    toast.ok('已清空该供应商所有模型！')
+    toast.ok(t('admin.llm.toastProviderCleared'))
     await loadConfig()
   } catch (err: any) {
     toast.err(err.message)
@@ -332,20 +337,20 @@ async function removeProvider() {
   // 批C(2026-09-13)：删供应商可能带走主脑激活模型 → danger + 提示先切换模型
   // 批2(2026-09-13)：原先这里算出 warn 却从未使用（vue-tsc TS6133），模型联删提示形同丢失，
   // 现直接并入确认文案，保证「删之前知道会带走什么」。
-  const cascade = providerDeleteCascadeHint(p)
+  const cascade = providerDeleteCascadeHint(p, t)
   const _ok = await ask({
-    title: '删除 LLM 供应商',
-    desc: `「${p.name}」将被删除${cascade}`,
-    detail: '若它挂着当前主脑激活模型，请先切换模型再删除',
+    title: t('admin.llm.confirmDeleteProviderTitle'),
+    desc: t('admin.llm.confirmDeleteProviderDesc', undefined, { name: p.name, cascade }),
+    detail: t('admin.llm.confirmDeleteProviderDetail'),
     danger: true,
-    okText: '删除',
+    okText: t('admin.llm.confirmDeleteOk'),
   })
   if (!_ok) return
   try {
     await api(`/api/v1/admin/llm/providers/${encodeURIComponent(p.id)}`, {
       method: 'DELETE',
     })
-    toast.ok(`供应商 ${p.name} 已删除`)
+    toast.ok(t('admin.llm.toastProviderDeleted', undefined, { name: p.name }))
     goBackToList()
     await loadConfig()
   } catch (err: any) {
@@ -396,7 +401,7 @@ const filteredRemoteModels = computed(() =>
 async function importRemoteModel(m: any, autoActivate = false) {
   if (!selectedProvider.value) return
   try {
-    const payload = buildRemoteModelPayload(m, selectedProvider.value)
+    const payload = buildRemoteModelPayload(m, selectedProvider.value, t)
     await api('/api/v1/admin/llm/models', {
       method: 'POST',
       body: JSON.stringify(payload),
@@ -410,7 +415,11 @@ async function importRemoteModel(m: any, autoActivate = false) {
       })
     }
     await loadConfig()
-    toast.ok(autoActivate ? `已收录并激活主脑为 ${m.id}！` : `已成功添加 ${m.id} 到模型列表！`)
+    toast.ok(
+      autoActivate
+        ? t('admin.llm.toastModelActivated', undefined, { id: m.id })
+        : t('admin.llm.toastModelAdded', undefined, { id: m.id }),
+    )
   } catch (err: any) {
     toast.err(err.message)
   }
@@ -424,7 +433,7 @@ async function importAllFilteredRemoteModels() {
     try {
       // ⚠️ 本刀之前这里与 importRemoteModel 各写了一份**逐字相同**的 payload
       //    字面量（11 个字段的回落链）。现统一走 buildRemoteModelPayload。
-      const payload = buildRemoteModelPayload(m, selectedProvider.value)
+      const payload = buildRemoteModelPayload(m, selectedProvider.value, t)
       await api('/api/v1/admin/llm/models', {
         method: 'POST',
         body: JSON.stringify(payload),
@@ -435,7 +444,7 @@ async function importAllFilteredRemoteModels() {
     }
   }
   await loadConfig()
-  toast.ok(`成功批量收录 ${successCount} 个模型到 ${selectedProvider.value.name}！`)
+  toast.ok(t('admin.llm.toastModelsImported', undefined, { n: successCount, name: selectedProvider.value.name }))
 }
 
 // ----------------- Model Management -----------------
@@ -508,7 +517,12 @@ async function activateModel(m: any) {
 async function deleteSingleModel(m: any) {
   const pid = selectedProvider.value?.id
   const pname = selectedProvider.value?.name || pid || ''
-  const _ok = await ask({ title: '删除模型', desc: `供应商「${pname}」名下的模型 ${m.id} 将被删除`, danger: true, okText: '删除' })
+  const _ok = await ask({
+    title: t('admin.llm.confirmDeleteModelTitle'),
+    desc: t('admin.llm.confirmDeleteModelDesc', undefined, { name: pname, id: m.id }),
+    danger: true,
+    okText: t('admin.llm.confirmDeleteOk'),
+  })
   if (!_ok) return
   try {
     const url = pid

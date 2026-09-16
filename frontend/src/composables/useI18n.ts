@@ -6,6 +6,21 @@ export type LocaleType = 'zh-CN' | 'en-US'
 
 const LOCALE_KEY = 'r20_locale'
 
+/**
+ * 界面语言选项 —— **全站唯一来源**。
+ *
+ * `label` 用该语言**自己的名字**（中文 / English），不随当前语言翻译：
+ * 语言开关的作用是让看不懂当前语言的人找到自己的语言，
+ * 译成「Chinese」对只看中文的人反而是障碍。
+ *
+ * 批 75：此前两个开关各写各的 —— 设置面板写 `中文` / `English`，
+ * 登录页模板里**硬编码**成 `中文` / `EN`，同一个语言两个写法。
+ */
+export const LOCALE_OPTIONS: { value: LocaleType; label: string }[] = [
+  { value: 'zh-CN', label: '中文' },
+  { value: 'en-US', label: 'English' },
+]
+
 type Dict = Record<string, any>
 
 // 结构优化阶段 0（2026-09-14）：移除 locales/legacy 迁移期兼容层。
@@ -106,6 +121,7 @@ export function useI18n() {
   return {
     locale,
     currentLocale,
+    LOCALE_OPTIONS,
     isEn,
     t,
     tm,

@@ -198,11 +198,22 @@ console.log('apiFormatEffect（切换 api_format 时的路径迁移）:');
 
 // ------------------------------------------------------------ buildRemoteModelPayload
 console.log('buildRemoteModelPayload（本刀消掉的逐字重复）:');
+
+/** 批 75：`buildRemoteModelPayload` / `providerDeleteCascadeHint` 改为
+ *  **注入 `t`**（与 `effortOptions(labelOf)` 同一约定：本模块不依赖 vue / i18n）。
+ *  这里用一个记录调用的假 t —— 既能满足调用契约，又能证明文案确实走了 i18n。 */
+const tCalls = [];
+const fakeT = (key, _fallback, params) => {
+  tCalls.push({ key, params });
+  if (key === 'admin.llm.remoteAutoCollected') return '[remoteAutoCollected]';
+  if (key === 'admin.llm.cascadeModelsDeleted') return `[cascade:${params?.n}]`;
+  return `[${key}]`;
+};
 {
   const provider = { id: 'p1', name: 'P1', base_url: 'https://a.b', api_format: 'openai_chat' };
   const full = M.buildRemoteModelPayload(
     { id: 'mx', name: 'MX', default_effort: 'low', capabilities: ['vision'],
-      context_length: 64000, description: 'D' }, provider);
+      context_length: 64000, description: 'D' }, provider, fakeT);
   eq('字段全集', Object.keys(full).sort(),
      ['api_format', 'base_url', 'capabilities', 'context_length', 'description',
       'id', 'name', 'provider_id', 'provider_name', 'reasoning_effort', 'reasoning_type']);
@@ -216,22 +227,22 @@ console.log('buildRemoteModelPayload（本刀消掉的逐字重复）:');
        reasoning_effort: 'low', capabilities: ['vision'] });
 
   // 回落链
-  const bare = M.buildRemoteModelPayload({ id: 'mz' }, provider);
+  const bare = M.buildRemoteModelPayload({ id: 'mz' }, provider, fakeT);
   eq('无 name → 回落 id', bare.name, 'mz');
   eq('无 api_format → 回落 provider', bare.api_format, 'openai_chat');
   eq('无 reasoning_type → auto', bare.reasoning_type, 'auto');
   eq('无 default_effort → high', bare.reasoning_effort, 'high');
   eq('无 capabilities → [chat]', bare.capabilities, ['chat']);
-  eq('无 description → 固定文案', bare.description, '从远端一键自动收录');
-  const noFmt = M.buildRemoteModelPayload({ id: 'm' }, { id: 'p' });
+  eq('无 description → 走注入的 i18n 文案', bare.description, '[remoteAutoCollected]');
+  const noFmt = M.buildRemoteModelPayload({ id: 'm' }, { id: 'p' }, fakeT);
   eq('provider 也无 api_format → openai_chat', noFmt.api_format, 'openai_chat');
   // description 截断
-  const long = M.buildRemoteModelPayload({ id: 'm', description: 'x'.repeat(300) }, provider);
+  const long = M.buildRemoteModelPayload({ id: 'm', description: 'x'.repeat(300) }, provider, fakeT);
   eq('description 截到 100', long.description.length, 100);
-  const empty = M.buildRemoteModelPayload({ id: 'm', description: '' }, provider);
-  eq('空 description → 回落文案（falsy 判定）', empty.description, '从远端一键自动收录');
+  const empty = M.buildRemoteModelPayload({ id: 'm', description: '' }, provider, fakeT);
+  eq('空 description → 回落文案（falsy 判定）', empty.description, '[remoteAutoCollected]');
   eq('context_length 可为 undefined（原实现直接透传）',
-     M.buildRemoteModelPayload({ id: 'm' }, provider).context_length, undefined);
+     M.buildRemoteModelPayload({ id: 'm' }, provider, fakeT).context_length, undefined);
 }
 
 // ------------------------------------------------------------ buildActivatePayload
@@ -241,15 +252,25 @@ eq('字段与顺序', M.buildActivatePayload('m1', 'p1', 'high'),
 
 // ------------------------------------------------------------ providerDeleteCascadeHint
 console.log('providerDeleteCascadeHint:');
-eq('models_count 优先', M.providerDeleteCascadeHint({ models_count: 3, models: [1, 2] }),
-   '，其名下 3 个模型将一并删除');
+eq('models_count 优先', M.providerDeleteCascadeHint({ models_count: 3, models: [1, 2] }, fakeT),
+   '[cascade:3]');
 eq('无 models_count → 用 models.length',
-   M.providerDeleteCascadeHint({ models: [1, 2] }), '，其名下 2 个模型将一并删除');
-eq('都没有 → 空串', M.providerDeleteCascadeHint({}), '');
-eq('0 个 → 空串（不给级联提示）', M.providerDeleteCascadeHint({ models_count: 0 }), '');
+   M.providerDeleteCascadeHint({ models: [1, 2] }, fakeT), '[cascade:2]');
+eq('都没有 → 空串', M.providerDeleteCascadeHint({}, fakeT), '');
+eq('0 个 → 空串（不给级联提示）', M.providerDeleteCascadeHint({ models_count: 0 }, fakeT), '');
 eq('models_count 为 0 时不再看 models（?? 语义）',
-   M.providerDeleteCascadeHint({ models_count: 0, models: [1, 2, 3] }), '');
-eq('null 不崩', M.providerDeleteCascadeHint(null), '');
+   M.providerDeleteCascadeHint({ models_count: 0, models: [1, 2, 3] }, fakeT), '');
+eq('null 不崩', M.providerDeleteCascadeHint(null, fakeT), '');
+
+// 批 75：文案必须经注入的 t —— 硬编码中文在英文界面下会直接显示中文
+tCalls.length = 0;
+M.buildRemoteModelPayload({ id: 'm' }, { id: 'p' }, fakeT);
+eq('buildRemoteModelPayload 的回落文案经 t()',
+   tCalls.some((c) => c.key === 'admin.llm.remoteAutoCollected'), true);
+tCalls.length = 0;
+M.providerDeleteCascadeHint({ models_count: 2 }, fakeT);
+eq('providerDeleteCascadeHint 的级联提示经 t() 且带 {n}',
+   tCalls, [{ key: 'admin.llm.cascadeModelsDeleted', params: { n: 2 } }]);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);

@@ -9,7 +9,7 @@ import { useTheme } from '../../composables/useTheme';
 import BaseSegmented from '../base/BaseSegmented.vue';
 import BaseSwitch from '../base/BaseSwitch.vue';
 
-const { t, currentLocale, setLocale } = useI18n();
+const { t, currentLocale, setLocale, LOCALE_OPTIONS } = useI18n();
 const { cvd, toggleCvd } = useTheme();
 
 const router = useRouter();
@@ -68,10 +68,7 @@ onBeforeUnmount(() => {
             <BaseSegmented
               class="w-full"
               :model-value="currentLocale"
-              :options="[
-                { value: 'zh-CN', label: '中文' },
-                { value: 'en-US', label: 'English' },
-              ]"
+              :options="LOCALE_OPTIONS"
               @update:model-value="(v: any) => setLocale(v)"
             />
           </div>

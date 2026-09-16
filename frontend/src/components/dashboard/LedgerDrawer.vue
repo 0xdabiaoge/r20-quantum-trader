@@ -170,7 +170,7 @@ const cells = computed(() => [
       <!-- 8 核心财务指标矩阵 -->
       <div>
         <h4 class="text-3xs font-bold uppercase tracking-wider text-[var(--ink-3)] mb-1.5">
-          {{ t('dash.ledger.lifecycle.grossPnl') }} & 财务指标
+          {{ t('dash.ledger.lifecycle.metricsTitle') }}
         </h4>
         <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <div
@@ -213,7 +213,7 @@ const cells = computed(() => [
             </dd>
           </div>
           <div class="flex justify-between items-center border-t pt-2" style="border-color: var(--line-1)">
-            <dt class="font-bold text-[var(--ink-1)]">{{ t('common.total') }} 费用合计</dt>
+            <dt class="font-bold text-[var(--ink-1)]">{{ t('dash.ledger.lifecycle.totalFees') }}</dt>
             <dd class="num font-mono font-bold" :class="feeAbs(x.fee) === '--' ? 'text-[var(--ink-3)]' : 'text-[var(--down)]'">
               {{ feeAbs(x.fee) }}
             </dd>

@@ -138,4 +138,27 @@ export const enAdminLlm = {
   providersTitle: 'Provider matrix',
   presetLabel: 'Presets',
   credentialsTitle: 'Credentials & endpoint',
-  noneConfigured: 'Not configured',};
+  noneConfigured: 'Not configured',
+
+  // batch 75: these were hard-coded Chinese, so the English UI showed Chinese.
+  providerTypeCompat: 'OpenAI compatible',
+  providerGroupCustom: 'Custom',
+  providerGroupOther: 'Other',
+  toastProviderSaved: 'Provider configuration saved.',
+  toastProviderCleared: 'All models under this provider have been cleared.',
+  confirmClearProviderTitle: 'Clear provider models',
+  confirmClearProviderDesc: 'Every model under {name} will be deleted',
+  confirmClearProviderOk: 'Clear',
+  confirmDeleteProviderTitle: 'Delete LLM provider',
+  confirmDeleteProviderDesc: '"{name}" will be deleted{cascade}',
+  confirmDeleteProviderDetail: 'If it holds the active brain model, switch models first.',
+  confirmDeleteOk: 'Delete',
+  confirmDeleteModelTitle: 'Delete model',
+  confirmDeleteModelDesc: 'Model {id} under provider "{name}" will be deleted',
+  cascadeModelsDeleted: '; {n} model(s) under it will be deleted too',
+  remoteAutoCollected: 'Auto-collected from remote',
+  toastProviderDeleted: 'Provider {name} deleted',
+  toastModelActivated: 'Collected and activated {id} as the brain.',
+  toastModelAdded: 'Added {id} to the model list.',
+  toastModelsImported: 'Imported {n} model(s) into {name}.',
+};

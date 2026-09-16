@@ -140,4 +140,27 @@ export const zhAdminLlm = {
   providersTitle: '供应商矩阵',
   presetLabel: '快捷预设',
   credentialsTitle: '凭据与端点',
-  noneConfigured: '未配置',};
+  noneConfigured: '未配置',
+
+  // ── 批 75：此前硬编码中文，英文界面下会直接显示中文 ──
+  providerTypeCompat: 'OpenAI 兼容',
+  providerGroupCustom: '自定义',
+  providerGroupOther: '其他',
+  toastProviderSaved: '供应商配置已成功保存！',
+  toastProviderCleared: '已清空该供应商所有模型！',
+  confirmClearProviderTitle: '清空供应商模型',
+  confirmClearProviderDesc: '{name} 旗下全部模型将被删除',
+  confirmClearProviderOk: '清空',
+  confirmDeleteProviderTitle: '删除 LLM 供应商',
+  confirmDeleteProviderDesc: '「{name}」将被删除{cascade}',
+  confirmDeleteProviderDetail: '若它挂着当前主脑激活模型，请先切换模型再删除',
+  confirmDeleteOk: '删除',
+  confirmDeleteModelTitle: '删除模型',
+  confirmDeleteModelDesc: '供应商「{name}」名下的模型 {id} 将被删除',
+  cascadeModelsDeleted: '，其名下 {n} 个模型将一并删除',
+  remoteAutoCollected: '从远端一键自动收录',
+  toastProviderDeleted: '供应商 {name} 已删除',
+  toastModelActivated: '已收录并激活主脑为 {id}！',
+  toastModelAdded: '已成功添加 {id} 到模型列表！',
+  toastModelsImported: '成功批量收录 {n} 个模型到 {name}！',
+};

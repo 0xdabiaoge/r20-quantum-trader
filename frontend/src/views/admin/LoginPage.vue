@@ -28,7 +28,7 @@ import { APP_VERSION } from '../../config/version';
 
 const auth = useAuthStore();
 const router = useRouter();
-const { t, currentLocale, setLocale } = useI18n();
+const { t, currentLocale, setLocale, LOCALE_OPTIONS } = useI18n();
 
 const username = ref('');
 const password = ref('');
@@ -53,24 +53,20 @@ async function handleLogin() {
         <span>{{ t('admin.login.backToScreen') }}</span>
       </button>
 
+      <!-- 批 75：语言名此前硬编码在模板里（`中文` / `EN`），与设置面板的
+           `中文` / `English` 不一致。现按 useI18n 导出的唯一常量渲染。 -->
       <div class="auth-lang-pill" role="group" :aria-label="t('common.language')">
-        <button
-          class="auth-lang-opt"
-          :class="{ 'is-active': currentLocale === 'zh-CN' }"
-          :aria-pressed="currentLocale === 'zh-CN'"
-          @click="setLocale('zh-CN')"
-        >
-          中文
-        </button>
-        <span class="auth-lang-sep" />
-        <button
-          class="auth-lang-opt"
-          :class="{ 'is-active': currentLocale === 'en-US' }"
-          :aria-pressed="currentLocale === 'en-US'"
-          @click="setLocale('en-US')"
-        >
-          EN
-        </button>
+        <template v-for="(opt, i) in LOCALE_OPTIONS" :key="opt.value">
+          <span v-if="i > 0" class="auth-lang-sep" />
+          <button
+            class="auth-lang-opt"
+            :class="{ 'is-active': currentLocale === opt.value }"
+            :aria-pressed="currentLocale === opt.value"
+            @click="setLocale(opt.value)"
+          >
+            {{ opt.label }}
+          </button>
+        </template>
       </div>
     </header>
 

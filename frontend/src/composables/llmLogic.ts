@@ -204,7 +204,14 @@ export function apiFormatEffect(format: string, currentPath: string | null | und
  * ⚠️ 这段字面量原先在 `importRemoteModel` 与 `importAllFilteredRemoteModels`
  * 里**各写了一份、逐字相同**（本刀实测确认）。现只此一处。
  */
-export function buildRemoteModelPayload(m: any, provider: any): Record<string, any> {
+export function buildRemoteModelPayload(
+  m: any,
+  provider: any,
+  /** i18n 取值函数（`t`）。与 `effortOptions` 的 `labelOf` 同一约定：
+   *  本模块不依赖 vue / i18n，「从远端一键自动收录」这句**用户可见文案**
+   *  由调用方注入 —— 此前写死中文，英文界面下会直接显示中文。 */
+  t: (key: string) => string,
+): Record<string, any> {
   return {
     id: m.id,
     name: m.name || m.id,
@@ -216,7 +223,7 @@ export function buildRemoteModelPayload(m: any, provider: any): Record<string, a
     reasoning_effort: m.default_effort || 'high',
     capabilities: m.capabilities || ['chat'],
     context_length: m.context_length,
-    description: m.description ? m.description.slice(0, 100) : '从远端一键自动收录',
+    description: m.description ? m.description.slice(0, 100) : t('admin.llm.remoteAutoCollected'),
   }
 }
 
@@ -230,7 +237,10 @@ export function buildActivatePayload(
 }
 
 /** 删除供应商确认框里的级联提示（原实现里 `cascade` 变量的拼法）。 */
-export function providerDeleteCascadeHint(provider: any): string {
+export function providerDeleteCascadeHint(
+  provider: any,
+  t: (key: string, fallback?: string, params?: Record<string, string | number>) => string,
+): string {
   const n = provider?.models_count ?? provider?.models?.length ?? 0
-  return n > 0 ? `，其名下 ${n} 个模型将一并删除` : ''
+  return n > 0 ? t('admin.llm.cascadeModelsDeleted', undefined, { n }) : ''
 }
