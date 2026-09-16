@@ -128,4 +128,6 @@ export const enAdminCouncil = {
   confirmRemoveDesc: 'The seat “{name}” will be removed',
   confirmRestoreTitle: 'Restore factory prompt',
   confirmRestoreDesc: 'The custom prompt for “{name}” will be overwritten',
+  // batch 38: separator for the missing-context tooltip
+  listSep: '; ',
 };

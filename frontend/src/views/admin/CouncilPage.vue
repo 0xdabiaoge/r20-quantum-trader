@@ -719,7 +719,7 @@ onMounted(loadData);
               v-if="testResult.market_context"
               class="badge"
               :class="(testResult.market_context.missing || []).length ? 'badge-warn' : ''"
-              :title="(testResult.market_context.missing || []).join('；')"
+              :title="(testResult.market_context.missing || []).join(t('admin.council.listSep'))"
             >
               {{ testResult.market_context.source === 'manual_mock'
                 ? t('admin.council.ctxManualMock')

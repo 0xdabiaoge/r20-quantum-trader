@@ -131,4 +131,6 @@ export const zhAdminCouncil = {
   confirmRemoveDesc: '【{name}】席位将被移除',
   confirmRestoreTitle: '恢复出厂提示词',
   confirmRestoreDesc: '【{name}】的自定义提示词将被覆盖',
+  // 批 38：缺失市场上下文提示串的分隔符
+  listSep: '；',
 };

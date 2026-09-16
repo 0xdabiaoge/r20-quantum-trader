@@ -41,4 +41,19 @@ export const enAdminInterceptors = {
   pipelineTitle: 'Interceptor pipeline',
   pipelineDesc: 'Ordered by execution priority, highest first; plugins higher up intervene earlier',
   empty: 'No interceptor plugins yet. Add one with the New plugin button at the top right',
-  editorTitle: 'Plugin source',};
+  editorTitle: 'Plugin source',  // ── batch 38: localize strings previously hardcoded in InterceptorsPage.vue ──
+  loadFailed: 'Failed to load plugins: {msg}',
+  toggleOn: 'Enabled interceptor plugin “{name}”',
+  toggleOff: 'Disabled interceptor plugin “{name}”',
+  opFailed: 'Action failed: {msg}',
+  reorderOk: 'Interceptor pipeline priority order updated',
+  reorderFailed: 'Failed to update order: {msg}',
+  readSourceFailed: 'Failed to read plugin source: {msg}',
+  saveCodeOk: 'Plugin “{file}” saved and hot-reloaded',
+  deleteConfirmTitle: 'Delete interceptor plugin',
+  deleteConfirmDesc: 'The file “{name}” will be permanently deleted from disk and cannot be recovered',
+  deleteOk: 'Deleted plugin “{file}”',
+  deleteFailed: 'Delete failed: {msg}',
+  sandboxFailed: 'Sandbox regression test failed: {msg}',
+  createOk: 'Interceptor plugin “{name}” created!',
+};

@@ -42,4 +42,19 @@ export const zhAdminInterceptors = {
   pipelineTitle: '拦截管线',
   pipelineDesc: '按执行优先级从高到低排列；越靠上的插件越早介入风控判定',
   empty: '暂无拦截插件，可点击右上角「新建插件」添加',
-  editorTitle: '插件源码',};
+  editorTitle: '插件源码',  // ── 批 38：本地化写死文案（原先直接写死在 InterceptorsPage.vue）──
+  loadFailed: '加载插件失败：{msg}',
+  toggleOn: '已启用拦截插件「{name}」',
+  toggleOff: '已停用拦截插件「{name}」',
+  opFailed: '操作失败：{msg}',
+  reorderOk: '已更新拦截管线执行优先级顺序',
+  reorderFailed: '排序更新失败：{msg}',
+  readSourceFailed: '读取插件源码失败：{msg}',
+  saveCodeOk: '插件「{file}」代码已保存并热加载生效',
+  deleteConfirmTitle: '删除拦截插件',
+  deleteConfirmDesc: '「{name}」的文件将被从磁盘彻底移除，不可恢复',
+  deleteOk: '已删除插件「{file}」',
+  deleteFailed: '删除失败：{msg}',
+  sandboxFailed: '沙箱回归测试执行失败：{msg}',
+  createOk: '成功创建拦截插件「{name}」！',
+};

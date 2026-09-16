@@ -75,9 +75,9 @@ async function applySuite(s: any) {
   try {
     const res = await api('/api/v1/admin/risk', { method: 'POST', body: JSON.stringify({ suite_id: s.id }) })
     syncFromServer(res.values)
-    toast.ok(`已一键应用「${s.name}」预设 · ${res.effect}`)
+    toast.ok(t('admin.risk.applyOk', undefined, { name: s.name, effect: res.effect }))
   } catch (e: any) {
-    toast.err(`应用预设失败: ${e.message}`)
+    toast.err(t('admin.risk.applyFailed', undefined, { msg: e.message }))
   } finally {
     busy.value = ''
   }
@@ -134,7 +134,7 @@ const { run: loadData, busy: loading } = useAsyncAction(async () => {
   processFresh.value = res.process_freshness || null
   engineValues.value = res.engine_values || null
   syncFromServer(res.values)
-}, { onError: (e) => toast.err(`加载失败: ${e.message}`), initialBusy: true });
+}, { onError: (e) => toast.err(t('admin.risk.loadFailed', undefined, { msg: e.message })), initialBusy: true });
 
 const dirtyKeys = computed(() => {
   if (!schema.value) return []
@@ -197,15 +197,16 @@ async function saveChanges() {
     return dirtyKeys.value.includes(p.key) && (v < p.min || v > p.max)
   })
   if (bad.length) {
-    toast.err(`以下参数越界：${bad.map((p: any) => p.label).join('、')}`)
+    const labels = bad.map((p: any) => p.label).join(t('admin.risk.itemSep'))
+    toast.err(t('admin.risk.outOfRange', undefined, { labels }))
     return
   }
   if (levInverted.value) {
-    toast.err('杠杆下限不能高于上限，请先修正「单笔杠杆区间」')
+    toast.err(t('admin.risk.levInvertedFix'))
     return
   }
   if (levInverted.value) {
-    toast.err('杠杆下限不能高于上限，请调整区间后再保存')
+    toast.err(t('admin.risk.levInvertedSave'))
     return
   }
   // 审计 P2-9：极端值（单标的占比≥50% / 日亏≥25% 权益 / 杠杆≥10x 等）此前一次点击即落盘，
@@ -224,10 +225,10 @@ async function saveChanges() {
   if (extreme.length) {
     const detail = extreme
       .map((k) => `${schema.value?.params.find((x: any) => x.key === k)?.label || k} = ${values[k]}`)
-      .join('；')
+      .join(t('admin.risk.detailSep'))
     const _ok = await ask({
-      title: '极端风控参数确认',
-      desc: `以下参数已进入极端区间，将显著放松硬风控：${detail}`,
+      title: t('admin.risk.extremeTitle'),
+      desc: t('admin.risk.extremeDesc', undefined, { detail }),
       danger: true,
       confirmPhrase: 'HIGH RISK',
       okText: t('common.confirmWrite'),
@@ -239,9 +240,9 @@ async function saveChanges() {
   try {
     const res = await api('/api/v1/admin/risk', { method: 'POST', body: JSON.stringify({ values, confirmation }) })
     syncFromServer(res.values)
-    toast.ok(`已保存 ${res.updated.length} 项修改 · ${res.effect}`)
+    toast.ok(t('admin.risk.saveOk', undefined, { n: res.updated.length, effect: res.effect }))
   } catch (e: any) {
-    toast.err(`保存失败: ${e.message}`)
+    toast.err(t('admin.risk.saveFailed', undefined, { msg: e.message }))
   } finally {
     busy.value = ''
   }
@@ -252,8 +253,8 @@ async function resetAll() {
   // 此前**零确认**一次点击即执行，而后端本就要求逐字短语 `RESET RISK`（前端把短语写死
   // 在请求体里，等于保险被旁路）。移动端误触即放松风控，风险极高——现要求逐字确认。
   const _ok = await ask({
-    title: '重置全部风控参数',
-    desc: '所有风控阈值将恢复为代码默认基线（含单笔仓位上限、日亏上限、杠杆上限等）',
+    title: t('admin.risk.resetAllTitle'),
+    desc: t('admin.risk.resetAllDesc'),
     danger: true,
     confirmPhrase: 'RESET RISK',
     okText: t('common.resetBaseline'),
@@ -263,9 +264,9 @@ async function resetAll() {
   try {
     const res = await api('/api/v1/admin/risk/reset', { method: 'POST', body: JSON.stringify({ confirmation: 'RESET RISK' }) })
     syncFromServer(res.values)
-    toast.ok(`已恢复代码默认基线 · ${res.effect}`)
+    toast.ok(t('admin.risk.resetOk', undefined, { effect: res.effect }))
   } catch (e: any) {
-    toast.err(`重置失败: ${e.message}`)
+    toast.err(t('admin.risk.resetFailed', undefined, { msg: e.message }))
   } finally {
     busy.value = ''
   }
@@ -326,7 +327,7 @@ onMounted(loadData)
 
       <p v-if="driftCount.length" class="rk-drift">
         <AlertTriangle :size="12" class="shrink-0" />
-        <span>{{ t('admin.risk.engineDrift') }}：{{ driftLabels.join('、') }}</span>
+        <span>{{ t('admin.risk.engineDrift') }}：{{ driftLabels.join(t('admin.risk.itemSep')) }}</span>
       </p>
     </section>
 

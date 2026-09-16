@@ -73,7 +73,7 @@ async function loadPlugins() {
     plugins.value = res.plugins || []
   } catch (e: any) {
     loadError.value = e.message
-    toast.err(`加载插件失败：${e.message}`)
+    toast.err(t('admin.interceptors.loadFailed', undefined, { msg: e.message }))
   } finally {
     loading.value = false
   }
@@ -87,9 +87,14 @@ async function togglePlugin(p: any) {
       body: JSON.stringify({ enabled: nextState }),
     })
     p.enabled = nextState
-    toast.ok(`已${nextState ? '启用' : '停用'}拦截插件「${p.name || p.filename}」`)
+    const name = p.name || p.filename
+    toast.ok(
+      nextState
+        ? t('admin.interceptors.toggleOn', undefined, { name })
+        : t('admin.interceptors.toggleOff', undefined, { name }),
+    )
   } catch (e: any) {
-    toast.err(`操作失败：${e.message}`)
+    toast.err(t('admin.interceptors.opFailed', undefined, { msg: e.message }))
   }
 }
 
@@ -107,9 +112,9 @@ async function movePlugin(idx: number, dir: -1 | 1) {
       body: JSON.stringify({ pipeline_order: newOrder }),
     })
     plugins.value = res.plugins || arr
-    toast.ok('已更新拦截管线执行优先级顺序')
+    toast.ok(t('admin.interceptors.reorderOk'))
   } catch (e: any) {
-    toast.err(`排序更新失败：${e.message}`)
+    toast.err(t('admin.interceptors.reorderFailed', undefined, { msg: e.message }))
     await loadPlugins()
   }
 }
@@ -123,7 +128,7 @@ async function openEditor(p: any) {
     codeError.value = ''
     editorVisible.value = true
   } catch (e: any) {
-    toast.err(`读取插件源码失败：${e.message}`)
+    toast.err(t('admin.interceptors.readSourceFailed', undefined, { msg: e.message }))
   }
 }
 
@@ -135,7 +140,7 @@ async function saveCode() {
       method: 'PUT',
       body: JSON.stringify({ code: editingCode.value }),
     })
-    toast.ok(`插件「${editingFilename.value}」代码已保存并热加载生效`)
+    toast.ok(t('admin.interceptors.saveCodeOk', undefined, { file: editingFilename.value }))
     editorVisible.value = false
     await loadPlugins()
   } catch (e: any) {
@@ -159,8 +164,8 @@ async function deletePlugin(p: any) {
   // 批C(2026-09-13)·不可逆操作收口：插件文件从磁盘彻底移除，原生 confirm 小条在
   // 移动端极易误触；改逐字短语确认（与项目危险操作约定一致）。
   const _ok = await ask({
-    title: '删除拦截插件',
-    desc: `「${p.name || p.filename}」的文件将被从磁盘彻底移除，不可恢复`,
+    title: t('admin.interceptors.deleteConfirmTitle'),
+    desc: t('admin.interceptors.deleteConfirmDesc', undefined, { name: p.name || p.filename }),
     danger: true,
     confirmPhrase: 'DELETE',
     okText: t('common.del'),
@@ -168,10 +173,10 @@ async function deletePlugin(p: any) {
   if (!_ok) return
   try {
     await api(`/api/v1/admin/interceptors/${encodeURIComponent(p.filename)}`, { method: 'DELETE' })
-    toast.ok(`已删除插件「${p.filename}」`)
+    toast.ok(t('admin.interceptors.deleteOk', undefined, { file: p.filename }))
     await loadPlugins()
   } catch (e: any) {
-    toast.err(`删除失败：${e.message}`)
+    toast.err(t('admin.interceptors.deleteFailed', undefined, { msg: e.message }))
   }
 }
 
@@ -184,7 +189,7 @@ async function runSandbox() {
     })
     testModalVisible.value = true
   } catch (e: any) {
-    toast.err(`沙箱回归测试执行失败：${e.message}`)
+    toast.err(t('admin.interceptors.sandboxFailed', undefined, { msg: e.message }))
   } finally {
     testing.value = false
   }
@@ -239,7 +244,7 @@ async function submitCreate() {
         code: newCode.value,
       }),
     })
-    toast.ok(`成功创建拦截插件「${res.name || res.filename}」！`)
+    toast.ok(t('admin.interceptors.createOk', undefined, { name: res.name || res.filename }))
     createModalVisible.value = false
     await loadPlugins()
   } catch (e: any) {

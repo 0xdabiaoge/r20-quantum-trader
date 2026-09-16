@@ -54,4 +54,6 @@ export const zhEvolution = {
     snapshotCounts: '动力学 {observed}/{total} · 仅价格 {priceOnly} · 无快照 {none}',
     baselineProtected: '基准心法补回 {n} 条',
   },
+  // 批 38：展示用列表分隔符（全角分号 vs 半角分号+空格）
+  itemSep: '；',
 };

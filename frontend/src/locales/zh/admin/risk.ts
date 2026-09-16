@@ -39,4 +39,21 @@ export const zhAdminRisk = {
   effectTitle: '生效说明',
   suitesTitle: '预设套件',
   suitesDesc: '一键套用经过验证的风控参数组合',
-  paramsTitle: '风控参数',};
+  paramsTitle: '风控参数',  // ── 批 38：本地化写死文案（原先直接写死在 RiskPage.vue）──
+  applyOk: '已一键应用「{name}」预设 · {effect}',
+  applyFailed: '应用预设失败: {msg}',
+  loadFailed: '加载失败: {msg}',
+  outOfRange: '以下参数越界：{labels}',
+  itemSep: '、',
+  detailSep: '；',
+  levInvertedFix: '杠杆下限不能高于上限，请先修正「单笔杠杆区间」',
+  levInvertedSave: '杠杆下限不能高于上限，请调整区间后再保存',
+  extremeTitle: '极端风控参数确认',
+  extremeDesc: '以下参数已进入极端区间，将显著放松硬风控：{detail}',
+  saveOk: '已保存 {n} 项修改 · {effect}',
+  saveFailed: '保存失败: {msg}',
+  resetAllTitle: '重置全部风控参数',
+  resetAllDesc: '所有风控阈值将恢复为代码默认基线（含单笔仓位上限、日亏上限、杠杆上限等）',
+  resetOk: '已恢复代码默认基线 · {effect}',
+  resetFailed: '重置失败: {msg}',
+};

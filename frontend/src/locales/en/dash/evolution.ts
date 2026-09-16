@@ -38,4 +38,6 @@ export const enEvolution = {
     snapshotCounts: 'dynamics {observed}/{total} · price-only {priceOnly} · none {none}',
     baselineProtected: '{n} baseline rules re-added',
   },
+  // batch 38: list separator for display (fullwidth vs ASCII)
+  itemSep: '; ',
 };

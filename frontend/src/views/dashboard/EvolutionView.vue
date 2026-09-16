@@ -58,7 +58,7 @@ function insBody(it: any): string {
     return Object.entries(it)
       .filter(([, v]) => v !== null && v !== undefined && typeof v !== 'object')
       .map(([k, v]) => `${k}: ${v}`)
-      .join('；');
+      .join(t('dash.evolution.itemSep'));
   }
   return String(it ?? '');
 }
@@ -74,7 +74,7 @@ function actText(a: any): string {
     return Object.entries(a)
       .filter(([, v]) => v !== null && v !== undefined && typeof v !== 'object')
       .map(([k, v]) => `${k}: ${v}`)
-      .join('；');
+      .join(t('dash.evolution.itemSep'));
   }
   return String(a ?? '');
 }

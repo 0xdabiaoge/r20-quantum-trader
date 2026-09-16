@@ -39,4 +39,21 @@ export const enAdminRisk = {
   effectTitle: 'Effect',
   suitesTitle: 'Presets',
   suitesDesc: 'Apply a validated combination of risk parameters in one click',
-  paramsTitle: 'Risk parameters',};
+  paramsTitle: 'Risk parameters',  // ── batch 38: localize strings previously hardcoded in RiskPage.vue ──
+  applyOk: 'Applied preset “{name}” · {effect}',
+  applyFailed: 'Failed to apply preset: {msg}',
+  loadFailed: 'Load failed: {msg}',
+  outOfRange: 'These parameters are out of range: {labels}',
+  itemSep: ', ',
+  detailSep: '; ',
+  levInvertedFix: 'The leverage floor cannot exceed the cap — fix the single-trade leverage range first',
+  levInvertedSave: 'The leverage floor cannot exceed the cap — adjust the range before saving',
+  extremeTitle: 'Confirm extreme risk parameters',
+  extremeDesc: 'These parameters are now in the extreme range and will significantly loosen hard risk controls: {detail}',
+  saveOk: 'Saved {n} change(s) · {effect}',
+  saveFailed: 'Save failed: {msg}',
+  resetAllTitle: 'Reset all risk parameters',
+  resetAllDesc: 'All risk thresholds return to the code default baseline (single-trade position cap, daily loss cap, leverage cap, etc.)',
+  resetOk: 'Restored the code default baseline · {effect}',
+  resetFailed: 'Reset failed: {msg}',
+};
