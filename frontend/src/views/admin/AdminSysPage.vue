@@ -61,9 +61,10 @@ const creating = ref(false)
 const createError = ref('')
 
 // F2：统一错误出口（error → toast，与原实现一致）。
-// 只取 run：原实现的 `loading` 是**死状态** —— 脚本里来回切换，模板从不渲染它
-// （模板中 loading 出现 0 次），故这里不引入 busy，否则 trigger 未读告警。
-const { run: load } = useAsyncAction(async () => {
+// 批 71：原实现的 `loading` 是**死状态**（模板从不渲染，故此前只取 run）。
+// 现在错误块的重试按钮真的需要忙碌态了 —— 不绑会让用户连点两次、
+// 发出两个并发请求，且期间界面毫无反馈 —— 所以把 busy 取回来并绑到按钮上。
+const { run: load, busy: loading } = useAsyncAction(async () => {
   if (!auth.isSuperadmin) return
   loadError.value = ''
   const res = await api<any>('/api/v1/admin/users')
@@ -268,8 +269,9 @@ onMounted(load)
         <span class="state-icon"><AlertTriangle :size="17" /></span>
         <p class="state-title">{{ t('common.loadFailed') }}</p>
         <p class="state-desc">{{ loadError }}</p>
-        <button class="btn btn-ghost btn-sm" style="margin-top: 4px" @click="load">
-          <RefreshCw :size="14" />
+        <button class="btn btn-ghost btn-sm" style="margin-top: 4px" :disabled="loading" @click="load">
+          <Loader2 v-if="loading" :size="14" class="as-spin" />
+          <RefreshCw v-else :size="14" />
           <span>{{ t('common.retry') }}</span>
         </button>
       </div>

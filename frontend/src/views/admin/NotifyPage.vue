@@ -488,12 +488,22 @@ onBeforeUnmount(() => {
               </div>
 
               <footer class="nf-card-foot">
-                <button class="btn btn-ghost btn-sm" @click="diagnose(c.key)">
-                  <ScanLine :size="13" />
+                <!-- 批 71：测试进行中按钮必须禁用 —— 此前连点会并发发起多次测试请求，
+                     而右上角结果区只会显示最后一次，用户看到的"重试"其实是请求风暴。 -->
+                <button
+                  class="btn btn-ghost btn-sm"
+                  :disabled="testResults[c.key]?.status === 'testing'"
+                  @click="diagnose(c.key)"
+                >
+                  <ScanLine :size="13" aria-hidden="true" />
                   <span>{{ t('admin.notify.diagnose') }}</span>
                 </button>
-                <button class="btn btn-ghost btn-sm" @click="sendTest(c.key)">
-                  <Send :size="13" />
+                <button
+                  class="btn btn-ghost btn-sm"
+                  :disabled="testResults[c.key]?.status === 'testing'"
+                  @click="sendTest(c.key)"
+                >
+                  <Send :size="13" aria-hidden="true" />
                   <span>{{ t('admin.notify.sendTest') }}</span>
                 </button>
 

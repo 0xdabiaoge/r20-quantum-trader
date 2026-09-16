@@ -494,8 +494,9 @@ onMounted(loadData)
 
     <BaseEmpty v-else :text="t('common.loadFailed')" :desc="t('common.networkError')">
       <template #action>
-        <button class="btn btn-ghost btn-sm" @click="loadData">
-          <RefreshCw :size="14" />
+        <button class="btn btn-ghost btn-sm" :disabled="loading" @click="loadData">
+          <Loader2 v-if="loading" :size="14" class="rk-spin" />
+          <RefreshCw v-else :size="14" />
           <span>{{ t('common.retry') }}</span>
         </button>
       </template>

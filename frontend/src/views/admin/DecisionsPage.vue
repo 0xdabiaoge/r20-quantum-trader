@@ -287,7 +287,12 @@ function tone(level: string): string {
           <span class="state-icon"><AlertCircle :size="17" /></span>
           <p class="state-title">{{ t('common.loadFailed') }}</p>
           <p class="state-desc">{{ logError }}</p>
-          <button class="btn btn-ghost btn-sm" style="margin-top: 4px" @click="fetchLogStream(activeLogTab)">
+          <button
+            class="btn btn-ghost btn-sm"
+            style="margin-top: 4px"
+            :disabled="logLoading"
+            @click="fetchLogStream(activeLogTab)"
+          >
             <RefreshCw :size="14" :class="logLoading && 'dc-spin'" />
             <span>{{ t('common.retry') }}</span>
           </button>

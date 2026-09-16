@@ -140,7 +140,10 @@ function statusLabel(s: string): string {
       <div v-if="error" role="status" aria-live="polite" class="gw-stale">
         <AlertTriangle :size="13" />
         <span>{{ t('admin.gateway.msgs.loadFailed', undefined, { msg: error }) }}</span>
-        <button class="btn btn-quiet btn-sm" @click="load">{{ t('common.retry') }}</button>
+        <button class="btn btn-quiet btn-sm" :disabled="loading" @click="load">
+          <RefreshCw :size="14" :class="loading && 'gw-spin'" aria-hidden="true" />
+          {{ t('common.retry') }}
+        </button>
       </div>
 
       <!-- ══ 运行状态带 ══ -->
