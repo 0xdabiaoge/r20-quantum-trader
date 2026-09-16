@@ -261,6 +261,7 @@ function statusLabel(s: string): string {
           :rows="deliveries"
           :row-key="(d: any) => d.id"
           :empty-text="t('admin.gateway.deliveries.empty')"
+          row-class="gw-tr"
         >
           <template #head>
             <tr class="gw-th">
@@ -275,27 +276,26 @@ function statusLabel(s: string): string {
           </template>
 
           <template #row="{ row: d }">
-            <tr class="gw-tr">
-              <td class="mono gw-dim">#{{ d.id }}</td>
-              <td class="gw-topic">{{ d.topic }}</td>
-              <td class="mono gw-target truncate" :title="d.target">{{ d.target }}</td>
-              <td>
-                <span class="badge" :class="statusTone(d.status)" :title="d.status">{{ statusLabel(d.status) }}</span>
-              </td>
-              <td class="gw-r mono gw-dim">{{ d.attempts ?? 0 }}</td>
-              <td class="mono gw-dim">{{ d.updated_at ? fmtJobTime(d.updated_at) : '--' }}</td>
-              <td>
-                <button
-                  v-if="d.status === 'dead' || d.status === 'failed'"
-                  class="btn btn-quiet btn-sm gw-replay"
-                  @click="openReplay(d.id)"
-                >
-                  <RotateCcw :size="13" />
-                  <span>{{ t('admin.gateway.deliveries.replay') }}</span>
-                </button>
-                <span v-else class="gw-dim">--</span>
-              </td>
-            </tr>
+                <td class="mono gw-dim">#{{ d.id }}</td>
+                <td class="gw-topic">{{ d.topic }}</td>
+                <td class="mono gw-target truncate" :title="d.target">{{ d.target }}</td>
+                <td>
+                  <span class="badge" :class="statusTone(d.status)" :title="d.status">{{ statusLabel(d.status) }}</span>
+                </td>
+                <td class="gw-r mono gw-dim">{{ d.attempts ?? 0 }}</td>
+                <td class="mono gw-dim">{{ d.updated_at ? fmtJobTime(d.updated_at) : '--' }}</td>
+                <td>
+                  <button
+                    v-if="d.status === 'dead' || d.status === 'failed'"
+                    class="btn btn-quiet btn-sm gw-replay"
+                    @click="openReplay(d.id)"
+                  >
+                    <RotateCcw :size="13" />
+                    <span>{{ t('admin.gateway.deliveries.replay') }}</span>
+                  </button>
+                  <span v-else class="gw-dim">--</span>
+                </td>
+          
           </template>
         </DataTable>
       </section>

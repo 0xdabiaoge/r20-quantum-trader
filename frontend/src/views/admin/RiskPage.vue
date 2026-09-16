@@ -734,7 +734,10 @@ onMounted(loadData)
 }
 .rk-input {
   width: 92px;
-  padding:8px 10px;
+  /* 批 34：全站输入控件走 --h-md（30px）；本页自写成 8px 上下内边距 → 实测 35px，
+     既不在高度梯队（24/30/36）上，也比同页其它输入高 5px。 */
+  height: var(--h-md);
+  padding: 0 10px;
   border: 0;
   outline: none;
   background: transparent;

@@ -73,12 +73,16 @@ const props = withDefaults(defineProps<{
   loadingText?: string
   /** 是否允许按列排序（列上还需 sortable: true） */
   sortable?: boolean
+  /** 追加到 <tr> 上的类（批 34：消费方需要自定义行样式时用它，
+   *  不要在 #row 槽里再套一层 <tr> —— 那是无效嵌套，会让行高一分为二） */
+  rowClass?: string
 }>(), {
   columns: () => [],
   loading: false,
   sortable: false,
   flat: false,
   clickable: false,
+  rowClass: '',
 })
 
 const emit = defineEmits<{
@@ -190,7 +194,7 @@ const colCount = computed(() => props.columns.length + (has('actions') ? 1 : 0))
             v-for="(row, i) in displayRows"
             :key="rowKey ? rowKey(row, i) : i"
             class="border-b last:border-b-0 transition-colors hover:bg-[var(--surface-3)]"
-            :class="clickable ? 'cursor-pointer' : ''"
+            :class="[clickable ? 'cursor-pointer' : '', rowClass]"
             style="border-color: var(--line-1);"
             @click="emit('row-click', row)"
           >
