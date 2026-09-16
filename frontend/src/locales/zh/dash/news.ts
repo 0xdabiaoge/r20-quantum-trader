@@ -64,4 +64,10 @@ export const zhNews = {
   count: '共 {n} 条快讯',
   resetFilters: '重置筛选',
   emptyCoin: '暂无与 {sym} 相关的快讯',
+  macroDefault: '偏多震荡',
+  sourceReasonDefault: 'OKX官方公告 + 金十数据宏观快讯',
+  pctBull: '{n}% 多',
+  pctBear: '{n}% 空',
+  countNews: '{a} / {b} 条快讯',
+  ratioLabel: '多空比',
 };

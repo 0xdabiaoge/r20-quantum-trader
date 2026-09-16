@@ -198,4 +198,7 @@ export const zhMatrix = {
   chartBtn: '看主图',
   focusTip: '进入纯工位沉浸模式',
   focusRestoreTip: '恢复全量监控看板',
+  hudProdDynamics: 'PROD · 15M 动力学中枢',
+  focusEnter: '工位沉浸模式',
+  focusExit: '退出工位模式',
 };

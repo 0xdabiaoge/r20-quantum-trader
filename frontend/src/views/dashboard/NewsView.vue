@@ -32,10 +32,10 @@ const sourceFilters = computed(() => [
 ]);
 
 const ni = computed<any>(() => (store.data as any)?.news_intelligence || {});
-const macro = computed(() => ni.value.macro_sentiment || '偏多震荡');
+const macro = computed(() => ni.value.macro_sentiment || t('dash.news.macroDefault'));
 const rawNews = computed<any[]>(() => ni.value.latest_news || []);
 const freshAt = computed(() => ni.value.news_fresh_at || ni.value.timestamp || '');
-const sourceReason = computed(() => ni.value.source_reason || 'OKX官方公告 + 金十数据宏观快讯');
+const sourceReason = computed(() => ni.value.source_reason || t('dash.news.sourceReasonDefault'));
 const isSourceActive = computed(() => ni.value.source_available === true);
 
 // 黑天鹅熔断状态
@@ -214,11 +214,11 @@ function toggleCoinFilter(sym: string) {
             </div>
 
             <div class="flex justify-between text-4xs font-mono text-[var(--ink-3)]">
-              <span class="text-[var(--up)]">{{ c.bull.toFixed(0) }}% 多</span>
+              <span class="text-[var(--up)]">{{ t('dash.news.pctBull', undefined, { n: c.bull.toFixed(0) }) }}</span>
               <!-- 中位指标：多空账户比来自 OKX Rubik（真实端点）。绝不显示
                    虚构的「100 篇」样本量；仅在确有快讯提及该币时才追加篇数。 -->
-              <span :title="t('dash.news.ratioHint')">多空比 {{ c.ls || '--' }}<template v-if="c.mentions > 0"> · {{ t('dash.news.mentions', undefined, { n: c.mentions }) }}</template></span>
-              <span class="text-[var(--down)]">{{ c.bear.toFixed(0) }}% 空</span>
+              <span :title="t('dash.news.ratioHint')">{{ t('dash.news.ratioLabel') }} {{ c.ls || '--' }}<template v-if="c.mentions > 0"> · {{ t('dash.news.mentions', undefined, { n: c.mentions }) }}</template></span>
+              <span class="text-[var(--down)]">{{ t('dash.news.pctBear', undefined, { n: c.bear.toFixed(0) }) }}</span>
             </div>
           </button>
         </div>
@@ -240,7 +240,7 @@ function toggleCoinFilter(sym: string) {
           </div>
 
           <div class="text-3xs text-[var(--ink-3)] font-mono">
-            {{ filteredNews.length }} / {{ rawNews.length }} 条快讯
+            {{ t('dash.news.countNews', undefined, { a: filteredNews.length, b: rawNews.length }) }}
           </div>
         </div>
 

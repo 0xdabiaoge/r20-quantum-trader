@@ -98,4 +98,11 @@ export const enLedger = {
   exportCsv: 'Export CSV',
   exported: 'Ledger exported',
   empty: 'No closed trades yet — the AI is waiting for its first worthy setup',
+  venueAll: 'All venues',
+  venueOkx: 'OKX',
+  venueBinance: 'Binance',
+  modeAll: 'All accounts',
+  modeLive: 'Live',
+  modeDemo: 'Demo',
+  countRecords: '{a} / {b} records',
 };

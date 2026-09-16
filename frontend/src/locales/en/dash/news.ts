@@ -63,4 +63,10 @@ export const enNews = {
   count: '{n} items',
   resetFilters: 'Reset filters',
   emptyCoin: 'No news related to {sym}',
+  macroDefault: 'Bullish range',
+  sourceReasonDefault: 'OKX announcements + Jin10 macro flash',
+  pctBull: '{n}% bull',
+  pctBear: '{n}% bear',
+  countNews: '{a} / {b} flashes',
+  ratioLabel: 'L/S ratio',
 };

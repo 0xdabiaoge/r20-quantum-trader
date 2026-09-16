@@ -36,16 +36,16 @@ const fResult = ref<'all' | 'win' | 'loss'>('all');
 const fInst = ref('all');
 
 const venueOptions = [
-  { value: 'all', label: '全部场所' },
-  { value: 'okx', label: 'OKX 欧易' },
-  { value: 'binance', label: 'Binance 币安' },
+  { value: 'all', label: t('dash.ledger.venueAll') },
+  { value: 'okx', label: t('dash.ledger.venueOkx') },
+  { value: 'binance', label: t('dash.ledger.venueBinance') },
   { value: 'gate', label: 'Gate.io' },
 ];
 
 const modeOptions = [
-  { value: 'all', label: '全部账户' },
-  { value: 'live', label: '实盘 (Live)' },
-  { value: 'demo', label: '模拟 (Demo)' },
+  { value: 'all', label: t('dash.ledger.modeAll') },
+  { value: 'live', label: t('dash.ledger.modeLive') },
+  { value: 'demo', label: t('dash.ledger.modeDemo') },
 ];
 
 const instOptions = computed(() => {
@@ -189,7 +189,7 @@ const truncation = computed<{ kept: number; total: number } | null>(() => {
             class="rounded px-1.5 py-0.5 border text-3xs font-mono font-medium"
             style="background-color: var(--surface-2); border-color: var(--line-1); color: var(--ink-2)"
           >
-            {{ filtered.length }} / {{ all.length }} 笔记录
+            {{ t('dash.ledger.countRecords', undefined, { a: filtered.length, b: all.length }) }}
           </span>
         </div>
         <p class="text-3xs text-[var(--ink-3)] mt-0.5">

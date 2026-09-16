@@ -99,4 +99,11 @@ export const zhLedger = {
   exportCsv: '导出 CSV',
   exported: '台账已导出',
   empty: '暂无平仓记录——AI 还在等待第一笔像样的机会',
+  venueAll: '全部场所',
+  venueOkx: 'OKX 欧易',
+  venueBinance: 'Binance 币安',
+  modeAll: '全部账户',
+  modeLive: '实盘 (Live)',
+  modeDemo: '模拟 (Demo)',
+  countRecords: '{a} / {b} 笔记录',
 };

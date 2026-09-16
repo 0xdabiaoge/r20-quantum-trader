@@ -61,7 +61,7 @@ function pick(instId: string) {
             class="rounded px-1.5 py-0.5 border text-3xs font-mono font-medium"
             style="background-color: var(--surface-2); border-color: var(--line-1); color: var(--ink-2)"
           >
-            PROD · 15M 动力学中枢
+            {{ t('dash.matrix.hudProdDynamics') }}
           </span>
         </div>
         <p class="text-3xs text-[var(--ink-3)] mt-0.5">
@@ -79,7 +79,7 @@ function pick(instId: string) {
         >
           <Minimize2 v-if="isFocusMode" class="h-3.5 w-3.5" />
           <Maximize2 v-else class="h-3.5 w-3.5" />
-          <span>{{ isFocusMode ? '退出工位模式' : '工位沉浸模式' }}</span>
+          <span>{{ isFocusMode ? t('dash.matrix.focusExit') : t('dash.matrix.focusEnter') }}</span>
         </button>
       </div>
     </div>

@@ -185,4 +185,7 @@ export const enMatrix = {
   chartBtn: 'Chart',
   focusTip: 'Enter focused workstation mode',
   focusRestoreTip: 'Restore the full monitoring board',
+  hudProdDynamics: 'PROD · 15M dynamics hub',
+  focusEnter: 'Workstation mode',
+  focusExit: 'Exit workstation mode',
 };
