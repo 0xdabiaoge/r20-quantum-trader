@@ -7,6 +7,7 @@ export const enRadar = {
   current: 'This cycle',
   col: { time: 'Time', macro: 'Macro read', action: 'Action', symbols: 'Symbols' },
   detail: {
+    tabsAria: 'Decision detail tabs',
     title: 'Decision audit · {t}',
     promptElided: 'identical to the top-level prompt; only the character count is shown here',
     macro: 'Macro read',

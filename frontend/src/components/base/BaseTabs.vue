@@ -3,12 +3,13 @@
 defineProps<{
   modelValue: string;
   items: { key: string; label: string; count?: number }[];
+  label?: string;
 }>();
 const emit = defineEmits<{ (e: 'update:modelValue', v: string): void }>();
 </script>
 
 <template>
-  <div class="flex items-center gap-1 overflow-x-auto" style="border-bottom: 1px solid var(--line-1)" role="tablist">
+  <div class="flex items-center gap-1 overflow-x-auto" style="border-bottom: 1px solid var(--line-1)" role="tablist" :aria-label="label">
     <button
       v-for="it in items"
       :key="it.key"

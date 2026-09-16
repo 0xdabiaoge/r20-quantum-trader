@@ -67,7 +67,7 @@ function monogram(name: string): string {
       </div>
 
       <div class="pd-tabs">
-        <div class="seg seg-lg">
+        <div class="seg seg-lg" role="tablist" :aria-label="t('admin.llm.detailTabsAria')">
           <button role="tab" :aria-selected="detailTab === 'config'" :class="{ 'seg-on': detailTab === 'config' }" @click="detailTab = 'config'">
             <Settings :size="13" />
             <span>{{ t('admin.llm.tabConfig') }}</span>

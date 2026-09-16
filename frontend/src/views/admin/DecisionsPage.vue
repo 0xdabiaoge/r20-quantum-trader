@@ -159,7 +159,7 @@ function tone(level: string): string {
           <span class="badge">{{ t('admin.decisions.latestFirst') }}</span>
         </div>
 
-        <div class="seg">
+        <div class="seg" role="tablist" :aria-label="t('admin.decisions.logSourceAria')">
           <button role="tab" :aria-selected="activeLogTab === 'trader'" :class="{ 'seg-on': activeLogTab === 'trader' }" @click="fetchLogStream('trader')">
             {{ t('admin.decisions.tabTrader') }}
           </button>
@@ -181,7 +181,7 @@ function tone(level: string): string {
           :placeholder="t('admin.decisions.searchPlaceholder')"
         />
 
-        <div class="seg">
+        <div class="seg" role="tablist" :aria-label="t('admin.decisions.logLevelAria')">
           <button role="tab" :aria-selected="levelFilter === 'all'" :class="{ 'seg-on': levelFilter === 'all' }" @click="levelFilter = 'all'">
             {{ t('admin.decisions.filterAll') }}
             <span class="dc-seg-n num">{{ entries.length }}</span>

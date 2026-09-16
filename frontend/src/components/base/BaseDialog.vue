@@ -3,12 +3,14 @@
  * 全局对话框原语：Teleport 挂 body、焦点陷阱、ESC/遮罩关闭、滚动锁。
  * 规则：编辑/表单用 Dialog，详情透视用 Drawer，删除确认用 useConfirm。
  */
-import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, ref, watch, useId } from 'vue';
 import { X } from 'lucide-vue-next';
 import { useI18n } from '../../composables/useI18n';
 import { useModalFocus } from '../../composables/useModalFocus';
 
 const { t } = useI18n();
+const titleId = useId();
+const descId = useId();
 
 const props = withDefaults(
   defineProps<{
@@ -57,6 +59,8 @@ onBeforeUnmount(releaseModalFocus);
             ref="panel"
             role="dialog"
             aria-modal="true"
+            :aria-labelledby="title || $slots.title ? titleId : undefined"
+            :aria-describedby="desc ? descId : undefined"
             tabindex="-1"
             class="float-panel relative w-full outline-none"
             :style="{ maxWidth: width, outline: tone === 'danger' ? '1px solid var(--down-line)' : undefined }"
@@ -68,10 +72,10 @@ onBeforeUnmount(releaseModalFocus);
               style="border-bottom: 1px solid var(--line-1)"
             >
               <div class="min-w-0">
-                <h3 class="text-base font-semibold" style="color: var(--ink-strong)">
+                <h3 :id="titleId" class="text-base font-semibold" style="color: var(--ink-strong)">
                   <slot name="title">{{ title }}</slot>
                 </h3>
-                <p v-if="desc" class="mt-0.5 text-xs" style="color: var(--ink-2)">{{ desc }}</p>
+                <p v-if="desc" :id="descId" class="mt-0.5 text-xs" style="color: var(--ink-2)">{{ desc }}</p>
               </div>
               <button
                 v-if="showClose"

@@ -15,4 +15,6 @@ export const zhAdminDecisions = {
   filterError: '仅错误',
   filterNoMatch: '当前筛选条件无匹配日志',
   entriesCount: '{n} 条',
+  logSourceAria: '日志数据源切换',
+  logLevelAria: '日志级别过滤',
 };

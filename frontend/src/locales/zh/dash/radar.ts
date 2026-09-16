@@ -13,6 +13,7 @@ export const zhRadar = {
     symbols: '涉及标的',
   },
   detail: {
+    tabsAria: '决策详情分栏',
     title: '决策审计 · {t}',
     promptElided: '完整提示词与顶层「决策透视」同文，此处只显示字数',
     macro: '宏观研判',

@@ -104,7 +104,7 @@ function dirOf(a: string): 'long' | 'short' | 'flat' {
     :subtitle="cycle?.policy_version || 'R20 Multi-Agent System'"
     @close="emit('close')"
   >
-    <BaseTabs v-model="tab" :items="tabs" class="mb-3.5" />
+    <BaseTabs v-model="tab" :items="tabs" :label="t('dash.radar.detail.tabsAria')" class="mb-3.5" />
 
     <!-- 1. 宏观综合研判 -->
     <div v-if="tab === 'macro'" class="space-y-3">

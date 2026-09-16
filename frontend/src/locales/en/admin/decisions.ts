@@ -14,4 +14,6 @@ export const enAdminDecisions = {
   filterError: 'Errors only',
   filterNoMatch: 'No entries match the current filter',
   entriesCount: '{n} entries',
+  logSourceAria: 'Log source switcher',
+  logLevelAria: 'Log level filter',
 };

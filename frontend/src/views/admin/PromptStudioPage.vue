@@ -606,7 +606,7 @@ onMounted(loadLib)
         <!-- 模块编排 -->
         <section class="card ps-center">
           <header class="card-head">
-            <div class="seg">
+            <div class="seg" role="tablist" :aria-label="t('admin.promptStudio.pipelineTabsAria')">
               <button
                 v-for="p in pipelines"
                 :key="p.id"
@@ -745,7 +745,7 @@ onMounted(loadLib)
           <header class="card-head">
             <h2 class="card-title"><Eye :size="14" />{{ t('admin.promptStudio.preview.title') }}</h2>
             <div class="ps-prev-actions">
-              <div class="seg">
+              <div class="seg" role="tablist" :aria-label="t('admin.promptStudio.preview.title')">
                 <button role="tab" :aria-selected="previewMode === 'rendered'" :class="{ 'seg-on': previewMode === 'rendered' }" @click="previewMode = 'rendered'">
                   {{ t('admin.promptStudio.preview.rendered') }}
                 </button>

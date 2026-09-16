@@ -89,6 +89,7 @@ export const zhAdminLlm = {
   fetch: '获取',
   addNewModel: '添加新模型',
   clearModelsTitle: '清空该供应商所有模型',
+  detailTabsAria: '供应商设置分栏',
   tabConfig: '配置',
   tabModels: '模型',
   fetchTitle: '获取 {name} 远端可用模型',

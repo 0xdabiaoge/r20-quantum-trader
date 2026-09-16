@@ -87,6 +87,7 @@ export const enAdminLlm = {
   fetch: 'Fetch',
   addNewModel: 'Add new model',
   clearModelsTitle: 'Clear all models of this provider',
+  detailTabsAria: 'Provider settings tabs',
   tabConfig: 'Config',
   tabModels: 'Models',
   fetchTitle: 'Fetch remote models available for {name}',

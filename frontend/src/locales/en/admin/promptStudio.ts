@@ -28,6 +28,7 @@ export const enAdminPromptStudio = {
     active: 'Active',
     noDesc: 'No description',
   },
+  pipelineTabsAria: 'Pipeline switcher',
   pipelines: {
     tradingSystem: 'Trading System',
     tradingSystemDesc: 'Rules and decision discipline sent to the trading brain',

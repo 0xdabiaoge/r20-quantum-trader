@@ -28,6 +28,7 @@ export const zhAdminPromptStudio = {
     active: '当前生效',
     noDesc: '无详细描述',
   },
+  pipelineTabsAria: '管线切换',
   pipelines: {
     tradingSystem: '交易 System',
     tradingSystemDesc: '发给交易主脑的规则与决策纪律',
