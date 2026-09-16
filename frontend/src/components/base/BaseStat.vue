@@ -63,7 +63,7 @@ const toneVar = {
   width: 13px;
   height: 13px;
   padding: 0;
-  border-radius: 9999px;
+  border-radius: var(--r-pill);
   border: 1px solid var(--line-1);
   background: var(--surface-2);
   color: var(--ink-3);

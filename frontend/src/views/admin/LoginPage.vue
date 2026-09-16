@@ -216,7 +216,7 @@ async function handleLogin() {
   display: inline-flex;
   align-items: center;
   padding: 3px 8px;
-  border-radius: 9999px;
+  border-radius: var(--r-pill);
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
@@ -300,7 +300,7 @@ async function handleLogin() {
 .auth-version-tag {
   font-size: 10px;
   padding: 1px 5px;
-  border-radius: 3px;
+  border-radius: var(--r-xs);
   background: rgba(255, 255, 255, 0.05);
   color: var(--ds-color-text-placeholder);
 }

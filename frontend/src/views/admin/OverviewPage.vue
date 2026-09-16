@@ -506,7 +506,7 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
   align-items: center;
   gap: 6px;
   padding: 3px 10px;
-  border-radius: 9999px;
+  border-radius: var(--r-pill);
   background: rgba(72, 199, 142, 0.08);
   border: 1px solid rgba(72, 199, 142, 0.25);
 }
@@ -642,7 +642,7 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
   align-items: center;
   gap: 5px;
   padding: 2px 7px;
-  border-radius: 9999px;
+  border-radius: var(--r-pill);
   font-family: var(--ds-font-mono);
   font-size: var(--text-4xs);
   font-weight: 600;
@@ -844,13 +844,13 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
 .ov-gauge-bar {
   flex: 1;
   height: 4px;
-  border-radius: 9999px;
+  border-radius: var(--r-pill);
   background: rgba(255, 255, 255, 0.08);
   overflow: hidden;
 }
 .ov-gauge-fill {
   height: 100%;
-  border-radius: 9999px;
+  border-radius: var(--r-pill);
   transition: width var(--dur-base) ease;
 }
 .ov-gauge-num {
@@ -887,7 +887,7 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
   align-items: center;
   gap: 5px;
   padding: 2px 8px;
-  border-radius: 9999px;
+  border-radius: var(--r-pill);
   font-family: var(--ds-font-mono);
   font-size: var(--text-4xs);
   font-weight: 600;
@@ -1120,7 +1120,7 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
   font-size: 10px;
   color: var(--ds-color-brand);
   padding: 1px 5px;
-  border-radius: 3px;
+  border-radius: var(--r-xs);
   background: rgba(103, 153, 254, 0.08);
 }
 
