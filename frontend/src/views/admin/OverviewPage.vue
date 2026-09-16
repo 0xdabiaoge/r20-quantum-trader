@@ -90,10 +90,10 @@ const audits = computed<any[]>(() => (runtime.value?.audit || []).slice(0, 8));
 const showSkeleton = computed(() => loading.value && !loaded.value);
 
 const quickNavs = computed(() => [
-  { to: '/admin/promptlib', icon: Braces, title: t('admin.overview.quick.prompts'), desc: '语义变量与版本预设' },
-  { to: '/admin/council', icon: Landmark, title: t('admin.overview.quick.council'), desc: '多参谋交叉质询仲裁' },
-  { to: '/admin/interceptors', icon: Crosshair, title: t('admin.overview.quick.interceptors'), desc: 'Fail-Closed 物理硬防线' },
-  { to: '/admin/llm', icon: Cpu, title: t('admin.overview.quick.llm'), desc: '供应商路由与思考强度' },
+  { to: '/admin/promptlib', icon: Braces, title: t('admin.overview.quick.prompts'), desc: t('admin.overview.quickPromptsDesc') },
+  { to: '/admin/council', icon: Landmark, title: t('admin.overview.quick.council'), desc: t('admin.overview.quickCouncilDesc') },
+  { to: '/admin/interceptors', icon: Crosshair, title: t('admin.overview.quick.interceptors'), desc: t('admin.overview.quickInterceptorsDesc') },
+  { to: '/admin/llm', icon: Cpu, title: t('admin.overview.quick.llm'), desc: t('admin.overview.quickLlmDesc') },
 ]);
 
 function parseAuditContext(action: string, detail: any): { label: string; tag: string; tagType: string; summary: string } {
@@ -102,33 +102,33 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
   
   if (act === 'login') {
     return {
-      label: '管理员鉴权',
+      label: t('admin.overview.auditLoginLabel'),
       tag: 'AUTH',
       tagType: 'info',
-      summary: `用户: ${d.username || 'admin'} · 来源: ${d.ip || '本地客户端'}`
+      summary: t('admin.overview.auditUser', undefined, { u: d.username || 'admin', ip: d.ip || t('admin.overview.auditLocalClient') })
     };
   }
   if (act.includes('test') || act.includes('notify') || act.includes('notification')) {
     return {
-      label: '通道连通测试',
+      label: t('admin.overview.auditTestLabel'),
       tag: 'NOTIFY',
       tagType: 'neutral',
-      summary: `通道: ${d.channel || '系统通道'} · 结果: ${d.result?.accepted ? '接收成功' : '测试已派发'}`
+      summary: t('admin.overview.auditChannel', undefined, { c: d.channel || t('admin.overview.auditSystemChannel'), r: d.result?.accepted ? t('admin.overview.auditAccepted') : t('admin.overview.auditDispatched') })
     };
   }
   if (act.includes('interceptor')) {
     return {
-      label: '拦截规则状态',
+      label: t('admin.overview.auditRuleLabel'),
       tag: 'RULE',
       tagType: 'warn',
-      summary: `规则: ${d.filename || d.actor || '防线配置'} · 状态: ${d.enabled ? '已启用' : '已停用'}`
+      summary: t('admin.overview.auditRule', undefined, { f: d.filename || d.actor || t('admin.overview.auditRuleConfig'), s: d.enabled ? t('admin.overview.auditEnabled') : t('admin.overview.auditDisabled') })
     };
   }
   return {
     label: act,
     tag: 'OP',
     tagType: 'neutral',
-    summary: Object.keys(d).length ? JSON.stringify(d).slice(0, 80) : '执行成功'
+    summary: Object.keys(d).length ? JSON.stringify(d).slice(0, 80) : t('admin.overview.auditOk')
   };
 }
 </script>
@@ -181,12 +181,12 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
         </div>
         <div class="ov-hud-body">
           <div class="ov-hud-val num">PID {{ service.pid || '--' }}</div>
-          <div class="ov-hud-sub mono">FastAPI 核心进程 · 守护中</div>
+          <div class="ov-hud-sub mono">{{ t('admin.overview.hudCoreProcess') }}</div>
         </div>
         <div class="ov-hud-foot">
           <span class="ov-hud-pill">
             <Clock :size="11" />
-            已运行 {{ uptime }}
+            {{ t('admin.overview.hudUptime', undefined, { t: uptime }) }}
           </span>
         </div>
       </div>
@@ -203,11 +203,11 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
             {{ llm.model || t('common.notConfigured') }}
           </div>
           <div class="ov-hud-sub truncate">
-            {{ llm.provider_name || '内置渠道' }} · 思考强度 {{ (llm.reasoning_effort || '标准').toUpperCase() }}
+            {{ llm.provider_name || t('admin.overview.hudBuiltin') }} · {{ t('admin.overview.hudEffort') }} {{ (llm.reasoning_effort || t('admin.overview.hudEffortStd')).toUpperCase() }}
           </div>
         </div>
         <div class="ov-hud-foot">
-          <span class="ov-hud-pill">多模型参谋仲裁</span>
+          <span class="ov-hud-pill">{{ t('admin.overview.hudArbiter') }}</span>
         </div>
       </RouterLink>
 
@@ -222,10 +222,10 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
           <div class="ov-hud-val" :class="isDemo ? 'text-amber' : 'is-up'">
             {{ venueEnv }}
           </div>
-          <div class="ov-hud-sub">OKX · Binance · Gate 三所平权路由</div>
+          <div class="ov-hud-sub">{{ t('admin.overview.hudVenueRoute') }}</div>
         </div>
         <div class="ov-hud-foot">
-          <span class="ov-hud-pill">AUTO 智能分流</span>
+          <span class="ov-hud-pill">{{ t('admin.overview.hudAutoRoute') }}</span>
         </div>
       </RouterLink>
 
@@ -233,15 +233,15 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
       <RouterLink to="/admin/interceptors" class="ov-hud-card is-interactive">
         <div class="ov-hud-head">
           <span class="ov-hud-icon"><ShieldCheck :size="14" /></span>
-          <span class="ov-hud-label">物理风控防线</span>
+          <span class="ov-hud-label">{{ t('admin.overview.hudRiskLine') }}</span>
           <span class="ov-hud-badge is-shield">FAIL-CLOSED</span>
         </div>
         <div class="ov-hud-body">
-          <div class="ov-hud-val is-up">100% 物理拦截</div>
-          <div class="ov-hud-sub">4/4 数据管道就绪 · 异常硬锁拒单</div>
+          <div class="ov-hud-val is-up">{{ t('admin.overview.hudPhysicalBlock', undefined, { n: 100 }) }}</div>
+          <div class="ov-hud-sub">{{ t('admin.overview.hudPipeReady', undefined, { a: 4, b: 4 }) }}</div>
         </div>
         <div class="ov-hud-foot">
-          <span class="ov-hud-pill">熔断门禁就绪</span>
+          <span class="ov-hud-pill">{{ t('admin.overview.hudBreakerReady') }}</span>
         </div>
       </RouterLink>
     </section>
@@ -291,16 +291,16 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
                 v-if="d.action === 'BUY_LONG'"
                 class="ov-act-tag is-long"
               >
-                ▲ 做多 LONG
+                {{ t('admin.overview.dirLong') }}
               </span>
               <span
                 v-else-if="d.action === 'SELL_SHORT'"
                 class="ov-act-tag is-short"
               >
-                ▼ 做空 SHORT
+                {{ t('admin.overview.dirShort') }}
               </span>
               <span v-else class="ov-act-tag is-wait">
-                ● 观望 WAIT
+                {{ t('admin.overview.dirWait') }}
               </span>
             </div>
 
@@ -371,7 +371,7 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
               </div>
               <div class="ov-pipe-meta">
                 <span class="ov-pipe-age mono">
-                  {{ f.age_seconds != null ? Math.round(f.age_seconds / 60) + 'm 前' : '--' }}
+                  {{ f.age_seconds != null ? t('admin.overview.pipeAgeMinutes', undefined, { n: Math.round(f.age_seconds / 60) }) : '--' }}
                 </span>
                 <span class="ov-pipe-size mono">{{ fmtNum((f.bytes || 0) / 1024, 0) }}K</span>
               </div>
@@ -419,7 +419,7 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
             <History :size="14" class="ov-ch-icon" />
             <span>{{ t('admin.overview.recentAudit') }}</span>
           </h3>
-          <p class="ov-ch-desc">系统鉴权、风控策略变更与接口交互运行审计记录</p>
+          <p class="ov-ch-desc">{{ t('admin.overview.auditDesc') }}</p>
         </div>
         <RouterLink to="/admin/audit" class="ov-ch-link">
           <span>{{ t('admin.overview.viewAll') }} →</span>
@@ -465,7 +465,7 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
           <!-- 相对时间与详情展开指示 -->
           <div class="ov-ar-meta">
             <TimeAgo :time="fmtDateTime(a.timestamp)" class="ov-ar-ago mono" />
-            <span class="ov-ar-toggle mono">{{ inspectingAuditIndex === idx ? '收起' : 'JSON' }}</span>
+            <span class="ov-ar-toggle mono">{{ inspectingAuditIndex === idx ? t('admin.overview.collapse') : 'JSON' }}</span>
           </div>
 
           <!-- 展开的原始 JSON 结构 -->
@@ -881,6 +881,29 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
   flex-direction: column;
   gap: var(--ds-space-4);
   min-width: 0;
+}
+
+/* 批 30：右副轨此前比左栏矮 140px，页面右下角留一块空白（实测：
+   左卡 .ov-stream-card 561px / 右轨 421px，网格 align-items:start，
+   差值直接变成桌面上的一块死区）。宽屏下让**两张卡各自吃掉一半余量**：
+   管道列表的行距与管控磁贴的高度随之摊开，两列底边对齐。 */
+@media (min-width: 1200px) {
+  .ov-workspace {
+    align-items: stretch;
+  }
+  .ov-side-rail > .card {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+  }
+  .ov-side-rail .ov-pipe-list {
+    flex: 1 1 auto;
+    justify-content: space-evenly;
+  }
+  .ov-side-rail .ov-nav-grid {
+    flex: 1 1 auto;
+    align-content: stretch;
+  }
 }
 
 .ov-chip-status {

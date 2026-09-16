@@ -119,4 +119,10 @@ export const enAdminPromptStudio = {
   unsavedSwitchProfile: 'Switching profiles will discard the unsaved changes. Continue?',
   unsavedSwitchPipeline: 'Switching pipelines will discard the unsaved changes. Continue?',
   continueAnyway: 'Switch anyway',
+  confirmDelModuleTitle: 'Delete this module',
+  confirmDelModuleDesc: 'The module will be removed from the current profile (applies after saving)',
+  confirmDelProfileTitle: 'Delete profile',
+  confirmDelProfileDesc: 'Profile “{name}” will be deleted',
+  confirmRollbackTitle: 'Roll back to this version',
+  confirmRollbackDesc: 'Rolling back overwrites the current profile content',
 };

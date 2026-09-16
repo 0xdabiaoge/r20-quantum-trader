@@ -147,7 +147,7 @@ async function saveEnvironment() {
       detail: '请先核对实盘 Key 权限与 IP 白名单已配置正确',
       danger: true,
       confirmPhrase: 'LIVE',
-      okText: '切换实盘',
+      okText: t('common.switchLive'),
     })
     if (!_ok) {
       toast.warn('未确认 LIVE，环境未切换')
@@ -233,7 +233,7 @@ async function removeInstrument(item: any) {
     desc: `${item.instId} 将不再参与选币与开仓（仅限当前无持仓、无追踪记录的标的）`,
     danger: true,
     confirmPhrase: `REMOVE ${item.instId}`,
-    okText: '移除',
+    okText: t('common.remove'),
   })
   if (!_ok) return
   try {

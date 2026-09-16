@@ -163,7 +163,7 @@ async function rollbackToBaseline() {
     desc: '清除非基准的过期/被污染心法，重置回官方基准黄金心法库（当日自进化成果将被丢弃）',
     danger: true,
     confirmPhrase: 'ROLLBACK',
-    okText: '执行回滚',
+    okText: t('common.rollbackRun'),
   });
   if (!_ok) return;
   if (busy.value || loading.value) return;
@@ -203,7 +203,7 @@ async function addMemoryItem() {
 }
 
 async function deleteMemoryItem(idx: number, lessonId: string) {
-  const _ok = await ask({ title: '删除自进化心法', desc: '该条心法将从认知库移除', danger: true, okText: '删除' });
+  const _ok = await ask({ title: '删除自进化心法', desc: '该条心法将从认知库移除', danger: true, okText: t('common.del') });
   if (!_ok) return;
   if (busy.value || loading.value) return;
   busy.value = 'delete';

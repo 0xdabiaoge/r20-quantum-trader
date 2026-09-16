@@ -125,4 +125,10 @@ export const zhAdminCouncil = {
   matrixColStop: '止损',
   matrixColTp: '止盈',
   matrixColReason: '裁定理由',
+  confirmLoadTitle: '载入标准投委会套件',
+  confirmLoadDesc: '将恢复标准交易员阵容，当前席位配置被覆盖',
+  confirmRemoveTitle: '移除交易员席位',
+  confirmRemoveDesc: '【{name}】席位将被移除',
+  confirmRestoreTitle: '恢复出厂提示词',
+  confirmRestoreDesc: '【{name}】的自定义提示词将被覆盖',
 };

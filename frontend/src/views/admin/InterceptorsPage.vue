@@ -163,7 +163,7 @@ async function deletePlugin(p: any) {
     desc: `「${p.name || p.filename}」的文件将被从磁盘彻底移除，不可恢复`,
     danger: true,
     confirmPhrase: 'DELETE',
-    okText: '删除',
+    okText: t('common.del'),
   })
   if (!_ok) return
   try {

@@ -238,7 +238,7 @@ async function doImportConfig() {
 
 async function applySuite(suiteId: string) {
   if (!auth.isSuperadmin) return;
-  const _ok = await ask({ title: '载入标准投委会套件', desc: '将恢复标准交易员阵容，当前席位配置被覆盖', danger: true, okText: '载入' });
+  const _ok = await ask({ title: t('admin.council.confirmLoadTitle'), desc: t('admin.council.confirmLoadDesc'), danger: true, okText: t('common.load') });
   if (!_ok) return;
   try {
     const res = await api('/api/v1/admin/council/apply-suite', {
@@ -284,7 +284,7 @@ async function removeRole(roleId: string) {
     toast.warn('首席投资官 (CIO) 负责终审收口与发单，不可删除！');
     return;
   }
-  const _ok = await ask({ title: '移除交易员席位', desc: `【${roleDisplayName(role, roleId)}】席位将被移除`, danger: true, okText: '移除' });
+  const _ok = await ask({ title: t('admin.council.confirmRemoveTitle'), desc: t('admin.council.confirmRemoveDesc', undefined, { name: roleDisplayName(role, roleId) }), danger: true, okText: t('common.remove') });
   if (!_ok) return;
   delete councilConfig.value.roles[roleId];
   expandedRole.value = nextExpandedRole(Object.keys(councilConfig.value.roles || {}), '');
@@ -292,7 +292,7 @@ async function removeRole(roleId: string) {
 }
 
 async function resetRole(roleId: string) {
-  const _ok = await ask({ title: '恢复出厂提示词', desc: `【${roleDisplayName(councilConfig.value.roles[roleId], roleId)}】的自定义提示词将被覆盖`, danger: true, okText: '恢复' });
+  const _ok = await ask({ title: t('admin.council.confirmRestoreTitle'), desc: t('admin.council.confirmRestoreDesc', undefined, { name: roleDisplayName(councilConfig.value.roles[roleId], roleId) }), danger: true, okText: t('common.restore') });
   if (!_ok) return;
   try {
     const res = await api('/api/v1/admin/council/reset-role', {

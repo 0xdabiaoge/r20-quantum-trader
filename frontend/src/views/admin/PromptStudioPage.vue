@@ -305,7 +305,7 @@ function addModule() {
 }
 
 async function removeModule(idx: number) {
-  const _ok = await ask({ title: '删除该模块', desc: '模块将从当前方案中移除（保存后生效）', danger: true, okText: '删除' })
+  const _ok = await ask({ title: t('admin.promptStudio.confirmDelModuleTitle'), desc: t('admin.promptStudio.confirmDelModuleDesc'), danger: true, okText: t('common.del') })
   if (!_ok) return
   workingModules.value.splice(idx, 1)
   if (activeEditingIdx.value >= workingModules.value.length) {
@@ -331,7 +331,7 @@ function duplicateModule(idx: number) {
 }
 
 async function deleteProfile() {
-  const _ok = await ask({ title: '删除方案', desc: `方案「${selectedProfile.value?.name}」将被删除`, danger: true, okText: '删除' })
+  const _ok = await ask({ title: t('admin.promptStudio.confirmDelProfileTitle'), desc: t('admin.promptStudio.confirmDelProfileDesc', undefined, { name: selectedProfile.value?.name }), danger: true, okText: t('common.del') })
   if (!_ok) return
   try {
     await api(`/api/v1/admin/prompt-profiles/${encodeURIComponent(selectedProfileId.value)}`, { method: 'DELETE' })
@@ -353,7 +353,7 @@ async function showHistory() {
 }
 
 async function rollback(revId: string) {
-  const _ok = await ask({ title: '回滚到该版本', desc: '回滚将覆盖当前方案内容', danger: true, okText: '回滚' })
+  const _ok = await ask({ title: t('admin.promptStudio.confirmRollbackTitle'), desc: t('admin.promptStudio.confirmRollbackDesc'), danger: true, okText: t('common.rollback') })
   if (!_ok) return
   try {
     await api(`/api/v1/admin/prompt-profiles/${encodeURIComponent(selectedProfileId.value)}/rollback`, {

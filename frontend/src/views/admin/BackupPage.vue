@@ -153,7 +153,7 @@ async function runNow() {
     desc: '打包当前系统并按已启用目标上传',
     danger: true,
     confirmPhrase: 'BACKUP R20',
-    okText: '执行',
+    okText: t('common.execute'),
   })
   if (!_ok) return
   busy.value = 'run'
@@ -269,7 +269,7 @@ async function restoreArchive(archiveName: string) {
     desc: `归档【${clean}】将解压覆盖当前系统配置、历史数据与策略`,
     danger: true,
     confirmPhrase: 'RESTORE R20',
-    okText: '覆盖恢复',
+    okText: t('common.overwriteRestore'),
   })
   if (!_ok) return
   busy.value = 'restore'

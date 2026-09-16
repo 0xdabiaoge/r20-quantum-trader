@@ -122,4 +122,10 @@ export const enAdminCouncil = {
   matrixColStop: 'Stop',
   matrixColTp: 'Target',
   matrixColReason: 'Rationale',
+  confirmLoadTitle: 'Load the standard council suite',
+  confirmLoadDesc: 'This restores the standard trader lineup and overwrites the current seat configuration',
+  confirmRemoveTitle: 'Remove trader seat',
+  confirmRemoveDesc: 'The seat “{name}” will be removed',
+  confirmRestoreTitle: 'Restore factory prompt',
+  confirmRestoreDesc: 'The custom prompt for “{name}” will be overwritten',
 };

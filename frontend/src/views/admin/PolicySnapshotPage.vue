@@ -128,7 +128,7 @@ async function saveArchive() {
 
 async function restorePolicy(hash: string, name: string) {
   if (!auth.isSuperadmin) return;
-  const _ok = await ask({ title: t('admin.policySnapshot.confirm.restore', undefined, { name, hash }), danger: true, okText: '恢复' });
+  const _ok = await ask({ title: t('admin.policySnapshot.confirm.restore', undefined, { name, hash }), danger: true, okText: t('common.restore') });
   if (!_ok) return;
   restoring.value = true;
   try {
@@ -149,7 +149,7 @@ async function restorePolicy(hash: string, name: string) {
 
 async function deleteArchive(hash: string, name: string) {
   if (!auth.isSuperadmin) return;
-  const _ok = await ask({ title: t('admin.policySnapshot.confirm.delete', undefined, { name, hash }), danger: true, okText: '删除' });
+  const _ok = await ask({ title: t('admin.policySnapshot.confirm.delete', undefined, { name, hash }), danger: true, okText: t('common.del') });
   if (!_ok) return;
   deleting.value = hash;
   try {

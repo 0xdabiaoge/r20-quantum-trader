@@ -230,7 +230,7 @@ async function saveChanges() {
       desc: `以下参数已进入极端区间，将显著放松硬风控：${detail}`,
       danger: true,
       confirmPhrase: 'HIGH RISK',
-      okText: '确认写入',
+      okText: t('common.confirmWrite'),
     })
     if (!_ok) return
     confirmation = 'HIGH RISK'
@@ -256,7 +256,7 @@ async function resetAll() {
     desc: '所有风控阈值将恢复为代码默认基线（含单笔仓位上限、日亏上限、杠杆上限等）',
     danger: true,
     confirmPhrase: 'RESET RISK',
-    okText: '重置基线',
+    okText: t('common.resetBaseline'),
   })
   if (!_ok) return
   busy.value = 'reset'

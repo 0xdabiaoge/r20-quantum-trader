@@ -133,7 +133,7 @@ async function unlockUser(u: any) {
     title: t('admin.adminsys.msgs.unlockPrompt', undefined, { name: u.username, id: u.id }),
     danger: true,
     confirmPhrase: `UNLOCK ADMIN ${u.id}`,
-    okText: '解锁',
+    okText: t('common.unlock'),
   })
   if (!_ok) return
   try {

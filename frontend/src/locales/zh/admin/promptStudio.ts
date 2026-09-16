@@ -119,4 +119,10 @@ export const zhAdminPromptStudio = {
   unsavedSwitchProfile: '切换方案将丢失当前未保存的修改。确定继续？',
   unsavedSwitchPipeline: '切换管线将丢失当前未保存的修改。确定继续？',
   continueAnyway: '继续切换',
+  confirmDelModuleTitle: '删除该模块',
+  confirmDelModuleDesc: '模块将从当前方案中移除（保存后生效）',
+  confirmDelProfileTitle: '删除方案',
+  confirmDelProfileDesc: '方案「{name}」将被删除',
+  confirmRollbackTitle: '回滚到该版本',
+  confirmRollbackDesc: '回滚将覆盖当前方案内容',
 };
