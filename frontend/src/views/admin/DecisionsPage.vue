@@ -178,6 +178,7 @@ function tone(level: string): string {
           v-model="query"
           type="search"
           class="field dc-search"
+          :aria-label="t('admin.decisions.searchPlaceholder')"
           :placeholder="t('admin.decisions.searchPlaceholder')"
         />
 

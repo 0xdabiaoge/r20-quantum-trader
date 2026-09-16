@@ -343,7 +343,7 @@ onMounted(load)
         <span>{{ createError }}</span>
       </div>
 
-      <div class="as-create">
+      <form id="as-create-form" class="as-create" @submit.prevent="createUser">
         <label class="as-field">
           <span class="form-label">{{ t('admin.adminsys.create.account') }}</span>
           <input v-model="newUsername" class="field mono" autocomplete="off" />
@@ -361,13 +361,13 @@ onMounted(load)
           <span class="form-label">{{ t('admin.adminsys.create.password') }}</span>
           <input v-model="newPasswordForCreate" type="password" autocomplete="new-password" class="field" />
         </label>
-      </div>
+      </form>
 
       <template #footer>
         <button class="btn btn-ghost btn-sm" @click="createVisible = false">
           {{ t('admin.adminsys.create.cancel') }}
         </button>
-        <button class="btn btn-primary btn-sm" :disabled="creating" @click="createUser">
+        <button class="btn btn-primary btn-sm" type="submit" form="as-create-form" :disabled="creating" @click="createUser">
           <Loader2 v-if="creating" :size="13" class="as-spin" />
           <Plus v-else :size="13" />
           <span>{{ t('admin.adminsys.create.submit') }}</span>

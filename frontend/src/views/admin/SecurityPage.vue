@@ -993,7 +993,7 @@ onMounted(() => { loadAll(); loadMx() })
           {{ t('admin.security.closeSuffix') }}
         </p>
 
-        <div class="sc-close-fields">
+        <form id="sc-close-form" class="sc-close-fields" @submit.prevent="confirmClose">
           <label class="sc-field">
             <span class="form-label">{{ t('admin.security.adminPasswordLabel') }}</span>
             <input v-model="closePassword" type="password" class="field" />
@@ -1010,14 +1010,14 @@ onMounted(() => { loadAll(); loadMx() })
               class="field mono"
             />
           </label>
-        </div>
+        </form>
       </template>
 
       <template #footer>
         <button class="btn btn-ghost btn-sm" @click="closeModal = null">
           {{ t('admin.security.cancel') }}
         </button>
-        <button class="btn btn-danger btn-sm" :disabled="closing" @click="confirmClose">
+        <button class="btn btn-danger btn-sm" type="submit" form="sc-close-form" :disabled="closing" @click="confirmClose">
           <Loader2 v-if="closing" :size="13" class="sc-spin" />
           <span>{{ closing ? t('admin.security.closing') : t('admin.security.confirmClose') }}</span>
         </button>

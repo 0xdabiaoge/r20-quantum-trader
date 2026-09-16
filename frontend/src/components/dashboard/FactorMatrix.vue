@@ -170,7 +170,8 @@ const processedRows = computed(() => {
           <Search class="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-[var(--ink-3)]" />
           <input
             v-model="searchQuery"
-            type="text"
+            type="search"
+            :aria-label="t('dash.matrix.searchPlaceholder')"
             :placeholder="t('dash.matrix.searchPlaceholder')"
             class="h-6 w-36 rounded border border-[var(--line-1)] pl-6 pr-2 text-3xs transition-colors focus:outline-none focus:border-[var(--ds-color-border-input-focus)] focus:ring-1 focus:ring-[var(--ds-color-border-input-focus)]"
             style="background-color: var(--surface-2); color: var(--ink-1)"

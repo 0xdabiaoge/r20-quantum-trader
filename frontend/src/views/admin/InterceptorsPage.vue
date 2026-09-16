@@ -455,6 +455,7 @@ onMounted(loadPlugins)
         <span>{{ createError }}</span>
       </div>
 
+      <form id="ip-create-form" @submit.prevent="submitCreate">
       <div class="ip-field">
         <span class="form-label">{{ t('admin.interceptors.filenameLabel') }}</span>
         <input
@@ -475,10 +476,11 @@ onMounted(loadPlugins)
           :aria-label="t('admin.interceptors.codeLabel')"
         />
       </div>
+      </form>
 
       <template #footer>
         <button class="btn btn-ghost btn-sm" @click="closeCreate">{{ t('admin.interceptors.cancel') }}</button>
-        <button class="btn btn-primary btn-sm" :disabled="creating" @click="submitCreate">
+        <button class="btn btn-primary btn-sm" type="submit" form="ip-create-form" :disabled="creating" @click="submitCreate">
           <Loader2 v-if="creating" :size="14" class="ip-spin" />
           <Plus v-else :size="14" />
           <span>{{ t('admin.interceptors.createAndAdd') }}</span>

@@ -185,7 +185,7 @@ onMounted(load)
           <div class="au-tools">
             <div class="au-search focus-ring">
               <Search :size="13" />
-              <input v-model="search" :placeholder="t('admin.audit.searchPlaceholder')" class="au-search-input" />
+              <input v-model="search" type="search" :aria-label="t('admin.audit.searchPlaceholder')" :placeholder="t('admin.audit.searchPlaceholder')" class="au-search-input" />
             </div>
             <div class="seg" role="tablist" :aria-label="t('admin.audit.filtersLabel')">
               <button

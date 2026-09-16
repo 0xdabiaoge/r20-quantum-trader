@@ -49,7 +49,7 @@ const title = computed(() =>
       </span>
     </template>
 
-    <div class="me-form">
+    <form id="model-edit-form" class="me-form" @submit.prevent="saveModelForm">
       <label class="me-field">
         <span class="form-label">{{ t('admin.llm.modelIdLabel') }}</span>
         <input
@@ -104,13 +104,13 @@ const title = computed(() =>
           class="field num"
         />
       </label>
-    </div>
+    </form>
 
     <template #footer>
       <button class="btn btn-ghost btn-sm" @click="modelModalVisible = false">
         {{ t('admin.llm.cancel') }}
       </button>
-      <button class="btn btn-primary btn-sm" @click="saveModelForm">
+      <button class="btn btn-primary btn-sm" type="submit" form="model-edit-form" @click="saveModelForm">
         {{ t('admin.llm.saveModel') }}
       </button>
     </template>

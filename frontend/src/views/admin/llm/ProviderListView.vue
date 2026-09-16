@@ -343,7 +343,7 @@ const bandFacts = () => [
         <h2 class="card-title"><Server :size="14" />{{ t('admin.llm.providersTitle') }}</h2>
         <div class="pv-search focus-ring">
           <Search :size="13" />
-          <input v-model="searchQuery" :placeholder="t('admin.llm.searchPlaceholder')" class="pv-search-input" />
+          <input v-model="searchQuery" type="search" :aria-label="t('admin.llm.searchPlaceholder')" :placeholder="t('admin.llm.searchPlaceholder')" class="pv-search-input" />
         </div>
         <span class="badge mono">{{ filteredProviders.length }}</span>
       </header>
