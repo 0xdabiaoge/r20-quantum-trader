@@ -203,11 +203,19 @@ class DuplicationRemovedTest(unittest.TestCase):
         self.assertIn("cross_examinations", page)
 
     def test_icon_table_keys_are_derived_not_guessed(self):
-        """图标表键必须经 roleIconKeyOf() 取，不得再写 `roleIcons[roleId] || ...`。"""
+        """图标表键必须经 roleIconKeyOf() 取，不得再写 `roleIcons[roleId] || ...`。
+
+        2026-09-16 重钉：改版**刻意弃用** `councilLogic.roleColorOf / ROLE_COLORS`
+        的五色轮盘（页面 docstring 写明："与「单一强调色 + 语义色」的工作台语言冲突"，
+        新设计改中性席位牌 + CIO 走品牌强调色；该模块与其 mjs 契约测试未被改动）。
+        故原断言"页面必须出现 `roleColorOf(`"已不成立——**原意照旧**：
+        键要经函数推导、不许手写查表；顺手把"颜色轮盘不得复活"反向钉住。
+        """
         page = _code(PAGE)
         self.assertIn("roleIcons[roleIconKeyOf(", page)
-        self.assertIn("roleColorOf(", page)
         self.assertNotIn("roleColors[roleId]", page)
+        self.assertNotIn("roleColorOf(", page, "五色轮盘已弃用，不得复活")
+        self.assertIn("seatTone(", page, "席位着色必须走单一来源 seatTone()")
 
 
 class ChainIntactTest(unittest.TestCase):
@@ -228,10 +236,16 @@ class ChainIntactTest(unittest.TestCase):
             self.assertIn(fn, src, f"有状态动作 {fn} 不应被搬走")
 
     def test_page_still_renders_roles_and_slots(self):
+        """2026-09-16 重钉：席位列改由派生值 `seatEntries` 驱动（改版把逐个席位大卡
+        手风琴换成「席位列 / 席位编辑器」主从双栏），模板里不再出现字面量
+        `councilConfig.roles`。**原意不变**：共识模式、数据槽位、席位（roles）、
+        模型库四样都必须仍在渲染，且 roles 仍取自接口载荷。
+        """
         src = _read(PAGE)
         for anchor in ('v-for="mode in CONSENSUS_MODES"',
+                       'v-for="[roleId, role] in seatEntries"',
                        'v-for="slot in DATA_SLOTS"',
-                       "councilConfig.roles",
+                       "councilConfig.value.roles",
                        "availableModels"):
             self.assertIn(anchor, src, f"页面模板缺少 {anchor}")
 
@@ -259,15 +273,30 @@ class ChainIntactTest(unittest.TestCase):
 
 class NoNewDependenciesTest(unittest.TestCase):
     def test_page_imports_unchanged_plus_logic(self):
+        """页面 import 白名单（禁止无端增减依赖）。
+
+        2026-09-16 重钉：改版把「页内展开的导入面板」改成 `BaseDialog`、总开关改用
+        `BaseSwitch`（页面 docstring 写明"对话框化"），故白名单增两项**本仓内部组件**。
+        原意（不许引入新的**第三方依赖**）不但保留，还补了一条更直接的断言：
+        非相对路径的 import 只许 `vue` / `lucide-vue-next`。
+        """
         src = _read(PAGE)
         imports = re.findall(r"^import .*? from '([^']+)'", src, re.M)
         allowed = {"vue", "../../utils/format", "../../composables/useToast",
                    "../../composables/useConfirm", "../../components/admin/PageHeader.vue",
                    "../../composables/useI18n", "../../composables/useApi",
                    "../../stores/auth", "lucide-vue-next",
+                   "../../components/base/BaseSwitch.vue",
+                   "../../components/base/BaseDialog.vue",
                    "./council/councilLogic"}
         extra = [i for i in imports if i not in allowed]
         self.assertEqual(extra, [], f"出现预期外 import（禁止增减依赖）: {extra}")
+        # ⚠️ 上面那条 `^import .*? from` 只扫**单行** import（lucide 是多行 import，
+        # 历来扫不到）。第三方依赖另用不锚行首的匹配来钉，覆盖多行写法。
+        all_from = re.findall(r"from '([^']+)'", src)
+        third_party = sorted({i for i in all_from if not i.startswith(".")})
+        self.assertEqual(third_party, ["lucide-vue-next", "vue"],
+                         f"第三方依赖只许 vue / lucide-vue-next（内部相对路径不算依赖）: {third_party}")
 
 
 if __name__ == "__main__":
