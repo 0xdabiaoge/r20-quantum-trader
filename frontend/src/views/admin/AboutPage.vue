@@ -39,8 +39,8 @@ import { Info, GitBranch, Download, RefreshCw, CheckCircle2, AlertTriangle,
 
 const { api } = useApi();
 
-// F2：取数样板收成一行。原实现出错只 console.error（页面不显示），
-// 这里保持同样的可见性（页面无错误位），错误仍可从 error 取。
+// F2：取数样板收成一行。取数失败由下方 `v-if="error && !about"` 的 role="alert"
+// 横幅呈现（批 67 补的通报语义），故此处不再叠一条 toast。
 const { data: about, loading, error, loaded, reload: load } = useResource<any>('/api/v1/admin/about', {
   immediate: true,
   onError: (e) => console.error(e),
@@ -305,7 +305,15 @@ const bandFacts = computed(() => {
           </div>
 
           <!-- 结果 -->
-          <div v-if="updateResult" class="ab-result" :class="updateResult.error ? 'is-error' : 'is-ok'">
+          <!-- 批 70：本页刻意不弹 toast（错误出口一一写进 updateResult），
+               所以这块内联结果就是**唯一反馈**，必须自己通报给读屏器。 -->
+          <div
+            v-if="updateResult"
+            class="ab-result"
+            :class="updateResult.error ? 'is-error' : 'is-ok'"
+            :role="updateResult.error ? 'alert' : 'status'"
+            aria-live="polite"
+          >
             <span class="ab-result-icon">
               <AlertTriangle v-if="updateResult.error" :size="15" />
               <CheckCircle2 v-else :size="15" />

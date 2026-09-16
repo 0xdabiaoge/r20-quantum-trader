@@ -92,6 +92,10 @@ const newInstId = ref('')
 // ---- positions & close ----
 const snapshot = ref<any>(null)
 const snapshotState = ref('')
+/** 批 70：区分「正在加载」与「加载失败」—— 此前两者共用一个字符串，
+ *  模板无条件渲染旋转图标，失败时用户看到的是「转圈 + 报错」，
+ *  视觉上像是在继续加载（而不是已经失败），读屏器也收不到任何通报。 */
+const snapshotError = ref(false)
 const manualClose = ref(false)
 const closePassword = ref('')
 const closeModal = ref<{ show: boolean; pos: any } | null>(null)
@@ -257,12 +261,14 @@ async function removeInstrument(item: any) {
 
 async function loadPositions() {
   snapshotState.value = t('admin.security.loadingPositions')
+  snapshotError.value = false
   try {
     const d = await api('/api/v1/admin/okx/account-snapshot')
     snapshot.value = d
     snapshotState.value = ''
   } catch (e: any) {
     snapshotState.value = e.message
+    snapshotError.value = true
     snapshot.value = null
   }
 }
@@ -929,8 +935,17 @@ onMounted(() => { loadAll(); loadMx() })
             </button>
           </template>
 
-          <p v-if="snapshotState" class="sc-loading">
-            <Loader2 :size="12" class="sc-spin" />{{ snapshotState }}
+          <!-- 批 70：加载中 → status + 旋转图标；失败 → alert + 警示图标（不再转圈） -->
+          <p
+            v-if="snapshotState"
+            class="sc-loading"
+            :class="{ 'is-error': snapshotError }"
+            :role="snapshotError ? 'alert' : 'status'"
+            aria-live="polite"
+          >
+            <Loader2 v-if="!snapshotError" :size="12" class="sc-spin" aria-hidden="true" />
+            <AlertTriangle v-else :size="12" aria-hidden="true" />
+            {{ snapshotState }}
           </p>
 
           <p v-else-if="snapshot" class="sc-snap-meta">
@@ -1453,6 +1468,12 @@ onMounted(() => { loadAll(); loadMx() })
   gap: 6px;
   font-size: var(--text-3xs);
   color: var(--ds-color-text-placeholder);
+}
+/* 批 70：失败态用语义色与左竖线（本页既有语汇），不再沿用占位符灰 */
+.sc-loading.is-error {
+  color: var(--down);
+  padding-left: var(--ds-space-2);
+  border-left: 2px solid var(--down);
 }
 .sc-snap-meta {
   display: flex;

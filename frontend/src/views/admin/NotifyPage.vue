@@ -497,10 +497,14 @@ onBeforeUnmount(() => {
                   <span>{{ t('admin.notify.sendTest') }}</span>
                 </button>
 
+                <!-- 批 70：测试发送/诊断的结果只写进 testResults，本页不弹 toast，
+                     故这里必须自报 —— 失败用 alert，其余（含 testing）用 status。 -->
                 <span
                   v-if="testResults[c.key]"
                   class="nf-result"
                   :class="testTone(testResults[c.key].status)"
+                  :role="testTone(testResults[c.key].status) === 'badge-down' ? 'alert' : 'status'"
+                  aria-live="polite"
                 >
                   <b>{{ testResults[c.key].status }}</b>
                   <span class="nf-result-detail">{{ testResults[c.key].detail }}</span>
