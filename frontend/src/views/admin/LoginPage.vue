@@ -314,8 +314,8 @@ async function handleLogin() {
   gap: 8px;
   padding: 10px 12px;
   border-radius: var(--r-ctl);
-  background: rgba(240, 113, 120, 0.1);
-  border: 1px solid rgba(240, 113, 120, 0.25);
+  background: var(--down-bg);
+  border: 1px solid var(--down-line);
   color: var(--down);
   font-size: var(--text-xs);
   margin-bottom: 18px;

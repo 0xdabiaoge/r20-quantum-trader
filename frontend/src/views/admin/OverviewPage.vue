@@ -522,8 +522,10 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
   height: 20px;
   padding: 0 8px;
   border-radius: var(--r-pill);
-  background: rgba(72, 199, 142, 0.08);
-  border: 1px solid rgba(72, 199, 142, 0.25);
+  /* 批 74：胶囊的底/边此前硬编码了 --up 的同色 rgba —— 色相一样，
+     但不吃 CVD 令牌，色盲模式下就变成「蓝字配绿底」。统一走 --up-bg / --up-line。 */
+  background: var(--up-bg);
+  border: 1px solid var(--up-line);
 }
 .ov-live-dot {
   width: 6px;
@@ -583,8 +585,9 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
   justify-content: space-between;
   padding: var(--ds-space-4);
   border-radius: var(--r-card);
-  background: rgba(240, 113, 120, 0.08);
-  border: 1px solid rgba(240, 113, 120, 0.3);
+  /* 批 74：同上 —— 硬编码 --down 同色 rgba 会让色盲模式下出现「橙字配红底」。 */
+  background: var(--down-bg);
+  border: 1px solid var(--down-line);
 }
 .ov-error-left {
   display: flex;
@@ -670,9 +673,9 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
   font-weight: 600;
 }
 .ov-hud-badge.is-up {
-  background: rgba(72, 199, 142, 0.1);
+  background: var(--up-bg);
   color: var(--up);
-  border: 1px solid rgba(72, 199, 142, 0.25);
+  border: 1px solid var(--up-line);
 }
 .ov-hud-badge.is-shield {
   background: rgba(103, 153, 254, 0.1);
@@ -849,14 +852,14 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
   white-space: nowrap;
 }
 .ov-act-tag.is-long {
-  background: rgba(72, 199, 142, 0.12);
+  background: var(--up-bg);
   color: var(--up);
-  border: 1px solid rgba(72, 199, 142, 0.25);
+  border: 1px solid var(--up-line);
 }
 .ov-act-tag.is-short {
-  background: rgba(240, 113, 120, 0.12);
+  background: var(--down-bg);
   color: var(--down);
-  border: 1px solid rgba(240, 113, 120, 0.25);
+  border: 1px solid var(--down-line);
 }
 .ov-act-tag.is-wait {
   background: rgba(255, 255, 255, 0.04);
@@ -945,14 +948,14 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
   font-weight: 600;
 }
 .ov-chip-status.is-live {
-  background: rgba(72, 199, 142, 0.1);
+  background: var(--up-bg);
   color: var(--up);
-  border: 1px solid rgba(72, 199, 142, 0.25);
+  border: 1px solid var(--up-line);
 }
 .ov-chip-status.is-warn {
-  background: rgba(224, 177, 85, 0.1);
+  background: var(--warn-bg);
   color: var(--warn);
-  border: 1px solid rgba(224, 177, 85, 0.25);
+  border: 1px solid var(--warn-line);
 }
 
 .ov-pipe-list {
@@ -1142,9 +1145,9 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
   border: 1px solid rgba(103, 153, 254, 0.25);
 }
 .ov-tag-chip.is-warn {
-  background: rgba(224, 177, 85, 0.12);
+  background: var(--warn-bg);
   color: var(--warn);
-  border: 1px solid rgba(224, 177, 85, 0.25);
+  border: 1px solid var(--warn-line);
 }
 .ov-tag-chip.is-neutral {
   background: rgba(255, 255, 255, 0.05);
