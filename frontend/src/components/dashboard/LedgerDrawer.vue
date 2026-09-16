@@ -47,7 +47,9 @@ function feeAbs(v: unknown): string {
 
 function feeSigned(v: unknown): string {
   const a = feeAbs(v);
-  return a === '--' ? '--' : `-${a}`;
+  if (a === '--') return '--';
+  // 批 24：0 不加负号 —— 否则「手续费 0」会渲染成 `-0.0000`（负零）
+  return Number(a.replace(/,/g, '')) === 0 ? a : `-${a}`;
 }
 
 /* —— 数理快照可观测性（证据纪律）——

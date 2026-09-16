@@ -229,13 +229,13 @@ const truncation = computed<{ kept: number; total: number } | null>(() => {
             <BaseStat :label="t('dash.ledger.summary.net')" :value="fmtSigned(netSum)" :delta-tone="netSum >= 0 ? 'up' : 'down'" />
           </div>
           <div class="bg-[var(--surface-1)] p-3">
-            <BaseStat :label="t('dash.ledger.summary.fees')" :value="`-${fmtNum(feeSum, 2)}`" delta-tone="muted" />
+            <BaseStat :label="t('dash.ledger.summary.fees')" :value="feeSum ? `-${fmtNum(feeSum, 2)}` : fmtNum(0, 2)" delta-tone="muted" />
           </div>
           <div class="bg-[var(--surface-1)] p-3">
             <BaseStat
               :label="t('dash.ledger.summary.fundingNet')"
               :value="fmtSigned(fundingSum)"
-              :delta="`+${fmtNum(fundingIncome, 2)} / -${fmtNum(fundingExpense, 2)}`"
+              :delta="`${fundingIncome ? '+' + fmtNum(fundingIncome, 2) : fmtNum(0, 2)} / ${fundingExpense ? '-' + fmtNum(fundingExpense, 2) : fmtNum(0, 2)}`"
               :delta-tone="fundingSum >= 0 ? 'up' : 'down'"
               :hint="t('dash.ledger.summary.fundingNetHint')"
             />

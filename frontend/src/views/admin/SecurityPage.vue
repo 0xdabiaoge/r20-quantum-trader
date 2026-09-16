@@ -54,6 +54,8 @@ const { t } = useI18n()
 const config = ref<any>(null)
 const runtime = ref<any>(null)
 const loading = ref(true)
+/** 批 24：首屏加载失败的原因（留在页面上，配重试按钮；不再只靠一闪而过的 toast） */
+const loadError = ref('')
 
 type TabKey = 'venues' | 'pool' | 'emergency'
 const activeTab = ref<TabKey>('venues')
@@ -104,6 +106,7 @@ const probingVenue = ref<'binance' | 'gate' | 'okx' | ''>('')
 
 async function loadAll() {
   loading.value = true
+  loadError.value = ''
   try {
     const [cfg, rt] = await Promise.all([
       api('/api/v1/admin/config'),
@@ -117,6 +120,8 @@ async function loadAll() {
     instruments.value = inst.instruments || []
     instLimits.value = inst.limits || instLimits.value
   } catch (e: any) {
+    // 批 24：除了 toast，还要把错误留在页面上（toast 3 秒即消失，用户回来只看到空白页）
+    loadError.value = String(e?.message || e)
     toast.err(`加载失败：${e.message}`)
   } finally {
     loading.value = false
@@ -516,6 +521,18 @@ onMounted(() => { loadAll(); loadMx() })
     <!-- 首屏骨架 -->
     <div v-if="loading && !config" class="sc-skel">
       <div v-for="i in 6" :key="i" class="skeleton skeleton-row" />
+    </div>
+
+    <!-- 加载失败：批 24 —— 此前失败只弹一个 3 秒就消失的 toast，
+         config 保持 null，模板两个分支都不命中 → 页面只剩页头，一片空白且无重试入口。 -->
+    <div v-else-if="loadError && !config" class="state-block is-error">
+      <span class="state-icon"><AlertTriangle :size="17" /></span>
+      <p class="state-title">{{ t('common.loadFailed') }}</p>
+      <p class="state-desc">{{ loadError }}</p>
+      <button class="btn btn-ghost btn-sm" style="margin-top: 4px" :disabled="loading" @click="loadAll">
+        <RefreshCw :size="14" />
+        <span>{{ t('common.retry') }}</span>
+      </button>
     </div>
 
     <template v-else-if="config">

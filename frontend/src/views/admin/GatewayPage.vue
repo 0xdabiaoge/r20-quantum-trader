@@ -120,7 +120,10 @@ function statusTone(s: string): string {
     <div v-if="error && !gw" class="state-block is-error gw-error">
       <span class="state-icon"><AlertTriangle :size="17" /></span>
       <p class="state-title">{{ t('common.loadFailed') }}</p>
-      <p class="state-desc">{{ t('admin.gateway.msgs.loadFailed', undefined, { msg: error }) }}</p>
+      <!-- 批 24：原来这里复用 `msgs.loadFailed`（值 = 「加载失败：{msg}」），
+           于是标题与说明连读成「加载失败 / 加载失败：stub failure」——同一句话说了两遍。
+           toast 仍用带前缀的那条（toast 没有标题），这里只留原因。 -->
+      <p class="state-desc">{{ error }}</p>
       <button class="btn btn-ghost btn-sm" style="margin-top: 4px" :disabled="loading" @click="load">
         <RefreshCw :size="14" :class="loading && 'gw-spin'" />
         <span>{{ t('common.retry') }}</span>

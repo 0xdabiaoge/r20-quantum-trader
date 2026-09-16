@@ -37,12 +37,14 @@ import { useApi } from '../../composables/useApi'
 import { useAsyncAction } from '../../composables/useAsyncAction'
 import { useAuthStore } from '../../stores/auth'
 import { UserCog, KeyRound, Plus, Lock, Unlock, ShieldCheck, ShieldAlert,
-  RefreshCw, Loader2, Users, UserCheck, UserX } from 'lucide-vue-next'
+  RefreshCw, Loader2, Users, UserCheck, UserX, AlertTriangle } from 'lucide-vue-next'
 
 const { api } = useApi()
 const auth = useAuthStore()
 
 const users = ref<any[]>([])
+/** 批 24：账号列表拉取失败的原因（页面上保留错误 + 重试，不再只靠 toast） */
+const loadError = ref('')
 const currentUserId = ref<number>(0)
 // Password form
 const pwdUserId = ref<number>(0)
@@ -63,11 +65,12 @@ const createError = ref('')
 // （模板中 loading 出现 0 次），故这里不引入 busy，否则 trigger 未读告警。
 const { run: load } = useAsyncAction(async () => {
   if (!auth.isSuperadmin) return
+  loadError.value = ''
   const res = await api<any>('/api/v1/admin/users')
   users.value = res.users || []
   currentUserId.value = res.current_user_id
   pwdUserId.value = res.current_user_id
-}, { onError: (e) => toast.err(e.message) })
+}, { onError: (e) => { loadError.value = String(e?.message || e); toast.err(e.message) } })
 
 async function changePassword() {
   if (newPassword.value.length < 12) {
@@ -257,6 +260,19 @@ onMounted(load)
 
       <!-- 非超管：无权限视图 -->
       <BaseEmpty v-if="!auth.isSuperadmin" :text="t('admin.adminsys.users.superadminOnly')" :icon="ShieldAlert" />
+
+      <!-- 批 24：取账号列表失败时，此前只弹一个转瞬即逝的 toast，
+           users 保持 []，于是页面显示「暂无管理员账号」——把**接口故障**说成**没有账号**，
+           超管回到这个页面会以为账号被清空了，且没有重试入口。 -->
+      <div v-else-if="loadError" class="state-block is-error">
+        <span class="state-icon"><AlertTriangle :size="17" /></span>
+        <p class="state-title">{{ t('common.loadFailed') }}</p>
+        <p class="state-desc">{{ loadError }}</p>
+        <button class="btn btn-ghost btn-sm" style="margin-top: 4px" @click="load">
+          <RefreshCw :size="14" />
+          <span>{{ t('common.retry') }}</span>
+        </button>
+      </div>
 
       <BaseEmpty v-else-if="!users.length" :text="t('admin.adminsys.noUsers')" />
 
