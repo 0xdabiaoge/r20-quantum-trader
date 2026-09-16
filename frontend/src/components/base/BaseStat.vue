@@ -31,13 +31,17 @@ const toneVar = {
   <div class="group flex min-w-0 flex-col justify-center gap-1 overflow-hidden px-3.5 py-2.5 select-none" :title="hint">
     <div class="flex min-w-0 items-center justify-between gap-1">
       <span class="truncate text-3xs font-semibold uppercase tracking-wider text-[var(--ink-3)]">{{ label }}</span>
+      <!-- 批 85：`aria-controls` 的目标 `<p :id="hintId">` 是 `v-if="hint && showHint"`
+           —— 收起时它不在 DOM 里，此时仍输出 aria-controls 就是**悬空引用**
+           （ARIA 要求被引用元素存在）。与 BaseTabs 既有约定一致：
+           目标不在就不输出该属性，展开态由 aria-expanded 表达。 -->
       <button
         v-if="hint"
         type="button"
         class="kpi-hint shrink-0 cursor-pointer opacity-0 group-hover:opacity-60 hover:!opacity-100 focus-visible:opacity-100 group-focus-within:opacity-60"
         :aria-label="hint"
         :aria-expanded="showHint"
-        :aria-controls="hintId"
+        :aria-controls="showHint ? hintId : undefined"
         @click.stop="showHint = !showHint"
       >
         i

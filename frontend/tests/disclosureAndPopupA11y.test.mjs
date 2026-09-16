@@ -70,7 +70,15 @@ test('SettingsPopover 必须声明 role="dialog" 且禁止非法 role="menu"', (
   assert.equal(/role="menu"/.test(text), false, 'SettingsPopover 不得包含 role="menu"（禁止将 tablist 嵌套进 menu）');
   assert.match(text, /role="dialog"/, 'SettingsPopover 缺失 role="dialog"');
   assert.match(text, /aria-haspopup="dialog"/, 'SettingsPopover 触发器缺失 aria-haspopup="dialog"');
-  assert.match(text, /:aria-controls="panelId"/, 'SettingsPopover 缺失 :aria-controls');
+  // 批 85：受控目标 `<div v-if="open">` 收起时不在 DOM —— 因此 aria-controls
+  // 必须**条件输出**（目标存在时才给），否则引用悬空。故断言「引用了 panelId」
+  // 且「是带 undefined 的条件式」，而不是钉死无条件的旧写法。
+  assert.match(text, /:aria-controls="[^"]*panelId[^"]*"/, 'SettingsPopover 缺失 :aria-controls 对 panelId 的引用');
+  assert.match(
+    text,
+    /:aria-controls="[^"]*\?[^"]*undefined[^"]*"/,
+    'SettingsPopover 的 aria-controls 必须条件输出（其目标是 v-if 渲染，收起时不在 DOM）',
+  );
 });
 
 test('ChartWorkstation 浮层具备正确的 popover ARIA 语义', () => {

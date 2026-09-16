@@ -712,7 +712,7 @@ onUnmounted(() => {
           style="border-color: var(--line-1); background-color: var(--surface-2)"
           :aria-expanded="symbolMenu"
           aria-haspopup="listbox"
-          :aria-controls="symbolMenuId"
+          :aria-controls="symbolMenu ? symbolMenuId : undefined"
           @click="symbolMenu = !symbolMenu"
         >
           <span class="text-xs font-bold" style="color: var(--ink-strong)">{{ currentSymbol }}</span>
@@ -773,7 +773,7 @@ onUnmounted(() => {
             :class="showIndicatorMenu || activeIndicatorCount > 0 ? 'bg-[var(--accent-bg)] text-[var(--accent)] border border-[var(--accent-line)]' : 'btn-ghost'"
             :aria-expanded="showIndicatorMenu"
             aria-haspopup="dialog"
-            :aria-controls="indicatorMenuId"
+            :aria-controls="showIndicatorMenu ? indicatorMenuId : undefined"
             @click="showIndicatorMenu = !showIndicatorMenu"
           >
             <SlidersHorizontal />

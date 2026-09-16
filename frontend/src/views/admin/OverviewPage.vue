@@ -449,7 +449,7 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
           role="button"
           tabindex="0"
           :aria-expanded="inspectingAuditIndex === idx"
-          :aria-controls="'audit-detail-' + idx"
+          :aria-controls="inspectingAuditIndex === idx ? 'audit-detail-' + idx : undefined"
           @click="inspectingAuditIndex = inspectingAuditIndex === idx ? null : idx"
           @keydown.enter="inspectingAuditIndex = inspectingAuditIndex === idx ? null : idx"
           @keydown.space.prevent="inspectingAuditIndex = inspectingAuditIndex === idx ? null : idx"

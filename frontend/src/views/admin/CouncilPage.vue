@@ -821,7 +821,7 @@ onMounted(loadData);
                   <button
                     class="btn btn-quiet btn-sm"
                     :aria-expanded="Boolean(expandedReasoning[String(key)])"
-                    :aria-controls="`cn-reasoning-${key}`"
+                    :aria-controls="expandedReasoning[String(key)] ? `cn-reasoning-${key}` : undefined"
                     @click="expandedReasoning[String(key)] = !expandedReasoning[String(key)]"
                   >
                     {{ expandedReasoning[String(key)] ? t('admin.council.collapseReasoning') : t('admin.council.expandReasoning') }}

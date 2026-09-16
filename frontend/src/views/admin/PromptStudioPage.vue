@@ -471,7 +471,7 @@ onMounted(loadLib)
           :class="showVarRibbon ? 'btn-primary' : 'btn-ghost'"
           :title="t('admin.promptStudio.toolbar.varRibbonTitle')"
           :aria-expanded="showVarRibbon"
-          :aria-controls="'ps-var-ribbon'"
+          :aria-controls="showVarRibbon ? 'ps-var-ribbon' : undefined"
           @click="showVarRibbon = !showVarRibbon"
         >
           <Layers :size="14" />

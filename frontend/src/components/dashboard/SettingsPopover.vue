@@ -44,7 +44,7 @@ onBeforeUnmount(() => {
       class="btn btn-quiet btn-icon"
       :aria-expanded="open"
       aria-haspopup="dialog"
-      :aria-controls="panelId"
+      :aria-controls="open ? panelId : undefined"
       :aria-label="t('dash.shell.settings.title')"
       :title="t('dash.shell.settings.title')"
       @click="open = !open"
