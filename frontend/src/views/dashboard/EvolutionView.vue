@@ -69,8 +69,13 @@ const snapAudit = computed<any>(() => review.value.snapshot_audit || null);
 function actText(a: any): string {
   if (typeof a === 'string') return a;
   if (a && typeof a === 'object') {
-    const t = a.action || a.text || a.content || a.summary || a.description;
-    if (t) return a.action_type ? `【${a.action_type}】${t}` : String(t);
+    // 批 41：局部变量改名（原为 `t`，把 i18n 的 t 遮蔽了），
+    // 动作前缀的方括号交由语言决定（中文【】/ 英文 []）。
+    const body = a.action || a.text || a.content || a.summary || a.description;
+    if (body)
+      return a.action_type
+        ? t('dash.evolution.actText', undefined, { type: a.action_type, text: body })
+        : String(body);
     return Object.entries(a)
       .filter(([, v]) => v !== null && v !== undefined && typeof v !== 'object')
       .map(([k, v]) => `${k}: ${v}`)
@@ -107,7 +112,7 @@ const md = computed(() => (store.data as any)?.ai_trading_memory_md || '');
             class="rounded px-1.5 py-0.5 border text-3xs font-mono font-medium"
             style="background-color: var(--surface-2); border-color: var(--line-1); color: var(--ink-2)"
           >
-            每 6 小时自主覆写迭代
+            {{ t('dash.evolution.autoIterateBadge') }}
           </span>
         </div>
         <p class="text-3xs text-[var(--ink-3)] mt-0.5">
@@ -217,7 +222,7 @@ const md = computed(() => (store.data as any)?.ai_trading_memory_md || '');
           <div v-if="snapAudit" class="dsh-card p-4 space-y-2">
             <h2 class="text-xs font-bold uppercase tracking-wider text-[var(--ink-strong)] flex items-center gap-1.5">
               <ShieldCheck class="h-4 w-4 text-[var(--accent)]" />
-              确定性物理快照审计
+              {{ t('dash.evolution.snapshotAuditTitle') }}
             </h2>
             <div class="dsh-card-sub p-3 text-3xs font-mono text-[var(--ink-2)] space-y-1">
               <div v-for="(v, k) in snapAudit" :key="k" class="flex justify-between">

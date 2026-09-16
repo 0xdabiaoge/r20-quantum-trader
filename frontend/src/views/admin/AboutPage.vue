@@ -62,7 +62,7 @@ const { run: checkUpdate, busy: updateChecking } = useAsyncAction(async () => {
   }
   updateResult.value = res.error
     // 模板以 .error 键判红（审计①#8）：git 失败回 HTTP 200+error 字段，必须走红分支
-    ? { error: `更新检查失败：${res.error}（无法确认是否落后，安全补丁可能静默脱班）`, data: res }
+    ? { error: t('admin.about.updateCheckFailed', undefined, { msg: res.error }), data: res }
     : {
         ok: true,
         message: res.behind > 0

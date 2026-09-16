@@ -42,4 +42,6 @@ export const zhAdminAbout = {
   bandVersion: '系统版本',
   bandControlPlane: '网关控制面',
   bandRuntime: '运行环境',
-  bandSyncGap: '待同步差额',};
+  bandSyncGap: '待同步差额',  // ── 批 41：本地化写死文案（更新检查失败）──
+  updateCheckFailed: '更新检查失败：{msg}（无法确认是否落后，安全补丁可能静默脱班）',
+};

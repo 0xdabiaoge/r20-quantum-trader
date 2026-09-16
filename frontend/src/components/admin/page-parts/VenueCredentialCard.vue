@@ -7,6 +7,9 @@
  * 对外接口（props / slots）保持兼容。
  */
 import { computed } from 'vue'
+import { useI18n } from '../../../composables/useI18n'
+
+const { t } = useI18n()
 
 const props = withDefaults(defineProps<{
   name: string
@@ -15,7 +18,15 @@ const props = withDefaults(defineProps<{
   tone?: 'up' | 'warn' | 'down'
   envText: string
   envLabel?: string
-}>(), { tone: 'warn', envLabel: '当前资金档位' })
+}>(), { tone: 'warn', envLabel: '' })
+
+/**
+ * 档位标签（批 41）。**不能**写成 props 默认值里的 `t(...)`：
+ * SFC 编译器会把默认值提到独立作用域（`checkInvalidScopeReference`），
+ * 引用 setup 里的 `t` 会在 `npm run build` 阶段直接失败 ——
+ * 而这一步 `vue-tsc` **查不出来**（它只看类型）。故改为渲染期回落。
+ */
+const envLabelText = computed(() => props.envLabel || t('dash.venueAccounts.envLabel'))
 
 const toneClass = computed(
   () => ({ up: 'badge-up', warn: 'badge-warn', down: 'badge-down' })[props.tone] ?? 'badge-warn',
@@ -35,7 +46,7 @@ const toneClass = computed(
 
     <!-- 资金档位 -->
     <div class="vc-env">
-      <span class="vc-env-label">{{ envLabel }}</span>
+      <span class="vc-env-label">{{ envLabelText }}</span>
       <span class="vc-env-value mono">{{ envText }}</span>
     </div>
 

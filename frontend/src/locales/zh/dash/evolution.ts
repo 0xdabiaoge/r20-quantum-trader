@@ -56,4 +56,8 @@ export const zhEvolution = {
   },
   // 批 38：展示用列表分隔符（全角分号 vs 半角分号+空格）
   itemSep: '；',
+  // ── 批 41：本地化写死文案（EvolutionView 模板与动作文本前缀）──
+  autoIterateBadge: '每 6 小时自主覆写迭代',
+  snapshotAuditTitle: '确定性物理快照审计',
+  actText: '【{type}】{text}',
 };

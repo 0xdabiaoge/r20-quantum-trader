@@ -70,4 +70,15 @@ export const zhAdminNotify = {
   channelsDesc: '逐通道配置、诊断与发送测试；开关即时生效，其余字段需点「保存全部通知通道」',
   scheduleTitle: '每日量化简报',
   testLabel: '最近一次诊断 / 测试',
-  testIdle: '未测试',};
+  testIdle: '未测试',  // ── 批 41：本地化写死文案（原先直接写死在 NotifyPage.vue）──
+  loadFailed: '加载通知配置失败: {msg}',
+  toggleOk: '{channel} 通道已成功{state}',
+  stateOn: '开启',
+  stateOff: '关闭',
+  toggleFailed: '通道状态切换失败',
+  savedAll: '全部通知通道配置已保存',
+  saveFailed: '保存配置失败',
+  qqBound: 'QQ 机器人授权成功，正在自动启动 OpenID 捕获…',
+  scheduleRequired: '请至少填写一个 HH:MM 时间',
+  scheduleSaved: '简报时间已保存',
+};

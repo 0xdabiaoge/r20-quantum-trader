@@ -69,4 +69,15 @@ export const enAdminNotify = {
   channelsDesc: 'Configure, diagnose and test-send per channel; toggles apply immediately, other fields need Save all channels',
   scheduleTitle: 'Daily quant briefing',
   testLabel: 'Last diagnosis / test',
-  testIdle: 'Not tested',};
+  testIdle: 'Not tested',  // ── batch 41: localize strings previously hardcoded in NotifyPage.vue ──
+  loadFailed: 'Failed to load notification configuration: {msg}',
+  toggleOk: '{channel} channel turned {state}',
+  stateOn: 'on',
+  stateOff: 'off',
+  toggleFailed: 'Failed to switch the channel state',
+  savedAll: 'All notification channel settings saved',
+  saveFailed: 'Failed to save the configuration',
+  qqBound: 'QQ bot authorised; capturing the OpenID automatically...',
+  scheduleRequired: 'Provide at least one HH:MM time',
+  scheduleSaved: 'Briefing times saved',
+};

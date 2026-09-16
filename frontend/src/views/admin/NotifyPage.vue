@@ -70,7 +70,7 @@ async function loadConfig(silent = false) {
   } catch (e: any) {
     console.error(e)
     loadError.value = e.message || String(e)
-    if (!silent) toast.err('加载通知配置失败: ' + (e.message || String(e)))
+    if (!silent) toast.err(t('admin.notify.loadFailed', undefined, { msg: e.message || String(e) }))
   } finally {
     if (!silent) loading.value = false
   }
@@ -98,10 +98,16 @@ async function toggleChannel(channel: string, enabled: boolean) {
       }
     }
     const res = await api(`/api/v1/admin/channels/${channel}/toggle`, { method: 'PUT', body: JSON.stringify(payload) })
-    toast.ok(res.message || `${channel} 通道已成功${enabled ? '开启' : '关闭'}`)
+    toast.ok(
+      res.message ||
+        t('admin.notify.toggleOk', undefined, {
+          channel,
+          state: t(enabled ? 'admin.notify.stateOn' : 'admin.notify.stateOff'),
+        }),
+    )
     await loadConfig(true)
   } catch (e: any) {
-    toast.err(e.message || '通道状态切换失败')
+    toast.err(e.message || t('admin.notify.toggleFailed'))
     await loadConfig(true)
   }
 }
@@ -123,10 +129,10 @@ async function saveAll() {
       qq_openid: config.value.qq.openid,
     }
     const res = await api('/api/v1/admin/notifications', { method: 'PUT', body: JSON.stringify(body) })
-    toast.ok(res.message || '全部通知通道配置已保存')
+    toast.ok(res.message || t('admin.notify.savedAll'))
     await loadConfig(true)
   } catch (e: any) {
-    toast.err(e.message || '保存配置失败')
+    toast.err(e.message || t('admin.notify.saveFailed'))
   }
 }
 
@@ -200,7 +206,7 @@ async function startQqBind() {
         } else if (r.status === 'awaiting_message') {
           stopBindPolling()
           bindModal.value = false
-          toast.ok('QQ 机器人授权成功，正在自动启动 OpenID 捕获…')
+          toast.ok(t('admin.notify.qqBound'))
           startCapture()
         } else if (r.status === 'expired') {
           bindStatus.value = { ...bindStatus.value, text: t('admin.notify.qrExpired'), tone: 'amber' }
@@ -242,10 +248,10 @@ async function sendTest(channel: string) {
 
 async function saveSchedule() {
   const times = String(config.value._briefingTimes || '').split(/[,，\s]+/).filter(Boolean)
-  if (!times.length) { toast.warn('请至少填写一个 HH:MM 时间'); return }
+  if (!times.length) { toast.warn(t('admin.notify.scheduleRequired')); return }
   try {
     await api('/api/v1/admin/notifications/schedule', { method: 'PUT', body: JSON.stringify({ briefing_times: times }) })
-    toast.ok('简报时间已保存')
+    toast.ok(t('admin.notify.scheduleSaved'))
   } catch (e: any) {
     toast.err(e.message)
   }

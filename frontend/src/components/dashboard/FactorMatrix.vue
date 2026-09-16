@@ -163,7 +163,7 @@ const processedRows = computed(() => {
           <input
             v-model="searchQuery"
             type="text"
-            placeholder="搜索标的 (BTC/ETH)..."
+            :placeholder="t('dash.matrix.searchPlaceholder')"
             class="h-6 w-36 rounded border pl-6 pr-2 text-3xs outline-none transition-colors focus:border-[var(--line-3)]"
             style="background-color: var(--surface-2); border-color: var(--line-1); color: var(--ink-1)"
           />

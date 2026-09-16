@@ -106,4 +106,8 @@ export const zhLedger = {
   modeLive: '实盘 (Live)',
   modeDemo: '模拟 (Demo)',
   countRecords: '{a} / {b} 笔记录',
+  // ── 批 41：本地化写死文案（LedgerDrawer 标题与行标签）──
+  councilSource: 'AI 投委会决策溯源',
+  execStrategy: '执行策略',
+  adoptedSeat: '采纳席位',
 };

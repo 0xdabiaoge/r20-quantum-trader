@@ -40,4 +40,8 @@ export const enEvolution = {
   },
   // batch 38: list separator for display (fullwidth vs ASCII)
   itemSep: '; ',
+  // ── batch 41: localize strings previously hardcoded in EvolutionView ──
+  autoIterateBadge: 'Self-rewriting every 6 hours',
+  snapshotAuditTitle: 'Deterministic math snapshot audit',
+  actText: '[{type}] {text}',
 };

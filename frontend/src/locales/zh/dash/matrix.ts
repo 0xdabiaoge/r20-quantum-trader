@@ -201,4 +201,12 @@ export const zhMatrix = {
   hudProdDynamics: 'PROD · 15M 动力学中枢',
   focusEnter: '工位沉浸模式',
   focusExit: '退出工位模式',
+  // ── 批 41：本地化写死文案（FactorDrawer 预算行 / FactorMatrix 搜索框）──
+  searchPlaceholder: '搜索标的 (BTC/ETH)...',
+  budget: {
+    limit: '上限 {v}',
+    before: '预留前占 {v}',
+    this: '本次预留 {v}',
+    state: '态 {v}',
+  },
 };

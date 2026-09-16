@@ -188,4 +188,12 @@ export const enMatrix = {
   hudProdDynamics: 'PROD · 15M dynamics hub',
   focusEnter: 'Workstation mode',
   focusExit: 'Exit workstation mode',
+  // ── batch 41: localize strings previously hardcoded in FactorDrawer / FactorMatrix ──
+  searchPlaceholder: 'Search symbol (BTC/ETH)...',
+  budget: {
+    limit: 'Cap {v}',
+    before: 'Reserved before {v}',
+    this: 'This reservation {v}',
+    state: 'State {v}',
+  },
 };

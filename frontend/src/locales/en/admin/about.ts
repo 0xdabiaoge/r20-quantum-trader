@@ -42,4 +42,6 @@ export const enAdminAbout = {
   bandVersion: 'System version',
   bandControlPlane: 'Gateway control plane',
   bandRuntime: 'Runtime',
-  bandSyncGap: 'Sync gap',};
+  bandSyncGap: 'Sync gap',  // ── batch 41: localize the update-check failure message ──
+  updateCheckFailed: 'Update check failed: {msg} (cannot tell whether this build is behind; security patches may silently fall out of sync)',
+};

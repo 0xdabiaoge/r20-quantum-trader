@@ -131,12 +131,12 @@ const vdBudgetText = computed(() => {
   if (!b) return '';
   const parts: string[] = [];
   const limit = numOrNull(b.limit_usdt);
-  parts.push(`上限 ${limit === null ? '--' : fmtNum(limit, 0) + 'U'}`);
+  parts.push(t('dash.matrix.budget.limit', undefined, { v: limit === null ? '--' : fmtNum(limit, 0) + 'U' }));
   const before = numOrNull(b.reserved_before_usdt);
-  if (before !== null) parts.push(`预留前占 ${fmtNum(before, 2)}U`);
+  if (before !== null) parts.push(t('dash.matrix.budget.before', undefined, { v: fmtNum(before, 2) + 'U' }));
   const thisAmt = numOrNull(b.amount_usdt ?? b.margin_usdt);
-  parts.push(`本次预留 ${thisAmt === null ? '--' : fmtNum(thisAmt, 2) + 'U'}`);
-  if (b.state) parts.push(`态 ${String(b.state)}`);
+  parts.push(t('dash.matrix.budget.this', undefined, { v: thisAmt === null ? '--' : fmtNum(thisAmt, 2) + 'U' }));
+  if (b.state) parts.push(t('dash.matrix.budget.state', undefined, { v: String(b.state) }));
   if (b.error) parts.push(String(b.error));
   return parts.join(' · ');
 });

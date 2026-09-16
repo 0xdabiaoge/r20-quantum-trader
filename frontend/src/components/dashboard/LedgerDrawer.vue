@@ -23,19 +23,29 @@ const x = computed(() => props.trade || {});
 const holding = computed(() => x.value.status === 'holding');
 
 /** 投委会溯源 */
-const SEAT_LABELS: Record<string, string> = {
-  trader_trend: 'A·顺势交易员',
-  trader_momentum: 'B·动能突破员',
-  trader_quant: 'C·数理套利员',
-  cio: 'CIO 仲裁席',
-  REJECT_ALL: '驳回全部',
+/**
+ * 席位展示名（批 41）。**完整键路径**查表，与雷达抽屉共用 `dash.radar.seat.*`
+ * —— 同一个席位在两处必须同名，此前这里写死中文、雷达抽屉走 locale，
+ * 英文界面下台账抽屉显示「A·顺势交易员」。未登记 id 原样透出。
+ */
+const SEAT_TEXT_KEY: Record<string, string> = {
+  trader_trend: 'dash.radar.seat.traderTrend',
+  trader_momentum: 'dash.radar.seat.traderMomentum',
+  trader_quant: 'dash.radar.seat.traderQuant',
+  cio: 'dash.radar.seat.cio',
+  REJECT_ALL: 'dash.radar.seat.rejectAll',
 };
+function seatLabel(id: unknown): string {
+  const raw = String(id ?? '');
+  const key = SEAT_TEXT_KEY[raw];
+  return key ? t(key, raw) : raw;
+}
 
 const councilNote = computed(() => {
   const cc = x.value.council;
   if (!cc || !holding.value) return '';
   if (!cc.ran) return t('dash.ledger.council.degraded');
-  const seat = SEAT_LABELS[String(cc.adopted_role || '')] || String(cc.adopted_role || '');
+  const seat = seatLabel(cc.adopted_role);
   return seat ? t('dash.ledger.council.adopted', undefined, { seat }) : t('dash.ledger.council.ran');
 });
 
@@ -215,17 +225,17 @@ const cells = computed(() => [
       <div v-if="x.council || x.strategy" class="dsh-card-sub p-3.5">
         <h4 class="text-3xs font-bold uppercase tracking-wider text-[var(--ink-3)] mb-2 flex items-center gap-1.5">
           <Landmark class="h-3 w-3 text-[var(--accent)]" />
-          AI 投委会决策溯源
+          {{ t('dash.ledger.councilSource') }}
         </h4>
         <div class="space-y-2 text-xs">
           <div class="flex items-center justify-between">
-            <span class="text-[var(--ink-3)]">执行策略</span>
+            <span class="text-[var(--ink-3)]">{{ t('dash.ledger.execStrategy') }}</span>
             <span class="font-mono font-semibold text-[var(--ink-1)]">{{ x.strategy || 'Momentum Alpha' }}</span>
           </div>
           <div v-if="x.council?.adopted_role" class="flex items-center justify-between">
-            <span class="text-[var(--ink-3)]">采纳席位</span>
+            <span class="text-[var(--ink-3)]">{{ t('dash.ledger.adoptedSeat') }}</span>
             <span class="font-mono font-semibold text-[var(--up)]">
-              {{ SEAT_LABELS[String(x.council.adopted_role)] || x.council.adopted_role }}
+              {{ seatLabel(x.council.adopted_role) }}
             </span>
           </div>
           <div v-if="councilNote" class="text-3xs text-[var(--ink-2)] rounded p-2" style="background-color: var(--surface-2)">
