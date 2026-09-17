@@ -76,6 +76,13 @@ test('所有 dsh-card-header 必须使用语义化 <header> 标签', () => {
   assert.deepEqual(badHeaders, [], `发现使用非 <header> 标签的卡片头部：\n  ${badHeaders.join('\n  ')}`);
 });
 
+test('LedgerView 筛选下拉菜单必须使用语义化筛选器名称（而非默认选项值）', () => {
+  const vue = readFileSync(path.join(SRC, 'views/dashboard/LedgerView.vue'), 'utf8');
+  assert.match(vue, /v-model="fVenue"[^>]*:aria-label="t\('dash\.ledger\.filters\.venue'\)"/);
+  assert.match(vue, /v-model="fMode"[^>]*:aria-label="t\('dash\.ledger\.filters\.mode'\)"/);
+  assert.match(vue, /v-model="fInst"[^>]*:aria-label="t\('dash\.ledger\.filters\.symbol'\)"/);
+});
+
 test('闸自检：能准确拦截无 aria-label 的 select 与非 header 卡片头', () => {
   const badSel = '<select v-model="role"><option>admin</option></select>';
   const goodSel = '<select v-model="role" :aria-label="label"><option>admin</option></select>';

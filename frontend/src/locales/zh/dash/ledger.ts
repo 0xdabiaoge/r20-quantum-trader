@@ -17,6 +17,8 @@ export const zhLedger = {
     pfSource: '账单口径 · {n} 笔',
   },
   filters: {
+    venue: '交易场所',
+    mode: '账户模式',
     symbol: '标的',
     dir: '方向',
     result: '结果',

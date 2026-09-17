@@ -322,7 +322,7 @@ const truncation = computed<{ kept: number; total: number } | null>(() => {
           <div class="flex flex-wrap items-center gap-2 ms-auto">
             <select
               v-model="fVenue"
-              :aria-label="t('dash.ledger.venueAll')" 
+              :aria-label="t('dash.ledger.filters.venue')" 
               class="h-7 rounded border border-[var(--line-1)] px-2 text-3xs transition-colors focus:outline-none focus:border-[var(--ds-color-border-input-focus)] focus:ring-1 focus:ring-[var(--ds-color-border-input-focus)]"
               style="background-color: var(--surface-2); color: var(--ink-1)"
               @change="page = 1"
@@ -332,7 +332,7 @@ const truncation = computed<{ kept: number; total: number } | null>(() => {
 
             <select
               v-model="fMode"
-              :aria-label="t('dash.ledger.modeAll')" 
+              :aria-label="t('dash.ledger.filters.mode')" 
               class="h-7 rounded border border-[var(--line-1)] px-2 text-3xs transition-colors focus:outline-none focus:border-[var(--ds-color-border-input-focus)] focus:ring-1 focus:ring-[var(--ds-color-border-input-focus)]"
               style="background-color: var(--surface-2); color: var(--ink-1)"
               @change="page = 1"

@@ -16,6 +16,8 @@ export const enLedger = {
     pfSource: 'bills basis · {n} trades',
   },
   filters: {
+    venue: 'Trading venue',
+    mode: 'Account mode',
     symbol: 'Symbol',
     dir: 'Side',
     result: 'Result',
