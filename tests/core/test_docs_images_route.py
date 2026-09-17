@@ -16,7 +16,7 @@ class DocsImagesRouteTests(unittest.TestCase):
         self.client = TestClient(app_module.app)
 
     def test_serves_real_png_same_origin(self):
-        resp = self.client.get("/docs/images/v760_risk_control.png")
+        resp = self.client.get("/docs/images/v792_risk_control.png")
         self.assertEqual(resp.status_code, 200, resp.text)
         self.assertTrue(resp.headers["content-type"].startswith("image/png"))
         self.assertEqual(resp.content[:8], b"\x89PNG\r\n\x1a\n", "返回的不是合法 PNG 头")
