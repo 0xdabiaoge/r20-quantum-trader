@@ -5,6 +5,7 @@
  */
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { useRouteFocus } from '../composables/useRouteFocus';
 import { useDashboardStore } from '../stores/dashboard';
 import { useI18n } from '../composables/useI18n';
 import { APP_VERSION } from '../config/version';
@@ -32,6 +33,9 @@ import SkipLink from '../components/base/SkipLink.vue';
 import TrajectoryPanel from '../components/dashboard/TrajectoryPanel.vue';
 
 const route = useRoute();
+
+// 批 112：切页后把焦点交给主内容（首次进入不抢，见组合式头注）
+useRouteFocus();
 const router = useRouter();
 const store = useDashboardStore();
 const { t } = useI18n();

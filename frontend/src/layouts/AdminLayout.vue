@@ -13,6 +13,7 @@
  */
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { useRouteFocus } from '../composables/useRouteFocus';
 import {
   PanelLeftClose,
   PanelLeftOpen,
@@ -30,6 +31,9 @@ import BeijingClock from '../components/base/BeijingClock.vue';
 import SkipLink from '../components/base/SkipLink.vue';
 
 const route = useRoute();
+
+// 批 112：切页后把焦点交给主内容（首次进入不抢，见组合式头注）
+useRouteFocus();
 const router = useRouter();
 const auth = useAuthStore();
 const { t } = useI18n();
@@ -181,7 +185,7 @@ watch(() => route.path, () => (drawerOpen.value = false));
       </header>
 
       <!-- 内容区 -->
-      <main id="main-content" tabindex="-1" class="wb-main scroll-area">
+      <main id="main-content" tabindex="-1" class="wb-main scroll-area outline-none">
         <div class="wb-content">
           <router-view />
         </div>

@@ -209,6 +209,7 @@ onUnmounted(() => {
             v-for="s in sections"
             :key="s.id"
             @click="scrollToSection(s.id)"
+            :aria-current="activeSection === s.id ? 'location' : undefined"
             class="w-full text-left px-3 py-2 rounded text-xs font-medium transition-all flex items-center justify-between group cursor-pointer border"
             :style="activeSection === s.id
               ? { backgroundColor: 'var(--surface-3)', color: 'var(--ink-strong)', borderColor: 'var(--line-3)', fontWeight: 'bold' }
