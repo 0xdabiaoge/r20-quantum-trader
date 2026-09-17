@@ -403,7 +403,13 @@ onMounted(loadPlugins)
     </template>
 
     <!-- ══ 源码编辑器 ══ -->
-    <BaseDialog :open="editorVisible" size="xl" initial-focus="textarea" @close="closeEditor">
+    <BaseDialog
+      :open="editorVisible"
+      :title="t('admin.interceptors.editorTitle')"
+      size="xl"
+      initial-focus="textarea"
+      @close="closeEditor"
+    >
       <template #title>
         <span class="ip-dlg-title">
           <FileCode :size="15" />

@@ -16,7 +16,13 @@ const LINUXDO = 'https://linux.do/';
 </script>
 
 <template>
-  <BaseDialog :open="aboutOpen" size="sm" @close="aboutOpen = false">
+  <BaseDialog
+    :open="aboutOpen"
+    :title="t('brand.name')"
+    :desc="t('brand.tagline')"
+    size="sm"
+    @close="aboutOpen = false"
+  >
     <template #title>
       <div class="flex items-center gap-2.5">
         <img src="/favicon.svg" class="h-8 w-8 rounded-lg" alt="" />

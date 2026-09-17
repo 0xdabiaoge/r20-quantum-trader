@@ -112,7 +112,7 @@ const title = computed(() =>
         {{ t('admin.llm.cancel') }}
       </button>
       <!-- 批 115：表单已挂 @submit.prevent="saveModelForm"，type="submit" 按钮无需再挂 @click，避免单次点击触发两次保存 -->
-      <button class="btn btn-primary btn-sm" type="submit" form="model-edit-form">
+      <button class="btn btn-primary btn-sm" type="submit" form="model-edit-form" :disabled="!modelForm.id.trim()">
         {{ t('admin.llm.saveModel') }}
       </button>
     </template>
