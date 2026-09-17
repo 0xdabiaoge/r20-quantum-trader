@@ -39,6 +39,7 @@ const { t } = useI18n();
 import { useApi } from '../../composables/useApi';
 import { Zap, RefreshCw, Loader2, ScanLine, QrCode, AlertTriangle, Send, Save,
   ArrowUpRight, CheckCircle2, ShieldCheck, Brain, OctagonAlert, Clock, Radio, CalendarClock } from 'lucide-vue-next';
+import BaseLoadingAnnounce from '../../components/base/BaseLoadingAnnounce.vue';
 
 const { api } = useApi();
 const config = ref<any>(null);
@@ -386,6 +387,7 @@ onBeforeUnmount(() => {
       <!-- ══ 通道状态带 ══ -->
       <section class="card band">
         <template v-if="loading && !config">
+          <BaseLoadingAnnounce />
           <div v-for="i in 4" :key="i" class="fact">
             <div class="skeleton skeleton-text" style="width: 48%" />
             <div class="skeleton skeleton-text skeleton-value" style="width: 62%" />

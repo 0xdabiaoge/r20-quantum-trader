@@ -26,6 +26,7 @@ import { useApi } from '../../composables/useApi';
 import { Terminal, RefreshCw, AlertCircle } from 'lucide-vue-next';
 import PageHeader from '../../components/admin/PageHeader.vue';
 import CopyButton from '../../components/base/CopyButton.vue';
+import BaseLoadingAnnounce from '../../components/base/BaseLoadingAnnounce.vue';
 
 const { t } = useI18n();
 const { api } = useApi();
@@ -279,6 +280,7 @@ function tone(level: string): string {
       <div class="dc-body">
         <!-- 首屏加载 -->
         <div v-if="logLoading && !entries.length" class="dc-skel">
+          <BaseLoadingAnnounce />
           <div v-for="i in 14" :key="i" class="skeleton skeleton-text" :style="{ width: 40 + ((i * 37) % 55) + '%' }" />
         </div>
 

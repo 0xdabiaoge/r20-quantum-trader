@@ -28,6 +28,7 @@ import BaseDialog from '../../components/base/BaseDialog.vue'
 import BaseEmpty from '../../components/base/BaseEmpty.vue'
 import { ScrollText, RefreshCw, Search, AlertTriangle, Loader2, CheckCircle2,
   Ban, HelpCircle, Activity, ShieldCheck, User, FileJson } from 'lucide-vue-next'
+import BaseLoadingAnnounce from '../../components/base/BaseLoadingAnnounce.vue';
 
 const { api } = useApi()
 const records = ref<any[]>([])
@@ -169,6 +170,7 @@ onMounted(load)
       <!-- ══ 审计统计带 ══ -->
       <section class="card band">
         <template v-if="loading && !records.length">
+          <BaseLoadingAnnounce />
           <div v-for="i in 4" :key="i" class="fact">
             <div class="skeleton skeleton-text" style="width: 48%" />
             <div class="skeleton skeleton-text skeleton-value" style="width: 60%" />
@@ -213,6 +215,7 @@ onMounted(load)
         </header>
 
         <div v-if="loading && !records.length" class="au-skel">
+          <BaseLoadingAnnounce />
           <div v-for="i in 8" :key="i" class="skeleton skeleton-row" />
         </div>
 

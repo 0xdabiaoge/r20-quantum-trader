@@ -36,6 +36,7 @@ import BaseDialog from '../../components/base/BaseDialog.vue';
 import BaseEmpty from '../../components/base/BaseEmpty.vue';
 import { Info, GitBranch, Download, RefreshCw, CheckCircle2, AlertTriangle,
   ShieldCheck, Terminal, Loader2, ArrowUpRight } from 'lucide-vue-next';
+import BaseLoadingAnnounce from '../../components/base/BaseLoadingAnnounce.vue';
 
 const { api } = useApi();
 
@@ -169,6 +170,7 @@ const bandFacts = computed(() => {
       <!-- ══ 版本状态带 ══ -->
       <section class="card band">
         <template v-if="showSkeleton">
+          <BaseLoadingAnnounce />
           <div v-for="i in 4" :key="i" class="fact">
             <div class="skeleton skeleton-text" style="width: 48%" />
             <div class="skeleton skeleton-text skeleton-value" style="width: 62%" />

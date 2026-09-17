@@ -52,6 +52,7 @@ import {
   Plus, ArrowUp, ArrowDown, Eye, CheckCircle2, Save, AlertTriangle,
   History, RotateCcw, Trash2, Copy, Download, Upload, FileUp,
   Sparkles, BookOpen, Layers, Loader2 } from 'lucide-vue-next';
+import BaseLoadingAnnounce from '../../components/base/BaseLoadingAnnounce.vue';
 
 const { api } = useApi();
 const auth = useAuthStore();
@@ -508,6 +509,7 @@ onMounted(loadLib)
       <!-- ══ 方案总览带 ══ -->
       <section class="card band">
         <template v-if="loading">
+          <BaseLoadingAnnounce />
           <div v-for="i in 4" :key="i" class="fact">
             <div class="skeleton skeleton-text" style="width: 46%" />
             <div class="skeleton skeleton-text skeleton-value" style="width: 70%" />
@@ -579,6 +581,7 @@ onMounted(loadLib)
 
       <!-- ══ 三栏工作台 ══ -->
       <div v-if="loading" class="ps-skel-grid">
+        <BaseLoadingAnnounce />
         <div v-for="i in 3" :key="i" class="card p-4">
           <div class="skeleton skeleton-text" style="width: 40%" />
           <div class="skeleton skeleton-row mt-3" />

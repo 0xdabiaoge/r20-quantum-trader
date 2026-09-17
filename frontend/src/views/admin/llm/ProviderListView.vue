@@ -26,6 +26,7 @@ import { useI18n } from '../../../composables/useI18n'
 import { useLlmCtx } from './injection'
 import { AlertCircle, ArrowDown, ArrowUp, CheckCircle2, Clock, History, Plus,
   RefreshCw, Save, Search, ShieldAlert, X, Server, Brain, Timer, Route } from 'lucide-vue-next'
+import BaseLoadingAnnounce from '../../../components/base/BaseLoadingAnnounce.vue';
 
 const { t } = useI18n()
 const {
@@ -364,6 +365,7 @@ const bandFacts = () => [
 
       <!-- ① 首次加载：骨架 -->
       <div v-if="cfgFirstLoad" class="pv-skel">
+        <BaseLoadingAnnounce />
         <div v-for="i in 4" :key="i" class="skeleton skeleton-row" />
       </div>
 

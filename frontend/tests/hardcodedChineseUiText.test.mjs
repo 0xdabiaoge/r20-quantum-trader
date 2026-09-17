@@ -117,7 +117,10 @@ test('模板文本节点里不得出现硬编码中文（DocsView 长文正文�
     const rel = path.relative(SRC, file);
     if (rel === DOCS_PAGE) continue; // 整页中文文档，单独决策
     const raw = readFileSync(file, 'utf8');
-    const tm = raw.match(/<template>([\s\S]*)<\/template>/);
+    // ⚠️ 先剥 script/style 再取模板块：本仓有文件的**脚本注释里写着裸的 template 开标签**，
+    //    贪婪正则会从那里起匹配，把注释文字当成模板文本（批 113 实测踩到）。
+    const sfcOnly = raw.replace(/<script[\s\S]*?<\/script>/g, '').replace(/<style[\s\S]*?<\/style>/g, '');
+    const tm = sfcOnly.match(/<template>([\s\S]*)<\/template>/);
     if (!tm) continue;
     for (const seg of templateChineseTextNodes(stripComments(tm[1]))) {
       bad.push(`${rel} :: ${JSON.stringify(seg)}`);

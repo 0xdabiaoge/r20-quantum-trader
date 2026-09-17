@@ -72,6 +72,7 @@ import { Users,
   Loader2,
   Scale,
   Clock } from 'lucide-vue-next';
+import BaseLoadingAnnounce from '../../components/base/BaseLoadingAnnounce.vue';
 
 const { api } = useApi();
 const auth = useAuthStore();
@@ -446,6 +447,7 @@ onMounted(loadData);
       <!-- ══ 议事状态带 ══ -->
       <section class="card band">
         <template v-if="loading">
+          <BaseLoadingAnnounce />
           <div v-for="i in 4" :key="i" class="fact">
             <div class="skeleton skeleton-text" style="width: 48%" />
             <div class="skeleton skeleton-text skeleton-value" style="width: 68%" />
@@ -557,6 +559,7 @@ onMounted(loadData);
           </header>
 
           <div v-if="loading" class="cn-seats">
+            <BaseLoadingAnnounce />
             <div v-for="i in 4" :key="i" class="cn-seat">
               <span class="skeleton skeleton-avatar" />
               <span class="skeleton skeleton-text" style="flex: 1" />

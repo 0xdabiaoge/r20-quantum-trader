@@ -39,6 +39,7 @@ import BaseEmpty from '../../components/base/BaseEmpty.vue';
 import { Layers, FileText, Sparkles, ShieldCheck, Users, RefreshCw,
   Hash, Activity, Clock, ArrowUpRight, BookmarkPlus, RotateCcw,
   Archive, Trash2, Loader2, AlertTriangle, Package } from 'lucide-vue-next';
+import BaseLoadingAnnounce from '../../components/base/BaseLoadingAnnounce.vue';
 
 const { api } = useApi();
 const auth = useAuthStore();
@@ -297,6 +298,7 @@ onMounted(() => {
 
     <!-- 首屏骨架 -->
     <template v-if="loading">
+      <BaseLoadingAnnounce />
       <section class="card band">
         <div v-for="i in 4" :key="i" class="fact">
           <div class="skeleton skeleton-text" style="width: 46%" />

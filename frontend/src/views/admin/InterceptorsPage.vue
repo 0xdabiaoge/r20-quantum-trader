@@ -36,6 +36,7 @@ import { useApi } from '../../composables/useApi';
 import { useAuthStore } from '../../stores/auth';
 import { ArrowUp, ArrowDown, Plus, Code, Trash2, Play, AlertTriangle,
   Save, Download, Loader2, ShieldCheck, RefreshCw, FileCode } from 'lucide-vue-next';
+import BaseLoadingAnnounce from '../../components/base/BaseLoadingAnnounce.vue';
 
 const { api } = useApi();
 const auth = useAuthStore();
@@ -311,6 +312,7 @@ onMounted(loadPlugins)
 
         <!-- 骨架 -->
         <div v-if="loading" class="ip-skel">
+          <BaseLoadingAnnounce />
           <div v-for="i in 5" :key="i" class="skeleton skeleton-row" />
         </div>
 

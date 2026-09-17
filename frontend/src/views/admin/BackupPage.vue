@@ -37,6 +37,7 @@ import { useApi } from '../../composables/useApi'
 import { useAuthStore } from '../../stores/auth'
 import { HardDrive, RefreshCw, PlugZap, Save, PlayCircle, Archive, Download,
   Upload, RotateCcw, AlertTriangle, Loader2, MapPin, Clock, CalendarClock, History } from 'lucide-vue-next'
+import BaseLoadingAnnounce from '../../components/base/BaseLoadingAnnounce.vue';
 
 const { api } = useApi()
 const auth = useAuthStore()
@@ -382,6 +383,7 @@ onMounted(load)
       <!-- ══ 灾备状态带 ══ -->
       <section class="card band">
         <template v-if="loading && !simple">
+          <BaseLoadingAnnounce />
           <div v-for="i in 4" :key="i" class="fact">
             <div class="skeleton skeleton-text" style="width: 48%" />
             <div class="skeleton skeleton-text skeleton-value" style="width: 62%" />

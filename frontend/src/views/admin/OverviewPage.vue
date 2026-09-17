@@ -41,6 +41,7 @@ import PageHeader from '../../components/admin/PageHeader.vue';
 import BaseEmpty from '../../components/base/BaseEmpty.vue';
 import TimeAgo from '../../components/base/TimeAgo.vue';
 import { fmtNum, fmtDateTime } from '../../utils/format';
+import BaseLoadingAnnounce from '../../components/base/BaseLoadingAnnounce.vue';
 
 const { t } = useI18n();
 
@@ -266,6 +267,7 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
 
         <!-- 加载骨架 -->
         <div v-if="showSkeleton" class="ov-skel-stack">
+          <BaseLoadingAnnounce />
           <div v-for="i in 5" :key="i" class="skeleton ov-skel-row" />
         </div>
 
@@ -362,6 +364,7 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
 
           <div class="ov-pipe-list">
             <div v-if="showSkeleton" class="ov-skel-stack">
+              <BaseLoadingAnnounce />
               <div v-for="i in 4" :key="i" class="skeleton ov-skel-pipe" />
             </div>
 
@@ -435,6 +438,7 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
       </header>
 
       <div v-if="showSkeleton" class="ov-skel-stack">
+        <BaseLoadingAnnounce />
         <div v-for="i in 4" :key="i" class="skeleton ov-skel-row" />
       </div>
 

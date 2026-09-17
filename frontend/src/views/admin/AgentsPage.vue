@@ -28,6 +28,7 @@ import BaseEmpty from '../../components/base/BaseEmpty.vue';
 import { useResource } from '../../composables/useResource';
 import { Package, Cpu, KeyRound, RefreshCw, Loader2, AlertTriangle,
   Activity, ShieldCheck, Radio } from 'lucide-vue-next';
+import BaseLoadingAnnounce from '../../components/base/BaseLoadingAnnounce.vue';
 
 const { data, loading, error, loaded, reload: load } = useResource<any>('/api/v1/admin/agents', {
   immediate: true,
@@ -110,6 +111,7 @@ function ageText(a: any): string {
       <!-- ══ 名册状态带 ══ -->
       <section class="card band">
         <template v-if="showSkeleton">
+          <BaseLoadingAnnounce />
           <div v-for="i in 4" :key="i" class="fact">
             <div class="skeleton skeleton-text" style="width: 48%" />
             <div class="skeleton skeleton-text skeleton-value" style="width: 64%" />
@@ -159,6 +161,7 @@ function ageText(a: any): string {
         </header>
 
         <div v-if="showSkeleton" class="ag-skel">
+          <BaseLoadingAnnounce />
           <div v-for="i in 4" :key="i" class="skeleton skeleton-row" />
         </div>
 

@@ -28,6 +28,7 @@ import BaseDialog from '../../components/base/BaseDialog.vue';
 import PageHeader from '../../components/admin/PageHeader.vue';
 import { Zap, RefreshCw, RotateCcw, Server, Clock, AlertTriangle } from 'lucide-vue-next';
 import { fmtDateTime } from '../../utils/format';
+import BaseLoadingAnnounce from '../../components/base/BaseLoadingAnnounce.vue';
 
 const { t } = useI18n();
 const { api } = useApi();
@@ -149,6 +150,7 @@ function statusLabel(s: string): string {
       <!-- ══ 运行状态带 ══ -->
       <section class="card band">
         <template v-if="showSkeleton">
+          <BaseLoadingAnnounce />
           <div v-for="i in 4" :key="i" class="fact">
             <div class="skeleton skeleton-text" style="width: 50%" />
             <div class="skeleton skeleton-text skeleton-value" style="width: 70%" />
@@ -208,6 +210,7 @@ function statusLabel(s: string): string {
         </header>
 
         <div v-if="showSkeleton" class="gw-jobs">
+          <BaseLoadingAnnounce />
           <div v-for="i in 5" :key="i" class="gw-job">
             <span class="skeleton skeleton-dot" />
             <span class="skeleton skeleton-text" style="width: 40%" />
@@ -253,6 +256,7 @@ function statusLabel(s: string): string {
 
         <!-- 骨架屏：不经 DataTable 的 loading（其 colspan 依赖 columns，本表只用槽） -->
         <div v-if="showSkeleton" class="gw-skel">
+          <BaseLoadingAnnounce />
           <div v-for="i in 7" :key="i" class="gw-skel-row">
             <span class="skeleton skeleton-text" :style="{ width: 24 + ((i * 29) % 46) + '%' }" />
           </div>

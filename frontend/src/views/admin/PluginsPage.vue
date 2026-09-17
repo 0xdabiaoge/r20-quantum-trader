@@ -23,6 +23,7 @@ import PageHeader from '../../components/admin/PageHeader.vue';
 import BaseEmpty from '../../components/base/BaseEmpty.vue';
 import { useResource } from '../../composables/useResource';
 import { Blocks, ShieldAlert, RefreshCw, Loader2, AlertTriangle, PackageCheck, PackageX } from 'lucide-vue-next';
+import BaseLoadingAnnounce from '../../components/base/BaseLoadingAnnounce.vue';
 
 const { data, loading, error, loaded, reload: load } = useResource<any>('/api/v1/admin/plugins', {
   immediate: true,
@@ -82,6 +83,7 @@ function typeLabel(v: string): string {
       <!-- ══ 插件状态带 ══ -->
       <section class="card band">
         <template v-if="showSkeleton">
+          <BaseLoadingAnnounce />
           <div v-for="i in 4" :key="i" class="fact">
             <div class="skeleton skeleton-text" style="width: 48%" />
             <div class="skeleton skeleton-text skeleton-value" style="width: 62%" />
@@ -129,6 +131,7 @@ function typeLabel(v: string): string {
         </header>
 
         <div v-if="showSkeleton" class="pl-skel">
+          <BaseLoadingAnnounce />
           <div v-for="i in 4" :key="i" class="skeleton skeleton-row" />
         </div>
 

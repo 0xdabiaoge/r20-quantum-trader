@@ -44,6 +44,7 @@ import { useAuthStore } from '../../stores/auth';
 import { Brain, Sparkles, RefreshCw, Clock, Plus, Trash2, Save,
   PlayCircle, BookOpen, Sliders, Terminal, ShieldCheck, RotateCcw,
   Loader2, AlertTriangle } from 'lucide-vue-next';
+import BaseLoadingAnnounce from '../../components/base/BaseLoadingAnnounce.vue';
 
 const { api } = useApi();
 const auth = useAuthStore();
@@ -425,6 +426,7 @@ onMounted(loadData);
         <!-- 运行状态带 -->
         <section class="card band">
           <template v-if="loading">
+            <BaseLoadingAnnounce />
             <div v-for="i in 4" :key="i" class="fact">
               <div class="skeleton skeleton-text" style="width: 48%" />
               <div class="skeleton skeleton-text skeleton-value" style="width: 66%" />
@@ -500,6 +502,7 @@ onMounted(loadData);
 
           <!-- 骨架 -->
           <div v-if="loading" class="evo-skel">
+            <BaseLoadingAnnounce />
             <div v-for="i in 4" :key="i" class="skeleton skeleton-row" />
           </div>
 
@@ -586,6 +589,7 @@ onMounted(loadData);
           </header>
 
           <div v-if="loading" class="evo-skel">
+            <BaseLoadingAnnounce />
             <div v-for="i in 3" :key="i" class="skeleton skeleton-row" />
           </div>
 

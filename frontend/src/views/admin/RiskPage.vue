@@ -34,6 +34,7 @@ import DangerZone from '../../components/admin/page-parts/DangerZone.vue';
 import BaseEmpty from '../../components/base/BaseEmpty.vue';
 import { ShieldAlert, Save, RotateCcw, Loader2, Info, Layers,
   Target, Flame, TrendingUp, RefreshCw, AlertTriangle } from 'lucide-vue-next';
+import BaseLoadingAnnounce from '../../components/base/BaseLoadingAnnounce.vue';
 
 const { api } = useApi();
 const store = useDashboardStore();
@@ -333,6 +334,7 @@ onMounted(loadData)
 
     <!-- 首屏加载 -->
     <div v-if="loading" class="rk-skel">
+      <BaseLoadingAnnounce />
       <div v-for="i in 6" :key="i" class="skeleton skeleton-row" />
     </div>
 

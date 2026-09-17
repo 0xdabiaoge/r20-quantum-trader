@@ -48,6 +48,7 @@ import BaseDialog from '../../components/base/BaseDialog.vue'
 import BaseEmpty from '../../components/base/BaseEmpty.vue'
 import { Save, RefreshCw, Layers, Trash2, Zap, ShieldCheck, Route, KeyRound,
   Wallet, Activity, AlertTriangle, Loader2, Radar } from 'lucide-vue-next'
+import BaseLoadingAnnounce from '../../components/base/BaseLoadingAnnounce.vue';
 
 const { api } = useApi()
 const auth = useAuthStore()
@@ -533,6 +534,7 @@ onMounted(() => { loadAll(); loadMx() })
 
     <!-- 首屏骨架 -->
     <div v-if="loading && !config" class="sc-skel">
+      <BaseLoadingAnnounce />
       <div v-for="i in 6" :key="i" class="skeleton skeleton-row" />
     </div>
 
