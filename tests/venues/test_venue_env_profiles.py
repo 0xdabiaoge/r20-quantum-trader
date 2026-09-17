@@ -77,6 +77,14 @@ class ProfileTableTest(unittest.TestCase):
         with self.assertRaises(ExchangeCapabilityError):
             ep.get_profile("gate", "mainnet")
 
+    def test_sandbox_alias_compatibility_has_env_and_pinned(self):
+        # Gate 沙盒注册名为 sandbox，传入 demo 别名必须被 has_env 认可并对齐
+        self.assertTrue(ep.has_env("gate", "demo"))
+        self.assertTrue(ep.has_env("gate", "sandbox"))
+        self.assertTrue(ep.has_env("gate", "testnet"))
+        self.assertFalse(ep.has_env("gate", "unknown"))
+        self.assertEqual(ep.get_profile("gate", "demo").urls, ep.get_profile("gate", "sandbox").urls)
+
 
 class LegacyFlagCompatTest(unittest.TestCase):
     """R20_{VENUE}_TESTNET 旧布尔开关 → 档位兼容映射，现有调用点语义不破坏。"""

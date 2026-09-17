@@ -414,12 +414,23 @@ class GateAdapter(BaseExchangeAdapter):
         return self.signed_request("DELETE", "/api/v4/futures/usdt/orders",
                                    params={"contract": inst, "id": str(order_id)})
 
+    def open_orders(self) -> List[Dict[str, Any]]:
+        """全合约未成交普通挂单（与 BinanceAdapter.open_orders 归一契约）。"""
+        data = self.signed_request("GET", "/api/v4/futures/usdt/orders",
+                                   params={"status": "open", "limit": "100"})
+        return data if isinstance(data, list) else []
+
     def list_open_orders(self, symbol: str) -> List[Dict[str, Any]]:
         """该合约未成交普通挂单（G7 联动：对账前先撤孤儿入场挂单用）。"""
         inst = self.native_symbol(symbol)
-        data = self.signed_request("GET", "/api/v4/futures/usdt/orders",
-                                   params={"contract": inst, "status": "open", "limit": "100"})
-        return data if isinstance(data, list) else []
+        try:
+            data = self.signed_request("GET", "/api/v4/futures/usdt/orders",
+                                       params={"contract": inst, "status": "open", "limit": "100"})
+            return data if isinstance(data, list) else []
+        except GateAPIError as err:
+            if "CONTRACT_NOT_FOUND" in str(err) or "not found" in str(err).lower():
+                return []
+            raise
 
     def fast_close_position(self, symbol: str, text: str = "", pos_side: Optional[str] = None) -> Dict[str, Any]:
         """市价全平当前持仓（双向与单向模式自适应；审计 B1：方向钉腿 +
@@ -520,11 +531,18 @@ class GateAdapter(BaseExchangeAdapter):
             raise
         return placed
 
-    def list_protective_orders(self, symbol: str) -> List[Dict[str, Any]]:
-        inst = self.native_symbol(symbol)
-        data = self.signed_request("GET", "/api/v4/futures/usdt/price_orders",
-                                   params={"contract": inst, "status": "open", "limit": "100"})
-        return data if isinstance(data, list) else []
+    def list_protective_orders(self, symbol: Optional[str] = None) -> List[Dict[str, Any]]:
+        params = {"status": "open", "limit": "100"}
+        if symbol:
+            params["contract"] = self.native_symbol(symbol)
+        try:
+            data = self.signed_request("GET", "/api/v4/futures/usdt/price_orders",
+                                       params=params)
+            return data if isinstance(data, list) else []
+        except GateAPIError as err:
+            if "CONTRACT_NOT_FOUND" in str(err) or "not found" in str(err).lower():
+                return []
+            raise
 
     def cancel_price_order(self, order_id: Any) -> Any:
         return self.signed_request("DELETE", f"/api/v4/futures/usdt/price_orders/{order_id}")

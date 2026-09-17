@@ -83,7 +83,7 @@ def collect_cross_venue_positions(positions, pending_orders_list,
                     v_chg = round(((v_mark - v_avg) / v_avg * 100) if v_avg > 0 else 0, 2)
 
                     # Check cloud OCO protective orders
-                    matching_v_algos = [a for a in v_algos if base_sym in str(a.get("symbol", "")).upper()]
+                    matching_v_algos = [a for a in v_algos if base_sym in str(a.get("symbol") or a.get("contract") or "").upper()]
                     v_sl = next((float(a.get("trigger_price") or a.get("triggerPrice") or 0) for a in matching_v_algos if "STOP" in str(a.get("raw", {}).get("orderType", "")).upper() or "STOP" in str(a.get("type", "")).upper()), None)
                     v_tp = next((float(a.get("trigger_price") or a.get("triggerPrice") or 0) for a in matching_v_algos if "TAKE_PROFIT" in str(a.get("raw", {}).get("orderType", "")).upper() or "TAKE_PROFIT" in str(a.get("type", "")).upper()), None)
 
@@ -119,7 +119,7 @@ def collect_cross_venue_positions(positions, pending_orders_list,
                     })
 
                 for vo in (v_open_orders or []):
-                    base_sym = str(vo.get("base") or vo.get("symbol", "")).replace("USDT", "").replace("_USDT", "").upper()
+                    base_sym = str(vo.get("base") or vo.get("symbol") or vo.get("contract") or "").replace("USDT", "").replace("_USDT", "").upper()
                     v_inst_id = f"{base_sym}-USDT-SWAP"
                     vo_side_raw = str(vo.get("side", "")).lower()
                     vo_is_long = vo_side_raw == "buy"

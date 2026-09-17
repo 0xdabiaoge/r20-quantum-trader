@@ -76,7 +76,14 @@ _TRUE = ("1", "true", "yes", "on")
 
 
 def has_env(venue: str, environment: str) -> bool:
-    return (str(venue).lower(), str(environment).lower()) in PROFILES
+    vkey = str(venue).lower()
+    ekey = str(environment).lower()
+    if (vkey, ekey) in PROFILES:
+        return True
+    from .identity import is_sandbox_environment
+    if is_sandbox_environment(ekey):
+        return any((vkey, candidate) in PROFILES for candidate in ("demo", "sandbox", "testnet"))
+    return False
 
 
 def get_profile(venue: str, environment: str) -> EnvProfile:
@@ -155,8 +162,8 @@ def _persist(venue: str, environment: str, base_url: str, evidence: Dict[str, Op
 def pinned_base_url(venue: str, environment: str) -> Optional[str]:
     """已持久化的选择域；不在当前候选集（profile 更新后）视为失效。"""
     prof = get_profile(venue, environment)
-    pinned = (((_load_persisted().get(str(venue).lower()) or {})
-               .get(str(environment).lower()) or {})
+    pinned = (((_load_persisted().get(str(prof.venue).lower()) or {})
+               .get(str(prof.environment).lower()) or {})
               .get("base_url") or "")
     return pinned if pinned and pinned in prof.urls else None
 
