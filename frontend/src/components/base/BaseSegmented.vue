@@ -13,9 +13,15 @@ const props = defineProps<{
   modelValue: T;
   options: { value: T; label?: string; icon?: Component; title?: string }[];
   large?: boolean;
-  /** 组名（批 44）：`role="tablist"` 没有可访问名时读屏器只会念"标签列表"，
-   *  用户不知道这三个分段在筛选什么（状态/方向/结果）。 */
-  label?: string;
+  /**
+   * 组名（批 44）：`role="tablist"` 没有可访问名时读屏器只会念"标签列表"，
+   *  用户不知道这三个分段在筛选什么（状态/方向/结果）。
+   *
+   *  批 110：由可选改为**必填**。实测 25 路由 17 条 tablist 里有 **4 条没有名字**
+   *  （周期分段、持仓/挂单分段，`/` 与 `/trading` 各两条）—— 都是漏传该 prop。
+   *  改成必填后，漏传会在 `vue-tsc` 阶段直接失败，不必再等人肉发现。
+   */
+  label: string;
 }>();
 
 const emit = defineEmits<{ (e: 'update:modelValue', v: T): void }>();

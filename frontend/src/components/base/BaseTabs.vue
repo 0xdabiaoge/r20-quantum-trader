@@ -13,7 +13,8 @@ import { useRovingTabs } from '../../composables/useRovingTabs';
 const props = defineProps<{
   modelValue: string;
   items: { key: string; label: string; count?: number }[];
-  label?: string;
+  /** 组名（批 110 由可选改**必填**，理由同 BaseSegmented：无名 tablist 读屏只会念"标签列表"）。 */
+  label: string;
   /**
    * 分区 id 前缀（批 66）。传入后每个 tab 会生成 `aria-controls="${baseId}-panel-${key}"`，
    * 消费端对应面板需声明 `:id="`${baseId}-panel-${key}`"`、`role="tabpanel"`、

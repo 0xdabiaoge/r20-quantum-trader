@@ -74,6 +74,7 @@ onBeforeUnmount(() => {
             <p class="form-label mb-1.5">{{ t('dash.shell.settings.language') }}</p>
             <BaseSegmented
               class="w-full"
+              :label="t('dash.shell.settings.language')"
               :model-value="currentLocale"
               :options="LOCALE_OPTIONS"
               @update:model-value="(v: any) => setLocale(v)"

@@ -22,6 +22,9 @@ export const enMatrix = {
     day14: '14 days',
     vsYesterday: 'vs yesterday',
   },
+  positionsOrders: {
+    tabsAria: 'Positions and orders',
+  },
   positions: {
     tab: 'Positions',
     title: 'Open positions',

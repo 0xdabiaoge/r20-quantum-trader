@@ -90,6 +90,7 @@ function symOf(x: { instId?: string; name?: string }): string {
       <div class="flex items-center gap-2">
         <BaseSegmented
           v-model="tab"
+          :label="t('dash.matrix.positionsOrders.tabsAria')"
           :options="[
             { value: 'positions', label: `${t('dash.matrix.positions.tab')} ${filteredPositions.length}` },
             { value: 'orders', label: `${t('dash.matrix.orders.tab')} ${filteredOrders.length}` },

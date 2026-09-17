@@ -788,6 +788,7 @@ onUnmounted(() => {
 
         <BaseSegmented
           :model-value="currentPeriod"
+          :label="t('dash.matrix.chart.tf')"
           :options="periods.map((p) => ({ value: p.id, label: p.label }))"
           @update:model-value="(id: any) => selectPeriod(periods.find((p) => p.id === id))"
         />

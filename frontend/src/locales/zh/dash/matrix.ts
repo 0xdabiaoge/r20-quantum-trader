@@ -25,6 +25,9 @@ export const zhMatrix = {
     vsYesterday: '较昨日',
   },
 
+  positionsOrders: {
+    tabsAria: '持仓与挂单',
+  },
   positions: {
     tab: '活动持仓',
     title: '活动持仓',
