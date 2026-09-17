@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import math
+import os
 from typing import Any, Dict, Optional
 
 from .execution.risk_gates import (
@@ -116,9 +117,14 @@ def open_protected_position(decision: Dict[str, Any], *,
     # 保证金夹取与池准入判定共用。
     pool = _load_venue_pool_soft(venue)
 
+    _cur_min_lev = float(os.getenv("R20_MIN_LEVERAGE", "") or MIN_LEVERAGE or 2.0)
+    _cur_max_lev = float(os.getenv("R20_MAX_LEVERAGE", "") or MAX_LEVERAGE or 5.0)
+    if _cur_min_lev > _cur_max_lev:
+        _cur_min_lev = _cur_max_lev
+
     leverage, decision = _clamp_leverage(
         venue=venue, asset=asset, decision=decision, leverage=leverage,
-        min_leverage=MIN_LEVERAGE, max_leverage=MAX_LEVERAGE)
+        min_leverage=_cur_min_lev, max_leverage=_cur_max_lev)
 
     _margin_unclamped = margin
     margin, decision, margin_clamped_from = _clamp_margin(

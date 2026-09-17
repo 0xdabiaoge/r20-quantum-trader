@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import concurrent.futures
 import json
+import os
 import time
 from typing import Any, Callable, Dict, Optional, Tuple
 
@@ -266,6 +267,10 @@ def execute_council_debate(load_config: Callable[[], Dict[str, Any]], resolve_se
         except Exception:
             _R20_MAX_LEVERAGE = 5.0
             _R20_MIN_LEVERAGE = 2.0
+    _R20_MAX_LEVERAGE = float(os.getenv("R20_MAX_LEVERAGE", "") or _R20_MAX_LEVERAGE or 5.0)
+    _R20_MIN_LEVERAGE = float(os.getenv("R20_MIN_LEVERAGE", "") or _R20_MIN_LEVERAGE or 2.0)
+    if _R20_MIN_LEVERAGE > _R20_MAX_LEVERAGE:
+        _R20_MIN_LEVERAGE = _R20_MAX_LEVERAGE
 
     config = load_config()
     roles = config.get("roles", {})

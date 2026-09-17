@@ -76,6 +76,51 @@ def evaluate_instrument_tier(inst_id: str, name: str = "") -> str:
     return "tier_2_momentum"
 
 
+def derive_instrument_leverage_cap(
+    tier: str,
+    min_leverage: float | None = None,
+    max_leverage: float | None = None,
+) -> int:
+    """根据标的分层 (Tier 1 蓝筹 vs Tier 2 动量) 与全局风控杠杆区间动态派生单标的上限。
+
+    - Tier 1 (蓝筹 BTC/ETH)：跟随全局上限 MAX_LEVERAGE；
+    - Tier 2 (动量高弹性 SOL/DOGE 等)：在 [MIN_LEVERAGE, MAX_LEVERAGE] 区间内按风险梯度收紧，
+      保证不低于 MIN_LEVERAGE 且不高于 MAX_LEVERAGE。
+    """
+    if min_leverage is None or max_leverage is None:
+        try:
+            from scripts.risk_constants import MIN_LEVERAGE as _RC_MIN, MAX_LEVERAGE as _RC_MAX
+        except Exception:
+            _RC_MIN, _RC_MAX = 2.0, 5.0
+        if min_leverage is None:
+            min_leverage = float(os.getenv("R20_MIN_LEVERAGE", "") or _RC_MIN or 2.0)
+        if max_leverage is None:
+            max_leverage = float(os.getenv("R20_MAX_LEVERAGE", "") or _RC_MAX or 5.0)
+    lo = max(1.0, float(min_leverage or 2.0))
+    hi = max(lo, float(max_leverage or 5.0))
+    if tier == "tier_1_bluechip":
+        return max(1, int(round(hi)))
+    # 动量币在 [lo, hi] 内取约 40% 的弹性跨度（在默认 2~5x 时刚好为 3x，与出厂基线完美对齐）
+    cap = int(round(lo + (hi - lo) * 0.4))
+    return max(int(round(lo)), min(int(round(hi)), cap))
+
+
+def sync_pool_leverage_caps(
+    min_leverage: float | None = None,
+    max_leverage: float | None = None,
+) -> list[dict[str, Any]]:
+    """根据指定的杠杆区间，在锁内重新对齐池内所有标的的 max_leverage 并安全落盘。"""
+    def _updater(pool: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        for item in pool:
+            tier = item.get("tier") or evaluate_instrument_tier(item.get("instId", ""), item.get("name", ""))
+            item["tier"] = tier
+            item["max_leverage"] = derive_instrument_leverage_cap(
+                tier, min_leverage=min_leverage, max_leverage=max_leverage
+            )
+        return pool
+    return mutate_instruments(_updater)
+
+
 def score_universe_candidate(
     candidate: dict[str, Any],
     vol_24h_usd: float = 0.0,
@@ -109,7 +154,7 @@ def score_universe_candidate(
         score -= 15.0
 
     candidate["tier"] = tier
-    candidate["max_leverage"] = profile["max_leverage"]
+    candidate["max_leverage"] = derive_instrument_leverage_cap(tier)
     candidate["sl_atr_mult"] = profile["sl_atr_mult"]
     candidate["universe_score"] = round(max(0.0, min(100.0, score)), 1)
     return candidate
@@ -132,7 +177,7 @@ def from_okx_instrument(raw: dict[str, Any]) -> dict[str, Any]:
         "type": "crypto",
         "ccy": base,
         "tier": tier,
-        "max_leverage": profile["max_leverage"],
+        "max_leverage": derive_instrument_leverage_cap(tier),
         "sl_atr_mult": profile["sl_atr_mult"],
         "base_sz": 1,
         "precision": _precision(tick_size),
@@ -209,11 +254,24 @@ def load_instruments() -> list[dict[str, Any]]:
         _POOL_STATE.update({"status": "invalid", "detail": f"{POOL_FILE} 全部条目非法", "dropped": dropped})
         print(f"[instrument_pool] error 标的池无一条合法 → 交易侧本轮不开新仓")
         return [dict(item) for item in DEFAULT_INSTRUMENTS]
+    try:
+        from scripts.risk_constants import MIN_LEVERAGE as _RC_MIN, MAX_LEVERAGE as _RC_MAX
+    except Exception:
+        _RC_MIN, _RC_MAX = 2.0, 5.0
+    _cur_min = float(os.getenv("R20_MIN_LEVERAGE", "") or _RC_MIN or 2.0)
+    _cur_max = float(os.getenv("R20_MAX_LEVERAGE", "") or _RC_MAX or 5.0)
+    if _cur_min > _cur_max:
+        _cur_min = _cur_max
+
     for item in kept:
         if "tier" not in item:
             item["tier"] = evaluate_instrument_tier(item.get("instId", ""), item.get("name", ""))
-            item["max_leverage"] = TIER_PROFILES[item["tier"]]["max_leverage"]
             item["sl_atr_mult"] = TIER_PROFILES[item["tier"]]["sl_atr_mult"]
+        tier = item["tier"]
+        cur_cap = item.get("max_leverage")
+        # 兼容自适应：若池内上限低于当前全局下限、或高于全局上限、或蓝筹未跟随全局上限，按当前风控区间派生
+        if cur_cap is None or cur_cap < _cur_min or cur_cap > _cur_max or (tier == "tier_1_bluechip" and cur_cap != int(round(_cur_max))):
+            item["max_leverage"] = derive_instrument_leverage_cap(tier, min_leverage=_cur_min, max_leverage=_cur_max)
     _POOL_STATE.update({
         "status": "ok" if not dropped else "invalid",
         "detail": "" if not dropped else f"丢弃 {len(dropped)} 项: {', '.join(dropped)}",

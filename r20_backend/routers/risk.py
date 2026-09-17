@@ -140,6 +140,14 @@ def admin_risk_update(payload: RiskConfigUpdate, x_r20_session: str | None = Hea
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     update_env(env_updates)
     refresh_settings()
+    try:
+        from scripts.instrument_pool import sync_pool_leverage_caps
+        cur_v = risk_config.current_values()
+        _sync_min = float(env_updates.get("R20_MIN_LEVERAGE", cur_v.get("R20_MIN_LEVERAGE", 2.0)))
+        _sync_max = float(env_updates.get("R20_MAX_LEVERAGE", cur_v.get("R20_MAX_LEVERAGE", 5.0)))
+        sync_pool_leverage_caps(min_leverage=_sync_min, max_leverage=_sync_max)
+    except Exception:
+        pass
     audit_record("risk.config.update", "success", {
         "actor": actor["username"],
         "suite": payload.suite_id or None,
@@ -162,6 +170,13 @@ def admin_risk_reset(payload: RiskResetRequest, x_r20_session: str | None = Head
         raise HTTPException(status_code=400, detail="确认短语必须精确为：RESET RISK")
     remove_env(set(risk_config.reset_keys()))
     refresh_settings()
+    try:
+        from scripts.instrument_pool import sync_pool_leverage_caps
+        cur_v = risk_config.current_values()
+        sync_pool_leverage_caps(min_leverage=float(cur_v.get("R20_MIN_LEVERAGE", 2.0)),
+                                max_leverage=float(cur_v.get("R20_MAX_LEVERAGE", 5.0)))
+    except Exception:
+        pass
     audit_record("risk.config.reset", "success", {"actor": actor["username"]})
     return {
         "reset": True,

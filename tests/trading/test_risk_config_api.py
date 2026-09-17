@@ -200,6 +200,38 @@ class RiskConfigApiTests(unittest.TestCase):
         self.assertEqual(res.status_code, 400)
         self.assertIn("未知风控预设套件", res.json()["detail"])
 
+    def test_pool_leverage_caps_synced_on_risk_update(self):
+        """风控管理页保存杠杆区间（如 5~7x）时，标的池必须同步刷新 max_leverage（蓝筹 7x，动量 6x）。"""
+        from unittest.mock import patch
+        import scripts.instrument_pool as ip
+        self.assertEqual(ip.derive_instrument_leverage_cap("tier_1_bluechip", 2.0, 5.0), 5)
+        self.assertEqual(ip.derive_instrument_leverage_cap("tier_2_momentum", 2.0, 5.0), 3)
+        self.assertEqual(ip.derive_instrument_leverage_cap("tier_1_bluechip", 5.0, 7.0), 7)
+        self.assertEqual(ip.derive_instrument_leverage_cap("tier_2_momentum", 5.0, 7.0), 6)
+
+        sandbox_pool = Path(self.temp.name) / "instrument_pool.json"
+        sandbox_pool.write_text((ROOT / "data" / "instrument_pool.json").read_text(encoding="utf-8"), encoding="utf-8")
+
+        with patch.object(ip, "POOL_FILE", sandbox_pool):
+            headers = self.login("admin", "InitialAdmin123456")
+            res = self.client.post("/api/v1/admin/risk", headers=headers,
+                                   json={"values": {"R20_MIN_LEVERAGE": 5.0, "R20_MAX_LEVERAGE": 7.0}})
+            self.assertEqual(res.status_code, 200, res.text)
+
+            pool = ip.load_instruments()
+            btc = next(item for item in pool if item["instId"] == "BTC-USDT-SWAP")
+            sui = next(item for item in pool if item["instId"] == "SUI-USDT-SWAP")
+            self.assertEqual(btc["max_leverage"], 7)
+            self.assertEqual(sui["max_leverage"], 6)
+
+            res_reset = self.client.post("/api/v1/admin/risk/reset", headers=headers, json={"confirmation": "RESET RISK"})
+            self.assertEqual(res_reset.status_code, 200)
+            pool_reset = ip.load_instruments()
+            btc_reset = next(item for item in pool_reset if item["instId"] == "BTC-USDT-SWAP")
+            sui_reset = next(item for item in pool_reset if item["instId"] == "SUI-USDT-SWAP")
+            self.assertEqual(btc_reset["max_leverage"], 5)
+            self.assertEqual(sui_reset["max_leverage"], 3)
+
 
 class PromptRiskContractTests(unittest.TestCase):
     """SYSTEM_PROMPT 与风控常量、线上布局的三重契约。
