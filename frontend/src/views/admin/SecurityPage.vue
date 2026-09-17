@@ -84,6 +84,11 @@ const keys = ref({ live_key: '', live_secret: '', live_pass: '', demo_key: '', d
 const newCapital = ref<string>('')
 const capitalConfirm = ref<string>('')
 const savingCapital = ref(false)
+const capitalAmountOk = computed(() => {
+  const n = Number(newCapital.value)
+  return !Number.isNaN(n) && n > 0
+})
+const capitalConfirmOk = computed(() => capitalConfirm.value.trim().toUpperCase() === 'UPDATE CAPITAL')
 
 // ---- instruments ----
 const instruments = ref<any[]>([])
@@ -102,6 +107,14 @@ const closePassword = ref('')
 const closeModal = ref<{ show: boolean; pos: any } | null>(null)
 const closePhraseInput = ref('')
 const closing = ref(false)
+const closePhraseOk = computed(() => {
+  const pos = closeModal.value?.pos
+  if (!pos?.close_confirmation) return false
+  return closePhraseInput.value.trim().toUpperCase() === pos.close_confirmation
+})
+const closeReady = computed(() => {
+  return !!closePassword.value && closePhraseOk.value
+})
 
 // ---- 多所凭证与档位（Binance / Gate 独立保存） ----
 const mx = ref<any>(null)
@@ -825,7 +838,7 @@ onMounted(() => { loadAll(); loadMx() })
           <template #actions>
             <button type="button"
               class="btn btn-primary btn-sm"
-              :disabled="savingCapital || !auth.isSuperadmin"
+              :disabled="savingCapital || !auth.isSuperadmin || !capitalAmountOk || !capitalConfirmOk"
               @click="saveCapital"
             >
               <Loader2 v-if="savingCapital" :size="13" class="animate-spin shrink-0" />
@@ -837,11 +850,27 @@ onMounted(() => { loadAll(); loadMx() })
           <div class="sc-form-2">
             <label class="field-stack">
               <span class="form-label">{{ t('admin.security.capitalAmount') }}</span>
-              <input v-model="newCapital" class="field num" inputmode="decimal" />
+              <input
+                v-model="newCapital"
+                type="text"
+                class="field num"
+                :class="{ 'is-bad': !!newCapital && !capitalAmountOk }"
+                :aria-invalid="!!newCapital && !capitalAmountOk ? 'true' : undefined"
+                inputmode="decimal"
+              />
             </label>
             <label class="field-stack">
               <span class="form-label">{{ t('admin.security.capitalConfirmLabel') }}</span>
-              <input v-model="capitalConfirm" type="text" autocomplete="off" spellcheck="false" class="field mono" placeholder="UPDATE CAPITAL" />
+              <input
+                v-model="capitalConfirm"
+                type="text"
+                autocomplete="off"
+                spellcheck="false"
+                class="field mono"
+                :class="{ 'is-bad': !!capitalConfirm && !capitalConfirmOk }"
+                :aria-invalid="!!capitalConfirm && !capitalConfirmOk ? 'true' : undefined"
+                placeholder="UPDATE CAPITAL"
+              />
             </label>
           </div>
 
@@ -1041,6 +1070,8 @@ onMounted(() => { loadAll(); loadMx() })
               type="text"
               autocomplete="off"
               spellcheck="false"
+              :class="{ 'is-bad': !!closePhraseInput && !closePhraseOk }"
+              :aria-invalid="!!closePhraseInput && !closePhraseOk ? 'true' : undefined"
               :placeholder="closeModal.pos.close_confirmation"
               class="field mono"
             />
@@ -1053,7 +1084,7 @@ onMounted(() => { loadAll(); loadMx() })
           {{ t('admin.security.cancel') }}
         </button>
         <!-- 批 115：表单已挂 @submit.prevent="confirmClose"，type="submit" 按钮无需再挂 @click，避免单次点击触发两次平仓请求 -->
-        <button class="btn btn-danger btn-sm" type="submit" form="sc-close-form" :disabled="closing">
+        <button class="btn btn-danger btn-sm" type="submit" form="sc-close-form" :disabled="closing || !closeReady">
           <Loader2 v-if="closing" :size="13" class="animate-spin shrink-0" />
           <span>{{ closing ? t('admin.security.closing') : t('admin.security.confirmClose') }}</span>
         </button>
