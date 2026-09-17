@@ -753,7 +753,7 @@ onMounted(loadData);
 
               <textarea
                 v-model="selectedRole.prompt"
-                rows="10"
+                rows="20"
                 spellcheck="false"
                 :aria-label="t('admin.council.seatPromptAria')"
                 class="field cn-textarea"
@@ -1325,9 +1325,15 @@ onMounted(loadData);
 .cn-textarea {
   margin-top: var(--ds-space-3);
   width: 100%;
+  min-height: 420px;
   resize: vertical;
-  line-height: var(--leading-body);
-  font-family: inherit;
+  font-family: var(--ds-font-mono);
+  font-size: var(--text-base);
+  line-height: 1.6;
+  tab-size: 2;
+  padding: var(--ds-space-3-5) var(--ds-space-4);
+  background-color: var(--ds-color-bg-code);
+  border-radius: var(--r-ctl);
 }
 
 /* ══ 辩论实录 ══ */

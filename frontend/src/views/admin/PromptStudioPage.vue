@@ -725,7 +725,7 @@ onMounted(loadLib)
               />
               <textarea
                 v-model="selectedModule.content"
-                rows="12"
+                rows="24"
                 spellcheck="false"
                 :aria-label="t('admin.promptStudio.moduleEditor')"
                 class="field ps-textarea"
@@ -1234,9 +1234,15 @@ onMounted(loadLib)
 }
 .ps-textarea {
   width: 100%;
+  min-height: 500px;
   resize: vertical;
-  line-height: var(--leading-body);
-  font-family: inherit;
+  font-family: var(--ds-font-mono);
+  font-size: var(--text-base);
+  line-height: 1.6;
+  tab-size: 2;
+  padding: var(--ds-space-3-5) var(--ds-space-4);
+  background-color: var(--ds-color-bg-code);
+  border-radius: var(--r-ctl);
 }
 
 /* 动作栏 */
@@ -1292,7 +1298,8 @@ onMounted(loadLib)
   color: var(--ds-color-text-secondary);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  max-height: 56vh;
+  min-height: 500px;
+  max-height: 72vh;
   overflow-y: auto;
 }
 .ps-prev-copy {

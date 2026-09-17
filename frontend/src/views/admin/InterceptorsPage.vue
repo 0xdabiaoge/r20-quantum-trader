@@ -406,7 +406,7 @@ onMounted(loadPlugins)
     <BaseDialog
       :open="editorVisible"
       :title="t('admin.interceptors.editorTitle')"
-      size="xl"
+      size="2xl"
       initial-focus="textarea"
       @close="closeEditor"
     >
@@ -427,7 +427,7 @@ onMounted(loadPlugins)
 
       <textarea
         v-model="editingCode"
-        rows="22"
+        rows="26"
         spellcheck="false"
         class="field ip-code"
         :aria-label="t('admin.interceptors.codeLabel')"
@@ -456,7 +456,7 @@ onMounted(loadPlugins)
       :open="createModalVisible"
       :title="t('admin.interceptors.createTitle')"
       :desc="t('admin.interceptors.createHint')"
-      size="lg"
+      size="xl"
       initial-focus="input"
       @close="closeCreate"
     >
@@ -483,7 +483,7 @@ onMounted(loadPlugins)
         <span class="form-label">{{ t('admin.interceptors.codeLabel') }}</span>
         <textarea
           v-model="newCode"
-          rows="16"
+          rows="20"
           spellcheck="false"
           class="field ip-code"
           :aria-label="t('admin.interceptors.codeLabel')"
@@ -717,10 +717,15 @@ onMounted(loadPlugins)
 }
 .ip-code {
   width: 100%;
+  min-height: 520px;
   resize: vertical;
   font-family: var(--ds-font-mono);
-  font-size: var(--text-2xs);
-  line-height: var(--leading-body);
+  font-size: var(--text-base);
+  line-height: 1.6;
+  tab-size: 4;
+  padding: var(--ds-space-3-5) var(--ds-space-4);
+  background-color: var(--ds-color-bg-code);
+  border-radius: var(--r-ctl);
 }
 
 .ip-field + .ip-field {

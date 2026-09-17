@@ -17,7 +17,7 @@ const props = withDefaults(
     open: boolean;
     title?: string;
     desc?: string;
-    size?: 'sm' | 'md' | 'lg' | 'xl';
+    size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
     closeOnScrim?: boolean;
     showClose?: boolean;
     /** 顶部强调条语义（danger 时用于编辑危险表单） */
@@ -35,7 +35,7 @@ const props = withDefaults(
 const emit = defineEmits<{ (e: 'close'): void }>();
 
 const width = computed(
-  () => ({ sm: '400px', md: '560px', lg: '760px', xl: '960px' })[props.size || 'md'],
+  () => ({ sm: '400px', md: '560px', lg: '760px', xl: '960px', '2xl': '1160px' })[props.size || 'md'],
 );
 
 const panel = ref<HTMLElement | null>(null);
