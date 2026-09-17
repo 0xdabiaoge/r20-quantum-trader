@@ -51,6 +51,7 @@ const pwdUserId = ref<number>(0)
 const currentPassword = ref('')
 const newPassword = ref('')
 const changingPwd = ref(false)
+const pwdReady = computed(() => !!currentPassword.value && newPassword.value.length >= 12)
 
 // Create form
 const createVisible = ref(false)
@@ -59,6 +60,7 @@ const newRole = ref('admin')
 const newPasswordForCreate = ref('')
 const creating = ref(false)
 const createError = ref('')
+const createReady = computed(() => newUsername.value.trim().length >= 3 && newPasswordForCreate.value.length >= 12)
 
 // F2：统一错误出口（error → toast，与原实现一致）。
 // 批 71：原实现的 `loading` 是**死状态**（模板从不渲染，故此前只取 run）。
@@ -234,11 +236,19 @@ onMounted(load)
 
         <label class="field-stack">
           <span class="form-label">{{ t('admin.adminsys.password.newPassword') }}</span>
-          <input v-model="newPassword" type="password" autocomplete="new-password" class="field" />
+          <input
+            v-model="newPassword"
+            type="password"
+            autocomplete="new-password"
+            class="field"
+            :class="{ 'is-bad': !!newPassword && newPassword.length < 12 }"
+            :aria-invalid="!!newPassword && newPassword.length < 12 ? 'true' : undefined"
+            :placeholder="t('admin.adminsys.msgs.pwdTooShort')"
+          />
         </label>
 
         <div class="as-pwd-submit">
-          <button type="button" class="btn btn-primary btn-sm" :disabled="changingPwd" @click="changePassword">
+          <button type="button" class="btn btn-primary btn-sm" :disabled="changingPwd || !pwdReady" @click="changePassword">
             <Loader2 v-if="changingPwd" :size="13" class="animate-spin shrink-0" />
             <KeyRound v-else :size="13" />
             <span>{{ changingPwd ? t('admin.adminsys.password.updating') : t('admin.adminsys.password.submit') }}</span>
@@ -349,7 +359,15 @@ onMounted(load)
       <form id="as-create-form" class="as-create" @submit.prevent="createUser">
         <label class="field-stack">
           <span class="form-label">{{ t('admin.adminsys.create.account') }}</span>
-          <input v-model="newUsername" class="field mono" autocomplete="off" />
+          <input
+            v-model="newUsername"
+            type="text"
+            class="field mono"
+            :class="{ 'is-bad': !!newUsername && newUsername.trim().length < 3 }"
+            :aria-invalid="!!newUsername && newUsername.trim().length < 3 ? 'true' : undefined"
+            autocomplete="off"
+            placeholder="admin"
+          />
         </label>
 
         <label class="field-stack">
@@ -362,7 +380,15 @@ onMounted(load)
 
         <label class="field-stack">
           <span class="form-label">{{ t('admin.adminsys.create.password') }}</span>
-          <input v-model="newPasswordForCreate" type="password" autocomplete="new-password" class="field" />
+          <input
+            v-model="newPasswordForCreate"
+            type="password"
+            autocomplete="new-password"
+            class="field"
+            :class="{ 'is-bad': !!newPasswordForCreate && newPasswordForCreate.length < 12 }"
+            :aria-invalid="!!newPasswordForCreate && newPasswordForCreate.length < 12 ? 'true' : undefined"
+            :placeholder="t('admin.adminsys.msgs.pwdTooShort')"
+          />
         </label>
       </form>
 
@@ -371,7 +397,7 @@ onMounted(load)
           {{ t('admin.adminsys.create.cancel') }}
         </button>
         <!-- 批 115：表单已挂 @submit.prevent="createUser"，type="submit" 按钮无需再挂 @click，避免单次点击触发两次创建请求 -->
-        <button class="btn btn-primary btn-sm" type="submit" form="as-create-form" :disabled="creating">
+        <button class="btn btn-primary btn-sm" type="submit" form="as-create-form" :disabled="creating || !createReady">
           <Loader2 v-if="creating" :size="13" class="animate-spin shrink-0" />
           <Plus v-else :size="13" />
           <span>{{ t('admin.adminsys.create.submit') }}</span>
