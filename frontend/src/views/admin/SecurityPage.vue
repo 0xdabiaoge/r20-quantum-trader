@@ -281,6 +281,7 @@ function openClose(pos: any) {
 }
 
 async function confirmClose() {
+  if (closing.value) return
   const pos = closeModal.value?.pos
   if (!pos) return
   if (!closePassword.value) { toast.err(t('admin.security.errNeedPassword')); return }
@@ -1048,10 +1049,11 @@ onMounted(() => { loadAll(); loadMx() })
       </template>
 
       <template #footer>
-        <button class="btn btn-ghost btn-sm" @click="closeModal = null">
+        <button type="button" class="btn btn-ghost btn-sm" @click="closeModal = null">
           {{ t('admin.security.cancel') }}
         </button>
-        <button class="btn btn-danger btn-sm" type="submit" form="sc-close-form" :disabled="closing" @click="confirmClose">
+        <!-- 批 115：表单已挂 @submit.prevent="confirmClose"，type="submit" 按钮无需再挂 @click，避免单次点击触发两次平仓请求 -->
+        <button class="btn btn-danger btn-sm" type="submit" form="sc-close-form" :disabled="closing">
           <Loader2 v-if="closing" :size="13" class="animate-spin shrink-0" />
           <span>{{ closing ? t('admin.security.closing') : t('admin.security.confirmClose') }}</span>
         </button>

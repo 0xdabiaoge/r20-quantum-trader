@@ -231,6 +231,7 @@ def check_risk(package: dict, decision: dict, context: dict) -> tuple[bool, str]
 }
 
 async function submitCreate() {
+  if (creating.value) return
   createError.value = ''
   if (!newFilename.value.trim()) {
     createError.value = t('admin.interceptors.filenameRequired')
@@ -483,8 +484,9 @@ onMounted(loadPlugins)
       </form>
 
       <template #footer>
-        <button class="btn btn-ghost btn-sm" @click="closeCreate">{{ t('admin.interceptors.cancel') }}</button>
-        <button class="btn btn-primary btn-sm" type="submit" form="ip-create-form" :disabled="creating" @click="submitCreate">
+        <button type="button" class="btn btn-ghost btn-sm" @click="closeCreate">{{ t('admin.interceptors.cancel') }}</button>
+        <!-- 批 115：表单已挂 @submit.prevent="submitCreate"，type="submit" 按钮无需再挂 @click，避免单次点击触发两次创建请求 -->
+        <button class="btn btn-primary btn-sm" type="submit" form="ip-create-form" :disabled="creating">
           <Loader2 v-if="creating" :size="14" class="animate-spin shrink-0" />
           <Plus v-else :size="14" />
           <span>{{ t('admin.interceptors.createAndAdd') }}</span>

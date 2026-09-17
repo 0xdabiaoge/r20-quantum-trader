@@ -108,10 +108,11 @@ const title = computed(() =>
     </form>
 
     <template #footer>
-      <button class="btn btn-ghost btn-sm" @click="modelModalVisible = false">
+      <button type="button" class="btn btn-ghost btn-sm" @click="modelModalVisible = false">
         {{ t('admin.llm.cancel') }}
       </button>
-      <button class="btn btn-primary btn-sm" type="submit" form="model-edit-form" @click="saveModelForm">
+      <!-- 批 115：表单已挂 @submit.prevent="saveModelForm"，type="submit" 按钮无需再挂 @click，避免单次点击触发两次保存 -->
+      <button class="btn btn-primary btn-sm" type="submit" form="model-edit-form">
         {{ t('admin.llm.saveModel') }}
       </button>
     </template>

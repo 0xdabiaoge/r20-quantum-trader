@@ -95,6 +95,7 @@ async function changePassword() {
 }
 
 async function createUser() {
+  if (creating.value) return
   createError.value = ''
   if (newUsername.value.length < 3 || newPasswordForCreate.value.length < 12) {
     toast.err(t('admin.adminsys.msgs.createTooShort'))
@@ -366,10 +367,11 @@ onMounted(load)
       </form>
 
       <template #footer>
-        <button class="btn btn-ghost btn-sm" @click="createVisible = false">
+        <button type="button" class="btn btn-ghost btn-sm" @click="createVisible = false">
           {{ t('admin.adminsys.create.cancel') }}
         </button>
-        <button class="btn btn-primary btn-sm" type="submit" form="as-create-form" :disabled="creating" @click="createUser">
+        <!-- 批 115：表单已挂 @submit.prevent="createUser"，type="submit" 按钮无需再挂 @click，避免单次点击触发两次创建请求 -->
+        <button class="btn btn-primary btn-sm" type="submit" form="as-create-form" :disabled="creating">
           <Loader2 v-if="creating" :size="13" class="animate-spin shrink-0" />
           <Plus v-else :size="13" />
           <span>{{ t('admin.adminsys.create.submit') }}</span>
