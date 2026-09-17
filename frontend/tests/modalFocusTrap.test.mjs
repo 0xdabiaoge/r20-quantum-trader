@@ -43,7 +43,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { tabbableOf } from '../src/composables/useModalFocus.ts';
+import { tabbableOf, lockBodyScroll, unlockBodyScroll, getScrollLockDepth } from '../src/composables/useModalFocus.ts';
 
 const SRC = path.resolve(import.meta.dirname, '..', 'src');
 /** 造一个「元素形状」的假对象：只看得到 tabIndex 与 offsetParent。 */
@@ -76,6 +76,44 @@ test('空列表不炸（面板内一个可聚焦元素都没有）', () => {
   assert.deepEqual(tabbableOf([]), []);
 });
 
+test('滚动锁引用计数：嵌套模态关闭时只有深度归零才解开 body 滚动锁（批 116）', () => {
+  const origDoc = globalThis.document;
+  try {
+    const fakeBody = { style: { overflow: '' } };
+    globalThis.document = { body: fakeBody };
+
+    assert.equal(getScrollLockDepth(), 0);
+    assert.equal(fakeBody.style.overflow, '');
+
+    // 打开第一层模态
+    lockBodyScroll();
+    assert.equal(getScrollLockDepth(), 1);
+    assert.equal(fakeBody.style.overflow, 'hidden');
+
+    // 打开第二层嵌套模态（例如在历史弹窗里点回滚弹出 ConfirmHost）
+    lockBodyScroll();
+    assert.equal(getScrollLockDepth(), 2);
+    assert.equal(fakeBody.style.overflow, 'hidden');
+
+    // 关闭第二层模态：第一层仍然开着，body.overflow 必须保持 'hidden'，绝不能提前解开！
+    unlockBodyScroll();
+    assert.equal(getScrollLockDepth(), 1);
+    assert.equal(fakeBody.style.overflow, 'hidden');
+
+    // 关闭第一层模态：所有模态退出，body.overflow 恢复原始值 ''
+    unlockBodyScroll();
+    assert.equal(getScrollLockDepth(), 0);
+    assert.equal(fakeBody.style.overflow, '');
+
+    // 冗余调用 unlock 不得产生负数下溢
+    unlockBodyScroll();
+    assert.equal(getScrollLockDepth(), 0);
+    assert.equal(fakeBody.style.overflow, '');
+  } finally {
+    globalThis.document = origDoc;
+  }
+});
+
 test('useModalFocus 必须用 tabbableOf（别再退回只按 offsetParent 过滤的选择器）', () => {
   const src = readFileSync(path.join(SRC, 'composables/useModalFocus.ts'), 'utf8');
   assert.match(src, /export function tabbableOf/, '抽出来的判据不见了');
@@ -84,5 +122,5 @@ test('useModalFocus 必须用 tabbableOf（别再退回只按 offsetParent 过�
   // 陷阱的三件事必须都还在（别为了修这条把别的删了）
   assert.match(src, /e\.key === 'Escape'/, 'Escape 关闭逻辑不见了');
   assert.match(src, /e\.key !== 'Tab'/, 'Tab 处理逻辑不见了');
-  assert.match(src, /document\.body\.style\.overflow/, '滚动锁不见了');
+  assert.match(src, /export function lockBodyScroll/, '滚动锁引用计数函数不见了');
 });

@@ -55,6 +55,45 @@ export function tabbableOf<T extends { tabIndex: number; offsetParent: unknown }
 /** 模块级栈：嵌套模态只有最上层响应 Escape。 */
 const stack: symbol[] = [];
 
+/**
+ * 模块级滚动锁引用计数（批 116 修）。
+ *
+ * ⚠️ 不能把滚动锁简单写成布尔开关：
+ * 历史弹窗上点"回滚"打开确认弹窗（ConfirmHost）、或在任何模态层里调用 `ask()` 时，
+ * 会出现**嵌套模态**。如果每次关闭都简单执行 `body.style.overflow = ''`，
+ * 那么上层的确认弹窗一旦关闭，底层的模态虽然**依然开着**，背景页的滚动锁却被提前解开，
+ * 用户滚动时底层页面穿透滑动，遮罩与焦点脱节。
+ *
+ * 引入引用计数：
+ * - 只有深度从 0 变 1 时才记录原值并锁死 `hidden`；
+ * - 关闭时深度减 1，只有当所有模态全部关闭（深度归 0）才把滚动还给背景页。
+ */
+let scrollLockDepth = 0;
+let originalBodyOverflow: string | null = null;
+
+export function lockBodyScroll() {
+  if (typeof document === 'undefined') return;
+  if (scrollLockDepth === 0) {
+    originalBodyOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+  }
+  scrollLockDepth += 1;
+}
+
+export function unlockBodyScroll() {
+  if (typeof document === 'undefined') return;
+  scrollLockDepth = Math.max(0, scrollLockDepth - 1);
+  if (scrollLockDepth === 0) {
+    document.body.style.overflow = originalBodyOverflow ?? '';
+    originalBodyOverflow = null;
+  }
+}
+
+/** 供测试读取当前锁定深度 */
+export function getScrollLockDepth() {
+  return scrollLockDepth;
+}
+
 export function useModalFocus(
   panel: Ref<HTMLElement | null>,
   onClose: () => void,
@@ -133,6 +172,22 @@ export function useModalFocus(
     }
   }
 
+  let isScrollLocked = false;
+
+  function applyScrollLock() {
+    if (lockScroll && !isScrollLocked) {
+      lockBodyScroll();
+      isScrollLocked = true;
+    }
+  }
+
+  function removeScrollLock() {
+    if (isScrollLocked) {
+      unlockBodyScroll();
+      isScrollLocked = false;
+    }
+  }
+
   /**
    * 跟随 `open` 状态调用：打开时记住原焦点、锁滚动、挂监听并把焦点落到 **`initialFocus()`
    * 指定的元素，未指定则落到面板容器**（`tabindex="-1"` + `outline-none`）；
@@ -141,20 +196,20 @@ export function useModalFocus(
   async function sync(open: boolean) {
     if (open) {
       lastFocused = document.activeElement;
-      if (lockScroll) document.body.style.overflow = 'hidden';
+      applyScrollLock();
       await nextTick();
       attach();
       (initialFocus?.() || panel.value)?.focus?.();
       return;
     }
-    if (lockScroll) document.body.style.overflow = '';
+    removeScrollLock();
     detach();
     (lastFocused as HTMLElement | null)?.focus?.();
   }
 
   /** 组件卸载兜底：解开滚动锁与监听（避免留下"页面永远滚不动"）。 */
   function release() {
-    if (lockScroll) document.body.style.overflow = '';
+    removeScrollLock();
     detach();
   }
 
