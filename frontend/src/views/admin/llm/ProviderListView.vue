@@ -260,7 +260,7 @@ const bandFacts = () => [
                 class="pv-num-input"
                 :aria-label="t('admin.llm.attemptsLabel')"
               />
-              <span class="pv-num-unit">{{ t('admin.llm.timesUnit') }}</span>
+              <span class="pv-num-unit">{{ requestAttemptsInput === 1 ? t('admin.llm.timesUnitSingular') : t('admin.llm.timesUnit') }}</span>
             </div>
             <div class="pv-presets">
               <button
@@ -271,7 +271,7 @@ const bandFacts = () => [
                 :class="{ 'is-on': requestAttemptsInput === n }"
                 @click="requestAttemptsInput = n"
               >
-                {{ t('admin.llm.timesN', undefined, { n }) }}
+                {{ n === 1 ? t('admin.llm.times1', undefined, { n }) : t('admin.llm.timesN', undefined, { n }) }}
               </button>
             </div>
           </div>

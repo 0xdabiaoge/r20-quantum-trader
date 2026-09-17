@@ -182,7 +182,8 @@ function monogram(name: string): string {
               <button
                 type="button"
                 class="btn btn-quiet btn-icon btn-sm pd-eye"
-                :title="showApiKey ? t('admin.llm.cancel') : 'API Key'"
+                :title="showApiKey ? t('admin.llm.hideApiKey') : t('admin.llm.showApiKey')"
+                :aria-label="showApiKey ? t('admin.llm.hideApiKey') : t('admin.llm.showApiKey')"
                 @click="showApiKey = !showApiKey"
               >
                 <EyeOff v-if="showApiKey" :size="14" />

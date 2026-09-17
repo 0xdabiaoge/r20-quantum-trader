@@ -128,6 +128,7 @@ async function handleLogin() {
                 type="button"
                 class="auth-eye-btn"
                 :title="showPwd ? t('admin.login.hidePwd') : t('admin.login.showPwd')"
+                :aria-label="showPwd ? t('admin.login.hidePwd') : t('admin.login.showPwd')"
                 @click="showPwd = !showPwd"
               >
                 <EyeOff v-if="showPwd" :size="14" />
