@@ -250,6 +250,7 @@ const processedRows = computed(() => {
                     <span>{{ t('dash.matrix.matrix.col.price') }}</span>
                     <ArrowUp v-if="sortKey === 'price' && sortOrder === 'asc'" class="h-3 w-3" />
                     <ArrowDown v-else-if="sortKey === 'price' && sortOrder === 'desc'" class="h-3 w-3" />
+                    <ArrowUpDown v-else class="h-3 w-3 opacity-40" />
                   </span>
                 </button>
               </th>
@@ -259,6 +260,7 @@ const processedRows = computed(() => {
                     <span>{{ t('dash.matrix.matrix.col.chg') }}</span>
                     <ArrowUp v-if="sortKey === 'chg24h' && sortOrder === 'asc'" class="h-3 w-3" />
                     <ArrowDown v-else-if="sortKey === 'chg24h' && sortOrder === 'desc'" class="h-3 w-3" />
+                    <ArrowUpDown v-else class="h-3 w-3 opacity-40" />
                   </span>
                 </button>
               </th>
@@ -268,6 +270,7 @@ const processedRows = computed(() => {
                     <span>v (1H)</span>
                     <ArrowUp v-if="sortKey === 'velocity' && sortOrder === 'asc'" class="h-3 w-3" />
                     <ArrowDown v-else-if="sortKey === 'velocity' && sortOrder === 'desc'" class="h-3 w-3" />
+                    <ArrowUpDown v-else class="h-3 w-3 opacity-40" />
                   </span>
                 </button>
               </th>
@@ -277,6 +280,7 @@ const processedRows = computed(() => {
                     <span>a (1H)</span>
                     <ArrowUp v-if="sortKey === 'accel' && sortOrder === 'asc'" class="h-3 w-3" />
                     <ArrowDown v-else-if="sortKey === 'accel' && sortOrder === 'desc'" class="h-3 w-3" />
+                    <ArrowUpDown v-else class="h-3 w-3 opacity-40" />
                   </span>
                 </button>
               </th>
@@ -286,6 +290,7 @@ const processedRows = computed(() => {
                     <span>ADX</span>
                     <ArrowUp v-if="sortKey === 'adx' && sortOrder === 'asc'" class="h-3 w-3" />
                     <ArrowDown v-else-if="sortKey === 'adx' && sortOrder === 'desc'" class="h-3 w-3" />
+                    <ArrowUpDown v-else class="h-3 w-3 opacity-40" />
                   </span>
                 </button>
               </th>
@@ -295,6 +300,7 @@ const processedRows = computed(() => {
                     <span>{{ t('dash.matrix.matrix.col.ls') }}</span>
                     <ArrowUp v-if="sortKey === 'ls' && sortOrder === 'asc'" class="h-3 w-3" />
                     <ArrowDown v-else-if="sortKey === 'ls' && sortOrder === 'desc'" class="h-3 w-3" />
+                    <ArrowUpDown v-else class="h-3 w-3 opacity-40" />
                   </span>
                 </button>
               </th>
@@ -304,6 +310,7 @@ const processedRows = computed(() => {
                     <span>{{ t('dash.matrix.matrix.col.decision') }}</span>
                     <ArrowUp v-if="sortKey === 'conf' && sortOrder === 'asc'" class="h-3 w-3" />
                     <ArrowDown v-else-if="sortKey === 'conf' && sortOrder === 'desc'" class="h-3 w-3" />
+                    <ArrowUpDown v-else class="h-3 w-3 opacity-40" />
                   </span>
                 </button>
               </th>
