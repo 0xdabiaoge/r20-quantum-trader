@@ -31,6 +31,27 @@ import { nextTick, type Ref } from 'vue';
 const FOCUSABLE_SELECTOR =
   'a[href],button:not([disabled]),textarea:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex="-1"])';
 
+/**
+ * 真正能被 **Tab 键**走到的元素（批 109 修）。
+ *
+ * ⚠️ 只靠 `FOCUSABLE_SELECTOR` 不够：`button:not([disabled])` 会**把
+ * `tabindex="-1"` 的按钮也算进来** —— 而这类按钮浏览器根本不给它 Tab 焦点。
+ * 站上到处都是这种写法（`BaseTabs` 的**漫游 tabindex**：只有当前页签可 Tab，
+ * 其余 `tabindex="-1"` 靠方向键切换）。
+ *
+ * 后果是实测出来的真缺陷：焦点停在「当前页签」时，循环判据里算出的
+ * `last` 是那个**走不到的非活动页签**，于是 `activeElement === last` 永远不成立、
+ * **不拦 Tab**，浏览器就把焦点送到面板后面的 `BODY` ——
+ * 声明了 `aria-modal="true"` 的抽屉，键盘用户能一路 Tab 到背景页去。
+ * 实测轨迹抽屉：Tab 序列 `关闭 → 当前页签 → BODY → 回到关闭`，每 3 次逃逸 1 次。
+ *
+ * 判据改为按 **`el.tabIndex >= 0`** 过滤：漫游 tabindex、`tabindex="-1"`、
+ * 以及将来任何"看着能聚焦其实不能"的写法都会被统一排除。
+ */
+export function tabbableOf<T extends { tabIndex: number; offsetParent: unknown }>(els: T[]): T[] {
+  return els.filter((el) => el.offsetParent !== null && el.tabIndex >= 0);
+}
+
 /** 模块级栈：嵌套模态只有最上层响应 Escape。 */
 const stack: symbol[] = [];
 
@@ -58,9 +79,7 @@ export function useModalFocus(
 
   function focusables(): HTMLElement[] {
     if (!panel.value) return [];
-    return Array.from(panel.value.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
-      (el) => el.offsetParent !== null,
-    );
+    return tabbableOf(Array.from(panel.value.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)));
   }
 
   function onKeydown(e: KeyboardEvent) {
