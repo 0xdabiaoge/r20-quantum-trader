@@ -1,11 +1,23 @@
 <script setup lang="ts">
 /** Toast 渲染宿主：右上角堆叠，App.vue 挂一次。 */
 import { CheckCircle2, AlertTriangle, XCircle, Info, X } from 'lucide-vue-next';
+import { ref } from 'vue';
 import { useToast } from '../../composables/useToast';
 import { useI18n } from '../../composables/useI18n';
 
-const { items, dismiss } = useToast();
+const { items, dismiss, pause, resume } = useToast();
 const { t } = useI18n();
+
+/* 批 108：鼠标移入 / 键盘焦点进入提示区就暂停倒计时，离开按剩余时间继续 ——
+   长消息（尤其带第二行建议文案的错误）不至于读一半就消失。
+   focusout 会在**内部**两个可聚焦元素之间跳转时也触发，故只在焦点真的
+   离开整个提示区（relatedTarget 不在容器内）时才恢复。 */
+const stack = ref<HTMLElement | null>(null);
+
+function onFocusOut(e: FocusEvent) {
+  const next = e.relatedTarget as Node | null;
+  if (!next || !stack.value || !stack.value.contains(next)) resume();
+}
 
 const icons = { ok: CheckCircle2, err: XCircle, warn: AlertTriangle, info: Info } as const;
 const colors = {
@@ -19,9 +31,14 @@ const colors = {
 <template>
   <Teleport to="body">
     <div
+      ref="stack"
       class="fixed right-3 top-14 flex w-[340px] max-w-[calc(100vw-24px)] flex-col gap-2"
       style="z-index: var(--z-toast)"
       aria-live="polite"
+      @mouseenter="pause"
+      @mouseleave="resume"
+      @focusin="pause"
+      @focusout="onFocusOut"
     >
       <TransitionGroup name="toast">
         <div
