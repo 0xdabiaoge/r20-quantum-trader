@@ -283,11 +283,11 @@ onMounted(loadData)
         <span class="badge" :class="dirtyKeys.length ? 'badge-warn' : 'badge-up'">
           {{ dirtyKeys.length ? t('admin.risk.pendingSave', undefined, { n: dirtyKeys.length }) : t('admin.risk.inSync') }}
         </span>
-        <button class="btn btn-ghost btn-sm" :disabled="loading || busy !== ''" @click="loadData">
+        <button type="button" class="btn btn-ghost btn-sm" :disabled="loading || busy !== ''" @click="loadData">
           <RefreshCw :size="14" :class="loading && 'animate-spin shrink-0'" />
           <span>{{ t('common.refresh') }}</span>
         </button>
-        <button class="btn btn-primary btn-sm" :disabled="busy !== '' || !dirtyKeys.length" @click="saveChanges">
+        <button type="button" class="btn btn-primary btn-sm" :disabled="busy !== '' || !dirtyKeys.length" @click="saveChanges">
           <Loader2 v-if="busy === 'save'" :size="14" class="animate-spin shrink-0" />
           <Save v-else :size="14" />
           <span>{{ busy === 'save' ? t('admin.risk.saving') : t('admin.risk.saveApply') }}</span>
@@ -361,7 +361,7 @@ onMounted(loadData)
               <span v-else class="rk-suite-tag">{{ s.tagline }}</span>
             </div>
             <p class="rk-suite-desc">{{ s.desc }}</p>
-            <button
+            <button type="button"
               class="btn btn-ghost btn-sm"
               :disabled="busy !== '' || activeSuiteId === s.id"
               @click="applySuite(s)"
@@ -471,7 +471,7 @@ onMounted(loadData)
                 />
                 <span class="rk-unit">{{ p.unit }}</span>
               </div>
-              <button
+              <button type="button"
                 v-if="Math.abs((draft[p.key] ?? 0) - p.default) > 1e-9"
                 class="btn btn-quiet btn-icon btn-sm"
                 :title="t('admin.risk.revertItem')"
@@ -496,7 +496,7 @@ onMounted(loadData)
 
     <BaseEmpty v-else :text="t('common.loadFailed')" :desc="loadError || t('common.networkError')">
       <template #action>
-        <button class="btn btn-ghost btn-sm" :disabled="loading" @click="loadData">
+        <button type="button" class="btn btn-ghost btn-sm" :disabled="loading" @click="loadData">
           <Loader2 v-if="loading" :size="14" class="animate-spin shrink-0" />
           <RefreshCw v-else :size="14" />
           <span>{{ t('common.retry') }}</span>
@@ -507,7 +507,7 @@ onMounted(loadData)
     <!-- 悬浮保存条 -->
     <div v-if="schema && dirtyKeys.length" class="rk-savebar">
       <span class="rk-savebar-text">{{ t('admin.risk.unsavedCount', undefined, { n: dirtyKeys.length }) }}</span>
-      <button class="btn btn-primary btn-sm" :disabled="busy !== ''" @click="saveChanges">
+      <button type="button" class="btn btn-primary btn-sm" :disabled="busy !== ''" @click="saveChanges">
         <Loader2 v-if="busy === 'save'" :size="14" class="animate-spin shrink-0" />
         <Save v-else :size="14" />
         <span>{{ busy === 'save' ? t('admin.risk.saving') : t('admin.risk.saveApply') }}</span>

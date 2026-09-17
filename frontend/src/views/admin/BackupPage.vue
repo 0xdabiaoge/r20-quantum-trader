@@ -361,7 +361,7 @@ onMounted(load)
         <span class="badge" :class="simple?.configured ? 'badge-up' : 'badge-warn'">
           {{ simple?.configured ? t('admin.backup.targetConfigured') : t('admin.backup.targetNotConfigured') }}
         </span>
-        <button class="btn btn-ghost btn-sm" :disabled="loading" @click="load">
+        <button type="button" class="btn btn-ghost btn-sm" :disabled="loading" @click="load">
           <Loader2 v-if="loading && simple" :size="14" class="animate-spin shrink-0" />
           <RefreshCw v-else :size="14" />
           <span>{{ t('common.refresh') }}</span>
@@ -373,7 +373,7 @@ onMounted(load)
       <span class="state-icon"><AlertTriangle :size="17" /></span>
       <p class="state-title">{{ t('common.loadFailed') }}</p>
       <p class="state-desc">{{ loadError }}</p>
-      <button class="btn btn-ghost btn-sm mt-1" :disabled="loading" @click="load">
+      <button type="button" class="btn btn-ghost btn-sm mt-1" :disabled="loading" @click="load">
         <RefreshCw :size="14" />
         <span>{{ t('common.retry') }}</span>
       </button>
@@ -486,17 +486,17 @@ onMounted(load)
 
           <footer class="bk-foot">
             <template v-if="auth.isSuperadmin">
-              <button class="btn btn-ghost btn-sm" :disabled="busy !== ''" @click="testConnection">
+              <button type="button" class="btn btn-ghost btn-sm" :disabled="busy !== ''" @click="testConnection">
                 <Loader2 v-if="busy === 'test'" :size="13" class="animate-spin shrink-0" />
                 <PlugZap v-else :size="13" />
                 <span>{{ busy === 'test' ? t('admin.backup.testing') : t('admin.backup.testConnection') }}</span>
               </button>
-              <button class="btn btn-primary btn-sm" :disabled="busy !== ''" @click="save">
+              <button type="button" class="btn btn-primary btn-sm" :disabled="busy !== ''" @click="save">
                 <Loader2 v-if="busy === 'save'" :size="13" class="animate-spin shrink-0" />
                 <Save v-else :size="13" />
                 <span>{{ busy === 'save' ? t('admin.backup.saving') : t('admin.backup.saveBackup') }}</span>
               </button>
-              <button class="btn btn-danger btn-sm" :disabled="busy !== ''" @click="runNow">
+              <button type="button" class="btn btn-danger btn-sm" :disabled="busy !== ''" @click="runNow">
                 <Loader2 v-if="busy === 'run'" :size="13" class="animate-spin shrink-0" />
                 <PlayCircle v-else :size="13" />
                 <span>{{ busy === 'run' ? t('admin.backup.running') : t('admin.backup.backupNow') }}</span>
@@ -504,7 +504,7 @@ onMounted(load)
 
               <!-- Hidden file input for upload -->
               <input ref="uploadFileInput" type="file" accept=".tar.gz,.tgz" class="hidden" @change="onFileSelected" />
-              <button class="btn btn-ghost btn-sm" :disabled="busy !== ''" @click="triggerUpload">
+              <button type="button" class="btn btn-ghost btn-sm" :disabled="busy !== ''" @click="triggerUpload">
                 <Loader2 v-if="busy === 'upload'" :size="13" class="animate-spin shrink-0" />
                 <Upload v-else :size="13" />
                 <span>{{ busy === 'upload' ? t('admin.backup.uploading') : t('admin.backup.uploadPackage') }}</span>
@@ -561,7 +561,7 @@ onMounted(load)
                 </div>
 
                 <div class="bk-archive-actions">
-                  <button
+                  <button type="button"
                     class="btn btn-ghost btn-sm"
                     :disabled="downloadingArchive === (a.name.split('/').pop() || a.name)"
                     :title="t('admin.backup.downloadTitle')"
@@ -571,7 +571,7 @@ onMounted(load)
                     <Download v-else :size="13" />
                     <span>{{ t('admin.backup.downloadTitle') }}</span>
                   </button>
-                  <button
+                  <button type="button"
                     v-if="auth.isSuperadmin"
                     class="btn btn-quiet btn-sm is-danger"
                     :disabled="busy === 'restore'"

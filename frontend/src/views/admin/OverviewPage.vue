@@ -145,7 +145,7 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
             <span class="ov-live-text">TELEMETRY LIVE</span>
           </div>
           <span class="ov-version-badge mono">{{ APP_VERSION }}</span>
-          <button class="ov-btn-refresh" :disabled="loading" @click="load" :title="t('common.refresh')">
+          <button type="button" class="ov-btn-refresh" :disabled="loading" @click="load" :title="t('common.refresh')">
             <RefreshCw :size="14" :class="loading && 'animate-spin shrink-0'" />
             <span>{{ t('common.refresh') }}</span>
           </button>
@@ -162,7 +162,7 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
           <p class="ov-error-desc">{{ t('admin.overview.loadFailedDesc') }}</p>
         </div>
       </div>
-      <button class="btn btn-primary btn-sm" :disabled="loading" @click="load">
+      <button type="button" class="btn btn-primary btn-sm" :disabled="loading" @click="load">
         <RefreshCw :size="14" :class="loading && 'animate-spin shrink-0'" />
         <span>{{ t('common.retry') }}</span>
       </button>

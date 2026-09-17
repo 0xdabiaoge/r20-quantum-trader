@@ -48,7 +48,7 @@ async function handleLogin() {
   <div class="auth-page">
     <!-- 顶部极简操作条 -->
     <header class="auth-topbar">
-      <button class="auth-back-btn" @click="router.push('/')">
+      <button type="button" class="auth-back-btn" @click="router.push('/')">
         <ArrowLeft :size="14" />
         <span>{{ t('admin.login.backToScreen') }}</span>
       </button>
@@ -58,7 +58,7 @@ async function handleLogin() {
       <div class="auth-lang-pill" role="group" :aria-label="t('common.language')">
         <template v-for="(opt, i) in LOCALE_OPTIONS" :key="opt.value">
           <span v-if="i > 0" class="auth-lang-sep" />
-          <button
+          <button type="button"
             class="auth-lang-opt"
             :class="{ 'is-active': currentLocale === opt.value }"
             :aria-pressed="currentLocale === opt.value"

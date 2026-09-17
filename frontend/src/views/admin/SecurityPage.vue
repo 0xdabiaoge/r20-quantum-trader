@@ -525,7 +525,7 @@ onMounted(() => { loadAll(); loadMx() })
         <span class="badge mono">
           {{ t('admin.security.chipPreferred') }} {{ preferredVenue.toUpperCase() }}
         </span>
-        <button class="btn btn-ghost btn-sm" :disabled="loading" @click="loadAll">
+        <button type="button" class="btn btn-ghost btn-sm" :disabled="loading" @click="loadAll">
           <Loader2 v-if="loading && config" :size="14" class="animate-spin shrink-0" />
           <RefreshCw v-else :size="14" />
           <span>{{ t('common.refresh') }}</span>
@@ -545,7 +545,7 @@ onMounted(() => { loadAll(); loadMx() })
       <span class="state-icon"><AlertTriangle :size="17" /></span>
       <p class="state-title">{{ t('common.loadFailed') }}</p>
       <p class="state-desc">{{ loadError }}</p>
-      <button class="btn btn-ghost btn-sm mt-1" :disabled="loading" @click="loadAll">
+      <button type="button" class="btn btn-ghost btn-sm mt-1" :disabled="loading" @click="loadAll">
         <RefreshCw :size="14" />
         <span>{{ t('common.retry') }}</span>
       </button>
@@ -584,7 +584,7 @@ onMounted(() => { loadAll(); loadMx() })
       <template v-if="activeTab === 'venues'">
         <SettingsSection :title="t('admin.security.routingTitle')" :description="t('admin.security.routingDesc')" :icon="Route">
           <template #actions>
-            <button class="btn btn-primary btn-sm" :disabled="savingMx" @click="saveRouting">
+            <button type="button" class="btn btn-primary btn-sm" :disabled="savingMx" @click="saveRouting">
               <Loader2 v-if="savingMx" :size="13" class="animate-spin shrink-0" />
               <Save v-else :size="13" />
               <span>{{ savingMx ? t('admin.security.saving') : t('admin.security.saveRouting') }}</span>
@@ -677,13 +677,13 @@ onMounted(() => { loadAll(); loadMx() })
                 <p class="sc-hint"><AlertTriangle :size="11" />{{ t('admin.security.liveConfirmNote') }}</p>
               </template>
               <template #probe>
-                <button class="btn btn-quiet btn-sm" :disabled="probingVenue === 'okx'" @click="probeVenue('okx')">
+                <button type="button" class="btn btn-quiet btn-sm" :disabled="probingVenue === 'okx'" @click="probeVenue('okx')">
                   <RefreshCw :size="14" :class="probingVenue === 'okx' ? 'animate-spin shrink-0' : ''" />
                   <span>{{ probingVenue === 'okx' ? t('admin.security.probing') : t('admin.security.detect') }}</span>
                 </button>
               </template>
               <template #save>
-                <button class="btn btn-primary btn-sm" :disabled="savingOkx" @click="saveEnvironment">
+                <button type="button" class="btn btn-primary btn-sm" :disabled="savingOkx" @click="saveEnvironment">
                   <Loader2 v-if="savingOkx" :size="12" class="animate-spin shrink-0" />
                   <Save v-else :size="12" />
                   <span>{{ savingOkx ? t('admin.security.saving') : t('admin.security.saveOkx') }}</span>
@@ -717,13 +717,13 @@ onMounted(() => { loadAll(); loadMx() })
                 <p class="sc-hint">{{ t('admin.security.binanceExtra') }}</p>
               </template>
               <template #probe>
-                <button class="btn btn-quiet btn-sm" :disabled="probingVenue !== '' && probingVenue !== 'binance'" @click="probeVenue('binance')">
+                <button type="button" class="btn btn-quiet btn-sm" :disabled="probingVenue !== '' && probingVenue !== 'binance'" @click="probeVenue('binance')">
                   <RefreshCw :size="14" />
                   <span>{{ t('admin.security.detect') }}</span>
                 </button>
               </template>
               <template #save>
-                <button class="btn btn-primary btn-sm" :disabled="savingVenue !== ''" @click="saveVenue('binance')">
+                <button type="button" class="btn btn-primary btn-sm" :disabled="savingVenue !== ''" @click="saveVenue('binance')">
                   <Loader2 v-if="savingVenue === 'binance'" :size="12" class="animate-spin shrink-0" />
                   <Save v-else :size="12" />
                   <span>{{ savingVenue === 'binance' ? t('admin.security.saving') : t('admin.security.saveBinance') }}</span>
@@ -773,13 +773,13 @@ onMounted(() => { loadAll(); loadMx() })
                 <p class="sc-hint">{{ t('admin.security.gateExtra') }}</p>
               </template>
               <template #probe>
-                <button class="btn btn-quiet btn-sm" :disabled="probingVenue !== '' && probingVenue !== 'gate'" @click="probeVenue('gate')">
+                <button type="button" class="btn btn-quiet btn-sm" :disabled="probingVenue !== '' && probingVenue !== 'gate'" @click="probeVenue('gate')">
                   <RefreshCw :size="14" />
                   <span>{{ t('admin.security.detect') }}</span>
                 </button>
               </template>
               <template #save>
-                <button class="btn btn-primary btn-sm" :disabled="savingVenue !== ''" @click="saveVenue('gate')">
+                <button type="button" class="btn btn-primary btn-sm" :disabled="savingVenue !== ''" @click="saveVenue('gate')">
                   <Loader2 v-if="savingVenue === 'gate'" :size="12" class="animate-spin shrink-0" />
                   <Save v-else :size="12" />
                   <span>{{ savingVenue === 'gate' ? t('admin.security.saving') : t('admin.security.saveGate') }}</span>
@@ -795,7 +795,7 @@ onMounted(() => { loadAll(); loadMx() })
             <span class="badge" :class="healthAllOk ? 'badge-up' : 'badge-warn'">
               {{ healthAllOk ? t('admin.security.healthOk') : t('admin.security.healthDegraded') }}
             </span>
-            <button class="btn btn-quiet btn-sm" @click="loadMx">
+            <button type="button" class="btn btn-quiet btn-sm" @click="loadMx">
               <RefreshCw :size="14" />
               <span>{{ t('admin.security.recheck') }}</span>
             </button>
@@ -823,7 +823,7 @@ onMounted(() => { loadAll(); loadMx() })
       <template v-if="activeTab === 'pool'">
         <SettingsSection :title="t('admin.security.capitalTitle')" :description="t('admin.security.capitalDesc')" :icon="Wallet">
           <template #actions>
-            <button
+            <button type="button"
               class="btn btn-primary btn-sm"
               :disabled="savingCapital || !auth.isSuperadmin"
               @click="saveCapital"
@@ -857,7 +857,7 @@ onMounted(() => { loadAll(); loadMx() })
               class="field mono sc-inst-input"
               @keyup.enter="addInstrument"
             />
-            <button class="btn btn-primary btn-sm" @click="addInstrument">
+            <button type="button" class="btn btn-primary btn-sm" @click="addInstrument">
               <Layers :size="13" />
               <span>{{ t('admin.security.addInstrument') }}</span>
             </button>
@@ -892,7 +892,7 @@ onMounted(() => { loadAll(); loadMx() })
                 <span v-else class="badge">{{ t('admin.security.removableBadge') }}</span>
               </span>
               <span class="sc-actions">
-                <button
+                <button type="button"
                   :disabled="item.protected || item.has_tracker || item.held_live || item.holdings_unknown"
                   class="btn btn-quiet btn-icon btn-sm is-danger"
                   :title="item.held_live
@@ -916,7 +916,7 @@ onMounted(() => { loadAll(); loadMx() })
       <template v-if="activeTab === 'emergency'">
         <SettingsSection :title="t('admin.security.manualTitle')" :description="t('admin.security.manualDesc')" :icon="Zap">
           <template #actions>
-            <button class="btn btn-quiet btn-sm" @click="saveManualClose">
+            <button type="button" class="btn btn-quiet btn-sm" @click="saveManualClose">
               <Save :size="13" />
               <span>{{ t('admin.security.saveSwitch') }}</span>
             </button>
@@ -932,7 +932,7 @@ onMounted(() => { loadAll(); loadMx() })
 
         <SettingsSection :title="t('admin.security.snapshotTitle')" :description="t('admin.security.snapshotDesc')" :icon="Radar">
           <template #actions>
-            <button class="btn btn-quiet btn-sm" @click="loadPositions">
+            <button type="button" class="btn btn-quiet btn-sm" @click="loadPositions">
               <Zap :size="13" />
               <span>{{ t('admin.security.refreshPositions') }}</span>
             </button>
@@ -994,7 +994,7 @@ onMounted(() => { loadAll(); loadMx() })
                 {{ Number(p.upl || 0).toFixed(4) }}
               </span>
               <span class="sc-actions">
-                <button class="btn btn-danger btn-sm" @click="openClose(p)">
+                <button type="button" class="btn btn-danger btn-sm" @click="openClose(p)">
                   {{ t('admin.security.quickClose') }}
                 </button>
               </span>

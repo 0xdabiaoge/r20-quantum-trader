@@ -412,19 +412,19 @@ onMounted(loadData);
   <div class="cn">
     <PageHeader :title="t('nav.admin.council')" :description="t('admin.council.desc')">
       <template #actions>
-        <button class="btn btn-ghost btn-sm" :disabled="!auth.isSuperadmin" @click="exportConfig">
+        <button type="button" class="btn btn-ghost btn-sm" :disabled="!auth.isSuperadmin" @click="exportConfig">
           <Download :size="14" />
           <span>{{ t('admin.council.export') }}</span>
         </button>
-        <button class="btn btn-ghost btn-sm" :disabled="!auth.isSuperadmin" @click="importVisible = true">
+        <button type="button" class="btn btn-ghost btn-sm" :disabled="!auth.isSuperadmin" @click="importVisible = true">
           <Upload :size="14" />
           <span>{{ t('admin.council.import') }}</span>
         </button>
-        <button class="btn btn-ghost btn-sm" :disabled="testing || !auth.isSuperadmin" @click="runDebateTest">
+        <button type="button" class="btn btn-ghost btn-sm" :disabled="testing || !auth.isSuperadmin" @click="runDebateTest">
           <Play :size="14" />
           <span>{{ testing ? t('admin.council.testing') : t('admin.council.runTest') }}</span>
         </button>
-        <button class="btn btn-primary btn-sm" :disabled="saving || !auth.isSuperadmin" @click="saveConfig">
+        <button type="button" class="btn btn-primary btn-sm" :disabled="saving || !auth.isSuperadmin" @click="saveConfig">
           <Save :size="14" />
           <span>{{ saving ? t('admin.council.saving') : t('admin.council.save') }}</span>
         </button>
@@ -436,7 +436,7 @@ onMounted(loadData);
       <span class="state-icon"><AlertTriangle :size="17" /></span>
       <p class="state-title">{{ t('common.loadFailed') }}</p>
       <p class="state-desc">{{ loadError || t('common.networkError') }}</p>
-      <button class="btn btn-ghost btn-sm mt-1" :disabled="loading" @click="loadData">
+      <button type="button" class="btn btn-ghost btn-sm mt-1" :disabled="loading" @click="loadData">
         <Loader2 v-if="loading" :size="14" class="animate-spin shrink-0" />
         <RotateCcw v-else :size="14" />
         <span>{{ t('common.retry') }}</span>
@@ -502,11 +502,11 @@ onMounted(loadData);
             <p class="card-sub">{{ t('admin.council.timeoutHint') }}</p>
           </div>
           <div class="cn-head-actions">
-            <button class="btn btn-ghost btn-sm" :disabled="!auth.isSuperadmin" @click="applySuite('hedge_fund_desk')">
+            <button type="button" class="btn btn-ghost btn-sm" :disabled="!auth.isSuperadmin" @click="applySuite('hedge_fund_desk')">
               <RotateCcw :size="14" />
               <span>{{ t('admin.council.restoreSuite') }}</span>
             </button>
-            <button class="btn btn-ghost btn-sm" :disabled="!auth.isSuperadmin" @click="addNewCustomTrader">
+            <button type="button" class="btn btn-ghost btn-sm" :disabled="!auth.isSuperadmin" @click="addNewCustomTrader">
               <Plus :size="14" />
               <span>{{ t('admin.council.addTrader') }}</span>
             </button>
@@ -514,7 +514,7 @@ onMounted(loadData);
         </header>
 
         <div class="cn-modes">
-          <button
+          <button type="button"
             v-for="mode in CONSENSUS_MODES"
             :key="mode.id"
             class="cn-mode"
@@ -569,7 +569,7 @@ onMounted(loadData);
           <BaseEmpty v-else-if="!seatEntries.length" :text="t('admin.council.noSeats')" />
 
           <div v-else class="cn-seats">
-            <button
+            <button type="button"
               v-for="[roleId, role] in seatEntries"
               :key="roleId"
               class="cn-seat"
@@ -631,7 +631,7 @@ onMounted(loadData);
                     ? t('admin.council.arbitratorBadge')
                     : (selectedRole.enabled !== false ? t('admin.council.seatActive') : t('admin.council.seatMuted')) }}
                 </span>
-                <button
+                <button type="button"
                   v-if="!isCioSeat(selectedRole, expandedRole) && !isBuiltinTrader(expandedRole)"
                   class="btn btn-danger btn-sm"
                   :disabled="!auth.isSuperadmin"
@@ -740,7 +740,7 @@ onMounted(loadData);
                   >
                     +&#123;&#123;{{ slot.k }}&#125;&#125;
                   </button>
-                  <button
+                  <button type="button"
                     class="btn btn-quiet btn-sm"
                     :disabled="!auth.isSuperadmin"
                     @click="resetRole(expandedRole)"
@@ -790,7 +790,7 @@ onMounted(loadData);
               </template>
             </span>
           </div>
-          <button class="btn btn-ghost btn-sm" @click="testResult = null">
+          <button type="button" class="btn btn-ghost btn-sm" @click="testResult = null">
             {{ t('admin.council.collapse') }}
           </button>
         </header>
@@ -821,7 +821,7 @@ onMounted(loadData);
                 </div>
                 <p class="cn-adv-body">{{ adv.content }}</p>
                 <div v-if="adv.reasoning" class="cn-adv-reason">
-                  <button
+                  <button type="button"
                     class="btn btn-quiet btn-sm"
                     :aria-expanded="Boolean(expandedReasoning[String(key)])"
                     :aria-controls="expandedReasoning[String(key)] ? `cn-reasoning-${key}` : undefined"
@@ -966,8 +966,8 @@ onMounted(loadData);
       </div>
 
       <template #footer>
-        <button class="btn btn-ghost btn-sm" @click="closeImport">{{ t('admin.council.cancel') }}</button>
-        <button
+        <button type="button" class="btn btn-ghost btn-sm" @click="closeImport">{{ t('admin.council.cancel') }}</button>
+        <button type="button"
           class="btn btn-primary btn-sm"
           :disabled="importing || !importRawJson.trim()"
           @click="doImportConfig"

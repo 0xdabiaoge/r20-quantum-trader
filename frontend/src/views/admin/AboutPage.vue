@@ -147,7 +147,7 @@ const bandFacts = computed(() => {
     <PageHeader :title="t('nav.admin.about')" :description="t('admin.about.intro')">
       <template #actions>
         <span class="badge badge-accent mono">{{ t('admin.about.badge') }}</span>
-        <button class="btn btn-ghost btn-sm" :disabled="loading" @click="load">
+        <button type="button" class="btn btn-ghost btn-sm" :disabled="loading" @click="load">
           <Loader2 v-if="loading && loaded" :size="14" class="animate-spin shrink-0" />
           <RefreshCw v-else :size="14" />
           <span>{{ t('common.refresh') }}</span>
@@ -160,7 +160,7 @@ const bandFacts = computed(() => {
       <span class="state-icon"><AlertTriangle :size="17" /></span>
       <p class="state-title">{{ t('common.loadFailed') }}</p>
       <p class="state-desc">{{ error }}</p>
-      <button class="btn btn-ghost btn-sm mt-1" :disabled="loading" @click="load">
+      <button type="button" class="btn btn-ghost btn-sm mt-1" :disabled="loading" @click="load">
         <RefreshCw :size="14" />
         <span>{{ t('common.retry') }}</span>
       </button>
@@ -286,7 +286,7 @@ const bandFacts = computed(() => {
 
           <!-- 动作 -->
           <div class="ab-actions">
-            <button
+            <button type="button"
               class="btn btn-ghost btn-sm"
               :disabled="updateChecking || updateRunning"
               @click="checkUpdate"
@@ -296,7 +296,7 @@ const bandFacts = computed(() => {
               <span>{{ updateChecking ? t('admin.about.connecting') : t('admin.about.checkUpdate') }}</span>
             </button>
 
-            <button
+            <button type="button"
               class="btn btn-primary btn-sm"
               :disabled="updateChecking || updateRunning"
               @click="openUpdateModal"
@@ -370,10 +370,10 @@ const bandFacts = computed(() => {
       </div>
 
       <template #footer>
-        <button class="btn btn-ghost btn-sm" :disabled="updateRunning" @click="showConfirmModal = false">
+        <button type="button" class="btn btn-ghost btn-sm" :disabled="updateRunning" @click="showConfirmModal = false">
           {{ t('admin.about.cancel') }}
         </button>
-        <button
+        <button type="button"
           class="btn btn-primary btn-sm"
           :disabled="!phaseOk || updateRunning"
           @click="executeUpdate"

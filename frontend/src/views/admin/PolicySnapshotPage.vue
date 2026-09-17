@@ -274,11 +274,11 @@ onMounted(() => {
         <span v-if="snapshotData?.policy_version" class="badge badge-accent mono">
           {{ snapshotData.policy_version }}
         </span>
-        <button class="btn btn-ghost btn-sm" :disabled="refreshing" @click="fetchSnapshot">
+        <button type="button" class="btn btn-ghost btn-sm" :disabled="refreshing" @click="fetchSnapshot">
           <RefreshCw :size="14" :class="refreshing && 'animate-spin shrink-0'" />
           <span>{{ refreshing ? t('admin.policySnapshot.btn.refreshing') : t('admin.policySnapshot.btn.refresh') }}</span>
         </button>
-        <button class="btn btn-primary btn-sm" :disabled="!auth.isSuperadmin" @click="showArchiveModal = true">
+        <button type="button" class="btn btn-primary btn-sm" :disabled="!auth.isSuperadmin" @click="showArchiveModal = true">
           <BookmarkPlus :size="14" />
           <span>{{ t('admin.policySnapshot.btn.archive') }}</span>
         </button>
@@ -290,7 +290,7 @@ onMounted(() => {
       <span class="state-icon"><AlertTriangle :size="17" /></span>
       <p class="state-title">{{ t('admin.policySnapshot.err.fetchFailed') }}</p>
       <p class="state-desc">{{ errorMsg }}</p>
-      <button class="btn btn-ghost btn-sm mt-1" :disabled="refreshing" @click="fetchSnapshot">
+      <button type="button" class="btn btn-ghost btn-sm mt-1" :disabled="refreshing" @click="fetchSnapshot">
         <RefreshCw :size="14" :class="refreshing && 'animate-spin shrink-0'" />
         <span>{{ t('common.retry') }}</span>
       </button>
@@ -414,7 +414,7 @@ onMounted(() => {
             </div>
 
             <div class="pol-arc-actions">
-              <button
+              <button type="button"
                 class="btn btn-sm"
                 :class="isCurrentArc(arc) ? 'btn-ghost' : 'btn-ghost pol-restore'"
                 :disabled="restoring || !auth.isSuperadmin || isCurrentArc(arc)"
@@ -424,7 +424,7 @@ onMounted(() => {
                 <span>{{ isCurrentArc(arc) ? t('admin.policySnapshot.archive.isCurrent') : t('admin.policySnapshot.archive.restore') }}</span>
               </button>
 
-              <button
+              <button type="button"
                 class="btn btn-danger btn-sm"
                 :disabled="deleting === arcKey(arc) || !auth.isSuperadmin"
                 :title="t('admin.policySnapshot.archive.deleteTitle')"
@@ -448,7 +448,7 @@ onMounted(() => {
       :desc="errorMsg"
     >
       <template #action>
-        <button class="btn btn-ghost btn-sm" :disabled="refreshing" @click="fetchSnapshot">
+        <button type="button" class="btn btn-ghost btn-sm" :disabled="refreshing" @click="fetchSnapshot">
           <RefreshCw :size="14" :class="refreshing && 'animate-spin shrink-0'" />
           <span>{{ t('common.retry') }}</span>
         </button>
@@ -464,7 +464,7 @@ onMounted(() => {
       :desc="t('admin.policySnapshot.emptySnapshotDesc')"
     >
       <template #action>
-        <button class="btn btn-ghost btn-sm" :disabled="refreshing" @click="fetchSnapshot">
+        <button type="button" class="btn btn-ghost btn-sm" :disabled="refreshing" @click="fetchSnapshot">
           <RefreshCw :size="14" :class="refreshing && 'animate-spin shrink-0'" />
           <span>{{ t('admin.policySnapshot.btn.refresh') }}</span>
         </button>
@@ -503,10 +503,10 @@ onMounted(() => {
       </div>
 
       <template #footer>
-        <button class="btn btn-ghost btn-sm" @click="closeArchiveModal">
+        <button type="button" class="btn btn-ghost btn-sm" @click="closeArchiveModal">
           {{ t('admin.policySnapshot.modal.cancel') }}
         </button>
-        <button
+        <button type="button"
           class="btn btn-primary btn-sm"
           :disabled="archiving || !archiveName.trim()"
           @click="saveArchive"

@@ -88,7 +88,7 @@ function ageText(a: any): string {
     <PageHeader :title="t('nav.admin.agents')" :description="t('admin.agents.desc')">
       <template #actions>
         <span class="badge badge-accent mono">{{ t('admin.agents.policyChip') }}</span>
-        <button class="btn btn-ghost btn-sm" :disabled="loading" @click="load">
+        <button type="button" class="btn btn-ghost btn-sm" :disabled="loading" @click="load">
           <Loader2 v-if="loading && loaded" :size="14" class="animate-spin shrink-0" />
           <RefreshCw v-else :size="14" />
           <span>{{ t('admin.agents.refresh') }}</span>
@@ -101,7 +101,7 @@ function ageText(a: any): string {
       <span class="state-icon"><AlertTriangle :size="17" /></span>
       <p class="state-title">{{ t('common.loadFailed') }}</p>
       <p class="state-desc">{{ error }}</p>
-      <button class="btn btn-ghost btn-sm mt-1" :disabled="loading" @click="load">
+      <button type="button" class="btn btn-ghost btn-sm mt-1" :disabled="loading" @click="load">
         <RefreshCw :size="14" />
         <span>{{ t('common.retry') }}</span>
       </button>

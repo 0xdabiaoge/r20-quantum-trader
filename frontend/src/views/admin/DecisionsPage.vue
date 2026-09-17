@@ -159,7 +159,7 @@ function tone(level: string): string {
           <span class="dsh-status-dot active" aria-hidden="true" />
           {{ t('admin.decisions.normalRun') }}
         </span>
-        <button class="btn btn-ghost btn-sm" :disabled="logLoading" @click="fetchLogStream(activeLogTab)">
+        <button type="button" class="btn btn-ghost btn-sm" :disabled="logLoading" @click="fetchLogStream(activeLogTab)">
           <RefreshCw :size="14" :class="logLoading && 'animate-spin shrink-0'" />
           <span>{{ t('common.refresh') }}</span>
         </button>
@@ -289,7 +289,7 @@ function tone(level: string): string {
           <span class="state-icon"><AlertCircle :size="17" /></span>
           <p class="state-title">{{ t('common.loadFailed') }}</p>
           <p class="state-desc">{{ logError }}</p>
-          <button
+          <button type="button"
             class="btn btn-ghost btn-sm mt-1"
             :disabled="logLoading"
             @click="fetchLogStream(activeLogTab)"

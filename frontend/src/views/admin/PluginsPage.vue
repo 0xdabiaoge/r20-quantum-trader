@@ -60,7 +60,7 @@ function typeLabel(v: string): string {
     <PageHeader :title="t('nav.admin.plugins')" :description="t('admin.plugins.intro')">
       <template #actions>
         <span class="badge badge-accent mono">{{ t('admin.plugins.badge') }}</span>
-        <button class="btn btn-ghost btn-sm" :disabled="loading" @click="load">
+        <button type="button" class="btn btn-ghost btn-sm" :disabled="loading" @click="load">
           <Loader2 v-if="loading && loaded" :size="14" class="animate-spin shrink-0" />
           <RefreshCw v-else :size="14" />
           <span>{{ t('admin.plugins.refresh') }}</span>
@@ -73,7 +73,7 @@ function typeLabel(v: string): string {
       <span class="state-icon"><AlertTriangle :size="17" /></span>
       <p class="state-title">{{ t('common.loadFailed') }}</p>
       <p class="state-desc">{{ error }}</p>
-      <button class="btn btn-ghost btn-sm mt-1" :disabled="loading" @click="load">
+      <button type="button" class="btn btn-ghost btn-sm mt-1" :disabled="loading" @click="load">
         <RefreshCw :size="14" />
         <span>{{ t('common.retry') }}</span>
       </button>

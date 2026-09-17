@@ -199,7 +199,7 @@ onMounted(load)
     <PageHeader :title="t('nav.admin.adminsys')" :description="t('admin.adminsys.securityNote')">
       <template #actions>
         <span class="badge badge-accent mono">{{ t('admin.adminsys.governanceBadge') }}</span>
-        <button class="btn btn-ghost btn-sm" :disabled="!auth.isSuperadmin" @click="load">
+        <button type="button" class="btn btn-ghost btn-sm" :disabled="!auth.isSuperadmin" @click="load">
           <RefreshCw :size="14" />
           <span>{{ t('common.refresh') }}</span>
         </button>
@@ -238,7 +238,7 @@ onMounted(load)
         </label>
 
         <div class="as-pwd-submit">
-          <button class="btn btn-primary btn-sm" :disabled="changingPwd" @click="changePassword">
+          <button type="button" class="btn btn-primary btn-sm" :disabled="changingPwd" @click="changePassword">
             <Loader2 v-if="changingPwd" :size="13" class="animate-spin shrink-0" />
             <KeyRound v-else :size="13" />
             <span>{{ changingPwd ? t('admin.adminsys.password.updating') : t('admin.adminsys.password.submit') }}</span>
@@ -254,7 +254,7 @@ onMounted(load)
       <header class="card-head">
         <h2 class="card-title"><UserCog :size="14" />{{ t('admin.adminsys.users.title') }}</h2>
         <span v-if="auth.isSuperadmin" class="badge mono">{{ users.length }}</span>
-        <button v-if="auth.isSuperadmin" class="btn btn-primary btn-sm" @click="openCreate">
+        <button type="button" v-if="auth.isSuperadmin" class="btn btn-primary btn-sm" @click="openCreate">
           <Plus :size="14" />
           <span>{{ t('admin.adminsys.users.create') }}</span>
         </button>
@@ -270,7 +270,7 @@ onMounted(load)
         <span class="state-icon"><AlertTriangle :size="17" /></span>
         <p class="state-title">{{ t('common.loadFailed') }}</p>
         <p class="state-desc">{{ loadError }}</p>
-        <button class="btn btn-ghost btn-sm mt-1" :disabled="loading" @click="load">
+        <button type="button" class="btn btn-ghost btn-sm mt-1" :disabled="loading" @click="load">
           <Loader2 v-if="loading" :size="14" class="animate-spin shrink-0" />
           <RefreshCw v-else :size="14" />
           <span>{{ t('common.retry') }}</span>
@@ -312,7 +312,7 @@ onMounted(load)
           </span>
 
           <span class="as-actions">
-            <button
+            <button type="button"
               v-if="u.id !== currentUserId"
               class="btn btn-ghost btn-sm"
               @click="toggleEnabled(u)"
@@ -321,7 +321,7 @@ onMounted(load)
               <span>{{ u.enabled ? t('admin.adminsys.users.disable') : t('admin.adminsys.users.enable') }}</span>
             </button>
 
-            <button
+            <button type="button"
               v-if="u.locked_until"
               class="btn btn-quiet btn-sm is-warn"
               @click="unlockUser(u)"

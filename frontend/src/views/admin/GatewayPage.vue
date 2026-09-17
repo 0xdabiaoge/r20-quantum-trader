@@ -115,7 +115,7 @@ function statusLabel(s: string): string {
     <PageHeader :title="t('nav.admin.gateway')" :description="t('admin.gateway.desc')">
       <template #actions>
         <span class="badge">{{ t('admin.gateway.opsBadge') }}</span>
-        <button class="btn btn-ghost btn-sm" :disabled="loading" @click="load">
+        <button type="button" class="btn btn-ghost btn-sm" :disabled="loading" @click="load">
           <RefreshCw :size="14" :class="loading && 'animate-spin shrink-0'" />
           <span>{{ t('common.refresh') }}</span>
         </button>
@@ -130,7 +130,7 @@ function statusLabel(s: string): string {
            于是标题与说明连读成「加载失败 / 加载失败：stub failure」——同一句话说了两遍。
            toast 仍用带前缀的那条（toast 没有标题），这里只留原因。 -->
       <p class="state-desc">{{ error }}</p>
-      <button class="btn btn-ghost btn-sm mt-1" :disabled="loading" @click="load">
+      <button type="button" class="btn btn-ghost btn-sm mt-1" :disabled="loading" @click="load">
         <RefreshCw :size="14" :class="loading && 'animate-spin shrink-0'" />
         <span>{{ t('common.retry') }}</span>
       </button>
@@ -141,7 +141,7 @@ function statusLabel(s: string): string {
       <div v-if="error" role="status" aria-live="polite" class="gw-stale">
         <AlertTriangle :size="13" />
         <span>{{ t('admin.gateway.msgs.loadFailed', undefined, { msg: error }) }}</span>
-        <button class="btn btn-quiet btn-sm" :disabled="loading" @click="load">
+        <button type="button" class="btn btn-quiet btn-sm" :disabled="loading" @click="load">
           <RefreshCw :size="14" :class="loading && 'animate-spin shrink-0'" aria-hidden="true" />
           {{ t('common.retry') }}
         </button>
@@ -248,7 +248,7 @@ function statusLabel(s: string): string {
             <h2 class="card-title"><Zap :size="14" />{{ t('admin.gateway.deliveries.title') }}</h2>
             <p class="card-sub">{{ t('admin.gateway.deliveries.records', undefined, { n: deliveries.length }) }}</p>
           </div>
-          <button class="btn btn-ghost btn-sm" :disabled="loading" @click="load">
+          <button type="button" class="btn btn-ghost btn-sm" :disabled="loading" @click="load">
             <RefreshCw :size="14" :class="loading && 'animate-spin shrink-0'" />
             <span>{{ t('admin.gateway.deliveries.refresh') }}</span>
           </button>
@@ -293,7 +293,7 @@ function statusLabel(s: string): string {
                 <td class="gw-r mono gw-dim">{{ d.attempts ?? 0 }}</td>
                 <td class="mono gw-dim">{{ d.updated_at ? fmtJobTime(d.updated_at) : '--' }}</td>
                 <td>
-                  <button
+                  <button type="button"
                     v-if="d.status === 'dead' || d.status === 'failed'"
                     class="btn btn-quiet btn-sm gw-replay"
                     @click="openReplay(d.id)"
@@ -336,8 +336,8 @@ function statusLabel(s: string): string {
       </p>
 
       <template #footer>
-        <button class="btn btn-ghost btn-sm" @click="closeReplay">{{ t('common.cancel') }}</button>
-        <button
+        <button type="button" class="btn btn-ghost btn-sm" @click="closeReplay">{{ t('common.cancel') }}</button>
+        <button type="button"
           class="btn btn-primary btn-sm"
           :disabled="!replayPhrase.trim() || replaying"
           @click="confirmReplay"

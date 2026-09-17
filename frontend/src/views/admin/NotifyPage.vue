@@ -364,7 +364,7 @@ onBeforeUnmount(() => {
         <span class="badge badge-accent mono">
           {{ t('admin.notify.channelsChip') }} {{ enabledChannelsCount }}/4
         </span>
-        <button class="btn btn-ghost btn-sm" :disabled="loading" @click="loadConfig()">
+        <button type="button" class="btn btn-ghost btn-sm" :disabled="loading" @click="loadConfig()">
           <Loader2 v-if="loading && config" :size="14" class="animate-spin shrink-0" />
           <RefreshCw v-else :size="14" />
           <span>{{ t('common.refresh') }}</span>
@@ -377,7 +377,7 @@ onBeforeUnmount(() => {
       <span class="state-icon"><AlertTriangle :size="17" /></span>
       <p class="state-title">{{ t('common.loadFailed') }}</p>
       <p class="state-desc">{{ loadError }}</p>
-      <button class="btn btn-ghost btn-sm mt-1" :disabled="loading" @click="loadConfig()">
+      <button type="button" class="btn btn-ghost btn-sm mt-1" :disabled="loading" @click="loadConfig()">
         <RefreshCw :size="14" />
         <span>{{ t('common.retry') }}</span>
       </button>
@@ -451,11 +451,11 @@ onBeforeUnmount(() => {
 
                 <div class="nf-card-actions">
                   <template v-if="c.qqActions">
-                    <button class="btn btn-primary btn-sm" @click="startQqBind">
+                    <button type="button" class="btn btn-primary btn-sm" @click="startQqBind">
                       <QrCode :size="13" />
                       <span>{{ t('admin.notify.scanBind') }}</span>
                     </button>
-                    <button class="btn btn-ghost btn-sm" @click="startCapture">
+                    <button type="button" class="btn btn-ghost btn-sm" @click="startCapture">
                       <Zap :size="13" />
                       <span>{{ t('admin.notify.autoOpenId') }}</span>
                     </button>
@@ -492,7 +492,7 @@ onBeforeUnmount(() => {
               <footer class="nf-card-foot">
                 <!-- 批 71：测试进行中按钮必须禁用 —— 此前连点会并发发起多次测试请求，
                      而右上角结果区只会显示最后一次，用户看到的"重试"其实是请求风暴。 -->
-                <button
+                <button type="button"
                   class="btn btn-ghost btn-sm"
                   :disabled="testResults[c.key]?.status === 'testing'"
                   @click="diagnose(c.key)"
@@ -500,7 +500,7 @@ onBeforeUnmount(() => {
                   <ScanLine :size="13" aria-hidden="true" />
                   <span>{{ t('admin.notify.diagnose') }}</span>
                 </button>
-                <button
+                <button type="button"
                   class="btn btn-ghost btn-sm"
                   :disabled="testResults[c.key]?.status === 'testing'"
                   @click="sendTest(c.key)"
@@ -569,11 +569,11 @@ onBeforeUnmount(() => {
           </div>
 
           <footer class="nf-save">
-            <button class="btn btn-primary btn-sm" @click="saveAll">
+            <button type="button" class="btn btn-primary btn-sm" @click="saveAll">
               <Save :size="14" />
               <span>{{ t('admin.notify.saveAll') }}</span>
             </button>
-            <button class="btn btn-ghost btn-sm" @click="saveSchedule">
+            <button type="button" class="btn btn-ghost btn-sm" @click="saveSchedule">
               <CalendarClock :size="14" />
               <span>{{ t('admin.notify.saveSchedule') }}</span>
             </button>
@@ -611,7 +611,7 @@ onBeforeUnmount(() => {
       </div>
 
       <template #footer>
-        <button class="btn btn-ghost btn-sm" @click="captureModal = false">
+        <button type="button" class="btn btn-ghost btn-sm" @click="captureModal = false">
           {{ t('admin.notify.close') }}
         </button>
       </template>
@@ -637,11 +637,11 @@ onBeforeUnmount(() => {
       </div>
 
       <template #footer>
-        <button class="btn btn-ghost btn-sm" @click="startQqBind">
+        <button type="button" class="btn btn-ghost btn-sm" @click="startQqBind">
           <RefreshCw :size="14" />
           <span>{{ t('admin.notify.refreshQr') }}</span>
         </button>
-        <button class="btn btn-primary btn-sm" @click="closeBindModal">
+        <button type="button" class="btn btn-primary btn-sm" @click="closeBindModal">
           {{ t('admin.notify.close') }}
         </button>
       </template>

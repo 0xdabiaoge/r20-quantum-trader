@@ -312,11 +312,11 @@ onMounted(loadData);
           <span class="dsh-status-dot active" aria-hidden="true" />
           {{ t('admin.evolution.guardChip') }}
         </span>
-        <button class="btn btn-ghost btn-sm" :disabled="busy !== '' || loading" @click="reloadMemory">
+        <button type="button" class="btn btn-ghost btn-sm" :disabled="busy !== '' || loading" @click="reloadMemory">
           <RefreshCw :size="14" :class="loading && 'animate-spin shrink-0'" />
           <span>{{ t('admin.evolution.reloadMemory') }}</span>
         </button>
-        <button
+        <button type="button"
           v-if="auth.isSuperadmin"
           class="btn btn-ghost btn-sm"
           :disabled="busy !== ''"
@@ -326,7 +326,7 @@ onMounted(loadData);
           <RotateCcw :size="14" />
           <span>{{ t('admin.evolution.rollback') }}</span>
         </button>
-        <button v-if="auth.isSuperadmin" class="btn btn-primary btn-sm" :disabled="busy !== ''" @click="openRunDialog">
+        <button type="button" v-if="auth.isSuperadmin" class="btn btn-primary btn-sm" :disabled="busy !== ''" @click="openRunDialog">
           <PlayCircle :size="14" />
           <span>{{ busy === 'run' ? t('admin.evolution.runningReview') : t('admin.evolution.reviewNow') }}</span>
         </button>
@@ -338,7 +338,7 @@ onMounted(loadData);
       <span class="state-icon"><AlertTriangle :size="17" /></span>
       <p class="state-title">{{ t('common.loadFailed') }}</p>
       <p class="state-desc">{{ loadError }}</p>
-      <button class="btn btn-ghost btn-sm mt-1" :disabled="loading" @click="loadData">
+      <button type="button" class="btn btn-ghost btn-sm mt-1" :disabled="loading" @click="loadData">
         <RefreshCw :size="14" :class="loading && 'animate-spin shrink-0'" />
         <span>{{ t('common.retry') }}</span>
       </button>
@@ -490,7 +490,7 @@ onMounted(loadData);
               :placeholder="t('admin.evolution.addPlaceholder')"
               @keydown.enter="addMemoryItem"
             />
-            <button
+            <button type="button"
               class="btn btn-primary btn-sm"
               :disabled="busy !== '' || !newMemoryText.trim()"
               @click="addMemoryItem"
@@ -532,7 +532,7 @@ onMounted(loadData);
                   :label="`${item.category} · ${t('admin.evolution.score')} ${item.health_score}`"
                   @update:model-value="() => toggleLessonStatus(item.id)"
                 />
-                <button
+                <button type="button"
                   class="btn btn-quiet btn-icon btn-sm evo-del"
                   :title="t('admin.evolution.removeTitle')"
                   :disabled="busy !== '' || loading || !auth.isSuperadmin"
@@ -577,7 +577,7 @@ onMounted(loadData);
                 {{ activeTab === 'evolution_system' ? t('admin.evolution.systemDesc') : t('admin.evolution.userDesc') }}
               </p>
             </div>
-            <button
+            <button type="button"
               v-if="auth.isSuperadmin"
               class="btn btn-primary btn-sm"
               :disabled="busy !== ''"
@@ -653,8 +653,8 @@ onMounted(loadData);
       </label>
 
       <template #footer>
-        <button class="btn btn-ghost btn-sm" @click="closeRunDialog">{{ t('common.cancel') }}</button>
-        <button
+        <button type="button" class="btn btn-ghost btn-sm" @click="closeRunDialog">{{ t('common.cancel') }}</button>
+        <button type="button"
           class="btn btn-primary btn-sm"
           :disabled="!runDialog.phrase.trim() || busy === 'run'"
           @click="confirmRun"

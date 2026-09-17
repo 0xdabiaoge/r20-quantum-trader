@@ -274,16 +274,16 @@ onMounted(loadPlugins)
           <span class="dsh-status-dot active" aria-hidden="true" />
           {{ t('admin.interceptors.failClosed') }}
         </span>
-        <button class="btn btn-ghost btn-sm" :disabled="loading" @click="loadPlugins">
+        <button type="button" class="btn btn-ghost btn-sm" :disabled="loading" @click="loadPlugins">
           <RefreshCw :size="14" :class="loading && 'animate-spin shrink-0'" />
           <span>{{ t('common.refresh') }}</span>
         </button>
-        <button class="btn btn-ghost btn-sm" :disabled="testing" @click="runSandbox">
+        <button type="button" class="btn btn-ghost btn-sm" :disabled="testing" @click="runSandbox">
           <Loader2 v-if="testing" :size="14" class="animate-spin shrink-0" />
           <Play v-else :size="14" />
           <span>{{ testing ? t('admin.interceptors.testing') : t('admin.interceptors.runSandbox') }}</span>
         </button>
-        <button v-if="auth.isSuperadmin" class="btn btn-primary btn-sm" @click="openCreateModal">
+        <button type="button" v-if="auth.isSuperadmin" class="btn btn-primary btn-sm" @click="openCreateModal">
           <Plus :size="14" />
           <span>{{ t('admin.interceptors.newPlugin') }}</span>
         </button>
@@ -295,7 +295,7 @@ onMounted(loadPlugins)
       <span class="state-icon"><AlertTriangle :size="17" /></span>
       <p class="state-title">{{ t('common.loadFailed') }}</p>
       <p class="state-desc">{{ loadError }}</p>
-      <button class="btn btn-ghost btn-sm mt-1" :disabled="loading" @click="loadPlugins">
+      <button type="button" class="btn btn-ghost btn-sm mt-1" :disabled="loading" @click="loadPlugins">
         <RefreshCw :size="14" :class="loading && 'animate-spin shrink-0'" />
         <span>{{ t('common.retry') }}</span>
       </button>
@@ -330,7 +330,7 @@ onMounted(loadPlugins)
           >
             <!-- 优先级 -->
             <div class="ip-order">
-              <button
+              <button type="button"
                 class="btn btn-quiet btn-icon btn-sm"
                 :disabled="idx === 0"
                 :title="t('admin.interceptors.raiseTitle')"
@@ -338,7 +338,7 @@ onMounted(loadPlugins)
               >
                 <ArrowUp :size="13" />
               </button>
-              <button
+              <button type="button"
                 class="btn btn-quiet btn-icon btn-sm"
                 :disabled="idx === plugins.length - 1"
                 :title="t('admin.interceptors.lowerTitle')"
@@ -373,7 +373,7 @@ onMounted(loadPlugins)
 
             <!-- 动作 -->
             <div class="ip-actions">
-              <button
+              <button type="button"
                 class="btn btn-ghost btn-sm"
                 :title="t('admin.interceptors.sourceTitle')"
                 @click="openEditor(p)"
@@ -382,7 +382,7 @@ onMounted(loadPlugins)
                 <span>{{ t('admin.interceptors.sourceCode') }}</span>
               </button>
 
-              <button
+              <button type="button"
                 v-if="auth.isSuperadmin && !p.filename.startsWith('0')"
                 class="btn btn-danger btn-sm"
                 :title="t('admin.interceptors.deleteTitle')"
@@ -432,12 +432,12 @@ onMounted(loadPlugins)
         <span class="ip-contract mono">
           {{ t('admin.interceptors.contractLabel') }} check_risk(package, decision, ctx)
         </span>
-        <button class="btn btn-ghost btn-sm" @click="exportPluginCode(editingFilename, editingCode)">
+        <button type="button" class="btn btn-ghost btn-sm" @click="exportPluginCode(editingFilename, editingCode)">
           <Download :size="14" />
           <span>{{ t('admin.interceptors.exportPy') }}</span>
         </button>
-        <button class="btn btn-ghost btn-sm" @click="closeEditor">{{ t('admin.interceptors.cancel') }}</button>
-        <button class="btn btn-primary btn-sm" :disabled="savingCode" @click="saveCode">
+        <button type="button" class="btn btn-ghost btn-sm" @click="closeEditor">{{ t('admin.interceptors.cancel') }}</button>
+        <button type="button" class="btn btn-primary btn-sm" :disabled="savingCode" @click="saveCode">
           <Loader2 v-if="savingCode" :size="14" class="animate-spin shrink-0" />
           <Save v-else :size="14" />
           <span>{{ savingCode ? t('admin.interceptors.saving') : t('admin.interceptors.saveAndReload') }}</span>
@@ -541,7 +541,7 @@ onMounted(loadPlugins)
       </div>
 
       <template #footer>
-        <button class="btn btn-primary btn-sm" @click="testModalVisible = false">
+        <button type="button" class="btn btn-primary btn-sm" @click="testModalVisible = false">
           {{ t('admin.interceptors.closeReport') }}
         </button>
       </template>

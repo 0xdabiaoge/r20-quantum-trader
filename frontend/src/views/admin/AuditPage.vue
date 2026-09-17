@@ -147,7 +147,7 @@ onMounted(load)
     <PageHeader :title="t('nav.admin.audit')" :description="t('admin.audit.intro')">
       <template #actions>
         <span class="badge badge-accent mono">{{ t('admin.audit.badge') }}</span>
-        <button class="btn btn-ghost btn-sm" :disabled="loading" @click="load">
+        <button type="button" class="btn btn-ghost btn-sm" :disabled="loading" @click="load">
           <Loader2 v-if="loading && records.length" :size="14" class="animate-spin shrink-0" />
           <RefreshCw v-else :size="14" />
           <span>{{ t('admin.audit.refresh') }}</span>
@@ -160,7 +160,7 @@ onMounted(load)
       <span class="state-icon"><AlertTriangle :size="17" /></span>
       <p class="state-title">{{ t('common.loadFailed') }}</p>
       <p class="state-desc">{{ loadError }}</p>
-      <button class="btn btn-ghost btn-sm mt-1" :disabled="loading" @click="load">
+      <button type="button" class="btn btn-ghost btn-sm mt-1" :disabled="loading" @click="load">
         <RefreshCw :size="14" />
         <span>{{ t('common.retry') }}</span>
       </button>
@@ -294,7 +294,7 @@ onMounted(load)
       </template>
 
       <template #footer>
-        <button class="btn btn-primary btn-sm" @click="detailRec = null">
+        <button type="button" class="btn btn-primary btn-sm" @click="detailRec = null">
           {{ t('admin.audit.close') }}
         </button>
       </template>

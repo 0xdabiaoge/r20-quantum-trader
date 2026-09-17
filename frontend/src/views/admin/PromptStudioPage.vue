@@ -467,7 +467,7 @@ onMounted(loadLib)
   <div class="ps">
     <PageHeader :title="t('nav.admin.prompts')" :description="t('admin.promptStudio.pageDesc')">
       <template #actions>
-        <button
+        <button type="button"
           class="btn btn-sm"
           :class="showVarRibbon ? 'btn-primary' : 'btn-ghost'"
           :title="t('admin.promptStudio.toolbar.varRibbonTitle')"
@@ -478,15 +478,15 @@ onMounted(loadLib)
           <Layers :size="14" />
           <span>{{ showVarRibbon ? t('admin.promptStudio.toolbar.collapseRibbon') : t('admin.promptStudio.toolbar.insertVars') }}</span>
         </button>
-        <button class="btn btn-ghost btn-sm" :title="t('admin.promptStudio.toolbar.dictTitle')" @click="variableGuideVisible = true">
+        <button type="button" class="btn btn-ghost btn-sm" :title="t('admin.promptStudio.toolbar.dictTitle')" @click="variableGuideVisible = true">
           <BookOpen :size="14" />
           <span>{{ t('admin.promptStudio.toolbar.dictionary') }}</span>
         </button>
-        <button class="btn btn-ghost btn-sm" :title="t('admin.promptStudio.toolbar.importTitle')" @click="importVisible = true">
+        <button type="button" class="btn btn-ghost btn-sm" :title="t('admin.promptStudio.toolbar.importTitle')" @click="importVisible = true">
           <Upload :size="14" />
           <span>{{ t('admin.promptStudio.toolbar.import') }}</span>
         </button>
-        <button class="btn btn-ghost btn-sm" :title="t('admin.promptStudio.toolbar.exportTitle')" @click="exportProfile">
+        <button type="button" class="btn btn-ghost btn-sm" :title="t('admin.promptStudio.toolbar.exportTitle')" @click="exportProfile">
           <Download :size="14" />
           <span>{{ t('admin.promptStudio.toolbar.export') }}</span>
         </button>
@@ -498,7 +498,7 @@ onMounted(loadLib)
       <span class="state-icon"><AlertTriangle :size="17" /></span>
       <p class="state-title">{{ t('common.loadFailed') }}</p>
       <p class="state-desc">{{ loadError || t('common.networkError') }}</p>
-      <button class="btn btn-ghost btn-sm mt-1" :disabled="loading" @click="loadLib">
+      <button type="button" class="btn btn-ghost btn-sm mt-1" :disabled="loading" @click="loadLib">
         <Loader2 v-if="loading" :size="14" class="animate-spin shrink-0" />
         <RotateCcw v-else :size="14" />
         <span>{{ t('common.retry') }}</span>
@@ -567,7 +567,7 @@ onMounted(loadLib)
           <Layers :size="13" />
           <span class="label-caps">{{ t('admin.promptStudio.ribbon.title') }}</span>
         </div>
-        <button
+        <button type="button"
           v-for="v in templateVariables"
           :key="v.key"
           class="ps-var"
@@ -595,7 +595,7 @@ onMounted(loadLib)
         <aside class="card ps-lib">
           <header class="card-head">
             <h2 class="card-title">{{ t('admin.promptStudio.profiles.title') }}</h2>
-            <button v-if="auth.isSuperadmin" class="btn btn-quiet btn-icon btn-sm" :title="t('admin.promptStudio.profiles.create')" @click="openCreateProfile">
+            <button type="button" v-if="auth.isSuperadmin" class="btn btn-quiet btn-icon btn-sm" :title="t('admin.promptStudio.profiles.create')" @click="openCreateProfile">
               <Plus :size="14" />
             </button>
           </header>
@@ -603,7 +603,7 @@ onMounted(loadLib)
           <BaseEmpty v-if="!(lib.profiles || []).length" :text="t('admin.promptStudio.profiles.noDesc')" />
 
           <div v-else class="ps-profiles">
-            <button
+            <button type="button"
               v-for="p in lib.profiles"
               :key="p.id"
               class="ps-profile"
@@ -679,23 +679,23 @@ onMounted(loadLib)
                   {{ sourceBadge(m)!.text }}
                 </span>
                 <span class="ps-mod-actions">
-                  <button class="btn btn-quiet btn-icon btn-sm" :disabled="idx === 0" :title="t('admin.promptStudio.modules.moveUp')" @click.stop="moveModule(idx, -1)">
+                  <button type="button" class="btn btn-quiet btn-icon btn-sm" :disabled="idx === 0" :title="t('admin.promptStudio.modules.moveUp')" @click.stop="moveModule(idx, -1)">
                     <ArrowUp :size="13" />
                   </button>
-                  <button class="btn btn-quiet btn-icon btn-sm" :disabled="idx === workingModules.length - 1" :title="t('admin.promptStudio.modules.moveDown')" @click.stop="moveModule(idx, 1)">
+                  <button type="button" class="btn btn-quiet btn-icon btn-sm" :disabled="idx === workingModules.length - 1" :title="t('admin.promptStudio.modules.moveDown')" @click.stop="moveModule(idx, 1)">
                     <ArrowDown :size="13" />
                   </button>
-                  <button class="btn btn-quiet btn-icon btn-sm" :title="t('admin.promptStudio.modules.duplicate')" @click.stop="duplicateModule(idx)">
+                  <button type="button" class="btn btn-quiet btn-icon btn-sm" :title="t('admin.promptStudio.modules.duplicate')" @click.stop="duplicateModule(idx)">
                     <Copy :size="13" />
                   </button>
-                  <button class="btn btn-quiet btn-icon btn-sm ps-del" :title="t('admin.promptStudio.modules.delete')" @click.stop="removeModule(idx)">
+                  <button type="button" class="btn btn-quiet btn-icon btn-sm ps-del" :title="t('admin.promptStudio.modules.delete')" @click.stop="removeModule(idx)">
                     <Trash2 :size="13" />
                   </button>
                 </span>
               </div>
             </div>
 
-            <button class="btn btn-ghost btn-sm ps-add" @click="addModule">
+            <button type="button" class="btn btn-ghost btn-sm ps-add" @click="addModule">
               <Plus :size="14" />
               <span>{{ t('admin.promptStudio.modules.add') }}</span>
             </button>
@@ -733,11 +733,11 @@ onMounted(loadLib)
           <!-- 动作栏 -->
           <footer class="ps-actions">
             <div class="ps-actions-left">
-              <button class="btn btn-primary btn-sm" :disabled="!dirty || !auth.isSuperadmin" @click="saveProfile">
+              <button type="button" class="btn btn-primary btn-sm" :disabled="!dirty || !auth.isSuperadmin" @click="saveProfile">
                 <Save :size="14" />
                 <span>{{ t('admin.promptStudio.modules.save') }}{{ dirty ? ' *' : '' }}</span>
               </button>
-              <button
+              <button type="button"
                 v-if="!isActiveProfile && auth.isSuperadmin"
                 class="btn btn-ghost btn-sm ps-activate"
                 @click="activateProfile"
@@ -748,15 +748,15 @@ onMounted(loadLib)
             </div>
 
             <div class="ps-actions-right">
-              <button v-if="auth.isSuperadmin" class="btn btn-ghost btn-sm" @click="openDuplicateProfile">
+              <button type="button" v-if="auth.isSuperadmin" class="btn btn-ghost btn-sm" @click="openDuplicateProfile">
                 <Copy :size="14" />
                 <span>{{ t('admin.promptStudio.modules.duplicateProfile') }}</span>
               </button>
-              <button class="btn btn-ghost btn-sm" @click="showHistory">
+              <button type="button" class="btn btn-ghost btn-sm" @click="showHistory">
                 <History :size="14" />
                 <span>{{ t('admin.promptStudio.modules.history') }}</span>
               </button>
-              <button v-if="!isActiveProfile && auth.isSuperadmin" class="btn btn-danger btn-sm" @click="deleteProfile">
+              <button type="button" v-if="!isActiveProfile && auth.isSuperadmin" class="btn btn-danger btn-sm" @click="deleteProfile">
                 <Trash2 :size="14" />
                 <span>{{ t('admin.promptStudio.modules.deleteProfile') }}</span>
               </button>
@@ -806,7 +806,7 @@ onMounted(loadLib)
 
           <pre class="ps-preview" tabindex="0">{{ compiledPreview || t('admin.promptStudio.preview.empty') }}</pre>
 
-          <button class="btn btn-ghost btn-sm ps-prev-copy" @click="copyPreview">
+          <button type="button" class="btn btn-ghost btn-sm ps-prev-copy" @click="copyPreview">
             <Copy :size="13" />
             <span>{{ t('admin.promptStudio.preview.copy') }}</span>
           </button>
@@ -828,7 +828,7 @@ onMounted(loadLib)
             <span class="badge badge-accent">{{ v.category }}</span>
             <span class="ps-dict-label">{{ v.label }}</span>
             <code class="ps-dict-key">&#123;&#123;{{ v.key }}&#125;&#125;</code>
-            <button
+            <button type="button"
               class="btn btn-primary btn-sm ps-dict-insert"
               @click="insertVarIntoActiveModule(v.key); variableGuideVisible = false"
             >
@@ -890,10 +890,10 @@ onMounted(loadLib)
       </div>
 
       <template #footer>
-        <button class="btn btn-ghost btn-sm" @click="importVisible = false">
+        <button type="button" class="btn btn-ghost btn-sm" @click="importVisible = false">
           {{ t('admin.promptStudio.import.cancel') }}
         </button>
-        <button class="btn btn-primary btn-sm" @click="submitImport">
+        <button type="button" class="btn btn-primary btn-sm" @click="submitImport">
           <Upload :size="14" />
           <span>{{ t('admin.promptStudio.import.confirm') }}</span>
         </button>
@@ -915,7 +915,7 @@ onMounted(loadLib)
             <span class="ps-history-note">{{ h.note || h.summary || h.id || h.revision_id }}</span>
             <span class="ps-history-meta mono">{{ fmtDateTime(h.created_at || h.time) }} · {{ h.actor || 'system' }}</span>
           </div>
-          <button class="btn btn-ghost btn-sm" @click="rollback(h.id || h.revision_id)">
+          <button type="button" class="btn btn-ghost btn-sm" @click="rollback(h.id || h.revision_id)">
             <RotateCcw :size="13" />
             <span>{{ t('admin.promptStudio.history.rollback') }}</span>
           </button>
@@ -943,8 +943,8 @@ onMounted(loadLib)
       </label>
 
       <template #footer>
-        <button class="btn btn-ghost btn-sm" @click="closeNameDialog">{{ t('common.cancel') }}</button>
-        <button
+        <button type="button" class="btn btn-ghost btn-sm" @click="closeNameDialog">{{ t('common.cancel') }}</button>
+        <button type="button"
           class="btn btn-primary btn-sm"
           :disabled="!nameDialog.value.trim() || nameDialog.busy"
           @click="submitNameDialog"
