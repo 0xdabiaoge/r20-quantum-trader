@@ -211,11 +211,11 @@ function actionBadgeClass(action: string) {
             <button
               v-for="filter in ['all', 'warn', 'error'] as const"
               :key="filter"
-              class="rounded px-2 py-0.5 text-3xs font-medium uppercase cursor-pointer"
-              :style="
+              class="rounded border px-2 py-0.5 text-3xs font-medium uppercase cursor-pointer transition-colors min-h-[var(--h-sm)]"
+              :class="
                 logFilter === filter
-                  ? { backgroundColor: 'var(--accent-bg)', color: 'var(--accent)', border: '1px solid var(--accent-line)' }
-                  : { color: 'var(--ink-3)' }
+                  ? 'bg-[var(--accent-bg)] text-[var(--accent)] border-[var(--accent-line)]'
+                  : 'text-[var(--ink-3)] border-transparent hover:bg-[var(--ds-color-bg-hover)] hover:text-[var(--ink-1)]'
               "
               @click="logFilter = filter"
             >

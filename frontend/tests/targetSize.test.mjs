@@ -97,6 +97,19 @@ test('委员会内联改名输入框的命中区不得低于 24px', () => {
   assert.ok(h.value !== null && h.value >= MIN_TARGET, `.cn-name-input 高度解析为 ${h.value}，低于 ${MIN_TARGET}px`);
 });
 
+test('抽屉内日志过滤芯片的命中区不得低于 24px（批 106）', () => {
+  // 实测 23.4px（text-3xs 行高 + py-0.5 + 1px 边框），差一点点。
+  // 这些芯片只在抽屉打开、且切到「实时日志」页签时才存在 —— 页面级审计看不到。
+  const src = readFileSync(path.join(SRC, 'components/dashboard/TrajectoryPanel.vue'), 'utf8');
+  const tag = /<button[\s\S]{0,700}?logFilter === filter[\s\S]{0,700}?>/.exec(src);
+  assert.ok(tag, '找不到日志过滤芯片的模板');
+  assert.match(
+    tag[0],
+    /min-h-\[var\(--h-sm\)\]/,
+    '芯片命中区低于 WCAG 2.5.8 的 24px —— 用 min-h-[var(--h-sm)]（与 .sort-btn / 委员会改名框同一修法）',
+  );
+});
+
 test('判据自检：能解析令牌、能拒绝低于下限的值', () => {
   assert.equal(resolve('var(--h-sm)'), 24, '--h-sm 应解析为 24');
   assert.equal(resolve('var(--h-lg)'), 36, '--h-lg 应解析为 36');

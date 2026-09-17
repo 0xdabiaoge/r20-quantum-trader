@@ -216,6 +216,21 @@ test('勾选行（.sc-check）必须有悬停反馈，且危险变体也要有',
   );
 });
 
+test('抽屉内的日志过滤芯片必须有悬停反馈（页面审计看不到的地方）', () => {
+  // 批 106：这三个芯片（all/warn/error）在**默认关闭的抽屉**里，
+  // 页面级审计永远扫不到；它此前用内联 :style 写选中态、且**连 transition 都没有**，
+  // 所以「内联 :style + transition」那条判据也抓不到。实测未选中项悬停零变化。
+  const src = readFileSync(path.join(SRC, 'components/dashboard/TrajectoryPanel.vue'), 'utf8');
+  const tag = /<button[\s\S]{0,700}?logFilter === filter[\s\S]{0,700}?>/.exec(src);
+  assert.ok(tag, '找不到日志过滤芯片的模板');
+  assert.match(tag[0], /hover:bg-\[var\(--ds-color-bg-hover\)\]/, '未选中芯片缺少悬停反馈');
+  assert.match(tag[0], /hover:text-\[var\(--ink-1\)\]/, '未选中芯片缺少悬停文字色');
+  assert.ok(!/:style=/.test(tag[0]), '不要再退回内联 :style 写选中态');
+  assert.match(tag[0], /transition-colors/, '悬停变化要接过渡');
+  // 常驻 border：否则选中时凭空多出 1px 边框，整排宽度会跳
+  assert.match(tag[0], /\bborder\b[^"]*border-transparent/, '边框必须常驻（内联态时用border-transparent），否则选中会引起 1px 宽度跳动');
+});
+
 test('品牌 logo 链接必须有悬停反馈', () => {
   const m = /<RouterLink\s+to="\/"\s+class="([^"]*)"/.exec(DASH);
   assert.ok(m, '找不到品牌区 RouterLink');
