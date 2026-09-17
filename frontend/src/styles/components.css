@@ -220,8 +220,12 @@ textarea.input {
   outline: none;
   transition: background-color var(--dur-fast), border-color var(--dur-fast);
 }
+/* 批 122：textarea.field 必须恢复 height: auto 与上下 padding，
+   此前只声明了 textarea.input，导致全站使用 class="field" 的 textarea 全部被强制压成 30px 单行缝隙 */
+textarea.field,
 textarea.input {
   height: auto;
+  min-height: calc(var(--h-md) * 2);
   padding: 8px 10px;
   line-height: var(--leading-dense);
 }

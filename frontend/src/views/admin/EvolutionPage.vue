@@ -620,6 +620,7 @@ onMounted(loadData);
                 :disabled="!auth.isSuperadmin || mod.locked"
                 :aria-label="t('admin.evolution.moduleContentAria')"
                 rows="6"
+                spellcheck="false"
                 class="field evo-textarea"
                 :placeholder="t('common.notConfigured')"
               />

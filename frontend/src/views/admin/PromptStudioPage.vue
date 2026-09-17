@@ -721,6 +721,7 @@ onMounted(loadLib)
               <textarea
                 v-model="selectedModule.content"
                 rows="12"
+                spellcheck="false"
                 :aria-label="t('admin.promptStudio.moduleEditor')"
                 class="field ps-textarea"
                 :readonly="!auth.isSuperadmin"
@@ -871,6 +872,7 @@ onMounted(loadLib)
           <textarea
             v-model="importRawJson"
             rows="7"
+            spellcheck="false"
             class="field ps-textarea mono"
             :aria-label="t('admin.promptStudio.import.methodTwo')"
             placeholder='{"format": "r20-prompt-profile", "version": 3, "profile": { ... }}'

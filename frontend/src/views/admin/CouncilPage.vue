@@ -754,6 +754,7 @@ onMounted(loadData);
               <textarea
                 v-model="selectedRole.prompt"
                 rows="10"
+                spellcheck="false"
                 :aria-label="t('admin.council.seatPromptAria')"
                 class="field cn-textarea"
                 :disabled="!auth.isSuperadmin"
@@ -955,6 +956,7 @@ onMounted(loadData);
         <textarea
           v-model="importRawJson"
           rows="10"
+          spellcheck="false"
           :aria-label="t('admin.council.importJsonAria')"
           class="field cn-textarea mono"
           :placeholder="t('admin.council.importPlaceholder')"
