@@ -8,6 +8,7 @@ import { fetchCandles } from './chartCandles'
 import { mainIndicators, subIndicators, DEFAULT_ACTIVE_INDICATORS } from './chartIndicators'
 import { fmtDate, fmtHM, fmtClock } from '../../utils/format';
 import { ref, computed, watch, onMounted, onUnmounted, nextTick, useId } from 'vue'
+import { usePopoverFocus } from '../../composables/usePopoverFocus'
 import { useDashboardStore } from '../../stores/dashboard'
 import { symOf, instIdOf } from '../../utils/instId'
 import { useTheme } from '../../composables/useTheme'
@@ -175,8 +176,17 @@ const chartContainer = ref<HTMLElement | null>(null)
 // 2. 指标配置中心 (主图与副图严密区分)
 // ==========================================
 const showIndicatorMenu = ref<boolean>(false)
+/* 批 104：指标下拉是**非模态**气泡（role=dialog 但无 aria-modal），
+   打开时要把焦点交给面板 —— 此前键盘 Enter 打开后焦点仍停在触发按钮上。 */
+const indicatorTrigger = ref<HTMLElement | null>(null)
+const indicatorPanel = ref<HTMLElement | null>(null)
+usePopoverFocus(indicatorPanel, indicatorTrigger, showIndicatorMenu)
 const symbolMenu = ref<boolean>(false)
 const symbolMenuId = useId()
+/* 批 104：选币下拉同样是气泡，一并接管焦点交接。 */
+const symbolTrigger = ref<HTMLElement | null>(null)
+const symbolPanel = ref<HTMLElement | null>(null)
+usePopoverFocus(symbolPanel, symbolTrigger, symbolMenu)
 const indicatorMenuId = useId()
 
 /** 持仓/挂单中的币种（选币下拉的徽标） */
@@ -667,10 +677,23 @@ function handleClickOutside(e: MouseEvent) {
   }
 }
 
+/* 批 104：两个下拉此前**只能靠点空白处关**，按 Escape 毫无反应。
+   指标下拉声明的是 `role="dialog"` —— WAI-ARIA 明确要求 Escape 关闭对话框；
+   选币下拉是 listbox，同样应支持 Escape。焦点交还给触发器由 usePopoverFocus 负责。
+   本监听挂在 document 冒泡阶段：模态弹层（useModalFocus）会 stopPropagation，
+   所以模态开着时不会误伤。 */
+function handleKeydown(e: KeyboardEvent) {
+  if (e.key !== 'Escape') return
+  if (!showIndicatorMenu.value && !symbolMenu.value) return
+  showIndicatorMenu.value = false
+  symbolMenu.value = false
+}
+
 onMounted(() => {
   const initSym = props.initialSymbol || props.symbol
   if (initSym) currentSymbol.value = initSym.toUpperCase()
   document.addEventListener('click', handleClickOutside)
+  document.addEventListener('keydown', handleKeydown)
   nextTick(() => {
     initChart()
     // 3s 静默拉取最新数据，保证准确对齐与跳动
@@ -683,6 +706,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside)
+  document.removeEventListener('keydown', handleKeydown)
   if (timer) clearInterval(timer)
   if (countdownTimer) clearInterval(countdownTimer)
   if (chartContainer.value) {
@@ -708,6 +732,7 @@ onUnmounted(() => {
       <!-- 选币下拉 -->
       <div class="indicator-dropdown-container relative">
         <button
+          ref="symbolTrigger"
           class="flex h-7 cursor-pointer items-center gap-1.5 rounded border border-[var(--line-1)] bg-[var(--surface-2)] px-2.5 transition-colors hover:bg-[var(--surface-3)]"
           :aria-expanded="symbolMenu"
           aria-haspopup="listbox"
@@ -722,9 +747,11 @@ onUnmounted(() => {
           <div
             v-if="symbolMenu"
             :id="symbolMenuId"
+            ref="symbolPanel"
+            tabindex="-1"
             role="listbox"
             :aria-label="t('dash.matrix.chart.perp')"
-            class="float-panel absolute left-0 top-8 z-[var(--z-float)] max-h-80 w-56 overflow-y-auto p-1.5"
+            class="outline-none float-panel absolute left-0 top-8 z-[var(--z-float)] max-h-80 w-56 overflow-y-auto p-1.5"
           >
             <button
               v-for="sym in availableSymbols"
@@ -768,6 +795,7 @@ onUnmounted(() => {
         <!-- 指标菜单 -->
         <div class="indicator-dropdown-container relative">
           <button
+            ref="indicatorTrigger"
             class="btn btn-sm"
             :class="showIndicatorMenu || activeIndicatorCount > 0 ? 'bg-[var(--accent-bg)] text-[var(--accent)] border border-[var(--accent-line)]' : 'btn-ghost'"
             :aria-expanded="showIndicatorMenu"
@@ -781,7 +809,7 @@ onUnmounted(() => {
             <ChevronDown class="h-3 w-3 transition-transform" :class="showIndicatorMenu && 'rotate-180'" />
           </button>
           <Transition name="pop">
-            <div v-if="showIndicatorMenu" :id="indicatorMenuId" role="dialog" :aria-label="t('dash.matrix.chart.indicators')" class="float-panel absolute right-0 top-9 z-[var(--z-float)] max-h-[65vh] w-72 overflow-y-auto p-3 max-md:fixed max-md:inset-x-2 max-md:top-auto max-md:bottom-2 max-md:w-auto max-md:max-h-[70vh]">
+            <div v-if="showIndicatorMenu" :id="indicatorMenuId" ref="indicatorPanel" tabindex="-1" role="dialog" :aria-label="t('dash.matrix.chart.indicators')" class="outline-none float-panel absolute right-0 top-9 z-[var(--z-float)] max-h-[65vh] w-72 overflow-y-auto p-3 max-md:fixed max-md:inset-x-2 max-md:top-auto max-md:bottom-2 max-md:w-auto max-md:max-h-[70vh]">
               <p class="t-label mb-2">{{ t('dash.matrix.chart.indicatorHint') }}</p>
               <p class="t-label mb-1.5">{{ t('dash.matrix.chart.overlays') }}</p>
               <div class="mb-3 grid grid-cols-2 gap-1.5">

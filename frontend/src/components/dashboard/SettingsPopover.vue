@@ -6,6 +6,7 @@ import { useRouter } from 'vue-router';
 import { useUi } from '../../composables/useUi';
 import { useI18n } from '../../composables/useI18n';
 import { useTheme } from '../../composables/useTheme';
+import { usePopoverFocus } from '../../composables/usePopoverFocus';
 import BaseSegmented from '../base/BaseSegmented.vue';
 import BaseSwitch from '../base/BaseSwitch.vue';
 
@@ -18,6 +19,10 @@ const open = ref(false);
 const trigger = ref<HTMLElement | null>(null);
 const panel = ref<HTMLElement | null>(null);
 const panelId = useId();
+
+/* 批 104：这是个**非模态**气泡（无 aria-modal、无遮罩、允许点背景），
+   所以不用 useModalFocus（那会顺带锁滚动 + 困住 Tab），只要焦点交接。 */
+const { release: releasePopoverFocus } = usePopoverFocus(panel, trigger, open);
 
 function onDocDown(e: MouseEvent) {
   const el = e.target as Node;
@@ -34,6 +39,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   document.removeEventListener('mousedown', onDocDown);
   window.removeEventListener('keydown', onEsc);
+  releasePopoverFocus();
 });
 </script>
 
@@ -58,7 +64,8 @@ onBeforeUnmount(() => {
         v-if="open"
         :id="panelId"
         ref="panel"
-        class="float-panel absolute end-0 top-10 w-64 max-w-[calc(100vw-24px)] max-h-[70vh] overflow-y-auto p-3"
+        tabindex="-1"
+        class="float-panel absolute end-0 top-10 w-64 max-w-[calc(100vw-24px)] max-h-[70vh] overflow-y-auto p-3 outline-none"
         role="dialog"
         :aria-label="t('dash.shell.settings.title')"
       >
