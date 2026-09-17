@@ -225,9 +225,9 @@ def save_council_config(config: Dict[str, Any], *, enforce_models: bool = True) 
 
 # ---- 预设对齐迁移：仅替换"仍为旧出厂文案"的角色提示词(sha256 前16位识别)，用户定制一律保留 ----
 _LEGACY_PRESET_PROMPT_HASHES: Dict[str, Any] = {
-    "trader_trend": {"28fc1b0874f20dfc", "5c13b5e47c5cc054"},
-    "trader_momentum": {"37fb3f948d309f3b", "ee75c86b42cf6a2c"},
-    "trader_quant": {"5a18438f6afe6c87", "2704fd8c6000df18"},
+    "trader_trend": {"28fc1b0874f20dfc", "5c13b5e47c5cc054", "8bc787c9f01be9ac"},
+    "trader_momentum": {"37fb3f948d309f3b", "ee75c86b42cf6a2c", "8e23b4f5ad1699d6"},
+    "trader_quant": {"5a18438f6afe6c87", "2704fd8c6000df18", "51ecd08f51160da9"},
     "cio": {"165538e81c0bec8f", "88f1ab886c89a086"},
 }
 

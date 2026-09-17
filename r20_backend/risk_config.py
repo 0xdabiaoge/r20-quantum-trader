@@ -129,8 +129,8 @@ _INDEX = {p["key"]: p for p in _PARAMS}
 # ── 优质预设套件（一键应用；values 为原生单位，必须通过本 schema 校验） ──
 SUITES: list[dict[str, Any]] = [
     {"id": "conservative", "name": "🛡️ 稳健防守", "tagline": "本金安全绝对优先",
-     "desc": "适合新账户、小资金或高波动恶劣行情：仓位少而精、置信度与盈亏比门槛拉高、杠杆压至 3x、"
-             "彻底禁止金字塔加仓、日亏 3% 即熔断。牺牲部分机会换极低回撤。",
+     "desc": "适合新账户、小资金或高波动恶劣行情：仓位少而精、置信度与盈亏比门槛拉高(2.5:1)、杠杆压至 3x、"
+             "90分钟止损冷静期彻底隔绝震荡反复磨损、彻底禁止金字塔加仓、日亏 3% 即熔断。牺牲部分机会换极低回撤。",
      "values": {
          "R20_PORTFOLIO_RISK_BUDGET_USDT": 0.0,
          "R20_MAX_CONCURRENT_POSITIONS": 4, "R20_MAX_SAME_DIRECTION_POSITIONS": 2,
@@ -138,17 +138,17 @@ SUITES: list[dict[str, Any]] = [
          "R20_MAX_SINGLE_ASSET_MARGIN_USDT": 300.0, "R20_MIN_LEVERAGE": 2.0, "R20_MAX_LEVERAGE": 3.0,
          "R20_RISK_PER_TRADE_RATIO": 0.01, "R20_MIN_RISK_REWARD": 2.5, "R20_MIN_ENTRY_CONFIDENCE": 85.0,
          "R20_DAILY_LOSS_EQUITY_RATIO": 0.03, "R20_MAX_DAILY_LOSS_USDT": 100.0,
-         "R20_TIME_STOP_HOURS": 12.0, "R20_TIME_STOP_ATR_BAND": 0.10, "R20_STOP_COOLDOWN_MINUTES": 60,
+         "R20_TIME_STOP_HOURS": 12.0, "R20_TIME_STOP_ATR_BAND": 0.10, "R20_STOP_COOLDOWN_MINUTES": 90,
          "R20_MAX_SCALE_IN_COUNT": 0, "R20_MIN_SCALE_IN_PROFIT_RATIO": 0.012, "R20_MIN_SCALE_IN_CONFIDENCE": 85.0,
          "R20_MAX_TOTAL_EXPOSURE_USDT": 600.0,
      }},
     {"id": "balanced", "name": "⚖️ 均衡波段", "tagline": "推荐默认 · 攻守兼备",
      "desc": "系统出厂基线：同向 3 仓防共振踩踏、单笔保证金 20% 硬顶、2% 单笔风险、R:R 底线 2.0、"
-             "8 小时时间止损释放配比、允许 1 次严格浮盈加仓。适合日常 1H~4H 波段运营。",
+             "60分钟止损冷静期防连续磨损、8 小时时间止损释放配比、允许 1 次严格浮盈加仓。兼顾让利润奔跑与风险下限。",
      "values": {key: DEFAULTS[key] for key in DEFAULTS}},
     {"id": "aggressive", "name": "🚀 进取猎手", "tagline": "单边趋势市 · 经验账户专用",
      "desc": "适合明确单边主升/主跌浪与老手账户：同向放宽至 4 仓吃足趋势、置信度门禁降至 72% 抢先上车、"
-             "允许 2 次金字塔加仓放大盈利单、持仓时间放宽至 16 小时。回撤与熔断线同步放大，风险自负。",
+             "允许 2 次金字塔加仓放大盈利单、30分钟止损冷静期防极速反噬、持仓时间放宽至 16 小时。回撤与熔断线同步放大，风险自负。",
      "values": {
          "R20_PORTFOLIO_RISK_BUDGET_USDT": 0.0,
          "R20_MAX_CONCURRENT_POSITIONS": 0, "R20_MAX_SAME_DIRECTION_POSITIONS": 4,
@@ -156,7 +156,7 @@ SUITES: list[dict[str, Any]] = [
          "R20_MAX_SINGLE_ASSET_MARGIN_USDT": 800.0, "R20_MIN_LEVERAGE": 5.0, "R20_MAX_LEVERAGE": 7.0,
          "R20_RISK_PER_TRADE_RATIO": 0.03, "R20_MIN_RISK_REWARD": 2.0, "R20_MIN_ENTRY_CONFIDENCE": 72.0,
          "R20_DAILY_LOSS_EQUITY_RATIO": 0.08, "R20_MAX_DAILY_LOSS_USDT": 300.0,
-         "R20_TIME_STOP_HOURS": 16.0, "R20_TIME_STOP_ATR_BAND": 0.20, "R20_STOP_COOLDOWN_MINUTES": 15,
+         "R20_TIME_STOP_HOURS": 16.0, "R20_TIME_STOP_ATR_BAND": 0.20, "R20_STOP_COOLDOWN_MINUTES": 30,
          "R20_MAX_SCALE_IN_COUNT": 2, "R20_MIN_SCALE_IN_PROFIT_RATIO": 0.006, "R20_MIN_SCALE_IN_CONFIDENCE": 70.0,
          "R20_MAX_TOTAL_EXPOSURE_USDT": 3000.0,
      }},

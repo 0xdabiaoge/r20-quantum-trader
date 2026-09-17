@@ -402,27 +402,92 @@ onUnmounted(() => {
               </thead>
               <tbody>
                 <tr>
-                  <td class="font-mono font-bold text-[var(--accent)]">&#123;&#123;news_intelligence&#125;&#125;</td>
-                  <td>全网快讯</td>
-                  <td class="text-[var(--ink-2)]">注入全网最新重大突发要闻、黑天鹅熔断状态与宏观情绪标签</td>
+                  <td class="font-mono font-bold text-[var(--accent)]">&#123;&#123;account_balance&#125;&#125;</td>
+                  <td>账户资产</td>
+                  <td class="text-[var(--ink-2)]">交易所私有接口实时拉取的可用 USDT 现金余额（如 4393.08 USDT）</td>
                 </tr>
                 <tr>
-                  <td class="font-mono font-bold text-[var(--up)]">&#123;&#123;trading_memory&#125;&#125;</td>
-                  <td>自进化心法</td>
-                  <td class="text-[var(--ink-2)]">注入真实复盘提炼的核心心法、避坑铁律与长效实战教训</td>
-                </tr>
-                <tr>
-                  <td class="font-mono font-bold text-[var(--ink-strong)]">&#123;&#123;market_matrix&#125;&#125;</td>
-                  <td>微积分数理</td>
-                  <td class="text-[var(--ink-2)]">注入标的池全部币种最新价、微积分动力学 (v/a)、1H ADX 与聪明钱净流</td>
+                  <td class="font-mono font-bold text-[var(--accent)]">&#123;&#123;risk_budget&#125;&#125;</td>
+                  <td>风控预算</td>
+                  <td class="text-[var(--ink-2)]">按可用资金与风控参数自适应推导的单笔保证金、单标的封顶、日亏熔断线与 R:R 底线</td>
                 </tr>
                 <tr>
                   <td class="font-mono font-bold text-[var(--warn)]">&#123;&#123;account_positions&#125;&#125;</td>
                   <td>账户敞口</td>
-                  <td class="text-[var(--ink-2)]">注入在途持仓方向、均价、标记价、未结浮盈 UPL 及云端止损防线</td>
+                  <td class="text-[var(--ink-2)]">注入在途持仓方向、均价、未结浮盈 ROI、最高浮盈点（High Water Mark）及极值回撤百分比</td>
+                </tr>
+                <tr>
+                  <td class="font-mono font-bold text-[var(--warn)]">&#123;&#123;pending_orders&#125;&#125;</td>
+                  <td>挂单池</td>
+                  <td class="text-[var(--ink-2)]">注入在途未成交 Maker 限价挂单 ID、价位、数量及挂单时长，供模型执行 KEEP 或 CANCEL</td>
+                </tr>
+                <tr>
+                  <td class="font-mono font-bold text-[var(--ink-strong)]">&#123;&#123;market_matrix&#125;&#125;</td>
+                  <td>数理行情</td>
+                  <td class="text-[var(--ink-2)]">全标的实时价、微积分导数 (v/a/j/I)、定积分做功 (E/A)、延续/击穿概率 (P续/P破)、资金费率与盘口深度</td>
+                </tr>
+                <tr>
+                  <td class="font-mono font-bold text-[var(--accent)]">&#123;&#123;news_intelligence&#125;&#125;</td>
+                  <td>全网快讯</td>
+                  <td class="text-[var(--ink-2)]">注入全网最新重大突发要闻、美联储决策、黑天鹅预警与宏观情绪倾向标签</td>
+                </tr>
+                <tr>
+                  <td class="font-mono font-bold text-[var(--up)]">&#123;&#123;trading_memory&#125;&#125;</td>
+                  <td>自进化心法</td>
+                  <td class="text-[var(--ink-2)]">注入真实复盘提炼的核心心法、避坑铁律与长效实战教训（源自 structured_trading_memory.json）</td>
+                </tr>
+                <tr>
+                  <td class="font-mono font-bold text-[var(--ink-3)]">&#123;&#123;decision_timestamp&#125;&#125;</td>
+                  <td>系统环境</td>
+                  <td class="text-[var(--ink-2)]">当前决策周期的精确北京时间戳与时效基准</td>
                 </tr>
               </tbody>
             </table>
+          </div>
+
+          <!-- Prompt Guide Highlights -->
+          <div class="dsh-card-sub p-4 space-y-3">
+            <div class="flex items-center justify-between">
+              <h3 class="text-xs font-bold text-[var(--ink-strong)] flex items-center space-x-1.5">
+                <BookOpen class="w-3.5 h-3.5 text-[var(--accent)]" />
+                <span>💡 高胜率提示词编写五大核心军规（破解“赢小输大”实战攻略）</span>
+              </h3>
+              <span class="dsh-pill text-3xs font-mono">PROMPT_GUIDE.md</span>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+              <div class="p-2.5 rounded border" style="background-color: var(--surface-2); border-color: var(--line-1);">
+                <div class="font-bold text-[var(--up)]">1. 科学波段呼吸，严禁过早提损保本</div>
+                <div class="text-3xs mt-1 text-[var(--ink-3)]">
+                  浮盈 &lt; 1.0R~1.2R 坚决给足 1.8x~2.2x ATR 宽止损呼吸空间；浮盈稳固达到 ≥ 1.5R 且波段确立后再移损保本，杜绝潜力波段刚启动就被 15M 杂波扫出。
+                </div>
+              </div>
+
+              <div class="p-2.5 rounded border" style="background-color: var(--surface-2); border-color: var(--line-1);">
+                <div class="font-bold text-[var(--accent)]">2. 杜绝惊慌砸盘，让主升浪波段奔跑</div>
+                <div class="text-3xs mt-1 text-[var(--ink-3)]">
+                  严禁在轻度浮盈后的正常日内健康回抽中恐慌市价平仓；走势未破坏前坚决 HOLD，目标盈亏比锚定 2.0R~2.8R 空间，用深厚单笔收益弥补试错成本。
+                </div>
+              </div>
+
+              <div class="p-2.5 rounded border" style="background-color: var(--surface-2); border-color: var(--line-1);">
+                <div class="font-bold text-[var(--warn)]">3. 多资产敞口自律，防范系统性 Beta 踩踏</div>
+                <div class="text-3xs mt-1 text-[var(--ink-3)]">
+                  全账户同向持仓达 2 笔以上时，提示词要求自律收紧新开仓门槛（提升至 85%+），严格避开强相关币种同向开单，防范单边跳水连环被扫。
+                </div>
+              </div>
+
+              <div class="p-2.5 rounded border" style="background-color: var(--surface-2); border-color: var(--line-1);">
+                <div class="font-bold text-[var(--down)]">4. 止损后坚决冷静，杜绝绞肉市连续接刀</div>
+                <div class="text-3xs mt-1 text-[var(--ink-3)]">
+                  标的一旦止损出局，提示词明确要求严格遵守冷静期，未出现大级别突破前严禁反手或在同一区间连续重复抄底摸顶（拯救 ARB 式绞肉）。
+                </div>
+              </div>
+            </div>
+
+            <p class="text-3xs text-[var(--ink-3)] leading-body">
+              * 完整攻略与对冲基金投委会席位模板请查阅代码库根目录文档 <code>docs/PROMPT_GUIDE.md</code>。
+            </p>
           </div>
         </section>
 
