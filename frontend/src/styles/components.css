@@ -339,13 +339,21 @@ textarea.input {
   display: inline-flex;
   align-items: center;
   gap: 2px;
+  /* 批 114：窄屏/外语下分段条溢出父级时自适应横向滚动，不撑出整页也不被卡片硬切 */
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
   padding: 2px;
   background-color: var(--ds-color-bg-surface-2);
   border: 1px solid var(--ds-color-border-default);
   border-radius: var(--r-ctl);
   user-select: none;
 }
+.seg::-webkit-scrollbar {
+  display: none;
+}
 .seg button {
+  flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;

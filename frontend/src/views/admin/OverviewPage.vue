@@ -808,10 +808,13 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
 .ov-stream-list {
   display: flex;
   flex-direction: column;
+  /* 批 114：窄屏（移动端 390px）卡片宽度不足时允许横向平滑滚动，不裁切右侧时间与状态 */
+  overflow-x: auto;
 }
 .ov-stream-item {
   display: grid;
   grid-template-columns: 100px 100px 90px 1fr 70px;
+  min-width: 480px;
   align-items: center;
   gap: var(--sp-6);
   padding: var(--sp-6) var(--sp-8);
@@ -1092,10 +1095,13 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
 .ov-audit-table {
   display: flex;
   flex-direction: column;
+  /* 批 114：窄屏（移动端 390px）允许横向平滑滚动，不裁切右侧详情指示与时间 */
+  overflow-x: auto;
 }
 .ov-audit-row {
   display: grid;
   grid-template-columns: 180px 140px 1fr 140px;
+  min-width: 520px;
   align-items: center;
   gap: 12px;
   padding: 10px 20px;

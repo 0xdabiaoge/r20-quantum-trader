@@ -134,10 +134,11 @@ function toggleCoinFilter(sym: string) {
       </div>
 
       <!-- 信源状态与新鲜度 -->
-      <div class="flex flex-wrap items-center gap-1.5">
-        <span class="dsh-pill" :title="sourceReason">
+      <div class="flex flex-wrap items-center gap-1.5 max-w-full min-w-0">
+        <!-- 批 114：长信源文案在移动端（390px）增加 max-w-full 与 truncate，避免胶囊撑破视口溢出 68px -->
+        <span class="dsh-pill max-w-full min-w-0" :title="sourceReason">
           <span class="dsh-status-dot" :class="isSourceActive ? 'active' : 'warn'" aria-hidden="true" />
-          <span class="text-[var(--ink-2)]">{{ isSourceActive ? sourceReason : t('status.attention') }}</span>
+          <span class="text-[var(--ink-2)] truncate min-w-0">{{ isSourceActive ? sourceReason : t('status.attention') }}</span>
         </span>
         <!-- 批 73：信源**非活跃**时胶囊只显示"需注意"，而"为什么需注意"（source_reason）
              此前只挂在上面的 :title 上 —— 恰好在最需要它的时刻键盘与触摸够不到。 -->
