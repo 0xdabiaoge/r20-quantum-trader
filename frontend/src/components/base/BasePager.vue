@@ -19,7 +19,7 @@ const info = computed(() =>
   <nav class="flex items-center justify-between gap-3 px-3.5 py-2" :aria-label="t('common.pageNav')">
     <span class="t-faint num text-xs" role="status" aria-live="polite">{{ info }}</span>
     <div v-if="pageCount > 1" class="flex items-center gap-1">
-      <button
+      <button type="button"
         class="btn btn-ghost btn-icon btn-sm"
         :disabled="page <= 1"
         :title="t('common.prevPage')"
@@ -28,7 +28,7 @@ const info = computed(() =>
       >
         <ChevronLeft />
       </button>
-      <button
+      <button type="button"
         class="btn btn-ghost btn-icon btn-sm"
         :disabled="page >= pageCount"
         :title="t('common.nextPage')"

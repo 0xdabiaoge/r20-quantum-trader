@@ -79,7 +79,7 @@ const hint = computed(() => t('admin.shell.danger.confirmHint', undefined, { phr
         </span>
       </label>
 
-      <button
+      <button type="button"
         class="btn btn-danger btn-sm dz-action"
         :disabled="!unlocked"
         @click="act"

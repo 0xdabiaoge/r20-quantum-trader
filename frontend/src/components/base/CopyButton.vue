@@ -27,7 +27,7 @@ async function copy() {
 </script>
 
 <template>
-  <button
+  <button type="button"
     class="btn"
     :class="label ? 'btn-ghost btn-sm' : 'btn-quiet btn-icon btn-sm'"
     :title="done ? t('common.copied') : t('common.copy')"

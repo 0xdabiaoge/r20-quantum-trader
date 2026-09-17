@@ -1,18 +1,20 @@
 /**
- * 管理后台所有视图按钮类型显式化与表单隔离守卫闸（批 120）。
+ * 全站所有 Vue 模板按钮类型显式化与表单提交隔离守卫闸（批 121，原批 120 升级全仓覆盖）。
  *
  * ## 规则背景
  *
- * 在复杂交易管理后台中，存在大量带有输入框、多卡片操作、抽屉或弹窗的视图：
+ * 在复杂交易控制台与前台看板中，存在大量带有输入框、卡片操作、抽屉或弹窗的视图：
  * HTML 规范中，任何未显式声明 `type` 的 `<button>` 元素都会被浏览器默认当成 `type="submit"`。
  * 当用户在任何输入框聚焦并按下 Enter 键，或者在复杂的 DOM 树中触发回车时，
  * 缺省 `type` 的按钮会被当作提交按钮意外派发，造成误操作、页面刷新或非预期并发请求。
  *
  * 在批 115 中我们发现了由于按钮语义模糊导致的表单双重派发重大缺陷，
- * 在批 119 中治理了 LLM 模块的 24 处遗留。
- * 本闸将此守卫扩展覆盖到 `src/views/admin/` 下的**全部 22 个管理后台视图**，
- * 确保每一个 `<button>` 都显式具有 `type="button"` 或 `type="submit"`，
- * 零隐式提交遗留。
+ * 在批 119 中治理了 LLM 模块的 24 处遗留，
+ * 在批 120 中治理了管理后台其余 18 个视图的 140 余处遗留。
+ * 本闸将此守卫扩展覆盖到 `src/` 下的**全仓全部 53 个 Vue 组件与页面**（涵盖 base 原语、
+ * dashboard 看板视图、layouts 外壳与 admin 全部管理视图），
+ * 确保全站 270+ 个 `<button>` 每一个都显式具有 `type="button"` 或 `type="submit"`，
+ * 彻底终结隐式提交遗留。
  *
  * 运行：`node --test tests/*.test.mjs`
  */
@@ -21,7 +23,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 
-const ADMIN_DIR = path.resolve(import.meta.dirname, '..', 'src/views/admin');
+const SRC_DIR = path.resolve(import.meta.dirname, '..', 'src');
 
 /** 递归获取目录下的所有 .vue 文件 */
 function getVueFiles(dir, out = []) {
@@ -54,15 +56,15 @@ export function findUntypedButtons(source) {
   return bad;
 }
 
-test('管理后台全部 22 个视图内所有按钮必须显式声明 type 属性', () => {
-  const files = getVueFiles(ADMIN_DIR);
-  assert.ok(files.length >= 20, `检索到的管理视图文件数异常少: ${files.length}`);
+test('全仓全部 53 个 Vue 文件内所有按钮必须显式声明 type 属性', () => {
+  const files = getVueFiles(SRC_DIR);
+  assert.ok(files.length >= 45, `检索到的 Vue 组件与页面数异常少: ${files.length}`);
 
   const violations = [];
   let totalButtonsChecked = 0;
 
   for (const f of files) {
-    const rel = path.relative(ADMIN_DIR, f);
+    const rel = path.relative(SRC_DIR, f);
     const content = readFileSync(f, 'utf8');
     const hits = findUntypedButtons(content);
     const allBtns = [...stripComments(content).matchAll(/<button\b/g)];
@@ -73,11 +75,11 @@ test('管理后台全部 22 个视图内所有按钮必须显式声明 type 属�
     }
   }
 
-  assert.ok(totalButtonsChecked >= 100, `检查的后台按钮总数过少: ${totalButtonsChecked}`);
+  assert.ok(totalButtonsChecked >= 250, `全仓检查的按钮总数过少: ${totalButtonsChecked}`);
   assert.deepEqual(
     violations,
     [],
-    '管理后台视图发现未显式指定 type 的按钮（会默认为 submit 造成误提交）：\n  ' + violations.join('\n  '),
+    '全仓发现未显式指定 type 的按钮（会默认为 submit 造成误提交）：\n  ' + violations.join('\n  '),
   );
 });
 

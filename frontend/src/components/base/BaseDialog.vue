@@ -90,7 +90,7 @@ onBeforeUnmount(releaseModalFocus);
                 </h3>
                 <p v-if="desc" :id="descId" class="mt-0.5 text-xs" style="color: var(--ink-2)">{{ desc }}</p>
               </div>
-              <button
+              <button type="button"
                 v-if="showClose"
                 class="btn btn-quiet btn-icon shrink-0 -me-1.5"
                 :title="`${t('common.close')} (Esc)`"

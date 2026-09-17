@@ -117,7 +117,7 @@ onUnmounted(() => {
       style="background-color: var(--surface-header); border-color: var(--line-1);"
     >
       <div class="flex items-center space-x-2 sm:space-x-3 min-w-0">
-        <button
+        <button type="button"
           @click="router.push('/')"
           class="btn btn-quiet h-7 px-2.5 text-xs font-medium cursor-pointer inline-flex items-center gap-1.5"
           :title="t('docs.backTerminal')"
@@ -142,7 +142,7 @@ onUnmounted(() => {
       </div>
 
       <div class="flex items-center space-x-2 shrink-0">
-        <button
+        <button type="button"
           @click="mobileMenuOpen = !mobileMenuOpen"
           class="sm:hidden btn btn-quiet btn-icon h-7 w-7 cursor-pointer"
           :title="t('docs.tocBtn')"
@@ -154,7 +154,7 @@ onUnmounted(() => {
           <X v-else class="w-3.5 h-3.5" />
         </button>
 
-        <button
+        <button type="button"
           @click="router.push('/admin')"
           class="hidden sm:inline-flex btn btn-ghost h-7 px-2.5 text-xs font-medium cursor-pointer items-center gap-1"
         >
@@ -195,7 +195,7 @@ onUnmounted(() => {
           <div class="text-3xs font-bold uppercase tracking-wider text-[var(--ink-3)]">
             {{ t('docs.tocBtn') }} (TOC)
           </div>
-          <button
+          <button type="button"
             @click="mobileMenuOpen = false"
             class="sm:hidden btn btn-quiet btn-icon h-6 w-6"
             :title="t('docs.closeToc')"
@@ -205,7 +205,7 @@ onUnmounted(() => {
           </button>
         </div>
         <nav class="space-y-1">
-          <button
+          <button type="button"
             v-for="s in sections"
             :key="s.id"
             @click="scrollToSection(s.id)"

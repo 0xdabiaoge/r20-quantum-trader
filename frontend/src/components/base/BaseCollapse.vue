@@ -14,7 +14,7 @@ const contentId = useId();
 
 <template>
   <div class="card-flat overflow-hidden">
-    <button
+    <button type="button"
       class="flex w-full items-center gap-2 px-3.5 py-2.5 text-left transition-colors hover:bg-[var(--surface-3)] cursor-pointer"
       :aria-expanded="open"
       :aria-controls="contentId"

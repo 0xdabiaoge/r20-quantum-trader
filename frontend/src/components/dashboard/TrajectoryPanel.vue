@@ -146,7 +146,7 @@ function actionBadgeClass(action: string) {
 
           <div class="flex items-center gap-1.5">
             <kbd class="hidden sm:inline-flex">Esc</kbd>
-            <button
+            <button type="button"
               class="btn btn-quiet btn-icon cursor-pointer h-7 w-7"
               :title="`${t('dash.shell.panel.closeAria')} (Esc)`"
               :aria-label="t('dash.shell.panel.closeAria')"
@@ -208,7 +208,7 @@ function actionBadgeClass(action: string) {
 
           <!-- 日志过滤器 -->
           <div v-if="activeTab === 'logs'" class="flex items-center gap-1">
-            <button
+            <button type="button"
               v-for="filter in ['all', 'warn', 'error'] as const"
               :key="filter"
               class="rounded border px-2 py-0.5 text-3xs font-medium uppercase cursor-pointer transition-colors min-h-[var(--h-sm)]"

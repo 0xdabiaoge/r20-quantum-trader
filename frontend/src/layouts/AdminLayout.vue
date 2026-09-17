@@ -96,7 +96,7 @@ watch(() => route.path, () => (drawerOpen.value = false));
           <span class="wb-brand-name">{{ t('brand.name') }}</span>
           <span class="wb-version">{{ APP_VERSION }}</span>
         </div>
-        <button
+        <button type="button"
           v-if="!collapsed"
           class="wb-icon-btn wb-collapse"
           :title="t('admin.shell.collapse')"
@@ -113,7 +113,7 @@ watch(() => route.path, () => (drawerOpen.value = false));
         <div v-for="g in adminGroups" :key="g.key" class="wb-group">
           <div v-if="!collapsed" class="wb-group-label">{{ t(g.labelKey) }}</div>
           <div v-else class="wb-group-sep" />
-          <button
+          <button type="button"
             v-for="item in g.items"
             :key="item.key"
             class="wb-item"
@@ -130,7 +130,7 @@ watch(() => route.path, () => (drawerOpen.value = false));
 
       <!-- 底部动作 -->
       <div class="wb-rail-foot">
-        <button
+        <button type="button"
           v-if="collapsed"
           class="wb-icon-btn wb-expand"
           :title="t('admin.shell.expand')"
@@ -140,7 +140,7 @@ watch(() => route.path, () => (drawerOpen.value = false));
         >
           <PanelLeftOpen :size="15" />
         </button>
-        <button class="wb-item wb-item-danger" :title="t('nav.actions.logout')" @click="logout">
+        <button type="button" class="wb-item wb-item-danger" :title="t('nav.actions.logout')" @click="logout">
           <LogOut :size="15" class="wb-item-icon" />
           <span v-if="!collapsed" class="wb-item-text">{{ t('nav.actions.logout') }}</span>
         </button>
@@ -151,7 +151,7 @@ watch(() => route.path, () => (drawerOpen.value = false));
     <div class="wb-stage">
       <!-- 顶栏 -->
       <header class="wb-topbar">
-        <button
+        <button type="button"
           class="wb-icon-btn wb-burger"
           :title="drawerOpen ? t('admin.shell.collapse') : t('admin.shell.expand')"
           :aria-label="drawerOpen ? t('admin.shell.collapse') : t('admin.shell.expand')"
@@ -178,7 +178,7 @@ watch(() => route.path, () => (drawerOpen.value = false));
         <div class="wb-topbar-right">
           <BeijingClock class="wb-clock" />
 
-          <button class="wb-icon-btn" :title="t('nav.actions.backToScreen')" @click="router.push('/')">
+          <button type="button" class="wb-icon-btn" :title="t('nav.actions.backToScreen')" @click="router.push('/')">
             <MonitorPlay :size="15" />
           </button>
         </div>
@@ -198,7 +198,7 @@ watch(() => route.path, () => (drawerOpen.value = false));
       <aside id="admin-mobile-drawer" class="wb-drawer" :aria-label="t('admin.shell.brand')">
         <div class="wb-drawer-head">
           <span class="wb-brand-name">{{ t('brand.name') }} {{ t('admin.shell.brand') }}</span>
-          <button
+          <button type="button"
             class="wb-icon-btn"
             :title="t('common.close')"
             :aria-label="t('common.close')"
@@ -210,7 +210,7 @@ watch(() => route.path, () => (drawerOpen.value = false));
         <nav class="wb-nav scroll-area">
           <div v-for="g in adminGroups" :key="g.key" class="wb-group">
             <div class="wb-group-label">{{ t(g.labelKey) }}</div>
-            <button
+            <button type="button"
               v-for="item in g.items"
               :key="item.key"
               class="wb-item"
@@ -224,7 +224,7 @@ watch(() => route.path, () => (drawerOpen.value = false));
           </div>
         </nav>
         <div class="wb-rail-foot">
-          <button class="wb-item wb-item-danger" @click="logout">
+          <button type="button" class="wb-item wb-item-danger" @click="logout">
             <LogOut :size="15" class="wb-item-icon" />
             <span class="wb-item-text">{{ t('nav.actions.logout') }}</span>
           </button>

@@ -151,7 +151,7 @@ const vdBudgetText = computed(() => {
     @close="emit('close')"
   >
     <template #actions>
-      <button class="btn btn-ghost btn-sm" @click="factor && emit('pick-symbol', factor.instId)">
+      <button type="button" class="btn btn-ghost btn-sm" @click="factor && emit('pick-symbol', factor.instId)">
         <LineChart />{{ t('dash.matrix.chart.title') }}
       </button>
     </template>

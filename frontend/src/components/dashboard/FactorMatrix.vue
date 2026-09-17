@@ -204,7 +204,7 @@ const processedRows = computed(() => {
           class="flex items-center gap-0.5 rounded p-0.5"
           style="background-color: var(--surface-2); border: 1px solid var(--line-1)"
         >
-          <button
+          <button type="button"
             v-for="m in [
               { key: 'all', label: t('dash.matrix.filterAll') },
               { key: 'long', label: t('dash.matrix.filterLong') },
@@ -355,7 +355,7 @@ const processedRows = computed(() => {
                 </div>
               </td>
               <td class="text-right" @click.stop>
-                <button
+                <button type="button"
                   class="btn btn-quiet h-6 px-2 text-3xs font-medium cursor-pointer inline-flex items-center gap-1"
                   :title="t('dash.matrix.chartTip')"
                   @click="onQuickChart($event, f.instId)"
@@ -392,7 +392,7 @@ const processedRows = computed(() => {
               >
                 {{ actionMeta(actionOf(f)).label }}
               </span>
-              <button
+              <button type="button"
                 class="btn btn-quiet btn-icon h-6 w-6 cursor-pointer"
                 :title="t('dash.matrix.chartBtn')"
                 @click="onQuickChart($event, f.instId)"

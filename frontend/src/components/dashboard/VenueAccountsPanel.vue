@@ -128,7 +128,7 @@ function refreshAll(): void {
           :aria-label="t('dash.venueAccounts.envLabel')"
           data-test="env-switch"
         >
-          <button
+          <button type="button"
             class="px-2 py-1 rounded text-3xs font-medium cursor-pointer transition-colors flex items-center gap-1"
             :class="
               isDemo
@@ -142,7 +142,7 @@ function refreshAll(): void {
             <FlaskConical class="h-3 w-3" :style="{ color: isDemo ? 'var(--warn)' : 'currentColor' }" />
             {{ t('dash.venueAccounts.envDemo') }}
           </button>
-          <button
+          <button type="button"
             class="px-2 py-1 rounded text-3xs font-medium cursor-pointer transition-colors flex items-center gap-1"
             :class="
               !isDemo
@@ -158,7 +158,7 @@ function refreshAll(): void {
           </button>
         </div>
 
-        <button
+        <button type="button"
           class="btn btn-ghost btn-icon h-7 w-7"
           :title="t('dash.venueAccounts.refresh')"
           data-test="venue-refresh"
@@ -181,7 +181,7 @@ function refreshAll(): void {
       <div class="block md:hidden rounded p-2" style="background-color: var(--surface-2); border: 1px solid var(--line-1)">
         <div class="flex items-center justify-between text-2xs mb-1.5">
           <span class="font-bold text-[var(--ink-1)]">{{ t('dash.venueAccounts.mobileSummary') }}</span>
-          <button
+          <button type="button"
             class="text-3xs font-medium px-2 py-1 rounded cursor-pointer transition-colors bg-[var(--surface-3)] text-[var(--ink-2)] hover:bg-[var(--ds-color-bg-hover)] hover:text-[var(--ink-1)]"
             :aria-expanded="isMobileExpanded"
             :aria-controls="'venue-accounts-grid'"

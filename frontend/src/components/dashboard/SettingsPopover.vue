@@ -45,7 +45,7 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="relative">
-    <button
+    <button type="button"
       ref="trigger"
       class="btn btn-quiet btn-icon"
       :aria-expanded="open"
@@ -89,13 +89,13 @@ onBeforeUnmount(() => {
           </label>
           <div class="border-t pt-2" style="border-color: var(--line-1)">
             <p class="form-label mb-1">{{ t('dash.shell.settings.goto') }}</p>
-            <button class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-[var(--surface-3)]" style="color: var(--ink-1)" @click="open = false; router.push('/docs')">
+            <button type="button" class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-[var(--surface-3)]" style="color: var(--ink-1)" @click="open = false; router.push('/docs')">
               <BookOpen class="h-4 w-4" style="color: var(--ink-3)" />{{ t('nav.actions.docs') }}
             </button>
-            <button class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-[var(--surface-3)]" style="color: var(--ink-1)" @click="open = false; router.push('/admin')">
+            <button type="button" class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-[var(--surface-3)]" style="color: var(--ink-1)" @click="open = false; router.push('/admin')">
               <LayoutDashboard class="h-4 w-4" style="color: var(--ink-3)" />{{ t('nav.actions.console') }}
             </button>
-            <button class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-[var(--surface-3)]" style="color: var(--ink-1)" @click="open = false; peekOpen = true">
+            <button type="button" class="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-[var(--surface-3)]" style="color: var(--ink-1)" @click="open = false; peekOpen = true">
               <Eye class="h-4 w-4" style="color: var(--ink-3)" />{{ t('nav.actions.promptPeek') }}
             </button>
           </div>

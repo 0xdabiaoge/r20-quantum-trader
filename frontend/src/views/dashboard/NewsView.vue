@@ -192,7 +192,7 @@ function toggleCoinFilter(sym: string) {
             <p class="text-3xs text-[var(--ink-3)] mt-0.5">{{ t('dash.news.band.desc') }}</p>
           </div>
 
-          <button
+          <button type="button"
             v-if="selectedCoin"
             class="btn btn-ghost h-6 px-2 text-3xs font-medium cursor-pointer inline-flex items-center gap-1"
             @click="selectedCoin = null"
@@ -203,7 +203,7 @@ function toggleCoinFilter(sym: string) {
         </header>
 
         <div class="grid grid-cols-2 gap-2 p-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-          <button
+          <button type="button"
             v-for="c in coins"
             :key="c.sym"
             class="dsh-card-sub p-2.5 text-left transition-all cursor-pointer relative"

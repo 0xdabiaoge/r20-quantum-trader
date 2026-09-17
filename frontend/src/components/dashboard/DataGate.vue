@@ -77,7 +77,7 @@ async function retry() {
     <p class="state-title">{{ t('dash.shell.gateFailedTitle') }}</p>
     <p class="state-desc">{{ t('dash.shell.gateFailedDesc') }}</p>
     <p class="dg-error-raw mono">{{ store.error }}</p>
-    <button class="btn btn-ghost btn-sm" :disabled="store.loading" @click="retry">
+    <button type="button" class="btn btn-ghost btn-sm" :disabled="store.loading" @click="retry">
       <Loader2 v-if="store.loading" :size="14" class="animate-spin shrink-0" />
       <RefreshCw v-else :size="14" />
       <span>{{ store.loading ? t('dash.shell.gateRetrying') : t('dash.shell.gateRetry') }}</span>
@@ -92,7 +92,7 @@ async function retry() {
         <b>{{ t('dash.shell.gateStaleTitle') }}</b>
         <span>{{ t('dash.shell.gateStaleDesc', undefined, { t: staleAt }) }}</span>
       </span>
-      <button class="btn btn-quiet btn-sm" :disabled="store.loading" @click="retry">
+      <button type="button" class="btn btn-quiet btn-sm" :disabled="store.loading" @click="retry">
         <Loader2 v-if="store.loading" :size="14" class="animate-spin shrink-0" />
         <RefreshCw v-else :size="14" />
         <span>{{ store.loading ? t('dash.shell.gateRetrying') : t('dash.shell.gateRetry') }}</span>

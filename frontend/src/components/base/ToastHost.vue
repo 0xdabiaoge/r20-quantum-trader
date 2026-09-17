@@ -53,7 +53,7 @@ const colors = {
             <p class="text-sm font-semibold leading-snug" style="color: var(--ink-1)">{{ item.title }}</p>
             <p v-if="item.desc" class="mt-0.5 text-xs leading-body" style="color: var(--ink-2)">{{ item.desc }}</p>
           </div>
-          <button
+          <button type="button"
             class="-me-1 mt-px rounded p-1 opacity-60 transition-opacity hover:opacity-100 focus:opacity-100 cursor-pointer"
             :title="t('common.close')"
             :aria-label="t('common.close')"

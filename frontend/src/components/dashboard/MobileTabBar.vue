@@ -18,7 +18,7 @@ const activeKey = computed(() => (route.meta?.tab as string) || 'trading');
     aria-label="mobile primary"
   >
     <div class="mx-auto flex max-w-md items-stretch justify-around">
-      <button
+      <button type="button"
         v-for="tab in publicTabs"
         :key="tab.key"
         class="flex flex-1 cursor-pointer flex-col items-center gap-0.5 py-1.5 text-2xs font-medium transition-colors"

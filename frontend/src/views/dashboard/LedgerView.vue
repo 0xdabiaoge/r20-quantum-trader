@@ -199,7 +199,7 @@ const truncation = computed<{ kept: number; total: number } | null>(() => {
 
       <!-- 快速导出 CSV -->
       <div class="flex items-center gap-2">
-        <button
+        <button type="button"
           class="btn btn-ghost h-7 px-2.5 text-xs font-medium cursor-pointer inline-flex items-center gap-1.5"
           :disabled="!filtered.length"
           @click="exportCsv"

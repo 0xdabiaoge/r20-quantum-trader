@@ -146,7 +146,7 @@ function actionsOf(c: any): { inst: string; dir: string; conf: number }[] {
             >
               {{ grp.day }}
             </div>
-            <button
+            <button type="button"
               v-for="c in grp.items"
               :key="c.time"
               class="flex w-full cursor-pointer items-start gap-3 border-b px-4 py-3 text-left transition-colors last:border-b-0 hover:bg-[var(--surface-2)]"

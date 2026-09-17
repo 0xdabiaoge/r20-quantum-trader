@@ -735,7 +735,7 @@ onUnmounted(() => {
     >
       <!-- 选币下拉 -->
       <div class="indicator-dropdown-container relative">
-        <button
+        <button type="button"
           ref="symbolTrigger"
           class="flex h-7 cursor-pointer items-center gap-1.5 rounded border border-[var(--line-1)] bg-[var(--surface-2)] px-2.5 transition-colors hover:bg-[var(--surface-3)]"
           :aria-expanded="symbolMenu"
@@ -757,7 +757,7 @@ onUnmounted(() => {
             :aria-label="t('dash.matrix.chart.perp')"
             class="outline-none float-panel absolute left-0 top-8 z-[var(--z-float)] max-h-80 w-56 overflow-y-auto p-1.5"
           >
-            <button
+            <button type="button"
               v-for="sym in availableSymbols"
               :key="sym"
               class="flex w-full cursor-pointer items-center justify-between rounded px-2 py-1.5 text-left text-xs transition-colors hover:bg-[var(--surface-1)]"
@@ -799,7 +799,7 @@ onUnmounted(() => {
 
         <!-- 指标菜单 -->
         <div class="indicator-dropdown-container relative">
-          <button
+          <button type="button"
             ref="indicatorTrigger"
             class="btn btn-sm"
             :class="showIndicatorMenu || activeIndicatorCount > 0 ? 'bg-[var(--accent-bg)] text-[var(--accent)] border border-[var(--accent-line)]' : 'btn-ghost'"
@@ -818,7 +818,7 @@ onUnmounted(() => {
               <p class="t-label mb-2">{{ t('dash.matrix.chart.indicatorHint') }}</p>
               <p class="t-label mb-1.5">{{ t('dash.matrix.chart.overlays') }}</p>
               <div class="mb-3 grid grid-cols-2 gap-1.5">
-                <button
+                <button type="button"
                   v-for="ind in mainIndicators"
                   :key="ind.key"
                   class="flex cursor-pointer items-center justify-between rounded-md border px-2 py-1.5 text-xs font-semibold transition-colors"
@@ -838,7 +838,7 @@ onUnmounted(() => {
               </div>
               <p class="t-label mb-1.5">{{ t('dash.matrix.chart.panes') }}</p>
               <div class="grid grid-cols-2 gap-1.5">
-                <button
+                <button type="button"
                   v-for="ind in subIndicators"
                   :key="ind.key"
                   class="flex cursor-pointer items-center justify-between rounded-md border px-2 py-1.5 text-xs font-semibold transition-colors"
@@ -861,7 +861,7 @@ onUnmounted(() => {
         </div>
 
         <!-- 试算开关 -->
-        <button
+        <button type="button"
           class="btn btn-sm"
           :class="simMode ? 'btn-primary' : 'btn-ghost'"
           :title="simMode ? t('dash.matrix.chart.sim.exit') : t('dash.matrix.chart.sim.enter')"
@@ -871,10 +871,10 @@ onUnmounted(() => {
           <span class="hidden sm:inline">{{ simMode ? t('dash.matrix.chart.sim.exit') : t('dash.matrix.chart.simulate') }}</span>
         </button>
 
-        <button class="btn btn-ghost btn-icon btn-sm" :title="t('common.refresh')" @click="loadCandles(false, true)">
+        <button type="button" class="btn btn-ghost btn-icon btn-sm" :title="t('common.refresh')" @click="loadCandles(false, true)">
           <RefreshCw :class="isLoading && 'animate-spin shrink-0'" />
         </button>
-        <button
+        <button type="button"
           class="btn btn-ghost btn-icon btn-sm"
           :title="isFullscreen ? t('dash.matrix.chart.exitFullscreen') : t('dash.matrix.chart.fullscreen')"
           @click="isFullscreen = !isFullscreen"
@@ -962,10 +962,10 @@ onUnmounted(() => {
       </div>
 
       <div class="flex flex-wrap items-center justify-end gap-2 pt-1">
-        <button class="btn btn-ghost btn-sm" @click="resetSimulation">
+        <button type="button" class="btn btn-ghost btn-sm" @click="resetSimulation">
           <RotateCcw />{{ t('dash.matrix.chart.sim.reset') }}
         </button>
-        <button class="btn btn-primary btn-sm" @click="copySimulationSummary">
+        <button type="button" class="btn btn-primary btn-sm" @click="copySimulationSummary">
           <Check v-if="copied" style="color: var(--up)" />
           <Copy v-else />
           {{ copied ? t('common.copied') : t('dash.matrix.chart.sim.copy') }}

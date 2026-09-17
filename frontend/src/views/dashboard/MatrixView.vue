@@ -71,7 +71,7 @@ function pick(instId: string) {
 
       <!-- 模式切换控制器 -->
       <div class="flex items-center gap-2">
-        <button
+        <button type="button"
           class="btn btn-ghost h-7 px-2.5 text-xs font-medium cursor-pointer inline-flex items-center gap-1.5 transition-colors"
           :class="isFocusMode ? 'btn-primary' : ''"
           :title="isFocusMode ? t('dash.matrix.focusRestoreTip') : t('dash.matrix.focusTip')"
