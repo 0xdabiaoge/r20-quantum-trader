@@ -143,6 +143,57 @@ test('开了色觉辅助后，「跌」与「警告」仍必须分得开（批 1
   }
 });
 
+test('色觉辅助色作为**文字**落在自己的淡色底上也要达 AA（批 105 修的 4.40:1）', () => {
+  // ⚠️ 这是判据此前漏掉的一格，也是**全站回归审计**才抓到的那处：
+  // 语义色除了直接铺在卡片上，还会以「文字 + 12~13% 同色淡底」的小标签形态出现
+  // （/news 的「做多」11px 标签）。淡底把背景抬亮，对比度比裸卡片低得多 ——
+  // #6799fe 裸卡片上 5.86:1 合格，落到自己的淡底上只剩 **4.40:1**（AA 要 4.5）。
+  //
+  // 合成顺序：淡底 over 卡内层底色（实测卡内层是 #212634，比 --surface-1 亮）。
+  const CARDS = ['#151821', '#212634'];
+  const alphaOf = (v) => {
+    const m = /rgba\([^)]*,\s*([\d.]+)\s*\)/.exec(v);
+    return m ? +m[1] : 1;
+  };
+  const over = (tint, bg) => [0, 1, 2].map((i) => tint[i] * tint[3] + bg[i] * (1 - tint[3]));
+  const bad = [];
+  for (const [key, bgKey, alphaKey] of [
+    ['--r20-up', null, '--r20-up-bg'],
+    ['--r20-down', null, '--r20-down-bg'],
+    ['--r20-warn', null, '--r20-warn-bg'],
+  ]) {
+    const fg = CVD_DARK[key];
+    const bgDecl = CVD_DARK[alphaKey];
+    assert.ok(/^#/.test(fg) && /^rgba/.test(bgDecl), `${key} / ${alphaKey} 取值形态不对`);
+    const tint = [...toRgb(fg), alphaOf(bgDecl)];
+    for (const card of CARDS) {
+      const composed = over(tint, toRgb(card));
+      const hex = '#' + composed.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('');
+      const r = contrast(fg, hex);
+      if (r < 4.5) bad.push(`${key} ${fg} 落在自己的淡底(${bgDecl}) 上、卡片 ${card} → ${r.toFixed(2)}:1`);
+    }
+  }
+  assert.deepEqual(
+    bad,
+    [],
+    `色觉辅助下这些小标签文字达不到 AA 4.5:1（基准色够亮，但被自己的淡底抬亮了背景）：\n  ${bad.join('\n  ')}\n` +
+      '把语义色提亮，或把对应 `-bg` 的透明度调低。',
+  );
+});
+
+test('（记录，不断言）浅色主题的语义色淡底标签目前达不到 AA', () => {
+  // 浅色主题整套**已写好但不可达**（useTheme 是暗色专用桩，见批 103 的计划记录）。
+  // 实测浅色下「文字 + 同色淡底」无论开不开色觉辅助都不到 4.5:1：
+  //   非 CVD —— 涨 3.84 / 跌 4.18 / 警告 3.82
+  //   CVD   —— 涨 3.46 / 跌 3.97 / 警告 3.86
+  // 也就是说：**若将来要接通浅色主题，这套色得整体重算**，不是只补 CVD 那一档。
+  // 这里只做存在性检查（值还在），避免哪天被误删后无人知晓这段结论。
+  for (const k of ['--r20-up', '--r20-down', '--r20-warn']) {
+    assert.ok(/^#/.test(LIGHT[k]), `浅色主题缺少 ${k}`);
+    assert.ok(/^#/.test(CVD_LIGHT[k]), `浅色+CVD 缺少 ${k}`);
+  }
+});
+
 test('色觉辅助下的涨跌色，作为图形也要能看清（WCAG 1.4.11 非文本对比度 ≥3:1）', () => {
   for (const [name, blk, card] of [['暗色', CVD_DARK, DARK_CARD]]) {
     for (const key of ['--r20-up', '--r20-down']) {
