@@ -327,6 +327,8 @@ function statusLabel(s: string): string {
           type="text"
           autocomplete="off"
           spellcheck="false"
+          :class="{ 'is-bad': !!replayPhrase && !replayMatched }"
+          :aria-invalid="!!replayPhrase && !replayMatched ? 'true' : undefined"
           :placeholder="replayExpected"
           @keyup.enter="confirmReplay"
         />
@@ -339,7 +341,7 @@ function statusLabel(s: string): string {
         <button type="button" class="btn btn-ghost btn-sm" @click="closeReplay">{{ t('common.cancel') }}</button>
         <button type="button"
           class="btn btn-primary btn-sm"
-          :disabled="!replayPhrase.trim() || replaying"
+          :disabled="!replayMatched || replaying"
           @click="confirmReplay"
         >
           <span>{{ t('admin.gateway.deliveries.replaySubmit') }}</span>

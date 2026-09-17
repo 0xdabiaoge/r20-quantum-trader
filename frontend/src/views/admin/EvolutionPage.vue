@@ -268,6 +268,7 @@ async function savePipelineModules() {
 /* ── 立即复盘：原生 prompt() → 对话框（确认短语校验与请求体逐字保留） ── */
 const RUN_PHRASE = 'RUN EVOLUTION';
 const runDialog = ref<{ open: boolean; phrase: string }>({ open: false, phrase: '' });
+const runPhraseOk = computed(() => runDialog.value.phrase.trim().toUpperCase() === RUN_PHRASE);
 
 function openRunDialog() {
   runDialog.value = { open: true, phrase: '' };
@@ -648,6 +649,8 @@ onMounted(loadData);
           class="field mono"
           autocomplete="off"
           spellcheck="false"
+          :class="{ 'is-bad': !!runDialog.phrase && !runPhraseOk }"
+          :aria-invalid="!!runDialog.phrase && !runPhraseOk ? 'true' : undefined"
           :placeholder="RUN_PHRASE"
           @keyup.enter="confirmRun"
         />
@@ -657,7 +660,7 @@ onMounted(loadData);
         <button type="button" class="btn btn-ghost btn-sm" @click="closeRunDialog">{{ t('common.cancel') }}</button>
         <button type="button"
           class="btn btn-primary btn-sm"
-          :disabled="!runDialog.phrase.trim() || busy === 'run'"
+          :disabled="!runPhraseOk || busy === 'run'"
           @click="confirmRun"
         >
           <Loader2 v-if="busy === 'run'" :size="14" class="animate-spin shrink-0" />

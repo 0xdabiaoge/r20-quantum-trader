@@ -362,6 +362,8 @@ const bandFacts = computed(() => {
           type="text"
           autocomplete="off"
           spellcheck="false"
+          :class="{ 'is-bad': !!confirmPhrase && !phaseOk }"
+          :aria-invalid="!!confirmPhrase && !phaseOk ? 'true' : undefined"
           :aria-label="t('admin.about.phrasePlaceholder')"
           :placeholder="t('admin.about.phrasePlaceholder')"
           class="field mono ab-confirm-input"
