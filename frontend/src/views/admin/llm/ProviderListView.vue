@@ -133,11 +133,11 @@ const bandFacts = () => [
   <div class="pv">
     <PageHeader :title="t('nav.admin.llm')" :description="t('admin.llm.desc')">
       <template #actions>
-        <button class="btn btn-ghost btn-sm" :disabled="loading" @click="loadConfig">
+        <button type="button" class="btn btn-ghost btn-sm" :disabled="loading" @click="loadConfig">
           <RefreshCw :size="14" :class="loading && 'animate-spin shrink-0'" />
           <span>{{ t('admin.llm.refreshStatus') }}</span>
         </button>
-        <button class="btn btn-primary btn-sm" :title="t('admin.llm.addProviderTitle')" @click="openAddProviderModal">
+        <button type="button" class="btn btn-primary btn-sm" :title="t('admin.llm.addProviderTitle')" @click="openAddProviderModal">
           <Plus :size="14" />
           <span>{{ t('admin.llm.addProvider') }}</span>
         </button>
@@ -161,7 +161,7 @@ const bandFacts = () => [
           <p class="card-sub">{{ t('admin.llm.globalTimeoutDesc') }}</p>
         </div>
         <span class="badge mono">{{ t('admin.llm.currentLimit', undefined, { n: cfg?.thinking_timeout || 120 }) }}</span>
-        <button class="btn btn-primary btn-sm" :disabled="savingSettings" @click="saveGlobalSettings">
+        <button type="button" class="btn btn-primary btn-sm" :disabled="savingSettings" @click="saveGlobalSettings">
           <RefreshCw v-if="savingSettings" :size="14" class="animate-spin shrink-0" />
           <Save v-else :size="14" />
           <span>{{ savingSettings ? t('admin.llm.saving') : t('admin.llm.saveReasoning') }}</span>
@@ -234,7 +234,7 @@ const bandFacts = () => [
         <span class="badge mono">
           {{ t('admin.llm.attemptsChip', undefined, { n: cfg?.request_attempts || 3, m: (cfg?.fallback_model_ids || []).length }) }}
         </span>
-        <button class="btn btn-primary btn-sm" :disabled="savingSettings" @click="saveGlobalSettings">
+        <button type="button" class="btn btn-primary btn-sm" :disabled="savingSettings" @click="saveGlobalSettings">
           <RefreshCw v-if="savingSettings" :size="14" class="animate-spin shrink-0" />
           <Save v-else :size="14" />
           <span>{{ savingSettings ? t('admin.llm.saving') : t('admin.llm.saveResilience') }}</span>
@@ -325,7 +325,7 @@ const bandFacts = () => [
       <!-- 回退审计 -->
       <div class="pv-audit-head">
         <span class="label-caps"><History :size="11" />{{ t('admin.llm.recentFailover') }}</span>
-        <button class="btn btn-ghost btn-sm" @click="loadFailoverEvents">
+        <button type="button" class="btn btn-ghost btn-sm" @click="loadFailoverEvents">
           <RefreshCw :size="14" />
           <span>{{ t('admin.llm.refresh') }}</span>
         </button>
@@ -374,7 +374,7 @@ const bandFacts = () => [
         <span class="state-icon"><ShieldAlert :size="17" /></span>
         <p class="state-title">{{ t('common.loadFailed') }}</p>
         <p class="state-desc">{{ cfgError || t('common.networkError') }}</p>
-        <button class="btn btn-ghost btn-sm" :disabled="loading" @click="loadConfig">
+        <button type="button" class="btn btn-ghost btn-sm" :disabled="loading" @click="loadConfig">
           <RefreshCw :size="14" />
           <span>{{ t('common.retry') }}</span>
         </button>

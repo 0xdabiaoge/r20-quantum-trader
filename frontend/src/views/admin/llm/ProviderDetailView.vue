@@ -61,7 +61,7 @@ function monogram(name: string): string {
   <div class="pd">
     <!-- ══ 详情头 ══ -->
     <section class="card pd-head">
-      <button class="btn btn-ghost btn-sm" @click="goBackToList">
+      <button type="button" class="btn btn-ghost btn-sm" @click="goBackToList">
         <ArrowLeft :size="14" />
         <span>{{ t('admin.llm.back') }}</span>
       </button>
@@ -207,6 +207,7 @@ function monogram(name: string): string {
         <footer class="pd-foot">
           <button
             v-if="!selectedProvider.is_new"
+            type="button"
             class="btn btn-danger btn-sm"
             @click="removeProvider"
           >
@@ -214,7 +215,7 @@ function monogram(name: string): string {
             <span>{{ t('admin.llm.deleteProvider') }}</span>
           </button>
           <span class="pd-foot-spacer" />
-          <button class="btn btn-primary btn-sm" @click="saveProviderConfig">
+          <button type="button" class="btn btn-primary btn-sm" @click="saveProviderConfig">
             {{ t('admin.llm.saveProvider') }}
           </button>
         </footer>
@@ -265,6 +266,7 @@ function monogram(name: string): string {
             <div class="pd-model-actions">
               <button
                 v-if="m.id !== cfg?.active_model_id"
+                type="button"
                 class="btn btn-primary btn-sm"
                 :title="t('admin.llm.setBrainTitle')"
                 @click="activateModel(m)"
@@ -273,6 +275,7 @@ function monogram(name: string): string {
               </button>
 
               <button
+                type="button"
                 class="btn btn-ghost btn-icon btn-sm"
                 :disabled="testLoading && testingModelId === m.id"
                 :title="t('admin.llm.testConnTitle')"
@@ -281,11 +284,11 @@ function monogram(name: string): string {
                 <RefreshCw :size="14" :class="testLoading && testingModelId === m.id ? 'animate-spin shrink-0' : ''" />
               </button>
 
-              <button class="btn btn-ghost btn-icon btn-sm" :title="t('admin.llm.editParamsTitle')" @click="openEditModelModal(m)">
+              <button type="button" class="btn btn-ghost btn-icon btn-sm" :title="t('admin.llm.editParamsTitle')" @click="openEditModelModal(m)">
                 <Settings :size="13" />
               </button>
 
-              <button class="btn btn-quiet btn-icon btn-sm is-danger" :title="t('admin.llm.deleteModelTitle')" @click="deleteSingleModel(m)">
+              <button type="button" class="btn btn-quiet btn-icon btn-sm is-danger" :title="t('admin.llm.deleteModelTitle')" @click="deleteSingleModel(m)">
                 <Trash2 :size="13" />
               </button>
             </div>
@@ -293,15 +296,15 @@ function monogram(name: string): string {
         </div>
 
         <footer class="pd-toolbar">
-          <button class="btn btn-ghost btn-sm" @click="openFetchDialog">
+          <button type="button" class="btn btn-ghost btn-sm" @click="openFetchDialog">
             <DownloadCloud :size="13" />
             <span>{{ t('admin.llm.fetch') }}</span>
           </button>
-          <button class="btn btn-ghost btn-sm" @click="openAddModelModal">
+          <button type="button" class="btn btn-ghost btn-sm" @click="openAddModelModal">
             <Plus :size="13" />
             <span>{{ t('admin.llm.addNewModel') }}</span>
           </button>
-          <button class="btn btn-quiet btn-sm is-danger" :title="t('admin.llm.clearModelsTitle')" @click="clearCurrentProviderModels">
+          <button type="button" class="btn btn-quiet btn-sm is-danger" :title="t('admin.llm.clearModelsTitle')" @click="clearCurrentProviderModels">
             <Trash2 :size="13" />
             <span>{{ t('admin.llm.clearModelsTitle') }}</span>
           </button>

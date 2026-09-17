@@ -54,7 +54,7 @@ const {
           <span class="rf-endpoint mono truncate">{{ customFetchUrl || selectedProvider?.base_url || '--' }}</span>
         </div>
         <span v-if="selectedProvider?.has_key" class="badge badge-up">{{ t('admin.llm.useStoredKey') }}</span>
-        <button class="btn btn-primary btn-sm" :disabled="fetchingRemote" @click="executeRemoteFetch">
+        <button type="button" class="btn btn-primary btn-sm" :disabled="fetchingRemote" @click="executeRemoteFetch">
           <RefreshCw :size="14" :class="fetchingRemote ? 'animate-spin shrink-0' : ''" />
           <span>{{ fetchingRemote ? t('admin.llm.probing') : t('admin.llm.reprobe') }}</span>
         </button>
@@ -90,10 +90,10 @@ const {
               <span class="rf-row-id mono truncate">{{ rm.id }}</span>
             </div>
             <div class="rf-row-actions">
-              <button class="btn btn-ghost btn-sm" @click="importRemoteModel(rm, false)">
+              <button type="button" class="btn btn-ghost btn-sm" @click="importRemoteModel(rm, false)">
                 {{ t('admin.llm.addBtn') }}
               </button>
-              <button class="btn btn-primary btn-sm" @click="importRemoteModel(rm, true)">
+              <button type="button" class="btn btn-primary btn-sm" @click="importRemoteModel(rm, true)">
                 {{ t('admin.llm.addAndEnable') }}
               </button>
             </div>
@@ -110,12 +110,13 @@ const {
       </span>
       <button
         v-if="filteredRemoteModels.length"
+        type="button"
         class="btn btn-ghost btn-sm"
         @click="importAllFilteredRemoteModels"
       >
         {{ t('admin.llm.addAll', undefined, { n: filteredRemoteModels.length }) }}
       </button>
-      <button class="btn btn-primary btn-sm" @click="fetchModalVisible = false">
+      <button type="button" class="btn btn-primary btn-sm" @click="fetchModalVisible = false">
         {{ t('admin.llm.done') }}
       </button>
     </template>
