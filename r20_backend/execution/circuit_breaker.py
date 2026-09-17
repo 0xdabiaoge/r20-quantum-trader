@@ -47,8 +47,29 @@ def _ledger_sync_failed_venues(max_age_seconds: float = 2700.0) -> list[str]:
             age = (datetime.datetime.now(ts.tzinfo) - ts).total_seconds()
             if age > max_age_seconds:
                 return []
-        return [str(v) for v, d in (payload.get("venues") or {}).items()
-                if isinstance(d, dict) and d.get("status") == "failed"]
+        failed = []
+        for v, d in (payload.get("venues") or {}).items():
+            if not (isinstance(d, dict) and d.get("status") == "failed"):
+                continue
+            reason = str(d.get("reason") or "").lower()
+            # 审计：若失败原因是该所未配置有效凭证（免密只读行情模式），无账户台账可同步，
+            # 绝不能作为"当日亏损不可判全"的理由熔断其他已配置场所（如 OKX）的开仓。
+            is_unconfigured_error = any(
+                token in reason for token in (
+                    "-2015", "invalid api-key", "invalid key", "需显式设",
+                    "not configured", "未配置", "未提供", "missing credential"
+                )
+            )
+            if is_unconfigured_error:
+                try:
+                    from r20_backend.exchanges import venue_credentials
+                    ak, sk = venue_credentials(str(v), str(payload.get("environment") or ""))
+                    if not (ak and sk):
+                        continue
+                except Exception:
+                    pass
+            failed.append(str(v))
+        return failed
     except Exception:
         return []
 # 审计③(2026-09-13)：文件名分裂修复——旧值（复数 .json）与 trader 活文件

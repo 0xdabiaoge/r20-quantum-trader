@@ -198,7 +198,11 @@ def fetch_binance_closed_trades(environment: str = "demo", tz_bj=None) -> list:
         tz_bj = datetime.timezone(datetime.timedelta(hours=8))
     out = []
     try:
-        from r20_backend.exchanges import get_adapter
+        from r20_backend.exchanges import get_adapter, venue_credentials
+        ak, sk = venue_credentials("binance", environment)
+        if not (ak and sk):
+            # 未配置私有凭证（仅提供免密公共行情），无账户台账可同步，安全跳过
+            return []
         ad_bn = get_adapter("binance", environment=environment)
         income_rows = ad_bn.signed_request("GET", "/fapi/v1/income", params={"incomeType": "REALIZED_PNL", "limit": 100})
         if not income_rows or not isinstance(income_rows, list):
@@ -270,7 +274,11 @@ def fetch_gate_closed_trades(environment: str = "sandbox", tz_bj=None) -> list:
         tz_bj = datetime.timezone(datetime.timedelta(hours=8))
     out = []
     try:
-        from r20_backend.exchanges import get_adapter
+        from r20_backend.exchanges import get_adapter, venue_credentials
+        ak, sk = venue_credentials("gate", environment)
+        if not (ak and sk):
+            # 未配置私有凭证（仅提供免密公共行情），无账户台账可同步，安全跳过
+            return []
         ad_gate = get_adapter("gate", environment=environment)
         close_rows = ad_gate.signed_request("GET", "/api/v4/futures/usdt/position_close", params={"limit": 100})
         if not close_rows or not isinstance(close_rows, list):

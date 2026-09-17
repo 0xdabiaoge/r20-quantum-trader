@@ -103,6 +103,18 @@ class BreakerSidecarTests(unittest.TestCase):
         (Path(self.tmp.name) / "ledger_sync_status.json").write_text("{not json", encoding="utf-8")
         self.assertEqual(cb._ledger_sync_failed_venues(), [])
 
+    def test_unconfigured_venue_does_not_trip_circuit_breaker(self):
+        """未配置凭证的场所（免密只读行情模式）报错绝不能误熔断其他正常场所。"""
+        with patch("r20_backend.exchanges.venue_credentials", return_value=("", "")):
+            self._write_sidecar({
+                "okx": {"status": "ok"},
+                "binance": {"status": "failed", "reason": "Binance [-2015]: Invalid API-key, IP, or permissions for action"},
+                "gate": {"status": "failed", "reason": "Gate INVALID_KEY: Invalid key provided"},
+            })
+            self.assertEqual(cb._ledger_sync_failed_venues(), [])
+            active, reason = cb.is_circuit_breaker_active(usdt_available=1000.0)
+            self.assertFalse(active, f"未配置凭证的免密行情所导致了误熔断: {reason}")
+
 
 if __name__ == "__main__":
     unittest.main()

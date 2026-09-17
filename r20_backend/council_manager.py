@@ -223,12 +223,12 @@ def save_council_config(config: Dict[str, Any], *, enforce_models: bool = True) 
     return config
 
 
-# ---- 2026-09-09 预设对齐迁移：仅替换"仍为旧出厂文案"的角色提示词(sha256 前16位识别)，用户定制一律保留 ----
-_LEGACY_PRESET_PROMPT_HASHES: Dict[str, str] = {
-    "trader_trend": "28fc1b0874f20dfc",
-    "trader_momentum": "37fb3f948d309f3b",
-    "trader_quant": "5a18438f6afe6c87",
-    "cio": "165538e81c0bec8f",
+# ---- 预设对齐迁移：仅替换"仍为旧出厂文案"的角色提示词(sha256 前16位识别)，用户定制一律保留 ----
+_LEGACY_PRESET_PROMPT_HASHES: Dict[str, Any] = {
+    "trader_trend": {"28fc1b0874f20dfc", "5c13b5e47c5cc054"},
+    "trader_momentum": {"37fb3f948d309f3b", "ee75c86b42cf6a2c"},
+    "trader_quant": {"5a18438f6afe6c87", "2704fd8c6000df18"},
+    "cio": {"165538e81c0bec8f", "88f1ab886c89a086"},
 }
 
 def _migrate_untouched_preset_prompts(config: Dict[str, Any]) -> bool:
@@ -239,7 +239,9 @@ def _migrate_untouched_preset_prompts(config: Dict[str, Any]) -> bool:
         if not legacy_hash or not isinstance(role, dict):
             continue
         prompt = str(role.get("prompt", ""))
-        if hashlib.sha256(prompt.encode("utf-8")).hexdigest()[:16] == legacy_hash:
+        digest = hashlib.sha256(prompt.encode("utf-8")).hexdigest()[:16]
+        is_legacy = (digest == legacy_hash) if isinstance(legacy_hash, str) else (digest in legacy_hash)
+        if is_legacy:
             new_tpl = DEFAULT_PRESET_TEMPLATES.get(str(role_id))
             if new_tpl and prompt != new_tpl["prompt"]:
                 role["prompt"] = new_tpl["prompt"]

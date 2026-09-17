@@ -30,7 +30,7 @@
 
 | 模块 | 行数 | 说明 |
 |---|---|---|
-| `ai_brain_trader.py` | 1117 | AI 主脑六币种决策引擎（与主脚本共用风控常量） |
+| `ai_brain_trader.py` | 1117 | AI 主脑全标的池决策引擎（与主脚本共用风控常量） |
 | `factor_library.py` | 298 | 多因子库：`compute_instrument_factors()` 逐标的装配因子 |
 | `instrument_pool.py` | 409 | 交易宇宙（标的池）的**校验后**单一来源 |
 | `market_data_service.py` | 525 | 零进程直连公共行情服务 |

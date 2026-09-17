@@ -27,6 +27,25 @@ class CouncilPresetAlignmentTests(unittest.TestCase):
         self.assertNotIn("5%~15%", cm.DEFAULT_PRESET_TEMPLATES["trader_trend"]["prompt"])
         self.assertNotIn("8%~15%", cm.DEFAULT_PRESET_TEMPLATES["trader_momentum"]["prompt"])
         self.assertNotIn("2.5R", cm.DEFAULT_PRESET_TEMPLATES["trader_momentum"]["prompt"])
+        self.assertNotIn("+1.5x ATR 主张 UPDATE_SL 推保本", cm.DEFAULT_PRESET_TEMPLATES["trader_trend"]["prompt"])
+        self.assertIn("0.8R", cm.DEFAULT_PRESET_TEMPLATES["trader_trend"]["prompt"])
+
+    def test_presets_have_zero_unknown_variables_when_rendered(self):
+        """出厂预设角色提示词中的插槽必须全为合法变量，渲染时绝不报 [UNKNOWN_VARIABLE]。"""
+        mock_context = {
+            "trading_memory": "测试心法",
+            "account_balance": "1000.0",
+            "market_matrix": "测试行情",
+            "news_intelligence": "测试资讯",
+            "risk_budget": "测试预算",
+            "account_positions": "测试持仓",
+            "pending_orders": "测试挂单",
+            "active_instruments": "BTC,ETH",
+        }
+        for rid, tpl in cm.DEFAULT_PRESET_TEMPLATES.items():
+            rendered = cm._render_seat_prompt(tpl["prompt"], mock_context)
+            self.assertNotIn("[UNKNOWN_VARIABLE", rendered,
+                             f"角色 {rid} 的出厂提示词含有非法占位符，渲染后产生报错: {rendered}")
 
     def test_presets_no_template_literal_leaks(self):
         for rid, tpl in cm.DEFAULT_PRESET_TEMPLATES.items():
