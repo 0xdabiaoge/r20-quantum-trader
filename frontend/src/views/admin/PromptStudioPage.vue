@@ -73,6 +73,7 @@ const importVisible = ref(false);
 const importRawJson = ref('');
 const importNameOverride = ref('');
 const importFileError = ref('');
+const importing = ref(false);
 
 // Template Variables & Guide State
 const variableGuideVisible = ref(false);
@@ -430,11 +431,13 @@ function handleFileSelect(event: Event) {
 
 // 提交导入
 async function submitImport() {
+  if (importing.value) return
   importFileError.value = ''
   if (!importRawJson.value.trim()) {
     importFileError.value = t('admin.promptStudio.jsonRequired')
     return
   }
+  importing.value = true
   try {
     const payload = JSON.parse(importRawJson.value.trim())
     const res = await api('/api/v1/admin/prompt-profiles/import', {
@@ -452,6 +455,8 @@ async function submitImport() {
     await loadLib()
   } catch (e: any) {
     importFileError.value = t('admin.promptStudio.importFailed', undefined, { msg: e.message })
+  } finally {
+    importing.value = false
   }
 }
 
@@ -874,6 +879,8 @@ onMounted(loadLib)
             rows="7"
             spellcheck="false"
             class="field ps-textarea mono"
+            :class="{ 'is-bad': !!importFileError }"
+            :aria-invalid="!!importFileError ? 'true' : undefined"
             :aria-label="t('admin.promptStudio.import.methodTwo')"
             placeholder='{"format": "r20-prompt-profile", "version": 3, "profile": { ... }}'
           />
@@ -895,8 +902,13 @@ onMounted(loadLib)
         <button type="button" class="btn btn-ghost btn-sm" @click="importVisible = false">
           {{ t('admin.promptStudio.import.cancel') }}
         </button>
-        <button type="button" class="btn btn-primary btn-sm" @click="submitImport">
-          <Upload :size="14" />
+        <button type="button"
+          class="btn btn-primary btn-sm"
+          :disabled="importing || !importRawJson.trim()"
+          @click="submitImport"
+        >
+          <Loader2 v-if="importing" :size="14" class="animate-spin shrink-0" />
+          <Upload v-else :size="14" />
           <span>{{ t('admin.promptStudio.import.confirm') }}</span>
         </button>
       </template>

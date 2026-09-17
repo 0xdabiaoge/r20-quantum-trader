@@ -467,6 +467,8 @@ onMounted(loadPlugins)
           type="text"
           :aria-label="t('admin.interceptors.filenameLabel')"
           class="field mono"
+          :class="{ 'is-bad': !!createError && !newFilename.trim() }"
+          :aria-invalid="!!createError && !newFilename.trim() ? 'true' : undefined"
           :placeholder="t('admin.interceptors.filenamePlaceholder')"
         />
       </div>
@@ -486,7 +488,7 @@ onMounted(loadPlugins)
       <template #footer>
         <button type="button" class="btn btn-ghost btn-sm" @click="closeCreate">{{ t('admin.interceptors.cancel') }}</button>
         <!-- 批 115：表单已挂 @submit.prevent="submitCreate"，type="submit" 按钮无需再挂 @click，避免单次点击触发两次创建请求 -->
-        <button class="btn btn-primary btn-sm" type="submit" form="ip-create-form" :disabled="creating">
+        <button class="btn btn-primary btn-sm" type="submit" form="ip-create-form" :disabled="creating || !newFilename.trim()">
           <Loader2 v-if="creating" :size="14" class="animate-spin shrink-0" />
           <Plus v-else :size="14" />
           <span>{{ t('admin.interceptors.createAndAdd') }}</span>
