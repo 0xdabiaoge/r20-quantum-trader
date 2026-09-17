@@ -13,6 +13,7 @@ import { useDashboardStore } from '../../stores/dashboard'
 import { symOf, instIdOf } from '../../utils/instId'
 import { useTheme } from '../../composables/useTheme'
 import { useI18n } from '../../composables/useI18n'
+import { demotePositiveTabIndex } from '../../utils/tabOrder'
 import {
   init as initKLineChart,
   dispose as disposeKLineChart,
@@ -425,6 +426,9 @@ function initChart() {
       },
     },
   })
+
+  // 库把容器设成了 tabIndex=1（正数会插队到「跳到主内容」之前），装完立刻归一化
+  demotePositiveTabIndex(chartContainer.value)
 
   if (!klineChart) return
   ;(window as any).__klineChart = klineChart
