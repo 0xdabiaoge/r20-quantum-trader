@@ -893,7 +893,7 @@ onMounted(loadData);
             <div v-if="matrixRows.length" class="cn-matrix">
               <h4 class="cn-section-title">{{ t('admin.council.matrixTitle') }}</h4>
               <div class="cn-table-wrap">
-                <table class="table" :aria-label="t('admin.council.seatsTitle')">
+                <table class="table" :aria-label="t('admin.council.matrixTitle')">
                   <thead>
                     <tr>
                       <th scope="col">{{ t('admin.council.matrixColSymbol') }}</th>

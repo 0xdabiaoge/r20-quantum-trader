@@ -217,7 +217,7 @@ const vdBudgetText = computed(() => {
           <div v-if="vdRejected.length" class="mt-2.5">
             <p class="t-label mb-1">{{ t('dash.matrix.venue.rejectedTitle', undefined, { n: vdRejected.length }) }}</p>
             <div class="table-scroll-container rounded-lg" style="border: 1px solid var(--line-1)">
-              <table class="table" :aria-label="t('dash.ledger.venue')">
+              <table class="table" :aria-label="t('dash.matrix.venue.rejectedTitle', undefined, { n: vdRejected.length })">
                 <thead>
                   <tr><th scope="col">{{ t('dash.matrix.venue.thVenue') }}</th><th scope="col">{{ t('dash.matrix.venue.thStage') }}</th><th scope="col">{{ t('dash.matrix.venue.thReason') }}</th></tr>
                 </thead>

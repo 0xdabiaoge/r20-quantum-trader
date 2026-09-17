@@ -305,7 +305,7 @@ function dirOf(a: string): 'long' | 'short' | 'flat' {
       class="space-y-3"
     >
       <div class="overflow-x-auto">
-        <table class="table w-full" :aria-label="t('dash.radar.posMgmt')">
+        <table class="table w-full" :aria-label="t('dash.radar.detail.xvenue')">
           <thead>
             <tr>
               <th scope="col">{{ t('dash.radar.thSymbol') }}</th>
