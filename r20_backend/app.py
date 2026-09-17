@@ -134,6 +134,12 @@ def require_superadmin(x_r20_session: Any = None) -> dict[str, Any]:
 async def lifespan(_: FastAPI):
     refresh_settings()
     admin_auth.initialize_from_legacy(settings.admin_token or settings.setup_token)
+    try:
+        from scripts.instrument_pool import POOL_FILE, save_instruments, DEFAULT_INSTRUMENTS
+        if not POOL_FILE.exists():
+            save_instruments(DEFAULT_INSTRUMENTS)
+    except Exception:
+        pass
     start_gateway_supervisor()
     try:
         from r20_backend.dashboard_cache import start_dashboard_background_worker

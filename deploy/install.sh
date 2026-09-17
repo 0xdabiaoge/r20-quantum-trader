@@ -17,6 +17,12 @@ if [ ! -f "$ROOT/.env" ]; then
 fi
 chmod 600 "$ROOT/.env"
 
+# Initialize default instrument pool if not present (prevents untrusted pool blocking entry)
+if [ ! -f "$ROOT/data/instrument_pool.json" ]; then
+  mkdir -p "$ROOT/data"
+  "$VENV_DIR/bin/python" -c "from scripts.instrument_pool import save_instruments, DEFAULT_INSTRUMENTS; save_instruments(DEFAULT_INSTRUMENTS)" 2>/dev/null || true
+fi
+
 cat <<EOF
 
 R20 dependencies installed.

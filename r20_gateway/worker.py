@@ -89,6 +89,13 @@ def run() -> None:
         log(f"收编僵尸 running 作业行 {_adopted} 条（→ interrupted）")
     scheduler = GatewayScheduler(store)
     scheduler.initialize_migration_baseline()
+    try:
+        from scripts.instrument_pool import POOL_FILE, save_instruments, DEFAULT_INSTRUMENTS
+        if not POOL_FILE.exists():
+            save_instruments(DEFAULT_INSTRUMENTS)
+            log("初始化生成出厂默认标的池 data/instrument_pool.json")
+    except Exception as _init_exc:
+        log(f"标的池初始化检查异常: {_init_exc}")
     log("gateway worker started with scheduler ownership")
     _prune_job_history(store)                       # 启动清一次
     _next_prune_at = time.time() + PRUNE_INTERVAL_SECONDS
