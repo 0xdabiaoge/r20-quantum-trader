@@ -267,42 +267,49 @@ def fetch_okx_announcements(limit=15) -> list:
     return items[:limit]
 
 
-def fetch_jin10_macro_news(limit=20) -> list:
-    """金十数据官方宏观与要闻流抓取（hits_rank.json）+ 实时 7x24 宏观快讯滚动补充。"""
+def fetch_jin10_macro_news(limit=25) -> list:
+    """真实 7x24 全球宏观快讯流抓取（华尔街见闻全球快讯 + 新浪财经7x24 + 金十数据热点榜单）。
+
+    时间戳诚信原则（2026-09-18 用户反馈修正）：
+    绝不使用当前时刻 `time.time()` 伪造历史热点文章的发布时间！所有条目必须基于权威接口提供的
+    真实时间戳（display_time / create_time / updated_at），确保快讯流时间绝对真实客观。
+    """
     tz_bj = datetime.timezone(datetime.timedelta(hours=8))
     items = []
 
-    # 1. 金十数据官方热点要闻
+    # 1. 华尔街见闻 7x24 全球财经实时快讯（带真实秒级时间戳）
     try:
-        url = "https://cdn.jin10.com/json/index/hits_rank.json"
+        url = "https://api-one-wscn.awtmt.com/apiv1/content/lives?channel=global-channel&limit=25"
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
         with urllib.request.urlopen(req, timeout=5) as resp:
-            raw = json.loads(resp.read().decode("utf-8"))
-        news_list = (raw.get("all", {}).get("daily", {}).get("news", [])
-                     + raw.get("all", {}).get("weekly", {}).get("news", []))
-        updated_at = raw.get("all", {}).get("daily", {}).get("updated_at")
-        ts_now = int(time.time() * 1000)
-        for idx, it in enumerate(news_list[:12]):
-            title = str(it.get("title") or "").strip()
+            data = json.loads(resp.read().decode("utf-8"))
+        for it in data.get("data", {}).get("items", []):
+            text = (it.get("content_text") or "").strip()
+            title = (it.get("title") or "").strip()
             if not title:
+                title = re.split(r"[。！!？?\n]", text)[0].strip()[:70] if text else "宏观快讯"
+            ts_sec = int(it.get("display_time") or 0)
+            if ts_sec <= 0:
                 continue
-            item_id = it.get("id") or (ts_now - idx * 60000)
+            ts_ms = ts_sec * 1000
+            dt_str = datetime.datetime.fromtimestamp(ts_sec, tz=tz_bj).strftime("%Y-%m-%d %H:%M:%S")
+            item_id = it.get("id") or ts_ms
             items.append({
-                "id": f"jin10-{item_id}",
+                "id": f"wscn-{item_id}",
                 "title": title,
-                "summary": f"金十数据热点要闻: {title}",
-                "time": updated_at or datetime.datetime.now(tz_bj).strftime("%Y-%m-%d %H:%M:%S"),
-                "cTime": str(ts_now - idx * 60000),
-                "url": "https://www.jin10.com",
-                "platforms": ["金十数据"],
-                "importance": _classify_importance(title, ""),
+                "summary": text[:200] if text else title,
+                "time": dt_str,
+                "cTime": str(ts_ms),
+                "url": it.get("uri") or "https://wallstreetcn.com/live/global",
+                "platforms": ["华尔街见闻", "全球宏观快讯"],
+                "importance": _classify_importance(title, text),
             })
     except Exception as e:
-        print(f"[news_harvester] warn 金十数据抓取异常: {e}")
+        print(f"[news_harvester] warn 华尔街见闻抓取异常: {e}")
 
-    # 2. 7x24 实时宏观快讯滚动补充（新浪财经 7x24 全球宏观快讯）
+    # 2. 新浪财经 7x24 实时宏观快讯滚动（带真实发布时间）
     try:
-        url = "https://zhibo.sina.com.cn/api/zhibo/feed?page=1&page_size=20&zhibo_id=152"
+        url = "https://zhibo.sina.com.cn/api/zhibo/feed?page=1&page_size=25&zhibo_id=152"
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
         with urllib.request.urlopen(req, timeout=5) as resp:
             data = json.loads(resp.read().decode("utf-8"))
@@ -313,17 +320,16 @@ def fetch_jin10_macro_news(limit=20) -> list:
                 continue
             title_match = re.split(r"[。！!？?\n]", text)[0].strip()
             title = title_match[:70] if title_match else text[:70]
-            # 过滤非金融生活的纯杂音（仅保留与宏观金融、流动性、监管或中高重要度相关的快讯）
             if not is_crypto_or_macro_relevant(title, text) and _classify_importance(title, text) == "low":
                 continue
-            create_time = it.get("create_time") or datetime.datetime.now(tz_bj).strftime("%Y-%m-%d %H:%M:%S")
+            create_time = it.get("create_time")
+            if not create_time:
+                continue
             try:
                 dt_obj = datetime.datetime.strptime(create_time, "%Y-%m-%d %H:%M:%S").replace(tzinfo=tz_bj)
                 ts_ms = int(dt_obj.timestamp() * 1000)
             except Exception:
-                ts_ms = int(time.time() * 1000)
-            title_match = re.split(r"[。！!？?\n]", text)[0].strip()
-            title = title_match[:70] if title_match else text[:70]
+                continue
             items.append({
                 "id": f"macro-{it.get('id') or ts_ms}",
                 "title": title,
@@ -335,8 +341,48 @@ def fetch_jin10_macro_news(limit=20) -> list:
                 "importance": _classify_importance(title, text),
             })
     except Exception as e:
-        print(f"[news_harvester] warn 宏观快讯抓取异常: {e}")
+        print(f"[news_harvester] warn 新浪7x24宏观快讯抓取异常: {e}")
 
+    # 3. 金十数据热点要闻（基于榜单真实更新时间，绝不伪造当前时间戳）
+    try:
+        url = "https://cdn.jin10.com/json/index/hits_rank.json"
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            raw = json.loads(resp.read().decode("utf-8"))
+        news_list = (raw.get("all", {}).get("daily", {}).get("news", [])
+                     + raw.get("all", {}).get("weekly", {}).get("news", []))
+        updated_at = raw.get("all", {}).get("daily", {}).get("updated_at")
+        if updated_at:
+            try:
+                base_dt = datetime.datetime.strptime(updated_at, "%Y-%m-%d %H:%M:%S").replace(tzinfo=tz_bj)
+                base_ts = int(base_dt.timestamp() * 1000)
+            except Exception:
+                base_ts = 0
+        else:
+            base_ts = 0
+
+        for idx, it in enumerate(news_list[:8]):
+            title = str(it.get("title") or "").strip()
+            if not title:
+                continue
+            item_id = it.get("id") or idx
+            # 依榜单真实更新时间递减秒级排位，绝不使用当前运行时间戳
+            item_ts = max(0, base_ts - idx * 1000) if base_ts > 0 else 0
+            items.append({
+                "id": f"jin10-{item_id}",
+                "title": title,
+                "summary": f"金十数据热点要闻: {title}",
+                "time": updated_at or "今日要闻",
+                "cTime": str(item_ts),
+                "url": "https://www.jin10.com",
+                "platforms": ["金十数据"],
+                "importance": _classify_importance(title, ""),
+            })
+    except Exception as e:
+        print(f"[news_harvester] warn 金十数据抓取异常: {e}")
+
+    # 按真实时间戳严格降序排列
+    items.sort(key=lambda x: int(x.get("cTime", 0) or 0), reverse=True)
     return items[:limit]
 
 

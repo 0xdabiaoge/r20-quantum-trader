@@ -35,7 +35,7 @@ const jin10NewsCount = computed(() => rawNews.value.filter((item) =>
 ).length);
 
 const macroNewsCount = computed(() => rawNews.value.filter((item) =>
-  (item.platforms || []).some((p: string) => p.includes('宏观'))
+  (item.platforms || []).some((p: string) => p.includes('宏观') || p.includes('华尔街') || p.includes('新浪'))
 ).length);
 
 const sourceFilters = computed(() => [
@@ -99,7 +99,7 @@ const filteredNews = computed(() => {
   } else if (selectedSource.value === 'jin10') {
     list = list.filter((item) => (item.platforms || []).some((p: string) => p.includes('金十')));
   } else if (selectedSource.value === 'macro') {
-    list = list.filter((item) => (item.platforms || []).some((p: string) => p.includes('宏观')));
+    list = list.filter((item) => (item.platforms || []).some((p: string) => p.includes('宏观') || p.includes('华尔街') || p.includes('新浪')));
   } else if (selectedSource.value !== 'all') {
     list = list.filter((item) => (item.platforms || []).some((p: string) => p.includes(selectedSource.value)));
   }
