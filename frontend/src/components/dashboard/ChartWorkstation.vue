@@ -18,6 +18,7 @@ import {
   init as initKLineChart,
   dispose as disposeKLineChart,
   registerIndicator,
+  registerOverlay,
   type Chart as KLineChartType,
   type KLineData,
 } from 'klinecharts'
@@ -36,8 +37,88 @@ import {
 import BaseSegmented from '../base/BaseSegmented.vue'
 
 // ==========================================
-// 0. 注册原生 VWAP 指标 (基于成交量加权平均价)
+// 0. 注册原生 VWAP 指标与价格线渲染优化
 // ==========================================
+registerOverlay({
+  name: 'priceLine',
+  totalStep: 2,
+  needDefaultPointFigure: false,
+  needDefaultXAxisFigure: false,
+  needDefaultYAxisFigure: true,
+  createPointFigures: ({ coordinates, bounding, overlay }) => {
+    const y = coordinates[0]?.y ?? 0
+    const lineStyle = overlay.styles?.line || {}
+    const textStyle = overlay.styles?.text || {}
+    const label = String(overlay.extendData || '')
+
+    let strokeColor = lineStyle.color || '#10B981'
+    let strokeStyle = lineStyle.style || 'solid'
+    let strokeDashed = lineStyle.dashedValue || [6, 4]
+    let badgeBg = textStyle.backgroundColor || strokeColor
+    let displayBadge = label
+
+    const isEntry = label.includes('入场') || label.includes('Entry')
+    const isTp = label.includes('TP') || label.includes('止盈')
+    const isSl = label.includes('SL') || label.includes('止损')
+
+    if (isEntry) {
+      strokeColor = '#0284C7'
+      strokeStyle = 'solid'
+      badgeBg = '#0369A1'
+      displayBadge = `⚡ ${label.replace(/^[▲▼⚡\s]+/, '')}`
+    } else if (isTp) {
+      strokeColor = '#10B981'
+      strokeStyle = 'dashed'
+      strokeDashed = [8, 4]
+      badgeBg = '#047857'
+      displayBadge = `🎯 ${label.replace(/^[▲▼🎯\s]+/, '')}`
+    } else if (isSl) {
+      strokeColor = '#F43F5E'
+      strokeStyle = 'dashed'
+      strokeDashed = [4, 3]
+      badgeBg = '#BE123C'
+      displayBadge = `🛑 ${label.replace(/^[▲▼🛑\s]+/, '')}`
+    }
+
+    return [
+      {
+        type: 'line',
+        attrs: {
+          coordinates: [{ x: 0, y }, { x: bounding.width, y }],
+        },
+        styles: {
+          style: strokeStyle,
+          dashedValue: strokeDashed,
+          size: lineStyle.size || 1.5,
+          color: strokeColor,
+        },
+      },
+      {
+        type: 'text',
+        ignoreEvent: true,
+        attrs: {
+          x: Math.max(10, bounding.width - 8),
+          y: y - 4,
+          text: displayBadge,
+          align: 'right',
+          baseline: 'bottom',
+        },
+        styles: {
+          size: 11,
+          family: 'JetBrains Mono, -apple-system, BlinkMacSystemFont, sans-serif',
+          weight: 'bold',
+          color: '#FFFFFF',
+          backgroundColor: badgeBg,
+          paddingLeft: 6,
+          paddingRight: 6,
+          paddingTop: 2,
+          paddingBottom: 2,
+          borderRadius: 3,
+        },
+      },
+    ]
+  },
+})
 registerIndicator({
   name: 'VWAP',
   shortName: 'VWAP',

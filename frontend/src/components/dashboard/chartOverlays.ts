@@ -24,6 +24,32 @@
  * - 文案里的百分比固定 `toFixed(1)`。
  */
 
+/**
+ * K 线工位的价格线 Overlay 描述符（结构优化阶段 3·F4 第二轮抽离）。
+ *
+ * ## 为什么能抽
+ *
+ * 这四块原先内嵌在 `ChartWorkstation.vue` 的 `updatePriceLines()`（92 行）里。
+ * 它们**不读组件状态**：把入场/止损/止盈价、方向、文案、文字色作为入参传进来，
+ * 只返回"该建哪条线"的**纯描述对象**。真正调用图表库（`createOverlay` /
+ * `removeOverlay`）的仍然留在组件里 —— 也就是"算什么"与"怎么画"分开。
+ *
+ * 与同目录的 `chartMath.ts` / `chartStyles.ts` 同属"阶段 3·F4 抽离"系列。
+ *
+ * ## 一处刻意的入参：`textColor`
+ *
+ * 原实现里文字色取 `tok('--ink-1')`（读 CSS 变量）。把 `tok` 抽进来会让本模块
+ * 依赖 `window`/`document`，不再可独立检查。故改为**调用方解析后传入** ——
+ * 组件仍在同一处调用 `tok`，取值与时机都没变。
+ *
+ * ## 行为等价的要点
+ *
+ * - 三条线的 `name` 都是 `'priceLine'`、`paneId` 都是 `'candle_pane'`；
+ * - 只有入场线是 `solid`（且颜色随多空变），止损/止盈都是 `dashed` + `dashedValue:[6,4]`；
+ * - 止损恒 `#F43F5E`、止盈恒 `#10B981`，**不随多空反转**；
+ * - 文案里的百分比固定 `toFixed(1)`。
+ */
+
 /** 一条价格线的建线描述；字段名与图表库 `createOverlay` 的入参一致。 */
 export interface PriceLineOverlay {
   name: 'priceLine'

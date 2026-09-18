@@ -238,16 +238,46 @@ def current_values() -> dict[str, float | int]:
     return out
 
 
-def process_values() -> dict[str, float | int]:
-    """**本进程内**实际生效的值（= 本进程 import 单一事实源时的快照）。
+def reload_risk_constants() -> None:
+    """热重载 scripts.risk_constants 并刷新快照时间戳。
 
-    `DEFAULTS` 就是那次 import 里 `_env_float(...)` 的取值结果，等价于引擎常量
-    （`MAX_LEVERAGE = _env_float("R20_MAX_LEVERAGE", ...)` 与 `DEFAULTS[同键]` 同一次读取）。
-    与 `current_values()`（读 .env / 进程环境，管理员保存后会同步刷新）的区别，正是
-    审计 P0-2/P1-1 能长期隐身的原因：交易子进程每周期重启天然最新，而后台/worker
-    是长驻进程，改完 .env 后进程内仍是旧值。两者并排暴露，"改了但没生效"才看得见。
+    后台长驻进程在管理员保存修改后即可原地同步新值，无需手动重启后台。
     """
-    return {key: DEFAULTS[key] for key in RISK_ENV_KEYS}
+    import importlib
+    import scripts.risk_constants as rc
+
+    importlib.reload(rc)
+    global _LOADED_AT
+    _LOADED_AT = time.time()
+
+
+def process_values() -> dict[str, float | int]:
+    """**本进程内**实际生效的值（= 本进程当前加载的风控常量真实值）。"""
+    import scripts.risk_constants as rc
+
+    mapping: dict[str, float | int] = {
+        "R20_PORTFOLIO_RISK_BUDGET_USDT": rc.PORTFOLIO_RISK_BUDGET_USDT,
+        "R20_MAX_TOTAL_EXPOSURE_USDT": rc.MAX_TOTAL_EXPOSURE_USDT,
+        "R20_MAX_CONCURRENT_POSITIONS": rc.MAX_CONCURRENT_POSITIONS_CAP,
+        "R20_MAX_SAME_DIRECTION_POSITIONS": rc.MAX_SAME_DIRECTION_POSITIONS,
+        "R20_MAX_MARGIN_EQUITY_RATIO": rc.MAX_MARGIN_EQUITY_RATIO,
+        "R20_SINGLE_ASSET_EQUITY_RATIO": rc.SINGLE_ASSET_EQUITY_RATIO,
+        "R20_MAX_SINGLE_ASSET_MARGIN_USDT": rc.MAX_SINGLE_ASSET_MARGIN,
+        "R20_MIN_LEVERAGE": rc.MIN_LEVERAGE,
+        "R20_MAX_LEVERAGE": rc.MAX_LEVERAGE,
+        "R20_RISK_PER_TRADE_RATIO": rc.RISK_PER_TRADE_EQUITY_RATIO,
+        "R20_MIN_RISK_REWARD": rc.MIN_RISK_REWARD_RATIO,
+        "R20_MIN_ENTRY_CONFIDENCE": rc.MIN_ENTRY_CONFIDENCE,
+        "R20_MAX_DAILY_LOSS_USDT": rc.MAX_DAILY_LOSS_USDT,
+        "R20_DAILY_LOSS_EQUITY_RATIO": rc.DAILY_LOSS_EQUITY_RATIO,
+        "R20_TIME_STOP_HOURS": rc.TIME_STOP_HOURS,
+        "R20_TIME_STOP_ATR_BAND": rc.TIME_STOP_ATR_BAND,
+        "R20_STOP_COOLDOWN_MINUTES": rc.STOP_COOLDOWN_MINUTES,
+        "R20_MAX_SCALE_IN_COUNT": rc.MAX_SCALE_IN_COUNT,
+        "R20_MIN_SCALE_IN_PROFIT_RATIO": rc.MIN_SCALE_IN_PROFIT_RATIO,
+        "R20_MIN_SCALE_IN_CONFIDENCE": rc.MIN_SCALE_IN_CONFIDENCE,
+    }
+    return {key: mapping.get(key, DEFAULTS.get(key, 0)) for key in RISK_ENV_KEYS}
 
 
 def process_freshness() -> dict[str, Any]:

@@ -53,10 +53,22 @@ class MatchSnapshotIronRulesTests(unittest.TestCase):
         self.assertEqual(snap["velocity"], 1.1)
 
     def test_never_joins_future_snapshot(self):
-        # 开仓前无任何同向候选 → 必须 None，不得回填之后的快照
+        # 开仓 20 分钟后无任何同向候选 → 必须 None，不得回填遥远未来的快照
         journal = {"X": [{"side": "long", "entryTime": "2026-09-10 00:00:00", "snapshot": _dyn(velocity=1)}]}
         self.assertIsNone(sie._match_snapshot(journal, "X", "2026-09-09 13:33:11", "空"))
         self.assertIsNone(sie._match_snapshot(journal, "X", "2026-09-09 13:33:11", "多"))
+
+    def test_joins_nearest_snapshot_within_post_fill_window(self):
+        # 限价单在 13:28:10 成交，13:30:00 巡检捕获建档（相差不到 2 分钟）→ 正常 join
+        journal = {"BTC": [{"side": "long", "entryTime": "2026-09-09 13:30:00", "snapshot": _dyn(velocity=3.3)}]}
+        snap = sie._match_snapshot(journal, "BTC", "2026-09-09 13:28:10", "多")
+        self.assertIsNotNone(snap)
+        self.assertEqual(snap["velocity"], 3.3)
+
+    def test_load_closed_trades_filters_prior_history(self):
+        # 传入较新的起始时间，早于该时间的交易应全部被过滤
+        future_trades = sie.load_closed_trades(start_time_override="2099-01-01 00:00:00")
+        self.assertEqual(len(future_trades), 0)
 
     def test_rejects_stale_snapshot_beyond_window(self):
         journal = {"Y": [{"side": "long", "entryTime": "2026-08-01 10:00:00", "snapshot": _dyn(velocity=2)}]}

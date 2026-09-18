@@ -155,6 +155,8 @@ def get_cpa_client_config() -> Tuple[str, str]:
 # 回填因果证据。
 # =============================================================================
 SNAPSHOT_MAX_STALE_SECONDS = 6 * 3600
+#: 限价单撮合成交后、在下一个 15 分钟巡检周期首次被 trackers 建档捕获的最大时差（20分钟）
+SNAPSHOT_MAX_POST_FILL_LAG_SECONDS = 1200
 SIDE_ALIASES = {"多": "long", "空": "short", "long": "long", "short": "short"}
 
 
@@ -209,14 +211,16 @@ def load_signal_journal():
 
 
 def _match_snapshot(journal_by_inst, inst, open_time, side=None):
-    """按方向与开仓时间就近匹配开仓时刻快照（不晚于开仓、且在 join 窗口内的最后一条）。
+    """按方向与开仓时间就近匹配开仓时刻快照。
 
-    三条因果铁律（2026-09-10）：
+    因果铁律与巡检容差（2026-09-18）：
     1. 方向必须一致——台账方向可解析且 journal 记录带方向时，不一致者跳过，
        防止把空头开仓快照当多头成因；
-    2. 禁止未来快照——旧版无候选时回填 candidates[0] 会把开仓之后的行情写进
-       「开仓证据」，属于典型的倒推伪造通道，现一律返回 None 标记不可观测；
-    3. 禁止过期证据——快照距开仓超过 SNAPSHOT_MAX_STALE_SECONDS 即非本次开仓
+    2. 允许 15 分钟巡检时差——限价单挂单撮合成交后，持仓在下一个 15 分钟巡检周期
+       首次被 trackers 建档并写入快照（entryTime 略晚于 open_time 几分钟至 15 分钟），
+       允许 [open_dt - 6h, open_dt + 20min] 的合理首巡检窗口，杜绝误杀真实开仓快照；
+    3. 禁止远期未来快照——开仓 20 分钟之后的快照绝非开仓因果现场，一律返回 None；
+    4. 禁止过期证据——快照早于开仓超过 SNAPSHOT_MAX_STALE_SECONDS 即非本次开仓
        的因果现场，弃用。
     """
     candidates = journal_by_inst.get(inst) or []
@@ -224,31 +228,46 @@ def _match_snapshot(journal_by_inst, inst, open_time, side=None):
     if not candidates or open_dt is None:
         return None
     wanted_side = SIDE_ALIASES.get(str(side or "").strip())
-    best_dt, best_rec = None, None
+    best_diff, best_rec = None, None
     for rec in candidates:
         rec_side = SIDE_ALIASES.get(str(rec.get("side") or "").strip())
         if wanted_side and rec_side and rec_side != wanted_side:
             continue
         rec_dt = _parse_bj(rec.get("entryTime"))
-        if rec_dt is None or rec_dt > open_dt:
+        if rec_dt is None:
             continue
-        if (open_dt - rec_dt).total_seconds() > SNAPSHOT_MAX_STALE_SECONDS:
+        delta_sec = (rec_dt - open_dt).total_seconds()
+        if delta_sec < -SNAPSHOT_MAX_STALE_SECONDS or delta_sec > SNAPSHOT_MAX_POST_FILL_LAG_SECONDS:
             continue
-        if best_dt is None or rec_dt > best_dt:
-            best_dt, best_rec = rec_dt, rec
+        abs_diff = abs(delta_sec)
+        if best_diff is None or abs_diff < best_diff:
+            best_diff, best_rec = abs_diff, rec
     return (best_rec or {}).get("snapshot")
 
 
-def load_closed_trades():
+def load_closed_trades(start_time_override: str | None = None):
     account_init_file = os.path.join(DATA_DIR, "account_initial_state.json")
     reset_time_str = "1970-01-01 00:00:00"
+    evo_start_str = os.getenv("R20_EVOLUTION_START_TIME", "").strip()
     if os.path.exists(account_init_file):
         try:
             with open(account_init_file, "r", encoding="utf-8") as f:
                 acc_init = json.load(f)
-                reset_time_str = acc_init.get("reset_time", "1970-01-01 00:00:00")
+                reset_time_str = str(acc_init.get("reset_time") or "1970-01-01 00:00:00")
+                if not evo_start_str:
+                    evo_start_str = str(acc_init.get("evolution_start_time") or "").strip()
         except Exception:
             pass
+
+    # 确定自进化复盘起始时间（过滤更早的人工历史交易，杜绝远古历史单污染自进化）：
+    # 显式入参 > 环境变量 R20_EVOLUTION_START_TIME > account_initial_state.json evolution_start_time > reset_time > 默认 2026-09-01 00:00:00
+    effective_start = (
+        start_time_override
+        or evo_start_str
+        or (reset_time_str if reset_time_str > "2026-01-01 00:00:00" else "2026-09-01 00:00:00")
+    ).strip()
+    if len(effective_start) == 10:
+        effective_start = f"{effective_start} 00:00:00"
 
     journal_by_inst = load_signal_journal()
     closed_trades = []
@@ -261,7 +280,10 @@ def load_closed_trades():
                         continue
                     
                     c_time = str(t.get("close_time") or t.get("time") or "")
-                    if c_time and c_time < reset_time_str:
+                    o_time = str(t.get("open_time") or "")
+                    # 时间过滤器：若平仓或开仓早于自进化起始时间，则不纳入复盘
+                    check_time = c_time or o_time
+                    if check_time and check_time < effective_start:
                         continue
 
                     inst = str(t.get("inst") or t.get("name") or "OTHER")

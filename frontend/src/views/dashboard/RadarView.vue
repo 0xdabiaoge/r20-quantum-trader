@@ -62,15 +62,17 @@ const grouped = computed(() => {
   return out;
 });
 
-function actionsOf(c: any): { inst: string; dir: string; conf: number }[] {
-  const list: { inst: string; dir: string; conf: number }[] = [];
+function actionsOf(c: any): { inst: string; dir: string; conf: number; label?: string }[] {
+  const list: { inst: string; dir: string; conf: number; label?: string }[] = [];
   for (const m of c.position_management || []) {
     const a = String(m.action || '').toUpperCase();
     if (a && a !== 'WAIT' && a !== 'HOLD') {
+      const label = a === 'UPDATE_SL' ? '移损' : a === 'CLOSE_MARKET' ? '平仓' : a;
       list.push({
         inst: symOf(String(m.instId || '')),
         dir: a.includes('LONG') ? 'long' : a.includes('SHORT') ? 'short' : 'flat',
         conf: Number(m.confidence || 0),
+        label,
       });
     }
   }
@@ -141,7 +143,7 @@ function actionsOf(c: any): { inst: string; dir: string; conf: number }[] {
         <div v-else>
           <template v-for="grp in grouped" :key="grp.day">
             <div
-              class="sticky top-12 z-[1] border-b px-4 py-1.5 text-3xs font-bold uppercase tracking-wider text-[var(--ink-3)]"
+              class="border-b px-4 py-1.5 text-3xs font-bold uppercase tracking-wider text-[var(--ink-3)]"
               style="background-color: var(--surface-header); border-color: var(--line-1)"
             >
               {{ grp.day }}
@@ -169,11 +171,12 @@ function actionsOf(c: any): { inst: string; dir: string; conf: number }[] {
                 <div class="mt-2 flex flex-wrap items-center gap-2">
                   <span
                     v-for="a in actionsOf(c)"
-                    :key="a.inst + a.dir"
+                    :key="a.inst + a.dir + (a.label || '')"
                     class="dsh-pill !py-0.5"
                   >
                     <span class="num font-mono text-3xs font-bold text-[var(--ink-strong)]">{{ a.inst }}</span>
-                    <DirTag :dir="a.dir" />
+                    <span v-if="a.label" class="rounded px-1 py-0.5 border text-4xs font-mono font-medium text-[var(--accent)] border-[var(--accent-line)] bg-[var(--accent-bg)]">{{ a.label }}</span>
+                    <DirTag v-else :dir="a.dir" />
                     <ConfBadge :value="a.conf" />
                   </span>
 

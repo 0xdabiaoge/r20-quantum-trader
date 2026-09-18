@@ -598,62 +598,65 @@ def build_risk_budget_text(usdt_available: float = None) -> str:
     """
     if usdt_available is None or usdt_available < 0:
         return "[MISSING_CONTEXT:risk_budget]"
+    # 动态取单一事实源对象（支持后台热重载与多用例隔离）
+    import scripts.risk_constants as rc
+
     # 风险预算按「实际可用余额」自适应推导：预设绝不写死绝对金额，避免与小资金账户(如 80U)冲突。
     _eq = float(usdt_available)
     _m_lo = round(_eq * 0.03, 2)
-    _m_hi = round(_eq * min(0.12, MAX_MARGIN_EQUITY_RATIO), 2)
-    _m_strong = round(_eq * MAX_MARGIN_EQUITY_RATIO, 2)
+    _m_hi = round(_eq * min(0.12, rc.MAX_MARGIN_EQUITY_RATIO), 2)
+    _m_strong = round(_eq * rc.MAX_MARGIN_EQUITY_RATIO, 2)
     # 单标的累计 = min(绝对封顶 600U, 权益×30%)；日亏熔断 = min(绝对封顶 150U, 权益×5%)
-    _asset_cap = effective_single_asset_margin(_eq)
-    _daily_stop = effective_daily_loss_limit(_eq)
+    _asset_cap = rc.effective_single_asset_margin(_eq)
+    _daily_stop = rc.effective_daily_loss_limit(_eq)
     # 单笔上限同样受单标的累计封顶约束（首笔即计入累计）：min(权益×20%, 单标的封顶)
     _m_strong_cap = min(_m_strong, _asset_cap)
-    _asset_cap_note = (f"min({MAX_SINGLE_ASSET_MARGIN:g} 绝对封顶, 可用余额 {SINGLE_ASSET_EQUITY_RATIO:.0%})"
-                       if _asset_cap < round(_eq * SINGLE_ASSET_EQUITY_RATIO, 2) else f"可用余额 {SINGLE_ASSET_EQUITY_RATIO:.0%}")
-    _daily_stop_note = (f"min({MAX_DAILY_LOSS_USDT:g} 绝对封顶, 可用余额 {DAILY_LOSS_EQUITY_RATIO:.0%})"
-                        if _daily_stop < round(max(_eq * DAILY_LOSS_EQUITY_RATIO, 1.0), 2) else f"可用余额 {DAILY_LOSS_EQUITY_RATIO:.0%}")
+    _asset_cap_note = (f"min({rc.MAX_SINGLE_ASSET_MARGIN:g} 绝对封顶, 可用余额 {rc.SINGLE_ASSET_EQUITY_RATIO:.0%})"
+                       if _asset_cap < round(_eq * rc.SINGLE_ASSET_EQUITY_RATIO, 2) else f"可用余额 {rc.SINGLE_ASSET_EQUITY_RATIO:.0%}")
+    _daily_stop_note = (f"min({rc.MAX_DAILY_LOSS_USDT:g} 绝对封顶, 可用余额 {rc.DAILY_LOSS_EQUITY_RATIO:.0%})"
+                        if _daily_stop < round(max(_eq * rc.DAILY_LOSS_EQUITY_RATIO, 1.0), 2) else f"可用余额 {rc.DAILY_LOSS_EQUITY_RATIO:.0%}")
     text = (
         f"【本周期风险预算｜按实际可用余额 {_eq:.2f} USDT 与后台风控配置自适应推导，严禁套用任何固定绝对金额】:\n"
-        f"- 常规单笔保证金: {_m_lo} ~ {_m_hi} USDT (可用余额 3%~{min(0.12, MAX_MARGIN_EQUITY_RATIO):.0%})\n"
+        f"- 常规单笔保证金: {_m_lo} ~ {_m_hi} USDT (可用余额 3%~{min(0.12, rc.MAX_MARGIN_EQUITY_RATIO):.0%})\n"
         f"- 强信号单笔保证金上限: {round(_m_strong_cap, 2)} USDT "
-        f"(min(权益 {MAX_MARGIN_EQUITY_RATIO:.0%}={_m_strong}, 单标的封顶 {round(_asset_cap, 2)})，执行层硬顶)\n"
+        f"(min(权益 {rc.MAX_MARGIN_EQUITY_RATIO:.0%}={_m_strong}, 单标的封顶 {round(_asset_cap, 2)})，执行层硬顶)\n"
         f"- 单标的累计保证金上限(含金字塔加仓): {_asset_cap} USDT ({_asset_cap_note}，执行层已按同一 min() 硬夹)\n"
-        f"- 单笔最大可承受亏损: 以 1.0R 为基准，且不超过可用余额 {RISK_PER_TRADE_EQUITY_RATIO:.0%}\n"
+        f"- 单笔最大可承受亏损: 以 1.0R 为基准，且不超过可用余额 {rc.RISK_PER_TRADE_EQUITY_RATIO:.0%}\n"
         f"- 当日累计亏损熔断线: -{_daily_stop} USDT ({_daily_stop_note}，执行层已按同一 min() 硬夹)\n"
-        f"- 全系统同向持仓上限: {MAX_SAME_DIRECTION_POSITIONS} 笔 (多/空各自封顶，执行层硬拦截)\n"
+        f"- 全系统同向持仓上限: {rc.MAX_SAME_DIRECTION_POSITIONS} 笔 (多/空各自封顶，执行层硬拦截)\n"
         f"- 全系统并发持仓上限: "
-        + (f"{MAX_CONCURRENT_POSITIONS_CAP} 笔 (执行层硬拦截)\n" if MAX_CONCURRENT_POSITIONS_CAP > 0
+        + (f"{rc.MAX_CONCURRENT_POSITIONS_CAP} 笔 (执行层硬拦截)\n" if rc.MAX_CONCURRENT_POSITIONS_CAP > 0
            else "未单独设限 (0=不额外收紧；实际受标的池容量与同向上限约束)\n")
         + (
-            f"- 组合风险总预算(跨所合算): {PORTFOLIO_RISK_BUDGET_USDT:.2f} USDT (执行层按总名义敞口强制)\n"
-            if PORTFOLIO_RISK_BUDGET_USDT > 0 else
+            f"- 组合风险总预算(跨所合算): {rc.PORTFOLIO_RISK_BUDGET_USDT:.2f} USDT (执行层按总名义敞口强制)\n"
+            if rc.PORTFOLIO_RISK_BUDGET_USDT > 0 else
             "- 组合风险总预算(跨所合算): 未设上限 (0=引擎不封顶，仅受单标的/同向/并发上限约束)\n"
         )
         # 审计 P2-1：跨所同向敞口上限现已真执行（execution_router 发送前拒开），
         # 这里必须同源披露，否则"提示词口径 == 代码口径"又多一处例外。
         + (
-            f"- 跨所同向敞口上限: {MAX_TOTAL_EXPOSURE_USDT:.2f} USDT (同一标同方向跨所合计名义额，含本单；超出执行层拒开)\n"
-            if MAX_TOTAL_EXPOSURE_USDT > 0 else
+            f"- 跨所同向敞口上限: {rc.MAX_TOTAL_EXPOSURE_USDT:.2f} USDT (同一标同方向跨所合计名义额，含本单；超出执行层拒开)\n"
+            if rc.MAX_TOTAL_EXPOSURE_USDT > 0 else
             "- 跨所同向敞口上限: 未设上限 (0=不限制；仍受单标的/同向/并发上限约束)\n"
         )
-        + f"- 最长持仓时间: {TIME_STOP_HOURS:g} 小时 (超时且横盘无突破将被时间止损离场；横盘判定带宽 ±{TIME_STOP_ATR_BAND:.0%} ATR)\n"
-        f"- 单笔杠杆区间: {MIN_LEVERAGE:g}x ~ {MAX_LEVERAGE:g}x (在区间内按信号强度自主裁决；区间外执行层自动钳制)\n"
-        f"- 盈亏比 R:R 硬底线: {MIN_RISK_REWARD_RATIO:.1f} (低于此值的报价执行层物理拒绝)\n"
+        + f"- 最长持仓时间: {rc.TIME_STOP_HOURS:g} 小时 (超时且横盘无突破将被时间止损离场；横盘判定带宽 ±{rc.TIME_STOP_ATR_BAND:.0%} ATR)\n"
+        f"- 单笔杠杆区间: {rc.MIN_LEVERAGE:g}x ~ {rc.MAX_LEVERAGE:g}x (在区间内按信号强度自主裁决；区间外执行层自动钳制)\n"
+        f"- 盈亏比 R:R 硬底线: {rc.MIN_RISK_REWARD_RATIO:.1f} (低于此值的报价执行层物理拒绝)\n"
         # 审计 P3-4：宪法里的"目标 R:R ≥2.2/2.5"与"置信度 78%~88%"是硬编码，
         # 与可配的硬底线/门禁冲突（稳健套件门禁 85 → 78~88 一带整片必拒）。
         # 目标与标定带统一在此派生，宪法只指向本节。
-        f"- 目标盈亏比 R:R: ≥ {max(2.2, float(MIN_RISK_REWARD_RATIO or 0.0)):.1f} "
-        f"(= max(2.2, 硬底线 {MIN_RISK_REWARD_RATIO:.1f})；报价低于硬底线一律被拒)\n"
-        f"- 置信度标定带: {max(float(MIN_ENTRY_CONFIDENCE or 0.0), 78.0):.0f}% ~ "
-        f"{max(float(MIN_ENTRY_CONFIDENCE or 0.0), 78.0) + 8.0:.0f}% "
-        f"(下沿=执行层新开仓门禁 {MIN_ENTRY_CONFIDENCE:.0f}%，低于下沿必被物理拦截)\n"
-        f"- 新开仓最低置信度门禁: {MIN_ENTRY_CONFIDENCE:g}% (低于此值禁止新开仓)\n"
+        f"- 目标盈亏比 R:R: ≥ {max(2.2, float(rc.MIN_RISK_REWARD_RATIO or 0.0)):.1f} "
+        f"(= max(2.2, 硬底线 {rc.MIN_RISK_REWARD_RATIO:.1f})；报价低于硬底线一律被拒)\n"
+        f"- 置信度标定带: {max(float(rc.MIN_ENTRY_CONFIDENCE or 0.0), 78.0):.0f}% ~ "
+        f"{max(float(rc.MIN_ENTRY_CONFIDENCE or 0.0), 78.0) + 8.0:.0f}% "
+        f"(下沿=执行层新开仓门禁 {rc.MIN_ENTRY_CONFIDENCE:.0f}%，低于下沿必被物理拦截)\n"
+        f"- 新开仓最低置信度门禁: {rc.MIN_ENTRY_CONFIDENCE:g}% (低于此值禁止新开仓)\n"
         + (
             "- 金字塔加仓: 已禁用 (最大加仓次数 0，在途持仓仅可 HOLD/UPDATE_SL/CLOSE_MARKET)\n"
-            if MAX_SCALE_IN_COUNT <= 0 else
-            f"- 金字塔加仓门禁: 最多 {MAX_SCALE_IN_COUNT} 次 · 底仓浮盈 ≥ {MIN_SCALE_IN_PROFIT_RATIO:.1%} 且已保本 · 置信度 ≥ {MIN_SCALE_IN_CONFIDENCE:g}%\n"
+            if rc.MAX_SCALE_IN_COUNT <= 0 else
+            f"- 金字塔加仓门禁: 最多 {rc.MAX_SCALE_IN_COUNT} 次 · 底仓浮盈 ≥ {rc.MIN_SCALE_IN_PROFIT_RATIO:.1%} 且已保本 · 置信度 ≥ {rc.MIN_SCALE_IN_CONFIDENCE:g}%\n"
         )
-        + f"- 止损后同标的冷静期: {STOP_COOLDOWN_MINUTES} 分钟"
+        + f"- 止损后同标的冷静期: {rc.STOP_COOLDOWN_MINUTES} 分钟"
     )
     if _eq < 200.0:
         text += (

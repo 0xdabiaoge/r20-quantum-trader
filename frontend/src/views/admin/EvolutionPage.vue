@@ -67,6 +67,51 @@ const memoryVersion = ref<string | null>(null);
 const memoryStructured = ref<boolean | null>(null);
 const newMemoryText = ref('');
 const evolutionReport = ref<any>(null);
+const evolutionStartTime = ref('2026-09-01 00:00:00');
+const activeTradesCount = ref<number | null>(null);
+const savingStartTime = ref(false);
+
+async function loadEvolutionConfig() {
+  try {
+    const res = await api('/api/v1/admin/evolution/config');
+    if (res?.evolution_start_time) {
+      evolutionStartTime.value = res.evolution_start_time;
+      activeTradesCount.value = res.active_trades_count ?? null;
+    }
+  } catch {
+    // ignore
+  }
+}
+
+async function saveEvolutionStartTime() {
+  savingStartTime.value = true;
+  try {
+    const res = await api('/api/v1/admin/evolution/config', {
+      method: 'PUT',
+      body: JSON.stringify({ start_time: evolutionStartTime.value }),
+    });
+    activeTradesCount.value = res?.active_trades_count ?? null;
+    toast.ok(t('admin.evolution.filterSaved', undefined, { time: evolutionStartTime.value, n: activeTradesCount.value ?? 0 }));
+  } catch (e: any) {
+    toast.err(e.message);
+  } finally {
+    savingStartTime.value = false;
+  }
+}
+
+function setPresetStartTime(type: 'sep' | '7d' | '30d') {
+  if (type === 'sep') {
+    evolutionStartTime.value = '2026-09-01 00:00:00';
+  } else {
+    const d = new Date();
+    const days = type === '7d' ? 7 : 30;
+    d.setDate(d.getDate() - days);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    evolutionStartTime.value = `${y}-${m}-${day} 00:00:00`;
+  }
+}
 
 const selectedProfile = computed(() => (lib.value?.profiles || []).find((p: any) => p.id === selectedProfileId.value) || null);
 const enabledLessonCount = computed(() => structuredLessons.value.filter((l: any) => l.enabled).length);
@@ -96,6 +141,7 @@ async function loadData() {
     memoryVersion.value = memRes?.version || null;
     memoryStructured.value = memRes && 'legacy_read_only' in memRes ? !memRes.legacy_read_only : null;
     evolutionReport.value = reportRes || null;
+    loadEvolutionConfig();
     syncWorkingModules();
   } catch (e: any) {
     loadError.value = e.message;
@@ -471,6 +517,74 @@ onMounted(loadData);
               <span class="fact-foot">{{ t('admin.evolution.halfLifeSub') }}</span>
             </div>
           </template>
+        </section>
+
+        <!-- 复盘样本时间范围过滤 -->
+        <section class="card">
+          <header class="card-head">
+            <div>
+              <h2 class="card-title"><Sliders :size="14" />{{ t('admin.evolution.filterTitle') }}</h2>
+              <p class="card-sub">{{ t('admin.evolution.filterDesc') }}</p>
+            </div>
+            <span v-if="activeTradesCount !== null" class="badge">
+              {{ t('admin.evolution.activeTrades', undefined, { n: activeTradesCount }) }}
+            </span>
+          </header>
+
+          <div class="space-y-3 p-4">
+            <div class="flex flex-wrap items-center gap-2">
+              <label class="label-caps">{{ t('admin.evolution.startTimeLabel') }}</label>
+              <div class="flex items-center gap-2 flex-1 min-w-[280px]">
+                <input
+                  v-model="evolutionStartTime"
+                  type="text"
+                  class="input mono flex-1"
+                  :aria-label="t('admin.evolution.startTimeLabel')"
+                  placeholder="2026-09-01 00:00:00"
+                />
+                <button
+                  type="button"
+                  class="btn btn-primary btn-sm"
+                  :disabled="savingStartTime || !evolutionStartTime"
+                  @click="saveEvolutionStartTime"
+                >
+                  <Loader2 v-if="savingStartTime" :size="14" class="animate-spin shrink-0" />
+                  <Save v-else :size="14" />
+                  <span>{{ t('admin.evolution.saveFilter') }}</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- 快捷预设按钮 -->
+            <div class="flex flex-wrap items-center gap-1.5 pt-1">
+              <span class="text-3xs text-[var(--ink-3)] mr-1">{{ t('admin.evolution.quickPreset') }}</span>
+              <button
+                type="button"
+                class="btn btn-ghost btn-sm"
+                @click="setPresetStartTime('sep')"
+              >
+                {{ t('admin.evolution.presetSep') }}
+              </button>
+              <button
+                type="button"
+                class="btn btn-ghost btn-sm"
+                @click="setPresetStartTime('7d')"
+              >
+                {{ t('admin.evolution.preset7d') }}
+              </button>
+              <button
+                type="button"
+                class="btn btn-ghost btn-sm"
+                @click="setPresetStartTime('30d')"
+              >
+                {{ t('admin.evolution.preset30d') }}
+              </button>
+            </div>
+
+            <p class="text-3xs text-[var(--ink-3)] leading-normal">
+              {{ t('admin.evolution.startTimeHint') }}
+            </p>
+          </div>
         </section>
 
         <!-- 心法库 -->

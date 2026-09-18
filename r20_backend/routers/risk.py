@@ -140,6 +140,7 @@ def admin_risk_update(payload: RiskConfigUpdate, x_r20_session: str | None = Hea
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     update_env(env_updates)
     refresh_settings()
+    risk_config.reload_risk_constants()
     try:
         from scripts.instrument_pool import sync_pool_leverage_caps
         cur_v = risk_config.current_values()
@@ -170,6 +171,7 @@ def admin_risk_reset(payload: RiskResetRequest, x_r20_session: str | None = Head
         raise HTTPException(status_code=400, detail="确认短语必须精确为：RESET RISK")
     remove_env(set(risk_config.reset_keys()))
     refresh_settings()
+    risk_config.reload_risk_constants()
     try:
         from scripts.instrument_pool import sync_pool_leverage_caps
         cur_v = risk_config.current_values()

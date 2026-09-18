@@ -94,6 +94,20 @@ function dirOf(a: string): 'long' | 'short' | 'flat' {
   const u = String(a).toUpperCase();
   return u.includes('LONG') ? 'long' : u.includes('SHORT') ? 'short' : 'flat';
 }
+
+function posActionBadge(action: string): { label: string; class: string } {
+  const a = String(action || '').toUpperCase();
+  if (a === 'UPDATE_SL') {
+    return { label: '🔒 保本移损', class: 'text-[var(--accent)] border-[var(--accent-line)] bg-[var(--accent-bg)]' };
+  }
+  if (a === 'CLOSE_MARKET') {
+    return { label: '💰 市价平仓', class: 'text-[var(--warn)] border-[var(--warn-line)] bg-[var(--warn-bg)]' };
+  }
+  if (a === 'HOLD') {
+    return { label: '🛡️ 顺势持有', class: 'text-[var(--ink-2)] border-[var(--line-1)] bg-[var(--surface-2)]' };
+  }
+  return { label: a || '—', class: 'text-[var(--ink-3)] border-[var(--line-1)] bg-[var(--surface-2)]' };
+}
 </script>
 
 <template>
@@ -180,12 +194,17 @@ function dirOf(a: string): 'long' | 'short' | 'flat' {
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-2">
               <span class="font-mono font-bold text-xs text-[var(--ink-strong)]">{{ p.instId }}</span>
-              <DirTag :dir="dirOf(p.action)" />
+              <span class="rounded px-1.5 py-0.5 border text-3xs font-mono font-medium" :class="posActionBadge(p.action).class">
+                {{ posActionBadge(p.action).label }}
+              </span>
               <ConfBadge :value="p.confidence" />
             </div>
-            <span class="text-3xs font-mono text-[var(--ink-3)]">{{ p.action }}</span>
+            <span v-if="p.suggested_sl_price > 0" class="text-3xs font-mono text-[var(--down)]">
+              SL: {{ fmtPrice(p.suggested_sl_price) }}
+            </span>
+            <span v-else class="text-3xs font-mono text-[var(--ink-3)]">{{ p.action }}</span>
           </div>
-          <p class="text-xs text-[var(--ink-2)] leading-body">{{ p.reasoning }}</p>
+          <p class="text-xs text-[var(--ink-2)] leading-body">{{ p.reason || p.reasoning || '--' }}</p>
         </div>
       </div>
 
@@ -208,17 +227,17 @@ function dirOf(a: string): 'long' | 'short' | 'flat' {
               <ConfBadge :value="o.confidence" />
             </div>
             <span class="rounded px-1.5 py-0.5 border text-3xs font-mono text-[var(--ink-2)]" style="background-color: var(--surface-2); border-color: var(--line-1)">
-              {{ o.suggested_leverage || '5x' }}
+              {{ o.suggested_leverage || (o.leverage ? o.leverage + 'x' : '5x') }}
             </span>
           </div>
 
-          <p class="text-xs text-[var(--ink-2)] leading-body">{{ o.reasoning }}</p>
+          <p class="text-xs text-[var(--ink-2)] leading-body">{{ o.reason || o.reasoning || '--' }}</p>
 
           <!-- 挂单点位 -->
           <div class="grid grid-cols-3 gap-2 pt-2 border-t text-3xs font-mono" style="border-color: var(--line-1)">
             <div>
               <span class="text-[var(--ink-3)] block">{{ t('dash.radar.entry') }}</span>
-              <span class="font-bold text-[var(--ink-1)]">{{ fmtPrice(o.target_entry_price) }}</span>
+              <span class="font-bold text-[var(--ink-1)]">{{ fmtPrice(o.target_entry_price ?? o.entry_price) }}</span>
             </div>
             <div>
               <span class="text-[var(--ink-3)] block">{{ t('dash.radar.stopLoss') }}</span>

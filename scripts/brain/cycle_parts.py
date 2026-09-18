@@ -126,7 +126,11 @@ def build_history_record(*, time_str, policy_version, policy_hash, policy_snapsh
                 "risk_reward_ratio": standard_cache[p["instId"]]["decision"]["risk_reward_ratio"],
                 "data_quality": standard_cache[p["instId"]]["data_quality"],
                 "policy_version": policy_version,
-                "reason": standard_cache[p["instId"]]["decision"]["summary_reason"]
+                "reason": standard_cache[p["instId"]]["decision"]["summary_reason"],
+                "entry_price": standard_cache[p["instId"]]["decision"].get("entry_price"),
+                "target_entry_price": standard_cache[p["instId"]]["decision"].get("entry_price"),
+                "stop_loss_price": standard_cache[p["instId"]]["decision"].get("stop_loss_price"),
+                "take_profit_price": standard_cache[p["instId"]]["decision"].get("take_profit_price"),
             }
             for p in packages
         ]

@@ -65,6 +65,17 @@ export const enAdminEvolution = {
   moduleOff: 'Disabled',
 
   // ── added by the rebuild (batch 5) ──
+  filterTitle: 'Evolution Sample Filtering',
+  filterDesc: 'Filter out manual historical trades from years ago; only review modern quant trades',
+  startTimeLabel: 'Review Start Time (UTC+8)',
+  startTimeHint: 'Trades closed or opened prior to this time are excluded from review',
+  quickPreset: 'Quick presets:',
+  presetSep: 'Since 2026-09-01 (Recommended)',
+  preset7d: 'Last 7 Days',
+  preset30d: 'Last 30 Days',
+  activeTrades: 'Active Trades Included: {n}',
+  saveFilter: 'Save Filter Config',
+  filterSaved: 'Evolution start time updated to {time}, {n} trades active',
   reportStatsHint: 'Sample and verdict basis for this review',
   insightLine: 'Distilled insight',
   runConfirmTitle: 'Run the self-evolution review now',

@@ -66,6 +66,17 @@ export const zhAdminEvolution = {
   moduleOff: '已停用',
 
   // ── 推倒式重构新增（批 5）──
+  filterTitle: '自进化复盘样本过滤',
+  filterDesc: '设置自进化复盘的最早交易起算时间，隔绝多年陈旧的人工历史单',
+  startTimeLabel: '复盘起始时间 (UTC+8)',
+  startTimeHint: '早于此时间的平仓或开仓订单将被自动过滤，仅复盘此时间之后的量化实盘单',
+  quickPreset: '快捷设定:',
+  presetSep: '2026-09-01 起 (推荐)',
+  preset7d: '最近 7 天',
+  preset30d: '最近 30 天',
+  activeTrades: '当前纳入复盘有效交易: {n} 笔',
+  saveFilter: '保存过滤配置',
+  filterSaved: '复盘起始时间已更新为 {time}，当前有效交易 {n} 笔',
   reportStatsHint: '本次复盘样本与裁定依据',
   insightLine: '提炼洞见',
   runConfirmTitle: '立即强制执行自进化复盘',

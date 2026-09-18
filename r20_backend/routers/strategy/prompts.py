@@ -8,6 +8,7 @@ import os
 import re
 from typing import Any
 from fastapi import Header, HTTPException
+from pydantic import BaseModel, Field
 from r20_backend.config import refresh_settings
 from r20_backend.audit import record as audit_record
 from r20_backend.dependencies import PROMPT_OVERRIDE_FILE, require_admin_header, require_superadmin
@@ -326,3 +327,52 @@ def update_prompt_override(
         return {"saved": True, "enabled": bool(content), "restart_note": "下一次 AI 推演循环将自动叠加此提示词覆盖层。"}
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"更新提示词覆盖失败: {exc}")
+
+
+class EvolutionConfigUpdate(BaseModel):
+    start_time: str = Field(default="2026-09-01 00:00:00", min_length=10, max_length=30)
+
+
+@router.get("/api/v1/admin/evolution/config")
+def get_evolution_config(
+    x_r20_session: str | None = Header(default=None, alias="X-R20-Session"),
+    x_r20_admin_token: str | None = Header(default=None)
+) -> dict[str, Any]:
+    refresh_settings()
+    require_admin_header(x_r20_admin_token, x_r20_session)
+    from r20_backend.account_baseline import load_account_baseline
+    from scripts.self_improvement_engine import load_closed_trades
+    base = load_account_baseline()
+    evo_start = base.get("evolution_start_time", "2026-09-01 00:00:00")
+    trades = load_closed_trades(evo_start)
+    return {
+        "evolution_start_time": evo_start,
+        "active_trades_count": len(trades),
+        "note": "早于此时间的历史人工合约订单将被自动过滤，仅复盘此时间之后的量化实盘单。"
+    }
+
+
+@router.put("/api/v1/admin/evolution/config")
+def update_evolution_config(
+    payload: EvolutionConfigUpdate,
+    x_r20_session: str | None = Header(default=None, alias="X-R20-Session"),
+    x_r20_admin_token: str | None = Header(default=None)
+) -> dict[str, Any]:
+    refresh_settings()
+    actor = require_superadmin(x_r20_session)
+    from r20_backend.account_baseline import update_evolution_start_time
+    from scripts.self_improvement_engine import load_closed_trades
+    res = update_evolution_start_time(payload.start_time)
+    evo_start = res.get("evolution_start_time", "2026-09-01 00:00:00")
+    trades = load_closed_trades(evo_start)
+    audit_record("evolution.config.update", "success", {
+        "actor": actor.get("username", "admin"),
+        "evolution_start_time": evo_start,
+        "active_trades_count": len(trades)
+    })
+    return {
+        "ok": True,
+        "evolution_start_time": evo_start,
+        "active_trades_count": len(trades),
+        "effect": f"自进化复盘起始时间已更新为 {evo_start}，下次复盘将只纳入此时间之后的实盘交易。"
+    }
