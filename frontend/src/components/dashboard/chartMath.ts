@@ -24,18 +24,34 @@ export function computeRiskReward(input: {
 
   let riskDist = 0
   let rewardDist = 0
+  let isLockProfit = false
+  let slDiffPct = 0
 
   if (side === 'long') {
-    riskDist = Math.max(0, entry - sl)
+    if (entry > 0 && sl >= entry) {
+      isLockProfit = true
+      slDiffPct = ((sl - entry) / entry) * 100
+      riskDist = 0
+    } else {
+      riskDist = Math.max(0, entry - sl)
+      slDiffPct = entry > 0 ? -((entry - sl) / entry) * 100 : 0
+    }
     rewardDist = Math.max(0, tp - entry)
   } else {
-    riskDist = Math.max(0, sl - entry)
+    if (entry > 0 && sl <= entry && sl > 0) {
+      isLockProfit = true
+      slDiffPct = ((entry - sl) / entry) * 100
+      riskDist = 0
+    } else {
+      riskDist = Math.max(0, sl - entry)
+      slDiffPct = entry > 0 ? -((sl - entry) / entry) * 100 : 0
+    }
     rewardDist = Math.max(0, entry - tp)
   }
 
   const riskPct = entry > 0 ? (riskDist / entry) * 100 : 0
   const rewardPct = entry > 0 ? (rewardDist / entry) * 100 : 0
-  const rrRatio = riskDist > 0 ? rewardDist / riskDist : 0
+  const rrRatio = riskDist > 0 ? rewardDist / riskDist : (isLockProfit ? 99.9 : 0)
   const atrMultiple = atr > 0 ? riskDist / atr : 0
 
   const isRrCompliant = rrRatio >= 2.0
@@ -69,6 +85,8 @@ export function computeRiskReward(input: {
     hasRealPosition,
     estProfitUsd,
     estRiskUsd,
+    isLockProfit,
+    slDiffPct,
   }
 }
 

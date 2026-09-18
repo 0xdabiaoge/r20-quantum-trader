@@ -109,11 +109,31 @@ export interface SlOverlayInput {
   riskPct: number
   textColor: string
   isEn: boolean
+  /** 是否为移动保本/锁利状态（SL 已优于 Entry） */
+  isLockProfit?: boolean
+  /** 相对开仓成本的真实百分比变动（含正负） */
+  slDiffPct?: number
 }
 
-/** 止损价线：虚线，固定 risk 色。 */
+/** 止损价线：虚线，锁利为绿色，风险为警戒红色。 */
 export function buildSlOverlay(input: SlOverlayInput): PriceLineOverlay {
-  const { price, riskPct, textColor, isEn } = input
+  const { price, riskPct, textColor, isEn, isLockProfit, slDiffPct } = input
+  const isLock = !!isLockProfit
+  const color = isLock ? LONG_COLOR : SHORT_COLOR
+
+  let badgeText = ''
+  if (isLock) {
+    const diff = Math.abs(slDiffPct ?? riskPct)
+    if (diff >= 0.1) {
+      badgeText = isEn ? `Lock +${diff.toFixed(1)}%` : `锁利 +${diff.toFixed(1)}%`
+    } else {
+      badgeText = isEn ? 'Breakeven' : '保本'
+    }
+  } else {
+    const diff = Math.abs(slDiffPct ?? riskPct)
+    badgeText = `${isEn ? 'SL' : '止损'} -${diff.toFixed(1)}%`
+  }
+
   return {
     name: 'priceLine',
     paneId: 'candle_pane',
@@ -121,15 +141,13 @@ export function buildSlOverlay(input: SlOverlayInput): PriceLineOverlay {
     styles: {
       line: {
         style: 'dashed',
-        dashedValue: [6, 4],
+        dashedValue: isLock ? [8, 4] : [6, 4],
         size: LINE_SIZE,
-        color: SHORT_COLOR,
+        color,
       },
-      text: { size: TEXT_SIZE, color: textColor, backgroundColor: SHORT_COLOR },
+      text: { size: TEXT_SIZE, color: textColor, backgroundColor: color },
     },
-    // 批 26：标签不再用 emoji（🛑/🎯 在 canvas 文本里各家字体渲染不一致，
-    // 且设计清单禁 emoji 图标）。改用全站表格同款的 ▲▼ 方向字形。
-    extendData: `▼ ${isEn ? 'SL' : '止损SL'} -${riskPct.toFixed(1)}%`,
+    extendData: badgeText,
   }
 }
 
@@ -157,7 +175,7 @@ export function buildTpOverlay(input: TpOverlayInput): PriceLineOverlay {
       },
       text: { size: TEXT_SIZE, color: textColor, backgroundColor: LONG_COLOR },
     },
-    extendData: `▲ ${isEn ? 'TP' : '止盈TP'} +${rewardPct.toFixed(1)}%`,
+    extendData: `${isEn ? 'TP' : '止盈'} +${rewardPct.toFixed(1)}%`,
   }
 }
 
@@ -180,16 +198,18 @@ export function planPriceLines(input: {
   rewardPct: number
   textColor: string
   isEn: boolean
+  isLockProfit?: boolean
+  slDiffPct?: number
 }): { entry?: PriceLineOverlay; sl?: PriceLineOverlay; tp?: PriceLineOverlay } {
   const { entryPx, slPx, tpPx, hasPosOrOrder, isLong,
-          riskPct, rewardPct, textColor, isEn } = input
+          riskPct, rewardPct, textColor, isEn, isLockProfit, slDiffPct } = input
   const plan: { entry?: PriceLineOverlay; sl?: PriceLineOverlay; tp?: PriceLineOverlay } = {}
 
   if (hasPosOrOrder && entryPx > 0) {
     plan.entry = buildEntryOverlay({ price: entryPx, isLong, textColor, isEn })
   }
   if (slPx > 0) {
-    plan.sl = buildSlOverlay({ price: slPx, riskPct, textColor, isEn })
+    plan.sl = buildSlOverlay({ price: slPx, riskPct, textColor, isEn, isLockProfit, slDiffPct })
   }
   if (tpPx > 0) {
     plan.tp = buildTpOverlay({ price: tpPx, rewardPct, textColor, isEn })

@@ -59,37 +59,50 @@ registerOverlay({
 
     const isEntry = label.includes('入场') || label.includes('Entry')
     const isTp = label.includes('TP') || label.includes('止盈')
-    const isSl = label.includes('SL') || label.includes('止损')
+    const isSl = label.includes('SL') || label.includes('止损') || label.includes('锁利') || label.includes('保本') || label.includes('Lock') || label.includes('Breakeven')
+
+    // 垂直错位避让：入场与止盈胶囊贴线上方，止损/锁利胶囊贴线下方，避免相近点位相互覆盖
+    let textBaseline: 'top' | 'bottom' | 'middle' = 'middle'
+    let textYOffset = 0
 
     if (isEntry) {
       strokeColor = '#0284C7'
       strokeStyle = 'solid'
       badgeBg = '#0369A1'
-      displayBadge = `⚡ ${label.replace(/^[▲▼⚡\s]+/, '')}`
+      displayBadge = `⚡ ${label.replace(/^[▲▼⚡🛑🔒\s]+/, '')}`
+      textBaseline = 'bottom'
+      textYOffset = -2
     } else if (isTp) {
       strokeColor = '#10B981'
       strokeStyle = 'dashed'
       strokeDashed = [8, 4]
       badgeBg = '#047857'
       displayBadge = `🎯 ${label.replace(/^[▲▼🎯\s]+/, '')}`
+      textBaseline = 'bottom'
+      textYOffset = -2
     } else if (isSl) {
-      strokeColor = '#F43F5E'
+      const isLock = label.includes('锁利') || label.includes('保本') || label.includes('Lock') || label.includes('Breakeven')
+      strokeColor = isLock ? '#10B981' : '#F43F5E'
       strokeStyle = 'dashed'
-      strokeDashed = [4, 3]
-      badgeBg = '#BE123C'
-      displayBadge = `🛑 ${label.replace(/^[▲▼🛑\s]+/, '')}`
+      strokeDashed = isLock ? [8, 4] : [5, 3]
+      badgeBg = isLock ? '#047857' : '#BE123C'
+      displayBadge = isLock ? `🔒 ${label.replace(/^[▲▼🛑🔒\s]+/, '')}` : `🛑 ${label.replace(/^[▲▼🛑\s]+/, '')}`
+      textBaseline = 'top'
+      textYOffset = 2
     }
+
+    const startX = y < 45 ? Math.min(220, bounding.width * 0.5) : 0
 
     return [
       {
         type: 'line',
         attrs: {
-          coordinates: [{ x: 0, y }, { x: bounding.width, y }],
+          coordinates: [{ x: startX, y }, { x: bounding.width, y }],
         },
         styles: {
           style: strokeStyle,
           dashedValue: strokeDashed,
-          size: lineStyle.size || 1.5,
+          size: lineStyle.size || 1.2,
           color: strokeColor,
         },
       },
@@ -97,23 +110,23 @@ registerOverlay({
         type: 'text',
         ignoreEvent: true,
         attrs: {
-          x: Math.max(10, bounding.width - 8),
-          y: y - 4,
+          x: Math.max(10, bounding.width - 6),
+          y: y + textYOffset,
           text: displayBadge,
           align: 'right',
-          baseline: 'bottom',
+          baseline: textBaseline,
         },
         styles: {
-          size: 11,
+          size: 10,
           family: 'JetBrains Mono, -apple-system, BlinkMacSystemFont, sans-serif',
           weight: 'bold',
           color: '#FFFFFF',
           backgroundColor: badgeBg,
-          paddingLeft: 6,
-          paddingRight: 6,
-          paddingTop: 2,
-          paddingBottom: 2,
-          borderRadius: 3,
+          paddingLeft: 4,
+          paddingRight: 4,
+          paddingTop: 1.5,
+          paddingBottom: 1.5,
+          borderRadius: 2,
         },
       },
     ]
@@ -185,10 +198,8 @@ const store = useDashboardStore()
 const { theme, cvd } = useTheme()
 const isDark = computed(() => theme.value === 'dark')
 
-/* P4: mobile hides the always-on legend to stop multi-line overlay on narrow screens;
-   desktop keeps it (data always readable). Re-applied when crossing the 640px breakpoint. */
 function legendRule(): 'always' {
-  // 用户要求图例常驻左上角；副图压缩 + 容器加高缓解遮挡
+  // 指标数值（VWAP、MA、VOL 等）常驻显示，满足量化操盘随时观察要求
   return 'always'
 }
 
@@ -250,7 +261,7 @@ const periods = computed(() => [
 ])
 
 const currentSymbol = ref<string>('BTC')
-const currentPeriod = ref<string>('4H')
+const currentPeriod = ref<string>('1H')
 const isLoading = ref<boolean>(false)
 const chartContainer = ref<HTMLElement | null>(null)
 
@@ -521,7 +532,8 @@ function initChart() {
     pricePrecision: 2,
     volumePrecision: 2,
   })
-  klineChart.setPeriod({ type: 'hour', span: 1 })
+  const initP = periods.value.find((p) => p.id === currentPeriod.value) || { type: 'hour', span: 1 }
+  klineChart.setPeriod({ type: initP.type, span: initP.span })
 
   // 配置 DataLoader 驱动
   klineChart.setDataLoader({
@@ -591,6 +603,8 @@ function updatePriceLines() {
     rewardPct: riskRewardMetrics.value.rewardPct,
     textColor: tok('--ink-1'),
     isEn: isEn.value,
+    isLockProfit: riskRewardMetrics.value.isLockProfit,
+    slDiffPct: riskRewardMetrics.value.slDiffPct,
   })
 
   if (plan.entry) {

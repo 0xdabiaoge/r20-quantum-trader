@@ -39,6 +39,10 @@ export function chartStyles(
     },
     candle: {
       type: 'candle_solid',
+      margin: {
+        top: 48,
+        bottom: 16,
+      },
       bar: {
         upColor: tok('--up'),
         downColor: tok('--down'),
@@ -90,7 +94,7 @@ export function chartStyles(
         showRule: legendRule(),
         showType: 'standard',
         text: {
-          size: 11,
+          size: 10,
           family: 'JetBrains Mono, monospace',
           color: tok('--ink-2'),
         },
