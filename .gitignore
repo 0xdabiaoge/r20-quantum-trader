@@ -70,6 +70,7 @@ data/*.xlsx
 data/*.csv
 data/*.lock
 data/*.tmp
+data/*.bak
 data/*.enc
 data/*.txt
 data/*.md
