@@ -102,6 +102,15 @@ def collect_pending_order_rows(orders_data, pending_orders_list, *, tz_beijing, 
                 tp_px = str(att.get("tpTriggerPx") or "--")
                 sl_px = str(att.get("slTriggerPx") or "--")
 
+            try:
+                from scripts.okx_runtime import current_environment
+                _okx_env = current_environment()
+                _acc_mode = "DEMO" if _okx_env.simulated else "LIVE"
+                _env_mode = _okx_env.mode.lower()
+            except Exception:
+                _acc_mode = "DEMO"
+                _env_mode = "demo"
+
             pending_orders_list.append({
                 "venue": "okx",
                 "exchange": "okx",
@@ -123,7 +132,9 @@ def collect_pending_order_rows(orders_data, pending_orders_list, *, tz_beijing, 
                 "time": c_time_str,
                 "state": str(o.get("state", "live")),
                 "tp_px": tp_px,
-                "sl_px": sl_px
+                "sl_px": sl_px,
+                "account_mode": _acc_mode,
+                "environment": _env_mode,
             })
             added += 1
 

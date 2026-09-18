@@ -53,7 +53,9 @@ function getModeOf(item: any): 'LIVE' | 'DEMO' {
   if (item?.account_mode) return item.account_mode.toUpperCase() === 'LIVE' ? 'LIVE' : 'DEMO';
   if (item?.environment) return item.environment.toLowerCase() === 'live' ? 'LIVE' : 'DEMO';
   if (item?.is_simulated !== undefined) return item.is_simulated ? 'DEMO' : 'LIVE';
-  return 'LIVE';
+  const storeEnv = (store.data as any)?.environment || (store.account as any)?.environment;
+  if (storeEnv) return String(storeEnv).toLowerCase() === 'live' ? 'LIVE' : 'DEMO';
+  return 'DEMO';
 }
 
 const filteredPositions = computed(() => {
@@ -126,13 +128,12 @@ function symOf(x: { instId?: string; name?: string }): string {
       <table v-else class="table pop-table w-full" :aria-label="t('dash.matrix.positions.title')">
         <thead>
           <tr>
-            <th scope="col">{{ t('dash.matrix.positions.col.symbol') }}</th>
-            <th scope="col" class="col-num pop-col-entry">{{ t('dash.matrix.positions.col.entry') }}</th>
-            <th scope="col" class="col-num">{{ t('dash.matrix.positions.col.mark') }}</th>
-            <th scope="col" class="col-num pop-col-lev">{{ t('dash.matrix.positions.col.lev') }}</th>
-            <th scope="col" class="col-num">{{ t('dash.matrix.positions.col.pnl') }}</th>
-            <th scope="col" class="col-num">{{ t('dash.matrix.positions.col.sl') }} / {{ t('dash.matrix.positions.col.tp') }}</th>
-            <th scope="col" class="text-center">{{ t('dash.matrix.positions.col.oco') }}</th>
+            <th scope="col" class="min-w-[140px]">{{ t('dash.matrix.positions.col.symbol') }}</th>
+            <th scope="col" class="col-num min-w-[85px]">{{ t('dash.matrix.positions.col.entry') }} / {{ t('dash.matrix.positions.col.mark') }}</th>
+            <th scope="col" class="col-num min-w-[75px]">{{ t('dash.matrix.positions.col.lev') }} / {{ t('dash.matrix.positions.col.margin') }}</th>
+            <th scope="col" class="col-num min-w-[85px]">{{ t('dash.matrix.positions.col.pnl') }}</th>
+            <th scope="col" class="col-num min-w-[85px]">{{ t('dash.matrix.positions.col.sl') }} / {{ t('dash.matrix.positions.col.tp') }}</th>
+            <th scope="col" class="text-center min-w-[50px]">{{ t('dash.matrix.positions.col.oco') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -147,7 +148,7 @@ function symOf(x: { instId?: string; name?: string }): string {
             @keydown.space.prevent="emit('pick-symbol', p.instId)"
           >
             <td>
-              <div class="flex items-center gap-1.5 flex-wrap">
+              <div class="flex items-center gap-1 flex-wrap">
                 <span class="num font-mono font-semibold text-xs text-[var(--ink-strong)]">{{ symOf(p) }}</span>
                 <DirTag :dir="p.side" />
                 <span
@@ -163,26 +164,27 @@ function symOf(x: { instId?: string; name?: string }): string {
                   {{ getModeOf(p) }}
                 </span>
               </div>
-              <!-- 批 32：后端 stageDesc 长度不一（「持有监控中」5 字 / 「云端双腿防护中」7 字），
-                   列宽 78px 只够 6 字 → 长的那条折成两行，行高跟着不齐、且从词中间断开。
-                   统一截断成一行 + title 兜住全文（与批 25 的截断纪律一致）。 -->
               <p
                 v-if="p.stageDesc"
-                class="text-3xs text-[var(--ink-3)] leading-tight mt-0.5 truncate"
+                class="text-3xs text-[var(--ink-3)] leading-tight mt-0.5 truncate max-w-[150px]"
                 :title="p.stageDesc"
               >{{ p.stageDesc }}</p>
             </td>
-            <td class="col-num font-mono pop-col-entry">{{ fmtPrice(p.avgPx) }}</td>
-            <td class="col-num font-mono">{{ fmtPrice(p.markPx ?? p.last) }}</td>
-            <td class="col-num font-mono pop-col-lev">{{ p.lever }}x</td>
-            <td class="col-num font-mono" :class="posPnl(p) >= 0 ? 'up' : 'down'">
-              {{ arrow(posPnl(p)) }} {{ fmtSigned(posPnl(p)) }}
-              <span class="text-3xs block text-[var(--ink-3)]">{{ fmtPct(posRoi(p)) }}</span>
+            <td class="col-num font-mono">
+              <span class="block text-xs font-medium text-[var(--ink-strong)]">{{ fmtPrice(p.avgPx) }}</span>
+              <span class="block text-3xs text-[var(--ink-3)]">{{ fmtPrice(p.markPx ?? p.last) }}</span>
             </td>
-            <td class="col-num font-mono text-[var(--ink-3)]">
-              <span class="down">{{ fmtPrice(p.exchangeSl ?? p.displayStop) }}</span>
-              <span class="mx-1">/</span>
-              <span class="up">{{ fmtPrice(p.exchangeTp ?? p.displayTakeProfit) }}</span>
+            <td class="col-num font-mono">
+              <span class="block text-xs font-bold text-[var(--ink-strong)]">{{ p.lever }}x</span>
+              <span class="block text-3xs text-[var(--ink-2)] font-medium">{{ p.margin_usdt ? `${fmtNum(p.margin_usdt, 2)}U` : '--' }}</span>
+            </td>
+            <td class="col-num font-mono" :class="posPnl(p) >= 0 ? 'up' : 'down'">
+              <span class="block text-xs font-semibold">{{ arrow(posPnl(p)) }} {{ fmtSigned(posPnl(p)) }}</span>
+              <span class="text-3xs block" :class="posPnl(p) >= 0 ? 'text-[var(--up)]' : 'text-[var(--down)]'">{{ fmtPct(posRoi(p)) }}</span>
+            </td>
+            <td class="col-num font-mono text-3xs">
+              <span class="down block">SL {{ fmtPrice(p.exchangeSl ?? p.displayStop) }}</span>
+              <span class="up block">TP {{ fmtPrice(p.exchangeTp ?? p.displayTakeProfit) }}</span>
             </td>
             <td class="text-center">
               <span
@@ -213,12 +215,12 @@ function symOf(x: { instId?: string; name?: string }): string {
       <table v-else class="table pop-table w-full" :aria-label="t('dash.matrix.orders.title')">
         <thead>
           <tr>
-            <th scope="col">{{ t('dash.matrix.orders.col.symbol') }}</th>
-            <th scope="col" class="col-num">{{ t('dash.matrix.orders.col.price') }}</th>
-            <th scope="col" class="col-num">{{ t('dash.matrix.orders.col.qty') }}</th>
-            <th scope="col" class="col-num">{{ t('dash.matrix.orders.col.sl') }} / {{ t('dash.matrix.orders.col.tp') }}</th>
-            <th scope="col" class="pop-col-time">{{ t('dash.matrix.orders.col.placed') }}</th>
-            <th scope="col" class="text-center">{{ t('dash.matrix.orders.col.state') }}</th>
+            <th scope="col" class="min-w-[140px]">{{ t('dash.matrix.orders.col.symbol') }}</th>
+            <th scope="col" class="col-num min-w-[85px]">{{ t('dash.matrix.orders.col.price') }}</th>
+            <th scope="col" class="col-num min-w-[75px]">{{ t('dash.matrix.orders.col.qty') }} / {{ t('dash.matrix.positions.col.lev') }}</th>
+            <th scope="col" class="col-num min-w-[85px]">{{ t('dash.matrix.orders.col.sl') }} / {{ t('dash.matrix.orders.col.tp') }}</th>
+            <th scope="col" class="pop-col-time text-right min-w-[80px]">{{ t('dash.matrix.orders.col.placed') }}</th>
+            <th scope="col" class="text-center min-w-[60px]">{{ t('dash.matrix.orders.col.state') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -233,7 +235,7 @@ function symOf(x: { instId?: string; name?: string }): string {
             @keydown.space.prevent="emit('pick-symbol', o.instId)"
           >
             <td>
-              <div class="flex items-center gap-1.5 flex-wrap">
+              <div class="flex items-center gap-1 flex-wrap">
                 <span class="num font-mono font-semibold text-xs text-[var(--ink-strong)]">{{ symOf(o) }}</span>
                 <DirTag :dir="orderDir(o)" />
                 <span
@@ -250,14 +252,20 @@ function symOf(x: { instId?: string; name?: string }): string {
                 </span>
               </div>
             </td>
-            <td class="col-num font-mono">{{ fmtPrice(o.px) }}</td>
-            <td class="col-num font-mono">{{ fmtNum(Number(o.sz), 0) }}</td>
-            <td class="col-num font-mono text-[var(--ink-3)]">
-              <span class="down">{{ o.slTriggerPx ? fmtPrice(o.slTriggerPx) : '--' }}</span>
-              <span class="mx-1">/</span>
-              <span class="up">{{ o.tpTriggerPx ? fmtPrice(o.tpTriggerPx) : '--' }}</span>
+            <td class="col-num font-mono text-xs font-semibold text-[var(--ink-strong)]">
+              {{ fmtPrice(o.px) }}
             </td>
-            <td class="pop-col-time text-3xs text-[var(--ink-3)]"><TimeAgo :time="Number(o.cTime) || o.cTime" /></td>
+            <td class="col-num font-mono">
+              <span class="block text-xs font-medium text-[var(--ink-strong)]">{{ fmtNum(Number(o.sz), 0) }}</span>
+              <span class="block text-3xs text-[var(--ink-2)]">{{ o.lever || '3x' }}</span>
+            </td>
+            <td class="col-num font-mono text-3xs">
+              <span class="down block">SL {{ o.slTriggerPx ? fmtPrice(o.slTriggerPx) : (o.sl_px && String(o.sl_px) !== '--' ? fmtPrice(o.sl_px) : '--') }}</span>
+              <span class="up block">TP {{ o.tpTriggerPx ? fmtPrice(o.tpTriggerPx) : (o.tp_px && String(o.tp_px) !== '--' ? fmtPrice(o.tp_px) : '--') }}</span>
+            </td>
+            <td class="pop-col-time text-3xs text-right text-[var(--ink-3)]">
+              <TimeAgo :time="Number(o.cTime) || o.cTime" />
+            </td>
             <td class="text-center">
               <span class="inline-block whitespace-nowrap rounded px-1.5 py-0.5 text-3xs border border-[var(--line-1)] bg-[var(--surface-2)] text-[var(--ink-2)]">
                 {{ o.state === 'live' ? t('status.waiting') : o.state }}
@@ -274,48 +282,23 @@ function symOf(x: { instId?: string; name?: string }): string {
 </template>
 
 <style scoped>
-/* =========================================================================
-   批 18 · 列显隐改跟「面板宽度」，不再跟「视口宽度」
-   -------------------------------------------------------------------------
-   缺陷（实测）：本面板在 1600px 视口下宽 433px，而列显隐用的是 Tailwind
-   视口断点 —— `hidden 2xl:table-cell` 在 1600 ≥ 1536 时判定为「可见」，
-   于是 7 列硬塞进 433px，表格宽 564px 被容器裁掉："止损 / 止盈"（风险
-   关键列）只剩半个「止」字，且没有任何滚动提示。
-
-   修法：面板自身作为容器（container-type: inline-size），列显隐与内边距
-   改由容器宽度决定，并按「信息重要性」排序取舍：
-     始终保留 标的 / 标记价 / 未实现盈亏 / 止损·止盈 / 云端防线
-     ≥520px  再放出 开仓均价（与标记价高度冗余）
-     ≥600px  再放出 杠杆（静态值）与挂单时间
-   ========================================================================= */
 .pop-panel {
   container-type: inline-size;
 }
 
-.pop-col-entry,
-.pop-col-lev,
-.pop-col-time {
-  display: none;
+.pop-table {
+  table-layout: auto;
 }
 
-@container (min-width: 520px) {
-  .pop-col-entry,
+.pop-table th,
+.pop-table td {
+  padding-left: var(--sp-3);
+  padding-right: var(--sp-3);
+}
+
+@container (max-width: 480px) {
   .pop-col-time {
-    display: table-cell;
-  }
-}
-@container (min-width: 600px) {
-  .pop-col-lev {
-    display: table-cell;
-  }
-}
-
-/* 窄容器收紧单元格内边距：让「止损 / 止盈」也能一屏放下，不出现横向滚动 */
-@container (max-width: 559px) {
-  .pop-table th,
-  .pop-table td {
-    padding-left: var(--sp-4);
-    padding-right: var(--sp-4);
+    display: none;
   }
 }
 

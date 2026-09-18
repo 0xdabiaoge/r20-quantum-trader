@@ -83,6 +83,8 @@ export const enRadar = {
   cioVerdict: 'CIO final ruling',
   adopted: 'Adopted: {role}',
   seatsIndependent: 'Independent proposals per seat',
+  statusDegraded: 'Degraded',
+  viewReasoning: 'View reasoning chain',
   thSymbol: 'Symbol',
   thBasis: 'BN basis',
   thBasisGate: 'Gate basis',

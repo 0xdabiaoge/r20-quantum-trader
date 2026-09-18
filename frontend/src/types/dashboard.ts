@@ -68,6 +68,7 @@ export interface PendingOrderItem {
   tp_px?: number
   tpTriggerPx?: string
   slTriggerPx?: string
+  lever?: string
   venue?: string
   environment?: string
   account_mode?: string

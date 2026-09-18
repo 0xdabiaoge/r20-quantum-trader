@@ -225,8 +225,6 @@ def request(
         raise RuntimeError(f"OKX V5 网络请求失败：{type(exc).__name__}: {exc}") from exc
     if not isinstance(payload_json, dict):
         raise RuntimeError("OKX V5 invalid response envelope")
-    if str(payload_json.get("code", "0")) != "0":
-        raise RuntimeError(f"OKX {payload_json.get('code')}: {payload_json.get('msg') or '请求失败'}")
     data = payload_json.get("data") or []
     if not isinstance(data, list):
         data = [data]
@@ -236,6 +234,8 @@ def request(
         raise RuntimeError(
             f"OKX {failures[0].get('sCode')}: {failures[0].get('sMsg') or '业务请求失败'}"
         )
+    if str(payload_json.get("code", "0")) != "0":
+        raise RuntimeError(f"OKX {payload_json.get('code')}: {payload_json.get('msg') or '请求失败'}")
     return rows
 
 

@@ -76,14 +76,26 @@ def collect_pending_inst_ids(*, venues, venue_mode, broken_venues, venue_registr
                     continue
                 _graw = o.get("raw") if isinstance(o.get("raw"), dict) else {}
                 _gs = str(o.get("side") or _graw.get("side") or "").lower()
+                if not _gs:
+                    _sz_raw = o.get("size") if o.get("size") is not None else _graw.get("size")
+                    if _sz_raw is None:
+                        _sz_raw = o.get("amount") if o.get("amount") is not None else _graw.get("amount")
+                    try:
+                        if _sz_raw is not None and float(_sz_raw) != 0:
+                            _gs = "buy" if float(_sz_raw) > 0 else "sell"
+                    except (TypeError, ValueError):
+                        pass
                 _gro = (o.get("reduce_only") if o.get("reduce_only") is not None
                         else _graw.get("reduce_only"))
+                if _gro is None:
+                    _gro = (o.get("is_reduce_only") if o.get("is_reduce_only") is not None
+                            else _graw.get("is_reduce_only"))
                 if _gs not in ("buy", "sell") or _gro in (True, "true", "1"):
                     continue
                 _ginst = str(o.get("inst_id") or o.get("contract")
                              or _graw.get("contract") or _graw.get("symbol") or "")
                 _gbase = (str(o.get("base") or "").upper()
-                          or _ginst.split("_")[0].split("-")[0].upper())
+                          or _ginst.replace("_USDT", "").replace("USDT", "").split("-")[0].upper())
                 if not _gbase:
                     continue
                 pending_inst_ids.add(f"{_gbase}-USDT-SWAP")

@@ -7,36 +7,68 @@
 from __future__ import annotations
 
 from r20_backend.dashboard_payload.market import _global_env_axis
+from r20_backend.exchanges.base import canonical_base
 
 __all__ = ["collect_cross_venue_positions"]
 
 
 def _protection_triggers(algos, base_sym, opposite_side):
-    """从**已取回**的云端保护腿里取出该挂单的 `(SL, TP)` 触发价（2026-09-16）。
+    """从已取回的云端保护腿（Binance Algo / Gate Price Order）中取出该挂单/持仓的 (SL, TP) 触发价。
 
-    Binance/Gate 的 TP/SL 不在挂单对象里（只有 OKX 有 `attachAlgoOrds`），旧实现给
-    跨所挂单一律写死 `"--"` ⇒ 用户看到"裸单"，而云端双腿其实早已挂出
-    （实盘复核：ETH 空单 STOP 2456.5 / TAKE_PROFIT 2298.5，reduceOnly）。
-
-    只认**反向**（reduceOnly）腿：同向腿属于别的方向持仓，串味比 `"--"` 更危险。
-    任一腿匹配不到 → `None`，展示层落回 `"--"`（缺失≠编造）。
+    适配双所原生口径：
+    - Binance：合约存 symbol、价格存 triggerPrice、类型在 orderType / type；
+    - Gate：合约存 contract 或 initial.contract、价格在 trigger.price、
+      类型在 initial.text (t-r20sl*/t-r20tp*) 或 trigger.rule。
     """
-    def _pick(want: str):
-        for a in (algos or []):
-            if base_sym and base_sym not in str(a.get("symbol", "")).upper():
-                continue
-            if opposite_side and opposite_side not in str(a.get("side", "")).lower():
-                continue
-            kind = str((a.get("raw") or {}).get("orderType") or a.get("type", "")).upper()
-            if want not in kind:
-                continue
-            try:
-                return float(a.get("trigger_price") or a.get("triggerPrice"))
-            except (TypeError, ValueError):
-                return None
-        return None
+    sl_val = None
+    tp_val = None
+    b_sym = str(base_sym or "").strip().upper()
+    opp = str(opposite_side or "").strip().lower()
 
-    return _pick("STOP"), _pick("TAKE_PROFIT")
+    for a in (algos or []):
+        if not isinstance(a, dict):
+            continue
+        c_str = str(a.get("contract") or (a.get("initial") or {}).get("contract") or a.get("symbol") or "").upper()
+        if b_sym and b_sym not in c_str:
+            continue
+
+        trig = a.get("trigger") if isinstance(a.get("trigger"), dict) else {}
+        raw_px = a.get("trigger_price") or a.get("triggerPrice") or trig.get("price")
+        try:
+            px = float(raw_px)
+        except (TypeError, ValueError):
+            continue
+        if px <= 0:
+            continue
+
+        kind = str((a.get("raw") or {}).get("orderType") or a.get("type", "")).upper()
+        init_obj = a.get("initial") if isinstance(a.get("initial"), dict) else {}
+        text = (str(init_obj.get("text") or "") + str(a.get("text") or "")).lower()
+        rule = trig.get("rule")
+
+        is_sl = "STOP" in kind or "r20sl" in text or (rule == 2 if opp in ("sell", "short") else rule == 1)
+        is_tp = "TAKE_PROFIT" in kind or "r20tp" in text or (rule == 1 if opp in ("sell", "short") else rule == 2)
+
+        # 方向严格校验：Binance 有显式 side，Gate 用 auto_size / direction
+        a_side = str(a.get("side") or "").strip().lower()
+        if a_side:
+            if opp not in a_side:
+                continue
+        else:
+            auto_sz = str(init_obj.get("auto_size") or a.get("direction") or "").lower()
+            if opp in ("sell", "short"):
+                if auto_sz and not ("short" in auto_sz or "close_long" in auto_sz):
+                    continue
+            elif opp in ("buy", "long"):
+                if auto_sz and not ("long" in auto_sz or "close_short" in auto_sz):
+                    continue
+
+        if is_sl and sl_val is None:
+            sl_val = px
+        elif is_tp and tp_val is None:
+            tp_val = px
+
+    return sl_val, tp_val
 
 
 def collect_cross_venue_positions(positions, pending_orders_list,
@@ -64,7 +96,7 @@ def collect_cross_venue_positions(positions, pending_orders_list,
                     amt = float(vp.get("size_signed", 0) or 0)
                     if abs(amt) < 1e-12:
                         continue
-                    base_sym = str(vp.get("base") or vp.get("symbol", "")).replace("USDT", "").replace("_USDT", "").upper()
+                    base_sym = canonical_base(str(vp.get("base") or vp.get("symbol", "")))
                     v_inst_id = f"{base_sym}-USDT-SWAP"
                     v_pos_side = str(vp.get("side") or ("long" if amt > 0 else "short")).lower()
                     if "long" in v_pos_side:
@@ -82,10 +114,9 @@ def collect_cross_venue_positions(positions, pending_orders_list,
                     v_roi = round((v_upl / max(1.0, v_margin)) * 100, 2) if v_margin > 0 else 0.0
                     v_chg = round(((v_mark - v_avg) / v_avg * 100) if v_avg > 0 else 0, 2)
 
-                    # Check cloud OCO protective orders
-                    matching_v_algos = [a for a in v_algos if base_sym in str(a.get("symbol") or a.get("contract") or "").upper()]
-                    v_sl = next((float(a.get("trigger_price") or a.get("triggerPrice") or 0) for a in matching_v_algos if "STOP" in str(a.get("raw", {}).get("orderType", "")).upper() or "STOP" in str(a.get("type", "")).upper()), None)
-                    v_tp = next((float(a.get("trigger_price") or a.get("triggerPrice") or 0) for a in matching_v_algos if "TAKE_PROFIT" in str(a.get("raw", {}).get("orderType", "")).upper() or "TAKE_PROFIT" in str(a.get("type", "")).upper()), None)
+                    # Check cloud OCO protective orders (Binance & Gate unified)
+                    _opp_side = "sell" if "long" in v_pos_side else "buy"
+                    v_sl, v_tp = _protection_triggers(v_algos, base_sym, _opp_side)
 
                     positions.append({
                         "venue": v_name,
@@ -116,20 +147,34 @@ def collect_cross_venue_positions(positions, pending_orders_list,
                         "protectionStatus": "fully_protected" if (v_sl and v_tp) else ("partially_protected" if (v_sl or v_tp) else "unprotected"),
                         "protectionCoveragePct": 100.0 if (v_sl and v_tp) else (50.0 if (v_sl or v_tp) else 0.0),
                         "cloud_oco_verified": bool(v_sl and v_tp),
+                        "account_mode": env_axis.upper(),
+                        "environment": env_axis.lower(),
                     })
 
                 for vo in (v_open_orders or []):
-                    base_sym = str(vo.get("base") or vo.get("symbol") or vo.get("contract") or "").replace("USDT", "").replace("_USDT", "").upper()
+                    raw_sym = str(vo.get("base") or vo.get("symbol") or vo.get("contract") or "").upper()
+                    base_sym = canonical_base(raw_sym)
                     v_inst_id = f"{base_sym}-USDT-SWAP"
                     vo_side_raw = str(vo.get("side", "")).lower()
-                    vo_is_long = vo_side_raw == "buy"
+                    if not vo_side_raw:
+                        _sz_val = vo.get("size") if vo.get("size") is not None else vo.get("amount")
+                        try:
+                            if _sz_val is not None and float(_sz_val) != 0:
+                                vo_side_raw = "buy" if float(_sz_val) > 0 else "sell"
+                        except (TypeError, ValueError):
+                            pass
+                    vo_is_long = vo_side_raw in ("buy", "long")
                     vo_px_float = float(vo.get("price", 0) or 0)
                     vo_sz = str(vo.get("size", "--"))
-                    vo_ord_id = str(vo.get("order_id", vo.get("orderId", "")))
-                    # 2026-09-16：Binance/Gate 的 TP/SL **不在挂单对象里**（只有 OKX 有
-                    # `attachAlgoOrds`），旧实现一律写死 `"--"` ⇒ 用户在挂单行看到"无保护"，
-                    # 而云端双腿其实早已挂出（实盘复核：ETH 空单 STOP 2456.5 / TP 2298.5）。
-                    # 复用本段**上方已经取回**的 `v_algos` 匹配——零新增交易所调用。
+                    vo_ord_id = str(vo.get("order_id") or vo.get("orderId") or vo.get("id") or "")
+                    
+                    _created_ts = vo.get("create_time") or vo.get("time") or vo.get("cTime") or 0
+                    try:
+                        _c_ts_f = float(_created_ts)
+                        _c_time_ms = int(_c_ts_f * 1000) if (0 < _c_ts_f < 1e11) else int(_c_ts_f)
+                    except (TypeError, ValueError):
+                        _c_time_ms = 0
+
                     _opp_side = "sell" if vo_is_long else "buy"
                     _vo_sl, _vo_tp = _protection_triggers(v_algos, base_sym, _opp_side)
                     pending_orders_list.append({
@@ -149,11 +194,13 @@ def collect_cross_venue_positions(positions, pending_orders_list,
                         "lever": "3x",
                         "px": f"{vo_px_float:g}" if vo_px_float > 0 else "--",
                         "sz": vo_sz,
-                        "cTime": str(vo.get("time", "")),
+                        "cTime": str(_c_time_ms) if _c_time_ms > 0 else "",
                         "time": "刚刚",
                         "state": "live",
                         "tp_px": f"{_vo_tp:g}" if _vo_tp else "--",
-                        "sl_px": f"{_vo_sl:g}" if _vo_sl else "--"
+                        "sl_px": f"{_vo_sl:g}" if _vo_sl else "--",
+                        "account_mode": env_axis.upper(),
+                        "environment": env_axis.lower(),
                     })
             except Exception:
                 pass

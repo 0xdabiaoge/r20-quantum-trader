@@ -44,7 +44,9 @@ def amend_venue_stop_loss(ad, symbol: str, pos_side: str, new_sl: float,
             if not isinstance(row, dict):
                 continue
             _order = row.get("order")
+            _init = row.get("initial")
             text = (str(_order.get("text") or "") if isinstance(_order, dict) else "") \
+                + (str(_init.get("text") or "") if isinstance(_init, dict) else "") \
                 + str(row.get("text") or "") + str(row.get("type") or "")
             rid = str(row.get("id") or row.get("algo_id") or row.get("order_id") or "")
             if rid and ("r20sl" in text.lower() or "STOP" in text.upper()):

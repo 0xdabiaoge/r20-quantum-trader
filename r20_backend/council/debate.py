@@ -112,7 +112,7 @@ def _call_single_trader(resolve_seat: Callable[..., Any],
             reasoning_effort=override_effort,
             temperature=temperature,
             timeout=timeout,
-            allow_fallback=False,  # 委员会成员必须以其登记模型作答，保住模型身份；只享重试
+            allow_fallback=False,  # 委员会成员优先以其登记模型作答
         )
         return {
             "proposal_id": proposal_id,
@@ -130,6 +130,41 @@ def _call_single_trader(resolve_seat: Callable[..., Any],
             "weight": role_spec.get("weight", 1.0),
         }
     except Exception as e:
+        # 遇网关并发 504/502 超时，退避 1.5s 后自适应降低强度并重试一次，保住席位
+        err_str = str(e)
+        if ("504" in err_str or "502" in err_str or "timeout" in err_str.lower()) and timeout > 35.0:
+            try:
+                time.sleep(1.5)
+                retry_effort = "medium" if override_effort == "high" else override_effort
+                c_retry, r_retry, _, lat_retry = execute_llm_request(
+                    messages=messages,
+                    model=override_model,
+                    base_url=override_url,
+                    api_key=override_key,
+                    api_format=override_format,
+                    reasoning_effort=retry_effort,
+                    temperature=temperature,
+                    timeout=max(20.0, timeout - 20.0),
+                    allow_fallback=True,
+                )
+                return {
+                    "proposal_id": proposal_id,
+                    "role_id": role_id,
+                    "role_name": role_name,
+                    "model_used": override_model or get_active_llm_runtime().get("model", "default"),
+                    "model_requested": resolved["requested"],
+                    "model_registered": resolved["registered"],
+                    "model_fallback": resolved["fallback"],
+                    "model_note": resolved["reason"],
+                    "status": "ok",
+                    "content": c_retry.strip(),
+                    "reasoning": r_retry.strip() if r_retry else "",
+                    "latency_ms": lat_retry,
+                    "weight": role_spec.get("weight", 1.0),
+                }
+            except Exception as retry_exc:
+                e = retry_exc
+
         return {
             "proposal_id": proposal_id,
             "role_id": role_id,
@@ -323,8 +358,11 @@ def execute_council_debate(load_config: Callable[[], Dict[str, Any]], resolve_se
         cio_reserve = min(CIO_MIN_ARBITRATION_TIME, max(MIN_SAFE_REASONING_TIME * 2.0, rem * 0.35))
         round1_budget = max(2.0, min(max(rem * 0.55, 90.0), rem - cio_reserve))
         with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, len(trader_keys))) as pool:
-            futures = {
-                pool.submit(
+            futures = {}
+            for idx, key in enumerate(trader_keys):
+                if idx > 0:
+                    time.sleep(0.8)  # 错峰 0.8s 提交，防毫秒级并发打穿代理连接池
+                fut = pool.submit(
                     call_trader,
                     key,
                     roles[key],
@@ -332,9 +370,8 @@ def execute_council_debate(load_config: Callable[[], Dict[str, Any]], resolve_se
                     original_system_prompt,
                     round1_budget,
                     runtime_context,
-                ): key
-                for key in trader_keys
-            }
+                )
+                futures[fut] = key
             for fut in concurrent.futures.as_completed(futures):
                 key = futures[fut]
                 try:
@@ -413,8 +450,11 @@ def execute_council_debate(load_config: Callable[[], Dict[str, Any]], resolve_se
         cio_reserve = min(CIO_MIN_ARBITRATION_TIME, max(MIN_SAFE_REASONING_TIME, rem * 0.35))
         member_timeout = max(2.0, min(max(rem * 0.55, 90.0), rem - cio_reserve))
         with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, len(trader_keys))) as pool:
-            futures = {
-                pool.submit(
+            futures = {}
+            for idx, key in enumerate(trader_keys):
+                if idx > 0:
+                    time.sleep(0.8)  # 错峰 0.8s 提交，防毫秒级并发打穿代理连接池
+                fut = pool.submit(
                     call_trader,
                     key,
                     roles[key],
@@ -422,9 +462,8 @@ def execute_council_debate(load_config: Callable[[], Dict[str, Any]], resolve_se
                     original_system_prompt,
                     member_timeout,
                     runtime_context,
-                ): key
-                for key in trader_keys
-            }
+                )
+                futures[fut] = key
             for fut in concurrent.futures.as_completed(futures):
                 key = futures[fut]
                 try:

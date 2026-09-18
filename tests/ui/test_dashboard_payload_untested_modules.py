@@ -355,7 +355,7 @@ class BuildFactorsListTest(_Base):
 
 
 class LedgerViewSmokeTest(_Base):
-    """`load_ledger_lifecycle_trades(...)` —— 仅 1 处间接引用，补最小直测。"""
+    """`load_ledger_lifecycle_trades(...)` —— 仅 1 处间接引用，补最小直测与可观测性因果契约。"""
 
     #: 返回的是**二元组** `(valid_ledger_trades, trades_table)`（实测，不是 list）
     def test_missing_ledger_returns_empty_pair(self):
@@ -372,6 +372,101 @@ class LedgerViewSmokeTest(_Base):
         out = ledger_view.load_ledger_lifecycle_trades(
             p, self.tmp, False, "1970-01-01 00:00:00")
         self.assertEqual(out, ([], []))
+
+    def test_causal_join_attaches_snapshot_and_preserves_discipline(self):
+        """因果铁律贯通：有效快照挂接 DYNAMICS_OBSERVED，历史无快照严格保持 NONE。"""
+        full_snap = {k: 0.5 for k in (
+            "velocity", "acceleration", "jerk", "impulse", "curvature", "power",
+            "power_regime", "regime", "dynamics_quality",
+            "continuation_prob_pct", "breakdown_prob_pct", "var_95_pct", "cvar_95_pct",
+            "prob_regime", "is_fat_tail", "energy_integral", "deviation_area_integral"
+        )}
+        full_snap.update({"price": 100.0, "atr": 2.0, "null_field": None})
+
+        # 写入测试 journal
+        journal_data = [
+            {
+                "name": "SOL",
+                "side": "long",
+                "entryTime": "2026-09-18 10:05:00",
+                "snapshot": full_snap,
+            },
+            {
+                "name": "BTC",
+                "side": "short",
+                "entryTime": "2026-09-18 01:00:00",  # 早于开仓 > 6h，过期证据
+                "snapshot": full_snap,
+            },
+            {
+                "name": "ETH",
+                "side": "long",
+                "entryTime": "2026-09-18 10:45:00",  # 晚于开仓 > 20m，未来伪造
+                "snapshot": full_snap,
+            }
+        ]
+        with open(os.path.join(self.tmp, "signal_journal.json"), "w", encoding="utf-8") as f:
+            json.dump(journal_data, f)
+
+        ledger_data = [
+            # 1. 正常匹配：SOL 10:00 开仓，10:05 journal 捕获 → DYNAMICS_OBSERVED
+            {
+                "id": "trade_sol",
+                "inst": "SOL",
+                "side": "多",
+                "open_time": "2026-09-18 10:00:00",
+                "close_time": "2026-09-18 12:00:00",
+                "status": "closed",
+            },
+            # 2. 过期证据：BTC 08:00 开仓，快照早于 6h → NONE
+            {
+                "id": "trade_btc",
+                "inst": "BTC",
+                "side": "空",
+                "open_time": "2026-09-18 08:00:00",
+                "close_time": "2026-09-18 09:00:00",
+                "status": "closed",
+            },
+            # 3. 未来快照：ETH 10:00 开仓，快照晚于 20m → NONE
+            {
+                "id": "trade_eth",
+                "inst": "ETH",
+                "side": "多",
+                "open_time": "2026-09-18 10:00:00",
+                "close_time": "2026-09-18 11:00:00",
+                "status": "closed",
+            },
+            # 4. 远古历史单（无快照记录）→ 严格 NONE
+            {
+                "id": "trade_legacy",
+                "inst": "ADA",
+                "side": "多",
+                "open_time": "2026-09-11 10:00:00",
+                "close_time": "2026-09-11 11:00:00",
+                "status": "closed",
+            },
+        ]
+        ledger_path = os.path.join(self.tmp, "trading_ledger.json")
+        with open(ledger_path, "w", encoding="utf-8") as f:
+            json.dump(ledger_data, f)
+
+        valid, table = ledger_view.load_ledger_lifecycle_trades(
+            ledger_path, self.tmp, False, "1970-01-01 00:00:00")
+
+        by_id = {t["id"]: t for t in table}
+        sol = by_id["trade_sol"]
+        self.assertEqual(sol["snapshot_observability"], "DYNAMICS_OBSERVED")
+        self.assertIsNotNone(sol.get("entry_snapshot"))
+        self.assertEqual(sol["entry_snapshot"]["velocity"], 0.5)
+        self.assertNotIn("null_field", sol["entry_snapshot"])  # null 字段被 prune
+
+        self.assertEqual(by_id["trade_btc"]["snapshot_observability"], "NONE")
+        self.assertIsNone(by_id["trade_btc"].get("entry_snapshot"))
+
+        self.assertEqual(by_id["trade_eth"]["snapshot_observability"], "NONE")
+        self.assertIsNone(by_id["trade_eth"].get("entry_snapshot"))
+
+        self.assertEqual(by_id["trade_legacy"]["snapshot_observability"], "NONE")
+        self.assertIsNone(by_id["trade_legacy"].get("entry_snapshot"))
 
 
 if __name__ == "__main__":

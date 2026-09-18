@@ -647,6 +647,14 @@ def upsert_model(config_file: Path, reload_config: Callable[[], Dict[str, Any]],
         prov=prov,
         reasoning_type=reasoning_type    )
 
+    if mid == config.get("active_model_id") and default_effort:
+        config["active_reasoning_effort"] = default_effort
+        try:
+            from ..settings_store import update_env
+            update_env({"LLM_REASONING_EFFORT": default_effort})
+        except Exception:
+            pass
+
     _atomic_write_json(config_file, config)
     return {
         "model_id": mid,

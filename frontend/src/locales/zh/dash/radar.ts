@@ -89,6 +89,8 @@ export const zhRadar = {
   cioVerdict: 'CIO 终审裁决',
   adopted: '采纳提案: {role}',
   seatsIndependent: '各席位交易员独立提案',
+  statusDegraded: '异常降级',
+  viewReasoning: '查看思维链 (Reasoning)',
   thSymbol: '标的',
   thBasis: 'BN 基差',
   thBasisGate: 'Gate 基差',

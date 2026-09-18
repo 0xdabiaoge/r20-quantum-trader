@@ -208,7 +208,7 @@ const availableSymbols = computed(() => {
   // 1. 优先提取当前持仓标的 (去重)
   if (Array.isArray(store.positions)) {
     store.positions.forEach((p: any) => {
-      const sym = (p.name || symOf(p.instId))
+      const sym = (p.name || symOf(p.instId))?.replace(/_+$/, '').toUpperCase()
       if (sym) holdingSet.add(sym)
     })
   }
@@ -216,7 +216,7 @@ const availableSymbols = computed(() => {
   // 2. 优先提取挂单标的 (去重)
   if (Array.isArray(store.pendingOrders)) {
     store.pendingOrders.forEach((o: any) => {
-      const sym = (o.name || symOf(o.instId))
+      const sym = (o.name || symOf(o.instId))?.replace(/_+$/, '').toUpperCase()
       if (sym) holdingSet.add(sym)
     })
   }
@@ -225,7 +225,7 @@ const availableSymbols = computed(() => {
   //    此前误写为 store.factorLibrary，恒为 undefined 导致动态标的整段被跳过，标签页永远只剩硬编码兜底）
   if (Array.isArray(store.factors)) {
     store.factors.forEach((f: any) => {
-      const sym = (f.name || symOf(f.instId))
+      const sym = (f.name || symOf(f.instId))?.replace(/_+$/, '').toUpperCase()
       if (sym && !holdingSet.has(sym)) {
         otherSet.add(sym)
       }
@@ -250,7 +250,7 @@ const periods = computed(() => [
 ])
 
 const currentSymbol = ref<string>('BTC')
-const currentPeriod = ref<string>('1H')
+const currentPeriod = ref<string>('4H')
 const isLoading = ref<boolean>(false)
 const chartContainer = ref<HTMLElement | null>(null)
 
@@ -274,8 +274,8 @@ const indicatorMenuId = useId()
 /** 持仓/挂单中的币种（选币下拉的徽标） */
 const holdingSet = computed(() => {
   const s = new Set<string>()
-  store.positions.forEach((p: any) => { const n = String(p.name || p.instId || '').split('-')[0].toUpperCase(); if (n) s.add(n) })
-  store.pendingOrders.forEach((o: any) => { const n = String(o.name || o.instId || '').split('-')[0].toUpperCase(); if (n) s.add(n) })
+  store.positions.forEach((p: any) => { const n = String(p.name || p.instId || '').split('-')[0].replace(/_+$/, '').toUpperCase(); if (n) s.add(n) })
+  store.pendingOrders.forEach((o: any) => { const n = String(o.name || o.instId || '').split('-')[0].replace(/_+$/, '').toUpperCase(); if (n) s.add(n) })
   return s
 })
 const activeIndicators = ref<Record<string, boolean>>({ ...DEFAULT_ACTIVE_INDICATORS })

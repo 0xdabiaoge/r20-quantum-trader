@@ -266,13 +266,15 @@ class ProductionSnapshotShapeTest(unittest.TestCase):
                     f"{it.get('instId')}.{pillar} 键位与默认结构分叉")
 
     def test_smart_money_missing_semantics_survives_roundtrip(self):
-        """缺失语义必须原样进快照 —— 被中性值替换就是"UI 说谎"。"""
+        """缺失语义必须原样进快照 —— 被中性值替换就是"UI 说谎"。若已接入新数据源则校验真实可用性。"""
         for it in self._items():
             sm = it.get("smart_money_derivatives")
             if not isinstance(sm, dict):
                 continue
-            self.assertIs(sm.get("available"), False)
-            self.assertEqual(sm.get("signal"), "UNAVAILABLE")
+            if not sm.get("available"):
+                self.assertEqual(sm.get("signal"), "UNAVAILABLE")
+            else:
+                self.assertIn("weighted_long_pct", sm)
 
 
 class ImportSafetyTest(unittest.TestCase):

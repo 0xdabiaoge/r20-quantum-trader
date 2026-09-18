@@ -830,9 +830,32 @@ def execute_batch_ai_brain_cycle(
     # 跨所比对（币安/Gate 只读备源，纯证据增益，失败静默跳过不阻塞决策）
     fetch_cross_venue_matrix(packages)
 
-    # OKX Smart Money Signals：CLI 已移除且无公开 V5 等价接口——保持
-    # build 默认 smart_money 缺失标记（available=False），提示词面显式
-    # 呈现「数据源缺失」，不以中性值喂给模型。接入新数据源时在此填充。
+    # 顶级聪明钱与大户持仓数据接入（Binance 公开大户指标 + OKX Rubik 备选双源容灾）
+    try:
+        try:
+            from smart_money import fetch_smart_money_for_symbol
+        except ImportError:
+            from scripts.factors.smart_money import fetch_smart_money_for_symbol
+        for pkg in packages:
+            ccy = pkg.get("ccy") or pkg.get("name") or ""
+            if not ccy and "-" in pkg.get("instId", ""):
+                ccy = pkg["instId"].split("-")[0]
+            sm_data = fetch_smart_money_for_symbol(ccy, price=float(pkg.get("price") or 0.0))
+            if sm_data:
+                if pkg.get("lsRatio") == "N/A" and sm_data.get("lsRatio"):
+                    pkg["lsRatio"] = sm_data["lsRatio"]
+                if pkg.get("takerNetUsd") == "N/A" and sm_data.get("takerNetUsd"):
+                    pkg["takerNetUsd"] = sm_data["takerNetUsd"]
+                pkg["smart_money"] = {
+                    "available": True,
+                    "weighted_long_pct": sm_data.get("weighted_long_pct", "--"),
+                    "net_flow_usdt": sm_data.get("takerNetUsd", "--"),
+                    "avg_long_entry": "--",
+                    "avg_short_entry": "--",
+                    "top_win_rate": "--",
+                }
+    except Exception as exc:
+        print(f"[AI Brain Batch] 聪明钱数据注入降级: {exc}")
 
     positions_context = active_positions_detail
     active_positions_detail = active_positions_detail or []

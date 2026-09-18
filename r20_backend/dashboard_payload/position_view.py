@@ -108,6 +108,15 @@ def collect_position_rows(pos_data, positions, trackers, *, load_instruments):
                 lever_val = 3.0
             margin_usdt_val = round(okx_imr if okx_imr > 0 else (notional_usdt / lever_val), 2)
 
+            try:
+                from scripts.okx_runtime import current_environment
+                _okx_env = current_environment()
+                _acc_mode = "DEMO" if _okx_env.simulated else "LIVE"
+                _env_mode = _okx_env.mode.lower()
+            except Exception:
+                _acc_mode = "DEMO"
+                _env_mode = "demo"
+
             positions.append({
                 "venue": "okx",
                 "exchange": "okx",
@@ -122,6 +131,8 @@ def collect_position_rows(pos_data, positions, trackers, *, load_instruments):
                 "marginSource": "exchange_imr" if okx_imr > 0 else "notional_div_leverage",
                 "imr": okx_imr or None,
                 "lever": p.get("lever", "3"),
+                "account_mode": _acc_mode,
+                "environment": _env_mode,
                 "avgPx": avg_px,
                 "markPx": mark_px,
                 "upl": upl,

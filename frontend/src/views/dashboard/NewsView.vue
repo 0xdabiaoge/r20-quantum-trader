@@ -26,10 +26,23 @@ const { t } = useI18n();
 const selectedCoin = ref<string | null>(null);
 const selectedSource = ref<string>('all');
 
+const cryptoNewsCount = computed(() => rawNews.value.filter((item) =>
+  (item.platforms || []).some((p: string) => ['Cointelegraph', 'CoinDesk', 'TheBlock', 'Binance'].some((k) => p.includes(k))) || (item.coins && item.coins.length > 0)
+).length);
+
+const jin10NewsCount = computed(() => rawNews.value.filter((item) =>
+  (item.platforms || []).some((p: string) => p.includes('金十'))
+).length);
+
+const macroNewsCount = computed(() => rawNews.value.filter((item) =>
+  (item.platforms || []).some((p: string) => p.includes('宏观'))
+).length);
+
 const sourceFilters = computed(() => [
-  { key: 'all', label: t('dash.news.filters.all') },
-  { key: '金十数据', label: t('dash.news.source.jin10') },
-  { key: '全球宏观', label: t('dash.news.source.macro') },
+  { key: 'all', label: `${t('dash.news.filters.all')} (${rawNews.value.length})` },
+  { key: 'crypto', label: `${t('dash.news.filters.crypto')} (${cryptoNewsCount.value})` },
+  { key: 'jin10', label: `${t('dash.news.filters.jin10')} (${jin10NewsCount.value})` },
+  { key: 'macro', label: `${t('dash.news.filters.macro')} (${macroNewsCount.value})` },
 ]);
 
 /** 批 66：来源筛选分段的漫游 tabindex 与方向键导航。 */
@@ -79,7 +92,15 @@ const coins = computed(() => {
 // 按选中币种与来源过滤后的快讯流
 const filteredNews = computed(() => {
   let list = rawNews.value;
-  if (selectedSource.value !== 'all') {
+  if (selectedSource.value === 'crypto') {
+    list = list.filter((item) =>
+      (item.platforms || []).some((p: string) => ['Cointelegraph', 'CoinDesk', 'TheBlock', 'Binance'].some((k) => p.includes(k))) || (item.coins && item.coins.length > 0)
+    );
+  } else if (selectedSource.value === 'jin10') {
+    list = list.filter((item) => (item.platforms || []).some((p: string) => p.includes('金十')));
+  } else if (selectedSource.value === 'macro') {
+    list = list.filter((item) => (item.platforms || []).some((p: string) => p.includes('宏观')));
+  } else if (selectedSource.value !== 'all') {
     list = list.filter((item) => (item.platforms || []).some((p: string) => p.includes(selectedSource.value)));
   }
   if (!selectedCoin.value) return list;
@@ -252,7 +273,7 @@ function toggleCoinFilter(sym: string) {
       </div>
 
       <!-- 舆情快讯情报流 -->
-      <div class="dsh-card overflow-hidden">
+      <div class="dsh-card overflow-hidden min-h-[480px] flex flex-col">
         <!-- 筛选栏 -->
         <header class="dsh-card-header flex flex-wrap items-center justify-between gap-2">
           <div class="seg" role="tablist" :aria-label="t('dash.news.feed.source')">
@@ -278,10 +299,10 @@ function toggleCoinFilter(sym: string) {
         </header>
 
         <!-- 空态 -->
-        <BaseEmpty v-if="!filteredNews.length" :text="t('dash.news.feed.empty')" />
+        <BaseEmpty v-if="!filteredNews.length" class="flex-1 flex items-center justify-center py-12" :text="t('dash.news.feed.empty')" />
 
         <!-- 快讯卡片列表 -->
-        <div v-else class="divide-y" style="border-color: var(--line-1)">
+        <div v-else class="divide-y flex-1" style="border-color: var(--line-1)">
           <article
             v-for="item in filteredNews"
             :key="item.id || item.title"
@@ -329,7 +350,7 @@ function toggleCoinFilter(sym: string) {
                 :href="item.url"
                 target="_blank"
                 rel="noopener noreferrer"
-                class="text-3xs text-[var(--ink-3)] hover:text-[var(--accent)] inline-flex items-center gap-1 transition-colors px-1 -mx-1 py-1 -my-1"
+                class="relative text-3xs text-[var(--ink-3)] hover:text-[var(--accent)] inline-flex items-center gap-1 transition-colors px-1 -mx-1 py-1 -my-1"
               >
                 <span>{{ t('common.more') }}</span>
                 <span class="sr-only">{{ t('common.opensInNewTab') }}</span>
@@ -346,6 +367,16 @@ function toggleCoinFilter(sym: string) {
             </p>
           </article>
         </div>
+
+        <!-- 底部结束提示，消除移动端大幅留白错觉 -->
+        <footer
+          v-if="filteredNews.length"
+          class="mt-auto p-3.5 text-center text-3xs text-[var(--ink-3)] font-mono flex items-center justify-center gap-2 border-t border-[var(--line-1)] bg-[var(--surface-1)]/40"
+        >
+          <span class="h-px w-8 bg-[var(--line-1)]" aria-hidden="true" />
+          <span>{{ t('dash.news.feedEnd') }}</span>
+          <span class="h-px w-8 bg-[var(--line-1)]" aria-hidden="true" />
+        </footer>
       </div>
     </DataGate>
   </div>

@@ -118,6 +118,31 @@ class PendingOrderProtectionDisplayTest(unittest.TestCase):
         self.assertEqual(rows[0]["sl_px"], "94")
         self.assertEqual(rows[0]["tp_px"], "103")
 
+    def test_gate_native_protective_orders_matching(self):
+        """Gate 原生结构：contract 为 BTC_USDT，价格在 trigger.price，text 在 initial.text。"""
+        gate_algos = [
+            {
+                "id": "2100868994629107712",
+                "trigger": {"price": "77060.0", "rule": 2},
+                "initial": {"contract": "BTC_USDT", "text": "t-r20sl21170244", "auto_size": "close_long"}
+            },
+            {
+                "id": "2100952253513859072",
+                "trigger": {"price": "81000.0", "rule": 1},
+                "initial": {"contract": "BTC_USDT", "text": "t-r20tp41020503", "auto_size": "close_long"}
+            }
+        ]
+        ad = _FakeAdapter(
+            open_orders=[{"contract": "BTC_USDT", "side": "buy", "price": 77620.0, "size": "177"}],
+            algos=gate_algos,
+        )
+        rows = self._run(ad)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["name"], "BTC", "标的名称必须是干净的 BTC，绝不能带下划线 BTC_")
+        self.assertEqual(rows[0]["instId"], "BTC-USDT-SWAP")
+        self.assertEqual(rows[0]["sl_px"], "77060")
+        self.assertEqual(rows[0]["tp_px"], "81000")
+
 
 if __name__ == "__main__":
     unittest.main()

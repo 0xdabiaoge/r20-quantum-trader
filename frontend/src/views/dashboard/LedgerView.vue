@@ -142,6 +142,13 @@ function obsLabel(x: any): string {
   if (tag === 'PRICE_ONLY') return t('dash.ledger.observability.priceOnly');
   return t('dash.ledger.observability.none');
 }
+function obsBadge(x: any): string {
+  const tag = obsTag(x);
+  if (tag === 'DYNAMICS_OBSERVED') return t('dash.ledger.observability.badgeObserved');
+  if (tag === 'PARTIAL') return t('dash.ledger.observability.badgePartial');
+  if (tag === 'PRICE_ONLY') return t('dash.ledger.observability.badgePriceOnly');
+  return t('dash.ledger.observability.badgeNone');
+}
 function obsToneCls(x: any): string {
   const tag = obsTag(x);
   if (tag === 'DYNAMICS_OBSERVED') return 'text-[var(--up)] border-[var(--up-line)] bg-[var(--up-bg)]';
@@ -358,17 +365,16 @@ const truncation = computed<{ kept: number; total: number } | null>(() => {
         <!-- 数据表 -->
         <template v-else>
           <div class="overflow-x-auto">
-            <table class="table w-full" :aria-label="t('dash.ledger.title')">
+            <table class="table w-full max-w-[1360px]" :aria-label="t('dash.ledger.title')">
               <thead>
                 <tr>
-                  <th scope="col">{{ t('dash.ledger.col.symbol') }}</th>
-                  <th scope="col" class="col-num">{{ t('dash.ledger.col.entry') }}</th>
-                  <th scope="col" class="col-num">{{ t('dash.ledger.col.exit') }}</th>
-                  <th scope="col" class="col-num">{{ t('dash.ledger.col.pnl') }}</th>
-                  <th scope="col" class="col-num">{{ t('dash.ledger.col.fees') }}</th>
-                  <th scope="col">{{ t('dash.ledger.col.hold') }}</th>
-                  <th scope="col">{{ t('dash.ledger.col.exitReason') }}</th>
-                  <th scope="col" class="text-right">{{ t('dash.ledger.col.time') }}</th>
+                  <th scope="col" class="min-w-[180px]">{{ t('dash.ledger.col.symbol') }}</th>
+                  <th scope="col" class="col-num min-w-[100px]">{{ t('dash.ledger.col.entry') }} / {{ t('dash.ledger.col.exit') }}</th>
+                  <th scope="col" class="col-num min-w-[90px]">{{ t('dash.ledger.col.pnl') }}</th>
+                  <th scope="col" class="col-num min-w-[85px]">{{ t('dash.ledger.col.fees') }}</th>
+                  <th scope="col" class="min-w-[65px]">{{ t('dash.ledger.col.hold') }}</th>
+                  <th scope="col" class="max-w-[180px]">{{ t('dash.ledger.col.exitReason') }}</th>
+                  <th scope="col" class="text-right min-w-[95px]">{{ t('dash.ledger.col.time') }}</th>
                 </tr>
               </thead>
               <tbody>
@@ -382,7 +388,7 @@ const truncation = computed<{ kept: number; total: number } | null>(() => {
                   @keydown.space.prevent="detail = x"
                 >
                   <td>
-                    <div class="flex items-center gap-1.5 flex-wrap">
+                    <div class="flex items-center gap-1 flex-wrap">
                       <CryptoLogo :symbol="x.inst" :size="16" />
                       <span class="num font-mono font-semibold text-xs text-[var(--ink-strong)]">{{ x.inst }}</span>
                       <DirTag :dir="x.side" />
@@ -419,22 +425,24 @@ const truncation = computed<{ kept: number; total: number } | null>(() => {
                       >
                         <Zap class="w-3 h-3" />
                       </span>
-                      <!-- 数理快照可观测性：不可观测时**明确标注**，不留白也不编造 -->
+                      <!-- 数理快照可观测性：紧凑徽章 -->
                       <span
                         class="rounded px-1 py-0.5 text-3xs font-medium border"
                         :class="obsToneCls(x)"
                         :title="`${obsLabel(x)} · ${t('dash.ledger.observability.missingFields')} ${t('dash.ledger.observability.noBackfill')}`"
                       >
-                        {{ obsLabel(x) }}
+                        {{ obsBadge(x) }}
                       </span>
                     </div>
                   </td>
-                  <td class="col-num font-mono">{{ fmtPrice(x.open_px) }}</td>
-                  <td class="col-num font-mono" :class="x.status === 'holding' && 'text-[var(--ink-3)]'">
-                    {{ x.status === 'holding' ? t('status.running') : fmtPrice(x.close_px) }}
+                  <td class="col-num font-mono">
+                    <span class="block text-xs font-medium text-[var(--ink-strong)]">{{ fmtPrice(x.open_px) }}</span>
+                    <span class="block text-3xs" :class="x.status === 'holding' ? 'text-[var(--accent)] font-medium' : 'text-[var(--ink-3)]'">
+                      {{ x.status === 'holding' ? t('status.running') : fmtPrice(x.close_px) }}
+                    </span>
                   </td>
                   <td class="col-num font-mono" :class="dirClass(x.net_pnl)">
-                    {{ arrow(x.net_pnl) }} {{ fmtSigned(x.net_pnl) }}
+                    <span class="block font-medium">{{ arrow(x.net_pnl) }} {{ fmtSigned(x.net_pnl) }}</span>
                     <span class="block text-3xs text-[var(--ink-3)]">{{ fmtPct(x.roi_pct) }}</span>
                   </td>
                   <td class="col-num font-mono text-[var(--ink-2)]">

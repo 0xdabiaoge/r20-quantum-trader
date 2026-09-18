@@ -131,6 +131,19 @@ class OKXRestHttpBoundaryTests(unittest.TestCase):
         self.assertIn("51001", str(ctx.exception))
         self.assertIn("Order does not exist", str(ctx.exception))
 
+    def test_envelope_code_1_all_operations_failed_unpacks_row_scode(self):
+        """当 OKX 顶层返回 code=1 ('All operations failed') 时，解包 data 内部真实的业务级 sCode 与 sMsg。"""
+        freeze_environment(DEMO_ENV)
+        self.urlopen.return_value = _response(
+            code="1",
+            msg="All operations failed",
+            data=[{"ordId": "", "clOrdId": "c1", "sCode": "51121", "sMsg": "Order quantity must be a multiple of the lot size."}]
+        )
+        with self.assertRaises(RuntimeError) as ctx:
+            okx_rest.place_order("SUI-USDT-SWAP", "buy", "1324.5", px="0.77")
+        self.assertIn("51121", str(ctx.exception))
+        self.assertIn("Order quantity must be a multiple of the lot size", str(ctx.exception))
+
     def test_success_rows_only(self):
         freeze_environment(DEMO_ENV)
         self.urlopen.return_value = _response(data=[{"sCode": "0", "ordId": "9"}, "junk"])

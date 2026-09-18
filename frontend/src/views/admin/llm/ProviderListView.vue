@@ -42,6 +42,7 @@ const {
   modelNameOf,
   moveFallback,
   openAddProviderModal,
+  reasoningEffortInput,
   requestAttemptsInput,
   saveGlobalSettings,
   savingSettings,
@@ -80,6 +81,14 @@ const TIMEOUT_PRESETS = [
   { sec: 300, labelKey: 'admin.llm.presetLong' },
 ]
 const ATTEMPT_PRESETS = [1, 2, 3, 5]
+const EFFORT_PRESETS = [
+  { value: 'high', label: '高 (high)' },
+  { value: 'medium', label: '中 (medium)' },
+  { value: 'low', label: '低 (low)' },
+  { value: 'minimal', label: '极简 (minimal)' },
+  { value: 'none', label: '关闭 (none)' },
+  { value: 'auto', label: '自适应 (auto)' },
+]
 
 /** 供应商头像改为中性单字（旧版是 10 个分支的 emoji/符号 + 色相类） */
 function monogram(name: string): string {
@@ -177,7 +186,29 @@ const bandFacts = () => [
         </div>
         <div class="pv-kv">
           <span class="label-caps">{{ t('admin.llm.effort') }}</span>
-          <span class="pv-kv-v mono">{{ (cfg?.active_reasoning_effort || 'HIGH').toUpperCase() }}</span>
+          <span class="pv-kv-v mono">{{ (reasoningEffortInput || cfg?.active_reasoning_effort || 'HIGH').toUpperCase() }}</span>
+        </div>
+      </div>
+
+      <div class="pv-field">
+        <div class="pv-field-head">
+          <span class="form-label">{{ t('admin.llm.effort') }}</span>
+          <span class="pv-hint">{{ t('admin.llm.desc') }}</span>
+        </div>
+        <div class="pv-field-row">
+          <div class="pv-presets">
+            <span class="label-caps">{{ t('admin.llm.presetLabel') }}</span>
+            <button
+              v-for="opt in EFFORT_PRESETS"
+              :key="opt.value"
+              type="button"
+              class="pv-preset"
+              :class="{ 'is-on': (reasoningEffortInput || 'high').toLowerCase() === opt.value }"
+              @click="reasoningEffortInput = opt.value"
+            >
+              {{ opt.label }}
+            </button>
+          </div>
         </div>
       </div>
 

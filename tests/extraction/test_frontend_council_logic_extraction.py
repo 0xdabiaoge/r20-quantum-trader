@@ -303,6 +303,7 @@ class NoNewDependenciesTest(unittest.TestCase):
                    "../../stores/auth", "lucide-vue-next",
                    "../../components/base/BaseSwitch.vue",
                    "../../components/base/BaseDialog.vue",
+                   "../../components/base/BaseLoadingAnnounce.vue",
                    "./council/councilLogic"}
         extra = [i for i in imports if i not in allowed]
         self.assertEqual(extra, [], f"出现预期外 import（禁止增减依赖）: {extra}")

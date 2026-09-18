@@ -147,7 +147,7 @@ class NoDuplicationTest(unittest.TestCase):
         """模型 payload 的 11 字段回落链只应在 llmLogic.ts 一处。"""
         for p in (FACADE, PURE):
             src = _code(p)
-            hits = src.count("从远端一键自动收录")
+            hits = src.count("从远端一键自动收录") + src.count("admin.llm.remoteAutoCollected")
             if p == PURE:
                 self.assertEqual(hits, 1, "纯模块应恰好定义一次回落文案")
             else:

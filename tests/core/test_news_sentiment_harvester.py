@@ -74,6 +74,27 @@ class TestNewsSentimentHarvester(unittest.TestCase):
             self.assertEqual(items[0]["title"], "OKX to list NEWCOIN X-Perp")
             self.assertIn("OKX官方", items[0]["platforms"])
 
+    def test_fetch_crypto_rss_news_parsing(self):
+        fake_rss_xml = b"""<?xml version="1.0" encoding="UTF-8"?>
+        <rss version="2.0"><channel>
+            <item>
+                <title>Ethereum Layer-2 ecosystem records massive transaction volume</title>
+                <link>https://cointelegraph.com/news/eth-l2</link>
+                <description>Ethereum Layer-2 networks saw huge surge in activity.</description>
+                <pubDate>Fri, 18 Sep 2026 12:00:00 +0000</pubDate>
+            </item>
+        </channel></rss>"""
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = fake_rss_xml
+        mock_resp.__enter__.return_value = mock_resp
+
+        with patch("urllib.request.urlopen", return_value=mock_resp):
+            items = harvester.fetch_crypto_rss_news(limit=5)
+            self.assertTrue(len(items) >= 1)
+            self.assertIn("Cointelegraph", items[0]["platforms"])
+            self.assertIn("ETH", items[0]["coins"])
+            self.assertIn("Ethereum", items[0]["title"])
+
     def test_fetch_jin10_macro_news_parsing(self):
         fake_jin10 = {
             "all": {
@@ -152,6 +173,7 @@ class TestNewsSentimentHarvester(unittest.TestCase):
         }
 
         with patch.object(harvester, "fetch_okx_announcements", return_value=fake_ann), \
+             patch.object(harvester, "fetch_crypto_rss_news", return_value=[]), \
              patch.object(harvester, "fetch_jin10_macro_news", return_value=fake_j10), \
              patch.object(harvester, "fetch_okx_rubik_sentiment", return_value=fake_rubik), \
              patch.object(harvester, "load_instruments", return_value=[{"name": "BTC", "instId": "BTC-USDT-SWAP"}]):
@@ -187,6 +209,7 @@ class TestNewsSentimentHarvester(unittest.TestCase):
         }]
         with patch.object(harvester, "CIRCUIT_BREAKER_FILE", cb_file), \
              patch.object(harvester, "fetch_okx_announcements", return_value=ann), \
+             patch.object(harvester, "fetch_crypto_rss_news", return_value=[]), \
              patch.object(harvester, "fetch_jin10_macro_news", return_value=[]), \
              patch.object(harvester, "fetch_okx_rubik_sentiment", return_value=None), \
              patch.object(harvester, "load_instruments", return_value=[{"name": "BTC", "instId": "BTC-USDT-SWAP"}]):

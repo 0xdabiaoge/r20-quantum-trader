@@ -227,7 +227,7 @@ def compute_instrument_factors(item: Dict[str, Any], smart_money_pool: Dict[str,
     # SmartMoney Overlay（仅当真有数据源时覆盖缺失占位；无源时保留 available=False）
     if ccy in smart_money_pool:
         factors["smart_money_derivatives"]["available"] = True
-        factors["smart_money_derivatives"].pop("reason", None)
+        factors["smart_money_derivatives"]["reason"] = ""
         sm = smart_money_pool[ccy]
         ls = sm.get("longShortRatio", {})
         notional = sm.get("notional", {})
@@ -238,6 +238,8 @@ def compute_instrument_factors(item: Dict[str, Any], smart_money_pool: Dict[str,
         
         factors["smart_money_derivatives"]["weighted_long_pct"] = w_long
         factors["smart_money_derivatives"]["smart_money_flow_usd"] = net_str
+        if ls.get("longShortRatio") is not None:
+            factors["smart_money_derivatives"]["long_short_ratio"] = str(round(safe_float(ls.get("longShortRatio")), 2))
         long_avg = safe_float(notional.get("smartMoneyLongAvgEntry", 0))
         short_avg = safe_float(notional.get("smartMoneyShortAvgEntry", 0))
         if long_avg > 0:
@@ -268,10 +270,17 @@ def compute_instrument_factors(item: Dict[str, Any], smart_money_pool: Dict[str,
 
 def update_factor_library() -> Dict[str, Any]:
     """Fetch and calculate multi-pillar factor library snapshot for 6 instruments."""
-    # 1. Smart Money Pool：OKX CLI 已移除，smartmoney 无公开 V5 等价接口。
-    #    显式保持空池 → 各标的 smart_money_derivatives.available=False（缺失化，
-    #    不以中性值冒充信号；接入新数据源时仅需在此处填充 pool）。
-    smart_money_pool: Dict[str, Any] = {}
+    # 1. Smart Money Pool：通过 Binance 公开大户指标 + OKX Rubik 备选双源容灾采集
+    #    双源均不可用时保持空池 → 优雅缺失化 available=False
+    try:
+        try:
+            from smart_money import fetch_smart_money_pool
+        except ImportError:
+            from scripts.factors.smart_money import fetch_smart_money_pool
+        smart_money_pool = fetch_smart_money_pool(TARGET_INSTRUMENTS)
+    except Exception as e:
+        print(f"[Factor Library] SmartMoney pool fetch fallback: {e}")
+        smart_money_pool = {}
 
     # 2. Parallel Factor Computations
     with ThreadPoolExecutor(max_workers=6) as executor:

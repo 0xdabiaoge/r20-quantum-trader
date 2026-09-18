@@ -411,14 +411,40 @@ class GateAdapter(BaseExchangeAdapter):
 
     def cancel_order(self, symbol: str, order_id: Any) -> Any:
         inst = self.native_symbol(symbol)
-        return self.signed_request("DELETE", "/api/v4/futures/usdt/orders",
-                                   params={"contract": inst, "id": str(order_id)})
+        if str(order_id).lower() in ("all", "*") or not order_id:
+            return self.signed_request("DELETE", "/api/v4/futures/usdt/orders",
+                                       params={"contract": inst})
+        return self.signed_request("DELETE", f"/api/v4/futures/usdt/orders/{order_id}")
+
+    def _normalize_order_item(self, o: Dict[str, Any], default_symbol: str = "") -> Dict[str, Any]:
+        item = dict(o)
+        sz_val = 0.0
+        for k in ("size", "amount"):
+            v = o.get(k)
+            if v is not None:
+                try:
+                    sz_val = float(v)
+                    if sz_val != 0:
+                        break
+                except (TypeError, ValueError):
+                    pass
+        side = "buy" if sz_val > 0 else ("sell" if sz_val < 0 else "")
+        contract = str(o.get("contract") or default_symbol or "")
+        base = self.canonical(contract) if contract else default_symbol
+        item.setdefault("venue", "gate")
+        item.setdefault("order_id", str(o.get("id") or ""))
+        item.setdefault("side", side)
+        item.setdefault("base", base)
+        item.setdefault("reduce_only", bool(o.get("is_reduce_only") or o.get("is_close")))
+        return item
 
     def open_orders(self) -> List[Dict[str, Any]]:
         """全合约未成交普通挂单（与 BinanceAdapter.open_orders 归一契约）。"""
         data = self.signed_request("GET", "/api/v4/futures/usdt/orders",
                                    params={"status": "open", "limit": "100"})
-        return data if isinstance(data, list) else []
+        if not isinstance(data, list):
+            return []
+        return [self._normalize_order_item(o) for o in data if isinstance(o, dict)]
 
     def list_open_orders(self, symbol: str) -> List[Dict[str, Any]]:
         """该合约未成交普通挂单（G7 联动：对账前先撤孤儿入场挂单用）。"""
@@ -426,7 +452,9 @@ class GateAdapter(BaseExchangeAdapter):
         try:
             data = self.signed_request("GET", "/api/v4/futures/usdt/orders",
                                        params={"contract": inst, "status": "open", "limit": "100"})
-            return data if isinstance(data, list) else []
+            if not isinstance(data, list):
+                return []
+            return [self._normalize_order_item(o, default_symbol=symbol) for o in data if isinstance(o, dict)]
         except GateAPIError as err:
             if "CONTRACT_NOT_FOUND" in str(err) or "not found" in str(err).lower():
                 return []

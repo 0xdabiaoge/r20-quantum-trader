@@ -136,7 +136,18 @@ def clean_stale_open_orders(keep_ord_ids: Optional[set] = None,
             if not order_id or order_id in keep_ord_ids:
                 continue
             _side = str(o.get("side") or _raw.get("side") or "").lower()
+            if not _side:
+                _sz_raw = o.get("size") if o.get("size") is not None else _raw.get("size")
+                if _sz_raw is None:
+                    _sz_raw = o.get("amount") if o.get("amount") is not None else _raw.get("amount")
+                try:
+                    if _sz_raw is not None and float(_sz_raw) != 0:
+                        _side = "buy" if float(_sz_raw) > 0 else "sell"
+                except (TypeError, ValueError):
+                    pass
             _ro = o.get("reduce_only") if o.get("reduce_only") is not None else _raw.get("reduce_only")
+            if _ro is None:
+                _ro = o.get("is_reduce_only") if o.get("is_reduce_only") is not None else _raw.get("is_reduce_only")
             if _ro in (True, "true", "1"):
                 continue          # 减仓/保护族不属入场生命周期管辖
             if _v == "binance":
@@ -145,7 +156,7 @@ def clean_stale_open_orders(keep_ord_ids: Optional[set] = None,
             else:
                 inst_disp = str(o.get("contract") or _raw.get("contract") or "")
                 created_ms = int(float(o.get("create_time") or _raw.get("create_time") or (now_ts / 1000)) * 1000)
-            _b = str(o.get("base") or "").upper() or inst_disp.split("_")[0].split("-")[0].upper()
+            _b = str(o.get("base") or "").upper() or inst_disp.replace("_USDT", "").replace("USDT", "").split("-")[0].upper()
             if not _b or _side not in ("buy", "sell"):
                 continue
             entry = (created_ms, order_id, inst_disp)

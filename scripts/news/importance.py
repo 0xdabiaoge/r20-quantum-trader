@@ -35,7 +35,7 @@ from __future__ import annotations
 
 import re
 
-__all__ = ["_classify_importance", "_extract_coins"]
+__all__ = ["_classify_importance", "_extract_coins", "is_crypto_or_macro_relevant"]
 
 #: 高危关键词：系统性风险、崩盘、黑客、脱锚、破产清算、司法调查等
 HIGH_KEYWORDS = [
@@ -59,17 +59,34 @@ MID_KEYWORDS = [
 COIN_ALIASES = {
     "BTC": ["BTC", "BITCOIN", "比特币"],
     "ETH": ["ETH", "ETHEREUM", "以太坊", "以太币"],
-    "SOL": ["SOL", "SOLANA"],
+    "SOL": ["SOL", "SOLANA", "索拉纳"],
     "DOGE": ["DOGE", "DOGECOIN", "狗狗币"],
     "LINK": ["LINK", "CHAINLINK"],
     "AVAX": ["AVAX", "AVALANCHE", "雪崩"],
     "SUI": ["SUI"],
-    "ADA": ["ADA", "CARDANO"],
-    "XRP": ["XRP", "RIPPLE", "瑞波"],
+    "ADA": ["ADA", "CARDANO", "艾达币"],
+    "XRP": ["XRP", "RIPPLE", "瑞波", "瑞波币"],
+    "ARB": ["ARB", "ARBITRUM"],
+    "UNI": ["UNI", "UNISWAP"],
 }
 
 #: `_extract_coins` 最多返回的币数（控制晨报长度，既有行为）
 MAX_COINS = 4
+
+#: 加密与核心宏观相关性词表（用于过滤传统通用快讯里的非金融杂音）
+CRYPTO_MACRO_RELEVANT_KEYWORDS = [
+    "btc", "eth", "sol", "doge", "xrp", "crypto", "blockchain", "bitcoin",
+    "ethereum", "solana", "tether", "usdt", "usdc", "binance", "okx", "coinbase",
+    "etf", "sec", "cpi", "fed", "美联储", "加密", "比特币", "以太坊", "数字货币",
+    "虚拟货币", "区块链", "降息", "加息", "通胀", "鲍威尔", "非农", "央行", "流动性",
+    "defi", "web3", "币安", "稳定币", "钱包", "质押", "公链", "交易所", "代币",
+]
+
+
+def is_crypto_or_macro_relevant(title: str, summary: str) -> bool:
+    """判断通用快讯是否与加密资产、宏观流动性或监管风险强相关。"""
+    text = f"{title} {summary}".lower()
+    return any(kw in text for kw in CRYPTO_MACRO_RELEVANT_KEYWORDS)
 
 
 def _classify_importance(title: str, summary: str) -> str:

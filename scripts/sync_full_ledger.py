@@ -485,6 +485,7 @@ def _holding_row(p, venue, *, env, trackers, tz_bj, allowed, council_by_inst):
         "status": "holding",
         "exit_reason": "⏳ 运行监控中",
         "council": council_by_inst.get(inst),
+        "signal_snapshot": t_info.get("signal_snapshot"),
     }
 
 

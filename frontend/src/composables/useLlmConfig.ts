@@ -99,6 +99,7 @@ const modelForm = ref<any>({
 
 // Global Reasoning & Thinking Timeout State
 const thinkingTimeoutInput = ref<number>(120)
+const reasoningEffortInput = ref<string>('high')
 const savingSettings = ref(false)
 const settingsResult = ref<any>(null)
 
@@ -151,7 +152,7 @@ async function saveGlobalSettings() {
       body: JSON.stringify({
         thinking_timeout: Number(thinkingTimeoutInput.value) || 120,
         active_model_id: cfg.value?.active_model_id,
-        reasoning_effort: cfg.value?.active_reasoning_effort,
+        reasoning_effort: reasoningEffortInput.value || cfg.value?.active_reasoning_effort || 'high',
         request_attempts: Number(requestAttemptsInput.value) || 3,
         fallback_model_ids: fallbackIds.value,
       }),
@@ -184,6 +185,9 @@ async function loadConfig() {
   cfgError.value = ''
   try {
     cfg.value = await api('/api/v1/admin/llm/models')
+    if (cfg.value?.active_reasoning_effort) {
+      reasoningEffortInput.value = String(cfg.value.active_reasoning_effort).toLowerCase()
+    }
     if (cfg.value?.thinking_timeout) {
       thinkingTimeoutInput.value = Number(cfg.value.thinking_timeout)
     }
@@ -616,6 +620,7 @@ onMounted(() => {
     remoteSearch,
     removeProvider,
     requestAttemptsInput,
+    reasoningEffortInput,
     runTestModel,
     saveGlobalSettings,
     saveModelForm,

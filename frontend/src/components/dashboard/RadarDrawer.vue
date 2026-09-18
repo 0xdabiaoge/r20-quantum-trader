@@ -304,12 +304,26 @@ function posActionBadge(action: string): { label: string; class: string } {
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-2">
               <span class="font-mono font-bold text-xs text-[var(--ink-strong)]">{{ seatLabel(adv.role_id || adv.name) }}</span>
+              <span v-if="adv.model_used" class="text-3xs font-mono text-[var(--ink-3)]">({{ adv.model_used }})</span>
+              <span v-if="adv.status === 'error'" role="alert" class="text-3xs px-1.5 py-0.5 rounded bg-[var(--down-bg)] text-[var(--down)]">{{ t('dash.radar.statusDegraded') }}</span>
               <DirTag v-if="adv.action" :dir="dirOf(adv.action)" />
-              <ConfBadge :value="adv.confidence" />
+              <ConfBadge v-if="adv.confidence" :value="adv.confidence" />
             </div>
             <span v-if="adv.inst" class="text-3xs font-mono text-[var(--ink-2)]">{{ adv.inst }}</span>
           </div>
-          <p class="text-xs text-[var(--ink-2)] leading-body">{{ adv.reasoning || adv.view || '--' }}</p>
+          <!-- 优先展示方案正文 content，若无则展示 reasoning/view -->
+          <div v-if="adv.status === 'error'" role="alert" class="text-xs text-[var(--down)] bg-[var(--down-bg)]/30 p-2 rounded leading-body whitespace-pre-wrap">
+            {{ adv.content || '--' }}
+          </div>
+          <div v-else class="space-y-1.5">
+            <p v-if="adv.content" class="text-xs text-[var(--ink-1)] leading-body whitespace-pre-wrap font-mono select-text">{{ adv.content }}</p>
+            <p v-else-if="adv.reasoning || adv.view" class="text-xs text-[var(--ink-2)] leading-body whitespace-pre-wrap">{{ adv.reasoning || adv.view }}</p>
+            <p v-else class="text-xs text-[var(--ink-3)] leading-body">--</p>
+            <details v-if="adv.content && adv.reasoning" class="text-3xs text-[var(--ink-3)] pt-1 cursor-pointer">
+              <summary class="hover:text-[var(--accent)] select-none">{{ t('dash.radar.viewReasoning') }}</summary>
+              <div class="mt-1 p-2 rounded bg-[var(--bg-sub)] text-xs text-[var(--ink-2)] leading-body whitespace-pre-wrap">{{ adv.reasoning }}</div>
+            </details>
+          </div>
         </div>
       </div>
     </div>
