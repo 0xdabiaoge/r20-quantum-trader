@@ -665,26 +665,22 @@ function applyYAxisRangeOverride() {
       const mid = (minVal + maxVal) / 2
       if (mid <= 0) return defaultRange
       for (const lv of levels) {
-        if (lv > mid * 0.4 && lv < mid * 2.5) {
+        if (lv > mid * 0.7 && lv < mid * 1.5) {
           minVal = Math.min(minVal, lv)
           maxVal = Math.max(maxVal, lv)
         }
       }
       const diff = maxVal - minVal
-      const pad = diff * 0.08
-      const from = Math.max(0, minVal - pad)
-      const to = maxVal + pad
-      const range = to - from
       return {
-        from,
-        to,
-        range,
-        realFrom: from,
-        realTo: to,
-        realRange: range,
-        displayFrom: from,
-        displayTo: to,
-        displayRange: range,
+        from: minVal,
+        to: maxVal,
+        range: diff,
+        realFrom: minVal,
+        realTo: maxVal,
+        realRange: diff,
+        displayFrom: minVal,
+        displayTo: maxVal,
+        displayRange: diff,
       }
     },
   })
@@ -894,7 +890,7 @@ onUnmounted(() => {
   <div
     class="dsh-card select-none"
     :class="[
-      isFullscreen ? 'fixed inset-0 z-[100] bg-[var(--surface-base)] rounded-none flex flex-col' : '',
+      isFullscreen ? 'fixed inset-0 z-[100] !bg-[var(--surface-0,#090d16)] !bg-none rounded-none flex flex-col' : '',
       fill ? 'h-full flex flex-col' : '',
     ]"
   >
@@ -964,14 +960,15 @@ onUnmounted(() => {
           <RefreshCw :class="isLoading && 'animate-spin shrink-0'" />
         </button>
         <button type="button"
-          class="btn btn-ghost btn-icon btn-sm"
-          :class="isFullscreen ? 'bg-[var(--surface-3)] text-[var(--accent)] border border-[var(--accent-line)]' : ''"
+          class="btn btn-sm cursor-pointer"
+          :class="isFullscreen ? 'btn-primary px-2.5 font-semibold text-xs gap-1 shadow-sm' : 'btn-ghost btn-icon'"
           :title="isFullscreen ? t('dash.matrix.chart.exitFullscreen') : t('dash.matrix.chart.fullscreen')"
           :aria-label="isFullscreen ? t('dash.matrix.chart.exitFullscreen') : t('dash.matrix.chart.fullscreen')"
           @click="isFullscreen = !isFullscreen"
         >
-          <Minimize v-if="isFullscreen" />
-          <Maximize v-else />
+          <Minimize v-if="isFullscreen" class="h-3.5 w-3.5" />
+          <span v-if="isFullscreen">{{ t('dash.matrix.chart.exitFullscreen') }}</span>
+          <Maximize v-else class="h-3.5 w-3.5" />
         </button>
       </div>
 
@@ -1071,14 +1068,15 @@ onUnmounted(() => {
             <RefreshCw :class="isLoading && 'animate-spin shrink-0'" />
           </button>
           <button type="button"
-            class="btn btn-ghost btn-icon btn-sm"
-            :class="isFullscreen ? 'bg-[var(--surface-3)] text-[var(--accent)] border border-[var(--accent-line)]' : ''"
+            class="btn btn-sm cursor-pointer"
+            :class="isFullscreen ? 'btn-primary px-2.5 font-semibold text-xs gap-1 shadow-sm' : 'btn-ghost btn-icon'"
             :title="isFullscreen ? t('dash.matrix.chart.exitFullscreen') : t('dash.matrix.chart.fullscreen')"
             :aria-label="isFullscreen ? t('dash.matrix.chart.exitFullscreen') : t('dash.matrix.chart.fullscreen')"
             @click="isFullscreen = !isFullscreen"
           >
-            <Minimize v-if="isFullscreen" />
-            <Maximize v-else />
+            <Minimize v-if="isFullscreen" class="h-3.5 w-3.5" />
+            <span v-if="isFullscreen">{{ t('dash.matrix.chart.exitFullscreen') }}</span>
+            <Maximize v-else class="h-3.5 w-3.5" />
           </button>
         </div>
       </div>
