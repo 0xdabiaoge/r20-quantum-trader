@@ -157,6 +157,10 @@ export function chartStyles(
       position: 'right',
       type: 'normal',
       inside: false,
+      gap: {
+        top: 0.12,
+        bottom: 0.12,
+      },
       axisLine: {
         show: true,
         color: tok('--surface-3'),

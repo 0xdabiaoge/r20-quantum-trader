@@ -92,6 +92,16 @@ registerOverlay({
       textYOffset = 2
     }
 
+    // 视口上下边界保护：当线贴近画布顶部时（y < 24），改贴线下方；
+    // 当线贴近画布底部时（bounding.height && y > bounding.height - 24），改贴线上方
+    if (y < 24) {
+      textBaseline = 'top'
+      textYOffset = 3
+    } else if (bounding.height && y > bounding.height - 24) {
+      textBaseline = 'bottom'
+      textYOffset = -3
+    }
+
     const startX = y < 70 ? Math.min(240, bounding.width * 0.5) : 0
 
     return [
@@ -188,10 +198,18 @@ const emit = defineEmits<{
   (e: 'select-symbol', symbol: string): void
 }>()
 
-/* 工作站全屏：自管浮层，滚动锁 */
+/* 工作站全屏：自管浮层，滚动锁与重排自适应 */
 const isFullscreen = ref(false)
 watch(isFullscreen, (v) => {
   document.body.style.overflow = v ? 'hidden' : ''
+  nextTick(() => {
+    klineChart?.resize()
+    if (klineChart) {
+      const offset = typeof window !== 'undefined' && window.innerWidth < 640 ? 75 : 95
+      klineChart.setOffsetRightDistance(offset)
+      klineChart.scrollToRealTime()
+    }
+  })
 })
 onUnmounted(() => { document.body.style.overflow = '' })
 
@@ -525,7 +543,9 @@ function initChart() {
 
   if (!klineChart) return
   ;(window as any).__klineChart = klineChart
-  klineChart.setOffsetRightDistance(25)
+  const rightOffset = typeof window !== 'undefined' && window.innerWidth < 640 ? 75 : 95
+  klineChart.setOffsetRightDistance(rightOffset)
+  applyYAxisRangeOverride()
 
   // 必须显式设置默认 symbol 与 period，KLineChart 内部的 _dataLoader 才会触发加载！
   klineChart.setSymbol({
@@ -622,6 +642,52 @@ function updatePriceLines() {
     const tpRes = klineChart.createOverlay(plan.tp)
     tpOverlayId = typeof tpRes === 'string' ? tpRes : null
   }
+
+  applyYAxisRangeOverride()
+}
+
+/** 动态自适应扩展 Y 轴量程：确保大斜率下止盈/止损/入场线始终完整包含在视野内 */
+function applyYAxisRangeOverride() {
+  if (!klineChart) return
+  const hasPosOrOrder = Boolean(activePosition.value || activeOrder.value || simMode.value)
+  const levels = hasPosOrOrder
+    ? [effectiveEntry.value, effectiveSL.value, effectiveTP.value].filter(
+        (v) => typeof v === 'number' && v > 0 && Number.isFinite(v)
+      )
+    : []
+
+  klineChart.overrideYAxis({
+    paneId: 'candle_pane',
+    createRange: ({ defaultRange }) => {
+      if (levels.length === 0) return defaultRange
+      let minVal = defaultRange.from
+      let maxVal = defaultRange.to
+      const mid = (minVal + maxVal) / 2
+      if (mid <= 0) return defaultRange
+      for (const lv of levels) {
+        if (lv > mid * 0.4 && lv < mid * 2.5) {
+          minVal = Math.min(minVal, lv)
+          maxVal = Math.max(maxVal, lv)
+        }
+      }
+      const diff = maxVal - minVal
+      const pad = diff * 0.08
+      const from = Math.max(0, minVal - pad)
+      const to = maxVal + pad
+      const range = to - from
+      return {
+        from,
+        to,
+        range,
+        realFrom: from,
+        realTo: to,
+        realRange: range,
+        displayFrom: from,
+        displayTo: to,
+        displayRange: range,
+      }
+    },
+  })
 }
 
 // 倒计时
@@ -747,6 +813,9 @@ function onLegendBreakpoint() {
   if (m !== lastMobile) {
     lastMobile = m
     klineChart?.setStyles(getChartStyles())
+    if (klineChart) {
+      klineChart.setOffsetRightDistance(m ? 75 : 95)
+    }
   }
 }
 onMounted(() => window.addEventListener('resize', onLegendBreakpoint))
@@ -784,6 +853,10 @@ function handleClickOutside(e: MouseEvent) {
    所以模态开着时不会误伤。 */
 function handleKeydown(e: KeyboardEvent) {
   if (e.key !== 'Escape') return
+  if (isFullscreen.value) {
+    isFullscreen.value = false
+    return
+  }
   if (!showIndicatorMenu.value && !symbolMenu.value) return
   showIndicatorMenu.value = false
   symbolMenu.value = false
@@ -821,7 +894,7 @@ onUnmounted(() => {
   <div
     class="dsh-card select-none"
     :class="[
-      isFullscreen ? 'fixed inset-0 z-[var(--z-float)] rounded-none' : '',
+      isFullscreen ? 'fixed inset-0 z-[100] bg-[var(--surface-base)] rounded-none flex flex-col' : '',
       fill ? 'h-full flex flex-col' : '',
     ]"
   >
@@ -892,7 +965,9 @@ onUnmounted(() => {
         </button>
         <button type="button"
           class="btn btn-ghost btn-icon btn-sm"
+          :class="isFullscreen ? 'bg-[var(--surface-3)] text-[var(--accent)] border border-[var(--accent-line)]' : ''"
           :title="isFullscreen ? t('dash.matrix.chart.exitFullscreen') : t('dash.matrix.chart.fullscreen')"
+          :aria-label="isFullscreen ? t('dash.matrix.chart.exitFullscreen') : t('dash.matrix.chart.fullscreen')"
           @click="isFullscreen = !isFullscreen"
         >
           <Minimize v-if="isFullscreen" />
@@ -997,7 +1072,9 @@ onUnmounted(() => {
           </button>
           <button type="button"
             class="btn btn-ghost btn-icon btn-sm"
+            :class="isFullscreen ? 'bg-[var(--surface-3)] text-[var(--accent)] border border-[var(--accent-line)]' : ''"
             :title="isFullscreen ? t('dash.matrix.chart.exitFullscreen') : t('dash.matrix.chart.fullscreen')"
+            :aria-label="isFullscreen ? t('dash.matrix.chart.exitFullscreen') : t('dash.matrix.chart.fullscreen')"
             @click="isFullscreen = !isFullscreen"
           >
             <Minimize v-if="isFullscreen" />
