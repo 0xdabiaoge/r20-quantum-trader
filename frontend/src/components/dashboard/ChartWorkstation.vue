@@ -203,11 +203,16 @@ const isFullscreen = ref(false)
 watch(isFullscreen, (v) => {
   document.body.style.overflow = v ? 'hidden' : ''
   nextTick(() => {
-    klineChart?.resize()
     if (klineChart) {
+      klineChart.resize()
       const offset = typeof window !== 'undefined' && window.innerWidth < 640 ? 75 : 95
       klineChart.setOffsetRightDistance(offset)
       klineChart.scrollToRealTime()
+    }
+    if (!v) {
+      requestAnimationFrame(() => {
+        klineChart?.resize()
+      })
     }
   })
 })
@@ -546,6 +551,9 @@ function initChart() {
   const rightOffset = typeof window !== 'undefined' && window.innerWidth < 640 ? 75 : 95
   klineChart.setOffsetRightDistance(rightOffset)
   applyYAxisRangeOverride()
+
+  // 默认 K 线根数设为之前的 3/4 (单根蜡烛宽度调整为 4/3，蜡烛更清晰平滑)
+  klineChart.setBarSpace(10 * (4 / 3))
 
   // 必须显式设置默认 symbol 与 period，KLineChart 内部的 _dataLoader 才会触发加载！
   klineChart.setSymbol({
@@ -1094,7 +1102,7 @@ onUnmounted(() => {
     <div
       ref="chartContainer"
       class="relative w-full"
-      :class="isFullscreen ? 'flex-1 min-h-0' : fill ? 'flex-1 min-h-[340px]' : ''"
+      :class="isFullscreen ? 'flex-1 min-h-0' : ''"
       :style="{ height: isFullscreen ? undefined : (props.chartHeight || 'clamp(340px, 60vw, 560px)') }"
     ></div>
 
