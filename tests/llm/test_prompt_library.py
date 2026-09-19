@@ -170,6 +170,30 @@ class PromptLibraryTests(unittest.TestCase):
         compiled = library.compile_modules(malformed)
         self.assertEqual(compiled, "有效内容")
 
+    def test_wide_oscillation_preset_registered_and_valid(self):
+        # 1. 默认方案必须保持为 stable
+        lib = library.load_library()
+        self.assertEqual(lib["active_profile_id"], "stable")
+
+        # 2. 预设字典中必须包含 wide_oscillation 与 stable
+        self.assertIn("stable", library.PRESETS)
+        self.assertIn("wide_oscillation", library.PRESETS)
+
+        # 3. wide_oscillation 方案必须有效且通过全套门禁
+        wide = library.get_profile("wide_oscillation")
+        self.assertEqual(wide["id"], "wide_oscillation")
+        self.assertIn("宽幅震荡", wide["name"])
+        check = library.validate_profile(wide)
+        self.assertTrue(check["valid"], f"宽幅震荡预设校验失败: {check['errors']}")
+
+        # 4. all_profiles 必须同时包含两者
+        profiles = library.all_profiles()
+        ids = [p["id"] for p in profiles]
+        self.assertIn("stable", ids)
+        self.assertIn("wide_oscillation", ids)
+        self.assertEqual(ids[0], "stable")
+        self.assertEqual(ids[1], "wide_oscillation")
+
 
 if __name__ == "__main__":
     unittest.main()

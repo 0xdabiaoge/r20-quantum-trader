@@ -35,6 +35,7 @@ import {
   Minimize,
 } from 'lucide-vue-next'
 import BaseSegmented from '../base/BaseSegmented.vue'
+import CryptoLogo from './CryptoLogo.vue'
 
 // ==========================================
 // 0. 注册原生 VWAP 指标与价格线渲染优化
@@ -91,7 +92,7 @@ registerOverlay({
       textYOffset = 2
     }
 
-    const startX = y < 45 ? Math.min(220, bounding.width * 0.5) : 0
+    const startX = y < 70 ? Math.min(240, bounding.width * 0.5) : 0
 
     return [
       {
@@ -826,60 +827,81 @@ onUnmounted(() => {
   >
     <!-- 工具条：行情信息 + 工作站工具 -->
     <header
-      class="dsh-card-header flex flex-wrap items-center gap-x-3 gap-y-2"
+      class="dsh-card-header flex flex-wrap items-center justify-between gap-x-3 gap-y-2"
     >
-      <!-- 选币下拉 -->
-      <div class="indicator-dropdown-container relative">
-        <button type="button"
-          ref="symbolTrigger"
-          class="flex h-7 cursor-pointer items-center gap-1.5 rounded border border-[var(--line-1)] bg-[var(--surface-2)] px-2.5 transition-colors hover:bg-[var(--surface-3)]"
-          :aria-expanded="symbolMenu"
-          aria-haspopup="listbox"
-          :aria-controls="symbolMenu ? symbolMenuId : undefined"
-          @click="symbolMenu = !symbolMenu"
-        >
-          <span class="text-xs font-bold" style="color: var(--ink-strong)">{{ currentSymbol }}</span>
-          <span class="text-3xs" style="color: var(--ink-3)">/USDT · {{ t('dash.matrix.chart.perp') }}</span>
-          <ChevronDown class="h-3 w-3 transition-transform" :class="symbolMenu && 'rotate-180'" style="color: var(--ink-2)" />
-        </button>
-        <Transition name="pop">
-          <div
-            v-if="symbolMenu"
-            :id="symbolMenuId"
-            ref="symbolPanel"
-            tabindex="-1"
-            role="listbox"
-            :aria-label="t('dash.matrix.chart.perp')"
-            class="outline-none float-panel absolute left-0 top-8 z-[var(--z-float)] max-h-80 w-56 overflow-y-auto p-1.5"
+      <div class="flex items-center gap-2 flex-wrap">
+        <!-- 选币下拉 -->
+        <div class="indicator-dropdown-container relative">
+          <button type="button"
+            ref="symbolTrigger"
+            class="flex h-7 cursor-pointer items-center gap-1.5 rounded border border-[var(--line-1)] bg-[var(--surface-2)] px-2.5 transition-colors hover:bg-[var(--surface-3)]"
+            :aria-expanded="symbolMenu"
+            aria-haspopup="listbox"
+            :aria-controls="symbolMenu ? symbolMenuId : undefined"
+            @click="symbolMenu = !symbolMenu"
           >
-            <button type="button"
-              v-for="sym in availableSymbols"
-              :key="sym"
-              class="flex w-full cursor-pointer items-center justify-between rounded px-2 py-1.5 text-left text-xs transition-colors hover:bg-[var(--surface-1)]"
-              :style="sym === currentSymbol ? { color: 'var(--accent)', fontWeight: 600 } : { color: 'var(--ink-1)' }"
-              @click="selectSymbol(sym); symbolMenu = false"
+            <CryptoLogo :symbol="currentSymbol" :size="16" />
+            <span class="text-xs font-bold" style="color: var(--ink-strong)">{{ currentSymbol }}</span>
+            <span class="text-3xs" style="color: var(--ink-3)">/USDT · {{ t('dash.matrix.chart.perp') }}</span>
+            <ChevronDown class="h-3 w-3 transition-transform" :class="symbolMenu && 'rotate-180'" style="color: var(--ink-2)" />
+          </button>
+          <Transition name="pop">
+            <div
+              v-if="symbolMenu"
+              :id="symbolMenuId"
+              ref="symbolPanel"
+              tabindex="-1"
+              role="listbox"
+              :aria-label="t('dash.matrix.chart.perp')"
+              class="outline-none float-panel absolute left-0 top-8 z-[var(--z-float)] max-h-80 w-56 overflow-y-auto p-1.5"
             >
-              <span class="num font-mono">{{ sym }}</span>
-              <span v-if="holdingSet.has(sym)" class="badge badge-accent !h-4 !px-1 !text-4xs">{{ t('dash.matrix.chart.holding') }}</span>
-            </button>
-          </div>
-        </Transition>
+              <button type="button"
+                v-for="sym in availableSymbols"
+                :key="sym"
+                class="flex w-full cursor-pointer items-center justify-between rounded px-2 py-1.5 text-left text-xs transition-colors hover:bg-[var(--surface-1)]"
+                :style="sym === currentSymbol ? { color: 'var(--accent)', fontWeight: 600 } : { color: 'var(--ink-1)' }"
+                @click="selectSymbol(sym); symbolMenu = false"
+              >
+                <div class="flex items-center gap-2">
+                  <CryptoLogo :symbol="sym" :size="16" />
+                  <span class="num font-mono">{{ sym }}</span>
+                </div>
+                <span v-if="holdingSet.has(sym)" class="badge badge-accent !h-4 !px-1 !text-4xs">{{ t('dash.matrix.chart.holding') }}</span>
+              </button>
+            </div>
+          </Transition>
+        </div>
+
+        <!-- 现价 / 涨跌 / ATR -->
+        <span class="num font-mono text-sm font-bold" style="color: var(--ink-strong)">
+          {{ currentPrice >= 100 ? currentPrice.toFixed(1) : currentPrice.toFixed(4) }}
+        </span>
+        <span class="num font-mono text-xs font-semibold" :class="liveChangePct >= 0 ? 'up' : 'down'">
+          {{ liveChangePct >= 0 ? '+' : '' }}{{ liveChangePct.toFixed(2) }}%
+        </span>
+        <span class="dsh-pill hidden md:inline-flex">
+          <span class="dsh-status-dot active" aria-hidden="true" />{{ t('dash.matrix.chart.live') }}
+        </span>
+        <span class="t-faint num font-mono hidden text-3xs lg:inline">1H ATR {{ currentAtr >= 100 ? '$' + currentAtr.toFixed(1) : (currentAtr * 100).toFixed(2) + '%' }}</span>
       </div>
 
-      <!-- 现价 / 涨跌 / ATR -->
-      <span class="num font-mono text-sm font-bold" style="color: var(--ink-strong)">
-        {{ currentPrice >= 100 ? currentPrice.toFixed(1) : currentPrice.toFixed(4) }}
-      </span>
-      <span class="num font-mono text-xs font-semibold" :class="liveChangePct >= 0 ? 'up' : 'down'">
-        {{ liveChangePct >= 0 ? '+' : '' }}{{ liveChangePct.toFixed(2) }}%
-      </span>
-      <span class="dsh-pill hidden md:inline-flex">
-        <span class="dsh-status-dot active" aria-hidden="true" />{{ t('dash.matrix.chart.live') }}
-      </span>
-      <span class="t-faint num font-mono hidden text-3xs lg:inline">1H ATR {{ currentAtr >= 100 ? '$' + currentAtr.toFixed(1) : (currentAtr * 100).toFixed(2) + '%' }}</span>
+      <!-- 右侧动作按钮（全屏与刷新）：在窄屏保持在第 1 行右侧，在宽屏并入末端 -->
+      <div class="flex items-center gap-1.5 md:hidden ms-auto">
+        <button type="button" class="btn btn-ghost btn-icon btn-sm" :title="t('common.refresh')" @click="loadCandles(false, true)">
+          <RefreshCw :class="isLoading && 'animate-spin shrink-0'" />
+        </button>
+        <button type="button"
+          class="btn btn-ghost btn-icon btn-sm"
+          :title="isFullscreen ? t('dash.matrix.chart.exitFullscreen') : t('dash.matrix.chart.fullscreen')"
+          @click="isFullscreen = !isFullscreen"
+        >
+          <Minimize v-if="isFullscreen" />
+          <Maximize v-else />
+        </button>
+      </div>
 
-      <!-- 右侧工具组 -->
-      <div class="ms-auto flex flex-wrap items-center gap-1.5">
+      <!-- 周期、指标与试算组：宽屏居右，窄屏整齐铺于第 2 行 -->
+      <div class="flex flex-wrap items-center gap-1.5 max-md:w-full max-md:justify-between">
         <span class="dsh-pill mr-1 hidden sm:inline-flex">
           <span class="text-[var(--ink-3)]">{{ t('dash.matrix.chart.barCloseIn') }}</span>
           <b class="num font-mono" style="color: var(--warn)">{{ candleCountdown }}</b>
@@ -892,91 +914,96 @@ onUnmounted(() => {
           @update:model-value="(id: any) => selectPeriod(periods.find((p) => p.id === id))"
         />
 
-        <!-- 指标菜单 -->
-        <div class="indicator-dropdown-container relative">
+        <div class="flex items-center gap-1.5">
+          <!-- 指标菜单 -->
+          <div class="indicator-dropdown-container relative">
+            <button type="button"
+              ref="indicatorTrigger"
+              class="btn btn-sm"
+              :class="showIndicatorMenu || activeIndicatorCount > 0 ? 'bg-[var(--accent-bg)] text-[var(--accent)] border border-[var(--accent-line)]' : 'btn-ghost'"
+              :aria-expanded="showIndicatorMenu"
+              aria-haspopup="dialog"
+              :aria-controls="showIndicatorMenu ? indicatorMenuId : undefined"
+              @click="showIndicatorMenu = !showIndicatorMenu"
+            >
+              <SlidersHorizontal />
+              {{ t('dash.matrix.chart.indicators') }}
+              <span v-if="activeIndicatorCount > 0" class="num">{{ activeIndicatorCount }}</span>
+              <ChevronDown class="h-3 w-3 transition-transform" :class="showIndicatorMenu && 'rotate-180'" />
+            </button>
+            <Transition name="pop">
+              <div v-if="showIndicatorMenu" :id="indicatorMenuId" ref="indicatorPanel" tabindex="-1" role="dialog" :aria-label="t('dash.matrix.chart.indicators')" class="outline-none float-panel absolute right-0 top-9 z-[var(--z-float)] max-h-[65vh] w-72 overflow-y-auto p-3 max-md:fixed max-md:inset-x-2 max-md:top-auto max-md:bottom-2 max-md:w-auto max-md:max-h-[70vh]">
+                <p class="t-label mb-2">{{ t('dash.matrix.chart.indicatorHint') }}</p>
+                <p class="t-label mb-1.5">{{ t('dash.matrix.chart.overlays') }}</p>
+                <div class="mb-3 grid grid-cols-2 gap-1.5">
+                  <button type="button"
+                    v-for="ind in mainIndicators"
+                    :key="ind.key"
+                    class="flex cursor-pointer items-center justify-between rounded-md border px-2 py-1.5 text-xs font-semibold transition-colors"
+                    :class="
+                      activeIndicators[ind.key]
+                        ? 'bg-[var(--accent-bg)] border-[var(--accent-line)] text-[var(--ink-1)]'
+                        : 'bg-[var(--surface-1)] border-[var(--line-1)] text-[var(--ink-2)] hover:bg-[var(--surface-3)] hover:text-[var(--ink-1)]'
+                    "
+                    @click="toggleIndicatorKey(ind.key)"
+                  >
+                    <span class="flex min-w-0 items-center gap-1.5">
+                      <span class="h-2 w-2 shrink-0 rounded-full" :style="{ backgroundColor: ind.color }" />
+                      <span class="truncate">{{ ind.label }}</span>
+                    </span>
+                    <Check v-if="activeIndicators[ind.key]" class="h-3.5 w-3.5 shrink-0" style="color: var(--up)" />
+                  </button>
+                </div>
+                <p class="t-label mb-1.5">{{ t('dash.matrix.chart.panes') }}</p>
+                <div class="grid grid-cols-2 gap-1.5">
+                  <button type="button"
+                    v-for="ind in subIndicators"
+                    :key="ind.key"
+                    class="flex cursor-pointer items-center justify-between rounded-md border px-2 py-1.5 text-xs font-semibold transition-colors"
+                    :class="
+                      activeIndicators[ind.key]
+                        ? 'bg-[var(--accent-bg)] border-[var(--accent-line)] text-[var(--ink-1)]'
+                        : 'bg-[var(--surface-1)] border-[var(--line-1)] text-[var(--ink-2)] hover:bg-[var(--surface-3)] hover:text-[var(--ink-1)]'
+                    "
+                    @click="toggleIndicatorKey(ind.key)"
+                  >
+                    <span class="flex min-w-0 items-center gap-1.5">
+                      <span class="h-2 w-2 shrink-0 rounded-full" :style="{ backgroundColor: ind.color }" />
+                      <span class="truncate">{{ ind.label }}</span>
+                    </span>
+                    <Check v-if="activeIndicators[ind.key]" class="h-3.5 w-3.5 shrink-0" style="color: var(--up)" />
+                  </button>
+                </div>
+              </div>
+            </Transition>
+          </div>
+
+          <!-- 试算开关 -->
           <button type="button"
-            ref="indicatorTrigger"
             class="btn btn-sm"
-            :class="showIndicatorMenu || activeIndicatorCount > 0 ? 'bg-[var(--accent-bg)] text-[var(--accent)] border border-[var(--accent-line)]' : 'btn-ghost'"
-            :aria-expanded="showIndicatorMenu"
-            aria-haspopup="dialog"
-            :aria-controls="showIndicatorMenu ? indicatorMenuId : undefined"
-            @click="showIndicatorMenu = !showIndicatorMenu"
+            :class="simMode ? 'btn-primary' : 'btn-ghost'"
+            :title="simMode ? t('dash.matrix.chart.sim.exit') : t('dash.matrix.chart.sim.enter')"
+            @click="simMode = !simMode; if (simMode) initSimulation(); updatePriceLines()"
           >
-            <SlidersHorizontal />
-            {{ t('dash.matrix.chart.indicators') }}
-            <span v-if="activeIndicatorCount > 0" class="num">{{ activeIndicatorCount }}</span>
-            <ChevronDown class="h-3 w-3 transition-transform" :class="showIndicatorMenu && 'rotate-180'" />
+            <Sliders />
+            <span class="hidden sm:inline">{{ simMode ? t('dash.matrix.chart.sim.exit') : t('dash.matrix.chart.simulate') }}</span>
           </button>
-          <Transition name="pop">
-            <div v-if="showIndicatorMenu" :id="indicatorMenuId" ref="indicatorPanel" tabindex="-1" role="dialog" :aria-label="t('dash.matrix.chart.indicators')" class="outline-none float-panel absolute right-0 top-9 z-[var(--z-float)] max-h-[65vh] w-72 overflow-y-auto p-3 max-md:fixed max-md:inset-x-2 max-md:top-auto max-md:bottom-2 max-md:w-auto max-md:max-h-[70vh]">
-              <p class="t-label mb-2">{{ t('dash.matrix.chart.indicatorHint') }}</p>
-              <p class="t-label mb-1.5">{{ t('dash.matrix.chart.overlays') }}</p>
-              <div class="mb-3 grid grid-cols-2 gap-1.5">
-                <button type="button"
-                  v-for="ind in mainIndicators"
-                  :key="ind.key"
-                  class="flex cursor-pointer items-center justify-between rounded-md border px-2 py-1.5 text-xs font-semibold transition-colors"
-                  :class="
-                    activeIndicators[ind.key]
-                      ? 'bg-[var(--accent-bg)] border-[var(--accent-line)] text-[var(--ink-1)]'
-                      : 'bg-[var(--surface-1)] border-[var(--line-1)] text-[var(--ink-2)] hover:bg-[var(--surface-3)] hover:text-[var(--ink-1)]'
-                  "
-                  @click="toggleIndicatorKey(ind.key)"
-                >
-                  <span class="flex min-w-0 items-center gap-1.5">
-                    <span class="h-2 w-2 shrink-0 rounded-full" :style="{ backgroundColor: ind.color }" />
-                    <span class="truncate">{{ ind.label }}</span>
-                  </span>
-                  <Check v-if="activeIndicators[ind.key]" class="h-3.5 w-3.5 shrink-0" style="color: var(--up)" />
-                </button>
-              </div>
-              <p class="t-label mb-1.5">{{ t('dash.matrix.chart.panes') }}</p>
-              <div class="grid grid-cols-2 gap-1.5">
-                <button type="button"
-                  v-for="ind in subIndicators"
-                  :key="ind.key"
-                  class="flex cursor-pointer items-center justify-between rounded-md border px-2 py-1.5 text-xs font-semibold transition-colors"
-                  :class="
-                    activeIndicators[ind.key]
-                      ? 'bg-[var(--accent-bg)] border-[var(--accent-line)] text-[var(--ink-1)]'
-                      : 'bg-[var(--surface-1)] border-[var(--line-1)] text-[var(--ink-2)] hover:bg-[var(--surface-3)] hover:text-[var(--ink-1)]'
-                  "
-                  @click="toggleIndicatorKey(ind.key)"
-                >
-                  <span class="flex min-w-0 items-center gap-1.5">
-                    <span class="h-2 w-2 shrink-0 rounded-full" :style="{ backgroundColor: ind.color }" />
-                    <span class="truncate">{{ ind.label }}</span>
-                  </span>
-                  <Check v-if="activeIndicators[ind.key]" class="h-3.5 w-3.5 shrink-0" style="color: var(--up)" />
-                </button>
-              </div>
-            </div>
-          </Transition>
         </div>
 
-        <!-- 试算开关 -->
-        <button type="button"
-          class="btn btn-sm"
-          :class="simMode ? 'btn-primary' : 'btn-ghost'"
-          :title="simMode ? t('dash.matrix.chart.sim.exit') : t('dash.matrix.chart.sim.enter')"
-          @click="simMode = !simMode; if (simMode) initSimulation(); updatePriceLines()"
-        >
-          <Sliders />
-          <span class="hidden sm:inline">{{ simMode ? t('dash.matrix.chart.sim.exit') : t('dash.matrix.chart.simulate') }}</span>
-        </button>
-
-        <button type="button" class="btn btn-ghost btn-icon btn-sm" :title="t('common.refresh')" @click="loadCandles(false, true)">
-          <RefreshCw :class="isLoading && 'animate-spin shrink-0'" />
-        </button>
-        <button type="button"
-          class="btn btn-ghost btn-icon btn-sm"
-          :title="isFullscreen ? t('dash.matrix.chart.exitFullscreen') : t('dash.matrix.chart.fullscreen')"
-          @click="isFullscreen = !isFullscreen"
-        >
-          <Minimize v-if="isFullscreen" />
-          <Maximize v-else />
-        </button>
+        <!-- 桌面端刷新与全屏按钮 -->
+        <div class="hidden md:flex items-center gap-1.5">
+          <button type="button" class="btn btn-ghost btn-icon btn-sm" :title="t('common.refresh')" @click="loadCandles(false, true)">
+            <RefreshCw :class="isLoading && 'animate-spin shrink-0'" />
+          </button>
+          <button type="button"
+            class="btn btn-ghost btn-icon btn-sm"
+            :title="isFullscreen ? t('dash.matrix.chart.exitFullscreen') : t('dash.matrix.chart.fullscreen')"
+            @click="isFullscreen = !isFullscreen"
+          >
+            <Minimize v-if="isFullscreen" />
+            <Maximize v-else />
+          </button>
+        </div>
       </div>
     </header>
 

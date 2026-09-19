@@ -445,6 +445,15 @@ def update_cache_cycle():
             "reasoning_effort": os.getenv("LLM_REASONING_EFFORT", "high"),
             "api_format": "openai_chat",
         }
+    try:
+        from scripts.calculus_engine import detect_macro_market_regime
+        CACHE_DATA["market_regime"] = detect_macro_market_regime(factors_list)
+    except Exception:
+        try:
+            from calculus_engine import detect_macro_market_regime
+            CACHE_DATA["market_regime"] = detect_macro_market_regime(factors_list)
+        except Exception:
+            pass
     persist_dashboard_cache(CACHE_DATA)
     LAST_CACHE_TIME = time.time()
 

@@ -296,6 +296,20 @@ def construct_full_market_prompt(packages: List[Dict[str, Any]], pos_summary: st
   }}
 }}
 """
+    regime_text = ""
+    regime_data = None
+    try:
+        from scripts.calculus_engine import detect_macro_market_regime
+        regime_data = detect_macro_market_regime(packages)
+        regime_text = regime_data.get("summary_text", "")
+    except Exception:
+        try:
+            from calculus_engine import detect_macro_market_regime
+            regime_data = detect_macro_market_regime(packages)
+            regime_text = regime_data.get("summary_text", "")
+        except Exception:
+            pass
+
     runtime_vars = {
         "decision_timestamp": f"【推演基准时间】: {now_bj_str}",
         "account_balance": f"【当前账户可用资金】: {avail_balance_str}",
@@ -304,7 +318,8 @@ def construct_full_market_prompt(packages: List[Dict[str, Any]], pos_summary: st
         "pending_orders": f"【当前在途挂单列表】:\n{pending_orders_text}",
         "news_intelligence": f"【宏观环境基调】: {macro_env}\n【最新核心资讯要闻】:\n{news_text}",
         "trading_memory": memory_lessons.strip(),
-        "market_matrix": all_market_str,
+        "market_regime": regime_text,
+        "market_matrix": f"{regime_text}\n\n{all_market_str}" if regime_text else all_market_str,
     }
     _sys_ver = system_version
     profile = active_profile()
@@ -320,6 +335,8 @@ def construct_full_market_prompt(packages: List[Dict[str, Any]], pos_summary: st
     })
     if runtime_context_out is not None:
         runtime_context_out.update(runtime_vars)
+        if regime_data:
+            runtime_context_out["market_regime"] = regime_data
         if policy_snapshot:
             runtime_context_out["policy_snapshot"] = policy_snapshot
     return apply_module_layout(prompt, profile, "trading_user", f"{profile.get('name', '稳健')}交易用户提示词模板", context=runtime_vars)

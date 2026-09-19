@@ -75,7 +75,7 @@ def init_llm_config(config_file: Path) -> Dict[str, Any]:
     # 之后尊重用户自己的开关。老配置文件（无标记）视为首次：合并一次并落标记，升级无感。
     seed_defaults = not data.get("defaults_seeded")
     default_by_id = {dp["id"]: dp for dp in DEFAULT_PROVIDERS}
-    # (ignore legacy hardcoded providers from older versions)
+    # (ignore legacy hardcoded providers from older versions only during initial seeding if no key was configured)
     legacy_ids = {
         "siliconflow", "openrouter", "kelivoin", "tensdaq", "deepseek",
         "alhubmix", "suixiang", "dashscope", "zhipu", "grok", "volcengine"
@@ -83,7 +83,9 @@ def init_llm_config(config_file: Path) -> Dict[str, Any]:
 
     for found in existing_providers:
         pid = found.get("id")
-        if not pid or pid in legacy_ids:
+        if not pid:
+            continue
+        if seed_defaults and pid in legacy_ids and not found.get("api_key"):
             continue
         dp = default_by_id.get(pid)
         if dp:

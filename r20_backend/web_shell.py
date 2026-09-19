@@ -39,6 +39,7 @@ WORKSPACE_DIR = str(Path(__file__).resolve().parents[1])
 WEB_ROOT_DIR = str(Path(__file__).resolve().parent)
 VUE_DIST_DIR = os.path.join(WORKSPACE_DIR, "frontend", "dist")
 VUE_ASSETS_DIR = os.path.join(VUE_DIST_DIR, "assets")
+VUE_COINS_DIR = os.path.join(VUE_DIST_DIR, "coins")
 DOCS_IMAGES_DIR = os.path.join(WORKSPACE_DIR, "docs", "images")
 
 VUE_ADMIN_DIST_DIR = VUE_DIST_DIR  # Same SPA build handles both / and /admin/*
@@ -87,6 +88,12 @@ def mount_static_assets(app) -> None:
             "/assets",
             CachedStaticFiles(directory=VUE_ASSETS_DIR, cache_control="public, max-age=31536000, immutable"),
             name="vue_assets",
+        )
+    if os.path.isdir(VUE_COINS_DIR):
+        app.mount(
+            "/coins",
+            CachedStaticFiles(directory=VUE_COINS_DIR, cache_control="public, max-age=604800, stale-while-revalidate=86400"),
+            name="vue_coins",
         )
     if os.path.isdir(DOCS_IMAGES_DIR):
         app.mount(

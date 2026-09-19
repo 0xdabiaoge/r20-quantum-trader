@@ -84,12 +84,12 @@
      ⚠️ 刻度原本最小是 8px，微件没有台阶 → 4/5/6px 被手写十余处，
         同一个界面里出现三种几乎相同的微圆角。故补 `--r-xs`，并把
         4/5/6px 统一归到它。 */
-  --r-xs: 4px;
-  --ds-radius-sm: 8px;
+  --r-xs: 6px;
+  --ds-radius-sm: 10px;
   --ds-radius-input: 10px;
-  --ds-radius-media: 10px;
-  --ds-radius-panel: 16px;
-  --ds-radius-card: 10px;
+  --ds-radius-media: 12px;
+  --ds-radius-panel: 18px;
+  --ds-radius-card: 14px;
   --ds-radius-pill: 100px;
 
   /* —— 玻璃（DSH --ds-blur-glass）—— */
@@ -144,7 +144,7 @@
   /* —— 控件尺寸 —— */
   --r-ctl: var(--ds-radius-sm);
   --r-card: var(--ds-radius-card);
-  --r-float: 12px;
+  --r-float: 16px;
   --r-pill: var(--ds-radius-pill);
   --h-sm: 24px;
   --h-md: 30px;
@@ -176,8 +176,8 @@
    ========================================================================= */
 :root,
 :root[data-theme='dark'] {
-  --ds-color-brand: #6799fe;
-  --ds-color-brand-deep: #fff;
+  --ds-color-brand: #3b82f6;
+  --ds-color-brand-deep: #2563eb;
 
   --ds-color-text-primary: #f8fafc;
   --ds-color-text-secondary: #cbd5e1;
@@ -189,49 +189,49 @@
      改为 #8894a7：在上述全部实测底色上 ≥4.72:1，且与 description
      (#94a3b8, ≥5.66:1) 仍差 1.2 倍，第三级/第四级层级不塌。 */
   --ds-color-text-placeholder: #8894a7;
-  --ds-color-text-inverse: #0a0a0a;
+  --ds-color-text-inverse: #09090b;
 
-  --ds-color-bg-page: #0d0f14;
-  --ds-color-bg-surface-1: #1a1e29;
-  --ds-color-bg-surface-2: #212634;
-  --ds-color-bg-surface-3: #282f40;
-  --ds-color-bg-surface-4: #2f374a;
-  --ds-color-bg-surface-5: #363f54;
-  --ds-color-bg-overlay: #141720;
-  --ds-color-bg-surface-raised: #212634;
+  --ds-color-bg-page: #121214;
+  --ds-color-bg-surface-1: #18181b;
+  --ds-color-bg-surface-2: #202024;
+  --ds-color-bg-surface-3: #27272b;
+  --ds-color-bg-surface-4: #323238;
+  --ds-color-bg-surface-5: #3f3f46;
+  --ds-color-bg-overlay: #141416;
+  --ds-color-bg-surface-raised: #1c1c20;
   --ds-color-bg-hover: rgba(255, 255, 255, 0.05);
-  --ds-color-bg-input: #12141c;
-  --ds-color-bg-input-hover: #171b25;
-  --ds-color-bg-code: rgba(0, 0, 0, 0.45);
+  --ds-color-bg-input: #141416;
+  --ds-color-bg-input-hover: #1c1c20;
+  --ds-color-bg-code: rgba(0, 0, 0, 0.4);
 
-  --ds-color-border-subtle: #1e2330;
-  --ds-color-border-default: #283042;
-  --ds-color-border-divider: #283042;
-  --ds-color-border-hover: #3b455e;
-  --ds-color-border-strong: #424e6a;
-  --ds-color-border-secondary: #283042;
-  --ds-color-border-input: #283042;
+  --ds-color-border-subtle: rgba(255, 255, 255, 0.06);
+  --ds-color-border-default: rgba(255, 255, 255, 0.09);
+  --ds-color-border-divider: rgba(255, 255, 255, 0.07);
+  --ds-color-border-hover: rgba(255, 255, 255, 0.18);
+  --ds-color-border-strong: rgba(255, 255, 255, 0.25);
+  --ds-color-border-secondary: rgba(255, 255, 255, 0.08);
+  --ds-color-border-input: rgba(255, 255, 255, 0.1);
   --ds-color-border-input-focus: #3b82f6;
 
-  --ds-color-scrollbar: hsla(0, 0%, 100%, 0.2);
+  --ds-color-scrollbar: rgba(255, 255, 255, 0.15);
 
-  /* 主按钮 = 反色单色（DSH 的 --ds-btn-primary-*），非品牌蓝 */
-  --ds-btn-primary-bg: #fff;
-  --ds-btn-primary-text: #0a0a0a;
-  --ds-btn-primary-hover-bg: rgba(0, 0, 0, 0.2);
-  --ds-btn-secondary-bg: var(--ds-color-bg-surface-1);
-  --ds-btn-secondary-text: #fff;
-  --ds-btn-secondary-border: hsla(0, 0%, 100%, 0.15);
-  --ds-btn-secondary-hover-bg: hsla(0, 0%, 100%, 0.2);
-  --ds-btn-secondary-hover-border: hsla(0, 0%, 100%, 0.6);
-  --ds-btn-ghost-hover-bg: hsla(0, 0%, 100%, 0.08);
-  --ds-btn-ghost-hover-border: hsla(0, 0%, 100%, 0.2);
+  /* 主按钮 = ZCode 反色高对比单色主按钮 */
+  --ds-btn-primary-bg: #ffffff;
+  --ds-btn-primary-text: #09090b;
+  --ds-btn-primary-hover-bg: #f4f4f5;
+  --ds-btn-secondary-bg: rgba(255, 255, 255, 0.05);
+  --ds-btn-secondary-text: #f8fafc;
+  --ds-btn-secondary-border: rgba(255, 255, 255, 0.1);
+  --ds-btn-secondary-hover-bg: rgba(255, 255, 255, 0.09);
+  --ds-btn-secondary-hover-border: rgba(255, 255, 255, 0.2);
+  --ds-btn-ghost-hover-bg: rgba(255, 255, 255, 0.06);
+  --ds-btn-ghost-hover-border: rgba(255, 255, 255, 0.15);
 
-  --ds-shadow-card: hsla(0, 0%, 100%, 0.12) 0px 1px 0px 0px inset;
+  --ds-shadow-card: 0 1px 0 0 rgba(255, 255, 255, 0.08) inset, 0 12px 32px -4px rgba(0, 0, 0, 0.55);
   /* 浮层阴影：DSH 暗色未定义，此处为可用性必需扩展（下拉/弹窗需要脱离层叠感） */
-  --r20-shadow-float: 0 16px 40px -8px rgba(0, 0, 0, 0.8);
-  --r20-shadow-dialog: 0 24px 60px -12px rgba(0, 0, 0, 0.9);
-  --r20-overlay-scrim: rgba(0, 0, 0, 0.72);
+  --r20-shadow-float: 0 1px 0 0 rgba(255, 255, 255, 0.1) inset, 0 20px 48px -8px rgba(0, 0, 0, 0.75);
+  --r20-shadow-dialog: 0 1px 0 0 rgba(255, 255, 255, 0.12) inset, 0 24px 64px -12px rgba(0, 0, 0, 0.85);
+  --r20-overlay-scrim: rgba(0, 0, 0, 0.8);
 }
 
 /* =========================================================================
@@ -239,55 +239,54 @@
    —— 与 DSH :root 逐条一致
    ========================================================================= */
 :root[data-theme='light'] {
-  --ds-color-brand: #4d6bfe;
-  --ds-color-brand-deep: #3a65c2;
+  --ds-color-brand: #2563eb;
+  --ds-color-brand-deep: #1d4ed8;
 
-  --ds-color-text-primary: #1e232c;
-  --ds-color-text-secondary: rgba(0, 0, 0, 0.7);
-  --ds-color-text-description: rgba(0, 0, 0, 0.65);
-  --ds-color-text-placeholder: #666f7d;
-  --ds-color-text-inverse: #fff;
+  --ds-color-text-primary: #09090b;
+  --ds-color-text-secondary: #27272a;
+  --ds-color-text-description: #52525b;
+  --ds-color-text-placeholder: #71717a;
+  --ds-color-text-inverse: #ffffff;
 
-  --ds-color-bg-page: #f9f8f8;
-  --ds-color-bg-surface-1: hsla(0, 0%, 100%, 0.6);
-  --ds-color-bg-surface-2: hsla(0, 0%, 100%, 0.4);
-  --ds-color-bg-surface-3: rgba(0, 0, 0, 0.03);
-  --ds-color-bg-surface-4: rgba(0, 0, 0, 0.02);
-  --ds-color-bg-surface-5: rgba(0, 0, 0, 0.05);
-  --ds-color-bg-overlay: #fff;
-  --ds-color-bg-surface-raised: hsla(0, 0%, 100%, 0.84);
-  --ds-color-bg-hover: rgba(0, 0, 0, 0.04);
-  --ds-color-bg-input: hsla(0, 0%, 100%, 0.72);
-  --ds-color-bg-input-hover: hsla(0, 0%, 100%, 0.9);
+  --ds-color-bg-page: #f4f4f5;
+  --ds-color-bg-surface-1: #ffffff;
+  --ds-color-bg-surface-2: #eaecef;
+  --ds-color-bg-surface-3: #dfe2e6;
+  --ds-color-bg-surface-4: #cbd5e1;
+  --ds-color-bg-surface-5: #94a3b8;
+  --ds-color-bg-overlay: rgba(255, 255, 255, 0.96);
+  --ds-color-bg-surface-raised: #ffffff;
+  --ds-color-bg-hover: rgba(0, 0, 0, 0.05);
+  --ds-color-bg-input: #ffffff;
+  --ds-color-bg-input-hover: #f8fafc;
   --ds-color-bg-code: rgba(0, 0, 0, 0.05);
 
   --ds-color-border-subtle: rgba(0, 0, 0, 0.06);
-  --ds-color-border-default: rgba(0, 0, 0, 0.1);
-  --ds-color-border-divider: rgba(0, 0, 0, 0.08);
-  --ds-color-border-hover: hsla(20, 1%, 45%, 0.2);
-  --ds-color-border-strong: rgba(0, 0, 0, 0.2);
-  --ds-color-border-secondary: rgba(9, 45, 78, 0.14);
-  --ds-color-border-input: rgba(9, 45, 78, 0.16);
-  --ds-color-border-input-focus: rgba(9, 45, 78, 0.3);
+  --ds-color-border-default: rgba(0, 0, 0, 0.09);
+  --ds-color-border-divider: rgba(0, 0, 0, 0.07);
+  --ds-color-border-hover: rgba(0, 0, 0, 0.18);
+  --ds-color-border-strong: rgba(0, 0, 0, 0.25);
+  --ds-color-border-secondary: rgba(0, 0, 0, 0.08);
+  --ds-color-border-input: rgba(0, 0, 0, 0.12);
+  --ds-color-border-input-focus: #2563eb;
 
   --ds-color-scrollbar: rgba(0, 0, 0, 0.15);
 
-  --ds-btn-primary-bg: #1a1615;
-  --ds-btn-primary-text: #fff;
-  --ds-btn-primary-hover-bg: #2b2624;
-  --ds-btn-secondary-bg: #fff;
-  --ds-btn-secondary-text: #1e232c;
-  --ds-btn-secondary-border: rgba(9, 45, 78, 0.18);
-  --ds-btn-secondary-hover-bg: rgba(0, 0, 0, 0.05);
-  --ds-btn-secondary-hover-border: rgba(9, 45, 78, 0.36);
-  --ds-btn-ghost-hover-bg: rgba(0, 0, 0, 0.04);
-  --ds-btn-ghost-hover-border: hsla(20, 1%, 45%, 0.2);
+  --ds-btn-primary-bg: #09090b;
+  --ds-btn-primary-text: #ffffff;
+  --ds-btn-primary-hover-bg: #27272a;
+  --ds-btn-secondary-bg: #ffffff;
+  --ds-btn-secondary-text: #09090b;
+  --ds-btn-secondary-border: rgba(0, 0, 0, 0.12);
+  --ds-btn-secondary-hover-bg: #f4f4f5;
+  --ds-btn-secondary-hover-border: rgba(0, 0, 0, 0.22);
+  --ds-btn-ghost-hover-bg: rgba(0, 0, 0, 0.05);
+  --ds-btn-ghost-hover-border: rgba(0, 0, 0, 0.12);
 
-  --ds-shadow-card: 0 0 0 1px #f1f5f9, 0 2px 4px rgba(0, 0, 0, 0.05),
-    0 12px 24px rgba(0, 0, 0, 0.05);
-  --r20-shadow-float: 0 12px 32px -8px rgba(15, 23, 42, 0.14);
-  --r20-shadow-dialog: 0 20px 48px -12px rgba(15, 23, 42, 0.2);
-  --r20-overlay-scrim: rgba(15, 23, 42, 0.45);
+  --ds-shadow-card: 0 1px 3px rgba(0, 0, 0, 0.04), 0 4px 12px -2px rgba(0, 0, 0, 0.04);
+  --r20-shadow-float: 0 12px 32px -6px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.06);
+  --r20-shadow-dialog: 0 20px 48px -10px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.08);
+  --r20-overlay-scrim: rgba(0, 0, 0, 0.35);
 }
 
 /* =========================================================================
@@ -306,8 +305,8 @@
   --r20-warn: #e0b155;
   --r20-warn-bg: rgba(224, 177, 85, 0.12);
   --r20-warn-line: rgba(224, 177, 85, 0.3);
-  --r20-brand-bg: rgba(103, 153, 254, 0.13);
-  --r20-brand-line: rgba(103, 153, 254, 0.3);
+  --r20-brand-bg: rgba(59, 130, 246, 0.12);
+  --r20-brand-line: rgba(59, 130, 246, 0.28);
 }
 :root[data-theme='light'] {
   --r20-up: #1a7f5a;
@@ -429,16 +428,16 @@
    ========================================================================= */
 :root,
 :root[data-theme='dark'] {
-  --ds-color-bg-surface-card: #151821;
-  --ds-color-bg-surface-inset: #11131a;
-  --grad-surface: none;
-  --ds-shadow-card: 0 1px 0 0 rgba(255, 255, 255, 0.05) inset, 0 4px 16px -2px rgba(0, 0, 0, 0.4);
+  --ds-color-bg-surface-card: #18181b;
+  --ds-color-bg-surface-inset: #131315;
+  --grad-surface: linear-gradient(180deg, rgba(255, 255, 255, 0.028) 0%, rgba(255, 255, 255, 0) 100%);
+  --ds-shadow-card: 0 1px 0 0 rgba(255, 255, 255, 0.08) inset, 0 12px 32px -4px rgba(0, 0, 0, 0.55);
 }
 :root[data-theme='light'] {
   --ds-color-bg-surface-card: #ffffff;
-  --ds-color-bg-surface-inset: rgba(0, 0, 0, 0.018);
-  --grad-surface: none;
-  --ds-shadow-card: 0 1px 0 0 rgba(255, 255, 255, 0.9) inset, 0 8px 24px -6px rgba(0, 0, 0, 0.06);
+  --ds-color-bg-surface-inset: #f8f9fa;
+  --grad-surface: linear-gradient(180deg, rgba(255, 255, 255, 1) 0%, rgba(250, 250, 250, 1) 100%);
+  --ds-shadow-card: 0 1px 3px rgba(0, 0, 0, 0.04), 0 4px 12px -2px rgba(0, 0, 0, 0.04);
 }
 
 /* =========================================================================
@@ -446,15 +445,15 @@
    —— 42 个既有消费点零改动继承新外观；逐页重构时逐步迁往 --ds-* / --r20-*
    ========================================================================= */
 :root {
-  /* 画布与分层：舒适炭灰石板深色，清晰分层 */
-  --surface-0: #0d0f14;
-  --surface-header: #11131a;
-  --surface-sidebar: #11131a;
-  --surface-1: #151821;
-  --surface-2: #1c202b;
-  --surface-3: #232836;
-  --surface-head: #11131a;
-  --surface-input: #12141c;
+  /* 画布与分层：动态映射到 --ds-* 规范令牌，自适应浅色与深色主题 */
+  --surface-0: var(--ds-color-bg-page);
+  --surface-header: var(--ds-color-bg-overlay);
+  --surface-sidebar: var(--ds-color-bg-page);
+  --surface-1: var(--ds-color-bg-surface-card);
+  --surface-2: var(--ds-color-bg-surface-2);
+  --surface-3: var(--ds-color-bg-surface-3);
+  --surface-head: var(--ds-color-bg-surface-inset);
+  --surface-input: var(--ds-color-bg-input);
   --overlay-scrim: var(--r20-overlay-scrim);
 
   /* 描边 */

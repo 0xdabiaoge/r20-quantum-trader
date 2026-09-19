@@ -242,6 +242,28 @@ def load_ledger_lifecycle_trades(ledger_file, workspace_dir, autosync_enabled, r
                 inst_name = str(_t.get("inst") or _t.get("name") or "")
                 snap = match_trade_snapshot(journal_by_inst, inst_name, _t.get("open_time"), raw_side)
 
+            # 跨所台账无 journal 历史时的数理快照兜底对齐
+            if not snap:
+                inst_raw = str(_t.get("inst") or _t.get("name") or "")
+                calc_file = os.path.join(data_dir, "calculus_snapshot.json")
+                if os.path.exists(calc_file):
+                    try:
+                        with open(calc_file, "r", encoding="utf-8") as f_calc:
+                            calc_data = json.load(f_calc)
+                            for item in calc_data.get("instruments", []):
+                                if item.get("name") == inst_raw or item.get("instId") in (inst_raw, f"{inst_raw}-USDT-SWAP"):
+                                    from scripts.trader.signal_snapshot import build_signal_snapshot
+                                    f_mock = {
+                                        "name": inst_raw,
+                                        "price": float(_t.get("open_px") or _t.get("close_px") or 0.0),
+                                        "atr": 0.0,
+                                        "calculus": item.get("calculus", {})
+                                    }
+                                    snap = build_signal_snapshot(f_mock, data_dir=data_dir)
+                                    break
+                    except Exception:
+                        pass
+
             pruned = prune_snapshot(snap) if isinstance(snap, dict) else None
             if pruned:
                 _t["entry_snapshot"] = pruned

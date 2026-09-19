@@ -47,41 +47,34 @@ function pick(instId: string) {
 <template>
   <div class="space-y-3">
     <!-- 工位导航与控制顶栏 -->
-    <div
-      class="flex flex-wrap items-center justify-between gap-2 border-b pb-2.5"
-      style="border-color: var(--line-1)"
-    >
-      <div>
-        <div class="flex items-center gap-2">
-          <h1 class="text-sm font-bold tracking-tight text-[var(--ink-strong)] flex items-center gap-1.5">
-            <span class="dsh-status-dot active" aria-hidden="true" />
-            {{ t('dash.matrix.title') }}
-          </h1>
-          <span
-            class="rounded px-1.5 py-0.5 border text-3xs font-mono font-medium"
-            style="background-color: var(--surface-2); border-color: var(--line-1); color: var(--ink-2)"
-          >
-            {{ t('dash.matrix.hudProdDynamics') }}
-          </span>
-        </div>
-        <p class="text-3xs text-[var(--ink-3)] mt-0.5">
-          {{ t('dash.matrix.desc') }}
-        </p>
+    <div class="flex items-center justify-between gap-2 pt-0.5">
+      <div class="flex items-center gap-2">
+        <h1 class="text-xs font-bold tracking-tight text-[var(--ink-strong)] flex items-center gap-1.5">
+          <span class="dsh-status-dot active" aria-hidden="true" />
+          {{ t('dash.matrix.title') }}
+        </h1>
+        <span
+          class="rounded-full px-2 py-0.5 border text-3xs font-mono font-medium"
+          style="background-color: var(--surface-2); border-color: var(--line-1); color: var(--ink-2)"
+        >
+          {{ t('dash.matrix.hudProdDynamics') }}
+        </span>
+        <span class="hidden md:inline text-3xs text-[var(--ink-3)]">
+          · {{ t('dash.matrix.desc') }}
+        </span>
       </div>
 
       <!-- 模式切换控制器 -->
-      <div class="flex items-center gap-2">
-        <button type="button"
-          class="btn btn-ghost h-7 px-2.5 text-xs font-medium cursor-pointer inline-flex items-center gap-1.5 transition-colors"
-          :class="isFocusMode ? 'btn-primary' : ''"
-          :title="isFocusMode ? t('dash.matrix.focusRestoreTip') : t('dash.matrix.focusTip')"
-          @click="isFocusMode = !isFocusMode"
-        >
-          <Minimize2 v-if="isFocusMode" class="h-3.5 w-3.5" />
-          <Maximize2 v-else class="h-3.5 w-3.5" />
-          <span>{{ isFocusMode ? t('dash.matrix.focusExit') : t('dash.matrix.focusEnter') }}</span>
-        </button>
-      </div>
+      <button type="button"
+        class="btn btn-ghost h-7 px-3 text-xs font-medium cursor-pointer inline-flex items-center gap-1.5 rounded-full transition-all"
+        :class="isFocusMode ? 'btn-primary' : ''"
+        :title="isFocusMode ? t('dash.matrix.focusRestoreTip') : t('dash.matrix.focusTip')"
+        @click="isFocusMode = !isFocusMode"
+      >
+        <Minimize2 v-if="isFocusMode" class="h-3.5 w-3.5" />
+        <Maximize2 v-else class="h-3.5 w-3.5" />
+        <span>{{ isFocusMode ? t('dash.matrix.focusExit') : t('dash.matrix.focusEnter') }}</span>
+      </button>
     </div>
 
     <DataGate>

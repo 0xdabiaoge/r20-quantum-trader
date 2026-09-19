@@ -5,7 +5,7 @@ export const zhMatrix = {
 
   kpi: {
     equity: '账户总权益',
-    multiEquity: '多所组合总权益',
+    multiEquity: '多所组合资产分布',
     venuesConnected: '{n} 所接入',
     comboEquity: '组合总权益 (U)',
     comboEquityTip: '多所聚合权益',

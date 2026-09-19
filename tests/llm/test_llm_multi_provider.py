@@ -421,6 +421,54 @@ class LLMMultiProviderTests(unittest.TestCase):
         self.assertEqual(resp2.status_code, 200)
         self.assertEqual(resp2.json()["branch"], resp1.json()["branch"])
 
+    def test_legacy_id_provider_can_be_added_and_persisted(self):
+        """Regression test: User adding deepseek / openrouter must not be treated as legacy dead template."""
+        headers = self.login()
+
+        # 1. Add deepseek provider via API
+        resp = self.client.post("/api/v1/admin/llm/providers", headers=headers, json={
+            "id": "deepseek",
+            "name": "DeepSeek",
+            "base_url": "https://api.deepseek.com",
+            "api_key": "sk-deepseek-test-key",
+            "enabled": True,
+        })
+        self.assertEqual(resp.status_code, 200, resp.text)
+
+        # 2. Verify config reload preserves deepseek provider
+        cfg = llm_manager.load_llm_config()
+        p_ids = [p["id"] for p in cfg["providers"]]
+        self.assertIn("deepseek", p_ids)
+
+        # 3. Add a deepseek model under it
+        m_resp = self.client.post("/api/v1/admin/llm/models", headers=headers, json={
+            "id": "deepseek-chat",
+            "name": "DeepSeek V3",
+            "provider_id": "deepseek",
+        })
+        self.assertEqual(m_resp.status_code, 200, m_resp.text)
+
+        # 4. Verify model is persisted under deepseek provider
+        cfg2 = llm_manager.init_llm_config()
+        p_obj = next(p for p in cfg2["providers"] if p["id"] == "deepseek")
+        self.assertTrue(any(m["id"] == "deepseek-chat" for m in p_obj.get("models", [])))
+        self.assertTrue(any(m["id"] == "deepseek-chat" for m in cfg2["models"]))
+
+        # 5. Verify unseeded migration: keyless legacy template filtered, but keyed legacy preserved
+        test_file = self.temp_path / "llm_models_unseeded.json"
+        legacy_data = {
+            "providers": [
+                {"id": "siliconflow", "name": "SiliconFlow", "base_url": "https://api.siliconflow.cn", "api_key": ""},
+                {"id": "openrouter", "name": "OpenRouter", "base_url": "https://openrouter.ai/api/v1", "api_key": "sk-or-real-key"},
+            ]
+        }
+        test_file.write_text(json.dumps(legacy_data))
+        from r20_backend.llm.store import init_llm_config as _store_init_llm_config
+        unseeded_cfg = _store_init_llm_config(test_file)
+        unseeded_ids = [p["id"] for p in unseeded_cfg["providers"]]
+        self.assertNotIn("siliconflow", unseeded_ids)  # Keyless legacy filtered
+        self.assertIn("openrouter", unseeded_ids)       # Keyed legacy preserved
+
 
 if __name__ == "__main__":
     unittest.main()

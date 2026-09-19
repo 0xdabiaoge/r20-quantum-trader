@@ -14,6 +14,7 @@ import BaseSegmented from '../base/BaseSegmented.vue';
 import BaseEmpty from '../base/BaseEmpty.vue';
 import DirTag from '../base/DirTag.vue';
 import TimeAgo from '../base/TimeAgo.vue';
+import CryptoLogo from './CryptoLogo.vue';
 
 const emit = defineEmits<{ (e: 'pick-symbol', instId: string): void }>();
 
@@ -148,17 +149,18 @@ function symOf(x: { instId?: string; name?: string }): string {
             @keydown.space.prevent="emit('pick-symbol', p.instId)"
           >
             <td>
-              <div class="flex items-center gap-1 flex-wrap">
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <CryptoLogo :symbol="symOf(p)" :size="16" />
                 <span class="num font-mono font-semibold text-xs text-[var(--ink-strong)]">{{ symOf(p) }}</span>
                 <DirTag :dir="p.side" />
                 <span
-                  class="rounded px-1 py-0.5 text-3xs font-mono font-semibold uppercase border"
+                  class="rounded-full px-1.5 py-0.5 text-3xs font-mono font-semibold uppercase border"
                   :class="venueToneCls(getVenueOf(p))"
                 >
                   {{ getVenueOf(p).toUpperCase() }}
                 </span>
                 <span
-                  class="rounded px-1 py-0.5 text-3xs font-mono font-medium border"
+                  class="rounded-full px-1.5 py-0.5 text-3xs font-mono font-medium border"
                   :class="getModeOf(p) === 'LIVE' ? 'text-[var(--up)] border-[var(--up-line)] bg-[var(--up-bg)]' : 'text-[var(--warn)] border-[var(--warn-line)] bg-[var(--warn-bg)]'"
                 >
                   {{ getModeOf(p) }}
@@ -235,17 +237,18 @@ function symOf(x: { instId?: string; name?: string }): string {
             @keydown.space.prevent="emit('pick-symbol', o.instId)"
           >
             <td>
-              <div class="flex items-center gap-1 flex-wrap">
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <CryptoLogo :symbol="symOf(o)" :size="16" />
                 <span class="num font-mono font-semibold text-xs text-[var(--ink-strong)]">{{ symOf(o) }}</span>
                 <DirTag :dir="orderDir(o)" />
                 <span
-                  class="rounded px-1 py-0.5 text-3xs font-mono font-semibold uppercase border"
+                  class="rounded-full px-1.5 py-0.5 text-3xs font-mono font-semibold uppercase border"
                   :class="venueToneCls(getVenueOf(o))"
                 >
                   {{ getVenueOf(o).toUpperCase() }}
                 </span>
                 <span
-                  class="rounded px-1 py-0.5 text-3xs font-mono font-medium border"
+                  class="rounded-full px-1.5 py-0.5 text-3xs font-mono font-medium border"
                   :class="getModeOf(o) === 'LIVE' ? 'text-[var(--up)] border-[var(--up-line)] bg-[var(--up-bg)]' : 'text-[var(--warn)] border-[var(--warn-line)] bg-[var(--warn-bg)]'"
                 >
                   {{ getModeOf(o) }}

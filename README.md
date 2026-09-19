@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Release](https://img.shields.io/badge/Release-v7.9.6-blue.svg?style=flat-square)](https://github.com/555cute/r20-quantum-trader/releases/tag/v7.9.6)
+[![Release](https://img.shields.io/badge/Release-v8.0.0-blue.svg?style=flat-square)](https://github.com/555cute/r20-quantum-trader/releases/tag/v8.0.0)
 [![License](https://img.shields.io/badge/License-MIT-green.svg?style=flat-square)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg?style=flat-square)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100%2B-009688.svg?style=flat-square)](https://fastapi.tiangolo.com/)
@@ -96,7 +96,8 @@ R20 Quantum Trader 是一套面向专业交易员与量化团队打造的**多�
 ![提示词策略工作室](docs/images/v792_prompt_studio.png)
 
 - **模块自由拖拽与分层启停**：支持捕捉确定性波段、核心军规、止损防线等多模块自由排序与独立启停，交易员可随时覆写每一段 System 与 User 逻辑；
-- **标准化语义变量插槽**：内置 `{{macro_4h}}`（大周期趋势）、`{{calculus_1h}}`（微积分动能）、`{{smart_money}}`（大单资金流向）、`{{news_intelligence}}`（舆情快讯）、`{{trading_memory}}`（自进化心法）、`{{account_positions}}`（实时在管仓位）等丰富数据插槽，点击一键注入；
+- **官方双旗舰预设套件 (v8.0.0)**：出厂内置**「全维度波段强化版」**（基座默认主策略：顺势波段奔跑）与**「宽幅震荡箱体收割版」**（应对高波动箱体无序洗盘：边际高抛低吸、2.2x ATR 宽止损防插针扫损、1.5R 快锁保本），兼顾单边与震荡；
+- **标准化语义变量插槽**：内置 `{{market_regime}}`（宏观态势识别）、`{{macro_4h}}`（大周期趋势）、`{{calculus_1h}}`（微积分动能）、`{{smart_money}}`（大单资金流向）、`{{news_intelligence}}`（舆情快讯）、`{{trading_memory}}`（自进化心法）、`{{account_positions}}`（实时在管仓位）等丰富数据插槽，点击一键注入；
 - **实时组装与源码对齐**：右侧高保真预览填充底层真实行情指标后的拼接文本，排查格式一目了然；
 - **方案管理与 JSON 导入导出**：一键保存当前自定义方案、派生副本、回溯历史版本，导入弹窗具备严格的 JSON 校验门禁与防重入机制；
 - 📘 **提示词编写实战攻略**：详见 [R20 提示词编写与量化策略工程实战攻略 (PROMPT_GUIDE.md)](docs/PROMPT_GUIDE.md)。

@@ -126,32 +126,27 @@ function toggleCoinFilter(sym: string) {
 <template>
   <div class="space-y-3">
     <!-- 页头 -->
-    <div
-      class="flex flex-wrap items-center justify-between gap-2 border-b pb-2.5"
-      style="border-color: var(--line-1)"
-    >
-      <div>
-        <div class="flex items-center gap-2">
-          <h1 class="text-sm font-bold tracking-tight text-[var(--ink-strong)] flex items-center gap-1.5">
-            <Radio class="h-4 w-4 text-[var(--accent)]" />
-            {{ t('dash.news.title') }}
-          </h1>
-          <span
-            class="rounded px-1.5 py-0.5 border text-3xs font-mono font-medium"
-            style="background-color: var(--surface-2); border-color: var(--line-1); color: var(--ink-2)"
-          >
-            {{ t('dash.news.count', undefined, { n: rawNews.length }) }}
-          </span>
-          <span
-            class="rounded px-1.5 py-0.5 border text-3xs font-medium"
-            :class="macro.includes('多') ? 'text-[var(--up)] border-[var(--up-line)] bg-[var(--up-bg)]' : macro.includes('空') ? 'text-[var(--down)] border-[var(--down-line)] bg-[var(--down-bg)]' : 'text-[var(--ink-2)] border-[var(--line-1)] bg-[var(--surface-2)]'"
-          >
-            {{ macro }}
-          </span>
-        </div>
-        <p class="text-3xs text-[var(--ink-3)] mt-0.5">
-          {{ t('dash.news.desc') }}
-        </p>
+    <div class="flex items-center justify-between gap-2 pt-0.5">
+      <div class="flex items-center gap-2">
+        <h1 class="text-xs font-bold tracking-tight text-[var(--ink-strong)] flex items-center gap-1.5">
+          <Radio class="h-3.5 w-3.5 text-[var(--accent)]" />
+          {{ t('dash.news.title') }}
+        </h1>
+        <span
+          class="rounded-full px-2 py-0.5 border text-3xs font-mono font-medium"
+          style="background-color: var(--surface-2); border-color: var(--line-1); color: var(--ink-2)"
+        >
+          {{ t('dash.news.count', undefined, { n: rawNews.length }) }}
+        </span>
+        <span
+          class="rounded-full px-2 py-0.5 border text-3xs font-medium"
+          :class="macro.includes('多') ? 'text-[var(--up)] border-[var(--up-line)] bg-[var(--up-bg)]' : macro.includes('空') ? 'text-[var(--down)] border-[var(--down-line)] bg-[var(--down-bg)]' : 'text-[var(--ink-2)] border-[var(--line-1)] bg-[var(--surface-2)]'"
+        >
+          {{ macro }}
+        </span>
+        <span class="hidden md:inline text-3xs text-[var(--ink-3)]">
+          · {{ t('dash.news.desc') }}
+        </span>
       </div>
 
       <!-- 信源状态与新鲜度 -->

@@ -9,6 +9,7 @@
 |---|---|---|
 | `primitives.py` | 数学原语（`_finite` / `_ema` / `_diff` / `_normalise` / `_sign` / `_normal_cdf`）+ 4 个状态分级器 | 无 |
 | `calculate.py` | 定积分 / 概率论 / 因果微积分 / 多周期聚合（4 个 `calculate_*`） | 只依赖 `primitives` |
+| `regime.py` | 宏观态势自适应识别引擎（`detect_macro_market_regime`） | 依赖 `primitives` |
 
 依赖**单向无环**：`primitives` ← `calculate` ← 门面。
 子模块**不得**反向 import 门面（否则 `ImportError: partially initialized module`，

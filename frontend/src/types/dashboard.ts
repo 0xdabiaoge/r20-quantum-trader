@@ -197,6 +197,20 @@ export interface LLMRuntime {
   api_format: string
 }
 
+export interface MarketRegimeData {
+  regime_id: string
+  regime_name: string
+  regime_tag: string
+  trend_score: number
+  volatility_score: number
+  oscillation_score: number
+  shock_risk: boolean
+  dominant_direction: string
+  recommended_action: string
+  recommended_profile: string
+  summary_text: string
+}
+
 export interface DashboardResponse {
   timestamp: string
   is_stale: boolean
@@ -211,6 +225,7 @@ export interface DashboardResponse {
   factors: InstrumentFactor[]
   macro_assessment?: string
   llm_runtime?: LLMRuntime
+  market_regime?: MarketRegimeData
   logs: string[]
   trades: any[]
   ai_last_prompt?: string

@@ -299,6 +299,26 @@ def load_closed_trades(start_time_override: str | None = None):
                     raw_side = str(t.get("side") or t.get("direction") or "")
                     snap = t.get("signal_snapshot") or _match_snapshot(
                         journal_by_inst, inst, t.get("open_time"), raw_side)
+                    if not snap:
+                        calc_file = os.path.join(DATA_DIR, "calculus_snapshot.json")
+                        if os.path.exists(calc_file):
+                            try:
+                                with open(calc_file, "r", encoding="utf-8") as f_calc:
+                                    calc_data = json.load(f_calc)
+                                    for item in calc_data.get("instruments", []):
+                                        if item.get("name") == inst or item.get("instId") in (inst, f"{inst}-USDT-SWAP"):
+                                            from scripts.trader.signal_snapshot import build_signal_snapshot
+                                            f_mock = {
+                                                "name": inst,
+                                                "instId": f"{inst}-USDT-SWAP",
+                                                "price": float(t.get("open_px") or t.get("close_px") or 0.0),
+                                                "atr": 0.0,
+                                                "calculus": item.get("calculus", {})
+                                            }
+                                            snap = build_signal_snapshot(f_mock, data_dir=DATA_DIR)
+                                            break
+                            except Exception:
+                                pass
                     observability = classify_snapshot_observability(snap)
                     closed_trades.append({
                         "inst": inst,

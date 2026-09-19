@@ -551,7 +551,7 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
   height: 20px;
   padding: 0 8px;
   border-radius: var(--r-xs);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--ds-color-bg-hover);
   border: 1px solid var(--ds-color-border-default);
   font-size: var(--text-3xs);
   color: var(--ds-color-text-description);
@@ -563,7 +563,7 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
   gap: 6px;
   padding: 4px 12px;
   border-radius: var(--r-ctl);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--ds-color-bg-hover);
   border: 1px solid var(--ds-color-border-default);
   color: var(--ds-color-text-secondary);
   font-size: var(--text-xs);
@@ -578,9 +578,9 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
   cursor: not-allowed;
 }
 .ov-btn-refresh:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.08);
-  color: #fff;
-  border-color: rgba(255, 255, 255, 0.2);
+  background: var(--ds-color-bg-hover);
+  color: var(--ds-color-text-primary);
+  border-color: var(--ds-color-border-hover);
 }
 
 /* 报错恢复 */
@@ -616,10 +616,10 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
 .ov-hud {
   display: grid;
   grid-template-columns: 1fr;
-  gap: var(--ds-space-4);
+  gap: var(--ds-space-3);
 }
 @media (min-width: 640px) {
-  .ov-hud { grid-template-columns: repeat(2, 1fr); }
+  .ov-hud { grid-template-columns: repeat(2, 1fr); gap: var(--ds-space-4); }
 }
 @media (min-width: 1200px) {
   .ov-hud { grid-template-columns: repeat(4, 1fr); }
@@ -629,21 +629,27 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  min-height: 128px;
-  padding: var(--ds-space-4) var(--sp-8);
+  min-height: 104px;
+  padding: var(--ds-space-3) var(--ds-space-4);
   border-radius: var(--r-card);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.01) 100%), rgba(14, 17, 24, 0.72);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 1px 0 0 rgba(255, 255, 255, 0.07) inset, 0 8px 24px -6px rgba(0, 0, 0, 0.45);
+  background: var(--ds-color-bg-surface-card);
+  border: 1px solid var(--ds-color-border-default);
+  box-shadow: var(--shadow-card);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   transition: all var(--dur-fast) var(--ease-out);
   text-decoration: none;
   color: inherit;
 }
+@media (min-width: 640px) {
+  .ov-hud-card {
+    min-height: 124px;
+    padding: var(--ds-space-4) var(--sp-8);
+  }
+}
 .ov-hud-card.is-interactive:hover {
-  border-color: rgba(103, 153, 254, 0.35);
-  box-shadow: 0 1px 0 0 rgba(255, 255, 255, 0.12) inset, 0 12px 32px -8px rgba(0, 0, 0, 0.6);
+  border-color: var(--ds-color-brand);
+  box-shadow: var(--shadow-float);
   transform: translateY(-1px);
 }
 
@@ -698,13 +704,18 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
 }
 
 .ov-hud-body {
-  margin: 12px 0 8px;
+  margin: 6px 0;
+}
+@media (min-width: 640px) {
+  .ov-hud-body {
+    margin: 12px 0 8px;
+  }
 }
 .ov-hud-val {
   /* 批 28：16px 不在字阶上（档位是 15 / 18），落到 lg。 */
   font-size: var(--text-lg);
   font-weight: 600;
-  color: #fff;
+  color: var(--ds-color-text-primary);
   letter-spacing: -0.01em;
   line-height: 1.3;
 }
@@ -727,10 +738,10 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
   height: 20px;
   font-size: var(--text-3xs);
   color: var(--ds-color-text-placeholder);
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--ds-color-bg-hover);
   padding: 0 8px;
-  border-radius: var(--r-xs);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: var(--r-pill);
+  border: 1px solid var(--ds-color-border-subtle);
 }
 
 .pulse-dot {
@@ -836,7 +847,7 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
 .ov-sym-chip {
   font-size: var(--text-xs);
   font-weight: 600;
-  color: #fff;
+  color: var(--ds-color-text-primary);
   letter-spacing: 0.02em;
 }
 .ov-sym-market {
@@ -870,9 +881,9 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
   border: 1px solid var(--down-line);
 }
 .ov-act-tag.is-wait {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--surface-2);
   color: var(--ds-color-text-description);
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  border: 1px solid var(--line-1);
 }
 
 .ov-stream-gauge {
@@ -884,7 +895,7 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
   flex: 1;
   height: 4px;
   border-radius: var(--r-pill);
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--surface-2);
   overflow: hidden;
 }
 .ov-gauge-fill {
@@ -1028,7 +1039,7 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
   display: grid;
   grid-template-columns: 1fr;
   gap: 1px;
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--line-1);
 }
 @media (min-width: 480px) {
   .ov-nav-grid { grid-template-columns: repeat(2, 1fr); }
@@ -1038,13 +1049,13 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
   align-items: center;
   gap: 10px;
   padding: var(--sp-6) var(--ds-space-4);
-  background: rgba(15, 18, 25, 0.7);
+  background: var(--surface-1);
   text-decoration: none;
   color: inherit;
   transition: all var(--dur-fast) var(--ease-out);
 }
 .ov-nav-tile:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--ds-color-bg-hover);
 }
 .ov-nt-icon {
   display: flex;
@@ -1053,14 +1064,15 @@ function parseAuditContext(action: string, detail: any): { label: string; tag: s
   width: 28px;
   height: 28px;
   border-radius: var(--r-xs);
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--surface-2);
+  border: 1px solid var(--line-1);
   color: var(--ds-color-brand);
   flex-shrink: 0;
 }
 .ov-nav-tile:hover .ov-nt-icon {
-  background: rgba(103, 153, 254, 0.12);
-  border-color: rgba(103, 153, 254, 0.3);
+  background: var(--ds-color-brand);
+  color: #fff;
+  border-color: var(--ds-color-brand);
 }
 .ov-nt-content {
   min-width: 0;

@@ -274,9 +274,9 @@ def update_factor_library() -> Dict[str, Any]:
     #    双源均不可用时保持空池 → 优雅缺失化 available=False
     try:
         try:
-            from smart_money import fetch_smart_money_pool
-        except ImportError:
             from scripts.factors.smart_money import fetch_smart_money_pool
+        except ImportError:
+            from factors.smart_money import fetch_smart_money_pool
         smart_money_pool = fetch_smart_money_pool(TARGET_INSTRUMENTS)
     except Exception as e:
         print(f"[Factor Library] SmartMoney pool fetch fallback: {e}")

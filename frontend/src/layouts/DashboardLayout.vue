@@ -188,11 +188,11 @@ const venueHealth = computed(() => {
           v-for="tab in publicTabs"
           :key="tab.key"
           type="button"
-          class="w-full flex items-center gap-2.5 rounded px-2.5 py-2 text-xs font-medium cursor-pointer transition-colors"
+          class="w-full flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium cursor-pointer transition-all"
           :class="
             activeTab === tab.key
-              ? 'bg-[var(--surface-3)] text-[var(--ink-strong)] font-semibold'
-              : 'text-[var(--ink-2)] hover:bg-[var(--surface-2)] hover:text-[var(--ink-1)]'
+              ? 'bg-[var(--surface-3)] text-[var(--ink-strong)] font-semibold border border-[var(--line-2)] shadow-xs'
+              : 'text-[var(--ink-2)] hover:bg-[var(--surface-2)] hover:text-[var(--ink-1)] border border-transparent'
           "
           :title="navCompact ? t(tab.labelKey) : undefined"
           :aria-current="activeTab === tab.key ? 'page' : undefined"
@@ -216,7 +216,7 @@ const venueHealth = computed(() => {
         </div>
 
         <button type="button"
-          class="w-full flex items-center gap-2.5 rounded px-2.5 py-2 text-xs font-medium text-[var(--ink-2)] hover:bg-[var(--surface-2)] hover:text-[var(--ink-1)] cursor-pointer transition-colors"
+          class="w-full flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium text-[var(--ink-2)] hover:bg-[var(--surface-2)] hover:text-[var(--ink-1)] border border-transparent cursor-pointer transition-all"
           :title="navCompact ? t('dash.shell.nav.docsTitle') : undefined"
           :aria-current="route.path === '/docs' ? 'page' : undefined"
           @click="go('/docs')"

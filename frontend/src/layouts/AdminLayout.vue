@@ -21,9 +21,12 @@ import {
   X,
   LogOut,
   MonitorPlay,
+  Sun,
+  Moon,
 } from 'lucide-vue-next';
 import { useAuthStore } from '../stores/auth';
 import { useI18n } from '../composables/useI18n';
+import { useTheme } from '../composables/useTheme';
 import { useLocalStorage } from '../composables/useLocalStorage';
 import { adminGroups } from '../config/nav';
 import { APP_VERSION } from '../config/version';
@@ -37,6 +40,7 @@ useRouteFocus();
 const router = useRouter();
 const auth = useAuthStore();
 const { t } = useI18n();
+const { theme, toggleTheme } = useTheme();
 
 const collapsed = useLocalStorage('r20_admin_sidebar', false);
 const drawerOpen = ref(false);
@@ -165,7 +169,7 @@ watch(() => route.path, () => (drawerOpen.value = false));
         <nav class="wb-crumbs" aria-label="Breadcrumb">
           <span class="wb-crumb-root">{{ t('admin.shell.breadcrumbRoot') }}</span>
           <template v-if="currentMeta">
-            <span class="wb-crumb-sep">/</span>
+            <span class="wb-crumb-sep sm:inline hidden">/</span>
             <span class="wb-crumb-dim">{{ t(currentMeta.group.labelKey) }}</span>
             <span class="wb-crumb-sep">/</span>
             <span class="wb-crumb-cur">
@@ -177,6 +181,11 @@ watch(() => route.path, () => (drawerOpen.value = false));
 
         <div class="wb-topbar-right">
           <BeijingClock class="wb-clock" />
+
+          <button type="button" class="wb-icon-btn" :title="t('nav.actions.theme')" :aria-label="t('nav.actions.theme')" @click="toggleTheme">
+            <Sun v-if="theme === 'dark'" :size="15" />
+            <Moon v-else :size="15" />
+          </button>
 
           <button type="button" class="wb-icon-btn" :title="t('nav.actions.backToScreen')" @click="router.push('/')">
             <MonitorPlay :size="15" />
@@ -252,7 +261,7 @@ watch(() => route.path, () => (drawerOpen.value = false));
   flex-shrink: 0;
   width: var(--w-sidebar);
   border-right: 1px solid var(--ds-color-border-default);
-  background-color: rgba(9, 11, 16, 0.85);
+  background-color: var(--surface-sidebar);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   transition: width var(--dur-base) var(--ease-out);
@@ -359,11 +368,11 @@ watch(() => route.path, () => (drawerOpen.value = false));
   color: var(--ds-color-text-primary);
 }
 .wb-item.is-active {
-  background-color: rgba(103, 153, 254, 0.12);
-  color: #fff;
-  font-weight: 500;
-  border: 1px solid rgba(103, 153, 254, 0.25);
-  box-shadow: 0 0 14px -3px rgba(103, 153, 254, 0.2);
+  background-color: var(--ds-color-bg-hover);
+  color: var(--ds-color-text-primary);
+  font-weight: 600;
+  border: 1px solid var(--ds-color-border-hover);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
 }
 .wb-item-icon {
   flex-shrink: 0;
@@ -437,7 +446,7 @@ watch(() => route.path, () => (drawerOpen.value = false));
   height: var(--h-topbar);
   padding: 0 var(--ds-space-3);
   border-bottom: 1px solid var(--ds-color-border-default);
-  background-color: rgba(9, 11, 16, 0.75);
+  background-color: var(--surface-header);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   flex-shrink: 0;

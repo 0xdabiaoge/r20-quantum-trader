@@ -114,8 +114,8 @@ console.log('roleColorOf / roleIconKeyOf:');
 console.log('DATA_SLOTS:');
 {
   const ks = M.DATA_SLOTS.map(s => s.k);
-  eq('8 个槽位', M.DATA_SLOTS.length, 8);
-  eq('顺序与取值', ks, ['market_matrix', 'account_balance', 'account_positions',
+  eq('9 个槽位', M.DATA_SLOTS.length, 9);
+  eq('顺序与取值', ks, ['market_regime', 'market_matrix', 'account_balance', 'account_positions',
                         'pending_orders', 'risk_budget', 'active_instruments',
                         'news_intelligence', 'trading_memory']);
   eq('无重复', new Set(ks).size, ks.length);

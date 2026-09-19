@@ -215,10 +215,24 @@ class GateAdapter(BaseExchangeAdapter):
             "contract": self.native_symbol(symbol), "interval": "1h", "limit": 1,
         })
         rows = data if isinstance(data, list) else []
+        if not rows:
+            try:
+                resp = self.get_session().get(
+                    "https://api.gateio.ws/api/v4/futures/usdt/contract_stats",
+                    params={"contract": self.native_symbol(symbol), "interval": "1h", "limit": 1},
+                    timeout=4.0,
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    rows = data if isinstance(data, list) else []
+            except Exception:
+                pass
         if rows:
             try:
                 v = rows[-1].get("top_lsr_size")
-                return float(v) if v is not None else None
+                if v is None or float(v) <= 0:
+                    v = rows[-1].get("lsr_account")
+                return float(v) if v is not None and float(v) > 0 else None
             except (TypeError, ValueError):
                 return None
         return None

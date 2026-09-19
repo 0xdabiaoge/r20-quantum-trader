@@ -176,7 +176,7 @@ async function handleLogin() {
   justify-content: center;
   min-height: 100vh;
   padding: 24px;
-  background-color: #0b0c10;
+  background: radial-gradient(ellipse 80% 50% at 50% 25%, rgba(120, 119, 198, 0.12) 0%, rgba(0, 0, 0, 0) 70%), var(--ds-color-bg-page);
   overflow: hidden;
 }
 
@@ -206,9 +206,9 @@ async function handleLogin() {
   transition: all var(--dur-fast) var(--ease-out);
 }
 .auth-back-btn:hover {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.1);
-  color: #fff;
+  background: var(--ds-color-bg-hover);
+  border-color: var(--ds-color-border-hover);
+  color: var(--ds-color-text-primary);
 }
 
 .auth-lang-pill {
@@ -216,8 +216,8 @@ async function handleLogin() {
   align-items: center;
   padding: var(--sp-1) var(--sp-4);
   border-radius: var(--r-pill);
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--surface-2);
+  border: 1px solid var(--line-1);
 }
 .auth-lang-opt {
   border: 0;
@@ -235,7 +235,7 @@ async function handleLogin() {
 }
 .auth-lang-opt:hover {
   color: var(--ds-color-text-secondary);
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--ds-color-bg-hover);
 }
 .auth-lang-opt.is-active {
   color: var(--ds-color-text-primary);
@@ -245,7 +245,7 @@ async function handleLogin() {
   width: 1px;
   height: 10px;
   margin: 0 4px;
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--line-1);
 }
 
 /* 卡片本体 */
@@ -255,9 +255,11 @@ async function handleLogin() {
      是全站唯一的 14px 圆角。登录卡也是「卡片」，收敛到 `--r-card`(10px)，
      与其余 9 处卡片一致。⚠️ 这是本批唯一的**可见变化**（卡片圆角 14px→10px）。 */
   border-radius: var(--r-card);
-  background-color: #12141a;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 4px 24px -2px rgba(0, 0, 0, 0.5);
+  background: var(--ds-color-bg-surface-card);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid var(--ds-color-border-default);
+  box-shadow: var(--shadow-card);
 }
 
 /* 头部品牌 */
@@ -269,17 +271,17 @@ async function handleLogin() {
   margin-bottom: 24px;
 }
 .auth-logo-box {
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   /* 批 94：10px 就是 `--r-card` 的值，改用令牌（渲染完全相同）。 */
   border-radius: var(--r-card);
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   margin-bottom: 12px;
-  box-shadow: 0 0 16px -2px rgba(103, 153, 254, 0.2);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
 }
 .auth-logo {
   width: 22px;
@@ -289,7 +291,7 @@ async function handleLogin() {
   font-size: var(--text-xl);
   font-weight: 600;
   letter-spacing: -0.01em;
-  color: #fff;
+  color: var(--ds-color-text-primary);
   margin: 0;
 }
 .auth-subtitle {
@@ -304,7 +306,7 @@ async function handleLogin() {
   font-size: var(--text-4xs);
   padding: var(--sp-hair) var(--sp-2);
   border-radius: var(--r-xs);
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--surface-2);
   color: var(--ds-color-text-placeholder);
 }
 
@@ -349,17 +351,17 @@ async function handleLogin() {
   height: 38px;
   padding: 0 12px;
   border-radius: var(--r-ctl);
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  color: #fff;
+  background: var(--ds-color-bg-input);
+  border: 1px solid var(--ds-color-border-input);
+  color: var(--ds-color-text-primary);
   font-size: var(--text-xs);
   outline: none;
   transition: all var(--dur-fast) var(--ease-out);
 }
 .auth-input:focus {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(103, 153, 254, 0.5);
-  box-shadow: 0 0 0 3px rgba(103, 153, 254, 0.15);
+  background: var(--ds-color-bg-input);
+  border-color: var(--ds-color-border-input-focus);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
 }
 .auth-input::placeholder {
   color: var(--ds-color-text-placeholder);
@@ -403,21 +405,22 @@ async function handleLogin() {
   justify-content: center;
   gap: 8px;
   width: 100%;
-  height: 38px;
+  height: 40px;
   margin-top: 8px;
   border-radius: var(--r-ctl);
-  background: #ffffff;
-  border: 1px solid #ffffff;
-  color: #07090e;
+  background: var(--ds-btn-primary-bg);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  color: var(--ds-btn-primary-text);
   font-size: var(--text-xs);
   font-weight: 600;
   cursor: pointer;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2), 0 4px 14px rgba(255, 255, 255, 0.12);
   transition: all var(--dur-fast) var(--ease-out);
 }
 .auth-submit-btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 0 16px -2px rgba(255, 255, 255, 0.35);
+  background: var(--ds-btn-primary-hover-bg);
+  border-color: var(--ds-btn-primary-hover-bg);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3), 0 6px 20px rgba(255, 255, 255, 0.22);
   transform: translateY(-1px);
 }
 .auth-submit-btn:disabled {
@@ -433,7 +436,7 @@ async function handleLogin() {
   gap: 6px;
   margin-top: 20px;
   padding-top: var(--sp-6);
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  border-top: 1px solid var(--line-1);
   font-size: var(--text-4xs);
   color: var(--ds-color-text-placeholder);
   line-height: 1.4;
@@ -448,10 +451,14 @@ async function handleLogin() {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 8px;
+  padding: var(--sp-3) var(--sp-7);
+  border-radius: var(--r-pill);
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.06);
   font-size: var(--text-4xs);
-  letter-spacing: 0.04em;
-  color: rgba(255, 255, 255, 0.3);
+  letter-spacing: 0.05em;
+  color: var(--ds-color-text-description);
 }
 .auth-meta-dot {
   width: 5px;

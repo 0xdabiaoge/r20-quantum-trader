@@ -108,10 +108,7 @@ onMounted(async () => {
           <Layers class="h-3.5 w-3.5 text-[var(--accent)]" />
           {{ t('dash.matrix.kpi.multiEquity') }}
         </span>
-        <!-- 批 83：原为 `$ {{ … }} U` —— `$` 与后缀 `U` 同时表示币种，冗余。
-             全站约定是后缀 ` U`（FactorDrawer / LedgerDrawer 同款），同组件 KPI 单元
-             也用 `(U)` 标签，故去掉 `$`。 -->
-        <span class="font-mono font-semibold" style="color: var(--ink-1)">{{ totalAggregatedEquity }} U</span>
+        <span class="hidden md:inline font-mono font-semibold" style="color: var(--ink-1)">{{ totalAggregatedEquity }} U</span>
         <span
           class="rounded px-1.5 py-0.5 border text-3xs font-mono"
           style="background-color: var(--surface-2); border-color: var(--line-1); color: var(--ink-2)"
@@ -141,8 +138,8 @@ onMounted(async () => {
     </header>
 
     <!-- 6 个核心指标单元格 -->
-    <div class="grid grid-cols-2 gap-px bg-white/[0.04] sm:grid-cols-3 xl:grid-cols-6">
-      <div class="bg-black/20 p-3.5 flex flex-col justify-between">
+    <div class="grid grid-cols-2 gap-px bg-[var(--line-1)] sm:grid-cols-3 xl:grid-cols-6">
+      <div class="bg-[var(--surface-1)] hover:bg-[var(--surface-2)] transition-colors flex flex-col justify-between">
         <BaseStat
           :label="t('dash.matrix.kpi.comboEquity')"
           :value="totalAggregatedEquity"
@@ -159,7 +156,7 @@ onMounted(async () => {
         </BaseStat>
       </div>
 
-      <div class="bg-black/20 p-3.5 flex flex-col justify-between">
+      <div class="bg-[var(--surface-1)] hover:bg-[var(--surface-2)] transition-colors flex flex-col justify-between">
         <BaseStat
           :label="t('dash.matrix.kpi.todayPnl')"
           :value="fmtSigned(todayNet)"
@@ -169,7 +166,7 @@ onMounted(async () => {
         />
       </div>
 
-      <div class="bg-black/20 p-3.5 flex flex-col justify-between">
+      <div class="bg-[var(--surface-1)] hover:bg-[var(--surface-2)] transition-colors flex flex-col justify-between">
         <BaseStat
           :label="t('dash.matrix.kpi.floatPnl')"
           :value="fmtSigned(floatPnl)"
@@ -179,7 +176,7 @@ onMounted(async () => {
         />
       </div>
 
-      <div class="bg-black/20 p-3.5 flex flex-col justify-between">
+      <div class="bg-[var(--surface-1)] hover:bg-[var(--surface-2)] transition-colors flex flex-col justify-between">
         <BaseStat
           :label="t('dash.matrix.kpi.ls')"
           :value="`${longCount} / ${shortCount}`"
@@ -187,7 +184,7 @@ onMounted(async () => {
         />
       </div>
 
-      <div class="bg-black/20 p-3.5 flex flex-col justify-between">
+      <div class="bg-[var(--surface-1)] hover:bg-[var(--surface-2)] transition-colors flex flex-col justify-between">
         <BaseStat
           :label="t('dash.matrix.kpi.margin')"
           :value="`${fmtNum(marginUsage, 1)}%`"
@@ -197,7 +194,7 @@ onMounted(async () => {
         />
       </div>
 
-      <div class="bg-black/20 p-3.5 flex flex-col justify-between">
+      <div class="bg-[var(--surface-1)] hover:bg-[var(--surface-2)] transition-colors flex flex-col justify-between">
         <BaseStat
           :label="t('dash.matrix.kpi.oco')"
           :value="`${ocoCoverage.pct}%`"

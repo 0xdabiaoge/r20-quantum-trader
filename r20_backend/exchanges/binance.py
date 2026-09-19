@@ -176,6 +176,17 @@ class BinanceAdapter(BinanceAlgoRequestsMixin, BaseExchangeAdapter):
         data = self._public_get("/futures/data/topLongShortPositionRatio", {
             "symbol": self.native_symbol(symbol), "period": "1h", "limit": 1,
         })
+        if not (isinstance(data, list) and data):
+            try:
+                resp = self.get_session().get(
+                    "https://fapi.binance.com/futures/data/topLongShortPositionRatio",
+                    params={"symbol": self.native_symbol(symbol), "period": "1h", "limit": 1},
+                    timeout=4.0,
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+            except Exception:
+                pass
         if isinstance(data, list) and data:
             try:
                 return float(data[-1].get("longShortRatio"))

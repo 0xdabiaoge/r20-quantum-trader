@@ -76,6 +76,13 @@ TEMPLATE_VARIABLES_METADATA = [
         "sample": "# R20 AI 交易大脑长期记忆与启发式心法\n1. [2026-09-04] 4H主升浪中回调即是做多机会，严禁盲目摸顶开空...",
     },
     {
+        "key": "market_regime",
+        "label": "全市场宏观体制",
+        "category": "行情数据",
+        "description": "注入全市场宏观体制自适应识别结果（单边趋势/宽幅震荡/窄幅低波/极端冲击、趋势强度、波动与震荡指数、操盘指导建议）",
+        "sample": "【市场体制自适应识别】: 当前全市场宏观体制为【宽幅上下震荡】(高波动箱体 · 逆势防扫)。\n- 核心量化指标: 趋势强度=38.5/100 | 波动指数=76.2/100 | 震荡指数=82.0/100 | 主导方向=NEUTRAL\n- 操盘指导建议: 处于宽幅上下震荡箱体，建议箱体边界高抛低吸，拉宽止损至 2.0x ATR 防插针扫损，浮盈达 1.5R 及时保本或锁利。",
+    },
+    {
         "key": "market_matrix",
         "label": "标的行情数理矩阵",
         "category": "行情数据",
@@ -286,6 +293,67 @@ PRESETS: dict[str, dict[str, Any]] = {
 6. 形态确立且 R:R≥2.0 时，自信给出 78%~88% 置信度果断开单！""",
         "evolution_system": """【全维度波段复盘风格】\n优先识别回撤、过度交易、追价和低质量入场，但只使用真实可观测证据。小样本、数理快照缺失或因果不可辨时 NO_CHANGE；任何记忆都不得成为绕过硬风控的新阈值。""",
         "evolution_user": """【全维度波段进化任务】\n评估信号一致性、风险预算、手续费、入场与退出质量；只有多个独立样本支持时才沉淀新经验，否则保留旧记忆并提出需要补充的证据。""",
+    },
+    "wide_oscillation": {
+        "id": "wide_oscillation", "name": "宽幅震荡箱体收割版", "description": "专为宽幅上下震荡与高波动无序箱体量身定制：箱体边际高抛低吸、拉宽止损隔绝假突破与插针扫损、严禁半山腰追价、浮盈1.5R稳固即保本锁定。", "editable": True,
+        "editor_mode": "modules",
+        "pipelines": {
+            "trading_system": [
+                {"id": "custom-ts-wide-style", "title": "宽幅震荡箱体收割风格", "locked": False, "enabled": True, "source": "custom",
+                 "content": "【交易风格：宽幅震荡箱体收割（高波动箱体·边际高抛低吸·2.2x宽止损防插针·1.5R快锁保本）】\n所有 P0 硬约束保持不变。宽幅震荡行情核心在于箱体边际定价与防插针保护：严禁在箱体正中间（半山腰）追涨杀跌！开仓仅限于 1H/4H 箱体上轨阻力位承压做空，或箱体下轨支撑位企稳做多；止损给足 2.0~2.5x 1H ATR 宽阔空间并置于近期箱体摆动极值外，彻底杜绝日内假突破影线插针频繁扫损；箱体行情主浪空间受限，浮盈达 1.5R 稳固波段必须果断输出 UPDATE_SL 移至开仓成本保本位，锁死胜率，触及箱体对边或动能衰竭时主动锁利，杜绝浮盈变亏损；多空双向平权，形态触及箱体边际且盈亏比合规时，自信评定 78%~86% 果断挂单！"},
+            ],
+            "trading_user": [
+                {"id": "base-ts-time", "title": "当前决策时间戳与市场时效", "locked": True, "enabled": True, "source": "base",
+                 "content": "======================= 【当前决策时间戳与市场时效】 =======================\n{{decision_timestamp}}\n{{account_balance}}\n{{risk_budget}}"},
+                {"id": "base-ts-regime", "title": "全市场宏观体制自适应识别", "locked": True, "enabled": True, "source": "base",
+                 "content": "======================= 【全市场宏观体制自适应识别】 =======================\n{{market_regime}}"},
+                {"id": "base-ts-news", "title": "全网实时重大快讯与宏观情报", "locked": True, "enabled": True, "source": "base",
+                 "content": "======================= 【全网实时重大快讯与宏观情报】 =======================\n{{news_intelligence}}"},
+                {"id": "base-ts-pos", "title": "账户当前持仓与风险敞口全景", "locked": True, "enabled": True, "source": "base",
+                 "content": "======================= 【账户当前持仓与风险敞口全景】 =======================\n{{account_positions}}"},
+                {"id": "base-ts-pending", "title": "在途未成交限价挂单 (Pending Maker Orders)", "locked": True, "enabled": True, "source": "base",
+                 "content": "======================= 【在途未成交限价挂单 (Pending Maker Orders)】 =======================\n{{pending_orders}}"},
+                {"id": "base-ts-memory", "title": "R20 启发式实战认知与长期记忆", "locked": True, "enabled": True, "source": "base",
+                 "content": "======================= 【R20 启发式实战认知与长期记忆】 =======================\n{{trading_memory}}"},
+                {"id": "base-ts-matrix", "title": "全标的池原生行情、技术指标与筹码矩阵", "locked": True, "enabled": True, "source": "base",
+                 "content": "======================= 【全标的池原生行情、技术指标与筹码矩阵】 =======================\n{{market_matrix}}"},
+                {"id": "base-ts-task", "title": "推演与决策任务", "locked": False, "enabled": True, "source": "base", "content": ""},
+                {"id": "custom-tu-wide-style", "title": "宽幅震荡箱体裁决偏好（箱体边界定位·动能耗散逆转·拉宽呼吸·快锁胜率）", "locked": False, "enabled": True, "source": "custom",
+                 "content": "【宽幅震荡箱体裁决偏好（箱体边界定位·动能耗散逆转·拉宽呼吸·快锁胜率）】\n1. 箱体边缘入场原则：坚决拒绝在震荡区间正中央追多或追空。唯有当价格触及 4H/1H 箱体上轨承压（v 减速且 a < 0）挂限价做空，触及箱体下轨企稳（v 企稳且 a > 0）挂限价做多；\n2. 防插针宽止损体系：止损距离必须给足 2.0~2.5x 1H ATR，严密挂在近期箱体摆动极值点外侧，绝不在正常箱体震荡回抽中惊慌割肉；\n3. 阶梯式锁利防坐过山车：浮盈达 1.5R 稳固波段立即输出 UPDATE_SL 提损保本；价格接近箱体反向阻力位/支撑位时果断分批止盈退出，拒绝利润回吐；\n4. 动能反转微积分硬验证：重点参考一阶速度减速与加速度符号变向（如冲顶出现 v > 0 但 a < -0.10，探底出现 v < 0 但 a > 0.10），确认箱体动力学反转确立；\n5. 敞口自律防假突破：全账户同向在管持仓限制在 2 笔以内，防范假突破演变为单边异动踩踏；\n6. 边际形态达标且盈亏比满足要求时，自信给出 78%~86% 置信度果断开单！"},
+            ],
+            "evolution_system": [
+                {"id": "custom-es-wide-style", "title": "宽幅震荡复盘风格", "locked": False, "enabled": True, "source": "custom",
+                 "content": "【宽幅震荡复盘风格】\n重点排查半山腰盲目追价、止损空间过窄导致的假动作插针扫损、以及盈利后未及时移损导致的利润回吐。小样本、数理快照缺失或因果不可辨时 NO_CHANGE；任何记忆都不得成为绕过硬风控的新阈值。"},
+            ],
+            "evolution_user": [
+                {"id": "base-eu-time-hdr", "title": "当前认知复盘基准时间", "locked": True, "enabled": True, "source": "base",
+                 "content": "======================= 【当前认知复盘基准时间】 ======================="},
+                {"id": "base-eu-time", "title": "复盘基准时间", "locked": False, "enabled": True, "source": "base",
+                 "content": "【复盘基准时间】: {{timestamp_beijing}}"},
+                {"id": "base-eu-mem", "title": "当前系统已有的历史长期记忆库", "locked": True, "enabled": True, "source": "base",
+                 "content": "======================= 【当前系统已有的历史长期记忆库】 =======================\n{{existing_memory_markdown}}"},
+                {"id": "base-eu-ledger-hdr", "title": "R20 加密量化实盘战绩与历史交易台账", "locked": True, "enabled": True, "source": "base",
+                 "content": "======================= 【R20 加密量化实盘战绩与历史交易台账】 ======================="},
+                {"id": "base-eu-stats", "title": "统计汇总", "locked": False, "enabled": True, "source": "base",
+                 "content": "【统计汇总】:\n- 总平仓笔数: {{total}} 笔（胜 {{wins}} / 负 {{losses}} | 胜率 {{win_rate}}%）\n- 累计净盈亏: {{total_net}} USDT | 累计手续费: {{total_fees}} USDT\n- 当前聚焦标的池: {{target_instruments}}"},
+                {"id": "base-eu-trades", "title": "逐笔历史交易明细 (按时间排序)", "locked": False, "enabled": True, "source": "base",
+                 "content": "【逐笔历史交易明细】:\n{{closed_trades_json}}"},
+                {"id": "base-eu-task", "title": "复盘与长期记忆进化任务", "locked": False, "enabled": True, "source": "base",
+                 "content": "【复盘与长期记忆进化任务】:\n严格基于可观测台账证据复盘；没有交易发生时的微积分、定积分、概率与 VaR/CVaR 快照时，必须标记“数理快照不可观测”，不得事后编造。证据不足时输出 NO_CHANGE 并保留现有记忆。输出 change_status、diagnosis_insights、evolution_actions、ai_long_term_memory、memory_overwrites_reason 的严格 JSON。"},
+                {"id": "custom-eu-wide-task", "title": "宽幅震荡进化任务", "locked": False, "enabled": True, "source": "custom",
+                 "content": "【宽幅震荡进化任务】\n评估震荡区间识别准确度、箱体边际入场质量、止损抗插针有效性与手续费磨损；只有多个独立样本支持时才沉淀新经验，否则保留旧记忆并提出需要补充的证据。"},
+            ],
+        },
+        "trading_system": """【交易风格：宽幅震荡箱体收割（高波动箱体·边际高抛低吸·2.2x宽止损防插针·1.5R快锁保本）】\n所有 P0 硬约束保持不变。宽幅震荡行情核心在于箱体边际定价与防插针保护：严禁在箱体正中间（半山腰）追涨杀跌！开仓仅限于 1H/4H 箱体上轨阻力位承压做空，或箱体下轨支撑位企稳做多；止损给足 2.0~2.5x 1H ATR 宽阔空间并置于近期箱体摆动极值外，彻底杜绝日内假突破影线插针频繁扫损；箱体行情主浪空间受限，浮盈达 1.5R 稳固波段必须果断输出 UPDATE_SL 移至开仓成本保本位，锁死胜率，触及箱体对边或动能衰竭时主动锁利，杜绝浮盈变亏损；多空双向平权，形态触及箱体边际且盈亏比合规时，自信评定 78%~86% 果断挂单！""",
+        "trading_user": """【宽幅震荡箱体裁决偏好（箱体边界定位·动能耗散逆转·拉宽呼吸·快锁胜率）】
+1. 箱体边缘入场原则：坚决拒绝在震荡区间正中央追多或追空。唯有当价格触及 4H/1H 箱体上轨承压（v 减速且 a < 0）挂限价做空，触及箱体下轨企稳（v 企稳且 a > 0）挂限价做多；
+2. 防插针宽止损体系：止损距离必须给足 2.0~2.5x 1H ATR，严密挂在近期箱体摆动极值点外侧，绝不在正常箱体震荡回抽中惊慌割肉；
+3. 阶梯式锁利防坐过山车：浮盈达 1.5R 稳固波段立即输出 UPDATE_SL 提损保本；价格接近箱体反向阻力位/支撑位时果断分批止盈退出，拒绝利润回吐；
+4. 动能反转微积分硬验证：重点参考一阶速度减速与加速度符号变向（如冲顶出现 v > 0 但 a < -0.10，探底出现 v < 0 但 a > 0.10），确认箱体动力学反转确立；
+5. 敞口自律防假突破：全账户同向在管持仓限制在 2 笔以内，防范假突破演变为单边异动踩踏；
+6. 边际形态达标且盈亏比满足要求时，自信给出 78%~86% 置信度果断开单！""",
+        "evolution_system": """【宽幅震荡复盘风格】\n重点排查半山腰盲目追价、止损空间过窄导致的假动作插针扫损、以及盈利后未及时移损导致的利润回吐。小样本、数理快照缺失或因果不可辨时 NO_CHANGE；任何记忆都不得成为绕过硬风控的新阈值。""",
+        "evolution_user": """【宽幅震荡进化任务】\n评估震荡区间识别准确度、箱体边际入场质量、止损抗插针有效性与手续费磨损；只有多个独立样本支持时才沉淀新经验，否则保留旧记忆并提出需要补充的证据。""",
     },
 }
 
@@ -907,7 +975,7 @@ def all_profiles() -> list[dict[str, Any]]:
     library = load_library()
     profiles_map = copy.deepcopy(library["profiles"])
     result = []
-    for pid in ("stable",):
+    for pid in ("stable", "wide_oscillation"):
         if pid in profiles_map:
             result.append(profiles_map.pop(pid))
         elif pid in PRESETS:

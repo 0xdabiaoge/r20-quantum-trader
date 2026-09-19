@@ -182,49 +182,42 @@ const truncation = computed<{ kept: number; total: number } | null>(() => {
 <template>
   <div class="space-y-3">
     <!-- 页头：标题与工位状态 -->
-    <div
-      class="flex flex-wrap items-center justify-between gap-2 border-b pb-2.5"
-      style="border-color: var(--line-1)"
-    >
-      <div>
-        <div class="flex items-center gap-2">
-          <h1 class="text-sm font-bold tracking-tight text-[var(--ink-strong)] flex items-center gap-1.5">
-            <History class="h-4 w-4 text-[var(--accent)]" />
-            {{ t('dash.ledger.title') }}
-          </h1>
-          <span
-            class="rounded px-1.5 py-0.5 border text-3xs font-mono font-medium"
-            style="background-color: var(--surface-2); border-color: var(--line-1); color: var(--ink-2)"
-          >
-            {{ t('dash.ledger.countRecords', undefined, { a: filtered.length, b: all.length }) }}
-          </span>
-        </div>
-        <p class="text-3xs text-[var(--ink-3)] mt-0.5">
-          {{ t('dash.ledger.desc') }}
-        </p>
+    <div class="flex items-center justify-between gap-2 pt-0.5">
+      <div class="flex items-center gap-2">
+        <h1 class="text-xs font-bold tracking-tight text-[var(--ink-strong)] flex items-center gap-1.5">
+          <History class="h-3.5 w-3.5 text-[var(--accent)]" />
+          {{ t('dash.ledger.title') }}
+        </h1>
+        <span
+          class="rounded-full px-2 py-0.5 border text-3xs font-mono font-medium"
+          style="background-color: var(--surface-2); border-color: var(--line-1); color: var(--ink-2)"
+        >
+          {{ t('dash.ledger.countRecords', undefined, { a: filtered.length, b: all.length }) }}
+        </span>
+        <span class="hidden md:inline text-3xs text-[var(--ink-3)]">
+          · {{ t('dash.ledger.desc') }}
+        </span>
       </div>
 
       <!-- 快速导出 CSV -->
-      <div class="flex items-center gap-2">
-        <button type="button"
-          class="btn btn-ghost h-7 px-2.5 text-xs font-medium cursor-pointer inline-flex items-center gap-1.5"
-          :disabled="!filtered.length"
-          @click="exportCsv"
-        >
-          <Download class="h-3.5 w-3.5 text-[var(--accent)]" />
-          <span>{{ t('dash.ledger.exportCsv') }}</span>
-        </button>
-      </div>
+      <button type="button"
+        class="btn btn-ghost h-7 px-3 text-xs font-medium cursor-pointer inline-flex items-center gap-1.5 rounded-full transition-all"
+        :disabled="!filtered.length"
+        @click="exportCsv"
+      >
+        <Download class="h-3.5 w-3.5 text-[var(--accent)]" />
+        <span>{{ t('dash.ledger.exportCsv') }}</span>
+      </button>
     </div>
 
     <DataGate>
       <!-- 汇总指标 HUD -->
       <div class="dsh-card">
         <div class="grid grid-cols-2 gap-px bg-[var(--line-1)] sm:grid-cols-3 xl:grid-cols-6">
-          <div class="bg-[var(--surface-1)] p-3">
+          <div class="bg-[var(--surface-1)] hover:bg-[var(--surface-2)] transition-colors">
             <BaseStat :label="t('dash.ledger.summary.total')" :value="fmtNum(filtered.length, 0)" />
           </div>
-          <div class="bg-[var(--surface-1)] p-3">
+          <div class="bg-[var(--surface-1)] hover:bg-[var(--surface-2)] transition-colors">
             <BaseStat
               :label="t('dash.ledger.summary.winRate')"
               :value="winRate != null ? fmtNum(winRate, 1) + '%' : '--'"
@@ -232,13 +225,13 @@ const truncation = computed<{ kept: number; total: number } | null>(() => {
               delta-tone="muted"
             />
           </div>
-          <div class="bg-[var(--surface-1)] p-3">
+          <div class="bg-[var(--surface-1)] hover:bg-[var(--surface-2)] transition-colors">
             <BaseStat :label="t('dash.ledger.summary.net')" :value="fmtSigned(netSum)" />
           </div>
-          <div class="bg-[var(--surface-1)] p-3">
+          <div class="bg-[var(--surface-1)] hover:bg-[var(--surface-2)] transition-colors">
             <BaseStat :label="t('dash.ledger.summary.fees')" :value="feeSum ? `-${fmtNum(feeSum, 2)}` : fmtNum(0, 2)" />
           </div>
-          <div class="bg-[var(--surface-1)] p-3">
+          <div class="bg-[var(--surface-1)] hover:bg-[var(--surface-2)] transition-colors">
             <BaseStat
               :label="t('dash.ledger.summary.fundingNet')"
               :value="fmtSigned(fundingSum)"
@@ -247,7 +240,7 @@ const truncation = computed<{ kept: number; total: number } | null>(() => {
               :hint="t('dash.ledger.summary.fundingNetHint')"
             />
           </div>
-          <div class="bg-[var(--surface-1)] p-3">
+          <div class="bg-[var(--surface-1)] hover:bg-[var(--surface-2)] transition-colors">
             <BaseStat
               :label="t('dash.ledger.summary.pf')"
               :value="perf.profit_factor != null ? fmtNum(perf.profit_factor, 2) : '--'"

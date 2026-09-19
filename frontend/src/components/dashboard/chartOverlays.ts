@@ -119,7 +119,6 @@ export interface SlOverlayInput {
 export function buildSlOverlay(input: SlOverlayInput): PriceLineOverlay {
   const { price, riskPct, textColor, isEn, isLockProfit, slDiffPct } = input
   const isLock = !!isLockProfit
-  const color = isLock ? LONG_COLOR : SHORT_COLOR
 
   let badgeText = ''
   if (isLock) {
@@ -131,7 +130,7 @@ export function buildSlOverlay(input: SlOverlayInput): PriceLineOverlay {
     }
   } else {
     const diff = Math.abs(slDiffPct ?? riskPct)
-    badgeText = `${isEn ? 'SL' : '止损'} -${diff.toFixed(1)}%`
+    badgeText = `▼ ${isEn ? 'SL' : '止损SL'} -${diff.toFixed(1)}%`
   }
 
   return {
@@ -141,11 +140,11 @@ export function buildSlOverlay(input: SlOverlayInput): PriceLineOverlay {
     styles: {
       line: {
         style: 'dashed',
-        dashedValue: isLock ? [8, 4] : [6, 4],
+        dashedValue: [6, 4],
         size: LINE_SIZE,
-        color,
+        color: SHORT_COLOR,
       },
-      text: { size: TEXT_SIZE, color: textColor, backgroundColor: color },
+      text: { size: TEXT_SIZE, color: textColor, backgroundColor: SHORT_COLOR },
     },
     extendData: badgeText,
   }
@@ -175,7 +174,7 @@ export function buildTpOverlay(input: TpOverlayInput): PriceLineOverlay {
       },
       text: { size: TEXT_SIZE, color: textColor, backgroundColor: LONG_COLOR },
     },
-    extendData: `${isEn ? 'TP' : '止盈'} +${rewardPct.toFixed(1)}%`,
+    extendData: `▲ ${isEn ? 'TP' : '止盈TP'} +${rewardPct.toFixed(1)}%`,
   }
 }
 

@@ -42,7 +42,7 @@ const activeTab = computed(() => {
 
 <template>
   <header
-    class="relative z-[60] flex h-12 w-full shrink-0 items-center justify-between border-b px-3 sm:px-4 transition-colors"
+    class="relative z-[60] flex h-12 w-full shrink-0 items-center justify-between border-b px-3 sm:px-4 backdrop-blur-xl transition-colors"
     style="background-color: var(--surface-header); border-color: var(--line-1); color: var(--ink-1)"
   >
     <!-- 左侧：侧栏切换 + 面包屑 + 核心聚合状态 -->
@@ -61,9 +61,12 @@ const activeTab = computed(() => {
 
       <!-- 工作台面包屑与当前频道 -->
       <div class="flex items-center gap-2">
-        <span class="font-bold tracking-tight text-sm" style="color: var(--ink-strong)">{{ t('brand.name') }}</span>
-        <span class="text-xs" style="color: var(--ink-3)">/</span>
-        <span class="flex items-center gap-1.5 text-xs font-medium" style="color: var(--ink-1)">
+        <span class="font-bold tracking-tight text-sm" style="color: var(--ink-strong)">
+          <span class="sm:hidden">R20</span>
+          <span class="hidden sm:inline">{{ t('brand.name') }}</span>
+        </span>
+        <span class="hidden sm:inline text-xs" style="color: var(--ink-3)">/</span>
+        <span class="hidden sm:flex items-center gap-1.5 text-xs font-medium" style="color: var(--ink-1)">
           <component :is="activeTab.icon" class="h-3.5 w-3.5 text-blue-400" />
           {{ t(activeTab.labelKey) }}
         </span>
@@ -79,7 +82,7 @@ const activeTab = computed(() => {
     <div class="flex items-center gap-2">
       <!-- 决策轨迹流入口 -->
       <button type="button"
-        class="inline-flex h-[var(--h-md)] items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium cursor-pointer transition-colors hover:border-[var(--line-2)]"
+        class="inline-flex h-[var(--h-md)] items-center gap-1.5 rounded-full border px-3 text-xs font-medium cursor-pointer transition-all hover:border-[var(--line-2)] hover:bg-[var(--surface-3)]"
         style="background-color: var(--surface-2); border-color: var(--line-1); color: var(--ink-1)"
         :title="`${t('dash.shell.trajectoryBtn')} (⌘J)`"
         @click="trajectoryOpen = true"

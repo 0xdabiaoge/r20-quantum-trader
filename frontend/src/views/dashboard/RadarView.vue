@@ -17,6 +17,7 @@ import BaseEmpty from '../../components/base/BaseEmpty.vue';
 import DirTag from '../../components/base/DirTag.vue';
 import ConfBadge from '../../components/base/ConfBadge.vue';
 import RadarDrawer from '../../components/dashboard/RadarDrawer.vue';
+import CryptoLogo from '../../components/dashboard/CryptoLogo.vue';
 
 const store = useDashboardStore();
 const { t } = useI18n();
@@ -93,26 +94,21 @@ function actionsOf(c: any): { inst: string; dir: string; conf: number; label?: s
 <template>
   <div class="space-y-3">
     <!-- 页头 -->
-    <div
-      class="flex flex-wrap items-center justify-between gap-2 border-b pb-2.5"
-      style="border-color: var(--line-1)"
-    >
-      <div>
-        <div class="flex items-center gap-2">
-          <h1 class="text-sm font-bold tracking-tight text-[var(--ink-strong)] flex items-center gap-1.5">
-            <Brain class="h-4 w-4 text-[var(--accent)]" />
-            {{ t('dash.radar.title') }}
-          </h1>
-          <span
-            class="rounded px-1.5 py-0.5 border text-3xs font-mono font-medium"
-            style="background-color: var(--surface-2); border-color: var(--line-1); color: var(--ink-2)"
-          >
-            {{ t('dash.radar.cycles', undefined, { n: history.length }) }}
-          </span>
-        </div>
-        <p class="text-3xs text-[var(--ink-3)] mt-0.5">
-          {{ t('dash.radar.desc') }}
-        </p>
+    <div class="flex items-center justify-between gap-2 pt-0.5">
+      <div class="flex items-center gap-2">
+        <h1 class="text-xs font-bold tracking-tight text-[var(--ink-strong)] flex items-center gap-1.5">
+          <Brain class="h-3.5 w-3.5 text-[var(--accent)]" />
+          {{ t('dash.radar.title') }}
+        </h1>
+        <span
+          class="rounded-full px-2 py-0.5 border text-3xs font-mono font-medium"
+          style="background-color: var(--surface-2); border-color: var(--line-1); color: var(--ink-2)"
+        >
+          {{ t('dash.radar.cycles', undefined, { n: history.length }) }}
+        </span>
+        <span class="hidden md:inline text-3xs text-[var(--ink-3)]">
+          · {{ t('dash.radar.desc') }}
+        </span>
       </div>
 
       <!-- AI 决策健康指示状态 -->
@@ -174,6 +170,7 @@ function actionsOf(c: any): { inst: string; dir: string; conf: number; label?: s
                     :key="a.inst + a.dir + (a.label || '')"
                     class="dsh-pill !py-0.5"
                   >
+                    <CryptoLogo :symbol="a.inst" :size="14" />
                     <span class="num font-mono text-3xs font-bold text-[var(--ink-strong)]">{{ a.inst }}</span>
                     <span v-if="a.label" class="rounded px-1 py-0.5 border text-4xs font-mono font-medium text-[var(--accent)] border-[var(--accent-line)] bg-[var(--accent-bg)]">{{ a.label }}</span>
                     <DirTag v-else :dir="a.dir" />

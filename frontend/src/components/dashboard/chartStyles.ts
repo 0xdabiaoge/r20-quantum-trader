@@ -40,7 +40,7 @@ export function chartStyles(
     candle: {
       type: 'candle_solid',
       margin: {
-        top: 48,
+        top: 72,
         bottom: 16,
       },
       bar: {

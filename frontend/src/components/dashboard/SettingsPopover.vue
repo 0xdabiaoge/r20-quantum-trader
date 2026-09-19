@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /** 偏好弹层：主题 / 语言 / 色盲配色 —— 收进一个 ⚙，顶栏不再散落按钮 */
-import { onBeforeUnmount, onMounted, ref, useId } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, useId } from 'vue';
 import { SlidersHorizontal, BookOpen, LayoutDashboard, Eye } from 'lucide-vue-next';
 import { useRouter } from 'vue-router';
 import { useUi } from '../../composables/useUi';
@@ -11,7 +11,12 @@ import BaseSegmented from '../base/BaseSegmented.vue';
 import BaseSwitch from '../base/BaseSwitch.vue';
 
 const { t, currentLocale, setLocale, LOCALE_OPTIONS } = useI18n();
-const { cvd, toggleCvd } = useTheme();
+const { theme, setTheme, cvd, toggleCvd } = useTheme();
+
+const THEME_OPTIONS = computed(() => [
+  { value: 'light', label: t('dash.shell.settings.themeLight') },
+  { value: 'dark', label: t('dash.shell.settings.themeDark') },
+]);
 
 const router = useRouter();
 const { peekOpen } = useUi();
@@ -70,6 +75,16 @@ onBeforeUnmount(() => {
         :aria-label="t('dash.shell.settings.title')"
       >
         <div class="space-y-3">
+          <div>
+            <p class="form-label mb-1.5">{{ t('dash.shell.settings.theme') }}</p>
+            <BaseSegmented
+              class="w-full"
+              :label="t('dash.shell.settings.theme')"
+              :model-value="theme"
+              :options="THEME_OPTIONS"
+              @update:model-value="(v: any) => setTheme(v)"
+            />
+          </div>
           <div>
             <p class="form-label mb-1.5">{{ t('dash.shell.settings.language') }}</p>
             <BaseSegmented

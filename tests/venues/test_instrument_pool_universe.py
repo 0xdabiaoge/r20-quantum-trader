@@ -6,6 +6,7 @@ Validates:
 """
 from __future__ import annotations
 
+import os
 import sys
 import unittest
 from pathlib import Path
@@ -24,6 +25,22 @@ def setUpModule():
 
 
 class InstrumentPoolUniverseTests(unittest.TestCase):
+    def setUp(self):
+        self._orig_min = os.environ.get("R20_MIN_LEVERAGE")
+        self._orig_max = os.environ.get("R20_MAX_LEVERAGE")
+        os.environ["R20_MIN_LEVERAGE"] = "2.0"
+        os.environ["R20_MAX_LEVERAGE"] = "5.0"
+
+    def tearDown(self):
+        if self._orig_min is not None:
+            os.environ["R20_MIN_LEVERAGE"] = self._orig_min
+        else:
+            os.environ.pop("R20_MIN_LEVERAGE", None)
+        if self._orig_max is not None:
+            os.environ["R20_MAX_LEVERAGE"] = self._orig_max
+        else:
+            os.environ.pop("R20_MAX_LEVERAGE", None)
+
     def test_evaluate_instrument_tier(self):
         self.assertEqual(ip.evaluate_instrument_tier("BTC-USDT-SWAP", "BTC"), "tier_1_bluechip")
         self.assertEqual(ip.evaluate_instrument_tier("ETH-USDT-SWAP", "ETH"), "tier_1_bluechip")

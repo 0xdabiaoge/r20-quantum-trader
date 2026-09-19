@@ -166,7 +166,7 @@ const processedRows = computed(() => {
             {{ t('dash.matrix.matrix.title') }}
           </h2>
           <span
-            class="rounded px-1.5 py-0.5 border text-3xs font-mono font-medium"
+            class="rounded-full px-2 py-0.5 border text-3xs font-mono font-medium"
             style="background-color: var(--surface-2); border-color: var(--line-1); color: var(--ink-2)"
           >
             {{ processedRows.length }} / {{ rows.length }} {{ t('common.unitCoin') }}
@@ -188,7 +188,7 @@ const processedRows = computed(() => {
             spellcheck="false"
             :aria-label="t('dash.matrix.searchPlaceholder')"
             :placeholder="t('dash.matrix.searchPlaceholder')"
-            class="h-6 w-36 rounded border border-[var(--line-1)] pl-6 pr-6 text-3xs transition-colors focus:outline-none focus:border-[var(--ds-color-border-input-focus)] focus:ring-1 focus:ring-[var(--ds-color-border-input-focus)]"
+            class="h-6 w-36 rounded-full border border-[var(--line-1)] pl-6 pr-6 text-3xs transition-all focus:outline-none focus:border-[var(--ds-color-border-input-focus)] focus:ring-1 focus:ring-[var(--ds-color-border-input-focus)]"
             style="background-color: var(--surface-2); color: var(--ink-1)"
           />
           <kbd
@@ -201,7 +201,7 @@ const processedRows = computed(() => {
 
         <!-- 多空过滤小标签 -->
         <div
-          class="flex items-center gap-0.5 rounded p-0.5"
+          class="flex items-center gap-0.5 rounded-full p-0.5"
           style="background-color: var(--surface-2); border: 1px solid var(--line-1)"
         >
           <button type="button"
@@ -212,10 +212,10 @@ const processedRows = computed(() => {
               { key: 'wait', label: t('dash.matrix.filterWait') },
             ] as const"
             :key="m.key"
-            class="px-2 py-1 rounded text-3xs font-medium cursor-pointer transition-colors"
+            class="px-2 py-0.5 rounded-full text-3xs font-medium cursor-pointer transition-all"
             :class="
               filterMode === m.key
-                ? 'bg-[var(--surface-3)] text-[var(--ink-strong)] font-semibold'
+                ? 'bg-[var(--surface-3)] text-[var(--ink-strong)] font-semibold border border-[var(--line-2)] shadow-xs'
                 : 'text-[var(--ink-3)] hover:bg-[var(--ds-color-bg-hover)] hover:text-[var(--ink-1)]'
             "
             @click="filterMode = m.key"

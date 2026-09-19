@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 
-export type ThemeMode = 'dark'
+export type ThemeMode = 'light' | 'dark'
 
 const currentTheme = ref<ThemeMode>('dark')
 const cvdMode = ref(false)
@@ -21,15 +21,21 @@ function applyCvd(on: boolean) {
 }
 
 export function useTheme() {
-  function applyTheme(_theme: string = 'dark') {
-    currentTheme.value = 'dark'
+  function applyTheme(theme: ThemeMode = 'dark') {
+    currentTheme.value = theme
     if (typeof document !== 'undefined') {
       const el = document.documentElement
-      el.setAttribute('data-theme', 'dark')
-      el.classList.add('dark')
-      el.classList.remove('light')
+      el.setAttribute('data-theme', theme)
+      if (theme === 'light') {
+        el.classList.add('light')
+        el.classList.remove('dark')
+      } else {
+        el.classList.add('dark')
+        el.classList.remove('light')
+      }
       try {
-        localStorage.setItem('r20_theme', 'dark')
+        localStorage.setItem('r20_theme', theme)
+        localStorage.setItem('r20_theme_v2', theme)
       } catch {
         // ignore
       }
@@ -37,25 +43,30 @@ export function useTheme() {
   }
 
   function toggleTheme() {
-    applyTheme('dark')
+    applyTheme(currentTheme.value === 'dark' ? 'light' : 'dark')
   }
 
   function initTheme() {
     if (initialized) return
     initialized = true
+    let savedTheme: ThemeMode = 'dark'
     if (typeof document !== 'undefined') {
-      const el = document.documentElement
-      el.setAttribute('data-theme', 'dark')
-      el.classList.add('dark')
-      el.classList.remove('light')
       try {
         if (localStorage.getItem('r20_cvd') === '1') applyCvd(true)
-        localStorage.setItem('r20_theme', 'dark')
+        const storedV2 = localStorage.getItem('r20_theme_v2')
+        if (storedV2 === 'dark' || storedV2 === 'light') {
+          savedTheme = storedV2
+        } else {
+          // 清理历史残留的主题设置，确保全站升级为默认深色黑曜石主题
+          localStorage.removeItem('r20_theme')
+          localStorage.setItem('r20_theme_v2', 'dark')
+          savedTheme = 'dark'
+        }
       } catch {
         // fallback
       }
     }
-    applyTheme('dark')
+    applyTheme(savedTheme)
   }
 
   return {

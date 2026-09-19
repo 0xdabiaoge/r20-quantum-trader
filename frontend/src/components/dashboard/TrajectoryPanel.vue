@@ -71,10 +71,16 @@ const decisionStream = computed(() => {
       leverage: d.leverage,
       tp: d.take_profit_price,
       sl: d.stop_loss_price,
+      reasoning: d.reasoning || '',
+      marketStructure: d.market_structure || '',
+      calculusDynamics: d.calculus_dynamics || '',
+      mathProbRationale: d.math_prob_rationale || '',
       updatedAt: f.updated_at || new Date().toISOString(),
     };
   });
 });
+
+const marketRegime = computed(() => (store.data as any)?.market_regime || null);
 
 // 日志流提取与过滤
 const filteredLogs = computed(() => {
@@ -228,6 +234,28 @@ function actionBadgeClass(action: string) {
         <div class="flex-1 overflow-y-auto p-4">
           <!-- TAB 1: 决策流 -->
           <div v-if="activeTab === 'decisions'" class="space-y-3">
+            <!-- 宏观市场体制自适应徽章 -->
+            <div v-if="marketRegime" class="rounded border p-2.5 text-xs font-mono" style="background-color: var(--surface-2); border-color: var(--line-1)">
+              <div class="flex items-center justify-between">
+                <span class="font-bold flex items-center gap-1.5 text-[var(--accent)]">
+                  <ShieldCheck class="h-3.5 w-3.5" />
+                  {{ marketRegime.regime_name || t('dash.shell.panel.marketRegime') }}
+                </span>
+                <span class="text-3xs px-1.5 py-0.5 rounded border border-[var(--line-1)] text-[var(--ink-2)]">
+                  {{ marketRegime.regime_tag }}
+                </span>
+              </div>
+              <p class="mt-1 text-3xs text-[var(--ink-2)] font-sans leading-relaxed">
+                {{ marketRegime.recommended_action }}
+              </p>
+              <div class="mt-1.5 flex items-center justify-between text-4xs text-[var(--ink-3)] font-mono">
+                <span>{{ t('dash.shell.panel.velocity').split(' ')[0] }}: {{ marketRegime.trend_score }}</span>
+                <span>VOL: {{ marketRegime.volatility_score }}</span>
+                <span>OSC: {{ marketRegime.oscillation_score }}</span>
+                <span>DIR: {{ marketRegime.dominant_direction }}</span>
+              </div>
+            </div>
+
             <div
               v-for="item in decisionStream"
               :key="item.instId"
@@ -288,6 +316,34 @@ function actionBadgeClass(action: string) {
                 <div>ADX: <span style="color: var(--ink-1)">{{ Number(item.adx).toFixed(1) }}</span></div>
                 <div v-if="item.leverage">{{ t('dash.shell.panel.leverage') }} <span style="color: var(--ink-1)">{{ item.leverage }}x</span></div>
               </div>
+
+              <!-- 行4：思维心流与数理推演展开 (CoT) -->
+              <details
+                v-if="item.reasoning || item.calculusDynamics || item.mathProbRationale || item.marketStructure"
+                class="mt-2 text-3xs text-[var(--ink-3)] cursor-pointer"
+              >
+                <summary class="hover:text-[var(--accent)] select-none font-mono">
+                  {{ t('dash.shell.panel.viewCot') }}
+                </summary>
+                <div class="mt-1.5 p-2 rounded border space-y-1.5 text-3xs leading-relaxed font-sans select-text" style="background-color: var(--surface-head); border-color: var(--line-1); color: var(--ink-2)">
+                  <div v-if="item.marketStructure">
+                    <span class="font-bold font-mono" style="color: var(--ink-strong)">{{ t('dash.shell.panel.structure') }}: </span>
+                    <span>{{ item.marketStructure }}</span>
+                  </div>
+                  <div v-if="item.calculusDynamics">
+                    <span class="font-bold font-mono" style="color: var(--ink-strong)">{{ t('dash.shell.panel.dynamics') }}: </span>
+                    <span>{{ item.calculusDynamics }}</span>
+                  </div>
+                  <div v-if="item.mathProbRationale">
+                    <span class="font-bold font-mono" style="color: var(--ink-strong)">{{ t('dash.shell.panel.mathProb') }}: </span>
+                    <span>{{ item.mathProbRationale }}</span>
+                  </div>
+                  <div v-if="item.reasoning" class="pt-1 border-t" style="border-color: var(--line-1)">
+                    <span class="font-bold text-[var(--accent)] font-mono">{{ t('dash.shell.panel.draft') }}: </span>
+                    <pre tabindex="0" class="whitespace-pre-wrap font-mono text-4xs mt-0.5 outline-none" :aria-label="t('dash.shell.panel.draft')" style="color: var(--ink-2)">{{ item.reasoning }}</pre>
+                  </div>
+                </div>
+              </details>
             </div>
 
             <!-- 空态 -->

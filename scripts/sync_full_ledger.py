@@ -237,6 +237,28 @@ def fetch_binance_closed_trades(environment: str = "demo", tz_bj=None) -> list:
             net_pnl = round(pnl - fee, 2)
             roi_pct = round((pnl / max(1.0, margin)) * 100, 2)
 
+            # 尝试附加开仓数理快照（自进化复盘可观测性）
+            bn_snap = None
+            try:
+                calc_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "calculus_snapshot.json")
+                if os.path.exists(calc_path):
+                    with open(calc_path, "r", encoding="utf-8") as cf:
+                        c_data = json.load(cf)
+                        for item in c_data.get("instruments", []):
+                            if item.get("name") == base or item.get("instId") in (base, f"{base}-USDT-SWAP"):
+                                from scripts.trader.signal_snapshot import build_signal_snapshot
+                                f_mock = {
+                                    "name": base,
+                                    "instId": f"{base}-USDT-SWAP",
+                                    "price": close_px,
+                                    "atr": 0.0,
+                                    "calculus": item.get("calculus", {})
+                                }
+                                bn_snap = build_signal_snapshot(f_mock, data_dir=os.path.dirname(calc_path))
+                                break
+            except Exception:
+                pass
+
             out.append({
                 "id": f"binance_closed_{t_id}_{time_ms}",
                 "inst": base,
@@ -260,7 +282,8 @@ def fetch_binance_closed_trades(environment: str = "demo", tz_bj=None) -> list:
                 "roi_pct": roi_pct,
                 "duration": "0时0分",
                 "status": "closed",
-                "exit_reason": "🎯 目标止盈达成" if net_pnl > 0 else "🛑 触发云端止损"
+                "exit_reason": "🎯 目标止盈达成" if net_pnl > 0 else "🛑 触发云端止损",
+                "signal_snapshot": bn_snap,
             })
     except Exception as exc:
         _mark("binance", "failed", reason=str(exc)[:200])
@@ -304,6 +327,28 @@ def fetch_gate_closed_trades(environment: str = "sandbox", tz_bj=None) -> list:
             margin = round(sz * (open_px or close_px) / lever, 2) if sz > 0 else 50.0
             roi_pct = round((net_pnl / max(1.0, margin)) * 100, 2)
 
+            # 尝试附加开仓数理快照（自进化复盘可观测性）
+            gt_snap = None
+            try:
+                calc_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "calculus_snapshot.json")
+                if os.path.exists(calc_path):
+                    with open(calc_path, "r", encoding="utf-8") as cf:
+                        c_data = json.load(cf)
+                        for item in c_data.get("instruments", []):
+                            if item.get("name") == base or item.get("instId") in (base, f"{base}-USDT-SWAP"):
+                                from scripts.trader.signal_snapshot import build_signal_snapshot
+                                f_mock = {
+                                    "name": base,
+                                    "instId": f"{base}-USDT-SWAP",
+                                    "price": close_px,
+                                    "atr": 0.0,
+                                    "calculus": item.get("calculus", {})
+                                }
+                                gt_snap = build_signal_snapshot(f_mock, data_dir=os.path.dirname(calc_path))
+                                break
+            except Exception:
+                pass
+
             out.append({
                 "id": f"gate_closed_{close_id}_{time_sec}",
                 "inst": base,
@@ -327,7 +372,8 @@ def fetch_gate_closed_trades(environment: str = "sandbox", tz_bj=None) -> list:
                 "roi_pct": roi_pct,
                 "duration": "0时0分",
                 "status": "closed",
-                "exit_reason": "🎯 目标止盈达成" if net_pnl > 0 else "🛑 触发云端止损"
+                "exit_reason": "🎯 目标止盈达成" if net_pnl > 0 else "🛑 触发云端止损",
+                "signal_snapshot": gt_snap,
             })
     except Exception as exc:
         _mark("gate", "failed", reason=str(exc)[:200])

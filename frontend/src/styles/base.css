@@ -16,12 +16,14 @@
 
 html {
   scrollbar-gutter: stable;
-  background-color: #0d0f14;
+  background-color: var(--ds-color-bg-page, #121214);
 }
 
 body {
   margin: 0;
-  background-color: #0d0f14;
+  background-color: var(--ds-color-bg-page, #121214);
+  background-image: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(120, 119, 198, 0.08), transparent 70%);
+  background-attachment: fixed;
   color: var(--ds-color-text-secondary);
   font-family: var(--ds-font-body);
   font-size: var(--text-base);

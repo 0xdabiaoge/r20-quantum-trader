@@ -833,9 +833,9 @@ def execute_batch_ai_brain_cycle(
     # 顶级聪明钱与大户持仓数据接入（Binance 公开大户指标 + OKX Rubik 备选双源容灾）
     try:
         try:
-            from smart_money import fetch_smart_money_for_symbol
-        except ImportError:
             from scripts.factors.smart_money import fetch_smart_money_for_symbol
+        except ImportError:
+            from factors.smart_money import fetch_smart_money_for_symbol
         for pkg in packages:
             ccy = pkg.get("ccy") or pkg.get("name") or ""
             if not ccy and "-" in pkg.get("instId", ""):

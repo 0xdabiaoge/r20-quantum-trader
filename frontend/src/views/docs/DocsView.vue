@@ -113,13 +113,13 @@ onUnmounted(() => {
   <div class="min-h-screen font-sans selection:bg-[var(--accent)] selection:text-white" style="background-color: var(--surface-0); color: var(--ink-1);">
     <!-- Top Header Navigation -->
     <header
-      class="sticky top-0 z-[var(--z-header)] border-b px-3 sm:px-6 h-12 flex items-center justify-between"
+      class="sticky top-0 z-[var(--z-header)] border-b px-3 sm:px-6 h-12 flex items-center justify-between backdrop-blur-xl"
       style="background-color: var(--surface-header); border-color: var(--line-1);"
     >
       <div class="flex items-center space-x-2 sm:space-x-3 min-w-0">
         <button type="button"
           @click="router.push('/')"
-          class="btn btn-quiet h-7 px-2.5 text-xs font-medium cursor-pointer inline-flex items-center gap-1.5"
+          class="btn btn-quiet h-7 px-2.5 text-xs font-medium cursor-pointer inline-flex items-center gap-1.5 rounded-full"
           :title="t('docs.backTerminal')"
         >
           <ArrowLeft class="w-3.5 h-3.5" />
@@ -144,7 +144,7 @@ onUnmounted(() => {
       <div class="flex items-center space-x-2 shrink-0">
         <button type="button"
           @click="mobileMenuOpen = !mobileMenuOpen"
-          class="sm:hidden btn btn-quiet btn-icon h-7 w-7 cursor-pointer"
+          class="sm:hidden btn btn-quiet btn-icon h-7 w-7 cursor-pointer rounded-full"
           :title="t('docs.tocBtn')"
           :aria-label="t('docs.tocBtn')"
           :aria-expanded="mobileMenuOpen"
@@ -156,7 +156,7 @@ onUnmounted(() => {
 
         <button type="button"
           @click="router.push('/admin')"
-          class="hidden sm:inline-flex btn btn-ghost h-7 px-2.5 text-xs font-medium cursor-pointer items-center gap-1"
+          class="hidden sm:inline-flex btn btn-ghost h-7 px-3 text-xs font-medium cursor-pointer items-center gap-1.5 rounded-full"
         >
           <Lock class="w-3.5 h-3.5 text-[var(--accent)]" />
           <span>控制台</span>
@@ -166,7 +166,7 @@ onUnmounted(() => {
           href="https://github.com/555cute/r20-quantum-trader"
           target="_blank"
           rel="noopener noreferrer"
-          class="btn btn-primary h-7 px-2.5 text-xs font-medium inline-flex items-center gap-1"
+          class="btn btn-primary h-7 px-3 text-xs font-medium inline-flex items-center gap-1.5 rounded-full"
         >
           <ExternalLink class="w-3.5 h-3.5" aria-hidden="true" />
           <span class="hidden sm:inline">GitHub</span>
@@ -210,7 +210,7 @@ onUnmounted(() => {
             :key="s.id"
             @click="scrollToSection(s.id)"
             :aria-current="activeSection === s.id ? 'location' : undefined"
-            class="w-full text-left px-3 py-2 rounded text-xs font-medium transition-all flex items-center justify-between group cursor-pointer border"
+            class="w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition-all flex items-center justify-between group cursor-pointer border"
             :style="activeSection === s.id
               ? { backgroundColor: 'var(--surface-3)', color: 'var(--ink-strong)', borderColor: 'var(--line-3)', fontWeight: 'bold' }
               : { backgroundColor: 'transparent', borderColor: 'transparent', color: 'var(--ink-2)' }"

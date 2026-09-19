@@ -50,6 +50,13 @@ try:  # repo 根在 sys.path
         calculate_multi_timeframe,
         calculate_probability_theory,
     )
+    from scripts.calculus.regime import (  # noqa: E402,F401
+        REGIME_LOW_VOL_CHOPPY,
+        REGIME_TREND_EXPANSION,
+        REGIME_VOLATILITY_SHOCK,
+        REGIME_WIDE_OSCILLATION,
+        detect_macro_market_regime,
+    )
 except ImportError:  # scripts/ 在 sys.path（真实运行时的布局）
     from calculus.primitives import (  # noqa: E402,F401
         _diff,
@@ -68,4 +75,11 @@ except ImportError:  # scripts/ 在 sys.path（真实运行时的布局）
         calculate_definite_integrals,
         calculate_multi_timeframe,
         calculate_probability_theory,
+    )
+    from calculus.regime import (  # noqa: E402,F401
+        REGIME_LOW_VOL_CHOPPY,
+        REGIME_TREND_EXPANSION,
+        REGIME_VOLATILITY_SHOCK,
+        REGIME_WIDE_OSCILLATION,
+        detect_macro_market_regime,
     )
