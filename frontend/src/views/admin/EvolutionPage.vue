@@ -28,6 +28,7 @@
  *    后续写操作必须先显式「重新加载心法」（expectedMemoryVersion 会抛错）。
  */
 import { fmtDateTime } from '../../utils/format';
+import { resolveEvolutionStatus } from '../../utils/evolutionStatus';
 import { useToast } from '../../composables/useToast';
 import { useConfirm } from '../../composables/useConfirm';
 const toast = useToast();
@@ -348,6 +349,10 @@ async function confirmRun() {
   }
 }
 
+function evoStatusBadgeClass(status?: string, error?: string): string {
+  return resolveEvolutionStatus(status, error).adminBadgeClass;
+}
+
 onMounted(loadData);
 </script>
 
@@ -420,7 +425,7 @@ onMounted(loadData);
               <h2 class="card-title"><Sparkles :size="14" />{{ t('admin.evolution.reportTitle') }}</h2>
               <span
                 class="badge"
-                :class="evolutionReport.change_status === 'EVOLVED' ? 'badge-up' : 'badge-warn'"
+                :class="evoStatusBadgeClass(evolutionReport.change_status, evolutionReport.llm_error)"
               >
                 {{ evolutionReport.change_status || 'NO_CHANGE' }}
               </span>

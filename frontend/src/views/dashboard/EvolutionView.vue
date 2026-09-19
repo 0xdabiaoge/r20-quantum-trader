@@ -19,20 +19,32 @@ import { fmtNum, fmtDateTime } from '../../utils/format';
 import BaseStat from '../../components/base/BaseStat.vue';
 import BaseEmpty from '../../components/base/BaseEmpty.vue';
 import BaseCollapse from '../../components/base/BaseCollapse.vue';
+import { resolveEvolutionStatus } from '../../utils/evolutionStatus';
 
 const store = useDashboardStore();
 const { t } = useI18n();
 
 const review = computed<any>(() => (store.data as any)?.review || {});
 
-const statusKey = computed(() => String(review.value.change_status || ''));
+const statusResolved = computed(() =>
+  resolveEvolutionStatus(review.value.change_status, review.value.llm_error)
+);
+
+const statusKey = computed(() => statusResolved.value.key);
 const statusMeta = computed(() => {
-  const s = statusKey.value;
-  if (s === 'CHANGED') return { cls: 'text-[var(--up)] border-[var(--up-line)] bg-[var(--up-bg)]', label: t('dash.evolution.hud.statuses.CHANGED') };
-  if (s === 'NO_CHANGE') return { cls: 'text-[var(--ink-2)] border-[var(--line-1)] bg-[var(--surface-2)]', label: t('dash.evolution.hud.statuses.NO_CHANGE') };
-  if (s === 'RUNNING') return { cls: 'text-[var(--warn)] border-[var(--warn-line)] bg-[var(--warn-bg)]', label: t('dash.evolution.hud.statuses.RUNNING') };
-  if (s) return { cls: 'text-[var(--down)] border-[var(--down-line)] bg-[var(--down-bg)]', label: t('dash.evolution.hud.statuses.FAILED') };
-  return { cls: '', label: '--' };
+  const r = statusResolved.value;
+  let label = '--';
+  if (r.category === 'EVOLVED') label = t('dash.evolution.hud.statuses.CHANGED');
+  else if (r.category === 'NO_CHANGE') label = t('dash.evolution.hud.statuses.NO_CHANGE');
+  else if (r.category === 'RUNNING') label = t('dash.evolution.hud.statuses.RUNNING');
+  else if (r.category === 'FAILED') label = t('dash.evolution.hud.statuses.FAILED');
+  else if (r.category === 'UNKNOWN') label = r.key;
+
+  return {
+    cls: r.hudClass,
+    textCls: r.hudTextClass,
+    label,
+  };
 });
 
 const insights = computed<any[]>(() => review.value.diagnosis_insights || review.value.insights || []);
@@ -159,7 +171,7 @@ const md = computed(() => (store.data as any)?.ai_trading_memory_md || '');
           </div>
           <div class="bg-[var(--surface-1)] hover:bg-[var(--surface-2)] transition-colors px-3.5 py-2.5 flex flex-col justify-center">
             <span class="text-3xs text-[var(--ink-3)] font-semibold uppercase tracking-wider">{{ t('dash.evolution.hud.status') }}</span>
-            <span class="text-xs font-bold mt-1" :class="statusKey === 'CHANGED' ? 'text-[var(--up)]' : 'text-[var(--ink-1)]'">
+            <span class="text-xs font-bold mt-1" :class="statusMeta.textCls">
               {{ statusMeta.label }}
             </span>
           </div>

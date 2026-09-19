@@ -442,6 +442,9 @@ def _other_venue_live_positions(env_axis):
             if not base:
                 continue
             v_side = str(vp.get("side") or ("long" if amt > 0 else "short")).lower()
+            raw_d = vp.get("raw") if isinstance(vp.get("raw"), dict) else {}
+            v_notional = float(vp.get("notional") or raw_d.get("notional") or raw_d.get("value") or 0.0)
+            v_margin = float(vp.get("margin") or raw_d.get("margin") or raw_d.get("initial_margin") or 0.0)
             items.append({
                 "venue": v_name,
                 "instId": f"{base}-USDT-SWAP",
@@ -453,6 +456,8 @@ def _other_venue_live_positions(env_axis):
                 "lever": vp.get("leverage", 3) or 3,
                 "fee": 0.0,
                 "cTime": vp.get("open_time") or vp.get("cTime") or 0,
+                "notional": v_notional,
+                "margin": v_margin,
             })
     return items, ok_venues
 
@@ -484,8 +489,10 @@ def _holding_row(p, venue, *, env, trackers, tz_bj, allowed, council_by_inst):
     fee = float(p.get("fee", 0.0) or 0.0)
     ct_val = get_ct_val(inst)
 
-    notional = pos_sz * ct_val * mark_px
-    margin_usdt = round(notional / lever, 2) if lever > 0 else round(notional, 2)
+    raw_notional = float(p.get("notional", 0.0) or 0.0)
+    notional = raw_notional if raw_notional > 0 else (pos_sz * ct_val * mark_px)
+    raw_margin = float(p.get("margin", 0.0) or 0.0)
+    margin_usdt = round(raw_margin, 2) if raw_margin > 0 else (round(notional / lever, 2) if lever > 0 else round(notional, 2))
     roi_pct = round((upl / margin_usdt * 100) if margin_usdt > 0 else 0.0, 2)
 
     _c_raw = p.get("cTime", 0) or 0

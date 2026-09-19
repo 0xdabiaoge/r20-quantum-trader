@@ -384,6 +384,7 @@ class BinanceAdapter(BinanceAlgoRequestsMixin, BaseExchangeAdapter):
                 "mark_price": float(p.get("markPrice") or 0.0),
                 "leverage": float(p.get("leverage") or 0.0),
                 "margin": float(p.get("isolatedMargin") or p.get("positionInitialMargin") or 0.0),
+                "notional": float(p.get("notional") or 0.0),
                 "margin_mode": str(p.get("marginType") or "cross").lower(),
                 "unrealized_pnl": float(p.get("unRealizedProfit") or 0.0),
                 "liq_price": float(p.get("liquidationPrice") or 0.0) or None,

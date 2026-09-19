@@ -109,8 +109,24 @@ def collect_cross_venue_positions(positions, pending_orders_list,
                     v_avg = float(vp.get("entry_price", 0) or 0)
                     v_mark = float(vp.get("mark_price", 0) or v_avg)
                     v_lever = float(vp.get("leverage", 3) or 3)
-                    v_notional = round(v_sz * (v_mark if v_mark > 0 else v_avg), 2)
-                    v_margin = round(v_notional / max(1.0, v_lever), 2)
+                    if v_lever <= 0:
+                        v_lever = 3.0
+
+                    # 交易所官方名义价值与保证金优先：避免 Gate 等交易所的合约张数（如 BTC 1张=0.0001 BTC）
+                    # 直接乘以单价导致名义额放大万倍、保证金占比失真爆表。
+                    raw_dict = vp.get("raw") if isinstance(vp.get("raw"), dict) else {}
+                    raw_notional = float(vp.get("notional") or raw_dict.get("notional") or raw_dict.get("value") or raw_dict.get("notionalUsd") or 0.0)
+                    if raw_notional > 0:
+                        v_notional = round(raw_notional, 2)
+                    else:
+                        v_notional = round(v_sz * (v_mark if v_mark > 0 else v_avg), 2)
+
+                    raw_margin = float(vp.get("margin") or raw_dict.get("margin") or raw_dict.get("initial_margin") or raw_dict.get("isolatedMargin") or 0.0)
+                    if raw_margin > 0:
+                        v_margin = round(raw_margin, 2)
+                    else:
+                        v_margin = round(v_notional / max(1.0, v_lever), 2)
+
                     v_roi = round((v_upl / max(1.0, v_margin)) * 100, 2) if v_margin > 0 else 0.0
                     v_chg = round(((v_mark - v_avg) / v_avg * 100) if v_avg > 0 else 0, 2)
 
@@ -129,7 +145,7 @@ def collect_cross_venue_positions(positions, pending_orders_list,
                         "pos_sz": v_sz,
                         "notional_usdt": v_notional,
                         "margin_usdt": v_margin,
-                        "marginSource": "exchange_imr",
+                        "marginSource": "exchange_imr" if raw_margin > 0 else "estimated",
                         "lever": f"{int(v_lever)}",
                         "avgPx": v_avg,
                         "markPx": v_mark,
