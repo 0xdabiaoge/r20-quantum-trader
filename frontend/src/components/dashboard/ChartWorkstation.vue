@@ -102,6 +102,11 @@ registerOverlay({
       textYOffset = -3
     }
 
+    // 价格超出当前可视窗口时，自然不绘制（用户缩放/平移至该价位时自然展现，不强行拉扯或挤在角落）
+    if (y < -20 || (bounding.height > 0 && y > bounding.height + 20)) {
+      return []
+    }
+
     const startX = y < 70 ? Math.min(240, bounding.width * 0.5) : 0
 
     return [
@@ -550,7 +555,6 @@ function initChart() {
   ;(window as any).__klineChart = klineChart
   const rightOffset = typeof window !== 'undefined' && window.innerWidth < 640 ? 75 : 95
   klineChart.setOffsetRightDistance(rightOffset)
-  applyYAxisRangeOverride()
 
   // 默认 K 线根数设为之前的 3/4 (单根蜡烛宽度调整为 4/3，蜡烛更清晰平滑)
   klineChart.setBarSpace(10 * (4 / 3))
@@ -650,48 +654,6 @@ function updatePriceLines() {
     const tpRes = klineChart.createOverlay(plan.tp)
     tpOverlayId = typeof tpRes === 'string' ? tpRes : null
   }
-
-  applyYAxisRangeOverride()
-}
-
-/** 动态自适应扩展 Y 轴量程：确保大斜率下止盈/止损/入场线始终完整包含在视野内 */
-function applyYAxisRangeOverride() {
-  if (!klineChart) return
-  const hasPosOrOrder = Boolean(activePosition.value || activeOrder.value || simMode.value)
-  const levels = hasPosOrOrder
-    ? [effectiveEntry.value, effectiveSL.value, effectiveTP.value].filter(
-        (v) => typeof v === 'number' && v > 0 && Number.isFinite(v)
-      )
-    : []
-
-  klineChart.overrideYAxis({
-    paneId: 'candle_pane',
-    createRange: ({ defaultRange }) => {
-      if (levels.length === 0) return defaultRange
-      let minVal = defaultRange.from
-      let maxVal = defaultRange.to
-      const mid = (minVal + maxVal) / 2
-      if (mid <= 0) return defaultRange
-      for (const lv of levels) {
-        if (lv > mid * 0.7 && lv < mid * 1.5) {
-          minVal = Math.min(minVal, lv)
-          maxVal = Math.max(maxVal, lv)
-        }
-      }
-      const diff = maxVal - minVal
-      return {
-        from: minVal,
-        to: maxVal,
-        range: diff,
-        realFrom: minVal,
-        realTo: maxVal,
-        realRange: diff,
-        displayFrom: minVal,
-        displayTo: maxVal,
-        displayRange: diff,
-      }
-    },
-  })
 }
 
 // 倒计时

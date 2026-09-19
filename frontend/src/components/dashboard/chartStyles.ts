@@ -158,8 +158,8 @@ export function chartStyles(
       type: 'normal',
       inside: false,
       gap: {
-        top: 0.12,
-        bottom: 0.12,
+        top: 0.08,
+        bottom: 0.08,
       },
       axisLine: {
         show: true,
