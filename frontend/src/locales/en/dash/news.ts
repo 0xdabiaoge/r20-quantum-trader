@@ -70,4 +70,9 @@ export const enNews = {
   pctBear: '{n}% bear',
   countNews: '{a} / {b} flashes',
   ratioLabel: 'L/S ratio',
+  collapseBand: 'Collapse sentiment',
+  expandBand: 'Expand sentiment',
+  searchPlaceholder: 'Search keywords / coins...',
+  clearSearch: 'Clear search',
+  selectedFilter: 'Filtered',
 };

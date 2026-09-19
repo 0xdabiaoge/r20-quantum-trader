@@ -71,4 +71,9 @@ export const zhNews = {
   pctBear: '{n}% 空',
   countNews: '{a} / {b} 条快讯',
   ratioLabel: '多空比',
+  collapseBand: '收起多空面板',
+  expandBand: '展开多空面板',
+  searchPlaceholder: '搜索快讯关键词 / 币种...',
+  clearSearch: '清除搜索',
+  selectedFilter: '已筛选',
 };
