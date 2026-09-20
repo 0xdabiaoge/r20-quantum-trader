@@ -285,6 +285,22 @@ class TestReadOnlyMarketData(unittest.TestCase):
         # 能力表为类级冻结声明；缺能力时 fetch_top_trader_ratio 返回 None 不伪造
         self.assertTrue(GateAdapter.capabilities.has_top_trader_ratio)
 
+    def test_gate_order_normalization_unsigned_size(self):
+        gt = GateAdapter()
+        raw_sell_order = {
+            "id": "82472172750939950",
+            "contract": "BTC_USDT",
+            "size": -173,
+            "price": "80620",
+            "is_reduce_only": False,
+        }
+        item = gt._normalize_order_item(raw_sell_order)
+        self.assertEqual(item["side"], "sell")
+        self.assertEqual(item["size"], 173)
+        self.assertEqual(item["size_signed"], -173)
+        self.assertEqual(item["base"], "BTC")
+        self.assertEqual(item["venue"], "gate")
+
 
 if __name__ == "__main__":
     unittest.main()

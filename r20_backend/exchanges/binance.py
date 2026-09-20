@@ -686,6 +686,10 @@ class BinanceAdapter(BinanceAlgoRequestsMixin, BaseExchangeAdapter):
         return self._private_algo_send(self.build_algo_cancel_request(
             algo_id=algo_id, client_algo_id=client_algo_id))
 
+    def cancel_protective_orders(self, symbol: str) -> Any:
+        """撤销指定合约的全部活跃云端 Algo 保护单（TP/SL）。"""
+        return self.cancel_all_algo_open_orders(symbol=symbol)
+
     def cancel_all_algo_open_orders(self, *, symbol: str) -> Any:
         inst = self.native_symbol(symbol) if symbol else ""
         open_algos = self.list_protective_orders(symbol=inst)

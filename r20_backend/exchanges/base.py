@@ -274,5 +274,8 @@ class BaseExchangeAdapter:
     def attach_protective_orders(self, *args: Any, **kwargs: Any) -> Dict[str, Any]:
         raise self._unsupported("云端保护单（TP/SL）")
 
+    def cancel_protective_orders(self, *args: Any, **kwargs: Any) -> Any:
+        raise self._unsupported("撤销云端保护单")
+
     def cancel_order(self, *args: Any, **kwargs: Any) -> Dict[str, Any]:
         raise self._unsupported("撤单")

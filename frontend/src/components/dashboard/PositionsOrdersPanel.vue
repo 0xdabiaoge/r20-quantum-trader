@@ -90,6 +90,22 @@ function getTp1(p: any): string | null {
   const m = desc.match(/TP1:\s*([0-9.]+)/i);
   return m ? m[1] : null;
 }
+
+function orderQtyText(o: any): string {
+  const raw = o?.sz !== undefined ? o.sz : o?.size;
+  const n = Math.abs(Number(raw || 0));
+  if (!Number.isFinite(n) || n === 0) return '--';
+  const v = getVenueOf(o);
+  if (v === 'binance') {
+    return n < 1 ? fmtNum(n, 3) : (n < 10 ? fmtNum(n, 2) : fmtNum(n, 1));
+  }
+  return fmtNum(n, 0);
+}
+
+function orderUnitText(o: any): string {
+  const v = getVenueOf(o);
+  return v === 'binance' ? symOf(o) : t('dash.matrix.orders.col.qty');
+}
 </script>
 
 <template>
@@ -278,7 +294,9 @@ function getTp1(p: any): string | null {
               {{ fmtPrice(o.px) }}
             </td>
             <td class="col-num font-mono">
-              <span class="block text-xs font-medium text-[var(--ink-strong)]">{{ fmtNum(Number(o.sz), 0) }}</span>
+              <span class="block text-xs font-medium text-[var(--ink-strong)]" :title="`${orderQtyText(o)} ${orderUnitText(o)}`">
+                {{ orderQtyText(o) }}<span class="text-4xs text-[var(--ink-3)] ml-0.5">{{ orderUnitText(o) }}</span>
+              </span>
               <span class="block text-3xs text-[var(--ink-2)]">{{ o.lever || '3x' }}</span>
             </td>
             <td class="col-num font-mono text-3xs">
@@ -322,19 +340,10 @@ function getTp1(p: any): string | null {
   .pop-col-time {
     display: none;
   }
-}
-
-/* 极窄（手机）：仍可能出现横向滚动，此时把标的列钉在左侧，滚到哪都认得出是谁 */
-@container (max-width: 419px) {
-  .pop-table th:first-child,
-  .pop-table td:first-child {
-    position: sticky;
-    left: 0;
-    z-index: 1;
-    background-color: var(--ds-color-bg-surface-card);
-  }
-  .pop-table tbody tr:hover td:first-child {
-    background-color: var(--ds-color-bg-surface-2);
+  .pop-table th,
+  .pop-table td {
+    padding-left: var(--sp-2);
+    padding-right: var(--sp-2);
   }
 }
 </style>

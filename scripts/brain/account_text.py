@@ -111,7 +111,12 @@ def build_pending_order_lines(pending_orders_detail: Optional[List[Dict[str, Any
 
             raw_px = str(o.get("px") or "").strip()
             px_val = raw_px if raw_px and raw_px != "0" else ("市价" if ord_type == "market" else "--")
-            sz_val = str(o.get("sz", "--"))
+            raw_sz = o.get("sz")
+            try:
+                sz_float = float(raw_sz or 0)
+                sz_val = f"{abs(sz_float):g}" if sz_float != 0 else str(raw_sz if raw_sz is not None else "--")
+            except (TypeError, ValueError):
+                sz_val = str(raw_sz if raw_sz is not None else "--")
             ord_id = str(o.get("ordId", ""))
 
             attach_list = o.get("attachAlgoOrds", [])

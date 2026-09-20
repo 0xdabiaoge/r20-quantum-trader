@@ -37,7 +37,7 @@ def execute_scale_out_if_eligible(
     timestamp_full: str,
     executed_actions: List[str],
     *,
-    okx_rest,
+    okx_rest=None,
     venue_registry=None,
     record_trade=None,
     notify_trade_close=None,
@@ -143,13 +143,46 @@ def execute_scale_out_if_eligible(
         except Exception as exc:
             order_success = False
             order_detail = f"OKX分批平仓异常: {exc}"
-    else:
-        # 多所适配器路径
+    elif pos_venue == "binance":
         if venue_registry:
             try:
                 ad = venue_registry.get_adapter(pos_venue)
                 symbol_native = inst_id.split("-")[0]
-                res = ad.place_order(symbol_native, close_side, close_sz)
+                raw_pos = curr_pos.get("raw") if isinstance(curr_pos.get("raw"), dict) else {}
+                ps = str(curr_pos.get("positionSide") or raw_pos.get("positionSide") or "").upper()
+                if ps in ("LONG", "SHORT"):
+                    res = ad.place_order(symbol_native, close_side, close_sz, position_side=ps)
+                else:
+                    res = ad.place_order(symbol_native, close_side, close_sz, reduce_only=True)
+                order_success = True
+                order_detail = str(res)
+            except Exception as exc:
+                order_success = False
+                order_detail = f"BINANCE分批平仓异常: {exc}"
+        else:
+            order_success = False
+            order_detail = "未提供 BINANCE 适配器注册表"
+    elif pos_venue == "gate":
+        if venue_registry:
+            try:
+                ad = venue_registry.get_adapter(pos_venue)
+                symbol_native = inst_id.split("-")[0]
+                res = ad.place_order(symbol_native, close_side, close_sz, reduce_only=True)
+                order_success = True
+                order_detail = str(res)
+            except Exception as exc:
+                order_success = False
+                order_detail = f"GATE分批平仓异常: {exc}"
+        else:
+            order_success = False
+            order_detail = "未提供 GATE 适配器注册表"
+    else:
+        # 多所适配器路径兜底
+        if venue_registry:
+            try:
+                ad = venue_registry.get_adapter(pos_venue)
+                symbol_native = inst_id.split("-")[0]
+                res = ad.place_order(symbol_native, close_side, close_sz, reduce_only=True)
                 order_success = True
                 order_detail = str(res)
             except Exception as exc:
@@ -163,7 +196,7 @@ def execute_scale_out_if_eligible(
         executed_actions.append(f"[{name}] ⚠️ 分批止盈市价平仓提交失败: {order_detail}")
         return False, "平仓提交失败"
 
-    # 5. 原子级撤销旧 OCO 保护单，避免超额单量穿仓反向开单
+    # 5. 原子级撤销旧 OCO / 保护单，避免超额单量穿仓反向开单与旧止损残留
     if pos_venue == "okx":
         try:
             pending_algos = okx_rest.pending_algo_orders(inst_id)
@@ -177,6 +210,15 @@ def execute_scale_out_if_eligible(
                 okx_rest.cancel_algo_orders(old_algo_ids[:10], inst_id=inst_id)
         except Exception as cxl_exc:
             print(f"[Scale-Out] 清理 {inst_id} 旧OCO异常（由新保护单覆盖）: {cxl_exc}")
+    elif pos_venue in ("binance", "gate") and venue_registry:
+        try:
+            adapter = venue_registry.get_adapter(pos_venue)
+            if adapter and hasattr(adapter, "cancel_protective_orders"):
+                adapter.cancel_protective_orders(name)
+            elif adapter and hasattr(adapter, "cancel_all_algo_open_orders"):
+                adapter.cancel_all_algo_open_orders(symbol=adapter.native_symbol(name))
+        except Exception as cxl_exc:
+            print(f"[Scale-Out] 清理 {pos_venue.upper()} {name} 旧保护单异常: {cxl_exc}")
 
     # 6. 计算保本止损线并为剩余仓位重建云端 OCO
     breakeven_cushion = 0.0025 * entry_px

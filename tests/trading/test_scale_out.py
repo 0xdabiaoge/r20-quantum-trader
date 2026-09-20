@@ -189,6 +189,147 @@ class ScaleOutExecutionTests(unittest.TestCase):
         self.assertIn("已分批止盈50%", row["exit_reason"])
         self.assertEqual(row["scale_out_phase"], 1)
 
+    def test_binance_scale_out_cancels_old_protective_and_sets_reduce_only(self):
+        mock_venue_registry = MagicMock()
+        mock_bn_adapter = MagicMock()
+        mock_venue_registry.get_adapter.return_value = mock_bn_adapter
+        mock_bn_adapter.place_order.return_value = {"id": "bn_order_1"}
+
+        pos_bn = {
+            "side": "long",
+            "avgPx": 80000.0,
+            "pos": 10.0,
+            "venue": "binance",
+            "raw": {"positionSide": "BOTH"},
+        }
+        trackers = {
+            "BTC-USDT-SWAP_long": {
+                "initialSz": 10.0,
+                "currentSz": 10.0,
+                "takeProfitPx": 85000.0,
+                "trailingStopPx": 78000.0,
+                "scale_out_phase": 0,
+                "scale_count": 0,
+            }
+        }
+        actions = []
+        ok, reason = execute_scale_out_if_eligible(
+            self.sample_f_long, pos_bn, trackers,
+            "2026-09-20 12:00:00", actions,
+            venue_registry=mock_venue_registry,
+            record_trade=self.mock_record_trade,
+            notify_trade_close=self.mock_notify,
+            close_fee=self.mock_close_fee,
+            close_trade_payload=self.mock_payload,
+        )
+        self.assertTrue(ok)
+        self.assertEqual(reason, "首批分批平仓成功")
+        # 验证 Binance 减仓传递 reduce_only=True
+        mock_bn_adapter.place_order.assert_called_once_with(
+            "BTC", "sell", 5.0, reduce_only=True
+        )
+        # 验证 Binance 撤销了旧保护单
+        mock_bn_adapter.cancel_protective_orders.assert_called_once_with("BTC")
+        # 验证 Binance 为余仓挂载了新保护单
+        mock_bn_adapter.attach_protective_orders.assert_called_once_with(
+            "BTC", "long", tp_px=85000.0, sl_px=80200.0, contracts=5.0
+        )
+
+    def test_gate_scale_out_cancels_old_protective_and_sets_reduce_only(self):
+        mock_venue_registry = MagicMock()
+        mock_gate_adapter = MagicMock()
+        mock_venue_registry.get_adapter.return_value = mock_gate_adapter
+        mock_gate_adapter.place_order.return_value = {"id": "gt_order_1"}
+
+        pos_gate = {
+            "side": "long",
+            "avgPx": 80000.0,
+            "pos": 10.0,
+            "venue": "gate",
+        }
+        trackers = {
+            "BTC-USDT-SWAP_long": {
+                "initialSz": 10.0,
+                "currentSz": 10.0,
+                "takeProfitPx": 85000.0,
+                "trailingStopPx": 78000.0,
+                "scale_out_phase": 0,
+                "scale_count": 0,
+            }
+        }
+        actions = []
+        ok, reason = execute_scale_out_if_eligible(
+            self.sample_f_long, pos_gate, trackers,
+            "2026-09-20 12:00:00", actions,
+            venue_registry=mock_venue_registry,
+            record_trade=self.mock_record_trade,
+            notify_trade_close=self.mock_notify,
+            close_fee=self.mock_close_fee,
+            close_trade_payload=self.mock_payload,
+        )
+        self.assertTrue(ok)
+        self.assertEqual(reason, "首批分批平仓成功")
+        # 验证 Gate 减仓传递 reduce_only=True
+        mock_gate_adapter.place_order.assert_called_once_with(
+            "BTC", "sell", 5.0, reduce_only=True
+        )
+        # 验证 Gate 撤销了旧保护单
+        mock_gate_adapter.cancel_protective_orders.assert_called_once_with("BTC")
+        # 验证 Gate 为余仓挂载了新保护单
+        mock_gate_adapter.attach_protective_orders.assert_called_once_with(
+            "BTC", "long", tp_px=85000.0, sl_px=80200.0, contracts=5.0
+        )
+
+    def test_cycle_parts_scale_out_tp_derivation(self):
+        from scripts.brain.cycle_parts import _calculate_scale_out_tp, build_history_record
+
+        # 多头：80000 + 1.2 * 1000 = 81200
+        tp_long = _calculate_scale_out_tp(80000.0, "BUY_LONG", 1000.0, precision=2)
+        self.assertEqual(tp_long, 81200.0)
+
+        # 空头：80000 - 1.2 * 1000 = 78800
+        tp_short = _calculate_scale_out_tp(80000.0, "SELL_SHORT", 1000.0, precision=2)
+        self.assertEqual(tp_short, 78800.0)
+
+        # WAIT 或无价格返回 None
+        self.assertIsNone(_calculate_scale_out_tp(0.0, "WAIT", 1000.0))
+        self.assertIsNone(_calculate_scale_out_tp(80000.0, "WAIT", 0.0))
+
+        # build_history_record 集成测试
+        pkgs = [{"name": "BTC", "instId": "BTC-USDT-SWAP", "atr": 1000.0, "precision": 2}]
+        std_cache = {
+            "BTC-USDT-SWAP": {
+                "decision": {
+                    "action": "BUY_LONG",
+                    "confidence": 88,
+                    "entry_price": 80000.0,
+                    "stop_loss_price": 79000.0,
+                    "take_profit_price": 85000.0,
+                    "risk_reward_ratio": 5.0,
+                    "summary_reason": "4H结构突破做多",
+                },
+                "data_quality": {"status": "ok"},
+            }
+        }
+        rec = build_history_record(
+            time_str="2026-09-20 10:00:00",
+            policy_version="v8.1.1",
+            policy_hash="test_hash",
+            policy_snapshot={},
+            policy_summary="",
+            macro_summary="情绪健康",
+            council_status={"ran": True},
+            ai_last_prompt="",
+            pos_mgmt_list=[],
+            council_transcript=None,
+            packages=pkgs,
+            standard_cache=std_cache,
+        )
+        self.assertEqual(len(rec["top_opportunities"]), 1)
+        opp = rec["top_opportunities"][0]
+        self.assertEqual(opp["scale_out_tp"], 81200.0)
+        self.assertEqual(opp["take_profit_price"], 85000.0)
+
 
 if __name__ == "__main__":
     unittest.main()

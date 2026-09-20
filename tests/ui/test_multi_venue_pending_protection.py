@@ -143,6 +143,17 @@ class PendingOrderProtectionDisplayTest(unittest.TestCase):
         self.assertEqual(rows[0]["sl_px"], "77060")
         self.assertEqual(rows[0]["tp_px"], "81000")
 
+    def test_signed_size_normalized_to_unsigned_sz(self):
+        """Gate 等交易所原生 size 为负数时，看板挂单 sz 必须归一为正数（绝对值），绝不泄露负号。"""
+        ad = _FakeAdapter(
+            open_orders=[{"contract": "BTC_USDT", "side": "sell", "price": 80620.0, "size": -173}],
+            algos=[],
+        )
+        rows = self._run(ad)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["sz"], "173", "挂单 sz 必须取绝对值正数，绝不能带负号 -173")
+        self.assertEqual(rows[0]["side"], "sell")
+
 
 if __name__ == "__main__":
     unittest.main()

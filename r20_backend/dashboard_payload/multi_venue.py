@@ -181,7 +181,12 @@ def collect_cross_venue_positions(positions, pending_orders_list,
                             pass
                     vo_is_long = vo_side_raw in ("buy", "long")
                     vo_px_float = float(vo.get("price", 0) or 0)
-                    vo_sz = str(vo.get("size", "--"))
+                    _raw_sz = vo.get("size") if vo.get("size") is not None else vo.get("amount")
+                    try:
+                        _sz_num = float(_raw_sz or 0)
+                        vo_sz = f"{abs(_sz_num):g}" if _sz_num != 0 else str(_raw_sz if _raw_sz is not None else "--")
+                    except (TypeError, ValueError):
+                        vo_sz = str(_raw_sz if _raw_sz is not None else "--")
                     vo_ord_id = str(vo.get("order_id") or vo.get("orderId") or vo.get("id") or "")
                     
                     _created_ts = vo.get("create_time") or vo.get("time") or vo.get("cTime") or 0

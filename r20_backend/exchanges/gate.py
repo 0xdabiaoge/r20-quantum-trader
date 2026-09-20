@@ -389,7 +389,8 @@ class GateAdapter(BaseExchangeAdapter):
 
     def place_order(self, symbol: str, side: str, contracts: float,
                     price: Optional[float] = None, tif: str = "gtc",
-                    text: str = "", amount: Optional[str] = None) -> Dict[str, Any]:
+                    text: str = "", amount: Optional[str] = None,
+                    reduce_only: bool = False) -> Dict[str, Any]:
         """contracts 为正张数；side long→+、short→−（Gate 带符号张数语义）。
 
         US-004：amount 为十进制张数字符串（正数，方向仍由 side 决定）——仅当
@@ -405,6 +406,8 @@ class GateAdapter(BaseExchangeAdapter):
             "tif": "ioc" if price is None else tif,
             "text": text or f"t-r20{int(time.time() * 1000) % 100000000}",
         }
+        if reduce_only:
+            order["reduce_only"] = True
         if amount is not None and str(amount).strip() != "":
             amt = Decimal(str(amount).strip())
             if amt <= 0:
@@ -451,6 +454,13 @@ class GateAdapter(BaseExchangeAdapter):
         item.setdefault("side", side)
         item.setdefault("base", base)
         item.setdefault("reduce_only", bool(o.get("is_reduce_only") or o.get("is_close")))
+        item["size_signed"] = sz_val
+        item["size"] = abs(sz_val)
+        if "amount" in item and item["amount"] is not None:
+            try:
+                item["amount"] = str(abs(Decimal(str(item["amount"]))))
+            except Exception:
+                pass
         return item
 
     def open_orders(self) -> List[Dict[str, Any]]:
@@ -589,6 +599,19 @@ class GateAdapter(BaseExchangeAdapter):
 
     def cancel_price_order(self, order_id: Any) -> Any:
         return self.signed_request("DELETE", f"/api/v4/futures/usdt/price_orders/{order_id}")
+
+    def cancel_protective_orders(self, symbol: str) -> List[Any]:
+        """撤销指定合约的全部活跃价格触发保护单（TP/SL）。"""
+        orders = self.list_protective_orders(symbol)
+        results = []
+        for o in (orders or []):
+            oid = (o or {}).get("id")
+            if oid:
+                try:
+                    results.append(self.cancel_price_order(oid))
+                except Exception as exc:
+                    print(f"[Gate] 取消触发单 {oid} 失败: {exc}")
+        return results
 
     def amend_price_order(self, order_id: Any, *, trigger_price: Optional[str] = None,
                           price_type: Optional[int] = None, size: Optional[int] = None,
