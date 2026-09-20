@@ -525,6 +525,9 @@ class ConfigEffectMatrixTests(_Base):
         "R20_SCALE_OUT_ENABLED": ("scripts/trader/scale_out.py", "SCALE_OUT_ENABLED"),
         "R20_SCALE_OUT_RATIO": ("scripts/trader/scale_out.py", "SCALE_OUT_RATIO"),
         "R20_SCALE_OUT_TRIGGER_ATR": ("scripts/trader/scale_out.py", "SCALE_OUT_TRIGGER_ATR"),
+        "R20_MAX_RISK_REWARD": ("scripts/risk_constants.py", "MAX_RISK_REWARD_RATIO"),
+        "R20_STOP_LOSS_ATR_MULT": ("scripts/risk_constants.py", "STOP_LOSS_ATR_MULT"),
+        "R20_MAX_TAKE_PROFIT_ATR": ("scripts/risk_constants.py", "MAX_TAKE_PROFIT_ATR"),
     }
 
     def test_every_knob_has_an_enforcer(self):

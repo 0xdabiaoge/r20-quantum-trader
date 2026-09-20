@@ -155,6 +155,24 @@ def open_protected_position(decision: Dict[str, Any], *,
         fail_factory=_fail)
     if _exposure_fail is not None:
         return _exposure_fail
+
+    # 止盈宽度平滑收窄：防止 AI 规划过远天际线挂单无法落袋（受最大 R:R 与 ATR 跨度上限约束）
+    try:
+        from scripts.trader.brackets import clamp_take_profit_width
+        _prec = len(str(entry).split(".")[1]) if "." in str(entry) else 2
+        _ctx_atr = float(decision.get("atr") or decision.get("atr_1h") or 0.0)
+        tp = clamp_take_profit_width(
+            is_long=(action == "BUY_LONG"),
+            limit_px=entry,
+            sl_px=sl,
+            tp_px=tp,
+            atr=_ctx_atr,
+            prec=_prec,
+        )
+        decision["take_profit_price"] = tp
+    except Exception:
+        pass
+
     ok, reason, rr = validate_quote_geometry_and_rr(action, entry, tp, sl)
     if not ok:
         return _fail("risk_gate", f"物理风控拒绝: {reason}", venue=venue, rr=rr)

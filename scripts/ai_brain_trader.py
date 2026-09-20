@@ -645,8 +645,9 @@ def build_risk_budget_text(usdt_available: float = None) -> str:
         # 审计 P3-4：宪法里的"目标 R:R ≥2.2/2.5"与"置信度 78%~88%"是硬编码，
         # 与可配的硬底线/门禁冲突（稳健套件门禁 85 → 78~88 一带整片必拒）。
         # 目标与标定带统一在此派生，宪法只指向本节。
-        f"- 目标盈亏比 R:R: ≥ {max(2.2, float(rc.MIN_RISK_REWARD_RATIO or 0.0)):.1f} "
-        f"(= max(2.2, 硬底线 {rc.MIN_RISK_REWARD_RATIO:.1f})；报价低于硬底线一律被拒)\n"
+        f"- 目标盈亏比 R:R: {max(2.2, float(rc.MIN_RISK_REWARD_RATIO or 0.0)):.1f} ~ {rc.MAX_RISK_REWARD_RATIO:.1f} "
+        f"(上限 {rc.MAX_RISK_REWARD_RATIO:.1f}；低于硬底线一律被拒，超出上限执行层自动平滑收窄钳制，防止止盈过远)\n"
+        f"- 单笔止盈止损宽度: 基准止损 {rc.STOP_LOSS_ATR_MULT:g}x 1H ATR，最大止盈宽度 ≤ {rc.MAX_TAKE_PROFIT_ATR:g}x 1H ATR (超出上限执行层自动平滑收窄至合理波段)\n"
         f"- 置信度标定带: {max(float(rc.MIN_ENTRY_CONFIDENCE or 0.0), 78.0):.0f}% ~ "
         f"{max(float(rc.MIN_ENTRY_CONFIDENCE or 0.0), 78.0) + 8.0:.0f}% "
         f"(下沿=执行层新开仓门禁 {rc.MIN_ENTRY_CONFIDENCE:.0f}%，低于下沿必被物理拦截)\n"

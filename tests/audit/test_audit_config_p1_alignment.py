@@ -125,6 +125,9 @@ class PromptRiskBudgetAlignmentTests(_SandboxBase):
             "R20_SCALE_OUT_ENABLED": "分批止盈机制",
             "R20_SCALE_OUT_RATIO": f"{self.rc.SCALE_OUT_RATIO:.0%}",
             "R20_SCALE_OUT_TRIGGER_ATR": f"{self.rc.SCALE_OUT_TRIGGER_ATR:g}x ATR",
+            "R20_MAX_RISK_REWARD": f"上限 {self.rc.MAX_RISK_REWARD_RATIO:.1f}",
+            "R20_STOP_LOSS_ATR_MULT": f"基准止损 {self.rc.STOP_LOSS_ATR_MULT:g}x 1H ATR",
+            "R20_MAX_TAKE_PROFIT_ATR": f"最大止盈宽度 ≤ {self.rc.MAX_TAKE_PROFIT_ATR:g}x 1H ATR",
         }
         self.assertEqual(set(required), set(self.rc.RISK_ENV_KEYS),
                          f"覆盖表必须覆盖全部 {len(self.rc.RISK_ENV_KEYS)} 个旋钮")

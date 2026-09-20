@@ -274,7 +274,17 @@ def execute_scale_out_if_eligible(
 
     if notify_trade_close:
         try:
-            notify_trade_close(inst=name, pnl=realized_pnl, stage="首批分批止盈50%", exit_px=cur_px)
+            notify_trade_close(
+                inst=name,
+                pnl=realized_pnl,
+                stage="首批分批止盈50%",
+                exit_px=cur_px,
+                side="多" if is_long else "空",
+                entry_px=entry_px,
+                fee=fee_val,
+                venue=pos_venue,
+                is_partial=True,
+            )
         except Exception:
             pass
 
