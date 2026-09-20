@@ -84,6 +84,12 @@ function orderDir(o: any): 'long' | 'short' {
 function symOf(x: { instId?: string; name?: string }): string {
   return x.name || String(x.instId || '').split('-')[0];
 }
+function getTp1(p: any): string | null {
+  if (p?.scaleOutTp) return String(p.scaleOutTp);
+  const desc = String(p?.stageDesc || '');
+  const m = desc.match(/TP1:\s*([0-9.]+)/i);
+  return m ? m[1] : null;
+}
 </script>
 
 <template>
@@ -165,10 +171,18 @@ function symOf(x: { instId?: string; name?: string }): string {
                 >
                   {{ getModeOf(p) }}
                 </span>
+                <span
+                  v-if="(p.scaleOutPhase ?? 0) >= 1"
+                  class="rounded-full px-1.5 py-0.5 text-3xs font-mono font-semibold border text-[var(--up)] border-[var(--up-line)] bg-[var(--up-bg)]"
+                  :title="t('dash.matrix.positions.scaleOutTitle')"
+                >
+                  🎯 {{ t('dash.matrix.positions.scaleOutPill') }}
+                </span>
               </div>
               <p
                 v-if="p.stageDesc"
-                class="text-3xs text-[var(--ink-3)] leading-tight mt-0.5 truncate max-w-[150px]"
+                class="text-3xs leading-tight mt-0.5 truncate max-w-[170px]"
+                :class="(p.scaleOutPhase ?? 0) >= 1 ? 'text-[var(--up)] font-medium' : 'text-[var(--ink-3)]'"
                 :title="p.stageDesc"
               >{{ p.stageDesc }}</p>
             </td>
@@ -186,7 +200,12 @@ function symOf(x: { instId?: string; name?: string }): string {
             </td>
             <td class="col-num font-mono text-3xs">
               <span class="down block">SL {{ fmtPrice(p.exchangeSl ?? p.displayStop) }}</span>
-              <span class="up block">TP {{ fmtPrice(p.exchangeTp ?? p.displayTakeProfit) }}</span>
+              <span v-if="getTp1(p)" class="up block font-medium" :title="p.stageDesc || t('dash.matrix.positions.scaleOutTitle')">
+                TP1 {{ fmtPrice(getTp1(p)) }}
+              </span>
+              <span class="up block" :class="getTp1(p) ? 'text-[var(--ink-2)]' : ''">
+                {{ getTp1(p) ? 'TP2' : 'TP' }} {{ fmtPrice(p.exchangeTp ?? p.displayTakeProfit) }}
+              </span>
             </td>
             <td class="text-center">
               <span

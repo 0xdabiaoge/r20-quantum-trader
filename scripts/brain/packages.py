@@ -25,6 +25,7 @@
 正因如此，本模块**不 import 门面的任何东西**，只在调用期接收依赖。
 """
 import json
+import time
 import urllib.request
 
 from typing import Any, Dict
@@ -84,6 +85,7 @@ def fetch_single_instrument_package(item: Dict[str, Any], *,
     }
 
     # 1. Ticker
+    t_okx0 = time.time()
     try:
         req = urllib.request.Request(f"https://www.okx.com/api/v5/market/ticker?instId={inst_id}", headers=headers)
         with urllib.request.urlopen(req, timeout=3) as resp:
@@ -96,6 +98,7 @@ def fetch_single_instrument_package(item: Dict[str, Any], *,
                 op = float(t.get("open24h", 0) or 0)
                 pkg["chg24h"] = round(((pkg["price"] - op) / op * 100) if op > 0 else 0, 2)
                 pkg["vol24h"] = round(float(t.get("vol24h", 0) or 0), 2)
+                pkg["okx_latency_ms"] = max(1, int(round((time.time() - t_okx0) * 1000)))
     except Exception as exc:
         note_failure("okx_ticker", exc)
 

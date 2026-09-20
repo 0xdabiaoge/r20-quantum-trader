@@ -26,7 +26,7 @@ class EquityHistoryIsolationTests(unittest.TestCase):
         import scripts.okx_runtime as rt
         with patch.object(rt, "current_environment", lambda: env), \
              patch.object(dash, "ROOT", self.root):
-            return dash.equity_history(days=7)
+            return dash.equity_history(days=30)
 
     def test_other_environment_rows_excluded(self):
         out = self._run([

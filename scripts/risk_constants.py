@@ -89,6 +89,14 @@ MIN_SCALE_IN_PROFIT_RATIO = _env_float("R20_MIN_SCALE_IN_PROFIT_RATIO", 0.008)
 # 加仓必须达到的最低 AI 置信度（%）。
 MIN_SCALE_IN_CONFIDENCE = _env_float("R20_MIN_SCALE_IN_CONFIDENCE", 75.0)
 
+# ── 组5 · 持仓退出与分批止盈 ─────────────────────────────────────
+# 是否启用分批平仓止盈机制（1 = 开启，0 = 关闭）。
+SCALE_OUT_ENABLED = bool(_env_int("R20_SCALE_OUT_ENABLED", 1) > 0)
+# 分批平仓比例（默认 0.50 即平仓 50%，锁定本金利润，剩余仓位博大波段）。
+SCALE_OUT_RATIO = _env_float("R20_SCALE_OUT_RATIO", 0.50)
+# 分批平仓触发浮盈门槛（×ATR，达到该门槛时触发分批落袋，默认 1.2x ATR）。
+SCALE_OUT_TRIGGER_ATR = _env_float("R20_SCALE_OUT_TRIGGER_ATR", 1.20)
+
 # 组合风险总预算（USDT，跨所合算的顶层总闸；0 = 不封顶）。
 # 审计⑫(2026-09-13) 注释正名：旧注释承诺「0=自动按持仓上限×单标的封顶派生」，但执行层
 # 从未实现该派生（裸 getenv，0→None→无顶）——派生公式只存在于 dashboard 的 UI 展示，
@@ -127,6 +135,9 @@ DEFAULTS = {
     "R20_MAX_SCALE_IN_COUNT": 1,
     "R20_MIN_SCALE_IN_PROFIT_RATIO": 0.008,
     "R20_MIN_SCALE_IN_CONFIDENCE": 75.0,
+    "R20_SCALE_OUT_ENABLED": 1,
+    "R20_SCALE_OUT_RATIO": 0.50,
+    "R20_SCALE_OUT_TRIGGER_ATR": 1.20,
 }
 
 RISK_ENV_KEYS = tuple(DEFAULTS.keys())

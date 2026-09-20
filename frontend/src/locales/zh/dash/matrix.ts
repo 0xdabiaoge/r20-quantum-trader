@@ -51,6 +51,8 @@ export const zhMatrix = {
     ocoMiss: '未挂',
     ocoMissHint: '交易所侧无止盈止损保护',
     aiManaged: '持仓由 AI 管理',
+    scaleOutPill: '半仓保本',
+    scaleOutTitle: '已分批止盈50%，余仓保本奔跑中',
     detail: '持仓详情',
   },
 

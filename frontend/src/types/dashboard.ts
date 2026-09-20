@@ -45,6 +45,8 @@ export interface PositionItem {
   slTriggerPx?: number | string
   tpTriggerPx?: number | string
   stageDesc?: string
+  scaleOutPhase?: number
+  scaleOutTp?: number | string
   strategyTag?: string
   venue?: string
   environment?: string

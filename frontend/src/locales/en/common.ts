@@ -19,6 +19,8 @@ export const enCommon = {
     search: 'Search',
     filter: 'Filter',
     all: 'All',
+    expandAll: 'Expand All',
+    collapseAll: 'Collapse All',
     retry: 'Retry',
     back: 'Back',
     more: 'More',

@@ -48,6 +48,8 @@ export const enMatrix = {
     ocoMiss: 'Missing',
     ocoMissHint: 'No exchange-side protection',
     aiManaged: 'AI-managed positions',
+    scaleOutPill: 'Half BE',
+    scaleOutTitle: '50% profit locked, remainder at breakeven',
     detail: 'Position detail',
   },
   orders: {

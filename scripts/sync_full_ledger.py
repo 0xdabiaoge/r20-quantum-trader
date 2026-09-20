@@ -192,6 +192,50 @@ def get_ct_val(inst_name):
     _CTVAL_CACHE[inst_id] = ct
     return ct
 
+
+def _resolve_trade_leverage(
+    symbol_or_base: str,
+    venue_symbol_leverage: dict,
+    decisions_cache: dict | None = None,
+) -> int:
+    """解析外所（Binance/Gate）平仓单杠杆：
+    1. 优先从交易所账户读取的各标的实际档位中获取；
+    2. 次选从本地 AI 决策快照中读取该标的当时决策杠杆；
+    3. 再次根据标的分层（Tier-1 / Tier-2）派生杠杆上限；
+    4. 保底回退至系统配置的杠杆基线（彻底消除硬编码 2x 缺陷）。
+    """
+    clean_sym = symbol_or_base.upper().replace("_USDT", "").replace("USDT", "").replace("-SWAP", "")
+    lever = (
+        venue_symbol_leverage.get(symbol_or_base)
+        or venue_symbol_leverage.get(symbol_or_base.upper())
+        or venue_symbol_leverage.get(f"{clean_sym}USDT")
+        or venue_symbol_leverage.get(f"{clean_sym}_USDT")
+        or venue_symbol_leverage.get(clean_sym)
+    )
+    if not lever and decisions_cache:
+        dec_entry = decisions_cache.get(f"{clean_sym}-USDT-SWAP") or decisions_cache.get(clean_sym) or {}
+        dec_lev = dec_entry.get("decision", {}).get("leverage")
+        if dec_lev:
+            try:
+                lever = int(float(dec_lev))
+            except (TypeError, ValueError):
+                pass
+    if not lever:
+        try:
+            from scripts.instrument_pool import evaluate_instrument_tier, derive_instrument_leverage_cap
+            tier = evaluate_instrument_tier(f"{clean_sym}-USDT-SWAP", clean_sym)
+            lever = derive_instrument_leverage_cap(tier)
+        except Exception:
+            pass
+    if not lever or lever <= 0:
+        try:
+            from scripts.risk_constants import MIN_LEVERAGE
+            lever = int(float(os.getenv("R20_MIN_LEVERAGE", "") or MIN_LEVERAGE or 3.0))
+        except Exception:
+            lever = 3
+    return max(1, int(lever))
+
+
 def fetch_binance_closed_trades(environment: str = "demo", tz_bj=None) -> list:
     """拉取币安真实平仓盈亏台账（/fapi/v1/income REALIZED_PNL + /fapi/v1/userTrades）。"""
     if tz_bj is None:
@@ -207,6 +251,33 @@ def fetch_binance_closed_trades(environment: str = "demo", tz_bj=None) -> list:
         income_rows = ad_bn.signed_request("GET", "/fapi/v1/income", params={"incomeType": "REALIZED_PNL", "limit": 100})
         if not income_rows or not isinstance(income_rows, list):
             return []
+
+        # 批量获取币安各标的的当前杠杆档位（/fapi/v2/positionRisk 返回全量 symbol 的 leverage）
+        symbol_leverage_map = {}
+        try:
+            risk_rows = ad_bn.signed_request("GET", "/fapi/v2/positionRisk")
+            if isinstance(risk_rows, list):
+                for pr in risk_rows:
+                    s = str(pr.get("symbol", "")).upper()
+                    lev = pr.get("leverage")
+                    if s and lev is not None:
+                        try:
+                            lev_val = int(float(lev))
+                            if lev_val > 0:
+                                symbol_leverage_map[s] = lev_val
+                        except (TypeError, ValueError):
+                            pass
+        except Exception:
+            pass
+
+        decisions_cache = {}
+        try:
+            dec_path = os.path.join(DATA_DIR, "ai_brain_decisions.json")
+            if os.path.exists(dec_path):
+                with open(dec_path, "r", encoding="utf-8") as f:
+                    decisions_cache = json.load(f)
+        except Exception:
+            pass
 
         symbols = sorted(set(r.get("symbol", "") for r in income_rows if r.get("symbol")))
         user_trades_by_id = {}
@@ -232,7 +303,7 @@ def fetch_binance_closed_trades(environment: str = "demo", tz_bj=None) -> list:
             close_px = float(matched.get("price", 0) or 0)
             sz = float(matched.get("qty", 0) or 0)
             fee = round(abs(float(matched.get("commission", 0) or 0)), 4)
-            lever = 2
+            lever = _resolve_trade_leverage(symbol, symbol_leverage_map, decisions_cache)
             margin = round(sz * close_px / lever, 2) if (sz > 0 and close_px > 0) else 50.0
             net_pnl = round(pnl - fee, 2)
             roi_pct = round((pnl / max(1.0, margin)) * 100, 2)
@@ -240,7 +311,7 @@ def fetch_binance_closed_trades(environment: str = "demo", tz_bj=None) -> list:
             # 尝试附加开仓数理快照（自进化复盘可观测性）
             bn_snap = None
             try:
-                calc_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "calculus_snapshot.json")
+                calc_path = os.path.join(DATA_DIR, "calculus_snapshot.json")
                 if os.path.exists(calc_path):
                     with open(calc_path, "r", encoding="utf-8") as cf:
                         c_data = json.load(cf)
@@ -254,7 +325,7 @@ def fetch_binance_closed_trades(environment: str = "demo", tz_bj=None) -> list:
                                     "atr": 0.0,
                                     "calculus": item.get("calculus", {})
                                 }
-                                bn_snap = build_signal_snapshot(f_mock, data_dir=os.path.dirname(calc_path))
+                                bn_snap = build_signal_snapshot(f_mock, data_dir=DATA_DIR)
                                 break
             except Exception:
                 pass
@@ -307,6 +378,33 @@ def fetch_gate_closed_trades(environment: str = "sandbox", tz_bj=None) -> list:
         if not close_rows or not isinstance(close_rows, list):
             return []
 
+        # 批量获取 Gate 各标的的当前杠杆档位 (/api/v4/futures/usdt/positions)
+        gate_leverage_by_contract = {}
+        try:
+            gt_positions = ad_gate.signed_request("GET", "/api/v4/futures/usdt/positions")
+            if isinstance(gt_positions, list):
+                for gp in gt_positions:
+                    c = str(gp.get("contract", "")).upper()
+                    lev = gp.get("leverage")
+                    if c and lev is not None:
+                        try:
+                            lev_val = int(float(lev))
+                            if lev_val > 0:
+                                gate_leverage_by_contract[c] = lev_val
+                        except (TypeError, ValueError):
+                            pass
+        except Exception:
+            pass
+
+        decisions_cache = {}
+        try:
+            dec_path = os.path.join(DATA_DIR, "ai_brain_decisions.json")
+            if os.path.exists(dec_path):
+                with open(dec_path, "r", encoding="utf-8") as f:
+                    decisions_cache = json.load(f)
+        except Exception:
+            pass
+
         for r in close_rows:
             close_id = str(r.get("id") or "")
             contract = str(r.get("contract", "")).upper()
@@ -323,14 +421,14 @@ def fetch_gate_closed_trades(environment: str = "sandbox", tz_bj=None) -> list:
             open_px = float(r.get("long_price") or r.get("short_price") or 0)
             close_px = float(r.get("short_price") if side == "多" else r.get("long_price") or 0)
             sz = abs(float(r.get("accum_size", 0) or 0))
-            lever = 2
+            lever = _resolve_trade_leverage(contract, gate_leverage_by_contract, decisions_cache)
             margin = round(sz * (open_px or close_px) / lever, 2) if sz > 0 else 50.0
             roi_pct = round((net_pnl / max(1.0, margin)) * 100, 2)
 
             # 尝试附加开仓数理快照（自进化复盘可观测性）
             gt_snap = None
             try:
-                calc_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "calculus_snapshot.json")
+                calc_path = os.path.join(DATA_DIR, "calculus_snapshot.json")
                 if os.path.exists(calc_path):
                     with open(calc_path, "r", encoding="utf-8") as cf:
                         c_data = json.load(cf)
@@ -344,7 +442,7 @@ def fetch_gate_closed_trades(environment: str = "sandbox", tz_bj=None) -> list:
                                     "atr": 0.0,
                                     "calculus": item.get("calculus", {})
                                 }
-                                gt_snap = build_signal_snapshot(f_mock, data_dir=os.path.dirname(calc_path))
+                                gt_snap = build_signal_snapshot(f_mock, data_dir=DATA_DIR)
                                 break
             except Exception:
                 pass
@@ -536,7 +634,8 @@ def _holding_row(p, venue, *, env, trackers, tz_bj, allowed, council_by_inst):
         "roi_pct": roi_pct,
         "duration": duration_str,
         "status": "holding",
-        "exit_reason": "⏳ 运行监控中",
+        "exit_reason": t_info.get("stage_desc") or ("🎯 半仓保本奔跑中" if t_info.get("scale_out_phase", 0) >= 1 else "⏳ 运行监控中"),
+        "scale_out_phase": int(t_info.get("scale_out_phase", 0) or 0),
         "council": council_by_inst.get(inst),
         "signal_snapshot": t_info.get("signal_snapshot"),
     }

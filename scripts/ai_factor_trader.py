@@ -893,6 +893,22 @@ def sync_cloud_algo_stop(inst_id: str, pos_side: str, new_sl: float, reason: str
 
 def manage_position_tp_and_trailing(f, curr_pos, trackers, timestamp_full, executed_actions):
     """壳（第八十九刀搬至 `scripts/trader/position_exit.py`，调用期同名注入）。"""
+    try:
+        from scripts.trader.scale_out import execute_scale_out_if_eligible
+        execute_scale_out_if_eligible(
+            f, curr_pos, trackers, timestamp_full, executed_actions,
+            okx_rest=okx_rest,
+            venue_registry=venue_registry,
+            record_trade=record_trade,
+            notify_trade_close=notify_trade_close,
+            close_fee=_close_fee,
+            close_trade_payload=_close_trade_payload,
+            TAKER_FEE_RATE=TAKER_FEE_RATE,
+            ensure_cloud_position_protection=ensure_cloud_position_protection,
+        )
+    except Exception as _so_err:
+        print(f"[Scale-Out] 分批止盈判定跳过: {_so_err}")
+
     return _position_exit_manage(
         f, curr_pos, trackers, timestamp_full, executed_actions,
         _float_or_zero=_float_or_zero,

@@ -268,6 +268,89 @@ class LedgerRestMigrationTests(unittest.TestCase):
             self.assertNotIn("subprocess", texts[name], f"{name} 应零 subprocess")
         self.assertNotIn("run_json_cmd", texts["sync_web_data.py"])
 
+    # ---------- 外所（Binance / Gate）平仓台账杠杆动态解析 ----------
+    def test_resolve_trade_leverage_priority(self):
+        # 1. 优先取交易所实际档位
+        self.assertEqual(sfl._resolve_trade_leverage("BTCUSDT", {"BTCUSDT": 5}, {}), 5)
+        self.assertEqual(sfl._resolve_trade_leverage("BTC_USDT", {"BTC_USDT": 4}, {}), 4)
+
+        # 2. 次选取本地 AI 决策快照
+        dec_cache = {"BTC-USDT-SWAP": {"decision": {"leverage": 6}}}
+        self.assertEqual(sfl._resolve_trade_leverage("BTCUSDT", {}, dec_cache), 6)
+
+        # 3. 再次按标的分层派生（Tier-1 蓝筹 BTC）
+        lev = sfl._resolve_trade_leverage("BTCUSDT", {}, {})
+        self.assertGreaterEqual(lev, 2)
+        self.assertNotEqual(sfl._resolve_trade_leverage("BTCUSDT", {"BTCUSDT": 7}, {}), 2, "不能写死2x")
+
+    def test_binance_closed_trades_dynamic_leverage(self):
+        fake_income = [{
+            "tradeId": "t101",
+            "time": 1757000000000,
+            "income": "25.0",
+            "symbol": "BTCUSDT",
+        }]
+        fake_trades = [{
+            "id": "t101",
+            "side": "SELL",
+            "price": "60000.0",
+            "qty": "0.1",
+            "commission": "0.05",
+        }]
+        fake_risk = [{"symbol": "BTCUSDT", "leverage": "5"}]
+
+        class MockBinanceAdapter:
+            def signed_request(self, method, path, params=None):
+                if path == "/fapi/v1/income":
+                    return fake_income
+                if path == "/fapi/v1/userTrades":
+                    return fake_trades
+                if path == "/fapi/v2/positionRisk":
+                    return fake_risk
+                return []
+
+        with patch("r20_backend.exchanges.venue_credentials", return_value=("key", "secret")), \
+             patch("r20_backend.exchanges.get_adapter", return_value=MockBinanceAdapter()):
+            rows = sfl.fetch_binance_closed_trades(environment="demo")
+
+        self.assertEqual(len(rows), 1)
+        row = rows[0]
+        self.assertEqual(row["lever"], "5x", "币安平仓台账必须动态解析为 5x，绝不能写死 2x")
+        # 0.1 * 60000 / 5 = 1200.0
+        self.assertEqual(row["margin"], 1200.0)
+
+    def test_gate_closed_trades_dynamic_leverage(self):
+        fake_close = [{
+            "id": "g201",
+            "contract": "BTC_USDT",
+            "pnl": "30.0",
+            "pnl_pnl": "30.0",
+            "fee": "0.03",
+            "time": 1757000000,
+            "long_price": "60000.0",
+            "short_price": "61000.0",
+            "accum_size": "0.1",
+        }]
+        fake_positions = [{"contract": "BTC_USDT", "leverage": "4"}]
+
+        class MockGateAdapter:
+            def signed_request(self, method, path, params=None):
+                if path == "/api/v4/futures/usdt/position_close":
+                    return fake_close
+                if path == "/api/v4/futures/usdt/positions":
+                    return fake_positions
+                return []
+
+        with patch("r20_backend.exchanges.venue_credentials", return_value=("key", "secret")), \
+             patch("r20_backend.exchanges.get_adapter", return_value=MockGateAdapter()):
+            rows = sfl.fetch_gate_closed_trades(environment="demo")
+
+        self.assertEqual(len(rows), 1)
+        row = rows[0]
+        self.assertEqual(row["lever"], "4x", "Gate 平仓台账必须动态解析为 4x，绝不能写死 2x")
+        # 0.1 * 60000 / 4 = 1500.0
+        self.assertEqual(row["margin"], 1500.0)
+
 
 if __name__ == "__main__":
     unittest.main()

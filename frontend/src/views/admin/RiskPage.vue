@@ -32,8 +32,9 @@ import { useDashboardStore } from '../../stores/dashboard';
 import PageHeader from '../../components/admin/PageHeader.vue';
 import DangerZone from '../../components/admin/page-parts/DangerZone.vue';
 import BaseEmpty from '../../components/base/BaseEmpty.vue';
+import BaseSwitch from '../../components/base/BaseSwitch.vue';
 import { ShieldAlert, Save, RotateCcw, Loader2, Info, Layers,
-  Target, Flame, TrendingUp, RefreshCw, AlertTriangle } from 'lucide-vue-next';
+  Target, Flame, TrendingUp, RefreshCw, AlertTriangle, ChevronDown, ChevronRight } from 'lucide-vue-next';
 import BaseLoadingAnnounce from '../../components/base/BaseLoadingAnnounce.vue';
 
 const { api } = useApi();
@@ -86,6 +87,7 @@ async function applySuite(s: any) {
 
 const groupIcons: Record<string, any> = {
   exposure: Layers,
+  exit_strategy: Target,
   per_trade: Target,
   stop_loss: Flame,
   pyramiding: TrendingUp,
@@ -183,6 +185,12 @@ const engineFacts = computed(() => {
     { label: t('admin.risk.engineMaxPositions'), value: e.max_positions == null ? '--' : `${e.max_positions} / ${e.max_same_direction}` },
     { label: t('admin.risk.engineTargetRR'), value: `≥ ${e.target_rr}` },
     { label: t('admin.risk.engineConfBand'), value: `${(e.confidence_band || []).join('% ~ ')}%` },
+    {
+      label: '分批止盈口径',
+      value: e.scale_out_enabled
+        ? `${Math.round((e.scale_out_ratio || 0.5) * 100)}% · ${e.scale_out_trigger_atr || 1.2}x ATR`
+        : '已禁用',
+    },
     { label: t('admin.risk.engineEquityUsed'), value: e.usdt_available_used == null ? t('admin.risk.engineEquityUnknown') : `${e.usdt_available_used}${U}` },
   ]
 })
@@ -190,6 +198,67 @@ const engineFacts = computed(() => {
 const driftLabels = computed(() =>
   driftCount.value.map((k) => schema.value?.params.find((x: any) => x.key === k)?.label || k),
 )
+
+/** 置顶核心锁利出场策略：将 exit_strategy 提升至第 2 组（紧随仓位敞口），首屏直达 */
+const orderedGroups = computed(() => {
+  if (!schema.value?.groups) return [];
+  const list = [...schema.value.groups];
+  const exitIdx = list.findIndex((g: any) => g.id === 'exit_strategy');
+  if (exitIdx > -1) {
+    const [exitG] = list.splice(exitIdx, 1);
+    const expIdx = list.findIndex((g: any) => g.id === 'exposure');
+    list.splice(expIdx + 1, 0, exitG);
+  }
+  return list;
+});
+
+/** 分组手风琴折叠状态：默认仅展开核心组（仓位与出场），其余紧凑收拢为单行摘要，极大缩短页面长度 */
+const expandedGroups = ref<Record<string, boolean>>({
+  exposure: true,
+  exit_strategy: true,
+  per_trade: false,
+  stop_loss: false,
+  pyramiding: false,
+});
+
+const isAllExpanded = computed(() =>
+  orderedGroups.value.every((g: any) => expandedGroups.value[g.id] !== false),
+);
+
+function toggleAllGroups() {
+  const target = !isAllExpanded.value;
+  for (const g of orderedGroups.value) {
+    expandedGroups.value[g.id] = target;
+  }
+}
+
+function groupSummary(groupId: string): string {
+  if (groupId === 'exit_strategy') {
+    return draft.R20_SCALE_OUT_ENABLED ? `已开启 · ${Math.round((draft.R20_SCALE_OUT_RATIO || 0.5) * 100)}% · ${draft.R20_SCALE_OUT_TRIGGER_ATR || 1.2}x ATR` : '已禁用';
+  }
+  if (groupId === 'exposure') {
+    const levMin = draft.R20_MIN_LEVERAGE || 2;
+    const levMax = draft.R20_MAX_LEVERAGE || 5;
+    return `杠杆 ${levMin}~${levMax}x · 单笔 ${Math.round((draft.R20_MAX_MARGIN_EQUITY_RATIO || 0.2) * 100)}%`;
+  }
+  if (groupId === 'per_trade') {
+    return `R:R ≥ ${(draft.R20_MIN_RISK_REWARD || 2.0).toFixed(1)} · 置信度 ≥ ${draft.R20_MIN_ENTRY_CONFIDENCE || 80}%`;
+  }
+  if (groupId === 'stop_loss') {
+    return `日亏 ${Math.round((draft.R20_DAILY_LOSS_EQUITY_RATIO || 0.05) * 100)}% · 最长持仓 ${draft.R20_TIME_STOP_HOURS || 8}h · 冷静 ${draft.R20_STOP_COOLDOWN_MINUTES || 30}m`;
+  }
+  if (groupId === 'pyramiding') {
+    return (draft.R20_MAX_SCALE_IN_COUNT || 0) > 0 ? `允许加仓 ${draft.R20_MAX_SCALE_IN_COUNT} 次` : '已禁用加仓';
+  }
+  return '';
+}
+
+function groupHasDirty(groupId: string): boolean {
+  return dirtyKeys.value.some((key: string) => {
+    const p = schema.value?.params.find((x: any) => x.key === key);
+    return p && p.group === groupId;
+  });
+}
 
 async function saveChanges() {
   if (!dirtyKeys.value.length) return
@@ -374,19 +443,50 @@ onMounted(loadData)
 
       <!-- 风控参数 -->
       <section class="card">
-        <header class="card-head">
-          <h2 class="card-title"><ShieldAlert :size="14" />{{ t('admin.risk.paramsTitle') }}</h2>
-          <span class="badge mono">{{ schema.params.length }}</span>
+        <header class="card-head flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <h2 class="card-title"><ShieldAlert :size="14" />{{ t('admin.risk.paramsTitle') }}</h2>
+            <span class="badge mono">{{ schema.params.length }}</span>
+          </div>
+          <button
+            type="button"
+            class="btn btn-quiet btn-sm font-mono text-3xs"
+            @click="toggleAllGroups"
+          >
+            {{ isAllExpanded ? t('common.collapseAll') : t('common.expandAll') }}
+          </button>
         </header>
 
-        <div v-for="group in schema.groups" :key="group.id" class="rk-group">
-          <header class="rk-group-head">
+        <div v-for="group in orderedGroups" :key="group.id" class="rk-group">
+          <header
+            class="rk-group-head cursor-pointer select-none transition-colors hover:bg-[var(--surface-3)]"
+            role="button"
+            tabindex="0"
+            :aria-expanded="expandedGroups[group.id] !== false"
+            :aria-controls="'risk-group-' + group.id"
+            @click="expandedGroups[group.id] = !expandedGroups[group.id]"
+            @keydown.enter.prevent="expandedGroups[group.id] = !expandedGroups[group.id]"
+            @keydown.space.prevent="expandedGroups[group.id] = !expandedGroups[group.id]"
+          >
             <component :is="groupIcons[group.id] || ShieldAlert" :size="14" />
-            <div class="rk-group-text">
-              <span class="rk-group-name">{{ group.label }}</span>
+            <div class="rk-group-text flex-1">
+              <div class="flex items-center gap-2">
+                <span class="rk-group-name">{{ group.label }}</span>
+                <span v-if="groupHasDirty(group.id)" class="badge badge-warn text-3xs">{{ t('admin.risk.customized') }}</span>
+                <span v-if="!expandedGroups[group.id]" class="text-3xs font-mono text-[var(--ink-3)] bg-[var(--surface-2)] px-1.5 py-0.5 rounded border border-[var(--line-1)]">
+                  {{ groupSummary(group.id) }}
+                </span>
+              </div>
               <span class="rk-group-desc">{{ group.desc }}</span>
             </div>
+            <component
+              :is="expandedGroups[group.id] ? ChevronDown : ChevronRight"
+              :size="14"
+              class="text-[var(--ink-3)] transition-transform shrink-0"
+            />
           </header>
+
+          <div :id="'risk-group-' + group.id" v-show="expandedGroups[group.id] !== false">
 
           <!-- 杠杆区间合并行 -->
           <div v-if="group.id === 'exposure' && levMinP && levMaxP" class="rk-row">
@@ -455,7 +555,20 @@ onMounted(loadData)
             </div>
 
             <div class="rk-row-ctl">
-              <div class="rk-input-group focus-ring">
+              <div v-if="p.key === 'R20_SCALE_OUT_ENABLED'" class="flex items-center gap-3">
+                <span class="text-xs font-mono font-medium" :style="{ color: draft[p.key] ? 'var(--up)' : 'var(--ink-3)' }">
+                  {{ draft[p.key] ? '已开启' : '已关闭' }}
+                </span>
+                <BaseSwitch
+                  :model-value="Boolean(draft[p.key])"
+                  :aria-label="p.label"
+                  @update:model-value="(val: boolean) => {
+                    draft[p.key] = val ? 1 : 0;
+                    disp[p.key] = val ? '1' : '0';
+                  }"
+                />
+              </div>
+              <div v-else class="rk-input-group focus-ring">
                 <input
                   v-model="disp[p.key]"
                   type="number"
@@ -480,6 +593,7 @@ onMounted(loadData)
                 <RotateCcw :size="13" />
               </button>
             </div>
+          </div>
           </div>
         </div>
       </section>

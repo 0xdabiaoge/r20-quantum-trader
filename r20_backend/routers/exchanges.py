@@ -216,6 +216,8 @@ def admin_multi_exchange_status(x_r20_admin_token: str | None = Header(default=N
             "execution_open": execution_open(v),
         }
 
+    from scripts.okx_runtime import current_environment
+    okx_env = current_environment()
     okx_live_ak, okx_live_sk = _read_creds("okx", "live")
     okx_demo_ak, okx_demo_sk = _read_creds("okx", "demo")
     try:
@@ -245,6 +247,19 @@ def admin_multi_exchange_status(x_r20_admin_token: str | None = Header(default=N
             health = json.loads(health_path.read_text(encoding="utf-8"))
     except Exception:
         health = {}
+
+    # 保证 OKX 健康度与延迟展示（与 Binance / Gate 对齐）
+    if "venues" in health and "okx" in health["venues"]:
+        okx_h = health["venues"]["okx"]
+        okx_h["testnet"] = bool(okx_env.simulated)
+        if not okx_h.get("avg_ms"):
+            try:
+                from r20_backend.exchanges.diagnostics import diagnose_venue_connection
+                diag = diagnose_venue_connection("okx", "demo" if okx_env.simulated else "live", timeout=2.5)
+                if diag.get("latency_ms"):
+                    okx_h["avg_ms"] = diag["latency_ms"]
+            except Exception:
+                pass
 
     from r20_backend.exchanges import routing_policy
     pref = routing_policy.load_preferred_venue()
@@ -299,6 +314,13 @@ def admin_multi_exchange_update(payload: MultiExchangeUpdate,
             raise HTTPException(status_code=400,
                                 detail="变更执行开关确认短语必须精确为：OPEN BINANCE EXECUTION")
         env_values["R20_BINANCE_EXECUTION"] = "1" if payload.binance_execution else "0"
+    if payload.okx_execution is not None:
+        if payload.confirmation.strip().upper() != "OPEN OKX EXECUTION":
+            raise HTTPException(status_code=400,
+                                detail="变更执行开关确认短语必须精确为：OPEN OKX EXECUTION")
+        env_values["R20_OKX_EXECUTION"] = "1" if payload.okx_execution else "0"
+    if payload.okx_environment is not None:
+        env_values["R20_OKX_ENV"] = "demo" if payload.okx_environment.lower() == "demo" else "live"
     if env_values:
         fn_update_env(env_values)
     fn_refresh_settings()

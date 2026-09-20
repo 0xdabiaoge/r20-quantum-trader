@@ -39,7 +39,7 @@ import { useApi } from '../../composables/useApi'
 import { useAuthStore } from '../../stores/auth'
 import { fmtDateTime } from '../../utils/format'
 import {
-  deriveOkxLinked, deriveMxHealthChips, deriveGateExecDirty,
+  deriveOkxLinked, deriveMxHealthChips, deriveGateExecDirty, deriveBinanceExecDirty,
   venueStatus, envTextOf, okxEnvText as okxEnvTextOf, envBadge,
 } from './securityLogic'
 import VenueCredentialCard from '../../components/admin/page-parts/VenueCredentialCard.vue'
@@ -124,6 +124,10 @@ const preferredVenue = ref('auto')
 const routingMode = ref('auto')
 const gateExec = ref(false)
 const gateExecPhrase = ref('')
+const binanceExec = ref(false)
+const binanceExecPhrase = ref('')
+const okxCredViewLive = ref(false)
+const venueLatencies = ref<Record<string, number>>({})
 const savingMx = ref(false)
 const savingOkx = ref(false)
 const savingVenue = ref<'binance' | 'gate' | ''>('')
@@ -332,6 +336,14 @@ async function loadMx() {
       mxTestnet.value.binance = !!mx.value.venues.binance?.testnet
       mxTestnet.value.gate = !!mx.value.venues.gate?.testnet
       gateExec.value = !!mx.value.venues.gate?.execution_open
+      binanceExec.value = !!mx.value.venues.binance?.execution_open
+    }
+    if (mx.value?.health?.venues) {
+      for (const [k, v] of Object.entries(mx.value.health.venues as Record<string, any>)) {
+        if (v?.avg_ms) {
+          venueLatencies.value[k] = v.avg_ms
+        }
+      }
     }
     if (mx.value?.preferred_venue) {
       preferredVenue.value = mx.value.preferred_venue
@@ -383,6 +395,10 @@ async function probeVenue(venue: 'binance' | 'gate' | 'okx') {
       body: JSON.stringify(payload),
     })
 
+    if (res?.latency_ms) {
+      venueLatencies.value[venue] = res.latency_ms
+    }
+
     if (res?.ok) {
       toast.ok(res.message || t('admin.security.toastProbeOk', undefined, { venue: venue.toUpperCase() }))
     } else {
@@ -413,7 +429,7 @@ async function saveRouting() {
   }
 }
 
-/** 逐所保存凭证与档位：只提交本所键位，留空即不改；Gate 另承载执行总闸。 */
+/** 逐所保存凭证与档位：只提交本所键位，留空即不改；Gate / Binance 承载执行总闸。 */
 async function saveVenue(venue: 'binance' | 'gate') {
   savingVenue.value = venue
   try {
@@ -424,6 +440,10 @@ async function saveVenue(venue: 'binance' | 'gate') {
       const s = mxForm.value.binance_secret_key.trim()
       if (k) body.binance_api_key = k
       if (s) body.binance_secret_key = s
+      if (binanceExecDirty.value) {
+        body.binance_execution = binanceExec.value
+        body.confirmation = binanceExecPhrase.value.trim()
+      }
     } else {
       body.gate_testnet = mxTestnet.value.gate
       const k = mxForm.value.gate_api_key.trim()
@@ -437,7 +457,7 @@ async function saveVenue(venue: 'binance' | 'gate') {
     }
     await api('/api/v1/admin/multi-exchange', { method: 'PUT', body: JSON.stringify(body) })
     toast.ok(t('admin.security.toastVenueSaved', undefined, { venue: venue === 'binance' ? 'Binance' : 'Gate' }))
-    if (venue === 'binance') { mxForm.value.binance_api_key = ''; mxForm.value.binance_secret_key = '' }
+    if (venue === 'binance') { mxForm.value.binance_api_key = ''; mxForm.value.binance_secret_key = ''; binanceExecPhrase.value = '' }
     else { mxForm.value.gate_api_key = ''; mxForm.value.gate_secret_key = ''; gateExecPhrase.value = '' }
     await loadMx()
   } catch (e: any) {
@@ -453,6 +473,7 @@ async function saveVenue(venue: 'binance' | 'gate') {
 const okxLinked = computed(() => deriveOkxLinked(runtime.value))
 const mxHealthChips = computed(() => deriveMxHealthChips(mx.value))
 const gateExecDirty = computed(() => deriveGateExecDirty(gateExec.value, mx.value))
+const binanceExecDirty = computed(() => deriveBinanceExecDirty(binanceExec.value, mx.value))
 
 const binanceStatus = computed(() => venueStatus('binance', mx.value, t))
 const gateStatus = computed(() => venueStatus('gate', mx.value, t))
@@ -460,6 +481,32 @@ const gateStatus = computed(() => venueStatus('gate', mx.value, t))
 const okxEnvText = computed(() => okxEnvTextOf(config.value?.editable?.okx_environment, t))
 const binanceEnvText = computed(() => envTextOf('binance', t('admin.security.envDemoBinance'), mx.value, mxTestnet.value, t))
 const gateEnvText = computed(() => envTextOf('gate', t('admin.security.envDemoGate'), mx.value, mxTestnet.value, t))
+
+const okxTestnetSwitch = computed({
+  get: () => config.value?.editable?.okx_environment !== 'live',
+  set: async (val: boolean) => {
+    if (!config.value?.editable) return
+    if (!val) {
+      const _ok = await ask({
+        title: t('admin.security.confirmLiveTitle'),
+        desc: t('admin.security.confirmLiveDesc'),
+        detail: t('admin.security.confirmLiveDetail'),
+        danger: true,
+        confirmPhrase: 'LIVE',
+        okText: t('common.switchLive'),
+      })
+      if (!_ok) {
+        toast.warn(t('admin.security.warnNotConfirmed'))
+        return
+      }
+      config.value.editable.okx_environment = 'live'
+      okxCredViewLive.value = true
+    } else {
+      config.value.editable.okx_environment = 'demo'
+      okxCredViewLive.value = false
+    }
+  }
+})
 
 const TABS = computed<Array<{ key: TabKey; label: string; icon: any }>>(() => [
   { key: 'venues', label: t('admin.security.tabVenues'), icon: Route },
@@ -663,31 +710,49 @@ onMounted(() => { loadAll(); loadMx() })
               :env-text="okxEnvText" :env-label="t('admin.security.fundEnv')"
             >
               <template #env>
-                <label class="field-stack">
-                  <span class="form-label">{{ t('admin.security.envTier') }}</span>
-                  <select v-model="config.editable.okx_environment" class="field" :aria-label="t('admin.security.envTier')">
-                    <option value="demo">{{ t('admin.security.optDemo') }}</option>
-                    <option value="live">{{ t('admin.security.optLive') }}</option>
-                  </select>
-                </label>
+                <div class="field-stack">
+                  <span class="form-label">{{ t('admin.security.endpointTier') }}</span>
+                  <label class="sc-check">
+                    <BaseSwitch v-model="okxTestnetSwitch" :label="t('admin.security.okxDemoDomain')" />
+                    <span>{{ t('admin.security.okxDemoDomain') }}</span>
+                  </label>
+                </div>
               </template>
 
               <div class="sc-creds">
-                <span class="form-label">{{ t('admin.security.liveTrio') }}</span>
-                <input v-model="keys.live_key" type="password" :placeholder="t('admin.security.apiKeyKeep')" class="field" :aria-label="t('admin.security.liveKeyAria')" />
-                <input v-model="keys.live_secret" type="password" :placeholder="t('admin.security.phSecretKey')" class="field" :aria-label="t('admin.security.liveSecretAria')" />
-                <input v-model="keys.live_pass" type="password" :placeholder="t('admin.security.phPassphrase')" class="field" :aria-label="t('admin.security.livePassAria')" />
-              </div>
+                <div class="sc-creds-bar">
+                  <span class="form-label">
+                    {{ (okxCredViewLive ? t('admin.security.liveTrio') : t('admin.security.demoTrio')) }}
+                  </span>
+                  <button
+                    type="button"
+                    class="btn btn-quiet btn-sm"
+                    @click="okxCredViewLive = !okxCredViewLive"
+                  >
+                    {{ okxCredViewLive ? t('admin.security.viewDemoCred') : t('admin.security.viewLiveCred') }}
+                  </button>
+                </div>
 
-              <div class="sc-creds">
-                <span class="form-label">{{ t('admin.security.demoTrio') }}</span>
-                <input v-model="keys.demo_key" type="password" :placeholder="t('admin.security.apiKeyKeep')" class="field" :aria-label="t('admin.security.demoKeyAria')" />
-                <input v-model="keys.demo_secret" type="password" :placeholder="t('admin.security.phSecretKey')" class="field" :aria-label="t('admin.security.demoSecretAria')" />
-                <input v-model="keys.demo_pass" type="password" :placeholder="t('admin.security.phPassphrase')" class="field" :aria-label="t('admin.security.demoPassAria')" />
+                <div v-show="!okxCredViewLive" class="sc-creds-group">
+                  <input v-model="keys.demo_key" type="password" :placeholder="t('admin.security.apiKeyKeep')" class="field" :aria-label="t('admin.security.demoKeyAria')" />
+                  <input v-model="keys.demo_secret" type="password" :placeholder="t('admin.security.phSecretKey')" class="field" :aria-label="t('admin.security.demoSecretAria')" />
+                  <input v-model="keys.demo_pass" type="password" :placeholder="t('admin.security.phPassphrase')" class="field" :aria-label="t('admin.security.demoPassAria')" />
+                </div>
+                <div v-show="okxCredViewLive" class="sc-creds-group">
+                  <input v-model="keys.live_key" type="password" :placeholder="t('admin.security.apiKeyKeep')" class="field" :aria-label="t('admin.security.liveKeyAria')" />
+                  <input v-model="keys.live_secret" type="password" :placeholder="t('admin.security.phSecretKey')" class="field" :aria-label="t('admin.security.liveSecretAria')" />
+                  <input v-model="keys.live_pass" type="password" :placeholder="t('admin.security.phPassphrase')" class="field" :aria-label="t('admin.security.livePassAria')" />
+                </div>
               </div>
 
               <template #extra>
                 <p class="sc-hint"><AlertTriangle :size="11" />{{ t('admin.security.liveConfirmNote') }}</p>
+              </template>
+              <template #footer-left>
+                <span v-if="venueLatencies.okx" class="sc-latency mono num">
+                  <Radar :size="12" />
+                  <span>{{ venueLatencies.okx }}ms</span>
+                </span>
               </template>
               <template #probe>
                 <button type="button" class="btn btn-quiet btn-sm" :disabled="probingVenue === 'okx'" @click="probeVenue('okx')">
@@ -727,7 +792,29 @@ onMounted(() => { loadAll(); loadMx() })
               </div>
 
               <template #extra>
+                <div class="sc-gate">
+                  <label class="sc-check" :class="{ 'is-danger': binanceExec }">
+                    <BaseSwitch v-model="binanceExec" :label="t('admin.security.binanceMaster')" />
+                    <span>
+                      {{ t('admin.security.binanceMaster') }}
+                      <b>{{ mx?.venues?.binance?.execution_open ? t('admin.security.binanceMasterOpen') : t('admin.security.binanceMasterClosed') }}</b>
+                    </span>
+                  </label>
+                  <input
+                    v-if="binanceExecDirty && binanceExec"
+                    v-model="binanceExecPhrase"
+                    :aria-label="t('admin.security.binanceExecPhraseAria')"
+                    :placeholder="t('admin.security.binancePhrasePlaceholder')"
+                    class="field mono"
+                  />
+                </div>
                 <p class="sc-hint">{{ t('admin.security.binanceExtra') }}</p>
+              </template>
+              <template #footer-left>
+                <span v-if="venueLatencies.binance" class="sc-latency mono num">
+                  <Radar :size="12" />
+                  <span>{{ venueLatencies.binance }}ms</span>
+                </span>
               </template>
               <template #probe>
                 <button type="button" class="btn btn-quiet btn-sm" :disabled="probingVenue !== '' && probingVenue !== 'binance'" @click="probeVenue('binance')">
@@ -784,6 +871,12 @@ onMounted(() => { loadAll(); loadMx() })
                   />
                 </div>
                 <p class="sc-hint">{{ t('admin.security.gateExtra') }}</p>
+              </template>
+              <template #footer-left>
+                <span v-if="venueLatencies.gate" class="sc-latency mono num">
+                  <Radar :size="12" />
+                  <span>{{ venueLatencies.gate }}ms</span>
+                </span>
               </template>
               <template #probe>
                 <button type="button" class="btn btn-quiet btn-sm" :disabled="probingVenue !== '' && probingVenue !== 'gate'" @click="probeVenue('gate')">
@@ -1230,6 +1323,24 @@ onMounted(() => { loadAll(); loadMx() })
   display: flex;
   flex-direction: column;
   gap:6px;
+}
+.sc-creds-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.sc-creds-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sc-latency {
+  font-size: var(--text-3xs);
+  color: var(--ds-color-text-secondary);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 .sc-check {
   display: flex;

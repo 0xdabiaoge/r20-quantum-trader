@@ -74,6 +74,17 @@ const router = createRouter({
   },
 })
 
+router.onError((error) => {
+  if (/Failed to fetch dynamically imported module|Importing a module script failed/i.test(error?.message || '')) {
+    const key = 'r20_chunk_reload_lock'
+    const lastReload = parseInt(sessionStorage.getItem(key) || '0', 10)
+    if (Date.now() - lastReload > 10000) {
+      sessionStorage.setItem(key, String(Date.now()))
+      window.location.reload()
+    }
+  }
+})
+
 router.beforeEach(async (to) => {
   const auth = useAuthStore()
   if (to.meta.requiresAuth && !auth.isAuthenticated) {

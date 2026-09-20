@@ -78,8 +78,18 @@ export function deriveGateExecDirty(gateExec: boolean, mx: MxLike | null | undef
   return gateExec !== !!mx?.venues?.gate?.execution_open
 }
 
+/** Binance 执行闸开关是否有未保存改动。 */
+export function deriveBinanceExecDirty(binanceExec: boolean, mx: MxLike | null | undefined): boolean {
+  return binanceExec !== !!mx?.venues?.binance?.execution_open
+}
+
+/** OKX 执行闸开关是否有未保存改动。 */
+export function deriveOkxExecDirty(okxExec: boolean, mx: MxLike | null | undefined): boolean {
+  return okxExec !== !!mx?.venues?.okx?.execution_open
+}
+
 /** 三所状态徽章：**未知一律 warn，不升级为已就绪**。 */
-export function venueStatus(venue: 'binance' | 'gate', mx: MxLike | null | undefined, t: TFn): { text: string; tone: VenueTone } {
+export function venueStatus(venue: 'binance' | 'gate' | 'okx', mx: MxLike | null | undefined, t: TFn): { text: string; tone: VenueTone } {
   const v = mx?.venues?.[venue]
   if (!v) return { text: t('admin.security.statusUnknown'), tone: 'warn' }
   return v.has_api_key

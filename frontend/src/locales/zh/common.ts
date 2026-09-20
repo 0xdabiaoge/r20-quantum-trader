@@ -20,6 +20,8 @@ export const zhCommon = {
     search: '搜索',
     filter: '筛选',
     all: '全部',
+    expandAll: '全部展开',
+    collapseAll: '全部折叠',
     retry: '重试',
     back: '返回',
     more: '更多',

@@ -122,6 +122,9 @@ class PromptRiskBudgetAlignmentTests(_SandboxBase):
             "R20_MIN_SCALE_IN_PROFIT_RATIO": f"{self.rc.MIN_SCALE_IN_PROFIT_RATIO:.1%}",
             "R20_MIN_SCALE_IN_CONFIDENCE": f"{self.rc.MIN_SCALE_IN_CONFIDENCE:g}%",
             "R20_MAX_TOTAL_EXPOSURE_USDT": "跨所同向敞口上限",
+            "R20_SCALE_OUT_ENABLED": "分批止盈机制",
+            "R20_SCALE_OUT_RATIO": f"{self.rc.SCALE_OUT_RATIO:.0%}",
+            "R20_SCALE_OUT_TRIGGER_ATR": f"{self.rc.SCALE_OUT_TRIGGER_ATR:g}x ATR",
         }
         self.assertEqual(set(required), set(self.rc.RISK_ENV_KEYS),
                          f"覆盖表必须覆盖全部 {len(self.rc.RISK_ENV_KEYS)} 个旋钮")

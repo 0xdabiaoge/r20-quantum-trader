@@ -656,6 +656,11 @@ def build_risk_budget_text(usdt_available: float = None) -> str:
             if rc.MAX_SCALE_IN_COUNT <= 0 else
             f"- 金字塔加仓门禁: 最多 {rc.MAX_SCALE_IN_COUNT} 次 · 底仓浮盈 ≥ {rc.MIN_SCALE_IN_PROFIT_RATIO:.1%} 且已保本 · 置信度 ≥ {rc.MIN_SCALE_IN_CONFIDENCE:g}%\n"
         )
+        + (
+            f"- 分批止盈机制: 【已启用】(底仓浮盈达到 {rc.SCALE_OUT_TRIGGER_ATR:g}x ATR 时，执行层自动市价平仓 {rc.SCALE_OUT_RATIO:.0%} 锁定现金利润并提损保本；模型可让剩余仓位充分奔跑博取大波段)\n"
+            if rc.SCALE_OUT_ENABLED else
+            "- 分批止盈机制: 【已禁用】(全仓奔跑至目标止盈位或触发动态追踪止损)\n"
+        )
         + f"- 止损后同标的冷静期: {rc.STOP_COOLDOWN_MINUTES} 分钟"
     )
     if _eq < 200.0:

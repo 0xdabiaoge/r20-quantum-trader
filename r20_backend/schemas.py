@@ -52,6 +52,8 @@ class MultiExchangeUpdate(BaseModel):
     gate_testnet: bool | None = None
     gate_execution: bool | None = None   # R20_GATE_EXECUTION 总开关
     binance_execution: bool | None = None  # R20_BINANCE_EXECUTION 总开关
+    okx_execution: bool | None = None      # R20_OKX_EXECUTION 总开关
+    okx_environment: str | None = None     # OKX 资金环境：demo|live
     preferred_venue: str | None = None  # 全局路由首选：okx|binance|gate|auto
     routing_mode: str | None = None     # 选所路由模式：auto|balanced|split
     confirmation: str = ""               # 变更执行开关必须精确确认短语

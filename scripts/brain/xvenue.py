@@ -86,10 +86,22 @@ def _xv_flush_health(packages: List[Dict[str, Any]], *, health, safe_float,
                             "failed": dict(v.get("failed", {}))}
                         for k, v in health.items()}
         okx_ok = [p["name"] for p in packages if safe_float(p.get("price", 0)) > 0]
+        okx_latencies = {p["name"]: int(p["okx_latency_ms"]) for p in packages if p.get("okx_latency_ms")}
+        okx_avg = round(sum(okx_latencies.values()) / len(okx_latencies)) if okx_latencies else 0
+        try:
+            from scripts.okx_runtime import current_environment
+            okx_testnet = bool(current_environment().simulated)
+        except Exception:
+            okx_testnet = str(os.environ.get("R20_OKX_ENV", "demo")).lower() == "demo"
         venues = {
-            "okx": {"ok": okx_ok, "failed": {p["name"]: "ticker/price unavailable" for p in packages
-                                              if safe_float(p.get("price", 0)) <= 0},
-                    "latency_ms": {}, "testnet": False},
+            "okx": {
+                "ok": okx_ok,
+                "failed": {p["name"]: "ticker/price unavailable" for p in packages
+                           if safe_float(p.get("price", 0)) <= 0},
+                "latency_ms": okx_latencies,
+                "avg_ms": okx_avg,
+                "testnet": okx_testnet,
+            },
         }
         for venue, v in snapshot.items():
             failed = v["failed"]

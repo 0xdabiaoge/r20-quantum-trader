@@ -522,6 +522,9 @@ class ConfigEffectMatrixTests(_Base):
         "R20_MAX_SCALE_IN_COUNT": ("scripts/risk_constants.py", "MAX_SCALE_IN_COUNT"),
         "R20_MIN_SCALE_IN_PROFIT_RATIO": ("scripts/risk_constants.py", "MIN_SCALE_IN_PROFIT_RATIO"),
         "R20_MIN_SCALE_IN_CONFIDENCE": ("scripts/risk_constants.py", "MIN_SCALE_IN_CONFIDENCE"),
+        "R20_SCALE_OUT_ENABLED": ("scripts/trader/scale_out.py", "SCALE_OUT_ENABLED"),
+        "R20_SCALE_OUT_RATIO": ("scripts/trader/scale_out.py", "SCALE_OUT_RATIO"),
+        "R20_SCALE_OUT_TRIGGER_ATR": ("scripts/trader/scale_out.py", "SCALE_OUT_TRIGGER_ATR"),
     }
 
     def test_every_knob_has_an_enforcer(self):
@@ -546,6 +549,7 @@ class ConfigEffectMatrixTests(_Base):
             f"{rc.MIN_RISK_REWARD_RATIO:.1f}", f"{rc.MIN_ENTRY_CONFIDENCE:g}%",
             f"{rc.MAX_DAILY_LOSS_USDT:g}", f"{rc.MAX_SAME_DIRECTION_POSITIONS}", f"{rc.TIME_STOP_HOURS:g}",
             f"{rc.STOP_COOLDOWN_MINUTES}", f"{rc.MIN_SCALE_IN_CONFIDENCE:g}%",
+            f"{rc.SCALE_OUT_TRIGGER_ATR:g}x ATR",
         ]
         missing = [v for v in values if v not in text]
         self.assertEqual(missing, [], f"提示词小节缺这些生效值: {missing}")

@@ -14,6 +14,9 @@ from scripts.risk_constants import (
     RISK_ENV_KEYS,
     MIN_ENTRY_CONFIDENCE,
     MIN_RISK_REWARD_RATIO,
+    SCALE_OUT_ENABLED,
+    SCALE_OUT_RATIO,
+    SCALE_OUT_TRIGGER_ATR,
     effective_daily_loss_limit,
     effective_max_positions,
     effective_single_asset_margin,
@@ -27,6 +30,8 @@ _LOADED_AT = time.time()
 GROUPS = [
     {"id": "exposure", "label": "仓位与敞口", "label_en": "Position & Exposure",
      "desc": "控制同时持有多少仓、单边敞口多大、单个标的能吃掉多少保证金。"},
+    {"id": "exit_strategy", "label": "出场与分批止盈", "label_en": "Exit & Scale-Out",
+     "desc": "核心出场锁利机制：分批止盈开关、首批平仓比例、触发门槛（首屏核心风控）。"},
     {"id": "per_trade", "label": "单笔风险门禁", "label_en": "Per-Trade Risk Gates",
      "desc": "每一笔开仓在下单前必须通过的最低质量门槛。"},
     {"id": "stop_loss", "label": "止损与熔断", "label_en": "Stops & Circuit Breaker",
@@ -122,6 +127,19 @@ _PARAMS: list[dict[str, Any]] = [
      "label": "加仓最低 AI 置信度", "label_en": "Min Scale-In Confidence",
      "desc": "金字塔加仓需要达到的 AI 置信度门槛，通常应高于新开仓门禁。",
      "type": "float", "min": 0.0, "max": 100.0, "step": 1.0, "unit": "%", "display_scale": 1},
+    # ── 组5 出场与分批止盈 ──
+    {"key": "R20_SCALE_OUT_ENABLED", "group": "exit_strategy",
+     "label": "启用分批止盈 (Scale-Out)", "label_en": "Enable Scale-Out",
+     "desc": "开启后，当浮盈达到触发门槛时，执行层自动市价平仓指定比例锁定现金利润，并同步将剩余仓位推进至成本保本位（1=开启，0=关闭）。",
+     "type": "int", "min": 0, "max": 1, "step": 1, "unit": "", "display_scale": 1},
+    {"key": "R20_SCALE_OUT_RATIO", "group": "exit_strategy",
+     "label": "首批平仓止盈比例", "label_en": "Scale-Out Close Ratio",
+     "desc": "第一目标达成时市价落袋的仓位百分比，默认 50%（平一半、留一半博大单边）。",
+     "type": "float", "min": 0.1, "max": 0.9, "step": 0.05, "unit": "%", "display_scale": 100},
+    {"key": "R20_SCALE_OUT_TRIGGER_ATR", "group": "exit_strategy",
+     "label": "分批止盈触发门槛", "label_en": "Scale-Out Trigger Threshold",
+     "desc": "持仓浮盈达到该倍数 × 1H ATR 时启动分批平仓（通常为 1.0~1.5x ATR）。",
+     "type": "float", "min": 0.5, "max": 5.0, "step": 0.1, "unit": "× ATR", "display_scale": 1},
 ]
 
 _INDEX = {p["key"]: p for p in _PARAMS}
@@ -141,6 +159,7 @@ SUITES: list[dict[str, Any]] = [
          "R20_TIME_STOP_HOURS": 12.0, "R20_TIME_STOP_ATR_BAND": 0.10, "R20_STOP_COOLDOWN_MINUTES": 90,
          "R20_MAX_SCALE_IN_COUNT": 0, "R20_MIN_SCALE_IN_PROFIT_RATIO": 0.012, "R20_MIN_SCALE_IN_CONFIDENCE": 85.0,
          "R20_MAX_TOTAL_EXPOSURE_USDT": 600.0,
+         "R20_SCALE_OUT_ENABLED": 1, "R20_SCALE_OUT_RATIO": 0.50, "R20_SCALE_OUT_TRIGGER_ATR": 1.00,
      }},
     {"id": "balanced", "name": "⚖️ 均衡波段", "tagline": "推荐默认 · 攻守兼备",
      "desc": "系统出厂基线：同向 3 仓防共振踩踏、单笔保证金 20% 硬顶、2% 单笔风险、R:R 底线 2.0、"
@@ -159,6 +178,7 @@ SUITES: list[dict[str, Any]] = [
          "R20_TIME_STOP_HOURS": 16.0, "R20_TIME_STOP_ATR_BAND": 0.20, "R20_STOP_COOLDOWN_MINUTES": 30,
          "R20_MAX_SCALE_IN_COUNT": 2, "R20_MIN_SCALE_IN_PROFIT_RATIO": 0.006, "R20_MIN_SCALE_IN_CONFIDENCE": 70.0,
          "R20_MAX_TOTAL_EXPOSURE_USDT": 3000.0,
+         "R20_SCALE_OUT_ENABLED": 1, "R20_SCALE_OUT_RATIO": 0.40, "R20_SCALE_OUT_TRIGGER_ATR": 1.50,
      }},
 ]
 
@@ -276,6 +296,9 @@ def process_values() -> dict[str, float | int]:
         "R20_MAX_SCALE_IN_COUNT": rc.MAX_SCALE_IN_COUNT,
         "R20_MIN_SCALE_IN_PROFIT_RATIO": rc.MIN_SCALE_IN_PROFIT_RATIO,
         "R20_MIN_SCALE_IN_CONFIDENCE": rc.MIN_SCALE_IN_CONFIDENCE,
+        "R20_SCALE_OUT_ENABLED": 1 if rc.SCALE_OUT_ENABLED else 0,
+        "R20_SCALE_OUT_RATIO": rc.SCALE_OUT_RATIO,
+        "R20_SCALE_OUT_TRIGGER_ATR": rc.SCALE_OUT_TRIGGER_ATR,
     }
     return {key: mapping.get(key, DEFAULTS.get(key, 0)) for key in RISK_ENV_KEYS}
 
@@ -342,6 +365,9 @@ def effective_engine_values(usdt_available: float | None = None,
         "target_rr": round(max(2.2, float(MIN_RISK_REWARD_RATIO or 0.0)), 2),
         "confidence_band": [max(float(MIN_ENTRY_CONFIDENCE or 0.0), 78.0),
                             max(float(MIN_ENTRY_CONFIDENCE or 0.0), 78.0) + 8.0],
+        "scale_out_enabled": bool(SCALE_OUT_ENABLED),
+        "scale_out_ratio": float(SCALE_OUT_RATIO),
+        "scale_out_trigger_atr": float(SCALE_OUT_TRIGGER_ATR),
         "usdt_available_used": usdt_available,
     }
 
